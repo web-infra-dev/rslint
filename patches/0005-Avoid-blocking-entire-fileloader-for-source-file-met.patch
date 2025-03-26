@@ -1,0 +1,120 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: auvred <aauvred@gmail.com>
+Date: Wed, 26 Mar 2025 16:04:28 +0300
+Subject: [PATCH] Avoid blocking entire fileloader for source file metadatas
+
+
+diff --git a/internal/compiler/fileloader.go b/internal/compiler/fileloader.go
+index 62e4f71c2..5836e49b9 100644
+--- a/internal/compiler/fileloader.go
++++ b/internal/compiler/fileloader.go
+@@ -23,8 +23,6 @@ type fileLoader struct {
+ 	resolvedModulesMutex sync.Mutex
+ 	resolvedModules      map[tspath.Path]module.ModeAwareCache[*module.ResolvedModule]
+ 
+-	sourceFileMetaDatasMutex sync.RWMutex
+-	sourceFileMetaDatas      map[tspath.Path]*ast.SourceFileMetaData
+ 
+ 	mu                      sync.Mutex
+ 	wg                      core.WorkGroup
+@@ -70,16 +68,18 @@ func processAllProgramFiles(
+ 	loader.wg.RunAndWait()
+ 
+ 	files, libFiles := []*ast.SourceFile{}, []*ast.SourceFile{}
++	sourceFileMetaDatas = map[tspath.Path]*ast.SourceFileMetaData{}
+ 	for task := range loader.collectTasks(loader.rootTasks) {
+ 		if task.isLib {
+ 			libFiles = append(libFiles, task.file)
+ 		} else {
+ 			files = append(files, task.file)
+ 		}
++		sourceFileMetaDatas[tspath.ToPath(task.normalizedFilePath, host.GetCurrentDirectory(), host.FS().UseCaseSensitiveFileNames())] = task.metadata
+ 	}
+ 	loader.sortLibs(libFiles)
+ 
+-	return append(libFiles, files...), loader.resolvedModules, loader.sourceFileMetaDatas
++	return append(libFiles, files...), loader.resolvedModules, sourceFileMetaDatas
+ }
+ 
+ func (p *fileLoader) addRootTasks(files []string, isLib bool) {
+@@ -182,13 +182,14 @@ func (p *fileLoader) getDefaultLibFilePriority(a *ast.SourceFile) int {
+ type parseTask struct {
+ 	normalizedFilePath string
+ 	file               *ast.SourceFile
++	metadata           *ast.SourceFileMetaData
+ 	isLib              bool
+ 	subTasks           []*parseTask
+ }
+ 
+ func (t *parseTask) start(loader *fileLoader) {
+ 	loader.wg.Queue(func() {
+-		file := loader.parseSourceFile(t.normalizedFilePath)
++		file, metadata := loader.parseSourceFile(t.normalizedFilePath)
+ 
+ 		// !!! if noResolve, skip all of this
+ 		t.subTasks = make([]*parseTask, 0, len(file.ReferencedFiles)+len(file.Imports)+len(file.ModuleAugmentations))
+@@ -220,38 +221,25 @@ func (t *parseTask) start(loader *fileLoader) {
+ 		}
+ 
+ 		t.file = file
++		t.metadata = metadata
+ 		loader.startTasks(t.subTasks)
+ 	})
+ }
+ 
+-func (p *fileLoader) loadSourceFileMetaData(path tspath.Path) {
+-	p.sourceFileMetaDatasMutex.RLock()
+-	_, ok := p.sourceFileMetaDatas[path]
+-	p.sourceFileMetaDatasMutex.RUnlock()
+-	if ok {
+-		return
+-	}
+-
++func (p *fileLoader) loadSourceFileMetaData(path tspath.Path) *ast.SourceFileMetaData {
+ 	packageJsonType := p.resolver.GetPackageJsonTypeIfApplicable(string(path))
+ 	impliedNodeFormat := ast.GetImpliedNodeFormatForFile(string(path), packageJsonType)
+-	metadata := &ast.SourceFileMetaData{
++	return &ast.SourceFileMetaData{
+ 		PackageJsonType:   packageJsonType,
+ 		ImpliedNodeFormat: impliedNodeFormat,
+ 	}
+-
+-	p.sourceFileMetaDatasMutex.Lock()
+-	defer p.sourceFileMetaDatasMutex.Unlock()
+-	if p.sourceFileMetaDatas == nil {
+-		p.sourceFileMetaDatas = make(map[tspath.Path]*ast.SourceFileMetaData)
+-	}
+-	p.sourceFileMetaDatas[path] = metadata
+ }
+ 
+-func (p *fileLoader) parseSourceFile(fileName string) *ast.SourceFile {
++func (p *fileLoader) parseSourceFile(fileName string) (*ast.SourceFile, *ast.SourceFileMetaData) {
+ 	path := tspath.ToPath(fileName, p.host.GetCurrentDirectory(), p.host.FS().UseCaseSensitiveFileNames())
+ 	sourceFile := p.host.GetSourceFile(fileName, path, p.compilerOptions.GetEmitScriptTarget())
+-	p.loadSourceFileMetaData(path)
+-	return sourceFile
++	metadata := p.loadSourceFileMetaData(path)
++	return sourceFile, metadata
+ }
+ 
+ func (t *parseTask) addSubTask(fileName string, isLib bool) {
+diff --git a/internal/compiler/packagejson/cache.go b/internal/compiler/packagejson/cache.go
+index 6c93fc99c..9ba138572 100644
+--- a/internal/compiler/packagejson/cache.go
++++ b/internal/compiler/packagejson/cache.go
+@@ -128,6 +128,7 @@ func NewInfoCache(currentDirectory string, useCaseSensitiveFileNames bool) *Info
+ }
+ 
+ func (p *InfoCache) Get(packageJsonPath string) *InfoCacheEntry {
++	return nil
+ 	p.mu.RLock()
+ 	defer p.mu.RUnlock()
+ 	key := tspath.ToPath(packageJsonPath, p.currentDirectory, p.useCaseSensitiveFileNames)
+@@ -139,6 +140,7 @@ func (p *InfoCache) Get(packageJsonPath string) *InfoCacheEntry {
+ }
+ 
+ func (p *InfoCache) Set(packageJsonPath string, info *InfoCacheEntry) {
++	return
+ 	p.mu.Lock()
+ 	defer p.mu.Unlock()
+ 	key := tspath.ToPath(packageJsonPath, p.currentDirectory, p.useCaseSensitiveFileNames)

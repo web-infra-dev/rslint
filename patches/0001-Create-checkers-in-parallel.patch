@@ -1,0 +1,25 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: auvred <aauvred@gmail.com>
+Date: Wed, 26 Mar 2025 15:07:21 +0300
+Subject: [PATCH] Create checkers in parallel
+
+
+diff --git a/internal/compiler/program.go b/internal/compiler/program.go
+index 9e9443d04..47df8bf02 100644
+--- a/internal/compiler/program.go
++++ b/internal/compiler/program.go
+@@ -215,9 +215,13 @@ func (p *Program) CheckSourceFiles() {
+ func (p *Program) createCheckers() {
+ 	p.checkersOnce.Do(func() {
+ 		p.checkers = make([]*checker.Checker, core.IfElse(p.programOptions.SingleThreaded, 1, 4))
++		wg := core.NewWorkGroup(p.programOptions.SingleThreaded)
+ 		for i := range p.checkers {
+-			p.checkers[i] = checker.NewChecker(p)
++			wg.Queue(func() {
++				p.checkers[i] = checker.NewChecker(p)
++			})
+ 		}
++		wg.RunAndWait()
+ 		p.checkersByFile = make(map[*ast.SourceFile]*checker.Checker)
+ 		for i, file := range p.files {
+ 			p.checkersByFile[file] = p.checkers[i%len(p.checkers)]
