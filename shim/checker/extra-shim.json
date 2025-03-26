@@ -1,0 +1,39 @@
+{
+  "ExtraFunctions": [
+    "isTupleType",
+    "isNonDeferredTypeReference"
+  ],
+  "ExtraMethods": {
+    "Checker": [
+      "getBaseConstraintOfType",
+      "getDeclaredTypeOfSymbol",
+      "getBaseTypes",
+      "getSignaturesOfType",
+      "getApparentType",
+      "getIndexTypeOfType",
+      "getPropertyOfType",
+      "getSignaturesOfType",
+      "getPropertyNameForKnownSymbolName",
+      "getTypeFromTypeNode",
+      "getAccessedPropertyName",
+      "isArrayOrTupleType",
+      "isArrayType",
+      "getTypeArguments",
+      "getContextualType",
+      "getAwaitedType"
+    ]
+  },
+  "ExtraFields": {
+    "Type": [
+      "alias",
+      "flags",
+      "symbol"
+    ],
+    "Signature": [
+      "parameters"
+    ],
+    "Checker": [
+      "numberType"
+    ]
+  }
+}

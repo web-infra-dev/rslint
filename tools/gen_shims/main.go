@@ -11,6 +11,7 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"go/format"
 
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
@@ -22,6 +23,7 @@ const tsgoInternalPrefix = "github.com/microsoft/typescript-go/internal/"
 type ExtraShim struct {
 	ExtraFunctions []string
 	ExtraMethods map[string]([]string)
+	ExtraFields map[string]([]string)
 }
 
 func main() {
@@ -43,19 +45,10 @@ func main() {
 		packagesToShimFullNames[i] = tsgoInternalPrefix + pkg
 	}
 
-	// var astFileToSource sync.Map
-
 	packages, err := packages.Load(&packages.Config{
+		// TODO: path relative to repo root
 		Dir: "./shim/compiler",
-		Mode: packages.LoadSyntax | packages.NeedModule,
-		// ParseFile: func(fset *token.FileSet, filename string, src []byte) (*ast.File, error) {
-		// 	ast, err := parser.ParseFile(fset, filename, src, parser.ParseComments | parser.AllErrors)
-		// 	if err != nil {
-		// 		return ast, err
-		// 	}
-		// 	astFileToSource.Store(ast, src)
-		// 	return ast, err
-		// },
+		Mode: packages.LoadSyntax,
 	}, packagesToShimFullNames...)
 	if err != nil {
 		log.Fatalf("Error loading package: %v", err)
@@ -144,6 +137,10 @@ func main() {
 				matchedExtraMethods[name][method] = false
 			}
 		}
+		matchedExtraFields := make(map[string]bool, len(extraShim.ExtraFields))
+		for name := range extraShim.ExtraFields {
+			matchedExtraFields[name] = false
+		}
 
 		scope := pkg.Types.Scope()
 		for _, name := range scope.Names() {
@@ -203,14 +200,14 @@ func main() {
 					printReexport("type")
 				}
 
-				if extraMethods, ok := matchedExtraMethods[typeName.Name()]; isNamed && ok {
+				if extraMethods, ok := matchedExtraMethods[name]; isNamed && ok {
 					for method := range named.Methods() {
 						methodName := method.Name()
 						if _, exists := extraMethods[methodName]; !exists {
 							continue
 						}
 						extraMethods[methodName] = true
-						prefix := typeName.Name() + "_"
+						prefix := name + "_"
 						emitGoLinknameDirective(prefix + methodName, method)
 						funcDeclStr := types.ObjectString(method, qualifierOnlyPackageName)
 						recvStart := 0
@@ -240,6 +237,57 @@ func main() {
 						}
 						shimBuilder.WriteString(funcDeclStr[paramsStart:])
 						shimBuilder.WriteString("\n")
+					}
+				}
+
+				if _, ok := matchedExtraFields[name]; isNamed && ok {
+					importPackage("unsafe", true)
+
+					matchedExtraFields[name] = true
+					structBody, err := format.Source([]byte(types.TypeString(named.Underlying(), qualifierOnlyPackageName)))
+					if err != nil {
+						log.Fatalf("error formatting %v struct body: %v", name, err)
+					}
+					mirrorStructName := "extra_" + name
+					shimBuilder.WriteString("type ")
+					shimBuilder.WriteString(mirrorStructName)
+					shimBuilder.WriteByte(' ')
+					shimBuilder.Write(structBody)
+					shimBuilder.WriteByte('\n')
+
+					strct, ok := named.Underlying().(*types.Struct)
+					if !ok {
+						log.Fatalf("expected %v to be struct", name)
+					}
+
+					mappedFieldTypes := make(map[string]*types.Var, strct.NumFields())
+					for field := range strct.Fields() {
+						mappedFieldTypes[field.Name()] = field
+					}
+
+					for _, field := range extraShim.ExtraFields[name] {
+						shimBuilder.WriteString("func ")
+						shimBuilder.WriteString(name)
+						shimBuilder.WriteByte('_')
+						shimBuilder.WriteString(field)
+						shimBuilder.WriteString("(v *")
+						shimBuilder.WriteString(pkg.Name)
+						shimBuilder.WriteByte('.')
+						shimBuilder.WriteString(name)
+						shimBuilder.WriteString(") ")
+
+						fieldVar, ok := mappedFieldTypes[field]
+						if !ok {
+							log.Fatalf("expected struct %q to contain field %q", name, field)
+						}
+						shimBuilder.WriteString(types.TypeString(fieldVar.Type(), qualifierOnlyPackageName))
+						shimBuilder.WriteString(" {\n")
+						shimBuilder.WriteString("  return ((*")
+						shimBuilder.WriteString(mirrorStructName)
+						shimBuilder.WriteString(")(unsafe.Pointer(v))).")
+						shimBuilder.WriteString(field)
+						shimBuilder.WriteString("\n")
+						shimBuilder.WriteString("}\n")
 					}
 				}
 			case *types.Const:
