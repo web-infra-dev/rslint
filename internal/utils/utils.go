@@ -165,3 +165,12 @@ func Every[T any](slice []T, f func(T) bool) bool {
 	}
 	return true
 }
+
+// Source: typescript-go/internal/core/core.go
+func Flatten[T any](array [][]T) []T {
+	var result []T
+	for _, subArray := range array {
+		result = append(result, subArray...)
+	}
+	return result
+}

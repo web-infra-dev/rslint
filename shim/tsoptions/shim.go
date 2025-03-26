@@ -33,8 +33,6 @@ func GetDefaultLibFileName(options *core.CompilerOptions) string
 func GetLibFileName(libName string) (string, bool)
 //go:linkname GetNameMapFromList github.com/microsoft/typescript-go/internal/tsoptions.GetNameMapFromList
 func GetNameMapFromList(optDecls []*tsoptions.CommandLineOption) *tsoptions.NameMap
-//go:linkname GetSupportedExtensions github.com/microsoft/typescript-go/internal/tsoptions.GetSupportedExtensions
-func GetSupportedExtensions(options *core.CompilerOptions, extraFileExtensions []tsoptions.fileExtensionInfo) [][]string
 //go:linkname GetSupportedExtensionsWithJsonIfResolveJsonModule github.com/microsoft/typescript-go/internal/tsoptions.GetSupportedExtensionsWithJsonIfResolveJsonModule
 func GetSupportedExtensionsWithJsonIfResolveJsonModule(options *core.CompilerOptions, supportedExtensions [][]string) [][]string
 var LibFilesSet = tsoptions.LibFilesSet
@@ -51,10 +49,6 @@ func ParseCompilerOptions(key string, value any, allOptions *core.CompilerOption
 //go:linkname ParseConfigFileTextToJson github.com/microsoft/typescript-go/internal/tsoptions.ParseConfigFileTextToJson
 func ParseConfigFileTextToJson(fileName string, path tspath.Path, jsonText string) (any, []*ast.Diagnostic)
 type ParseConfigHost = tsoptions.ParseConfigHost
-//go:linkname ParseJsonConfigFileContent github.com/microsoft/typescript-go/internal/tsoptions.ParseJsonConfigFileContent
-func ParseJsonConfigFileContent(json any, host tsoptions.ParseConfigHost, basePath string, existingOptions *core.CompilerOptions, configFileName string, resolutionStack []tspath.Path, extraFileExtensions []tsoptions.fileExtensionInfo, extendedConfigCache map[tspath.Path]*tsoptions.ExtendedConfigCacheEntry) *tsoptions.ParsedCommandLine
-//go:linkname ParseJsonSourceFileConfigFileContent github.com/microsoft/typescript-go/internal/tsoptions.ParseJsonSourceFileConfigFileContent
-func ParseJsonSourceFileConfigFileContent(sourceFile *tsoptions.TsConfigSourceFile, host tsoptions.ParseConfigHost, basePath string, existingOptions *core.CompilerOptions, configFileName string, resolutionStack []tspath.Path, extraFileExtensions []tsoptions.fileExtensionInfo, extendedConfigCache map[tspath.Path]*tsoptions.ExtendedConfigCacheEntry) *tsoptions.ParsedCommandLine
 //go:linkname ParseListTypeOption github.com/microsoft/typescript-go/internal/tsoptions.ParseListTypeOption
 func ParseListTypeOption(opt *tsoptions.CommandLineOption, value string) ([]string, []*ast.Diagnostic)
 //go:linkname ParseWatchOptions github.com/microsoft/typescript-go/internal/tsoptions.ParseWatchOptions

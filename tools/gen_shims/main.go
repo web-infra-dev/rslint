@@ -11,8 +11,6 @@ import (
 	"path"
 	"slices"
 	"strings"
-	"go/format"
-
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"
 	"golang.org/x/tools/go/packages"
@@ -24,6 +22,7 @@ type ExtraShim struct {
 	ExtraFunctions []string
 	ExtraMethods map[string]([]string)
 	ExtraFields map[string]([]string)
+	IgnoreFunctions []string
 }
 
 func main() {
@@ -69,6 +68,12 @@ func main() {
 		}
 		if extraShim.ExtraFunctions == nil {
 			extraShim.ExtraFunctions = []string{}
+		}
+		if extraShim.ExtraFields == nil {
+			extraShim.ExtraFields = map[string]([]string){}
+		}
+		if extraShim.IgnoreFunctions == nil {
+			extraShim.IgnoreFunctions = []string{}
 		}
 
 		// true if directly used, false otherwise
@@ -244,26 +249,61 @@ func main() {
 					importPackage("unsafe", true)
 
 					matchedExtraFields[name] = true
-					structBody, err := format.Source([]byte(types.TypeString(named.Underlying(), qualifierOnlyPackageName)))
 					if err != nil {
 						log.Fatalf("error formatting %v struct body: %v", name, err)
 					}
 					mirrorStructName := "extra_" + name
-					shimBuilder.WriteString("type ")
-					shimBuilder.WriteString(mirrorStructName)
-					shimBuilder.WriteByte(' ')
-					shimBuilder.Write(structBody)
-					shimBuilder.WriteByte('\n')
+
+					var emitExtraStruct func (name string, s *types.Struct) 
+					emitExtraStruct = func (name string, s *types.Struct) {
+						shimBuilder.WriteString("type extra_")
+						shimBuilder.WriteString(name)
+						shimBuilder.WriteString(" struct {")
+
+						dependencies := [](struct {string; *types.Struct}){}
+						for field := range s.Fields() {
+							shimBuilder.WriteString("\n  ")
+							if !field.Embedded() {
+								shimBuilder.WriteString(field.Name())
+								shimBuilder.WriteByte(' ')
+							}
+
+							ptrType, ok := field.Type().(*types.Pointer)
+							if ok {
+								named, ok := ptrType.Elem().(*types.Named)
+								if ok && !named.Obj().Exported() {
+									strct, ok := named.Underlying().(*types.Struct)
+									if ok {
+										n := named.Obj().Name()
+										dependencies = append(dependencies, struct{string; *types.Struct}{n, strct})
+										shimBuilder.WriteString("extra_")
+										shimBuilder.WriteString(n)
+										continue
+									}
+								}
+							}
+
+							shimBuilder.WriteString(types.TypeString(field.Type(), qualifierOnlyPackageName))
+						}
+						shimBuilder.WriteString("\n}\n")
+
+						for _, dep := range dependencies {
+							emitExtraStruct(dep.string, dep.Struct)
+						}
+					}
 
 					strct, ok := named.Underlying().(*types.Struct)
 					if !ok {
 						log.Fatalf("expected %v to be struct", name)
 					}
 
+					emitExtraStruct(name, strct)
+
 					mappedFieldTypes := make(map[string]*types.Var, strct.NumFields())
 					for field := range strct.Fields() {
 						mappedFieldTypes[field.Name()] = field
 					}
+
 
 					for _, field := range extraShim.ExtraFields[name] {
 						shimBuilder.WriteString("func ")
@@ -295,8 +335,10 @@ func main() {
 			case *types.Var:
 				printReexport("var")
 			case *types.Func:
-				funcType := object.(*types.Func)
-				emitLinkedFunction(funcType)
+				if !slices.Contains(extraShim.IgnoreFunctions, name) {
+					funcType := object.(*types.Func)
+					emitLinkedFunction(funcType)
+				}
 			}
 		}
 

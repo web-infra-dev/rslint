@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/checker"
 )
 
 func TestIsSymbolFromDefaultLibrary(t *testing.T) {
@@ -21,7 +22,8 @@ func TestIsSymbolFromDefaultLibrary(t *testing.T) {
 			t.Fatalf("error creating program: %v", err)
 		}
 		sourceFile := program.GetSourceFile(filePath)
-		return program, program.GetTypeChecker().GetTypeAtLocation(sourceFile.Statements.Nodes[0].AsTypeAliasDeclaration().Name()).Symbol()
+		t := program.GetTypeChecker().GetTypeAtLocation(sourceFile.Statements.Nodes[0].AsTypeAliasDeclaration().Name())
+		return program, checker.Type_symbol(t)
   }
 
 	runTestForAliasDeclaration := func(code string, expected bool) {

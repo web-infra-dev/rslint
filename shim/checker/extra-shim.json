@@ -1,7 +1,8 @@
 {
   "ExtraFunctions": [
     "isTupleType",
-    "isNonDeferredTypeReference"
+    "isNonDeferredTypeReference",
+    "getFunctionFlags"
   ],
   "ExtraMethods": {
     "Checker": [
@@ -20,7 +21,12 @@
       "isArrayType",
       "getTypeArguments",
       "getContextualType",
-      "getAwaitedType"
+      "getAwaitedType",
+      "getTypeOfSymbol",
+      "getReturnTypeOfSignature",
+      "getContextualTypeForArgumentAtIndex",
+      "getResolvedSignature",
+      "getBaseTypeOfLiteralType"
     ]
   },
   "ExtraFields": {
@@ -29,11 +35,15 @@
       "flags",
       "symbol"
     ],
+    "TupleType": [
+      "combinedFlags"
+    ],
     "Signature": [
       "parameters"
     ],
     "Checker": [
-      "numberType"
+      "numberType",
+      "globalRegExpType"
     ]
   }
 }
