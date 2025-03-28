@@ -26,11 +26,20 @@ require (
 	github.com/microsoft/typescript-go/shim/tspath v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/osvfs v0.0.0
+	golang.org/x/tools v0.30.0
+	gotest.tools/v3 v3.5.2
+)
+
+require (
+	github.com/google/go-cmp v0.7.0 // indirect
+	golang.org/x/mod v0.23.0 // indirect
+	golang.org/x/sync v0.12.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
 )
 
 require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/go-json-experiment/json v0.0.0-20250223041408-d3c622f1b874 // indirect
-	github.com/microsoft/typescript-go v0.0.0-20250320211407-c070823a32d8 // indirect
+	github.com/microsoft/typescript-go v0.0.0-20250327222922-f572432311a4 // indirect
 	golang.org/x/text v0.23.0
 )
