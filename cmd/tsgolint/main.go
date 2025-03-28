@@ -23,6 +23,7 @@ import (
 	"none.none/tsgolint/internal/rules/no_redundant_type_constituents"
 	"none.none/tsgolint/internal/rules/no_unnecessary_type_assertion"
 	"none.none/tsgolint/internal/rules/no_unsafe_argument"
+	"none.none/tsgolint/internal/rules/no_unsafe_assignment"
 	"none.none/tsgolint/internal/rules/no_unsafe_call"
 	"none.none/tsgolint/internal/rules/no_unsafe_enum_comparison"
 	"none.none/tsgolint/internal/rules/no_unsafe_member_access"
@@ -98,6 +99,7 @@ func main() {
 			no_redundant_type_constituents.NoRedundantTypeConstituentsRule,
 			no_unnecessary_type_assertion.NoUnnecessaryTypeAssertionRule,
 			no_unsafe_argument.NoUnsafeArgumentRule,
+			no_unsafe_assignment.NoUnsafeAssignmentRule,
 			no_unsafe_call.NoUnsafeCallRule,
 			no_unsafe_enum_comparison.NoUnsafeEnumComparisonRule,
 			no_unsafe_member_access.NoUnsafeMemberAccessRule,

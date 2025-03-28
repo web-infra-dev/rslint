@@ -92,6 +92,8 @@ type Checker = checker.Checker
 func Checker_getResolvedSignature(recv *checker.Checker, node *ast.Node, candidatesOutArray *[]*checker.Signature, checkMode checker.CheckMode) *checker.Signature
 //go:linkname Checker_getTypeOfSymbol github.com/microsoft/typescript-go/internal/checker.(*Checker).getTypeOfSymbol
 func Checker_getTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
+//go:linkname Checker_getPropertiesOfType github.com/microsoft/typescript-go/internal/checker.(*Checker).getPropertiesOfType
+func Checker_getPropertiesOfType(recv *checker.Checker, t *checker.Type) []*ast.Symbol
 //go:linkname Checker_getPropertyOfType github.com/microsoft/typescript-go/internal/checker.(*Checker).getPropertyOfType
 func Checker_getPropertyOfType(recv *checker.Checker, t *checker.Type, name string) *ast.Symbol
 //go:linkname Checker_getSignaturesOfType github.com/microsoft/typescript-go/internal/checker.(*Checker).getSignaturesOfType
@@ -421,6 +423,9 @@ type extra_emitResolver struct {
 }
 func Checker_numberType(v *checker.Checker) *checker.Type {
   return ((*extra_Checker)(unsafe.Pointer(v))).numberType
+}
+func Checker_booleanType(v *checker.Checker) *checker.Type {
+  return ((*extra_Checker)(unsafe.Pointer(v))).booleanType
 }
 func Checker_globalRegExpType(v *checker.Checker) *checker.Type {
   return ((*extra_Checker)(unsafe.Pointer(v))).globalRegExpType

@@ -9,27 +9,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 )
 
-func VisitAllChildren(node *ast.Node, visitor func(node *ast.Node)) {
-	var visit ast.Visitor
-	visit = func(node *ast.Node) bool {
-		visitor(node)
-		return node.ForEachChild(visit)
-	}
-	node.ForEachChild(visit)
-}
-func VisitAllChildrenWithExit(node *ast.Node, visitor func(node *ast.Node) (func ())) {
-	var visit ast.Visitor
-	visit = func(node *ast.Node) bool {
-		onExit := visitor(node)
-		res := node.ForEachChild(visit)
-		if onExit != nil {
-			onExit()
-		}
-		return res
-	}
-	node.ForEachChild(visit)
-}
-
 type ConstraintTypeInfo struct {
 	ConstraintType  *checker.Type
 	IsTypeParameter bool
@@ -390,7 +369,7 @@ func GetContextualType(
   } else if parent.Kind == ast.KindJsxExpression {
     return checker.Checker_getContextualType(typeChecker, parent, checker.ContextFlagsNone)
   } else if ast.IsIdentifier(node) && (ast.IsPropertyAssignment(parent) || ast.IsShorthandPropertyAssignment(parent)) {
-		return checker.Checker_getContextualType(typeChecker, parent, checker.ContextFlagsNone)
+		return checker.Checker_getContextualType(typeChecker, node, checker.ContextFlagsNone)
   } else if ast.IsBinaryExpression(parent) && parent.AsBinaryExpression().OperatorToken.Kind == ast.KindEqualsToken && parent.AsBinaryExpression().Right == node {
     // is RHS of assignment
     return typeChecker.GetTypeAtLocation(parent.AsBinaryExpression().Left)

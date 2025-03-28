@@ -13,6 +13,7 @@
       "getApparentType",
       "getIndexTypeOfType",
       "getPropertyOfType",
+      "getPropertiesOfType",
       "getSignaturesOfType",
       "getPropertyNameForKnownSymbolName",
       "getTypeFromTypeNode",
@@ -43,6 +44,7 @@
     ],
     "Checker": [
       "numberType",
+      "booleanType",
       "globalRegExpType"
     ]
   }

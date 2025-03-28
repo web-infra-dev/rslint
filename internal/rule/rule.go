@@ -8,9 +8,26 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 )
 
+const (
+	lastTokenKind ast.Kind = 1000
+	lastOnExitTokenKind ast.Kind = 2000
+	lastOnAllowPatternTokenKind ast.Kind = 3000
+	lastOnAllowPatternOnExitTokenKind ast.Kind = 4000
+	lastOnNotAllowPatternTokenKind ast.Kind = 5000
+	lastOnNotAllowPatternOnExitTokenKind ast.Kind = 6000
+)
+
 func ListenerOnExit(kind ast.Kind) ast.Kind {
-	return kind + ast.KindCount + 1
+	return kind + 1000
 }
+// TODO(port): better name
+func ListenerOnAllowPattern(kind ast.Kind) ast.Kind {
+	return kind + lastOnExitTokenKind
+}
+func ListenerOnNotAllowPattern(kind ast.Kind) ast.Kind {
+	return kind + lastOnAllowPatternOnExitTokenKind
+}
+
 
 type RuleListeners map[ast.Kind](func (node *ast.Node))
 
