@@ -6,12 +6,14 @@ import (
 	"sync"
 	"testing"
 
-	"none.none/tsgolint/internal/linter"
-	"none.none/tsgolint/internal/rule"
-	"none.none/tsgolint/internal/utils"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"none.none/tsgolint/internal/linter"
+	"none.none/tsgolint/internal/rule"
+	"none.none/tsgolint/internal/utils"
+
+	"gotest.tools/v3/assert"
 )
 
 
@@ -144,9 +146,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 
 			if len(testCase.Output) == len(outputs) {
 				for i, expected := range testCase.Output {
-					if expected != outputs[i] {
-						t.Errorf("Expected code after fix:\n%v\nActual code after fix:\n%v", expected, outputs[i])
-					}
+					assert.Equal(t, expected, outputs[i], "Expected code after fix")
 				}
 			} else {
 				t.Errorf("Expected to have %v outputs but had %v", len(testCase.Output), len(outputs))
@@ -195,9 +195,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 						} else {
 							output, _, _ := linter.ApplyRuleFixes(testCase.Code, []rule.RuleSuggestion{suggestion})
 
-							if output != expectedSuggestion.Output {
-								t.Errorf("Expected code after suggestion:\n%v\nActual code after suggestion:\n%v", expectedSuggestion.Output, output)
-							}
+							assert.Equal(t, expectedSuggestion.Output, output, "Expected code after suggestion fix")
 						}
 					}
 				}
