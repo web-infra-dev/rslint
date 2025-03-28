@@ -29,8 +29,8 @@ type RuleFix struct {
 	Range core.TextRange
 }
 
-func RuleFixInsertBefore(node *ast.Node, text string) RuleFix {
-	trimmed := utils.TrimNodeTextRange(node)
+func RuleFixInsertBefore(file *ast.SourceFile, node *ast.Node, text string) RuleFix {
+	trimmed := utils.TrimNodeTextRange(file, node)
 	return RuleFix{
 		Text: text,
 		Range: trimmed.WithEnd(trimmed.Pos()),
@@ -42,14 +42,20 @@ func RuleFixInsertAfter(node *ast.Node, text string) RuleFix {
 		Range: node.Loc.WithPos(node.End()),
 	}
 }
-func RuleFixReplace(node *ast.Node, text string) RuleFix {
-	return RuleFixReplaceRange(utils.TrimNodeTextRange(node), text)
+func RuleFixReplace(file *ast.SourceFile, node *ast.Node, text string) RuleFix {
+	return RuleFixReplaceRange(utils.TrimNodeTextRange(file, node), text)
 }
 func RuleFixReplaceRange(textRange core.TextRange, text string) RuleFix {
 	return RuleFix{
 		Text: text,
 		Range: textRange,
 	}
+}
+func RuleFixRemove(file *ast.SourceFile, node *ast.Node) RuleFix {
+	return RuleFixReplace(file, node, "")
+}
+func RuleFixRemoveRange(textRange core.TextRange) RuleFix {
+	return RuleFixReplaceRange(textRange, "")
 }
 
 type RuleSuggestion struct {

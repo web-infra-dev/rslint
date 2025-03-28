@@ -77,7 +77,7 @@ func RunLinter(singleThreaded bool, fs vfs.FS, fileNames []string, getRulesForFi
 						ReportNode: func(node *ast.Node, msg rule.RuleMessage) {
 							onDiagnostic(rule.RuleDiagnostic{
 								RuleName: r.Name,
-								Range:      utils.TrimNodeTextRange(node),
+								Range:      utils.TrimNodeTextRange(file, node),
 								Message:    msg,
 								SourceFile: file,
 							})
@@ -85,7 +85,7 @@ func RunLinter(singleThreaded bool, fs vfs.FS, fileNames []string, getRulesForFi
 						ReportNodeWithFixes: func(node *ast.Node, msg rule.RuleMessage, fixes ...rule.RuleFix) {
 							onDiagnostic(rule.RuleDiagnostic{
 								RuleName: r.Name,
-								Range:      utils.TrimNodeTextRange(node),
+								Range:      utils.TrimNodeTextRange(file, node),
 								Message:    msg,
 								FixesPtr:      &fixes,
 								SourceFile: file,
@@ -95,7 +95,7 @@ func RunLinter(singleThreaded bool, fs vfs.FS, fileNames []string, getRulesForFi
 						ReportNodeWithSuggestions: func(node *ast.Node, msg rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
 							onDiagnostic(rule.RuleDiagnostic{
 								RuleName: r.Name,
-								Range:      utils.TrimNodeTextRange(node),
+								Range:      utils.TrimNodeTextRange(file, node),
 								Message:     msg,
 								Suggestions: &suggestions,
 								SourceFile:  file,

@@ -115,10 +115,10 @@ var NoFloatingPromisesRule = rule.Rule{
 				return []rule.RuleFix{rule.RuleFixReplaceRange(voidTokenRange, "await")}
 			}
 			if isHigherPrecedenceThanUnary(node.Expression) {
-				return []rule.RuleFix{rule.RuleFixInsertBefore(&node.Node, "await ")}
+				return []rule.RuleFix{rule.RuleFixInsertBefore(ctx.SourceFile, &node.Node, "await ")}
 			}
 			return []rule.RuleFix{
-rule.RuleFixInsertBefore(&node.Node, "await ("),
+rule.RuleFixInsertBefore(ctx.SourceFile, &node.Node, "await ("),
 rule.RuleFixInsertAfter(expression, ")"),
 			}
 		}
@@ -405,10 +405,10 @@ rule.RuleFixInsertAfter(expression, ")"),
 					Message: buildFloatingFixVoidMessage(),
 					FixesArr: (func() []rule.RuleFix {
 						if isHigherPrecedenceThanUnary(exprStatement.Expression) {
-							return []rule.RuleFix{rule.RuleFixInsertBefore(node, "void ")}
+							return []rule.RuleFix{rule.RuleFixInsertBefore(ctx.SourceFile, node, "void ")}
 						}
 						return []rule.RuleFix{
-							rule.RuleFixInsertBefore(node, "void ("),
+							rule.RuleFixInsertBefore(ctx.SourceFile, node, "void ("),
 							rule.RuleFixInsertAfter(expression, ")"),
 						}
 					})(),

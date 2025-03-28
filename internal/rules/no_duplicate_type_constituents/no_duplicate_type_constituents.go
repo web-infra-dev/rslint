@@ -108,7 +108,7 @@ var NoDuplicateTypeConstituentsRule = rule.Rule{
 			fixes := []rule.RuleFix{
 				{
 					Text: "",
-					Range: utils.TrimNodeTextRange(constituentNode),
+					Range: utils.TrimNodeTextRange(ctx.SourceFile, constituentNode),
 				},
 			}
 			if foundBefore {

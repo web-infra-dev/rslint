@@ -13,11 +13,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 )
 
-func ScannerForNode(node *ast.Node) *scanner.Scanner {
-	return scanner.GetScannerForSourceFile(ast.GetSourceFileOfNode(node), node.Pos())
-}
-func TrimNodeTextRange(node *ast.Node) core.TextRange {
-					return scanner.GetRangeOfTokenAtPosition(ast.GetSourceFileOfNode(node), node.Pos()).WithEnd(node.End())
+func TrimNodeTextRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+	return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).WithEnd(node.End())
 }
 
 func GetCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) iter.Seq[ast.CommentRange] {

@@ -187,10 +187,10 @@ func GetTypeName(
  *    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
  */
 func GetForStatementHeadLoc(
-  sourceCode *ast.SourceFile,
+  sourceFile *ast.SourceFile,
   node *ast.ForInOrOfStatement,
 ) core.TextRange {
-	return TrimNodeTextRange(node.AsNode()).WithEnd(node.Statement.Pos())
+	return TrimNodeTextRange(sourceFile, node.AsNode()).WithEnd(node.Statement.Pos())
 }
 
 
@@ -553,4 +553,3 @@ func GetParentFunctionNode(
 
 	return nil
 }
-

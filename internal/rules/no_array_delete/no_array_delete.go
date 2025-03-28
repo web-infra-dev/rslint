@@ -66,8 +66,8 @@ var NoArrayDeleteRule = rule.Rule{
 			}
 
 
-			expressionRange := utils.TrimNodeTextRange(expression.Expression)
-			argumentRange := utils.TrimNodeTextRange(expression.ArgumentExpression)
+			expressionRange := utils.TrimNodeTextRange(ctx.SourceFile, expression.Expression)
+			argumentRange := utils.TrimNodeTextRange(ctx.SourceFile, expression.ArgumentExpression)
 
 			deleteTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())
 			leftBracketTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, expressionRange.End())
