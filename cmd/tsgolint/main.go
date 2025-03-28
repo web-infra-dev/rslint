@@ -20,6 +20,7 @@ import (
 	"none.none/tsgolint/internal/rules/no_for_in_array"
 	"none.none/tsgolint/internal/rules/no_implied_eval"
 	"none.none/tsgolint/internal/rules/no_misused_promises"
+	"none.none/tsgolint/internal/rules/no_unnecessary_type_assertion"
 	"none.none/tsgolint/internal/rules/no_unsafe_argument"
 	"none.none/tsgolint/internal/rules/no_unsafe_call"
 	"none.none/tsgolint/internal/rules/no_unsafe_enum_comparison"
@@ -93,6 +94,7 @@ func main() {
 			no_for_in_array.NoForInArrayRule,
 			no_implied_eval.NoImpliedEvalRule,
 			no_misused_promises.NoMisusedPromisesRule,
+			no_unnecessary_type_assertion.NoUnnecessaryTypeAssertionRule,
 			no_unsafe_argument.NoUnsafeArgumentRule,
 			no_unsafe_call.NoUnsafeCallRule,
 			no_unsafe_enum_comparison.NoUnsafeEnumComparisonRule,
