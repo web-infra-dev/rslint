@@ -114,10 +114,7 @@ var NoUnnecessaryTypeAssertionRule = rule.Rule{
           !(
             ast.IsVariableDeclarationList(declaration.Parent) &&
             ast.IsVariableStatement(declaration.Parent.Parent) &&
-						declaration.Parent.Parent.AsVariableStatement().Modifiers() != nil &&
-						utils.Some(declaration.Parent.Parent.AsVariableStatement().Modifiers().Nodes, func (modifier *ast.Node) bool {
-							return modifier.Kind == ast.KindDeclareKeyword
-						}))) {
+						utils.IncludesModifier(declaration.Parent.Parent.AsVariableStatement(), ast.KindDeclareKeyword))) {
           // possibly used before assigned, so just skip it
           // better to false negative and skip it, than false positive and fix to compile erroring code
           //

@@ -171,3 +171,13 @@ func Flatten[T any](array [][]T) []T {
 	}
 	return result
 }
+
+func IncludesModifier(node interface { Modifiers() *ast.ModifierList }, modifier ast.Kind) bool {
+	modifiers := node.Modifiers()
+	if modifiers == nil {
+		return false
+	}
+	return Some(modifiers.NodeList.Nodes, func(m *ast.Node) bool {
+		return m.Kind == modifier
+	})
+}

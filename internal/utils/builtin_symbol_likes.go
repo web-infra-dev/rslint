@@ -181,17 +181,33 @@ func IsBuiltinSymbolLike(
 ) bool {
   return IsBuiltinSymbolLikeRecurser(program, typeChecker, t, func (subType *checker.Type) *bool {
 		symbol := checker.Type_symbol(subType)
-		var res bool
     if symbol == nil {
-      res = false
-			return &res
+      return Ref(false)
     }
 
 		actualSymbolName := symbol.Name
 
     if Some(symbolNames, func(name string) bool { return actualSymbolName == name }) && IsSymbolFromDefaultLibrary(program, symbol) {
-      res = true
-			return &res
+      return Ref(true)
+    }
+
+    return nil
+  });
+}
+
+func IsAnyBuiltinSymbolLike(
+	program *compiler.Program,
+	typeChecker *checker.Checker,
+  t *checker.Type,
+) bool {
+  return IsBuiltinSymbolLikeRecurser(program, typeChecker, t, func (subType *checker.Type) *bool {
+		symbol := checker.Type_symbol(subType)
+    if symbol == nil {
+			return Ref(false)
+    }
+
+    if IsSymbolFromDefaultLibrary(program, symbol) {
+			return Ref(true)
     }
 
     return nil

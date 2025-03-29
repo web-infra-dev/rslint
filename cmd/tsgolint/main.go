@@ -35,6 +35,7 @@ import (
 	"none.none/tsgolint/internal/rules/restrict_plus_operands"
 	"none.none/tsgolint/internal/rules/restrict_template_expressions"
 	"none.none/tsgolint/internal/rules/switch_exhaustiveness_check"
+	"none.none/tsgolint/internal/rules/unbound_method"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
@@ -111,6 +112,7 @@ func main() {
 			restrict_plus_operands.RestrictPlusOperandsRule,
 			restrict_template_expressions.RestrictTemplateExpressionsRule,
 			switch_exhaustiveness_check.SwitchExhaustivenessCheckRule,
+			unbound_method.UnboundMethodRule,
 		}
 
 		// rules = utils.Filter(rules, func(r rule.Rule) bool {
