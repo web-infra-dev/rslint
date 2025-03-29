@@ -112,7 +112,7 @@ var NoImpliedEvalRule = rule.Rule{
 
 			handler := node.Arguments()[0]
 
-			if slices.Contains(evalLikeFunctions, calleeName) && !isFunction(handler) { 
+			if slices.Contains(evalLikeFunctions, calleeName) && !isFunction(handler) {
 				symbol := ctx.TypeChecker.GetSymbolAtLocation(node.Expression())
 				if symbol == nil || !utils.Some(symbol.Declarations, func(d *ast.Node) bool {
 					return ast.GetSourceFileOfNode(d) == ctx.SourceFile
@@ -124,7 +124,7 @@ var NoImpliedEvalRule = rule.Rule{
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: checkImpliedEval,
-			ast.KindNewExpression: checkImpliedEval,
+			ast.KindNewExpression:  checkImpliedEval,
 		}
 	},
 }

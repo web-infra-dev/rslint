@@ -1,22 +1,22 @@
 package prefer_promise_reject_errors
 
 import (
-	"none.none/tsgolint/internal/rule"
-	"none.none/tsgolint/internal/utils"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"none.none/tsgolint/internal/rule"
+	"none.none/tsgolint/internal/utils"
 )
 
-func buildRejectAnErrorMessage() rule.RuleMessage{
+func buildRejectAnErrorMessage() rule.RuleMessage {
 	return rule.RuleMessage{
-		Id: "rejectAnError",
+		Id:          "rejectAnError",
 		Description: "Expected the Promise rejection reason to be an Error.",
 	}
 }
 
 type PreferPromiseRejectErrorsOptions struct {
-	AllowEmptyReject *bool
-	AllowThrowingAny *bool
+	AllowEmptyReject     *bool
+	AllowThrowingAny     *bool
 	AllowThrowingUnknown *bool
 }
 
@@ -41,7 +41,7 @@ var PreferPromiseRejectErrorsRule = rule.Rule{
 			if len(callExpression.Arguments.Nodes) != 0 {
 				argument := callExpression.Arguments.Nodes[0]
 				t := ctx.TypeChecker.GetTypeAtLocation(argument)
-				
+
 				if *opts.AllowThrowingAny && utils.IsTypeAnyType(t) {
 					return
 				}
@@ -53,16 +53,15 @@ var PreferPromiseRejectErrorsRule = rule.Rule{
 					return
 				}
 			} else if *opts.AllowEmptyReject {
-				return 
+				return
 			}
 			ctx.ReportNode(&callExpression.Node, buildRejectAnErrorMessage())
-    }
+		}
 
 		typeAtLocationIsLikePromise := func(node *ast.Node) bool {
-			t  := ctx.TypeChecker.GetTypeAtLocation(node)
-      return ( utils.IsPromiseConstructorLike(ctx.Program, ctx.TypeChecker, t) || utils.IsPromiseLike(ctx.Program, ctx.TypeChecker, t))
-    }
-
+			t := ctx.TypeChecker.GetTypeAtLocation(node)
+			return (utils.IsPromiseConstructorLike(ctx.Program, ctx.TypeChecker, t) || utils.IsPromiseLike(ctx.Program, ctx.TypeChecker, t))
+		}
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -77,7 +76,7 @@ var PreferPromiseRejectErrorsRule = rule.Rule{
 					if methodName == "reject" && typeAtLocationIsLikePromise(callee.Expression()) {
 						checkRejectCall(expr)
 					}
-				// reject(...)
+					// reject(...)
 				} else if ast.IsIdentifier(callee) {
 					symbol := ctx.TypeChecker.GetSymbolAtLocation(callee)
 					param := symbol.ValueDeclaration

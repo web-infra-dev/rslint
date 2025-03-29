@@ -254,7 +254,7 @@ const Component = (obj: O) => null;
 const Component: any = () => null;
 <Component func={async () => 10} />;
       `,
-			Tsx:true,
+			Tsx: true,
 		},
 		{
 			Code: `
@@ -537,7 +537,7 @@ foo(bar);
 
         <ASTViewer onSelectNode={onSelectFn} />;
       `,
-			Tsx: true,
+			Tsx:     true,
 			Options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: utils.Ref(NoMisusedPromisesChecksVoidReturnOptions{Attributes: utils.Ref(true)})},
 		},
 		{

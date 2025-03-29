@@ -102,21 +102,21 @@ func GetConstrainedTypeAtLocation(typeChecker *checker.Checker, node *ast.Node) 
  * @param type The type to get the name of.
  */
 func GetTypeName(
-  typeChecker *checker.Checker,
-  t *checker.Type,
+	typeChecker *checker.Checker,
+	t *checker.Type,
 ) string {
-  // It handles `string` and string literal types as string.
-  if checker.Type_flags(t) & checker.TypeFlagsStringLike != 0 {
-    return "string"
-  }
+	// It handles `string` and string literal types as string.
+	if checker.Type_flags(t)&checker.TypeFlagsStringLike != 0 {
+		return "string"
+	}
 
-  // If the type is a type parameter which extends primitive string types,
-  // but it was not recognized as a string like. So check the constraint
-  // type of the type parameter.
-  if IsTypeParameter(t) {
-    // `type.getConstraint()` method doesn't return the constraint type of
-    // the type parameter for some reason. So this gets the constraint type
-    // via AST.
+	// If the type is a type parameter which extends primitive string types,
+	// but it was not recognized as a string like. So check the constraint
+	// type of the type parameter.
+	if IsTypeParameter(t) {
+		// `type.getConstraint()` method doesn't return the constraint type of
+		// the type parameter for some reason. So this gets the constraint type
+		// via AST.
 		symbol := checker.Type_symbol(t)
 		decls := symbol.Declarations
 		if decls != nil && len(decls) > 0 {
@@ -127,27 +127,27 @@ func GetTypeName(
 				}
 			}
 		}
-  }
+	}
 
-  // If the type is a union and all types in the union are string like,
-  // return `string`. For example:
-  // - `"a" | "b"` is string.
-  // - `string | string[]` is not string.
-  if IsUnionType(t) && Every(UnionTypeParts(t), func(t *checker.Type) bool {
+	// If the type is a union and all types in the union are string like,
+	// return `string`. For example:
+	// - `"a" | "b"` is string.
+	// - `string | string[]` is not string.
+	if IsUnionType(t) && Every(UnionTypeParts(t), func(t *checker.Type) bool {
 		return GetTypeName(typeChecker, t) == "string"
 	}) {
-    return "string"
-  }
+		return "string"
+	}
 
-  // If the type is an intersection and a type in the intersection is string
-  // like, return `string`. For example: `string & {__htmlEscaped: void}`
-  if IsIntersectionType(t) && Some(IntersectionTypeParts(t), func(t *checker.Type) bool {
+	// If the type is an intersection and a type in the intersection is string
+	// like, return `string`. For example: `string & {__htmlEscaped: void}`
+	if IsIntersectionType(t) && Some(IntersectionTypeParts(t), func(t *checker.Type) bool {
 		return GetTypeName(typeChecker, t) == "string"
 	}) {
-    return "string"
-  }
+		return "string"
+	}
 
-  return typeChecker.TypeToString(t)
+	return typeChecker.TypeToString(t)
 }
 
 /**
@@ -166,19 +166,18 @@ func GetTypeName(
  *    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
  */
 func GetForStatementHeadLoc(
-  sourceFile *ast.SourceFile,
-  node *ast.ForInOrOfStatement,
+	sourceFile *ast.SourceFile,
+	node *ast.ForInOrOfStatement,
 ) core.TextRange {
 	return TrimNodeTextRange(sourceFile, node.AsNode()).WithEnd(node.Statement.Pos())
 }
 
-
-var arrayPredicateFunctions = []string{ "every", "filter", "find", "findIndex", "findLast", "findLastIndex", "some", }
+var arrayPredicateFunctions = []string{"every", "filter", "find", "findIndex", "findLast", "findLastIndex", "some"}
 
 func IsArrayMethodCallWithPredicate(
 	typeChecker *checker.Checker,
-  node *ast.CallExpression,
-)bool {
+	node *ast.CallExpression,
+) bool {
 	if !ast.IsAccessExpression(node.Expression) {
 		return false
 	}
@@ -194,8 +193,7 @@ func IsArrayMethodCallWithPredicate(
 	})
 }
 
-
-func IsRestParameterDeclaration(decl *ast.Declaration)bool {
+func IsRestParameterDeclaration(decl *ast.Declaration) bool {
 	return ast.IsParameter(decl) && decl.AsParameterDeclaration().DotDotDotToken != nil
 }
 
@@ -204,41 +202,39 @@ func IsRestParameterDeclaration(decl *ast.Declaration)bool {
  */
 func GetDeclaration(
 	typeChecker *checker.Checker,
-  node *ast.Node,
+	node *ast.Node,
 ) *ast.Declaration {
 	symbol := typeChecker.GetSymbolAtLocation(node)
-  if symbol == nil {
-    return nil
-  }
+	if symbol == nil {
+		return nil
+	}
 	if len(symbol.Declarations) > 0 {
 		return symbol.Declarations[0]
 	}
 	return nil
 }
 
-
 /**
  * @returns true if the type is `any[]`
  */
 func IsTypeAnyArrayType(
-	t * checker.Type,
+	t *checker.Type,
 	typeChecker *checker.Checker,
-)bool {
-  return checker.Checker_isArrayType(typeChecker, t) &&
-    IsTypeAnyType(checker.Checker_getTypeArguments(typeChecker, t)[0])
+) bool {
+	return checker.Checker_isArrayType(typeChecker, t) &&
+		IsTypeAnyType(checker.Checker_getTypeArguments(typeChecker, t)[0])
 }
 
 /**
  * @returns true if the type is `unknown[]`
  */
 func IsTypeUnknownArrayType(
-	t * checker.Type,
+	t *checker.Type,
 	typeChecker *checker.Checker,
-)bool {
-  return checker.Checker_isArrayType(typeChecker, t) &&
-    IsTypeUnknownType(checker.Checker_getTypeArguments(typeChecker, t)[0])
+) bool {
+	return checker.Checker_isArrayType(typeChecker, t) &&
+		IsTypeUnknownType(checker.Checker_getTypeArguments(typeChecker, t)[0])
 }
-
 
 /**
  * Does a simple check to see if there is an any being assigned to a non-any type.
@@ -252,73 +248,73 @@ func IsTypeUnknownArrayType(
  */
 func IsUnsafeAssignment(
 	t *checker.Type,
-  receiverT *checker.Type,
+	receiverT *checker.Type,
 	typeChecker *checker.Checker,
-  senderNode *ast.Node,
+	senderNode *ast.Node,
 ) (receiver *checker.Type, sender *checker.Type, unsafe bool) {
 	return isUnsafeAssignmentWorker(
 		t,
-    receiverT,
-    typeChecker,
-    senderNode,
-    map[*checker.Type]*Set[*checker.Type]{},
-  )
+		receiverT,
+		typeChecker,
+		senderNode,
+		map[*checker.Type]*Set[*checker.Type]{},
+	)
 }
 
 func isUnsafeAssignmentWorker(
 	t *checker.Type,
 	receiver *checker.Type,
-  typeChecker *checker.Checker,
-  senderNode *ast.Node,
-  visited map[*checker.Type]*Set[*checker.Type],
+	typeChecker *checker.Checker,
+	senderNode *ast.Node,
+	visited map[*checker.Type]*Set[*checker.Type],
 ) (*checker.Type, *checker.Type, bool) {
 	if IsTypeAnyType(t) {
-    // Allow assignment of any ==> unknown.
-    if (IsTypeUnknownType(receiver)) {
-      return nil, nil, false
-    }
+		// Allow assignment of any ==> unknown.
+		if IsTypeUnknownType(receiver) {
+			return nil, nil, false
+		}
 
-    if (!IsTypeAnyType(receiver)) {
-      return receiver, t, true
-    }
+		if !IsTypeAnyType(receiver) {
+			return receiver, t, true
+		}
 	}
 
 	typeAlreadyVisited, ok := visited[t]
 
-  if ok {
+	if ok {
 		if typeAlreadyVisited.Has(receiver) {
 			return nil, nil, false
 		}
 		typeAlreadyVisited.Add(receiver)
-  } else {
+	} else {
 		visited[t] = NewSetFromItems(receiver)
-  }
+	}
 
-  if (checker.IsNonDeferredTypeReference(t) && checker.IsNonDeferredTypeReference(receiver)) {
-    // TODO - figure out how to handle cases like this,
-    // where the types are assignable, but not the same type
-    /*
-    function foo(): ReadonlySet<number> { return new Set<any>(); }
+	if checker.IsNonDeferredTypeReference(t) && checker.IsNonDeferredTypeReference(receiver) {
+		// TODO - figure out how to handle cases like this,
+		// where the types are assignable, but not the same type
+		/*
+		   function foo(): ReadonlySet<number> { return new Set<any>(); }
 
-    // and
+		   // and
 
-    type Test<T> = { prop: T }
-    type Test2 = { prop: string }
-    declare const a: Test<any>;
-    const b: Test2 = a;
-    */
+		   type Test<T> = { prop: T }
+		   type Test2 = { prop: string }
+		   declare const a: Test<any>;
+		   const b: Test2 = a;
+		*/
 
 		if t.Target() != receiver.Target() {
-      // if the type references are different, assume safe, as we won't know how to compare the two types
-      // the generic positions might not be equivalent for both types
-      return nil, nil, false
+			// if the type references are different, assume safe, as we won't know how to compare the two types
+			// the generic positions might not be equivalent for both types
+			return nil, nil, false
 		}
 
 		if senderNode != nil && ast.IsNewExpression(senderNode) && ast.IsIdentifier(senderNode.Expression()) && senderNode.Expression().Text() == "Map" && len(senderNode.Arguments()) == 0 && senderNode.TypeArguments() == nil {
-      // special case to handle `new Map()`
-      // unfortunately Map's default empty constructor is typed to return `Map<any, any>` :(
-      // https://github.com/typescript-eslint/typescript-eslint/issues/2109#issuecomment-634144396
-      return nil, nil, false
+			// special case to handle `new Map()`
+			// unfortunately Map's default empty constructor is typed to return `Map<any, any>` :(
+			// https://github.com/typescript-eslint/typescript-eslint/issues/2109#issuecomment-634144396
+			return nil, nil, false
 		}
 
 		typeArguments := checker.Checker_getTypeArguments(typeChecker, t)
@@ -339,10 +335,10 @@ func isUnsafeAssignmentWorker(
 			}
 		}
 
-    return nil, nil, false
-  }
+		return nil, nil, false
+	}
 
-  return nil, nil, false
+	return nil, nil, false
 }
 
 /**
@@ -352,56 +348,55 @@ func isUnsafeAssignmentWorker(
  */
 func GetContextualType(
 	typeChecker *checker.Checker,
-  node *ast.Node,
+	node *ast.Node,
 ) *checker.Type {
 	parent := node.Parent
 
-  if (ast.IsCallExpression(parent) || ast.IsNewExpression(parent)) {
-    if (node == parent.Expression()) {
-      // is the callee, so has no contextual type
-      return nil
-    }
-  } else if ast.IsVariableDeclaration(parent) || ast.IsPropertyDeclaration(parent) || ast.IsParameter(parent) {
+	if ast.IsCallExpression(parent) || ast.IsNewExpression(parent) {
+		if node == parent.Expression() {
+			// is the callee, so has no contextual type
+			return nil
+		}
+	} else if ast.IsVariableDeclaration(parent) || ast.IsPropertyDeclaration(parent) || ast.IsParameter(parent) {
 		if t := parent.Type(); t != nil {
 			return checker.Checker_getTypeFromTypeNode(typeChecker, t)
 		}
 		return nil
-  } else if parent.Kind == ast.KindJsxExpression {
-    return checker.Checker_getContextualType(typeChecker, parent, checker.ContextFlagsNone)
-  } else if ast.IsIdentifier(node) && (ast.IsPropertyAssignment(parent) || ast.IsShorthandPropertyAssignment(parent)) {
+	} else if parent.Kind == ast.KindJsxExpression {
+		return checker.Checker_getContextualType(typeChecker, parent, checker.ContextFlagsNone)
+	} else if ast.IsIdentifier(node) && (ast.IsPropertyAssignment(parent) || ast.IsShorthandPropertyAssignment(parent)) {
 		return checker.Checker_getContextualType(typeChecker, node, checker.ContextFlagsNone)
-  } else if ast.IsBinaryExpression(parent) && parent.AsBinaryExpression().OperatorToken.Kind == ast.KindEqualsToken && parent.AsBinaryExpression().Right == node {
-    // is RHS of assignment
-    return typeChecker.GetTypeAtLocation(parent.AsBinaryExpression().Left)
-  } else if parent.Kind != ast.KindJsxExpression && !ast.IsTemplateSpan(parent) {
-    // parent is not something we know we can get the contextual type of
-    return nil
-  }
-  // TODO - support return statement checking
+	} else if ast.IsBinaryExpression(parent) && parent.AsBinaryExpression().OperatorToken.Kind == ast.KindEqualsToken && parent.AsBinaryExpression().Right == node {
+		// is RHS of assignment
+		return typeChecker.GetTypeAtLocation(parent.AsBinaryExpression().Left)
+	} else if parent.Kind != ast.KindJsxExpression && !ast.IsTemplateSpan(parent) {
+		// parent is not something we know we can get the contextual type of
+		return nil
+	}
+	// TODO - support return statement checking
 
-  return checker.Checker_getContextualType(typeChecker, node, checker.ContextFlagsNone)
+	return checker.Checker_getContextualType(typeChecker, node, checker.ContextFlagsNone)
 }
 
 func GetThisExpression(
-  node *ast.Node,
+	node *ast.Node,
 ) *ast.Node {
-  for {
+	for {
 		node = ast.SkipParentheses(node)
 
-    if ast.IsCallExpression(node) {
-      node = node.Expression()
-    } else if node.Kind == ast.KindThisKeyword {
-      return node
-    } else if ast.IsAccessExpression(node) {
-      node = node.Expression()
-    } else {
-      break
-    }
-  }
+		if ast.IsCallExpression(node) {
+			node = node.Expression()
+		} else if node.Kind == ast.KindThisKeyword {
+			return node
+		} else if ast.IsAccessExpression(node) {
+			node = node.Expression()
+		} else {
+			break
+		}
+	}
 
 	return nil
 }
-
 
 /*
  * If passed an enum member, returns the type of the parent. Otherwise,
@@ -413,15 +408,14 @@ func GetThisExpression(
  */
 func getBaseEnumType(typeChecker *checker.Checker, t *checker.Type) *checker.Type {
 	symbol := checker.Type_symbol(t)
-  if (!IsSymbolFlagSet(symbol, ast.SymbolFlagsEnumMember)) {
-    return t
-  }
+	if !IsSymbolFlagSet(symbol, ast.SymbolFlagsEnumMember) {
+		return t
+	}
 
-  return typeChecker.GetTypeAtLocation(
+	return typeChecker.GetTypeAtLocation(
 		symbol.ValueDeclaration.Parent,
-  )
+	)
 }
-
 
 /**
  * Retrieve only the Enum literals from a type. for example:
@@ -433,7 +427,7 @@ func getBaseEnumType(typeChecker *checker.Checker, t *checker.Type) *checker.Typ
  * - T extends Fruit --> [Fruit]
  */
 func GetEnumLiterals(t *checker.Type) []*checker.Type {
-  return Filter(
+	return Filter(
 		UnionTypeParts(t),
 		func(subType *checker.Type) bool {
 			return IsTypeFlagSet(subType, checker.TypeFlagsEnumLiteral)
@@ -454,35 +448,35 @@ func GetEnumTypes(
 	typeChecker *checker.Checker,
 	t *checker.Type,
 ) []*checker.Type {
-	return Map(GetEnumLiterals(t), func(t *checker.Type) *checker.Type{return getBaseEnumType(typeChecker, t)})
+	return Map(GetEnumLiterals(t), func(t *checker.Type) *checker.Type { return getBaseEnumType(typeChecker, t) })
 }
 
 type DiscriminatedAnyType uint8
 
 const (
-  DiscriminatedAnyTypeAny DiscriminatedAnyType = iota
-  DiscriminatedAnyTypePromiseAny
-  DiscriminatedAnyTypeAnyArray
-  DiscriminatedAnyTypeSafe
+	DiscriminatedAnyTypeAny DiscriminatedAnyType = iota
+	DiscriminatedAnyTypePromiseAny
+	DiscriminatedAnyTypeAnyArray
+	DiscriminatedAnyTypeSafe
 )
 
 /**
   * @returns `DiscriminatedAnyTypeAny ` if the type is `any`, `DiscriminatedAnyTypeAnyArray` if the type is `any[]` or `readonly any[]`, `DiscriminatedAnyTypePromiseAny` if the type is `Promise<any>`,
 *          otherwise it returns `DiscriminatedAnyTypeSafe`.
-  */
+*/
 func DiscriminateAnyType(
 	t *checker.Type,
-  typeChecker *checker.Checker,
-  program *compiler.Program,
+	typeChecker *checker.Checker,
+	program *compiler.Program,
 	node *ast.Node,
 ) DiscriminatedAnyType {
-  return discriminateAnyTypeWorker(t, typeChecker, program, node, NewSetFromItems[*checker.Type]());
+	return discriminateAnyTypeWorker(t, typeChecker, program, node, NewSetFromItems[*checker.Type]())
 }
 
 func discriminateAnyTypeWorker(
 	t *checker.Type,
-  typeChecker *checker.Checker,
-  program *compiler.Program,
+	typeChecker *checker.Checker,
+	program *compiler.Program,
 	node *ast.Node,
 	// TODO(port): do we really need visited here?
 	visited *Set[*checker.Type],
@@ -490,13 +484,13 @@ func discriminateAnyTypeWorker(
 	if visited.Has(t) {
 		return DiscriminatedAnyTypeSafe
 	}
-  visited.Add(t)
-  if (IsTypeAnyType(t)) {
-    return DiscriminatedAnyTypeAny
-  }
-  if (IsTypeAnyArrayType(t, typeChecker)) {
-    return DiscriminatedAnyTypeAnyArray
-  }
+	visited.Add(t)
+	if IsTypeAnyType(t) {
+		return DiscriminatedAnyTypeAny
+	}
+	if IsTypeAnyArrayType(t, typeChecker) {
+		return DiscriminatedAnyTypeAnyArray
+	}
 
 	foundPromiseAny := TypeRecurser(t, func(t *checker.Type) bool {
 		if !IsThenableType(typeChecker, node, t) {
@@ -506,7 +500,7 @@ func discriminateAnyTypeWorker(
 		if awaitedType == nil {
 			return false
 		}
-		awaitedAnyType := discriminateAnyTypeWorker(awaitedType, typeChecker,program, node, visited)
+		awaitedAnyType := discriminateAnyTypeWorker(awaitedType, typeChecker, program, node, visited)
 		return awaitedAnyType == DiscriminatedAnyTypeAny
 	})
 
@@ -517,18 +511,17 @@ func discriminateAnyTypeWorker(
 	return DiscriminatedAnyTypeSafe
 }
 
-
 func GetParentFunctionNode(
-  node *ast.Node,
+	node *ast.Node,
 ) *ast.Node {
-  current := node.Parent
-  for current != nil {
+	current := node.Parent
+	for current != nil {
 		if ast.IsFunctionLikeDeclaration(current) {
 			return current
 		}
 
-    current = current.Parent
-  }
+		current = current.Parent
+	}
 
 	return nil
 }

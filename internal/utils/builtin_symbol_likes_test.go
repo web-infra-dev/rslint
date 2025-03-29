@@ -3,17 +3,17 @@ package utils
 import (
 	"testing"
 
-	"none.none/tsgolint/internal/rules/fixtures"
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/checker"
+	"none.none/tsgolint/internal/rules/fixtures"
 )
 
 func TestIsSymbolFromDefaultLibrary(t *testing.T) {
 	rootDir := fixtures.GetRootDir()
 
-	getTypes := func (code string) (*compiler.Program, *ast.Symbol) {
+	getTypes := func(code string) (*compiler.Program, *ast.Symbol) {
 		filePath := tspath.ResolvePath(rootDir, "file.ts")
 		fs := NewOverlayVFSForFile(filePath, code)
 
@@ -24,42 +24,41 @@ func TestIsSymbolFromDefaultLibrary(t *testing.T) {
 		sourceFile := program.GetSourceFile(filePath)
 		t := program.GetTypeChecker().GetTypeAtLocation(sourceFile.Statements.Nodes[0].AsTypeAliasDeclaration().Name())
 		return program, checker.Type_symbol(t)
-  }
+	}
 
 	runTestForAliasDeclaration := func(code string, expected bool) {
-		program, symbol  := getTypes(code)
+		program, symbol := getTypes(code)
 		result := IsSymbolFromDefaultLibrary(program, symbol)
 		if result != expected {
 			t.Errorf("Expected %v. Actual %v", expected, result)
 		}
-  }
+	}
 
-  t.Run("is symbol from default library", func (t *testing.T) {
+	t.Run("is symbol from default library", func(t *testing.T) {
 		cases := []string{
-      "type Test = Array<number>;",
-      "type Test = Map<string,number>;",
-      "type Test = Promise<void>",
-      "type Test = Error",
-      "type Test = Object",
-    }
+			"type Test = Array<number>;",
+			"type Test = Map<string,number>;",
+			"type Test = Promise<void>",
+			"type Test = Error",
+			"type Test = Object",
+		}
 		for _, code := range cases {
-			t.Run(code, func (t *testing.T) {
+			t.Run(code, func(t *testing.T) {
 				runTestForAliasDeclaration(code, true)
 			})
 		}
-  })
+	})
 
-  t.Run("is not symbol from default library", func (t *testing.T) {
+	t.Run("is not symbol from default library", func(t *testing.T) {
 		cases := []string{
-      // "const test: Array<number> = [1,2,3];",
-      "type Test = number;",
-      "type Test = { bar: string; };",
-    }
+			// "const test: Array<number> = [1,2,3];",
+			"type Test = number;",
+			"type Test = { bar: string; };",
+		}
 		for _, code := range cases {
-			t.Run(code, func (t *testing.T) {
+			t.Run(code, func(t *testing.T) {
 				runTestForAliasDeclaration(code, false)
 			})
 		}
-  });
+	})
 }
-

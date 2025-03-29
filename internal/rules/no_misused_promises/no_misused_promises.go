@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"slices"
 
-	"none.none/tsgolint/internal/rule"
-	"none.none/tsgolint/internal/utils"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"none.none/tsgolint/internal/rule"
+	"none.none/tsgolint/internal/utils"
 )
 
 func buildConditionalMessage() rule.RuleMessage {
@@ -82,7 +82,7 @@ type NoMisusedPromisesOptions struct {
 
 var NoMisusedPromisesRule = rule.Rule{
 	Name: "no-misused-promises",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners{
+	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(NoMisusedPromisesOptions)
 		if !ok {
 			opts = NoMisusedPromisesOptions{}
@@ -229,7 +229,7 @@ var NoMisusedPromisesRule = rule.Rule{
 				return
 			}
 			// prevent checking the same node multiple times
-			if _, ok:=checkedNodes[node]; ok {
+			if _, ok := checkedNodes[node]; ok {
 				return
 			}
 			checkedNodes[node] = struct{}{}
@@ -364,7 +364,7 @@ var NoMisusedPromisesRule = rule.Rule{
 
 				(*voidReturnIndices) = append(*voidReturnIndices, index)
 			}
-			contextualType := checker.Checker_getContextualTypeForArgumentAtIndex(ctx.TypeChecker,  node, index,)
+			contextualType := checker.Checker_getContextualTypeForArgumentAtIndex(ctx.TypeChecker, node, index)
 
 			if contextualType != t {
 				checkThenableOrVoidArgument(
@@ -579,7 +579,7 @@ var NoMisusedPromisesRule = rule.Rule{
 				if objType == nil {
 					return
 				}
-				propertySymbol := checker.Checker_getPropertyOfType(ctx.TypeChecker,  objType, node.Name().Text(),)
+				propertySymbol := checker.Checker_getPropertyOfType(ctx.TypeChecker, objType, node.Name().Text())
 				if propertySymbol == nil {
 					return
 				}
@@ -731,62 +731,59 @@ var NoMisusedPromisesRule = rule.Rule{
 			}
 		}
 
-
-
 		listeners := rule.RuleListeners{
-			ast.KindBinaryExpression: func (node *ast.Node) {
-			if *opts.ChecksConditionals {
- 				checkConditional(node, false) 
+			ast.KindBinaryExpression: func(node *ast.Node) {
+				if *opts.ChecksConditionals {
+					checkConditional(node, false)
+				}
+
+				if *opts.ChecksVoidReturn && *opts.ChecksVoidReturnOpts.Variables && ast.IsAssignmentExpression(node, false) {
+					checkAssignment(node.AsBinaryExpression())
+				}
+			},
+		}
+		if *opts.ChecksConditionals {
+			listeners[ast.KindPropertyAccessExpression] = checkArrayPredicates
+			listeners[ast.KindElementAccessExpression] = checkArrayPredicates
+
+			listeners[ast.KindPrefixUnaryExpression] = func(node *ast.Node) {
+				expr := node.AsPrefixUnaryExpression()
+				if expr.Operator == ast.KindExclamationToken {
+					checkConditional(expr.Operand, true)
+				}
 			}
 
-					if *opts.ChecksVoidReturn && *opts.ChecksVoidReturnOpts.Variables && ast.IsAssignmentExpression(node, false) {
-							checkAssignment(node.AsBinaryExpression())
-						}
-		},
-	}
-			if *opts.ChecksConditionals {
-				listeners[ast.KindPropertyAccessExpression] = checkArrayPredicates
-				listeners[ast.KindElementAccessExpression] = checkArrayPredicates
+			listeners[ast.KindConditionalExpression] = func(node *ast.Node) { checkConditional(node.AsConditionalExpression().Condition, true) }
+			listeners[ast.KindForStatement] = func(node *ast.Node) { checkConditional(node.AsForStatement().Condition, true) }
+			listeners[ast.KindDoStatement] = func(node *ast.Node) { checkConditional(node.Expression(), true) }
+			listeners[ast.KindWhileStatement] = func(node *ast.Node) { checkConditional(node.Expression(), true) }
+			listeners[ast.KindIfStatement] = func(node *ast.Node) { checkConditional(node.Expression(), true) }
+		}
 
-
-				listeners[ast.KindPrefixUnaryExpression] = func(node *ast.Node) {
-					expr := node.AsPrefixUnaryExpression()
-					if expr.Operator == ast.KindExclamationToken {
-						checkConditional(expr.Operand, true)
-					}
-				}
-
-				listeners[ast.KindConditionalExpression] = func (node *ast.Node) { checkConditional(node.AsConditionalExpression().Condition, true) }
-				listeners[ast.KindForStatement] = func (node *ast.Node) { checkConditional(node.AsForStatement().Condition, true) }
-				listeners[ast.KindDoStatement] = func (node *ast.Node) { checkConditional(node.Expression(), true) }
-				listeners[ast.KindWhileStatement] = func (node *ast.Node) { checkConditional(node.Expression(), true) }
-				listeners[ast.KindIfStatement] = func (node *ast.Node) { checkConditional(node.Expression(), true) }
+		if *opts.ChecksVoidReturn {
+			if *opts.ChecksVoidReturnOpts.Arguments {
+				listeners[ast.KindCallExpression] = checkArguments
+				listeners[ast.KindNewExpression] = checkArguments
 			}
-
-			if *opts.ChecksVoidReturn {
-				if *opts.ChecksVoidReturnOpts.Arguments {
-					listeners[ast.KindCallExpression] = checkArguments
-					listeners[ast.KindNewExpression] = checkArguments
-				}
-				if *opts.ChecksVoidReturnOpts.Attributes {
-					listeners[ast.KindJsxAttribute] = func(node *ast.Node) { checkJSXAttribute(node.AsJsxAttribute())}
-				}
-				if *opts.ChecksVoidReturnOpts.InheritedMethods {
-					listeners[ast.KindClassDeclaration] = checkClassLikeOrInterfaceNode
-					listeners[ast.KindClassExpression] = checkClassLikeOrInterfaceNode
-					listeners[ast.KindInterfaceDeclaration] = checkClassLikeOrInterfaceNode
-				}
-				if *opts.ChecksVoidReturnOpts.Properties {
-					listeners[ast.KindPropertyAssignment] = checkProperty
-					listeners[ast.KindMethodDeclaration] = checkProperty
-					listeners[ast.KindShorthandPropertyAssignment] = checkProperty
-				}
-				if *opts.ChecksVoidReturnOpts.Returns {
-					listeners[ast.KindReturnStatement] = func(node *ast.Node) { checkReturnStatement(node.AsReturnStatement())}
-				}
-				if *opts.ChecksVoidReturnOpts.Variables {
-					listeners[ast.KindVariableDeclaration] = func(node *ast.Node) { checkVariableDeclaration(node.AsVariableDeclaration())}
-				}
+			if *opts.ChecksVoidReturnOpts.Attributes {
+				listeners[ast.KindJsxAttribute] = func(node *ast.Node) { checkJSXAttribute(node.AsJsxAttribute()) }
+			}
+			if *opts.ChecksVoidReturnOpts.InheritedMethods {
+				listeners[ast.KindClassDeclaration] = checkClassLikeOrInterfaceNode
+				listeners[ast.KindClassExpression] = checkClassLikeOrInterfaceNode
+				listeners[ast.KindInterfaceDeclaration] = checkClassLikeOrInterfaceNode
+			}
+			if *opts.ChecksVoidReturnOpts.Properties {
+				listeners[ast.KindPropertyAssignment] = checkProperty
+				listeners[ast.KindMethodDeclaration] = checkProperty
+				listeners[ast.KindShorthandPropertyAssignment] = checkProperty
+			}
+			if *opts.ChecksVoidReturnOpts.Returns {
+				listeners[ast.KindReturnStatement] = func(node *ast.Node) { checkReturnStatement(node.AsReturnStatement()) }
+			}
+			if *opts.ChecksVoidReturnOpts.Variables {
+				listeners[ast.KindVariableDeclaration] = func(node *ast.Node) { checkVariableDeclaration(node.AsVariableDeclaration()) }
+			}
 
 		}
 		if *opts.ChecksSpreads {
@@ -794,7 +791,7 @@ var NoMisusedPromisesRule = rule.Rule{
 			listeners[ast.KindSpreadAssignment] = checkSpread
 		}
 
-			return listeners
+		return listeners
 
 	},
 }

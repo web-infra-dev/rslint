@@ -48,4 +48,3 @@ func NewSetFromItems[T comparable](items ...T) *Set[T] {
 	}
 	return s
 }
-

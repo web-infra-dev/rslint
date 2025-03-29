@@ -1,28 +1,28 @@
 package only_throw_error
 
 import (
-	"none.none/tsgolint/internal/rule"
-	"none.none/tsgolint/internal/utils"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"none.none/tsgolint/internal/rule"
+	"none.none/tsgolint/internal/utils"
 )
 
 type OnlyThrowErrorOptions struct {
-	Allow          []utils.TypeOrValueSpecifier
+	Allow                []utils.TypeOrValueSpecifier
 	AllowInline          []string
-	AllowThrowingAny *bool
+	AllowThrowingAny     *bool
 	AllowThrowingUnknown *bool
 }
 
-func buildObjectMessage() rule.RuleMessage{
+func buildObjectMessage() rule.RuleMessage {
 	return rule.RuleMessage{
-		Id: "object",
+		Id:          "object",
 		Description: "Expected an error object to be thrown.",
 	}
 }
-func buildUndefMessage() rule.RuleMessage{
+func buildUndefMessage() rule.RuleMessage {
 	return rule.RuleMessage{
-		Id: "undef",
+		Id:          "undef",
 		Description: "Do not throw undefined.",
 	}
 }
@@ -51,12 +51,12 @@ var OnlyThrowErrorRule = rule.Rule{
 			ast.KindThrowStatement: func(node *ast.Node) {
 				expr := node.Expression()
 				// TODO(port): why do we ignore await and yield here??
-      	// if (
-      	//   node.type === AST_NODE_TYPES.AwaitExpression ||
-      	//   node.type === AST_NODE_TYPES.YieldExpression
-      	// ) {
-      	//   return;
-      	// }
+				// if (
+				//   node.type === AST_NODE_TYPES.AwaitExpression ||
+				//   node.type === AST_NODE_TYPES.YieldExpression
+				// ) {
+				//   return;
+				// }
 
 				t := ctx.TypeChecker.GetTypeAtLocation(expr)
 
@@ -66,7 +66,7 @@ var OnlyThrowErrorRule = rule.Rule{
 
 				if utils.IsTypeFlagSet(t, checker.TypeFlagsUndefined) {
 					ctx.ReportNode(node, buildUndefMessage())
-					return 
+					return
 				}
 
 				if *opts.AllowThrowingAny && utils.IsTypeAnyType(t) {
@@ -80,7 +80,6 @@ var OnlyThrowErrorRule = rule.Rule{
 				if utils.IsErrorLike(ctx.Program, ctx.TypeChecker, t) {
 					return
 				}
-
 
 				ctx.ReportNode(expr, buildObjectMessage())
 			},

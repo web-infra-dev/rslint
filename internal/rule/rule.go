@@ -1,25 +1,26 @@
 package rule
 
 import (
-	"none.none/tsgolint/internal/utils"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
+	"none.none/tsgolint/internal/utils"
 )
 
 const (
-	lastTokenKind ast.Kind = 1000
-	lastOnExitTokenKind ast.Kind = 2000
-	lastOnAllowPatternTokenKind ast.Kind = 3000
-	lastOnAllowPatternOnExitTokenKind ast.Kind = 4000
-	lastOnNotAllowPatternTokenKind ast.Kind = 5000
+	lastTokenKind                        ast.Kind = 1000
+	lastOnExitTokenKind                  ast.Kind = 2000
+	lastOnAllowPatternTokenKind          ast.Kind = 3000
+	lastOnAllowPatternOnExitTokenKind    ast.Kind = 4000
+	lastOnNotAllowPatternTokenKind       ast.Kind = 5000
 	lastOnNotAllowPatternOnExitTokenKind ast.Kind = 6000
 )
 
 func ListenerOnExit(kind ast.Kind) ast.Kind {
 	return kind + 1000
 }
+
 // TODO(port): better name
 func ListenerOnAllowPattern(kind ast.Kind) ast.Kind {
 	return kind + lastOnExitTokenKind
@@ -28,8 +29,7 @@ func ListenerOnNotAllowPattern(kind ast.Kind) ast.Kind {
 	return kind + lastOnAllowPatternOnExitTokenKind
 }
 
-
-type RuleListeners map[ast.Kind](func (node *ast.Node))
+type RuleListeners map[ast.Kind](func(node *ast.Node))
 
 type Rule struct {
 	Name string
@@ -49,13 +49,13 @@ type RuleFix struct {
 func RuleFixInsertBefore(file *ast.SourceFile, node *ast.Node, text string) RuleFix {
 	trimmed := utils.TrimNodeTextRange(file, node)
 	return RuleFix{
-		Text: text,
+		Text:  text,
 		Range: trimmed.WithEnd(trimmed.Pos()),
 	}
 }
 func RuleFixInsertAfter(node *ast.Node, text string) RuleFix {
 	return RuleFix{
-		Text: text,
+		Text:  text,
 		Range: node.Loc.WithPos(node.End()),
 	}
 }
@@ -64,7 +64,7 @@ func RuleFixReplace(file *ast.SourceFile, node *ast.Node, text string) RuleFix {
 }
 func RuleFixReplaceRange(textRange core.TextRange, text string) RuleFix {
 	return RuleFix{
-		Text: text,
+		Text:  text,
 		Range: textRange,
 	}
 }
@@ -85,9 +85,9 @@ func (s RuleSuggestion) Fixes() []RuleFix {
 }
 
 type RuleDiagnostic struct {
-	Range   core.TextRange
+	Range    core.TextRange
 	RuleName string
-	Message RuleMessage
+	Message  RuleMessage
 	// nil if no fixes were provided
 	FixesPtr *[]RuleFix
 	// nil if no suggestions were provided
@@ -103,10 +103,10 @@ func (d RuleDiagnostic) Fixes() []RuleFix {
 }
 
 type RuleContext struct {
-	SourceFile *ast.SourceFile
+	SourceFile                *ast.SourceFile
 	Program                   *compiler.Program
 	TypeChecker               *checker.Checker
-	ReportRange                func(textRange core.TextRange, msg RuleMessage)
+	ReportRange               func(textRange core.TextRange, msg RuleMessage)
 	ReportNode                func(node *ast.Node, msg RuleMessage)
 	ReportNodeWithFixes       func(node *ast.Node, msg RuleMessage, fixes ...RuleFix)
 	ReportNodeWithSuggestions func(node *ast.Node, msg RuleMessage, suggestions ...RuleSuggestion)

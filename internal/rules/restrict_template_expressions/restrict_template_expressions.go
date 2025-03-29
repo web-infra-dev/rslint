@@ -3,29 +3,29 @@ package restrict_template_expressions
 import (
 	"fmt"
 
-	"none.none/tsgolint/internal/rule"
-	"none.none/tsgolint/internal/utils"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"none.none/tsgolint/internal/rule"
+	"none.none/tsgolint/internal/utils"
 )
 
-func buildInvalidTypeMessage(t string) rule.RuleMessage{
+func buildInvalidTypeMessage(t string) rule.RuleMessage {
 	return rule.RuleMessage{
-		Id: "invalidType",
+		Id:          "invalidType",
 		Description: fmt.Sprintf("Invalid type \"%v\" of template literal expression.", t),
 	}
 }
 
 type RestrictTemplateExpressionsOptions struct {
-    AllowAny *bool
-    AllowArray *bool
-    AllowBoolean *bool
-    AllowNullish *bool
-    AllowNumber *bool
-    AllowRegExp *bool
-    AllowNever *bool
-		Allow          []utils.TypeOrValueSpecifier
-		AllowInline          []string
+	AllowAny     *bool
+	AllowArray   *bool
+	AllowBoolean *bool
+	AllowNullish *bool
+	AllowNumber  *bool
+	AllowRegExp  *bool
+	AllowNever   *bool
+	Allow        []utils.TypeOrValueSpecifier
+	AllowInline  []string
 }
 
 var RestrictTemplateExpressionsRule = rule.Rule{
@@ -36,7 +36,7 @@ var RestrictTemplateExpressionsRule = rule.Rule{
 			opts = RestrictTemplateExpressionsOptions{}
 		}
 		if opts.Allow == nil {
-     	opts.Allow = []utils.TypeOrValueSpecifier{{
+			opts.Allow = []utils.TypeOrValueSpecifier{{
 				From: utils.TypeOrValueSpecifierFromLib,
 				Name: []string{"Error", "URL", "URLSearchParams"},
 			}}
@@ -85,38 +85,36 @@ var RestrictTemplateExpressionsRule = rule.Rule{
 
 		globalRegexpType := checker.Checker_globalRegExpType(ctx.TypeChecker)
 
-		var isTypeAllowed func(innerType *checker.Type)bool 
-		isTypeAllowed=func(innerType *checker.Type)bool {
+		var isTypeAllowed func(innerType *checker.Type) bool
+		isTypeAllowed = func(innerType *checker.Type) bool {
 			return utils.Every(utils.UnionTypeParts(innerType), func(t *checker.Type) bool {
 				return utils.Some(utils.IntersectionTypeParts(t), func(t *checker.Type) bool {
-				return utils.IsTypeFlagSet(t, allowedFlags) ||
-					utils.TypeMatchesSomeSpecifier(t, opts.Allow, opts.AllowInline, ctx.Program) ||
-					(*opts.AllowArray && checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t) && isTypeAllowed(utils.GetNumberIndexType(ctx.TypeChecker, t))) ||
-					(*opts.AllowRegExp && t == globalRegexpType)
+					return utils.IsTypeFlagSet(t, allowedFlags) ||
+						utils.TypeMatchesSomeSpecifier(t, opts.Allow, opts.AllowInline, ctx.Program) ||
+						(*opts.AllowArray && checker.Checker_isArrayOrTupleType(ctx.TypeChecker, t) && isTypeAllowed(utils.GetNumberIndexType(ctx.TypeChecker, t))) ||
+						(*opts.AllowRegExp && t == globalRegexpType)
 				})
 			})
-    }
-
+		}
 
 		return rule.RuleListeners{
 			ast.KindTemplateExpression: func(node *ast.Node) {
-        // don't check tagged template literals
-        if ast.IsTaggedTemplateExpression(node.Parent) {
-          return
-        }
+				// don't check tagged template literals
+				if ast.IsTaggedTemplateExpression(node.Parent) {
+					return
+				}
 
 				for _, span := range node.AsTemplateExpression().TemplateSpans.Nodes {
 					expression := span.Expression()
 					expressionType := utils.GetConstrainedTypeAtLocation(
 						ctx.TypeChecker,
-    	        expression,
-    	      )
+						expression,
+					)
 					if !isTypeAllowed(expressionType) {
 						ctx.ReportNode(expression, buildInvalidTypeMessage(ctx.TypeChecker.TypeToString(expressionType)))
 					}
 				}
-      },
-
+			},
 		}
 	},
 }

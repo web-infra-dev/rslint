@@ -16,16 +16,15 @@ import (
 
 type ConfiguredRule struct {
 	Name string
-	Run func (ctx rule.RuleContext) rule.RuleListeners
+	Run  func(ctx rule.RuleContext) rule.RuleListeners
 }
 
-func RunLinter(singleThreaded bool, fs vfs.FS, fileNames []string, getRulesForFile func (sourceFile *ast.SourceFile) []ConfiguredRule, cwd string, tsconfigPath string, onDiagnostic func(diagnostic rule.RuleDiagnostic)) error {
+func RunLinter(singleThreaded bool, fs vfs.FS, fileNames []string, getRulesForFile func(sourceFile *ast.SourceFile) []ConfiguredRule, cwd string, tsconfigPath string, onDiagnostic func(diagnostic rule.RuleDiagnostic)) error {
 	program, err := utils.CreateProgram(singleThreaded, fs, cwd, tsconfigPath)
 
 	if err != nil {
 		return err
 	}
-
 
 	var files []*ast.SourceFile
 	if len(fileNames) == 0 {
@@ -49,7 +48,7 @@ func RunLinter(singleThreaded bool, fs vfs.FS, fileNames []string, getRulesForFi
 	slices.SortFunc(files, func(a *ast.SourceFile, b *ast.SourceFile) int {
 		return len(b.Text) - len(a.Text)
 	})
-	for _, file := range files  {
+	for _, file := range files {
 		queue <- file
 	}
 	close(queue)
@@ -57,18 +56,18 @@ func RunLinter(singleThreaded bool, fs vfs.FS, fileNames []string, getRulesForFi
 	wg := core.NewWorkGroup(singleThreaded)
 	for _, checker := range program.GetTypeCheckers() {
 		wg.Queue(func() {
-			registeredListeners := make(map[ast.Kind][](func (node *ast.Node)), 20)
+			registeredListeners := make(map[ast.Kind][](func(node *ast.Node)), 20)
 
 			for file := range queue {
 				rules := getRulesForFile(file)
 				for _, r := range rules {
 					ctx := rule.RuleContext{
-						SourceFile: file,
+						SourceFile:  file,
 						Program:     program,
 						TypeChecker: checker,
 						ReportRange: func(textRange core.TextRange, msg rule.RuleMessage) {
 							onDiagnostic(rule.RuleDiagnostic{
-								RuleName: r.Name,
+								RuleName:   r.Name,
 								Range:      textRange,
 								Message:    msg,
 								SourceFile: file,
@@ -76,7 +75,7 @@ func RunLinter(singleThreaded bool, fs vfs.FS, fileNames []string, getRulesForFi
 						},
 						ReportNode: func(node *ast.Node, msg rule.RuleMessage) {
 							onDiagnostic(rule.RuleDiagnostic{
-								RuleName: r.Name,
+								RuleName:   r.Name,
 								Range:      utils.TrimNodeTextRange(file, node),
 								Message:    msg,
 								SourceFile: file,
@@ -84,18 +83,18 @@ func RunLinter(singleThreaded bool, fs vfs.FS, fileNames []string, getRulesForFi
 						},
 						ReportNodeWithFixes: func(node *ast.Node, msg rule.RuleMessage, fixes ...rule.RuleFix) {
 							onDiagnostic(rule.RuleDiagnostic{
-								RuleName: r.Name,
+								RuleName:   r.Name,
 								Range:      utils.TrimNodeTextRange(file, node),
 								Message:    msg,
-								FixesPtr:      &fixes,
+								FixesPtr:   &fixes,
 								SourceFile: file,
 							})
 						},
 
 						ReportNodeWithSuggestions: func(node *ast.Node, msg rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
 							onDiagnostic(rule.RuleDiagnostic{
-								RuleName: r.Name,
-								Range:      utils.TrimNodeTextRange(file, node),
+								RuleName:    r.Name,
+								Range:       utils.TrimNodeTextRange(file, node),
 								Message:     msg,
 								Suggestions: &suggestions,
 								SourceFile:  file,
@@ -106,14 +105,13 @@ func RunLinter(singleThreaded bool, fs vfs.FS, fileNames []string, getRulesForFi
 					for kind, listener := range r.Run(ctx) {
 						listeners, ok := registeredListeners[kind]
 						if !ok {
-							listeners = make([](func (node *ast.Node)), 0, len(rules))
+							listeners = make([](func(node *ast.Node)), 0, len(rules))
 						}
 						registeredListeners[kind] = append(listeners, listener)
 					}
 				}
 
-
-				runListeners := func (kind ast.Kind, node *ast.Node) {
+				runListeners := func(kind ast.Kind, node *ast.Node) {
 					if listeners, ok := registeredListeners[kind]; ok {
 						for _, listener := range listeners {
 							listener(node)
@@ -122,21 +120,21 @@ func RunLinter(singleThreaded bool, fs vfs.FS, fileNames []string, getRulesForFi
 				}
 
 				/* convert.ts -> allowPattern:
-					  catch name
-					  variabledeclaration name
-					  forinstatement initializer
-					  forofstatement initializer
-					  (propagation) allowPattern > arrayliteralexpression elements
-					  (propagation) allowPattern > objectliteralexpression properties
-					  (propagation) allowPattern > spreadassignment,spreadelement expression
-					  (propagation) allowPattern > propertyassignment value
-					  arraybindingpattern elements
-					  objectbindingpattern elements
-					  (init) binaryexpression(with '=' operator') left
+				catch name
+				variabledeclaration name
+				forinstatement initializer
+				forofstatement initializer
+				(propagation) allowPattern > arrayliteralexpression elements
+				(propagation) allowPattern > objectliteralexpression properties
+				(propagation) allowPattern > spreadassignment,spreadelement expression
+				(propagation) allowPattern > propertyassignment value
+				arraybindingpattern elements
+				objectbindingpattern elements
+				(init) binaryexpression(with '=' operator') left
 				*/
 
 				var childVisitor ast.Visitor
-				var patternVisitor func (node *ast.Node)
+				var patternVisitor func(node *ast.Node)
 				patternVisitor = func(node *ast.Node) {
 					runListeners(node.Kind, node)
 					kind := rule.ListenerOnAllowPattern(node.Kind)

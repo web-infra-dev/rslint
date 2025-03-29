@@ -16,14 +16,13 @@ import (
 	"gotest.tools/v3/assert"
 )
 
-
 type ValidTestCase struct {
-	Code string
-	Only bool
-	Skip bool
-	Options any
+	Code     string
+	Only     bool
+	Skip     bool
+	Options  any
 	TSConfig string
-	Tsx bool
+	Tsx      bool
 }
 
 type InvalidTestCaseError struct {
@@ -41,14 +40,14 @@ type InvalidTestCaseSuggestion struct {
 }
 
 type InvalidTestCase struct {
-	Code   string
-	Only   bool
-	Skip   bool
-	Output []string
-	Errors []InvalidTestCaseError
+	Code     string
+	Only     bool
+	Skip     bool
+	Output   []string
+	Errors   []InvalidTestCaseError
 	TSConfig string
-	Options any
-	Tsx bool
+	Options  any
+	Tsx      bool
 }
 
 func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Rule, validTestCases []ValidTestCase, invalidTestCases []InvalidTestCase) {

@@ -4,38 +4,37 @@ import (
 	"fmt"
 	"slices"
 
-	"none.none/tsgolint/internal/rule"
-	"none.none/tsgolint/internal/utils"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"none.none/tsgolint/internal/rule"
+	"none.none/tsgolint/internal/utils"
 )
 
-func buildAddMissingCasesMessage() rule.RuleMessage{
+func buildAddMissingCasesMessage() rule.RuleMessage {
 	return rule.RuleMessage{
-		Id: "addMissingCases",
+		Id:          "addMissingCases",
 		Description: "Add branches for missing cases.",
 	}
 }
-func buildDangerousDefaultCaseMessage() rule.RuleMessage{
+func buildDangerousDefaultCaseMessage() rule.RuleMessage {
 	return rule.RuleMessage{
-		Id: "dangerousDefaultCase",
+		Id:          "dangerousDefaultCase",
 		Description: "The switch statement is exhaustive, so the default case is unnecessary.",
 	}
 }
-func buildSwitchIsNotExhaustiveMessage(missingBranches string) rule.RuleMessage{
+func buildSwitchIsNotExhaustiveMessage(missingBranches string) rule.RuleMessage {
 	return rule.RuleMessage{
-		Id: "switchIsNotExhaustive",
+		Id:          "switchIsNotExhaustive",
 		Description: fmt.Sprintf("Switch is not exhaustive. Cases not matched: %v", missingBranches),
 	}
 }
 
 type SwitchExhaustivenessCheckOptions struct {
 	AllowDefaultCaseForExhaustiveSwitch *bool
-	ConsiderDefaultExhaustiveForUnions *bool
-	DefaultCaseCommentPattern *string
-	RequireDefaultForNonUnion *bool
+	ConsiderDefaultExhaustiveForUnions  *bool
+	DefaultCaseCommentPattern           *string
+	RequireDefaultForNonUnion           *bool
 }
-
 
 type SwitchMetadata struct {
 	ContainsNonLiteralType bool
@@ -48,52 +47,50 @@ type SwitchMetadata struct {
 
 var SwitchExhaustivenessCheckRule = rule.Rule{
 	Name: "switch-exhaustiveness-check",
-	Run: func(ctx rule.RuleContext, options any)rule.RuleListeners {
+	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(SwitchExhaustivenessCheckOptions)
 		if !ok {
 			opts = SwitchExhaustivenessCheckOptions{}
 		}
 		if opts.AllowDefaultCaseForExhaustiveSwitch == nil {
-		      opts.AllowDefaultCaseForExhaustiveSwitch = utils.Ref( true)
-				}
-				if opts.ConsiderDefaultExhaustiveForUnions == nil {
-      opts.ConsiderDefaultExhaustiveForUnions = utils.Ref( false)
+			opts.AllowDefaultCaseForExhaustiveSwitch = utils.Ref(true)
+		}
+		if opts.ConsiderDefaultExhaustiveForUnions == nil {
+			opts.ConsiderDefaultExhaustiveForUnions = utils.Ref(false)
 		}
 		if opts.RequireDefaultForNonUnion == nil {
-      opts.RequireDefaultForNonUnion = utils.Ref( false)
+			opts.RequireDefaultForNonUnion = utils.Ref(false)
 		}
-
 
 		isLiteralLikeType := func(t *checker.Type) bool {
 			return utils.IsTypeFlagSet(
 				t,
-				checker.TypeFlagsLiteral | checker.TypeFlagsUndefined | checker.TypeFlagsNull | checker.TypeFlagsUniqueESSymbol,
+				checker.TypeFlagsLiteral|checker.TypeFlagsUndefined|checker.TypeFlagsNull|checker.TypeFlagsUniqueESSymbol,
 			)
-}
+		}
 
-
-/**
- * For example:
- *
- * - `"foo" | "bar"` is a type with all literal types.
- * - `"foo" | number` is a type that contains non-literal types.
- * - `"foo" & { bar: 1 }` is a type that contains non-literal types.
- *
- * Default cases are never superfluous in switches with non-literal types.
- */
- doesTypeContainNonLiteralType:=func(t *checker.Type)bool {
-  return utils.Some(
-		utils.UnionTypeParts(t),
-		func(t *checker.Type) bool {
-			return utils.Every(
-				utils.IntersectionTypeParts(t),
+		/**
+		 * For example:
+		 *
+		 * - `"foo" | "bar"` is a type with all literal types.
+		 * - `"foo" | number` is a type that contains non-literal types.
+		 * - `"foo" & { bar: 1 }` is a type that contains non-literal types.
+		 *
+		 * Default cases are never superfluous in switches with non-literal types.
+		 */
+		doesTypeContainNonLiteralType := func(t *checker.Type) bool {
+			return utils.Some(
+				utils.UnionTypeParts(t),
 				func(t *checker.Type) bool {
-					return !isLiteralLikeType(t)
+					return utils.Every(
+						utils.IntersectionTypeParts(t),
+						func(t *checker.Type) bool {
+							return !isLiteralLikeType(t)
+						},
+					)
 				},
 			)
-		},
-	)
-}
+		}
 
 		getSwitchMetadata := func(node *ast.SwitchStatement) *SwitchMetadata {
 			cases := node.CaseBlock.AsCaseBlock().Clauses.Nodes
@@ -120,22 +117,21 @@ var SwitchExhaustivenessCheckRule = rule.Rule{
 
 			missingLiteralBranchTypes := make([]*checker.Type, 0, 10)
 			utils.TypeRecurser(discriminantType, func(t *checker.Type) bool {
-					if slices.Contains(caseTypes, t) || !isLiteralLikeType(t) {
-						return false
-					}
-
-					          // "missing", "optional" and "undefined" types are different runtime objects,
-          // but all of them have TypeFlags.Undefined type flag
-          if (
-						slices.ContainsFunc(caseTypes, func(t *checker.Type) bool {
-							return utils.IsTypeFlagSet(t, checker.TypeFlagsUndefined)
-						}) && utils.IsTypeFlagSet(t, checker.TypeFlagsUndefined)) {
-						return false
-          }
-
-					missingLiteralBranchTypes = append(missingLiteralBranchTypes, t)
-
+				if slices.Contains(caseTypes, t) || !isLiteralLikeType(t) {
 					return false
+				}
+
+				// "missing", "optional" and "undefined" types are different runtime objects,
+				// but all of them have TypeFlags.Undefined type flag
+				if slices.ContainsFunc(caseTypes, func(t *checker.Type) bool {
+					return utils.IsTypeFlagSet(t, checker.TypeFlagsUndefined)
+				}) && utils.IsTypeFlagSet(t, checker.TypeFlagsUndefined) {
+					return false
+				}
+
+				missingLiteralBranchTypes = append(missingLiteralBranchTypes, t)
+
+				return false
 			})
 
 			return &SwitchMetadata{
@@ -148,60 +144,57 @@ var SwitchExhaustivenessCheckRule = rule.Rule{
 		checkSwitchExhaustive := func(node *ast.SwitchStatement, switchMetadata *SwitchMetadata) {
 			// If considerDefaultExhaustiveForUnions is enabled, the presence of a default case
 			// always makes the switch exhaustive.
-			if (*opts.ConsiderDefaultExhaustiveForUnions && switchMetadata.DefaultCase != nil) {
-			  return
+			if *opts.ConsiderDefaultExhaustiveForUnions && switchMetadata.DefaultCase != nil {
+				return
 			}
 
 			if len(switchMetadata.MissingLiteralBranchTypes) > 0 {
 				// TODO(port): more verbose message
-				          //   missingBranches: missingLiteralBranchTypes
-              // .map(missingType =>
-              //   tsutils.isTypeFlagSet(missingType, ts.TypeFlags.ESSymbolLike)
-              //     ? `typeof ${missingType.getSymbol()?.escapedName as string}`
-              //     : typeToString(missingType),
-              // )
-              // .join(' | '),
+				//   missingBranches: missingLiteralBranchTypes
+				// .map(missingType =>
+				//   tsutils.isTypeFlagSet(missingType, ts.TypeFlags.ESSymbolLike)
+				//     ? `typeof ${missingType.getSymbol()?.escapedName as string}`
+				//     : typeToString(missingType),
+				// )
+				// .join(' | '),
 
 				ctx.ReportNode(node.Expression, buildSwitchIsNotExhaustiveMessage("TODO"))
 			}
 		}
 
 		checkSwitchUnnecessaryDefaultCase := func(switchMetadata *SwitchMetadata) {
-     	if *opts.AllowDefaultCaseForExhaustiveSwitch {
-        return
-      }
+			if *opts.AllowDefaultCaseForExhaustiveSwitch {
+				return
+			}
 
-      if (
-        len(switchMetadata.MissingLiteralBranchTypes) == 0 &&
-        switchMetadata.DefaultCase != nil &&
-        !switchMetadata.ContainsNonLiteralType) {
+			if len(switchMetadata.MissingLiteralBranchTypes) == 0 &&
+				switchMetadata.DefaultCase != nil &&
+				!switchMetadata.ContainsNonLiteralType {
 				ctx.ReportNode(&switchMetadata.DefaultCase.Node, buildDangerousDefaultCaseMessage())
-      }
-}
+			}
+		}
 		checkSwitchNoUnionDefaultCase := func(node *ast.SwitchStatement, switchMetadata *SwitchMetadata) {
-		   if !*opts.RequireDefaultForNonUnion {
-        return
-      }
+			if !*opts.RequireDefaultForNonUnion {
+				return
+			}
 
-      if (switchMetadata.ContainsNonLiteralType && switchMetadata.DefaultCase == nil) {
+			if switchMetadata.ContainsNonLiteralType && switchMetadata.DefaultCase == nil {
 				ctx.ReportNode(node.Expression, buildSwitchIsNotExhaustiveMessage("default"))
 				// TODO(port): missing suggestion
-      }
-}
+			}
+		}
 
-return rule.RuleListeners{
-	ast.KindSwitchStatement: func(node *ast.Node) {
+		return rule.RuleListeners{
+			ast.KindSwitchStatement: func(node *ast.Node) {
 
+				stmt := node.AsSwitchStatement()
 
-			stmt := node.AsSwitchStatement()
-
-			metadata := getSwitchMetadata(stmt)
-			checkSwitchExhaustive(stmt, metadata)
-			checkSwitchUnnecessaryDefaultCase(metadata)
-			checkSwitchNoUnionDefaultCase(stmt, metadata)
-	},
-}
-
+				metadata := getSwitchMetadata(stmt)
+				checkSwitchExhaustive(stmt, metadata)
+				checkSwitchUnnecessaryDefaultCase(metadata)
+				checkSwitchNoUnionDefaultCase(stmt, metadata)
+			},
+		}
 
 	},
 }

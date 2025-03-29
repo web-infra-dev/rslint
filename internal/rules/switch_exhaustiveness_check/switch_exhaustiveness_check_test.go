@@ -9,8 +9,8 @@ import (
 )
 
 func TestSwitchExhaustivenessCheckRule(t *testing.T) {
-  rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &SwitchExhaustivenessCheckRule, []rule_tester.ValidTestCase{
-    {Code: `
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &SwitchExhaustivenessCheckRule, []rule_tester.ValidTestCase{
+		{Code: `
 type Day =
   | 'Monday'
   | 'Tuesday'
@@ -54,7 +54,7 @@ switch (day) {
   }
 }
     `},
-    {Code: `
+		{Code: `
 type Num = 0 | 1 | 2;
 
 function test(value: Num): number {
@@ -68,7 +68,7 @@ function test(value: Num): number {
   }
 }
     `},
-    {Code: `
+		{Code: `
 type Bool = true | false;
 
 function test(value: Bool): number {
@@ -80,7 +80,7 @@ function test(value: Bool): number {
   }
 }
     `},
-    {Code: `
+		{Code: `
 type Mix = 0 | 1 | 'two' | 'three' | true;
 
 function test(value: Mix): number {
@@ -98,7 +98,7 @@ function test(value: Mix): number {
   }
 }
     `},
-    {Code: `
+		{Code: `
 type A = 'a';
 type B = 'b';
 type C = 'c';
@@ -115,7 +115,7 @@ function test(value: Union): number {
   }
 }
     `},
-    {Code: `
+		{Code: `
 const A = 'a';
 const B = 1;
 const C = true;
@@ -133,8 +133,8 @@ function test(value: Union): number {
   }
 }
     `},
-    {
-      Code: `
+		{
+			Code: `
 type Day =
   | 'Monday'
   | 'Tuesday'
@@ -157,9 +157,9 @@ switch (day) {
   }
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{ ConsiderDefaultExhaustiveForUnions: utils.Ref(true) },
-    },
-    {Code: `
+			Options: SwitchExhaustivenessCheckOptions{ConsiderDefaultExhaustiveForUnions: utils.Ref(true)},
+		},
+		{Code: `
 const day = 'Monday' as string;
 let result = 0;
 
@@ -174,7 +174,7 @@ switch (day) {
   }
 }
     `},
-    {Code: `
+		{Code: `
 enum Enum {
   A,
   B,
@@ -189,7 +189,7 @@ function test(value: Enum): number {
   }
 }
     `},
-    {Code: `
+		{Code: `
 type ObjectUnion = { a: 1 } | { b: 2 };
 
 function test(value: ObjectUnion): number {
@@ -199,8 +199,8 @@ function test(value: ObjectUnion): number {
   }
 }
     `},
-    {
-      Code: `
+		{
+			Code: `
 declare const value: number;
 switch (value) {
   case 0:
@@ -211,13 +211,13 @@ switch (value) {
     return -1;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-  RequireDefaultForNonUnion: utils.Ref(true),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+		},
+		{
+			Code: `
 declare const value: string;
 switch (value) {
   case 'foo':
@@ -228,13 +228,13 @@ switch (value) {
     return -1;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
 declare const value: number;
 switch (value) {
   case 0:
@@ -245,13 +245,13 @@ switch (value) {
     return -1;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
 declare const value: bigint;
 switch (value) {
   case 0:
@@ -262,13 +262,13 @@ switch (value) {
     return -1;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
 declare const value: symbol;
 const foo = Symbol('foo');
 switch (value) {
@@ -278,13 +278,13 @@ switch (value) {
     return -1;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
 declare const value: 0 | 1 | number;
 switch (value) {
   case 0:
@@ -295,52 +295,52 @@ switch (value) {
     return -1;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
 declare const value: 'literal';
 switch (value) {
   case 'literal':
     return 0;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  RequireDefaultForNonUnion: utils.Ref(true),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+		},
+		{
+			Code: `
 declare const value: null;
 switch (value) {
   case null:
     return 0;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  RequireDefaultForNonUnion: utils.Ref(true),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+		},
+		{
+			Code: `
 declare const value: undefined;
 switch (value) {
   case undefined:
     return 0;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  RequireDefaultForNonUnion: utils.Ref(true),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+		},
+		{
+			Code: `
 declare const value: null | undefined;
 switch (value) {
   case null:
@@ -349,26 +349,26 @@ switch (value) {
     return 0;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  RequireDefaultForNonUnion: utils.Ref(true),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+		},
+		{
+			Code: `
 declare const value: 'literal' & { _brand: true };
 switch (value) {
   case 'literal':
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  RequireDefaultForNonUnion: utils.Ref(true),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+		},
+		{
+			Code: `
 declare const value: ('literal' & { _brand: true }) | 1;
 switch (value) {
   case 'literal':
@@ -377,13 +377,13 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  RequireDefaultForNonUnion: utils.Ref(true),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+		},
+		{
+			Code: `
 declare const value: (1 & { _brand: true }) | 'literal' | null;
 switch (value) {
   case 'literal':
@@ -394,13 +394,13 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  RequireDefaultForNonUnion: utils.Ref(true),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+		},
+		{
+			Code: `
 declare const value: '1' | '2' | number;
 switch (value) {
   case '1':
@@ -409,30 +409,13 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
-declare const value: '1' | '2' | number;
-switch (value) {
-  case '1':
-    break;
-  case '2':
-    break;
-  default:
-    break;
-}
-      `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
 declare const value: '1' | '2' | number;
 switch (value) {
   case '1':
@@ -443,13 +426,30 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
+declare const value: '1' | '2' | number;
+switch (value) {
+  case '1':
+    break;
+  case '2':
+    break;
+  default:
+    break;
+}
+      `,
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
 declare const value: '1' | '2' | (number & { foo: 'bar' });
 switch (value) {
   case '1':
@@ -460,13 +460,13 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
 declare const value: '1' | '2' | number;
 switch (value) {
   case '1':
@@ -477,13 +477,13 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-  RequireDefaultForNonUnion: utils.Ref(true),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+		},
+		{
+			Code: `
 declare const value: number | null | undefined;
 switch (value) {
   case null:
@@ -492,14 +492,14 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-  ConsiderDefaultExhaustiveForUnions: utils.Ref(true),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				ConsiderDefaultExhaustiveForUnions:  utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
 declare const value: '1' | '2' | number;
 switch (value) {
   case '1':
@@ -508,27 +508,27 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  ConsiderDefaultExhaustiveForUnions: utils.Ref(true),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				ConsiderDefaultExhaustiveForUnions:  utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
 declare const value: (string & { foo: 'bar' }) | '1';
 switch (value) {
   case '1':
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
 const a = Symbol('a');
 declare const value: typeof a | 2;
 switch (value) {
@@ -538,50 +538,50 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  RequireDefaultForNonUnion: utils.Ref(true),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+		},
+		{
+			Code: `
 declare const value: string | number;
 switch (value) {
   case 1:
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
 declare const value: string | number;
 switch (value) {
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
 declare const value: string | number;
 switch (value) {
   default:
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  RequireDefaultForNonUnion: utils.Ref(true),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+		},
+		{
+			Code: `
 declare const value: number;
 declare const a: number;
 switch (value) {
@@ -589,26 +589,26 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
 declare const value: bigint;
 switch (value) {
   case 10n:
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
 declare const value: symbol;
 const a = Symbol('a');
 switch (value) {
@@ -616,13 +616,13 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
 declare const value: symbol;
 const a = Symbol('a');
 switch (value) {
@@ -632,13 +632,13 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-  RequireDefaultForNonUnion: utils.Ref(true),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+		},
+		{
+			Code: `
 const a = Symbol('a');
 declare const value: typeof a | string;
 switch (value) {
@@ -648,13 +648,13 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-  RequireDefaultForNonUnion: utils.Ref(true),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+		},
+		{
+			Code: `
 const a = Symbol('a');
 declare const value: typeof a | string;
 switch (value) {
@@ -662,14 +662,14 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-  ConsiderDefaultExhaustiveForUnions: utils.Ref(true),
-  RequireDefaultForNonUnion: utils.Ref(true),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				ConsiderDefaultExhaustiveForUnions:  utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+		},
+		{
+			Code: `
 declare const value: boolean | 1;
 switch (value) {
   case 1:
@@ -678,14 +678,14 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-  ConsiderDefaultExhaustiveForUnions: utils.Ref(true),
-  RequireDefaultForNonUnion: utils.Ref(true),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				ConsiderDefaultExhaustiveForUnions:  utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+		},
+		{
+			Code: `
 declare const value: boolean | 1;
 switch (value) {
   case 1:
@@ -698,13 +698,13 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
 enum Aaa {
   Foo,
   Bar,
@@ -719,13 +719,13 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-  RequireDefaultForNonUnion: utils.Ref(false),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+		},
+		{
+			Code: `
 declare const literal: 'a' | 'b';
 switch (literal) {
   case 'a':
@@ -734,13 +734,13 @@ switch (literal) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-  ConsiderDefaultExhaustiveForUnions: utils.Ref(true),
-  RequireDefaultForNonUnion: utils.Ref(true),
-},
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				ConsiderDefaultExhaustiveForUnions: utils.Ref(true),
+				RequireDefaultForNonUnion:          utils.Ref(true),
+			},
+		},
+		{
+			Code: `
 declare const literal: 'a' | 'b';
 switch (literal) {
   case 'a':
@@ -749,10 +749,10 @@ switch (literal) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{ ConsiderDefaultExhaustiveForUnions: utils.Ref(true) },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{ConsiderDefaultExhaustiveForUnions: utils.Ref(true)},
+		},
+		{
+			Code: `
 declare const literal: 'a' | 'b';
 switch (literal) {
   case 'a':
@@ -761,10 +761,10 @@ switch (literal) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{ AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false) },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false)},
+		},
+		{
+			Code: `
 enum MyEnum {
   Foo = 'Foo',
   Bar = 'Bar',
@@ -783,10 +783,10 @@ switch (myEnum) {
   }
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{ ConsiderDefaultExhaustiveForUnions: utils.Ref(true) },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{ConsiderDefaultExhaustiveForUnions: utils.Ref(true)},
+		},
+		{
+			Code: `
 declare const value: boolean;
 switch (value) {
   case false:
@@ -796,10 +796,10 @@ switch (value) {
   }
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{ ConsiderDefaultExhaustiveForUnions: utils.Ref(true) },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{ConsiderDefaultExhaustiveForUnions: utils.Ref(true)},
+		},
+		{
+			Code: `
 function foo(x: string[]) {
   switch (x[0]) {
     case 'hi':
@@ -810,9 +810,9 @@ function foo(x: string[]) {
 }
       `,
 			TSConfig: "tsconfig.noUncheckedIndexedAccess.json",
-    },
-    {
-      Code: `
+		},
+		{
+			Code: `
 function foo(x: string[], y: string | undefined) {
   const a = x[0];
   if (typeof a === 'string') {
@@ -827,9 +827,9 @@ function foo(x: string[], y: string | undefined) {
 }
       `,
 			TSConfig: "tsconfig.noUncheckedIndexedAccess.json",
-    },
-    {
-      Code: `
+		},
+		{
+			Code: `
 declare const value: number;
 switch (value) {
   case 0:
@@ -840,11 +840,11 @@ switch (value) {
 }
       `,
 			// TODO(port): add support for DefaultCaseCommentPattern
-			Skip: true,
-      Options: SwitchExhaustivenessCheckOptions{ RequireDefaultForNonUnion: utils.Ref(true), },
-    },
-    {
-      Code: `
+			Skip:    true,
+			Options: SwitchExhaustivenessCheckOptions{RequireDefaultForNonUnion: utils.Ref(true)},
+		},
+		{
+			Code: `
 declare const value: 'a' | 'b';
 switch (value) {
   case 'a':
@@ -853,11 +853,11 @@ switch (value) {
 }
       `,
 			// TODO(port): add support for DefaultCaseCommentPattern
-			Skip: true,
-      Options: SwitchExhaustivenessCheckOptions{ ConsiderDefaultExhaustiveForUnions: utils.Ref(true) },
-    },
-    {
-      Code: `
+			Skip:    true,
+			Options: SwitchExhaustivenessCheckOptions{ConsiderDefaultExhaustiveForUnions: utils.Ref(true)},
+		},
+		{
+			Code: `
 declare const value: 'a' | 'b';
 switch (value) {
   case 'a':
@@ -867,313 +867,313 @@ switch (value) {
       `,
 			// TODO(port): add support for DefaultCaseCommentPattern
 			Skip: true,
-      Options: SwitchExhaustivenessCheckOptions{
-  ConsiderDefaultExhaustiveForUnions: utils.Ref(true),
-  DefaultCaseCommentPattern: utils.Ref("^skip\\sdefault"),
-},
-    },
-  }, []rule_tester.InvalidTestCase{
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				ConsiderDefaultExhaustiveForUnions: utils.Ref(true),
+				DefaultCaseCommentPattern:          utils.Ref("^skip\\sdefault"),
+			},
+		},
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code: `
 declare const value: 'literal';
 switch (value) {
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(true),
-  },
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 3,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: 'literal';
-// switch (value) {
-// case "literal": { throw new Error('Not implemented yet: "literal" case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      3,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const value: 'literal';
+					// switch (value) {
+					// case "literal": { throw new Error('Not implemented yet: "literal" case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 declare const value: 'literal' & { _brand: true };
 switch (value) {
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(true),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 3,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: 'literal' & { _brand: true };
-// switch (value) {
-// case "literal": { throw new Error('Not implemented yet: "literal" case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      3,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const value: 'literal' & { _brand: true };
+					// switch (value) {
+					// case "literal": { throw new Error('Not implemented yet: "literal" case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 declare const value: ('literal' & { _brand: true }) | 1;
 switch (value) {
   case 'literal':
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(true),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 3,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: ('literal' & { _brand: true }) | 1;
-// switch (value) {
-//   case 'literal':
-//     break;
-//   case 1: { throw new Error('Not implemented yet: 1 case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      3,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const value: ('literal' & { _brand: true }) | 1;
+					// switch (value) {
+					//   case 'literal':
+					//     break;
+					//   case 1: { throw new Error('Not implemented yet: 1 case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 declare const value: '1' | '2' | number;
 switch (value) {
   case '1':
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-    RequireDefaultForNonUnion: utils.Ref(false),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 3,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: '1' | '2' | number;
-// switch (value) {
-//   case '1':
-//     break;
-//   case "2": { throw new Error('Not implemented yet: "2" case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      3,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const value: '1' | '2' | number;
+					// switch (value) {
+					//   case '1':
+					//     break;
+					//   case "2": { throw new Error('Not implemented yet: "2" case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 declare const value: '1' | '2' | number;
 switch (value) {
   case '1':
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-    RequireDefaultForNonUnion: utils.Ref(true),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 3,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: '1' | '2' | number;
-// switch (value) {
-//   case '1':
-//     break;
-//   case "2": { throw new Error('Not implemented yet: "2" case') }
-// }
-//       `,
-//               },
-//             },
-          },
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 3,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: '1' | '2' | number;
-// switch (value) {
-//   case '1':
-//     break;
-//   default: { throw new Error('default case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      3,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const value: '1' | '2' | number;
+					// switch (value) {
+					//   case '1':
+					//     break;
+					//   case "2": { throw new Error('Not implemented yet: "2" case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      3,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const value: '1' | '2' | number;
+					// switch (value) {
+					//   case '1':
+					//     break;
+					//   default: { throw new Error('default case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 declare const value: (string & { foo: 'bar' }) | '1';
 switch (value) {
   case '1':
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-    RequireDefaultForNonUnion: utils.Ref(true),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 3,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: (string & { foo: 'bar' }) | '1';
-// switch (value) {
-//   case '1':
-//     break;
-//   default: { throw new Error('default case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      3,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const value: (string & { foo: 'bar' }) | '1';
+					// switch (value) {
+					//   case '1':
+					//     break;
+					//   default: { throw new Error('default case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 declare const value: (string & { foo: 'bar' }) | '1' | 1 | null | undefined;
 switch (value) {
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(true),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 3,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: (string & { foo: 'bar' }) | '1' | 1 | null | undefined;
-// switch (value) {
-// case undefined: { throw new Error('Not implemented yet: undefined case') }
-// case null: { throw new Error('Not implemented yet: null case') }
-// case "1": { throw new Error('Not implemented yet: "1" case') }
-// case 1: { throw new Error('Not implemented yet: 1 case') }
-// }
-//       `,
-//               },
-//             },
-          },
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 3,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: (string & { foo: 'bar' }) | '1' | 1 | null | undefined;
-// switch (value) {
-// default: { throw new Error('default case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      3,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const value: (string & { foo: 'bar' }) | '1' | 1 | null | undefined;
+					// switch (value) {
+					// case undefined: { throw new Error('Not implemented yet: undefined case') }
+					// case null: { throw new Error('Not implemented yet: null case') }
+					// case "1": { throw new Error('Not implemented yet: "1" case') }
+					// case 1: { throw new Error('Not implemented yet: 1 case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      3,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const value: (string & { foo: 'bar' }) | '1' | 1 | null | undefined;
+					// switch (value) {
+					// default: { throw new Error('default case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 declare const value: string | number;
 switch (value) {
   case 1:
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(true),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 3,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: string | number;
-// switch (value) {
-//   case 1:
-//     break;
-//   default: { throw new Error('default case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      3,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const value: string | number;
+					// switch (value) {
+					//   case 1:
+					//     break;
+					//   default: { throw new Error('default case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 declare const value: number;
 declare const a: number;
 switch (value) {
@@ -1181,69 +1181,69 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(true),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 4,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: number;
-// declare const a: number;
-// switch (value) {
-//   case a:
-//     break;
-//   default: { throw new Error('default case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      4,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const value: number;
+					// declare const a: number;
+					// switch (value) {
+					//   case a:
+					//     break;
+					//   default: { throw new Error('default case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 declare const value: bigint;
 switch (value) {
   case 10n:
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(true),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 3,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: bigint;
-// switch (value) {
-//   case 10n:
-//     break;
-//   default: { throw new Error('default case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      3,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const value: bigint;
+					// switch (value) {
+					//   case 10n:
+					//     break;
+					//   default: { throw new Error('default case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 declare const value: symbol;
 const a = Symbol('a');
 switch (value) {
@@ -1251,35 +1251,35 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(true),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 4,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: symbol;
-// const a = Symbol('a');
-// switch (value) {
-//   case a:
-//     break;
-//   default: { throw new Error('default case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      4,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const value: symbol;
+					// const a = Symbol('a');
+					// switch (value) {
+					//   case a:
+					//     break;
+					//   default: { throw new Error('default case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 const a = Symbol('aa');
 const b = Symbol('bb');
 declare const value: typeof a | typeof b | 1;
@@ -1288,37 +1288,37 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(true),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 5,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// const a = Symbol('aa');
-// const b = Symbol('bb');
-// declare const value: typeof a | typeof b | 1;
-// switch (value) {
-//   case 1:
-//     break;
-//   case a: { throw new Error('Not implemented yet: a case') }
-//   case b: { throw new Error('Not implemented yet: b case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      5,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// const a = Symbol('aa');
+					// const b = Symbol('bb');
+					// declare const value: typeof a | typeof b | 1;
+					// switch (value) {
+					//   case 1:
+					//     break;
+					//   case a: { throw new Error('Not implemented yet: a case') }
+					//   case b: { throw new Error('Not implemented yet: b case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 const a = Symbol('a');
 declare const value: typeof a | string;
 switch (value) {
@@ -1326,189 +1326,189 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(true),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 4,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// const a = Symbol('a');
-// declare const value: typeof a | string;
-// switch (value) {
-//   case a:
-//     break;
-//   default: { throw new Error('default case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      4,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// const a = Symbol('a');
+					// declare const value: typeof a | string;
+					// switch (value) {
+					//   case a:
+					//     break;
+					//   default: { throw new Error('default case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 declare const value: boolean;
 switch (value) {
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(false),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 3,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: boolean;
-// switch (value) {
-// case false: { throw new Error('Not implemented yet: false case') }
-// case true: { throw new Error('Not implemented yet: true case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      3,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const value: boolean;
+					// switch (value) {
+					// case false: { throw new Error('Not implemented yet: false case') }
+					// case true: { throw new Error('Not implemented yet: true case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 declare const value: boolean | 1;
 switch (value) {
   case false:
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(true),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 3,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: boolean | 1;
-// switch (value) {
-//   case false:
-//     break;
-//   case true: { throw new Error('Not implemented yet: true case') }
-//   case 1: { throw new Error('Not implemented yet: 1 case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      3,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const value: boolean | 1;
+					// switch (value) {
+					//   case false:
+					//     break;
+					//   case true: { throw new Error('Not implemented yet: true case') }
+					//   case 1: { throw new Error('Not implemented yet: 1 case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 declare const value: boolean | number;
 switch (value) {
   case 1:
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(true),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 3,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: boolean | number;
-// switch (value) {
-//   case 1:
-//     break;
-//   case false: { throw new Error('Not implemented yet: false case') }
-//   case true: { throw new Error('Not implemented yet: true case') }
-// }
-//       `,
-//               },
-//             },
-          },
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 3,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: boolean | number;
-// switch (value) {
-//   case 1:
-//     break;
-//   default: { throw new Error('default case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      3,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const value: boolean | number;
+					// switch (value) {
+					//   case 1:
+					//     break;
+					//   case false: { throw new Error('Not implemented yet: false case') }
+					//   case true: { throw new Error('Not implemented yet: true case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      3,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const value: boolean | number;
+					// switch (value) {
+					//   case 1:
+					//     break;
+					//   default: { throw new Error('default case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 declare const value: object;
 switch (value) {
   case 1:
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(true),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 3,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: object;
-// switch (value) {
-//   case 1:
-//     break;
-//   default: { throw new Error('default case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      3,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const value: object;
+					// switch (value) {
+					//   case 1:
+					//     break;
+					//   default: { throw new Error('default case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 enum Aaa {
   Foo,
   Bar,
@@ -1521,65 +1521,65 @@ switch (value) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-    RequireDefaultForNonUnion: utils.Ref(true),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 7,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// enum Aaa {
-//   Foo,
-//   Bar,
-// }
-// declare const value: Aaa | 1 | string;
-// switch (value) {
-//   case 1:
-//     break;
-//   case Aaa.Foo:
-//     break;
-//   case Aaa.Bar: { throw new Error('Not implemented yet: Aaa.Bar case') }
-// }
-//       `,
-//               },
-//             },
-          },
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 7,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// enum Aaa {
-//   Foo,
-//   Bar,
-// }
-// declare const value: Aaa | 1 | string;
-// switch (value) {
-//   case 1:
-//     break;
-//   case Aaa.Foo:
-//     break;
-//   default: { throw new Error('default case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      7,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// enum Aaa {
+					//   Foo,
+					//   Bar,
+					// }
+					// declare const value: Aaa | 1 | string;
+					// switch (value) {
+					//   case 1:
+					//     break;
+					//   case Aaa.Foo:
+					//     break;
+					//   case Aaa.Bar: { throw new Error('Not implemented yet: Aaa.Bar case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      7,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// enum Aaa {
+					//   Foo,
+					//   Bar,
+					// }
+					// declare const value: Aaa | 1 | string;
+					// switch (value) {
+					//   case 1:
+					//     break;
+					//   case Aaa.Foo:
+					//     break;
+					//   default: { throw new Error('default case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 type Day =
   | 'Monday'
   | 'Tuesday'
@@ -1599,48 +1599,48 @@ switch (day) {
   }
 }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 14,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// type Day =
-//   | 'Monday'
-//   | 'Tuesday'
-//   | 'Wednesday'
-//   | 'Thursday'
-//   | 'Friday'
-//   | 'Saturday'
-//   | 'Sunday';
-//
-// const day = 'Monday' as Day;
-// let result = 0;
-//
-// switch (day) {
-//   case 'Monday': {
-//     result = 1;
-//     break;
-//   }
-//   case "Tuesday": { throw new Error('Not implemented yet: "Tuesday" case') }
-//   case "Wednesday": { throw new Error('Not implemented yet: "Wednesday" case') }
-//   case "Thursday": { throw new Error('Not implemented yet: "Thursday" case') }
-//   case "Friday": { throw new Error('Not implemented yet: "Friday" case') }
-//   case "Saturday": { throw new Error('Not implemented yet: "Saturday" case') }
-//   case "Sunday": { throw new Error('Not implemented yet: "Sunday" case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      14,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// type Day =
+					//   | 'Monday'
+					//   | 'Tuesday'
+					//   | 'Wednesday'
+					//   | 'Thursday'
+					//   | 'Friday'
+					//   | 'Saturday'
+					//   | 'Sunday';
+					//
+					// const day = 'Monday' as Day;
+					// let result = 0;
+					//
+					// switch (day) {
+					//   case 'Monday': {
+					//     result = 1;
+					//     break;
+					//   }
+					//   case "Tuesday": { throw new Error('Not implemented yet: "Tuesday" case') }
+					//   case "Wednesday": { throw new Error('Not implemented yet: "Wednesday" case') }
+					//   case "Thursday": { throw new Error('Not implemented yet: "Thursday" case') }
+					//   case "Friday": { throw new Error('Not implemented yet: "Friday" case') }
+					//   case "Saturday": { throw new Error('Not implemented yet: "Saturday" case') }
+					//   case "Sunday": { throw new Error('Not implemented yet: "Sunday" case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 enum Enum {
   A,
   B,
@@ -1653,36 +1653,36 @@ function test(value: Enum): number {
   }
 }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 8,
-            Column: 11,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// enum Enum {
-//   A,
-//   B,
-// }
-//
-// function test(value: Enum): number {
-//   switch (value) {
-//     case Enum.A:
-//       return 1;
-//     case Enum.B: { throw new Error('Not implemented yet: Enum.B case') }
-//   }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      8,
+					Column:    11,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// enum Enum {
+					//   A,
+					//   B,
+					// }
+					//
+					// function test(value: Enum): number {
+					//   switch (value) {
+					//     case Enum.A:
+					//       return 1;
+					//     case Enum.B: { throw new Error('Not implemented yet: Enum.B case') }
+					//   }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 type A = 'a';
 type B = 'b';
 type C = 'c';
@@ -1695,37 +1695,37 @@ function test(value: Union): number {
   }
 }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 8,
-            Column: 11,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// type A = 'a';
-// type B = 'b';
-// type C = 'c';
-// type Union = A | B | C;
-//
-// function test(value: Union): number {
-//   switch (value) {
-//     case 'a':
-//       return 1;
-//     case "b": { throw new Error('Not implemented yet: "b" case') }
-//     case "c": { throw new Error('Not implemented yet: "c" case') }
-//   }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      8,
+					Column:    11,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// type A = 'a';
+					// type B = 'b';
+					// type C = 'c';
+					// type Union = A | B | C;
+					//
+					// function test(value: Union): number {
+					//   switch (value) {
+					//     case 'a':
+					//       return 1;
+					//     case "b": { throw new Error('Not implemented yet: "b" case') }
+					//     case "c": { throw new Error('Not implemented yet: "c" case') }
+					//   }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 const A = 'a';
 const B = 1;
 const C = true;
@@ -1739,38 +1739,38 @@ function test(value: Union): number {
   }
 }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 9,
-            Column: 11,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// const A = 'a';
-// const B = 1;
-// const C = true;
-//
-// type Union = typeof A | typeof B | typeof C;
-//
-// function test(value: Union): number {
-//   switch (value) {
-//     case 'a':
-//       return 1;
-//     case true: { throw new Error('Not implemented yet: true case') }
-//     case 1: { throw new Error('Not implemented yet: 1 case') }
-//   }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      9,
+					Column:    11,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// const A = 'a';
+					// const B = 1;
+					// const C = true;
+					//
+					// type Union = typeof A | typeof B | typeof C;
+					//
+					// function test(value: Union): number {
+					//   switch (value) {
+					//     case 'a':
+					//       return 1;
+					//     case true: { throw new Error('Not implemented yet: true case') }
+					//     case 1: { throw new Error('Not implemented yet: 1 case') }
+					//   }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 type DiscriminatedUnion = { type: 'A'; a: 1 } | { type: 'B'; b: 2 };
 
 function test(value: DiscriminatedUnion): number {
@@ -1780,33 +1780,33 @@ function test(value: DiscriminatedUnion): number {
   }
 }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 5,
-            Column: 11,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// type DiscriminatedUnion = { type: 'A'; a: 1 } | { type: 'B'; b: 2 };
-//
-// function test(value: DiscriminatedUnion): number {
-//   switch (value.type) {
-//     case 'A':
-//       return 1;
-//     case "B": { throw new Error('Not implemented yet: "B" case') }
-//   }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      5,
+					Column:    11,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// type DiscriminatedUnion = { type: 'A'; a: 1 } | { type: 'B'; b: 2 };
+					//
+					// function test(value: DiscriminatedUnion): number {
+					//   switch (value.type) {
+					//     case 'A':
+					//       return 1;
+					//     case "B": { throw new Error('Not implemented yet: "B" case') }
+					//   }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 type Day =
   | 'Monday'
   | 'Tuesday'
@@ -1821,44 +1821,44 @@ const day = 'Monday' as Day;
 switch (day) {
 }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 13,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// type Day =
-//   | 'Monday'
-//   | 'Tuesday'
-//   | 'Wednesday'
-//   | 'Thursday'
-//   | 'Friday'
-//   | 'Saturday'
-//   | 'Sunday';
-//
-// const day = 'Monday' as Day;
-//
-// switch (day) {
-// case "Monday": { throw new Error('Not implemented yet: "Monday" case') }
-// case "Tuesday": { throw new Error('Not implemented yet: "Tuesday" case') }
-// case "Wednesday": { throw new Error('Not implemented yet: "Wednesday" case') }
-// case "Thursday": { throw new Error('Not implemented yet: "Thursday" case') }
-// case "Friday": { throw new Error('Not implemented yet: "Friday" case') }
-// case "Saturday": { throw new Error('Not implemented yet: "Saturday" case') }
-// case "Sunday": { throw new Error('Not implemented yet: "Sunday" case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      13,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// type Day =
+					//   | 'Monday'
+					//   | 'Tuesday'
+					//   | 'Wednesday'
+					//   | 'Thursday'
+					//   | 'Friday'
+					//   | 'Saturday'
+					//   | 'Sunday';
+					//
+					// const day = 'Monday' as Day;
+					//
+					// switch (day) {
+					// case "Monday": { throw new Error('Not implemented yet: "Monday" case') }
+					// case "Tuesday": { throw new Error('Not implemented yet: "Tuesday" case') }
+					// case "Wednesday": { throw new Error('Not implemented yet: "Wednesday" case') }
+					// case "Thursday": { throw new Error('Not implemented yet: "Thursday" case') }
+					// case "Friday": { throw new Error('Not implemented yet: "Friday" case') }
+					// case "Saturday": { throw new Error('Not implemented yet: "Saturday" case') }
+					// case "Sunday": { throw new Error('Not implemented yet: "Sunday" case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 const a = Symbol('a');
 const b = Symbol('b');
 const c = Symbol('c');
@@ -1872,38 +1872,38 @@ function test(value: T): number {
   }
 }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 9,
-            Column: 11,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// const a = Symbol('a');
-// const b = Symbol('b');
-// const c = Symbol('c');
-//
-// type T = typeof a | typeof b | typeof c;
-//
-// function test(value: T): number {
-//   switch (value) {
-//     case a:
-//       return 1;
-//     case b: { throw new Error('Not implemented yet: b case') }
-//     case c: { throw new Error('Not implemented yet: c case') }
-//   }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      9,
+					Column:    11,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// const a = Symbol('a');
+					// const b = Symbol('b');
+					// const c = Symbol('c');
+					//
+					// type T = typeof a | typeof b | typeof c;
+					//
+					// function test(value: T): number {
+					//   switch (value) {
+					//     case a:
+					//       return 1;
+					//     case b: { throw new Error('Not implemented yet: b case') }
+					//     case c: { throw new Error('Not implemented yet: c case') }
+					//   }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 type T = 1 | 2;
 
 function test(value: T): number {
@@ -1913,31 +1913,31 @@ function test(value: T): number {
   }
 }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// type T = 1 | 2;
-//
-// function test(value: T): number {
-//   switch (value) {
-//     case 1:
-//       return 1;
-//     case 2: { throw new Error('Not implemented yet: 2 case') }
-//   }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// type T = 1 | 2;
+					//
+					// function test(value: T): number {
+					//   switch (value) {
+					//     case 1:
+					//       return 1;
+					//     case 2: { throw new Error('Not implemented yet: 2 case') }
+					//   }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 type T = 1 | 2;
 
 function test(value: T): number {
@@ -1945,30 +1945,30 @@ function test(value: T): number {
   }
 }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// type T = 1 | 2;
-//
-// function test(value: T): number {
-//   switch (value) {
-//   case 1: { throw new Error('Not implemented yet: 1 case') }
-//   case 2: { throw new Error('Not implemented yet: 2 case') }
-//   }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// type T = 1 | 2;
+					//
+					// function test(value: T): number {
+					//   switch (value) {
+					//   case 1: { throw new Error('Not implemented yet: 1 case') }
+					//   case 2: { throw new Error('Not implemented yet: 2 case') }
+					//   }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 export enum Enum {
   'test-test' = 'test-test',
   'test' = 'test',
@@ -1979,33 +1979,33 @@ function test(arg: Enum): string {
   }
 }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// export enum Enum {
-//   'test-test' = 'test-test',
-//   'test' = 'test',
-// }
-//
-// function test(arg: Enum): string {
-//   switch (arg) {
-//   case Enum['test-test']: { throw new Error('Not implemented yet: Enum[\'test-test\'] case') }
-//   case Enum.test: { throw new Error('Not implemented yet: Enum.test case') }
-//   }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// export enum Enum {
+					//   'test-test' = 'test-test',
+					//   'test' = 'test',
+					// }
+					//
+					// function test(arg: Enum): string {
+					//   switch (arg) {
+					//   case Enum['test-test']: { throw new Error('Not implemented yet: Enum[\'test-test\'] case') }
+					//   case Enum.test: { throw new Error('Not implemented yet: Enum.test case') }
+					//   }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 export enum Enum {
   '' = 'test-test',
   'test' = 'test',
@@ -2016,33 +2016,33 @@ function test(arg: Enum): string {
   }
 }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// export enum Enum {
-//   '' = 'test-test',
-//   'test' = 'test',
-// }
-//
-// function test(arg: Enum): string {
-//   switch (arg) {
-//   case Enum['']: { throw new Error('Not implemented yet: Enum[\'\'] case') }
-//   case Enum.test: { throw new Error('Not implemented yet: Enum.test case') }
-//   }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// export enum Enum {
+					//   '' = 'test-test',
+					//   'test' = 'test',
+					// }
+					//
+					// function test(arg: Enum): string {
+					//   switch (arg) {
+					//   case Enum['']: { throw new Error('Not implemented yet: Enum[\'\'] case') }
+					//   case Enum.test: { throw new Error('Not implemented yet: Enum.test case') }
+					//   }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 export enum Enum {
   '9test' = 'test-test',
   'test' = 'test',
@@ -2053,33 +2053,33 @@ function test(arg: Enum): string {
   }
 }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// export enum Enum {
-//   '9test' = 'test-test',
-//   'test' = 'test',
-// }
-//
-// function test(arg: Enum): string {
-//   switch (arg) {
-//   case Enum['9test']: { throw new Error('Not implemented yet: Enum[\'9test\'] case') }
-//   case Enum.test: { throw new Error('Not implemented yet: Enum.test case') }
-//   }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// export enum Enum {
+					//   '9test' = 'test-test',
+					//   'test' = 'test',
+					// }
+					//
+					// function test(arg: Enum): string {
+					//   switch (arg) {
+					//   case Enum['9test']: { throw new Error('Not implemented yet: Enum[\'9test\'] case') }
+					//   case Enum.test: { throw new Error('Not implemented yet: Enum.test case') }
+					//   }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 const value: number = Math.floor(Math.random() * 3);
 switch (value) {
   case 0:
@@ -2088,34 +2088,34 @@ switch (value) {
     return 1;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
-    RequireDefaultForNonUnion: utils.Ref(true),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// const value: number = Math.floor(Math.random() * 3);
-// switch (value) {
-//   case 0:
-//     return 0;
-//   case 1:
-//     return 1;
-//   default: { throw new Error('default case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(true),
+				RequireDefaultForNonUnion:           utils.Ref(true),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// const value: number = Math.floor(Math.random() * 3);
+					// switch (value) {
+					//   case 0:
+					//     return 0;
+					//   case 1:
+					//     return 1;
+					//   default: { throw new Error('default case') }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
         enum Enum {
           'a' = 1,
           [` + "`" + `key-with
@@ -2128,35 +2128,35 @@ switch (value) {
         switch (a) {
         }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-						// TODO(port): add support for suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "addMissingCases",
-      //           Output: `
-      //   enum Enum {
-      //     'a' = 1,
-      //     [` + "`" + `key-with
-      //
-      //     new-line` + "`" + `] = 2,
-      //   }
-      //
-      //   declare const a: Enum;
-      //
-      //   switch (a) {
-      //   case Enum.a: { throw new Error('Not implemented yet: Enum.a case') }
-      //   case Enum['key-with\n\n          new-line']: { throw new Error('Not implemented yet: Enum[\'key-with\\n\\n          new-line\'] case') }
-      //   }
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					// TODO(port): add support for suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "addMissingCases",
+					//           Output: `
+					//   enum Enum {
+					//     'a' = 1,
+					//     [` + "`" + `key-with
+					//
+					//     new-line` + "`" + `] = 2,
+					//   }
+					//
+					//   declare const a: Enum;
+					//
+					//   switch (a) {
+					//   case Enum.a: { throw new Error('Not implemented yet: Enum.a case') }
+					//   case Enum['key-with\n\n          new-line']: { throw new Error('Not implemented yet: Enum[\'key-with\\n\\n          new-line\'] case') }
+					//   }
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
         enum Enum {
           'a' = 1,
           "'a' ` + "`" + `b` + "`" + ` \"c\"" = 2,
@@ -2166,33 +2166,33 @@ switch (value) {
 
         switch (a) {}
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-						// TODO(port): add support for suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "addMissingCases",
-      //           Output: `
-      //   enum Enum {
-      //     'a' = 1,
-      //     "'a' ` + "`" + `b` + "`" + ` \"c\"" = 2,
-      //   }
-      //
-      //   declare const a: Enum;
-      //
-      //   switch (a) {
-      //   case Enum.a: { throw new Error('Not implemented yet: Enum.a case') }
-      //   case Enum['\'a\' ` + "`" + `b` + "`" + ` "c"']: { throw new Error('Not implemented yet: Enum[\'\\\'a\\\' ` + "`" + `b` + "`" + ` "c"\'] case') }
-      //   }
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					// TODO(port): add support for suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "addMissingCases",
+					//           Output: `
+					//   enum Enum {
+					//     'a' = 1,
+					//     "'a' ` + "`" + `b` + "`" + ` \"c\"" = 2,
+					//   }
+					//
+					//   declare const a: Enum;
+					//
+					//   switch (a) {
+					//   case Enum.a: { throw new Error('Not implemented yet: Enum.a case') }
+					//   case Enum['\'a\' ` + "`" + `b` + "`" + ` "c"']: { throw new Error('Not implemented yet: Enum[\'\\\'a\\\' ` + "`" + `b` + "`" + ` "c"\'] case') }
+					//   }
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
 type MyUnion = 'foo' | 'bar' | 'baz';
 
 declare const myUnion: MyUnion;
@@ -2208,18 +2208,18 @@ switch (myUnion) {
   }
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(false),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "dangerousDefaultCase",
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "dangerousDefaultCase",
+				},
+			},
+		},
+		{
+			Code: `
 enum MyEnum {
   Foo = 'Foo',
   Bar = 'Bar',
@@ -2239,18 +2239,18 @@ switch (myEnum) {
   }
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(false),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "dangerousDefaultCase",
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "dangerousDefaultCase",
+				},
+			},
+		},
+		{
+			Code: `
 enum MyEnum {
   Foo,
   Bar,
@@ -2270,18 +2270,18 @@ switch (myEnum) {
   }
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(false),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "dangerousDefaultCase",
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "dangerousDefaultCase",
+				},
+			},
+		},
+		{
+			Code: `
 declare const myBoolean: boolean;
 
 switch (myBoolean) {
@@ -2294,18 +2294,18 @@ switch (myBoolean) {
   }
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(false),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "dangerousDefaultCase",
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "dangerousDefaultCase",
+				},
+			},
+		},
+		{
+			Code: `
 declare const myValue: undefined;
 
 switch (myValue) {
@@ -2318,18 +2318,18 @@ switch (myValue) {
   }
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(false),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "dangerousDefaultCase",
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "dangerousDefaultCase",
+				},
+			},
+		},
+		{
+			Code: `
 declare const myValue: null;
 
 switch (myValue) {
@@ -2342,18 +2342,18 @@ switch (myValue) {
   }
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions {
-    AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
-    RequireDefaultForNonUnion: utils.Ref(false),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "dangerousDefaultCase",
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),
+				RequireDefaultForNonUnion:           utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "dangerousDefaultCase",
+				},
+			},
+		},
+		{
+			Code: `
 declare const myValue: 'foo' | boolean | undefined | null;
 
 switch (myValue) {
@@ -2370,15 +2370,15 @@ switch (myValue) {
   }
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false),RequireDefaultForNonUnion: utils.Ref(false), } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "dangerousDefaultCase",
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false), RequireDefaultForNonUnion: utils.Ref(false)},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "dangerousDefaultCase",
+				},
+			},
+		},
+		{
+			Code: `
 declare const literal: 'a' | 'b';
 
 switch (literal) {
@@ -2388,58 +2388,57 @@ switch (literal) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions { ConsiderDefaultExhaustiveForUnions: utils.Ref(false) } , Errors: []rule_tester.InvalidTestCaseError{ {
-            MessageId: "switchIsNotExhaustive",
-            Line: 4,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const literal: 'a' | 'b';
-//
-// switch (literal) {
-//   case 'a':
-//     break;
-//   case "b": { throw new Error('Not implemented yet: "b" case') }
-//   default:
-//     break;
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{ConsiderDefaultExhaustiveForUnions: utils.Ref(false)}, Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "switchIsNotExhaustive",
+				Line:      4,
+				Column:    9,
+				// TODO(port): add support for suggestions
+				//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				//               {
+				//                 MessageId: "addMissingCases",
+				//                 Output: `
+				// declare const literal: 'a' | 'b';
+				//
+				// switch (literal) {
+				//   case 'a':
+				//     break;
+				//   case "b": { throw new Error('Not implemented yet: "b" case') }
+				//   default:
+				//     break;
+				// }
+				//       `,
+				//               },
+				//             },
+			},
+			},
+		},
+		{
+			Code: `
 declare const literal: 'a' | 'b';
 
 switch (literal) {
   case 'a':
     break;
 }
-`,Errors: []rule_tester.InvalidTestCaseError{{MessageId: "switchIsNotExhaustive",Line: 4,Column: 9, 
-// TODO(port): add support for suggestions
-// Suggestions: []rule_tester.InvalidTestCaseSuggestion{ {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const literal: 'a' | 'b';
-//
-// switch (literal) {
-//   case 'a':
-//     break;
-//   case "b": { throw new Error('Not implemented yet: "b" case') }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "switchIsNotExhaustive", Line: 4, Column: 9},// TODO(port): add support for suggestions
+			// Suggestions: []rule_tester.InvalidTestCaseSuggestion{ {
+			//                 MessageId: "addMissingCases",
+			//                 Output: `
+			// declare const literal: 'a' | 'b';
+			//
+			// switch (literal) {
+			//   case 'a':
+			//     break;
+			//   case "b": { throw new Error('Not implemented yet: "b" case') }
+			// }
+			//       `,
+			//               },
+			//             },
+
+			},
+		},
+		{
+			Code: `
 declare const literal: 'a' | 'b';
 
 switch (literal) {
@@ -2448,31 +2447,31 @@ switch (literal) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions { ConsiderDefaultExhaustiveForUnions: utils.Ref(false) } , Errors: []rule_tester.InvalidTestCaseError{ {
-            MessageId: "switchIsNotExhaustive",
-            Line: 4,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const literal: 'a' | 'b';
-//
-// switch (literal) {
-//   case "b": { throw new Error('Not implemented yet: "b" case') }
-//   default:
-//   case 'a':
-//     break;
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{ConsiderDefaultExhaustiveForUnions: utils.Ref(false)}, Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "switchIsNotExhaustive",
+				Line:      4,
+				Column:    9,
+				// TODO(port): add support for suggestions
+				//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				//               {
+				//                 MessageId: "addMissingCases",
+				//                 Output: `
+				// declare const literal: 'a' | 'b';
+				//
+				// switch (literal) {
+				//   case "b": { throw new Error('Not implemented yet: "b" case') }
+				//   default:
+				//   case 'a':
+				//     break;
+				// }
+				//       `,
+				//               },
+				//             },
+			},
+			},
+		},
+		{
+			Code: `
 declare const literal: 'a' | 'b' | 'c';
 
 switch (literal) {
@@ -2482,33 +2481,33 @@ switch (literal) {
     break;
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions { ConsiderDefaultExhaustiveForUnions: utils.Ref(false) } , Errors: []rule_tester.InvalidTestCaseError{ {
-            MessageId: "switchIsNotExhaustive",
-            Line: 4,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const literal: 'a' | 'b' | 'c';
-//
-// switch (literal) {
-//   case 'a':
-//     break;
-//   case "b": { throw new Error('Not implemented yet: "b" case') }
-//   case "c": { throw new Error('Not implemented yet: "c" case') }
-//   default:
-//     break;
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{ConsiderDefaultExhaustiveForUnions: utils.Ref(false)}, Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "switchIsNotExhaustive",
+				Line:      4,
+				Column:    9,
+				// TODO(port): add support for suggestions
+				//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				//               {
+				//                 MessageId: "addMissingCases",
+				//                 Output: `
+				// declare const literal: 'a' | 'b' | 'c';
+				//
+				// switch (literal) {
+				//   case 'a':
+				//     break;
+				//   case "b": { throw new Error('Not implemented yet: "b" case') }
+				//   case "c": { throw new Error('Not implemented yet: "c" case') }
+				//   default:
+				//     break;
+				// }
+				//       `,
+				//               },
+				//             },
+			},
+			},
+		},
+		{
+			Code: `
 enum MyEnum {
   Foo = 'Foo',
   Bar = 'Bar',
@@ -2525,40 +2524,40 @@ switch (myEnum) {
   }
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions { ConsiderDefaultExhaustiveForUnions: utils.Ref(false) } , Errors: []rule_tester.InvalidTestCaseError{ {
-            MessageId: "switchIsNotExhaustive",
-            Line: 10,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// enum MyEnum {
-//   Foo = 'Foo',
-//   Bar = 'Bar',
-//   Baz = 'Baz',
-// }
-//
-// declare const myEnum: MyEnum;
-//
-// switch (myEnum) {
-//   case MyEnum.Foo:
-//     break;
-//   case MyEnum.Bar: { throw new Error('Not implemented yet: MyEnum.Bar case') }
-//   case MyEnum.Baz: { throw new Error('Not implemented yet: MyEnum.Baz case') }
-//   default: {
-//     break;
-//   }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{ConsiderDefaultExhaustiveForUnions: utils.Ref(false)}, Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "switchIsNotExhaustive",
+				Line:      10,
+				Column:    9,
+				// TODO(port): add support for suggestions
+				//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				//               {
+				//                 MessageId: "addMissingCases",
+				//                 Output: `
+				// enum MyEnum {
+				//   Foo = 'Foo',
+				//   Bar = 'Bar',
+				//   Baz = 'Baz',
+				// }
+				//
+				// declare const myEnum: MyEnum;
+				//
+				// switch (myEnum) {
+				//   case MyEnum.Foo:
+				//     break;
+				//   case MyEnum.Bar: { throw new Error('Not implemented yet: MyEnum.Bar case') }
+				//   case MyEnum.Baz: { throw new Error('Not implemented yet: MyEnum.Baz case') }
+				//   default: {
+				//     break;
+				//   }
+				// }
+				//       `,
+				//               },
+				//             },
+			},
+			},
+		},
+		{
+			Code: `
 declare const value: boolean;
 switch (value) {
   default: {
@@ -2566,31 +2565,31 @@ switch (value) {
   }
 }
       `,
-      Options: SwitchExhaustivenessCheckOptions { ConsiderDefaultExhaustiveForUnions: utils.Ref(false) } , Errors: []rule_tester.InvalidTestCaseError{ {
-            MessageId: "switchIsNotExhaustive",
-            Line: 3,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const value: boolean;
-// switch (value) {
-//   case false: { throw new Error('Not implemented yet: false case') }
-//   case true: { throw new Error('Not implemented yet: true case') }
-//   default: {
-//     break;
-//   }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{ConsiderDefaultExhaustiveForUnions: utils.Ref(false)}, Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "switchIsNotExhaustive",
+				Line:      3,
+				Column:    9,
+				// TODO(port): add support for suggestions
+				//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				//               {
+				//                 MessageId: "addMissingCases",
+				//                 Output: `
+				// declare const value: boolean;
+				// switch (value) {
+				//   case false: { throw new Error('Not implemented yet: false case') }
+				//   case true: { throw new Error('Not implemented yet: true case') }
+				//   default: {
+				//     break;
+				//   }
+				// }
+				//       `,
+				//               },
+				//             },
+			},
+			},
+		},
+		{
+			Code: `
 function foo(x: string[]) {
   switch (x[0]) {
     case 'hi':
@@ -2599,31 +2598,31 @@ function foo(x: string[]) {
 }
       `,
 			TSConfig: "tsconfig.noUncheckedIndexedAccess.json",
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 3,
-            Column: 11,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// function foo(x: string[]) {
-//   switch (x[0]) {
-//     case 'hi':
-//       break;
-//     case undefined: { throw new Error('Not implemented yet: undefined case') }
-//   }
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      3,
+					Column:    11,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// function foo(x: string[]) {
+					//   switch (x[0]) {
+					//     case 'hi':
+					//       break;
+					//     case undefined: { throw new Error('Not implemented yet: undefined case') }
+					//   }
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
 declare const myValue: 'a' | 'b';
 switch (myValue) {
   case 'a':
@@ -2634,14 +2633,14 @@ switch (myValue) {
 }
       `,
 			// TODO(port): add support for DefaultCaseCommentPattern
-			Skip: true,
-      Options: SwitchExhaustivenessCheckOptions { AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false) } , Errors: []rule_tester.InvalidTestCaseError{ {
-            MessageId: "dangerousDefaultCase",
-          },
-      },
-    },
-    {
-      Code: `
+			Skip:    true,
+			Options: SwitchExhaustivenessCheckOptions{AllowDefaultCaseForExhaustiveSwitch: utils.Ref(false)}, Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "dangerousDefaultCase",
+			},
+			},
+		},
+		{
+			Code: `
 declare const literal: 'a' | 'b' | 'c';
 
 switch (literal) {
@@ -2651,33 +2650,33 @@ switch (literal) {
 }
       `,
 			// TODO(port): add support for DefaultCaseCommentPattern
-			Skip: true,
-      Options: SwitchExhaustivenessCheckOptions { ConsiderDefaultExhaustiveForUnions: utils.Ref(false) } , Errors: []rule_tester.InvalidTestCaseError{ {
-            MessageId: "switchIsNotExhaustive",
-            Line: 4,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const literal: 'a' | 'b' | 'c';
-//
-// switch (literal) {
-//   case 'a':
-//     break;
-//   case "b": { throw new Error('Not implemented yet: "b" case') }
-//   case "c": { throw new Error('Not implemented yet: "c" case') }
-//   // no default
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Skip:    true,
+			Options: SwitchExhaustivenessCheckOptions{ConsiderDefaultExhaustiveForUnions: utils.Ref(false)}, Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "switchIsNotExhaustive",
+				Line:      4,
+				Column:    9,
+				// TODO(port): add support for suggestions
+				//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+				//               {
+				//                 MessageId: "addMissingCases",
+				//                 Output: `
+				// declare const literal: 'a' | 'b' | 'c';
+				//
+				// switch (literal) {
+				//   case 'a':
+				//     break;
+				//   case "b": { throw new Error('Not implemented yet: "b" case') }
+				//   case "c": { throw new Error('Not implemented yet: "c" case') }
+				//   // no default
+				// }
+				//       `,
+				//               },
+				//             },
+			},
+			},
+		},
+		{
+			Code: `
 declare const literal: 'a' | 'b' | 'c';
 
 switch (literal) {
@@ -2688,37 +2687,37 @@ switch (literal) {
       `,
 			// TODO(port): add support for DefaultCaseCommentPattern
 			Skip: true,
-      Options: SwitchExhaustivenessCheckOptions {
-    ConsiderDefaultExhaustiveForUnions: utils.Ref(false),
-    DefaultCaseCommentPattern: utils.Ref("^skip\\sdefault"),
-  } ,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 4,
-            Column: 9,
-						// TODO(port): add support for suggestions
-//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-//               {
-//                 MessageId: "addMissingCases",
-//                 Output: `
-// declare const literal: 'a' | 'b' | 'c';
-//
-// switch (literal) {
-//   case 'a':
-//     break;
-//   case "b": { throw new Error('Not implemented yet: "b" case') }
-//   case "c": { throw new Error('Not implemented yet: "c" case') }
-//   // skip default
-// }
-//       `,
-//               },
-//             },
-          },
-      },
-    },
-    {
-      Code: `
+			Options: SwitchExhaustivenessCheckOptions{
+				ConsiderDefaultExhaustiveForUnions: utils.Ref(false),
+				DefaultCaseCommentPattern:          utils.Ref("^skip\\sdefault"),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      4,
+					Column:    9,
+					// TODO(port): add support for suggestions
+					//             Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//               {
+					//                 MessageId: "addMissingCases",
+					//                 Output: `
+					// declare const literal: 'a' | 'b' | 'c';
+					//
+					// switch (literal) {
+					//   case 'a':
+					//     break;
+					//   case "b": { throw new Error('Not implemented yet: "b" case') }
+					//   case "c": { throw new Error('Not implemented yet: "c" case') }
+					//   // skip default
+					// }
+					//       `,
+					//               },
+					//             },
+				},
+			},
+		},
+		{
+			Code: `
         export namespace A {
           export enum B {
             C,
@@ -2732,37 +2731,37 @@ switch (literal) {
           }
         }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 9,
-            Column: 17,
-						// TODO(port): add support for suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "addMissingCases",
-      //           Output: `
-      //   export namespace A {
-      //     export enum B {
-      //       C,
-      //       D,
-      //     }
-      //   }
-      //   declare const foo: A.B;
-      //   switch (foo) {
-      //     case A.B.C: {
-      //       break;
-      //     }
-      //     case A.B.D: { throw new Error('Not implemented yet: A.B.D case') }
-      //   }
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      9,
+					Column:    17,
+					// TODO(port): add support for suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "addMissingCases",
+					//           Output: `
+					//   export namespace A {
+					//     export enum B {
+					//       C,
+					//       D,
+					//     }
+					//   }
+					//   declare const foo: A.B;
+					//   switch (foo) {
+					//     case A.B.C: {
+					//       break;
+					//     }
+					//     case A.B.D: { throw new Error('Not implemented yet: A.B.D case') }
+					//   }
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
         import { A } from './switch-exhaustiveness-check';
         declare const foo: A.B;
         switch (foo) {
@@ -2771,29 +2770,29 @@ switch (literal) {
           }
         }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "switchIsNotExhaustive",
-            Line: 4,
-            Column: 17,
-						// TODO(port): add support for suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "addMissingCases",
-      //           Output: `
-      //   import { A } from './switch-exhaustiveness-check';
-      //   declare const foo: A.B;
-      //   switch (foo) {
-      //     case A.B.C: {
-      //       break;
-      //     }
-      //     case A.B.D: { throw new Error('Not implemented yet: A.B.D case') }
-      //   }
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-  })
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "switchIsNotExhaustive",
+					Line:      4,
+					Column:    17,
+					// TODO(port): add support for suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "addMissingCases",
+					//           Output: `
+					//   import { A } from './switch-exhaustiveness-check';
+					//   declare const foo: A.B;
+					//   switch (foo) {
+					//     case A.B.C: {
+					//       break;
+					//     }
+					//     case A.B.D: { throw new Error('Not implemented yet: A.B.D case') }
+					//   }
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+	})
 }

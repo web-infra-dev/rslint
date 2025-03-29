@@ -1,10 +1,10 @@
 package await_thenable
 
 import (
-	"none.none/tsgolint/internal/rule"
-	"none.none/tsgolint/internal/utils"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"none.none/tsgolint/internal/rule"
+	"none.none/tsgolint/internal/utils"
 )
 
 func buildAwaitMessage() rule.RuleMessage {
@@ -103,7 +103,7 @@ var AwaitThenableRule = rule.Rule{
 				}
 
 				declaration := node.AsVariableDeclarationList()
-DeclaratorLoop:
+			DeclaratorLoop:
 				for _, declarator := range declaration.Declarations.Nodes {
 					init := declarator.Initializer()
 					if init == nil {

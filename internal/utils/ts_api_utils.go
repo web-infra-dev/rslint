@@ -20,7 +20,7 @@ func IntersectionTypeParts(t *checker.Type) []*checker.Type {
 }
 
 func IsTypeFlagSet(t *checker.Type, flags checker.TypeFlags) bool {
-	return t != nil && checker.Type_flags(t) & flags != 0
+	return t != nil && checker.Type_flags(t)&flags != 0
 }
 
 func IsIntrinsicType(t *checker.Type) bool {
@@ -63,43 +63,43 @@ func IsFalseLiteralType(t *checker.Type) bool {
 	return IsBooleanLiteralType(t) && IsIntrinsicType(t) && t.AsIntrinsicType().IntrinsicName() == "false"
 }
 
-func GetCallSignatures(typeChecker *checker.Checker, t *checker.Type) []*checker.Signature  {
-		return checker.Checker_getSignaturesOfType(typeChecker, t, checker.SignatureKindCall)
+func GetCallSignatures(typeChecker *checker.Checker, t *checker.Type) []*checker.Signature {
+	return checker.Checker_getSignaturesOfType(typeChecker, t, checker.SignatureKindCall)
 }
-func GetConstructSignatures(typeChecker *checker.Checker, t *checker.Type) []*checker.Signature  {
-		return checker.Checker_getSignaturesOfType(typeChecker, t, checker.SignatureKindConstruct)
+func GetConstructSignatures(typeChecker *checker.Checker, t *checker.Type) []*checker.Signature {
+	return checker.Checker_getSignaturesOfType(typeChecker, t, checker.SignatureKindConstruct)
 }
 
 // ex. getCallSignaturesOfType
-func CollectAllCallSignatures(typeChecker *checker.Checker, t *checker.Type) []*checker.Signature  {
-  if (IsUnionType(t)) {
+func CollectAllCallSignatures(typeChecker *checker.Checker, t *checker.Type) []*checker.Signature {
+	if IsUnionType(t) {
 		signatures := []*checker.Signature{}
-		for _, subtype :=  range t.Types() {
+		for _, subtype := range t.Types() {
 			signatures = append(signatures, GetCallSignatures(typeChecker, subtype)...)
 		}
-	  return signatures
+		return signatures
 	}
-	  if (IsIntersectionType(t)) {
-	    var signatures []*checker.Signature
-			for _, subtype := range t.Types() {
-				sig := GetCallSignatures(typeChecker, subtype)
-				if len(sig) != 0 {
-					if signatures != nil {
-						return []*checker.Signature{}
-					}
-					signatures = sig
+	if IsIntersectionType(t) {
+		var signatures []*checker.Signature
+		for _, subtype := range t.Types() {
+			sig := GetCallSignatures(typeChecker, subtype)
+			if len(sig) != 0 {
+				if signatures != nil {
+					return []*checker.Signature{}
 				}
+				signatures = sig
 			}
-			if signatures == nil {
-				return []*checker.Signature{}
-			}
-			return signatures
-	  }
-		return checker.Checker_getSignaturesOfType(typeChecker, t, checker.SignatureKindCall)
+		}
+		if signatures == nil {
+			return []*checker.Signature{}
+		}
+		return signatures
+	}
+	return checker.Checker_getSignaturesOfType(typeChecker, t, checker.SignatureKindCall)
 }
 
 func IsSymbolFlagSet(symbol *ast.Symbol, flag ast.SymbolFlags) bool {
-	return symbol != nil && symbol.Flags & flag != 0
+	return symbol != nil && symbol.Flags&flag != 0
 }
 
 func IsCallback(
@@ -157,7 +157,6 @@ func GetWellKnownSymbolPropertyOfType(t *checker.Type, name string, typeChecker 
 	return checker.Checker_getPropertyOfType(typeChecker, t, checker.Checker_getPropertyNameForKnownSymbolName(typeChecker, name))
 }
 
-
 /**
  * Checks if a given compiler option is enabled, accounting for whether all flags
  * (except `strictPropertyInitialization`) have been enabled by `strict: true`.
@@ -185,7 +184,7 @@ func GetWellKnownSymbolPropertyOfType(t *checker.Type, name string, typeChecker 
 func IsStrictCompilerOptionEnabled(
 	options *core.CompilerOptions,
 	option core.Tristate,
-)bool {
+) bool {
 	if options.Strict.IsTrue() {
 		return option.IsTrueOrUnknown()
 	}

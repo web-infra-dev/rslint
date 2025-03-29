@@ -1,11 +1,11 @@
 package no_floating_promises
 
 import (
-	"none.none/tsgolint/internal/rule"
-	"none.none/tsgolint/internal/utils"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"none.none/tsgolint/internal/rule"
+	"none.none/tsgolint/internal/utils"
 )
 
 type NoFloatingPromisesOptions struct {
@@ -111,15 +111,15 @@ var NoFloatingPromisesRule = rule.Rule{
 			node *ast.ExpressionStatement,
 		) []rule.RuleFix {
 			if ast.IsVoidExpression(expression) {
-				voidTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, expression.Pos()	)
+				voidTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, expression.Pos())
 				return []rule.RuleFix{rule.RuleFixReplaceRange(voidTokenRange, "await")}
 			}
 			if isHigherPrecedenceThanUnary(node.Expression) {
 				return []rule.RuleFix{rule.RuleFixInsertBefore(ctx.SourceFile, &node.Node, "await ")}
 			}
 			return []rule.RuleFix{
-rule.RuleFixInsertBefore(ctx.SourceFile, &node.Node, "await ("),
-rule.RuleFixInsertAfter(expression, ")"),
+				rule.RuleFixInsertBefore(ctx.SourceFile, &node.Node, "await ("),
+				rule.RuleFixInsertAfter(expression, ")"),
 			}
 		}
 		hasMatchingSignature := func(
@@ -368,66 +368,66 @@ rule.RuleFixInsertAfter(expression, ")"),
 
 		return rule.RuleListeners{
 			ast.KindExpressionStatement: func(node *ast.Node) {
-			exprStatement := node.AsExpressionStatement()
+				exprStatement := node.AsExpressionStatement()
 
-			if *opts.IgnoreIIFE && isAsyncIife(exprStatement) {
-				return
-			}
-
-			expression := ast.SkipParentheses(exprStatement.Expression)
-
-			if isKnownSafePromiseReturn(expression) {
-				return
-			}
-
-			isUnhandled, nonFunctionHandler, promiseArray := isUnhandledPromise(expression)
-
-			if !isUnhandled {
-				return
-			}
-			if promiseArray {
-				var msg rule.RuleMessage
-				if *opts.IgnoreVoid {
-					msg = buildFloatingPromiseArrayVoidMessage()
-				} else {
-					msg = buildFloatingPromiseArrayMessage()
-				}
-				ctx.ReportNode(node, msg)
-			} else if *opts.IgnoreVoid {
-				var msg rule.RuleMessage
-				if nonFunctionHandler {
-					msg = buildFloatingUselessRejectionHandlerVoidMessage()
-				} else {
-					msg = buildFloatingVoidMessage()
+				if *opts.IgnoreIIFE && isAsyncIife(exprStatement) {
+					return
 				}
 
-				ctx.ReportNodeWithSuggestions(node, msg, rule.RuleSuggestion{
-					Message: buildFloatingFixVoidMessage(),
-					FixesArr: (func() []rule.RuleFix {
-						if isHigherPrecedenceThanUnary(exprStatement.Expression) {
-							return []rule.RuleFix{rule.RuleFixInsertBefore(ctx.SourceFile, node, "void ")}
-						}
-						return []rule.RuleFix{
-							rule.RuleFixInsertBefore(ctx.SourceFile, node, "void ("),
-							rule.RuleFixInsertAfter(expression, ")"),
-						}
-					})(),
-				}, rule.RuleSuggestion{
-					Message:  buildFloatingFixAwaitMessage(),
-					FixesArr: addAwait(expression, exprStatement),
-				})
-			} else {
-				var msg rule.RuleMessage
-				if nonFunctionHandler {
-					msg = buildFloatingUselessRejectionHandlerMessage()
-				} else {
-					msg = buildFloatingMessage()
+				expression := ast.SkipParentheses(exprStatement.Expression)
+
+				if isKnownSafePromiseReturn(expression) {
+					return
 				}
-				ctx.ReportNodeWithSuggestions(node, msg, rule.RuleSuggestion{
-					Message:  buildFloatingFixAwaitMessage(),
-					FixesArr: addAwait(expression, exprStatement),
-				})
-			}
+
+				isUnhandled, nonFunctionHandler, promiseArray := isUnhandledPromise(expression)
+
+				if !isUnhandled {
+					return
+				}
+				if promiseArray {
+					var msg rule.RuleMessage
+					if *opts.IgnoreVoid {
+						msg = buildFloatingPromiseArrayVoidMessage()
+					} else {
+						msg = buildFloatingPromiseArrayMessage()
+					}
+					ctx.ReportNode(node, msg)
+				} else if *opts.IgnoreVoid {
+					var msg rule.RuleMessage
+					if nonFunctionHandler {
+						msg = buildFloatingUselessRejectionHandlerVoidMessage()
+					} else {
+						msg = buildFloatingVoidMessage()
+					}
+
+					ctx.ReportNodeWithSuggestions(node, msg, rule.RuleSuggestion{
+						Message: buildFloatingFixVoidMessage(),
+						FixesArr: (func() []rule.RuleFix {
+							if isHigherPrecedenceThanUnary(exprStatement.Expression) {
+								return []rule.RuleFix{rule.RuleFixInsertBefore(ctx.SourceFile, node, "void ")}
+							}
+							return []rule.RuleFix{
+								rule.RuleFixInsertBefore(ctx.SourceFile, node, "void ("),
+								rule.RuleFixInsertAfter(expression, ")"),
+							}
+						})(),
+					}, rule.RuleSuggestion{
+						Message:  buildFloatingFixAwaitMessage(),
+						FixesArr: addAwait(expression, exprStatement),
+					})
+				} else {
+					var msg rule.RuleMessage
+					if nonFunctionHandler {
+						msg = buildFloatingUselessRejectionHandlerMessage()
+					} else {
+						msg = buildFloatingMessage()
+					}
+					ctx.ReportNodeWithSuggestions(node, msg, rule.RuleSuggestion{
+						Message:  buildFloatingFixAwaitMessage(),
+						FixesArr: addAwait(expression, exprStatement),
+					})
+				}
 			},
 		}
 	},

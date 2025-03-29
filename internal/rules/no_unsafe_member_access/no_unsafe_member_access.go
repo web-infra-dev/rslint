@@ -3,28 +3,28 @@ package no_unsafe_member_access
 import (
 	"fmt"
 
-	"none.none/tsgolint/internal/rule"
-	"none.none/tsgolint/internal/utils"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"none.none/tsgolint/internal/rule"
+	"none.none/tsgolint/internal/utils"
 )
 
-func buildUnsafeComputedMemberAccessMessage(property, t string) rule.RuleMessage{
+func buildUnsafeComputedMemberAccessMessage(property, t string) rule.RuleMessage {
 	return rule.RuleMessage{
-		Id: "unsafeComputedMemberAccess",
+		Id:          "unsafeComputedMemberAccess",
 		Description: fmt.Sprintf("Computed name %v resolves to an %v value.", property, t),
 	}
 }
-func buildUnsafeMemberExpressionMessage(property, t string) rule.RuleMessage{
+func buildUnsafeMemberExpressionMessage(property, t string) rule.RuleMessage {
 	return rule.RuleMessage{
-		Id: "unsafeMemberExpression",
+		Id:          "unsafeMemberExpression",
 		Description: fmt.Sprintf("Unsafe member access %v on an %v value.", property, t),
 	}
 }
-func buildUnsafeThisMemberExpressionMessage(property string) rule.RuleMessage{
+func buildUnsafeThisMemberExpressionMessage(property string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id: "unsafeThisMemberExpression",
-		Description: fmt.Sprintf("Unsafe member access %v on an `any` value. `this` is typed as `any`.", property) + 
+		Description: fmt.Sprintf("Unsafe member access %v on an `any` value. `this` is typed as `any`.", property) +
 			"You can try to fix this by turning on the `noImplicitThis` compiler option, or adding a `this` parameter to the function.",
 	}
 }
@@ -33,7 +33,7 @@ type state uint8
 
 const (
 	stateUnsafe state = iota
-	stateSafe state = iota
+	stateSafe   state = iota
 )
 
 func createDataType(t *checker.Type) string {
@@ -43,30 +43,28 @@ func createDataType(t *checker.Type) string {
 	return "`any`"
 }
 
-
-
 var NoUnsafeMemberAccessRule = rule.Rule{
 	Name: "no-unsafe-member-access",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		compilerOptions := ctx.Program.GetCompilerOptions()
 		isNoImplicitThis := utils.IsStrictCompilerOptionEnabled(
-      compilerOptions,
-      compilerOptions.NoImplicitThis,
-    )
+			compilerOptions,
+			compilerOptions.NoImplicitThis,
+		)
 
 		stateCache := map[*ast.Node]state{}
 
-		var checkMemberExpression func(node *ast.Node)state 
-		checkMemberExpression=func(node *ast.Node)state {
+		var checkMemberExpression func(node *ast.Node) state
+		checkMemberExpression = func(node *ast.Node) state {
 			cachedState, ok := stateCache[node]
-      if ok {
-        return cachedState
-      }
+			if ok {
+				return cachedState
+			}
 
 			// TODO(port-perf): couldn't it be done at visitchildren phase?
 			parent := node.Parent
 			for !ast.IsSourceFile(parent) {
-      // ignore MemberExpressions with ancestors of type `TSClassImplements` or `TSInterfaceHeritage`
+				// ignore MemberExpressions with ancestors of type `TSClassImplements` or `TSInterfaceHeritage`
 				if ast.IsHeritageClause(parent) {
 					return stateSafe
 				}
@@ -76,12 +74,12 @@ var NoUnsafeMemberAccessRule = rule.Rule{
 			expression := node.Expression()
 			if ast.IsAccessExpression(expression) {
 				objectState := checkMemberExpression(expression)
-        if (objectState == stateUnsafe) {
-          // if the object is unsafe, we know this will be unsafe as well
-          // we don't need to report, as we have already reported on the inner member expr
-          stateCache[node] = objectState
-          return objectState
-        }
+				if objectState == stateUnsafe {
+					// if the object is unsafe, we know this will be unsafe as well
+					// we don't need to report, as we have already reported on the inner member expr
+					stateCache[node] = objectState
+					return objectState
+				}
 			}
 
 			t := ctx.TypeChecker.GetTypeAtLocation(expression)
@@ -89,9 +87,9 @@ var NoUnsafeMemberAccessRule = rule.Rule{
 			if utils.IsTypeAnyType(t) {
 				state = stateUnsafe
 			}
-      stateCache[node] = state
+			stateCache[node] = state
 
-      if (state == stateUnsafe) {
+			if state == stateUnsafe {
 				var property *ast.Node
 				var propertyName string
 				if ast.IsPropertyAccessExpression(node) {
@@ -103,27 +101,26 @@ var NoUnsafeMemberAccessRule = rule.Rule{
 					loc := utils.TrimNodeTextRange(ctx.SourceFile, property)
 					propertyName = "[" + ctx.SourceFile.Text[loc.Pos():loc.End()] + "]"
 				}
-				
-        // let messageId: 'unsafeMemberExpression' | 'unsafeThisMemberExpression' =
-        //   'unsafeMemberExpression';
 
-        if (!isNoImplicitThis) {
-          // `this.foo` or `this.foo[bar]`
+				// let messageId: 'unsafeMemberExpression' | 'unsafeThisMemberExpression' =
+				//   'unsafeMemberExpression';
+
+				if !isNoImplicitThis {
+					// `this.foo` or `this.foo[bar]`
 					thisExpression := utils.GetThisExpression(node)
 
-          if ( thisExpression != nil  && utils.IsTypeAnyType(
-              utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, thisExpression))) {
-								ctx.ReportNode(property, buildUnsafeThisMemberExpressionMessage(propertyName))
-								return state
-							}
-        }
+					if thisExpression != nil && utils.IsTypeAnyType(
+						utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, thisExpression)) {
+						ctx.ReportNode(property, buildUnsafeThisMemberExpressionMessage(propertyName))
+						return state
+					}
+				}
 
-				ctx.ReportNode(property, buildUnsafeMemberExpressionMessage(propertyName, createDataType(t) ))
-      }
+				ctx.ReportNode(property, buildUnsafeMemberExpressionMessage(propertyName, createDataType(t)))
+			}
 
-      return state;
-    }
-
+			return state
+		}
 
 		return rule.RuleListeners{
 			ast.KindPropertyAccessExpression: func(node *ast.Node) {
@@ -133,15 +130,15 @@ var NoUnsafeMemberAccessRule = rule.Rule{
 				checkMemberExpression(node)
 
 				arg := node.AsElementAccessExpression().ArgumentExpression
- // x[1]
-        if ( ast.IsLiteralExpression(arg)) {
-          // perf optimizations - literals can obviously never be `any`
-          return;
-        }
+				// x[1]
+				if ast.IsLiteralExpression(arg) {
+					// perf optimizations - literals can obviously never be `any`
+					return
+				}
 
-          // x[1++] x[++x] etc
-          // FUN FACT - **all** update expressions return type number, regardless of the argument's type,
-          // because JS engines return NaN if there the argument is not a number.
+				// x[1++] x[++x] etc
+				// FUN FACT - **all** update expressions return type number, regardless of the argument's type,
+				// because JS engines return NaN if there the argument is not a number.
 				unaryOperatorKind := ast.KindUnknown
 				if ast.IsPrefixUnaryExpression(arg) {
 					unaryOperatorKind = arg.AsPrefixUnaryExpression().Operator
@@ -154,13 +151,12 @@ var NoUnsafeMemberAccessRule = rule.Rule{
 
 				t := ctx.TypeChecker.GetTypeAtLocation(arg)
 
-        if (utils.IsTypeAnyType(t)) {
+				if utils.IsTypeAnyType(t) {
 					loc := utils.TrimNodeTextRange(ctx.SourceFile, arg)
 					propertyName := "[" + ctx.SourceFile.Text[loc.Pos():loc.End()] + "]"
 					ctx.ReportNode(arg, buildUnsafeComputedMemberAccessMessage(propertyName, createDataType(t)))
-        }
-      },
-
+				}
+			},
 		}
 	},
 }

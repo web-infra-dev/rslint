@@ -20,7 +20,7 @@ func TrimNodeTextRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRang
 func GetCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) iter.Seq[ast.CommentRange] {
 	nodeFactory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
 
-	return func (yield func(ast.CommentRange) bool) {
+	return func(yield func(ast.CommentRange) bool) {
 		for commentRange := range scanner.GetTrailingCommentRanges(nodeFactory, sourceFile.Text, inRange.Pos()) {
 			if commentRange.Pos() >= inRange.End() {
 				break
@@ -41,19 +41,18 @@ func GetCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) iter
 	}
 }
 
-func TypeRecurser(t *checker.Type, predicate func (t *checker.Type) /* should stop */ bool) bool {
-		if IsTypeFlagSet(t, checker.TypeFlagsUnionOrIntersection) {
-			for _, subtype := range t.Types() {
-				if TypeRecurser(subtype, predicate) {
-					return true
-				}
+func TypeRecurser(t *checker.Type, predicate func(t *checker.Type) /* should stop */ bool) bool {
+	if IsTypeFlagSet(t, checker.TypeFlagsUnionOrIntersection) {
+		for _, subtype := range t.Types() {
+			if TypeRecurser(subtype, predicate) {
+				return true
 			}
-			return false
-		} else {
-			return predicate(t)
 		}
+		return false
+	} else {
+		return predicate(t)
+	}
 }
-
 
 type OverlayVFS struct {
 	vfs.FS
@@ -95,7 +94,6 @@ func GetHeritageClauses(node *ast.Node) *ast.NodeList {
 	}
 	return nil
 }
-
 
 // Source: typescript-go/internal/core/core.go
 func Filter[T any](slice []T, f func(T) bool) []T {
@@ -172,7 +170,7 @@ func Flatten[T any](array [][]T) []T {
 	return result
 }
 
-func IncludesModifier(node interface { Modifiers() *ast.ModifierList }, modifier ast.Kind) bool {
+func IncludesModifier(node interface{ Modifiers() *ast.ModifierList }, modifier ast.Kind) bool {
 	modifiers := node.Modifiers()
 	if modifiers == nil {
 		return false

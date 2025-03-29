@@ -1,17 +1,16 @@
 package no_for_in_array
 
 import (
-	"none.none/tsgolint/internal/rule"
-	"none.none/tsgolint/internal/utils"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"none.none/tsgolint/internal/rule"
+	"none.none/tsgolint/internal/utils"
 )
-
 
 func buildForInViolationMessage() rule.RuleMessage {
 	return rule.RuleMessage{
-		Id: "forInViolation",
-		Description:"For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
+		Id:          "forInViolation",
+		Description: "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
 	}
 }
 
@@ -26,7 +25,7 @@ var NoForInArrayRule = rule.Rule{
 
 			return utils.IsTypeFlagSet(checker.Checker_getTypeOfSymbol(ctx.TypeChecker, lengthProperty), checker.TypeFlagsNumberLike)
 		}
-		isArrayLike := func(t *checker.Type)bool {
+		isArrayLike := func(t *checker.Type) bool {
 			return utils.TypeRecurser(t, func(t *checker.Type) bool {
 				return utils.GetNumberIndexType(ctx.TypeChecker, t) != nil && hasArrayishLength(t)
 			})
@@ -34,20 +33,19 @@ var NoForInArrayRule = rule.Rule{
 
 		return rule.RuleListeners{
 			ast.KindForInStatement: func(node *ast.Node) {
-			if !ast.IsForInStatement(node) {
-				return
-			}
+				if !ast.IsForInStatement(node) {
+					return
+				}
 
-			t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node.AsForInOrOfStatement().Expression)
+				t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node.AsForInOrOfStatement().Expression)
 
-
-        if isArrayLike(t) {
+				if isArrayLike(t) {
 					ctx.ReportRange(
 						utils.GetForStatementHeadLoc(ctx.SourceFile, node.AsForInOrOfStatement()),
 						buildForInViolationMessage(),
 					)
 				}
-      },
+			},
 		}
 	},
 }

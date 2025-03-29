@@ -1,153 +1,153 @@
 package no_unsafe_enum_comparison
 
 import (
-  "testing"
+	"testing"
 
-  "none.none/tsgolint/internal/rule_tester"
-  "none.none/tsgolint/internal/rules/fixtures"
+	"none.none/tsgolint/internal/rule_tester"
+	"none.none/tsgolint/internal/rules/fixtures"
 )
 
 func TestNoUnsafeEnumComparisonRule(t *testing.T) {
-  rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnsafeEnumComparisonRule, []rule_tester.ValidTestCase{
-    {Code: "'a' > 'b';"},
-    {Code: "'a' < 'b';"},
-    {Code: "'a' == 'b';"},
-    {Code: "'a' === 'b';"},
-    {Code: "1 > 2;"},
-    {Code: "1 < 2;"},
-    {Code: "1 == 2;"},
-    {Code: "1 === 2;"},
-    {Code: `
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnsafeEnumComparisonRule, []rule_tester.ValidTestCase{
+		{Code: "'a' > 'b';"},
+		{Code: "'a' < 'b';"},
+		{Code: "'a' == 'b';"},
+		{Code: "'a' === 'b';"},
+		{Code: "1 > 2;"},
+		{Code: "1 < 2;"},
+		{Code: "1 == 2;"},
+		{Code: "1 === 2;"},
+		{Code: `
       enum Fruit {
         Apple,
       }
       Fruit.Apple === ({} as any);
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple,
       }
       Fruit.Apple === undefined;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple,
       }
       Fruit.Apple === null;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple,
       }
       declare const fruit: Fruit | -1;
       fruit === -1;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple,
       }
       declare const fruit: Fruit | number;
       fruit === -1;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple,
       }
       declare const fruit: Fruit | 'apple';
       fruit === 'apple';
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple,
       }
       declare const fruit: Fruit | string;
       fruit === 'apple';
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple = 'apple',
       }
       declare const fruit: Fruit | 'apple';
       fruit === 'apple';
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple = 'apple',
       }
       declare const fruit: Fruit | string;
       fruit === 'apple';
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple = 'apple',
       }
       declare const fruit: Fruit | 0;
       fruit === 0;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple = 'apple',
       }
       declare const fruit: Fruit | number;
       fruit === 0;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple,
       }
       declare const fruit: Fruit | 'apple';
       fruit === Math.random() > 0.5 ? 'apple' : Fruit.Apple;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple = 'apple',
       }
       declare const fruit: Fruit | 'apple';
       fruit === Math.random() > 0.5 ? 'apple' : Fruit.Apple;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple = 'apple',
       }
       declare const fruit: Fruit | string;
       fruit === Math.random() > 0.5 ? 'apple' : Fruit.Apple;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple = 'apple',
       }
       declare const fruit: Fruit | 0;
       fruit === Math.random() > 0.5 ? 0 : Fruit.Apple;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple = 'apple',
       }
       declare const fruit: Fruit | number;
       fruit === Math.random() > 0.5 ? 0 : Fruit.Apple;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple,
         Banana,
       }
       Fruit.Apple === Fruit.Banana;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple = 0,
         Banana = 1,
       }
       Fruit.Apple === Fruit.Banana;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple = 'apple',
         Banana = 'banana',
       }
       Fruit.Apple === Fruit.Banana;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple,
         Banana,
@@ -155,7 +155,7 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
       const fruit = Fruit.Apple;
       fruit === Fruit.Banana;
     `},
-    {Code: `
+		{Code: `
       enum Vegetable {
         Asparagus = 'asparagus',
         Beet = 'beet',
@@ -164,7 +164,7 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
       const vegetable = Vegetable.Asparagus;
       vegetable === Vegetable.Beet;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple,
         Banana,
@@ -174,7 +174,7 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
       const fruit2 = Fruit.Banana;
       fruit1 === fruit2;
     `},
-    {Code: `
+		{Code: `
       enum Vegetable {
         Asparagus = 'asparagus',
         Beet = 'beet',
@@ -184,7 +184,7 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
       const vegetable2 = Vegetable.Beet;
       vegetable1 === vegetable2;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple,
         Banana,
@@ -199,7 +199,7 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
       declare const right: number | Fruit2;
       left === right;
     `},
-    {Code: `
+		{Code: `
       enum Vegetable {
         Asparagus = 'asparagus',
         Beet = 'beet',
@@ -214,7 +214,7 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
       declare const right: string | Vegetable2;
       left === right;
     `},
-    {Code: `
+		{Code: `
       enum Vegetable {
         Asparagus = 'asparagus',
         Beet = 'beet',
@@ -224,7 +224,7 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
       const vegetable = Vegetable.Asparagus;
       vegetable in foo;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple,
         Banana,
@@ -233,7 +233,7 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
       declare const fruitOrBoolean: Fruit | boolean;
       fruitOrBoolean === true;
     `},
-    {Code: `
+		{Code: `
       enum Str {
         A = 'a',
       }
@@ -275,14 +275,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
       num === someFunction;
       mixed === someFunction;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple,
       }
 
       const bitShift = 1 << Fruit.Apple;
     `},
-    {Code: `
+		{Code: `
       enum Fruit {
         Apple,
       }
@@ -302,7 +302,7 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         }
       }
     `},
-    {Code: `
+		{Code: `
       enum Vegetable {
         Asparagus = 'asparagus',
       }
@@ -315,7 +315,7 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         }
       }
     `},
-    {Code: `
+		{Code: `
       enum Vegetable {
         Asparagus = 'asparagus',
       }
@@ -328,128 +328,128 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         }
       }
     `},
-  }, []rule_tester.InvalidTestCase{
-    {
-      Code: `
+	}, []rule_tester.InvalidTestCase{
+		{
+			Code: `
         enum Fruit {
           Apple,
         }
         Fruit.Apple < 1;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Fruit {
           Apple,
         }
         Fruit.Apple > 1;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Fruit {
           Apple,
         }
         Fruit.Apple == 1;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Fruit {
           Apple,
         }
         Fruit.Apple === 1;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Fruit {
           Apple,
         }
         Fruit.Apple != 1;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Fruit {
           Apple,
         }
         Fruit.Apple !== 1;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Fruit {
           Apple = 0,
           Banana = 'banana',
         }
         Fruit.Apple === 0;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum Fruit {
-      //     Apple = 0,
-      //     Banana = 'banana',
-      //   }
-      //   Fruit.Apple === Fruit.Apple;
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum Fruit {
+					//     Apple = 0,
+					//     Banana = 'banana',
+					//   }
+					//   Fruit.Apple === Fruit.Apple;
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
         enum Fruit {
           Apple = 0,
           Banana = 'banana',
         }
         Fruit.Banana === '';
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Vegetable {
           Asparagus = 'asparagus',
           Beet = 'beet',
@@ -457,14 +457,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         }
         Vegetable.Asparagus === 'beet';
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Fruit {
           Apple,
           Banana,
@@ -472,14 +472,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         }
         1 === Fruit.Apple;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Vegetable {
           Asparagus = 'asparagus',
           Beet = 'beet',
@@ -487,14 +487,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         }
         'beet' === Vegetable.Asparagus;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Fruit {
           Apple,
           Banana,
@@ -503,14 +503,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         const fruit = Fruit.Apple;
         fruit === 1;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Vegetable {
           Asparagus = 'asparagus',
           Beet = 'beet',
@@ -519,14 +519,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         const vegetable = Vegetable.Asparagus;
         vegetable === 'beet';
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Fruit {
           Apple,
           Banana,
@@ -535,14 +535,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         const fruit = Fruit.Apple;
         1 === fruit;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Vegetable {
           Asparagus = 'asparagus',
           Beet = 'beet',
@@ -551,28 +551,28 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         const vegetable = Vegetable.Asparagus;
         'beet' === vegetable;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `enum Fruit { Apple, Banana, Cherry }enum Fruit2 {
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `enum Fruit { Apple, Banana, Cherry }enum Fruit2 {
   Apple2,
   Banana2,
   Cherry2,
 }
       Fruit.Apple === Fruit2.Apple2;
         `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Vegetable {
           Asparagus = 'asparagus',
           Beet = 'beet',
@@ -585,14 +585,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         }
         Vegetable.Asparagus === Vegetable2.Asparagus2;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `enum Fruit { Apple, Banana, Cherry }enum Fruit2 {
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `enum Fruit { Apple, Banana, Cherry }enum Fruit2 {
   Apple2,
   Banana2,
   Cherry2,
@@ -600,14 +600,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
       const fruit = Fruit.Apple;
       fruit === Fruit2.Apple2;
         `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Vegetable {
           Asparagus = 'asparagus',
           Beet = 'beet',
@@ -621,14 +621,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         const vegetable = Vegetable.Asparagus;
         vegetable === Vegetable2.Asparagus2;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Str {
           A = 'a',
         }
@@ -650,135 +650,135 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         mixed === 'a';
         mixed === 1;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum Str {
-      //     A = 'a',
-      //   }
-      //   enum Num {
-      //     B = 1,
-      //   }
-      //   enum Mixed {
-      //     A = 'a',
-      //     B = 1,
-      //   }
-      //
-      //   declare const str: Str;
-      //   declare const num: Num;
-      //   declare const mixed: Mixed;
-      //
-      //   // following are all errors because the value might be an enum value
-      //   str === Str.A;
-      //   num === 1;
-      //   mixed === 'a';
-      //   mixed === 1;
-      // `,
-      //         },
-      //       },
-          },
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum Str {
-      //     A = 'a',
-      //   }
-      //   enum Num {
-      //     B = 1,
-      //   }
-      //   enum Mixed {
-      //     A = 'a',
-      //     B = 1,
-      //   }
-      //
-      //   declare const str: Str;
-      //   declare const num: Num;
-      //   declare const mixed: Mixed;
-      //
-      //   // following are all errors because the value might be an enum value
-      //   str === 'a';
-      //   num === Num.B;
-      //   mixed === 'a';
-      //   mixed === 1;
-      // `,
-      //         },
-      //       },
-          },
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum Str {
-      //     A = 'a',
-      //   }
-      //   enum Num {
-      //     B = 1,
-      //   }
-      //   enum Mixed {
-      //     A = 'a',
-      //     B = 1,
-      //   }
-      //
-      //   declare const str: Str;
-      //   declare const num: Num;
-      //   declare const mixed: Mixed;
-      //
-      //   // following are all errors because the value might be an enum value
-      //   str === 'a';
-      //   num === 1;
-      //   mixed === Mixed.A;
-      //   mixed === 1;
-      // `,
-      //         },
-      //       },
-          },
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum Str {
-      //     A = 'a',
-      //   }
-      //   enum Num {
-      //     B = 1,
-      //   }
-      //   enum Mixed {
-      //     A = 'a',
-      //     B = 1,
-      //   }
-      //
-      //   declare const str: Str;
-      //   declare const num: Num;
-      //   declare const mixed: Mixed;
-      //
-      //   // following are all errors because the value might be an enum value
-      //   str === 'a';
-      //   num === 1;
-      //   mixed === 'a';
-      //   mixed === Mixed.B;
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum Str {
+					//     A = 'a',
+					//   }
+					//   enum Num {
+					//     B = 1,
+					//   }
+					//   enum Mixed {
+					//     A = 'a',
+					//     B = 1,
+					//   }
+					//
+					//   declare const str: Str;
+					//   declare const num: Num;
+					//   declare const mixed: Mixed;
+					//
+					//   // following are all errors because the value might be an enum value
+					//   str === Str.A;
+					//   num === 1;
+					//   mixed === 'a';
+					//   mixed === 1;
+					// `,
+					//         },
+					//       },
+				},
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum Str {
+					//     A = 'a',
+					//   }
+					//   enum Num {
+					//     B = 1,
+					//   }
+					//   enum Mixed {
+					//     A = 'a',
+					//     B = 1,
+					//   }
+					//
+					//   declare const str: Str;
+					//   declare const num: Num;
+					//   declare const mixed: Mixed;
+					//
+					//   // following are all errors because the value might be an enum value
+					//   str === 'a';
+					//   num === Num.B;
+					//   mixed === 'a';
+					//   mixed === 1;
+					// `,
+					//         },
+					//       },
+				},
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum Str {
+					//     A = 'a',
+					//   }
+					//   enum Num {
+					//     B = 1,
+					//   }
+					//   enum Mixed {
+					//     A = 'a',
+					//     B = 1,
+					//   }
+					//
+					//   declare const str: Str;
+					//   declare const num: Num;
+					//   declare const mixed: Mixed;
+					//
+					//   // following are all errors because the value might be an enum value
+					//   str === 'a';
+					//   num === 1;
+					//   mixed === Mixed.A;
+					//   mixed === 1;
+					// `,
+					//         },
+					//       },
+				},
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum Str {
+					//     A = 'a',
+					//   }
+					//   enum Num {
+					//     B = 1,
+					//   }
+					//   enum Mixed {
+					//     A = 'a',
+					//     B = 1,
+					//   }
+					//
+					//   declare const str: Str;
+					//   declare const num: Num;
+					//   declare const mixed: Mixed;
+					//
+					//   // following are all errors because the value might be an enum value
+					//   str === 'a';
+					//   num === 1;
+					//   mixed === 'a';
+					//   mixed === Mixed.B;
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
         enum Fruit {
           Apple = 'apple',
         }
@@ -789,14 +789,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         declare const weirdString: __String;
         weirdString === 'someArbitraryValue';
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Fruit {
           Apple,
         }
@@ -809,14 +809,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
           }
         }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCase",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCase",
+				},
+			},
+		},
+		{
+			Code: `
         enum Fruit {
           Apple,
           Banana,
@@ -833,14 +833,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
           }
         }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCase",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCase",
+				},
+			},
+		},
+		{
+			Code: `
         enum Vegetable {
           Asparagus = 'asparagus',
         }
@@ -853,14 +853,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
           }
         }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCase",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCase",
+				},
+			},
+		},
+		{
+			Code: `
         enum Vegetable {
           Asparagus = 'asparagus',
           Beet = 'beet',
@@ -877,14 +877,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
           }
         }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCase",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCase",
+				},
+			},
+		},
+		{
+			Code: `
         enum Vegetable {
           Asparagus = 'asparagus',
           Beet = 'beet',
@@ -904,14 +904,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
           }
         }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCase",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCase",
+				},
+			},
+		},
+		{
+			Code: `
         enum Str {
           A = 'a',
           B = 'b',
@@ -919,28 +919,28 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         declare const str: Str;
         str === 'b';
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum Str {
-      //     A = 'a',
-      //     B = 'b',
-      //   }
-      //   declare const str: Str;
-      //   str === Str.B;
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum Str {
+					//     A = 'a',
+					//     B = 'b',
+					//   }
+					//   declare const str: Str;
+					//   str === Str.B;
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
         enum Str {
           A = 'a',
           AB = 'ab',
@@ -948,28 +948,28 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         declare const str: Str;
         str === 'a' + 'b';
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum Str {
-      //     A = 'a',
-      //     AB = 'ab',
-      //   }
-      //   declare const str: Str;
-      //   str === Str.AB;
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum Str {
+					//     A = 'a',
+					//     AB = 'ab',
+					//   }
+					//   declare const str: Str;
+					//   str === Str.AB;
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
         enum Num {
           A = 1,
           B = 2,
@@ -977,28 +977,28 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         declare const num: Num;
         1 === num;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum Num {
-      //     A = 1,
-      //     B = 2,
-      //   }
-      //   declare const num: Num;
-      //   Num.A === num;
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum Num {
+					//     A = 1,
+					//     B = 2,
+					//   }
+					//   declare const num: Num;
+					//   Num.A === num;
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
         enum Num {
           A = 1,
           B = 2,
@@ -1006,28 +1006,28 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         declare const num: Num;
         1 /* with */ === /* comment */ num;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum Num {
-      //     A = 1,
-      //     B = 2,
-      //   }
-      //   declare const num: Num;
-      //   Num.A /* with */ === /* comment */ num;
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum Num {
+					//     A = 1,
+					//     B = 2,
+					//   }
+					//   declare const num: Num;
+					//   Num.A /* with */ === /* comment */ num;
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
         enum Num {
           A = 1,
           B = 2,
@@ -1035,28 +1035,28 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         declare const num: Num;
         1 + 1 === num;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum Num {
-      //     A = 1,
-      //     B = 2,
-      //   }
-      //   declare const num: Num;
-      //   Num.B === num;
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum Num {
+					//     A = 1,
+					//     B = 2,
+					//   }
+					//   declare const num: Num;
+					//   Num.B === num;
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
         enum Mixed {
           A = 1,
           B = 'b',
@@ -1064,28 +1064,28 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         declare const mixed: Mixed;
         mixed === 1;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum Mixed {
-      //     A = 1,
-      //     B = 'b',
-      //   }
-      //   declare const mixed: Mixed;
-      //   mixed === Mixed.A;
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum Mixed {
+					//     A = 1,
+					//     B = 'b',
+					//   }
+					//   declare const mixed: Mixed;
+					//   mixed === Mixed.A;
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
         enum Mixed {
           A = 1,
           B = 'b',
@@ -1093,190 +1093,190 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         declare const mixed: Mixed;
         mixed === 'b';
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum Mixed {
-      //     A = 1,
-      //     B = 'b',
-      //   }
-      //   declare const mixed: Mixed;
-      //   mixed === Mixed.B;
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum Mixed {
+					//     A = 1,
+					//     B = 'b',
+					//   }
+					//   declare const mixed: Mixed;
+					//   mixed === Mixed.B;
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
         enum StringKey {
           'test-key' /* with comment */ = 1,
         }
         declare const stringKey: StringKey;
         stringKey === 1;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum StringKey {
-      //     'test-key' /* with comment */ = 1,
-      //   }
-      //   declare const stringKey: StringKey;
-      //   stringKey === StringKey['test-key'];
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum StringKey {
+					//     'test-key' /* with comment */ = 1,
+					//   }
+					//   declare const stringKey: StringKey;
+					//   stringKey === StringKey['test-key'];
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
         enum StringKey {
           "key-'with-single'-quotes" = 1,
         }
         declare const stringKey: StringKey;
         stringKey === 1;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum StringKey {
-      //     "key-'with-single'-quotes" = 1,
-      //   }
-      //   declare const stringKey: StringKey;
-      //   stringKey === StringKey['key-\'with-single\'-quotes'];
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum StringKey {
+					//     "key-'with-single'-quotes" = 1,
+					//   }
+					//   declare const stringKey: StringKey;
+					//   stringKey === StringKey['key-\'with-single\'-quotes'];
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
         enum StringKey {
           'key-"with-double"-quotes' = 1,
         }
         declare const stringKey: StringKey;
         stringKey === 1;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum StringKey {
-      //     'key-"with-double"-quotes' = 1,
-      //   }
-      //   declare const stringKey: StringKey;
-      //   stringKey === StringKey['key-"with-double"-quotes'];
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum StringKey {
+					//     'key-"with-double"-quotes' = 1,
+					//   }
+					//   declare const stringKey: StringKey;
+					//   stringKey === StringKey['key-"with-double"-quotes'];
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
         enum StringKey {
           'key-` + "`" + `with-backticks` + "`" + `-quotes' = 1,
         }
         declare const stringKey: StringKey;
         stringKey === 1;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum StringKey {
-      //     'key-` + "`" + `with-backticks` + "`" + `-quotes' = 1,
-      //   }
-      //   declare const stringKey: StringKey;
-      //   stringKey === StringKey['key-` + "`" + `with-backticks` + "`" + `-quotes'];
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum StringKey {
+					//     'key-` + "`" + `with-backticks` + "`" + `-quotes' = 1,
+					//   }
+					//   declare const stringKey: StringKey;
+					//   stringKey === StringKey['key-` + "`" + `with-backticks` + "`" + `-quotes'];
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
         enum ComputedKey {
           ['test-key' /* with comment */] = 1,
         }
         declare const computedKey: ComputedKey;
         computedKey === 1;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum ComputedKey {
-      //     ['test-key' /* with comment */] = 1,
-      //   }
-      //   declare const computedKey: ComputedKey;
-      //   computedKey === ComputedKey['test-key'];
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum ComputedKey {
+					//     ['test-key' /* with comment */] = 1,
+					//   }
+					//   declare const computedKey: ComputedKey;
+					//   computedKey === ComputedKey['test-key'];
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
         enum ComputedKey {
           [` + "`" + `test-key` + "`" + ` /* with comment */] = 1,
         }
         declare const computedKey: ComputedKey;
         computedKey === 1;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum ComputedKey {
-      //     [` + "`" + `test-key` + "`" + ` /* with comment */] = 1,
-      //   }
-      //   declare const computedKey: ComputedKey;
-      //   computedKey === ComputedKey[` + "`" + `test-key` + "`" + `];
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum ComputedKey {
+					//     [` + "`" + `test-key` + "`" + ` /* with comment */] = 1,
+					//   }
+					//   declare const computedKey: ComputedKey;
+					//   computedKey === ComputedKey[` + "`" + `test-key` + "`" + `];
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
         enum ComputedKey {
           [` + "`" + `test-
           key` + "`" + ` /* with comment */] = 1,
@@ -1284,29 +1284,29 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         declare const computedKey: ComputedKey;
         computedKey === 1;
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-						//       TODO(port): implement suggestions
-      //       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-      //         {
-      //           MessageId: "replaceValueWithEnum",
-      //           Output: `
-      //   enum ComputedKey {
-      //     [` + "`" + `test-
-      //     key` + "`" + ` /* with comment */] = 1,
-      //   }
-      //   declare const computedKey: ComputedKey;
-      //   computedKey === ComputedKey[` + "`" + `test-
-      //     key` + "`" + `];
-      // `,
-      //         },
-      //       },
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+					//       TODO(port): implement suggestions
+					//       Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+					//         {
+					//           MessageId: "replaceValueWithEnum",
+					//           Output: `
+					//   enum ComputedKey {
+					//     [` + "`" + `test-
+					//     key` + "`" + ` /* with comment */] = 1,
+					//   }
+					//   declare const computedKey: ComputedKey;
+					//   computedKey === ComputedKey[` + "`" + `test-
+					//     key` + "`" + `];
+					// `,
+					//         },
+					//       },
+				},
+			},
+		},
+		{
+			Code: `
         enum Fruit {
           Apple,
         }
@@ -1314,14 +1314,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         if (foo === Fruit.Apple) {
         }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Fruit {
           Apple,
         }
@@ -1329,14 +1329,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         if (foo === Fruit.Apple) {
         }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Vegetable {
           Asparagus = 'asparagus',
         }
@@ -1344,14 +1344,14 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         if (foo === Vegetable.Asparagus) {
         }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-    {
-      Code: `
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+		{
+			Code: `
         enum Vegetable {
           Asparagus = 'asparagus',
         }
@@ -1359,12 +1359,11 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         if (foo === Vegetable.Asparagus) {
         }
       `,
-      Errors: []rule_tester.InvalidTestCaseError{
-          {
-            MessageId: "mismatchedCondition",
-          },
-      },
-    },
-  })
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "mismatchedCondition",
+				},
+			},
+		},
+	})
 }
-

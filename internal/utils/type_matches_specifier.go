@@ -28,9 +28,9 @@ type TypeOrValueSpecifier struct {
 	Package string
 }
 
-func typeMatchesStringSpecifier (
-  t *checker.Type,
-  names []string,
+func typeMatchesStringSpecifier(
+	t *checker.Type,
+	names []string,
 ) bool {
 	alias := checker.Type_alias(t)
 	var symbol *ast.Symbol
@@ -53,8 +53,8 @@ func typeMatchesStringSpecifier (
 
 func typeDeclaredInFile(
 	relativePath string,
-  declarationFiles []*ast.SourceFile,
-  program *compiler.Program,
+	declarationFiles []*ast.SourceFile,
+	program *compiler.Program,
 ) bool {
 	cwd := program.Host().GetCurrentDirectory()
 	if relativePath == "" {
@@ -69,40 +69,40 @@ func typeDeclaredInFile(
 }
 
 func typeDeclaredInLib(
-  declarationFiles []*ast.SourceFile,
-  program *compiler.Program,
+	declarationFiles []*ast.SourceFile,
+	program *compiler.Program,
 ) bool {
-  // Assertion: The type is not an error type.
+	// Assertion: The type is not an error type.
 
-  // Intrinsic type (i.e. string, number, boolean, etc) - Treat it as if it's from lib.
-  if (len(declarationFiles) == 0) {
-    return true
-  }
-  return Some(declarationFiles, func (d *ast.SourceFile)  bool {
-    return IsSourceFileDefaultLibrary(program, d)
+	// Intrinsic type (i.e. string, number, boolean, etc) - Treat it as if it's from lib.
+	if len(declarationFiles) == 0 {
+		return true
+	}
+	return Some(declarationFiles, func(d *ast.SourceFile) bool {
+		return IsSourceFileDefaultLibrary(program, d)
 	})
 }
 
 func findParentModuleDeclaration(
-  node *ast.Node,
+	node *ast.Node,
 ) *ast.ModuleDeclaration {
 	switch node.Kind {
-		case ast.KindModuleDeclaration:
-			decl := node.AsModuleDeclaration()
-			if ast.IsStringLiteral(decl.Name()) {
-				return decl
-			}
-			return nil
-		case ast.KindSourceFile:
-			return nil
-		default:
-			return findParentModuleDeclaration(node.Parent)
+	case ast.KindModuleDeclaration:
+		decl := node.AsModuleDeclaration()
+		if ast.IsStringLiteral(decl.Name()) {
+			return decl
+		}
+		return nil
+	case ast.KindSourceFile:
+		return nil
+	default:
+		return findParentModuleDeclaration(node.Parent)
 	}
 }
 
 func typeDeclaredInDeclareModule(
-  packageName string,
-  declarations []*ast.Node,
+	packageName string,
+	declarations []*ast.Node,
 ) bool {
 	return Some(declarations, func(d *ast.Node) bool {
 		parentModule := findParentModuleDeclaration(d)
@@ -111,12 +111,12 @@ func typeDeclaredInDeclareModule(
 }
 
 func typeDeclaredInDeclarationFile(
-  packageName string,
-  declarationFiles []*ast.SourceFile,
-  program *compiler.Program,
+	packageName string,
+	declarationFiles []*ast.SourceFile,
+	program *compiler.Program,
 ) bool {
 	// typesPackageName := ""
- //  // Handle scoped packages: if the name starts with @, remove it and replace / with __
+	//  // Handle scoped packages: if the name starts with @, remove it and replace / with __
 	// slashIndex := strings.Index(packageName, "/")
 	// if packageName[0] == '@' && slashIndex >= 0 {
 	// 	typesPackageName = packageName[1:slashIndex] + "__" + packageName[slashIndex+1:]
@@ -128,32 +128,30 @@ func typeDeclaredInDeclarationFile(
 
 	return false
 
-  // const matcher = new RegExp(`${packageName}|${typesPackageName}`);
-  // return declarationFiles.some(declaration => {
-  //   const packageIdName = program.sourceFileToPackageName.get(declaration.path);
-  //   return (
-  //     packageIdName != null &&
-  //     matcher.test(packageIdName) &&
-  //     program.isSourceFileFromExternalLibrary(declaration)
-  //   );
-  // });
+	// const matcher = new RegExp(`${packageName}|${typesPackageName}`);
+	// return declarationFiles.some(declaration => {
+	//   const packageIdName = program.sourceFileToPackageName.get(declaration.path);
+	//   return (
+	//     packageIdName != null &&
+	//     matcher.test(packageIdName) &&
+	//     program.isSourceFileFromExternalLibrary(declaration)
+	//   );
+	// });
 }
 
 func typeDeclaredInPackageDeclarationFile(
-  packageName string,
-  declarations []*ast.Node,
-  declarationFiles []*ast.SourceFile,
-  program *compiler.Program,
+	packageName string,
+	declarations []*ast.Node,
+	declarationFiles []*ast.SourceFile,
+	program *compiler.Program,
 ) bool {
-  return typeDeclaredInDeclareModule(packageName, declarations) ||
-    typeDeclaredInDeclarationFile(packageName, declarationFiles, program)
+	return typeDeclaredInDeclareModule(packageName, declarations) ||
+		typeDeclaredInDeclarationFile(packageName, declarationFiles, program)
 }
 
-
-
-func typeMatchesSpecifier (
-  t *checker.Type,
-  specifier TypeOrValueSpecifier,
+func typeMatchesSpecifier(
+	t *checker.Type,
+	specifier TypeOrValueSpecifier,
 	program *compiler.Program,
 ) bool {
 	if !typeMatchesStringSpecifier(t, specifier.Name) {
@@ -187,7 +185,7 @@ func typeMatchesSpecifier (
 	}
 }
 
-func TypeMatchesSomeSpecifier (
+func TypeMatchesSomeSpecifier(
 	t *checker.Type,
 	specifiers []TypeOrValueSpecifier,
 	inlineSpecifiers []string,
@@ -197,12 +195,11 @@ func TypeMatchesSomeSpecifier (
 		if IsIntrinsicErrorType(typePart) {
 			continue
 		}
-	if Some(specifiers, func(s TypeOrValueSpecifier) bool {
-		return typeMatchesSpecifier(t, s, program)
-	}) || typeMatchesStringSpecifier(t, inlineSpecifiers) {
-		return true
+		if Some(specifiers, func(s TypeOrValueSpecifier) bool {
+			return typeMatchesSpecifier(t, s, program)
+		}) || typeMatchesStringSpecifier(t, inlineSpecifiers) {
+			return true
+		}
 	}
+	return false
 }
-return false
-}
-
