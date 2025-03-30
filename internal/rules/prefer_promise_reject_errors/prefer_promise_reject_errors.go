@@ -79,6 +79,9 @@ var PreferPromiseRejectErrorsRule = rule.Rule{
 					// reject(...)
 				} else if ast.IsIdentifier(callee) {
 					symbol := ctx.TypeChecker.GetSymbolAtLocation(callee)
+					if symbol == nil {
+						return
+					}
 					param := symbol.ValueDeclaration
 
 					if param == nil || !ast.IsParameter(param) {

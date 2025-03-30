@@ -10,17 +10,17 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 )
 
-func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath string) (*compiler.Program, error) {
+func CreateCompilerHost(cwd string, fs vfs.FS) compiler.CompilerHost {
 	defaultLibraryPath := bundled.LibPath()
+	compilerOptions := core.CompilerOptions{}
+	return compiler.NewCompilerHost(&compilerOptions, cwd, fs, defaultLibraryPath)
+}
 
+func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath string, host compiler.CompilerHost) (*compiler.Program, error) {
 	resolvedConfigPath := tspath.ResolvePath(cwd, tsconfigPath)
 	if !fs.FileExists(resolvedConfigPath) {
 		return nil, fmt.Errorf("couldn't read tsconfig at %v", resolvedConfigPath)
 	}
-
-	compilerOptions := core.CompilerOptions{}
-
-	host := compiler.NewCompilerHost(&compilerOptions, cwd, fs, defaultLibraryPath)
 
 	program := compiler.NewProgram(compiler.ProgramOptions{
 		ConfigFileName: resolvedConfigPath,

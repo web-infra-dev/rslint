@@ -126,6 +126,9 @@ func (s *functionSignature) getNextParameterType() *checker.Type {
 		switch s.restType.Kind {
 		case restTypeKindTuple:
 			typeArguments := s.restType.TypeArguments
+			if len(typeArguments) == 0 {
+				return nil
+			}
 			if s.hasConsumedArguments {
 				// all types consumed by a rest - just assume it's the last type
 				// there is one edge case where this is wrong, but we ignore it because

@@ -9,6 +9,7 @@ import (
 	"none.none/tsgolint/internal/utils"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
@@ -19,8 +20,9 @@ type ConfiguredRule struct {
 	Run  func(ctx rule.RuleContext) rule.RuleListeners
 }
 
-func RunLinter(singleThreaded bool, fs vfs.FS, fileNames []string, getRulesForFile func(sourceFile *ast.SourceFile) []ConfiguredRule, cwd string, tsconfigPath string, onDiagnostic func(diagnostic rule.RuleDiagnostic)) error {
-	program, err := utils.CreateProgram(singleThreaded, fs, cwd, tsconfigPath)
+func RunLinter(singleThreaded bool, fs vfs.FS, fileNames []string, getRulesForFile func(sourceFile *ast.SourceFile) []ConfiguredRule, cwd string, tsconfigPath string, onDiagnostic func(diagnostic rule.RuleDiagnostic), host compiler.CompilerHost) error {
+	program, err := utils.CreateProgram(singleThreaded, fs, cwd, tsconfigPath, host)
+	cwdPath := tspath.ToPath("", cwd, program.Host().FS().UseCaseSensitiveFileNames())
 
 	if err != nil {
 		return err
@@ -29,8 +31,7 @@ func RunLinter(singleThreaded bool, fs vfs.FS, fileNames []string, getRulesForFi
 	var files []*ast.SourceFile
 	if len(fileNames) == 0 {
 		files = utils.Filter(program.SourceFiles(), func(f *ast.SourceFile) bool {
-			// TODO: case-aware comparison
-			return strings.HasPrefix(string(f.Path()), cwd)
+			return strings.HasPrefix(string(f.Path()), string(cwdPath))
 		})
 	} else {
 		files = make([]*ast.SourceFile, len(fileNames))

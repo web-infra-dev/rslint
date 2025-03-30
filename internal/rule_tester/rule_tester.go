@@ -64,6 +64,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 		}
 
 		fs := utils.NewOverlayVFSForFile(tspath.ResolvePath(rootDir, fileName), code)
+		host := utils.CreateCompilerHost(rootDir, &fs)
 
 		tsconfigPath := tsconfigPath
 		if tsconfigPathOverride != "" {
@@ -91,6 +92,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 
 				diagnostics = append(diagnostics, diagnostic)
 			},
+			host,
 		)
 
 		if err != nil {

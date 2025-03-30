@@ -2420,7 +2420,7 @@ switch (literal) {
   case 'a':
     break;
 }
-`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "switchIsNotExhaustive", Line: 4, Column: 9},// TODO(port): add support for suggestions
+`, Errors: []rule_tester.InvalidTestCaseError{{MessageId: "switchIsNotExhaustive", Line: 4, Column: 9}},// TODO(port): add support for suggestions
 			// Suggestions: []rule_tester.InvalidTestCaseSuggestion{ {
 			//                 MessageId: "addMissingCases",
 			//                 Output: `
@@ -2435,7 +2435,6 @@ switch (literal) {
 			//               },
 			//             },
 
-			},
 		},
 		{
 			Code: `
