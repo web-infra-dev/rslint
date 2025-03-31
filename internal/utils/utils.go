@@ -5,12 +5,9 @@ import (
 	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
-	"github.com/microsoft/typescript-go/shim/vfs"
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 )
 
 func TrimNodeTextRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
@@ -52,27 +49,6 @@ func TypeRecurser(t *checker.Type, predicate func(t *checker.Type) /* should sto
 	} else {
 		return predicate(t)
 	}
-}
-
-type OverlayVFS struct {
-	vfs.FS
-	VirtualFiles map[string]string
-}
-
-func NewOverlayVFSForFile(filePath string, source string) OverlayVFS {
-	virtualFiles := make(map[string]string, 1)
-	virtualFiles[filePath] = source
-	return OverlayVFS{
-		bundled.WrapFS(osvfs.FS()),
-		virtualFiles,
-	}
-}
-
-func (f *OverlayVFS) ReadFile(path string) (contents string, ok bool) {
-	if source, ok := f.VirtualFiles[path]; ok {
-		return source, true
-	}
-	return f.FS.ReadFile(path)
 }
 
 // SUPER DIRTY HACK FOR OPTIONAL FIELDS :(

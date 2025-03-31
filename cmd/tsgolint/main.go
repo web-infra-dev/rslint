@@ -6,9 +6,12 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"runtime"
 	"runtime/pprof"
 	"runtime/trace"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"unicode"
@@ -49,11 +52,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 )
 
-var traceOut = flag.String("trace", "", "File to put trace to")
-var cpuprofOut = flag.String("cpuprof", "", "File to put cpu profiling to")
-var singleThreaded = flag.Bool("singleThreaded", false, "Run in single threaded mode.")
-
-var lineEnds = make([]int, 13)
+const spaces = "                                                                                                    "
 
 func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions) {
 	diagnosticStart := d.Range.Pos()
@@ -80,26 +79,39 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 	w.Write([]byte{' ', 0x1b, '[', '7', 'm', 0x1b, '[', '1', 'm', 0x1b, '[', '3', '8', ';', '5', ';', '3', '7', 'm', ' '})
 	w.WriteString(d.RuleName)
 	w.WriteString(" \x1b[0m — ")
-	w.WriteString(d.Message.Description)
-	w.WriteString("\n  \x1b[2m╭─┴──────────(\x1b[0m \x1b[38;5;45m")
+	messageLineStart := 0
+	for i, char := range d.Message.Description {
+		if char == '\n' {
+			w.WriteString(d.Message.Description[messageLineStart:i+1])
+			messageLineStart = i+1
+			w.WriteString("    \x1b[2m│\x1b[0m")
+			w.WriteString(spaces[:len(d.RuleName)+1])
+		}
+	}
+	if messageLineStart <= len(d.Message.Description) {
+		w.WriteString(d.Message.Description[messageLineStart:len(d.Message.Description)])
+	}
+	w.WriteString("\n  \x1b[2m╭─┴──────────(\x1b[0m \x1b[3m\x1b[38;5;117m")
 	w.WriteString(tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions))
 	w.WriteByte(':')
 	w.Write([]byte(strconv.Itoa(diagnosticStartLine + 1)))
 	w.WriteByte(':')
 	w.Write([]byte(strconv.Itoa(diagnosticStartColumn + 1)))
-	w.WriteString("\x1b[0m \x1b[2m)──\x1b[0m\n")
+	w.WriteString("\x1b[0m \x1b[2m)─────\x1b[0m\n")
 
 	indentSize := math.MaxInt
 	line := codeboxStartLine
 	lineIndentCalculated := false
 	lastNonSpaceIndex := -1
 
+	lineStarts := make([]int, 13)
+	lineEnds := make([]int, 13)
+
 	if codeboxEndLine-codeboxStartLine >= len(lineEnds) {
 		w.WriteString("  \x1b[2m│\x1b[0m  Error range is too big. Skipping code block printing.\n  \x1b[2m╰────────────────────────────────\x1b[0m\n\n")
 		return
 	}
 
-	var lineStarts = make([]int, 13)
 
 	for i, char := range text[codeboxStart:codeboxEnd] {
 		if char == '\n' {
@@ -160,10 +172,10 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 
 		if underlineStart != underlineEnd {
 			w.WriteString(text[lineTextStart:underlineStart])
-			w.Write([]byte{0x1b, '[', '3', '8', ';', '5', ';', '1', '9', '6', 'm'})
+			w.Write([]byte{0x1b, '[', '3', '8', ';', '5', ';', '1', '6', '0', 'm'})
 			w.Write([]byte{0x1b, '[', '4', 'm'})
 			w.Write([]byte{0x1b, '[', '4', ':', '3', 'm'})
-			w.Write([]byte{0x1b, '[', '5', '8', ':', '5', ':', '1', '9', '6', 'm'})
+			w.Write([]byte{0x1b, '[', '5', '8', ':', '5', ':', '1', '6', '0', 'm'})
 			w.WriteString(text[underlineStart:underlineEnd])
 			w.Write([]byte{0x1b, '[', '0', 'm'})
 			w.WriteString(text[underlineEnd:lineTextEnd])
@@ -176,41 +188,95 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 	w.WriteString("  \x1b[2m╰────────────────────────────────\x1b[0m\n\n")
 }
 
+
+const usage = `tsgolint - linter based on typescript-go
+
+Usage:
+    tsgolint [OPTIONS]
+
+Options:
+    --tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.
+    -h, --help        Show help
+`
+
 func main() {
-	enableVirtualTerminalProcessing()
-	timeBefore := time.Now()
+	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
+
+	var (
+		help bool
+		tsconfig string
+
+		traceOut string
+		cpuprofOut string
+		singleThreaded bool
+	)
+
+	flag.StringVar(&tsconfig, "tsconfig", "", "which tsconfig to use.")
+	flag.BoolVar(&help, "help", false, "show help")
+	flag.BoolVar(&help, "h", false, "show help")
+
+	flag.StringVar(&traceOut, "trace", "", "file to put trace to")
+	flag.StringVar(&cpuprofOut, "cpuprof", "", "file to put cpu profiling to")
+	flag.BoolVar(&singleThreaded, "singleThreaded", false, "run in single threaded mode.")
+
 	flag.Parse()
 
-	if *traceOut != "" {
-		f, err := os.Create(*traceOut)
+	if help {
+		flag.Usage()
+		os.Exit(0)
+	}
+
+
+	enableVirtualTerminalProcessing()
+	timeBefore := time.Now()
+
+	if traceOut != "" {
+		f, err := os.Create(traceOut)
 		if err != nil {
-			panic(err)
+			fmt.Fprintf(os.Stderr, "error creating trace file: %v\n", err)
+			os.Exit(1)
 		}
 		defer f.Close()
 		trace.Start(f)
 		defer trace.Stop()
 	}
-	if *cpuprofOut != "" {
-		f, err := os.Create(*cpuprofOut + ".pg.gz")
+	if cpuprofOut != "" {
+		f, err := os.Create(cpuprofOut)
 		if err != nil {
-			panic(err)
+			fmt.Fprintf(os.Stderr, "error creating cpuprof file: %v\n", err)
+			os.Exit(1)
 		}
 		defer f.Close()
 		err = pprof.StartCPUProfile(f)
 		if err != nil {
-			panic(err)
+			fmt.Fprintf(os.Stderr, "error starting cpu profiling: %v\n", err)
+			os.Exit(1)
 		}
 		defer pprof.StopCPUProfile()
 	}
 
 	currentDirectory, err := os.Getwd()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error getting current directory: %v\n", err)
+		fmt.Fprintf(os.Stderr, "error getting current directory: %v\n", err)
 		os.Exit(1)
 	}
-	configFileName := tspath.ResolvePath(currentDirectory, "tsconfig.eslint.json")
 
-	var files []string
+	fs := bundled.WrapFS(osvfs.FS())
+	var configFileName string
+	if tsconfig == "" {
+		configFileName = tspath.ResolvePath(currentDirectory, "tsconfig.json")
+		if !fs.FileExists(configFileName) {
+			fs = utils.NewOverlayVFS(fs, map[string]string{
+				configFileName: "{}",
+			})
+		}
+	} else {
+		configFileName = tspath.ResolvePath(currentDirectory, tsconfig)
+		if !fs.FileExists(configFileName) {
+			fmt.Fprintf(os.Stderr, "error: tsconfig %q doesn't exist", tsconfig)
+			os.Exit(1)
+		}
+	}
 
 	var rules = []rule.Rule{
 		await_thenable.AwaitThenableRule,
@@ -239,10 +305,6 @@ func main() {
 		unbound_method.UnboundMethodRule,
 	}
 
-	diagnosticsChan := make(chan rule.RuleDiagnostic, 4096)
-	errorsCount := 0
-
-	fs := bundled.WrapFS(osvfs.FS())
 	host := utils.CreateCompilerHost(currentDirectory, fs)
 
 	comparePathOptions := tspath.ComparePathsOptions{
@@ -250,7 +312,26 @@ func main() {
 		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
 	}
 
+	program, err := utils.CreateProgram(singleThreaded, fs, currentDirectory, configFileName, host)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
+	}
+
+	files := []*ast.SourceFile{}
+	cwdPath := string(tspath.ToPath("", currentDirectory, program.Host().FS().UseCaseSensitiveFileNames()).EnsureTrailingDirectorySeparator())
+	for _, file := range program.SourceFiles() {
+		if strings.HasPrefix(string(file.Path()), cwdPath) {
+			files = append(files, file)
+		}
+	}
+	slices.SortFunc(files, func(a *ast.SourceFile, b *ast.SourceFile) int {
+		return len(b.Text) - len(a.Text)
+	})
+
 	var wg sync.WaitGroup
+
+	diagnosticsChan := make(chan rule.RuleDiagnostic, 4096)
+	errorsCount := 0
 
 	wg.Add(1)
 	go func() {
@@ -259,14 +340,17 @@ func main() {
 		defer w.Flush()
 		for d := range diagnosticsChan {
 			errorsCount++
+			if errorsCount == 1 {
+				w.WriteByte('\n')
+			}
 			printDiagnostic(d, w, comparePathOptions)
 		}
-		fmt.Fprintf(w, "Total errors: %v\n", errorsCount)
 	}()
 
+
 	err = linter.RunLinter(
-		*singleThreaded,
-		fs,
+		program,
+		singleThreaded,
 		files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			return utils.Map(rules, func(r rule.Rule) linter.ConfiguredRule {
@@ -278,22 +362,37 @@ func main() {
 				}
 			})
 		},
-		currentDirectory,
-		configFileName,
 		func(d rule.RuleDiagnostic) {
 			diagnosticsChan <- d
 		},
-		host,
 	)
 
 	close(diagnosticsChan)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error running linter: %v\n", err)
-		return
-		// os.Exit(1)
+		fmt.Fprintf(os.Stderr, "error running linter: %v\n", err)
+		os.Exit(1)
 	}
 
 	wg.Wait()
 
-	fmt.Printf("Execution time: %v\n", time.Since(timeBefore))
+	errorsText := "errors"
+	if errorsCount == 1 {
+		errorsText = "error"
+	}
+	threadsCount := 1
+	if !singleThreaded {
+		threadsCount = runtime.NumCPU()
+	}
+	fmt.Fprintf(
+		os.Stdout,
+		"Found \x1b[1m%v\x1b[0m %v \x1b[2m(linted \x1b[1m%v\x1b[22m\x1b[2m files with \x1b[1m%v\x1b[22m\x1b[2m rules in \x1b[1m%v\x1b[22m\x1b[2m using \x1b[1m%v\x1b[22m\x1b[2m threads)\n",
+		errorsCount,
+		errorsText,
+		len(files),
+		len(rules),
+		time.Since(timeBefore).Round(time.Millisecond),
+		threadsCount,
+	)
+
+	os.Exit(0)
 }

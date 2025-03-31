@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"gotest.tools/v3/assert"
 	"none.none/tsgolint/internal/rules/fixtures"
 )
 
@@ -17,10 +18,8 @@ func TestIsSymbolFromDefaultLibrary(t *testing.T) {
 		filePath := tspath.ResolvePath(rootDir, "file.ts")
 		fs := NewOverlayVFSForFile(filePath, code)
 
-		program, err := CreateProgram(true, &fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, &fs))
-		if err != nil {
-			t.Fatalf("error creating program: %v", err)
-		}
+		program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
+		assert.NilError(t, err, "couldn't create program")
 		sourceFile := program.GetSourceFile(filePath)
 		t := program.GetTypeChecker().GetTypeAtLocation(sourceFile.Statements.Nodes[0].AsTypeAliasDeclaration().Name())
 		return program, checker.Type_symbol(t)

@@ -64,16 +64,22 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 		}
 
 		fs := utils.NewOverlayVFSForFile(tspath.ResolvePath(rootDir, fileName), code)
-		host := utils.CreateCompilerHost(rootDir, &fs)
+		host := utils.CreateCompilerHost(rootDir, fs)
 
 		tsconfigPath := tsconfigPath
 		if tsconfigPathOverride != "" {
 			tsconfigPath = tsconfigPathOverride
 		}
-		err := linter.RunLinter(
+
+		program, err := utils.CreateProgram(true, fs, rootDir, tsconfigPath, host)
+		assert.NilError(t, err, "couldn't create program")
+
+		files := []*ast.SourceFile{program.GetSourceFile(fileName)}
+
+		err = linter.RunLinter(
+			program,
 			true,
-			&fs,
-			[]string{fileName},
+			files,
 			func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 				return []linter.ConfiguredRule{
 					{
@@ -84,20 +90,15 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 					},
 				}
 			},
-			rootDir,
-			tsconfigPath,
 			func(diagnostic rule.RuleDiagnostic) {
 				diagnosticsMu.Lock()
 				defer diagnosticsMu.Unlock()
 
 				diagnostics = append(diagnostics, diagnostic)
 			},
-			host,
 		)
 
-		if err != nil {
-			t.Fatalf("Error running linter: %v. Code:\n%v", err, code)
-		}
+		assert.NilError(t, err, "error running linter. code:\n", code)
 
 		return diagnostics
 	}
