@@ -22,7 +22,6 @@ func RunLinter(program *compiler.Program, singleThreaded bool, files []*ast.Sour
 	}
 	close(queue)
 
-
 	wg := core.NewWorkGroup(singleThreaded)
 	for _, checker := range program.GetTypeCheckers() {
 		wg.Queue(func() {
@@ -45,11 +44,11 @@ func RunLinter(program *compiler.Program, singleThreaded bool, files []*ast.Sour
 						},
 						ReportRangeWithSuggestions: func(textRange core.TextRange, msg rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
 							onDiagnostic(rule.RuleDiagnostic{
-								RuleName:   r.Name,
-								Range:      textRange,
-								Message:    msg,
+								RuleName:    r.Name,
+								Range:       textRange,
+								Message:     msg,
 								Suggestions: &suggestions,
-								SourceFile: file,
+								SourceFile:  file,
 							})
 						},
 						ReportNode: func(node *ast.Node, msg rule.RuleMessage) {

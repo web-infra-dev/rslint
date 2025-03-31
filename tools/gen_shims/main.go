@@ -5,23 +5,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"go/types"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+	"golang.org/x/tools/go/packages"
 	"log"
 	"maps"
 	"os"
 	"path"
 	"slices"
 	"strings"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
-	"golang.org/x/tools/go/packages"
 )
 
 const tsgoInternalPrefix = "github.com/microsoft/typescript-go/internal/"
 
 type ExtraShim struct {
-	ExtraFunctions []string
-	ExtraMethods map[string]([]string)
-	ExtraFields map[string]([]string)
+	ExtraFunctions  []string
+	ExtraMethods    map[string]([]string)
+	ExtraFields     map[string]([]string)
 	IgnoreFunctions []string
 }
 
@@ -46,7 +46,7 @@ func main() {
 
 	packages, err := packages.Load(&packages.Config{
 		// TODO: path relative to repo root
-		Dir: "./shim/compiler",
+		Dir:  "./shim/compiler",
 		Mode: packages.LoadSyntax,
 	}, packagesToShimFullNames...)
 	if err != nil {
@@ -86,7 +86,7 @@ func main() {
 				importedPackages[pkg] = false
 			}
 		}
-	
+
 		var qualifierOnlyPackageName types.Qualifier = func(p *types.Package) string {
 			importPackage(p.Path(), true)
 			return p.Name()
@@ -159,8 +159,8 @@ func main() {
 				}
 				continue
 			}
-	
-			printReexport := func (kind string) {
+
+			printReexport := func(kind string) {
 				importPackage(pkg.Types.Path(), true)
 				shimBuilder.WriteString(kind)
 				shimBuilder.WriteString(" ")
@@ -171,7 +171,7 @@ func main() {
 				shimBuilder.WriteString(name)
 				shimBuilder.WriteString("\n")
 			}
-	
+
 			switch object.(type) {
 			case *types.TypeName:
 				typeName := object.(*types.TypeName)
@@ -213,7 +213,7 @@ func main() {
 						}
 						extraMethods[methodName] = true
 						prefix := name + "_"
-						emitGoLinknameDirective(prefix + methodName, method)
+						emitGoLinknameDirective(prefix+methodName, method)
 						funcDeclStr := types.ObjectString(method, qualifierOnlyPackageName)
 						recvStart := 0
 						recvEnd := 0
@@ -221,10 +221,10 @@ func main() {
 						for i, s := range funcDeclStr {
 							if s == '(' {
 								if recvStart == 0 {
-									recvStart = i+1
+									recvStart = i + 1
 								}
 								if recvEnd != 0 {
-									paramsStart = i+1
+									paramsStart = i + 1
 									break
 								}
 							}
@@ -234,7 +234,7 @@ func main() {
 						}
 						shimBuilder.WriteString("func ")
 						shimBuilder.WriteString(prefix)
-						shimBuilder.WriteString(funcDeclStr[recvEnd+2:paramsStart])
+						shimBuilder.WriteString(funcDeclStr[recvEnd+2 : paramsStart])
 						shimBuilder.WriteString("recv ")
 						shimBuilder.WriteString(funcDeclStr[recvStart:recvEnd])
 						if method.Signature().Params() != nil {
@@ -254,13 +254,16 @@ func main() {
 					}
 					mirrorStructName := "extra_" + name
 
-					var emitExtraStruct func (name string, s *types.Struct) 
-					emitExtraStruct = func (name string, s *types.Struct) {
+					var emitExtraStruct func(name string, s *types.Struct)
+					emitExtraStruct = func(name string, s *types.Struct) {
 						shimBuilder.WriteString("type extra_")
 						shimBuilder.WriteString(name)
 						shimBuilder.WriteString(" struct {")
 
-						dependencies := [](struct {string; *types.Struct}){}
+						dependencies := [](struct {
+							string
+							*types.Struct
+						}){}
 						for field := range s.Fields() {
 							shimBuilder.WriteString("\n  ")
 							if !field.Embedded() {
@@ -275,7 +278,10 @@ func main() {
 									strct, ok := named.Underlying().(*types.Struct)
 									if ok {
 										n := named.Obj().Name()
-										dependencies = append(dependencies, struct{string; *types.Struct}{n, strct})
+										dependencies = append(dependencies, struct {
+											string
+											*types.Struct
+										}{n, strct})
 										shimBuilder.WriteString("extra_")
 										shimBuilder.WriteString(n)
 										continue
@@ -303,7 +309,6 @@ func main() {
 					for field := range strct.Fields() {
 						mappedFieldTypes[field.Name()] = field
 					}
-
 
 					for _, field := range extraShim.ExtraFields[name] {
 						shimBuilder.WriteString("func ")
@@ -388,7 +393,7 @@ func main() {
 		}
 		file.WriteString(shimHeaderBuilder.String())
 		file.WriteString(shimBuilder.String())
-	
+
 		shimHeaderBuilder.Reset()
 		shimBuilder.Reset()
 	}

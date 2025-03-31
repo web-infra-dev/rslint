@@ -103,12 +103,12 @@ func (d RuleDiagnostic) Fixes() []RuleFix {
 }
 
 type RuleContext struct {
-	SourceFile                *ast.SourceFile
-	Program                   *compiler.Program
-	TypeChecker               *checker.Checker
-	ReportRange               func(textRange core.TextRange, msg RuleMessage)
+	SourceFile                 *ast.SourceFile
+	Program                    *compiler.Program
+	TypeChecker                *checker.Checker
+	ReportRange                func(textRange core.TextRange, msg RuleMessage)
 	ReportRangeWithSuggestions func(textRange core.TextRange, msg RuleMessage, suggestions ...RuleSuggestion)
-	ReportNode                func(node *ast.Node, msg RuleMessage)
-	ReportNodeWithFixes       func(node *ast.Node, msg RuleMessage, fixes ...RuleFix)
-	ReportNodeWithSuggestions func(node *ast.Node, msg RuleMessage, suggestions ...RuleSuggestion)
+	ReportNode                 func(node *ast.Node, msg RuleMessage)
+	ReportNodeWithFixes        func(node *ast.Node, msg RuleMessage, fixes ...RuleFix)
+	ReportNodeWithSuggestions  func(node *ast.Node, msg RuleMessage, suggestions ...RuleSuggestion)
 }

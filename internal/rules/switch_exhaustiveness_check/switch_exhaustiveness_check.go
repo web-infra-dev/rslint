@@ -25,7 +25,7 @@ func buildDangerousDefaultCaseMessage() rule.RuleMessage {
 func buildSwitchIsNotExhaustiveMessage(missingBranches string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "switchIsNotExhaustive",
-		Description: fmt.Sprintf("Switch is not exhaustive. Cases not matched: %v", missingBranches),
+		Description: fmt.Sprintf("Switch is not exhaustive"), // . Cases not matched: %v", missingBranches),
 	}
 }
 

@@ -76,7 +76,7 @@ var NoArrayDeleteRule = rule.Rule{
 					Message: buildUseSpliceMessage(),
 					FixesArr: []rule.RuleFix{
 						rule.RuleFixRemoveRange(deleteTokenRange),
-						rule.RuleFixReplaceRange(leftBracketTokenRange,   ".splice("),
+						rule.RuleFixReplaceRange(leftBracketTokenRange, ".splice("),
 						rule.RuleFixReplaceRange(rightBracketTokenRange, ", 1)"),
 					},
 				})

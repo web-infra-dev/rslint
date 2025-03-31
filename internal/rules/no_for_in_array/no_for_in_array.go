@@ -41,7 +41,7 @@ var NoForInArrayRule = rule.Rule{
 
 				if isArrayLike(t) {
 					ctx.ReportRange(
-						utils.GetForStatementHeadLoc(ctx.SourceFile, node.AsForInOrOfStatement()),
+						utils.GetForStatementHeadLoc(ctx.SourceFile, node),
 						buildForInViolationMessage(),
 					)
 				}

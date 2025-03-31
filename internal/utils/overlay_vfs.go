@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/bundled"
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 )
@@ -167,7 +167,3 @@ func NewOverlayVFSForFile(filePath string, source string) vfs.FS {
 		virtualFiles,
 	}
 }
-
-
-
-

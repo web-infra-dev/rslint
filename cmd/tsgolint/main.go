@@ -82,8 +82,8 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 	messageLineStart := 0
 	for i, char := range d.Message.Description {
 		if char == '\n' {
-			w.WriteString(d.Message.Description[messageLineStart:i+1])
-			messageLineStart = i+1
+			w.WriteString(d.Message.Description[messageLineStart : i+1])
+			messageLineStart = i + 1
 			w.WriteString("    \x1b[2m│\x1b[0m")
 			w.WriteString(spaces[:len(d.RuleName)+1])
 		}
@@ -111,7 +111,6 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 		w.WriteString("  \x1b[2m│\x1b[0m  Error range is too big. Skipping code block printing.\n  \x1b[2m╰────────────────────────────────\x1b[0m\n\n")
 		return
 	}
-
 
 	for i, char := range text[codeboxStart:codeboxEnd] {
 		if char == '\n' {
@@ -172,10 +171,13 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 
 		if underlineStart != underlineEnd {
 			w.WriteString(text[lineTextStart:underlineStart])
-			w.Write([]byte{0x1b, '[', '3', '8', ';', '5', ';', '1', '6', '0', 'm'})
-			w.Write([]byte{0x1b, '[', '4', 'm'})
-			w.Write([]byte{0x1b, '[', '4', ':', '3', 'm'})
-			w.Write([]byte{0x1b, '[', '5', '8', ':', '5', ':', '1', '6', '0', 'm'})
+			w.Write([]byte{
+				0x1b, '[', '4', 'm',
+				0x1b, '[', '4', ':', '3', 'm',
+				0x1b, '[', '5', '8', ':', '5', ':', '1', '6', '0', 'm',
+				0x1b, '[', '3', '8', ';', '5', ';', '1', '6', '0', 'm',
+				0x1b, '[', '2', '2', ';', '4', '9', 'm',
+			})
 			w.WriteString(text[underlineStart:underlineEnd])
 			w.Write([]byte{0x1b, '[', '0', 'm'})
 			w.WriteString(text[underlineEnd:lineTextEnd])
@@ -187,7 +189,6 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 	}
 	w.WriteString("  \x1b[2m╰────────────────────────────────\x1b[0m\n\n")
 }
-
 
 const usage = `✨ tsgolint - speedy TypeScript linter
 
@@ -203,11 +204,11 @@ func main() {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
 	var (
-		help bool
+		help     bool
 		tsconfig string
 
-		traceOut string
-		cpuprofOut string
+		traceOut       string
+		cpuprofOut     string
 		singleThreaded bool
 	)
 
@@ -225,7 +226,6 @@ func main() {
 		flag.Usage()
 		os.Exit(0)
 	}
-
 
 	enableVirtualTerminalProcessing()
 	timeBefore := time.Now()
@@ -344,9 +344,11 @@ func main() {
 				w.WriteByte('\n')
 			}
 			printDiagnostic(d, w, comparePathOptions)
+			if w.Available() < 4096 {
+				w.Flush()
+			}
 		}
 	}()
-
 
 	err = linter.RunLinter(
 		program,
