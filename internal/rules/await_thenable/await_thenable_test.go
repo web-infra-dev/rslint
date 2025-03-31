@@ -490,9 +490,9 @@ for await (const value of yieldNumbers()) {
 				{
 					MessageId: "forAwaitOfNonAsyncIterable",
 					Line:      7,
-					Column:    5,
+					Column:    1,
 					EndLine:   7,
-					EndColumn: 10,
+					EndColumn: 42,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "convertToOrdinaryFor",
@@ -502,7 +502,7 @@ function* yieldNumbers() {
   yield 2;
   yield 3;
 }
-for (const value of yieldNumbers()) {
+for  (const value of yieldNumbers()) {
   console.log(value);
 }
       `,
@@ -534,7 +534,7 @@ function* yieldNumberPromises() {
   yield Promise.resolve(2);
   yield Promise.resolve(3);
 }
-for (const value of yieldNumberPromises()) {
+for  (const value of yieldNumberPromises()) {
   console.log(value);
 }
       `,

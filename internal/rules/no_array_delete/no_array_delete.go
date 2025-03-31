@@ -75,18 +75,9 @@ var NoArrayDeleteRule = rule.Rule{
 				ctx.ReportNodeWithSuggestions(node, buildNoArrayDeleteMessage(), rule.RuleSuggestion{
 					Message: buildUseSpliceMessage(),
 					FixesArr: []rule.RuleFix{
-						{
-							Text:  "",
-							Range: deleteTokenRange,
-						},
-						{
-							Text:  ".splice(",
-							Range: leftBracketTokenRange,
-						},
-						{
-							Text:  ", 1)",
-							Range: rightBracketTokenRange,
-						},
+						rule.RuleFixRemoveRange(deleteTokenRange),
+						rule.RuleFixReplaceRange(leftBracketTokenRange,   ".splice("),
+						rule.RuleFixReplaceRange(rightBracketTokenRange, ", 1)"),
 					},
 				})
 			},

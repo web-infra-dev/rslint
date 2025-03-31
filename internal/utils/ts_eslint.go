@@ -167,9 +167,15 @@ func GetTypeName(
  */
 func GetForStatementHeadLoc(
 	sourceFile *ast.SourceFile,
-	node *ast.ForInOrOfStatement,
+	node *ast.Node,
 ) core.TextRange {
-	return TrimNodeTextRange(sourceFile, node.AsNode()).WithEnd(node.Statement.Pos())
+	var statement *ast.Node
+	if ast.IsForStatement(node) {
+		statement = node.AsForStatement().Statement
+	} else {
+		statement = node.AsForInOrOfStatement().Statement
+	}
+	return TrimNodeTextRange(sourceFile, node).WithEnd(statement.Pos())
 }
 
 var arrayPredicateFunctions = []string{"every", "filter", "find", "findIndex", "findLast", "findLastIndex", "some"}

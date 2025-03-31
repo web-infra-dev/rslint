@@ -55,10 +55,7 @@ var AwaitThenableRule = rule.Rule{
 					ctx.ReportNodeWithSuggestions(node, buildAwaitMessage(), rule.RuleSuggestion{
 						Message: buildRemoveAwaitMessage(),
 						FixesArr: []rule.RuleFix{
-							{
-								Text:  "",
-								Range: scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos()),
-							},
+							rule.RuleFixRemoveRange(scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())),
 						},
 					})
 				}
@@ -80,19 +77,15 @@ var AwaitThenableRule = rule.Rule{
 					}
 				}
 
-				ctx.ReportNodeWithSuggestions(
-					// TODO(port): inaccurate range
-					stmt.AwaitModifier,
+				ctx.ReportRangeWithSuggestions(
+					utils.GetForStatementHeadLoc(ctx.SourceFile, node),
 					buildForAwaitOfNonAsyncIterableMessage(),
 					// Note that this suggestion causes broken code for sync iterables
 					// of promises, since the loop variable is not awaited.
 					rule.RuleSuggestion{
 						Message: buildConvertToOrdinaryForMessage(),
 						FixesArr: []rule.RuleFix{
-							{
-								Text:  "",
-								Range: stmt.AwaitModifier.Loc,
-							},
+							rule.RuleFixRemove(ctx.SourceFile, stmt.AwaitModifier),
 						},
 					},
 				)
@@ -128,17 +121,13 @@ var AwaitThenableRule = rule.Rule{
 						suggestions = append(suggestions, rule.RuleSuggestion{
 							Message: buildRemoveAwaitMessage(),
 							FixesArr: []rule.RuleFix{
-								{
-									Text:  "",
-									Range: scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos()),
-								},
+								rule.RuleFixRemoveRange(scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())),
 							},
 						})
 					}
 
 					ctx.ReportNodeWithSuggestions(init, buildAwaitUsingOfNonAsyncDisposableMessage(), suggestions...)
 				}
-
 			},
 		}
 	},

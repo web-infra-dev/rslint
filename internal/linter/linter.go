@@ -43,6 +43,15 @@ func RunLinter(program *compiler.Program, singleThreaded bool, files []*ast.Sour
 								SourceFile: file,
 							})
 						},
+						ReportRangeWithSuggestions: func(textRange core.TextRange, msg rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
+							onDiagnostic(rule.RuleDiagnostic{
+								RuleName:   r.Name,
+								Range:      textRange,
+								Message:    msg,
+								Suggestions: &suggestions,
+								SourceFile: file,
+							})
+						},
 						ReportNode: func(node *ast.Node, msg rule.RuleMessage) {
 							onDiagnostic(rule.RuleDiagnostic{
 								RuleName:   r.Name,
