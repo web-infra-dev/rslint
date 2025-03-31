@@ -1,11 +1,11 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: auvred <aauvred@gmail.com>
-Date: Wed, 26 Mar 2025 16:10:04 +0300
+Date: Mon, 31 Mar 2025 07:48:45 +0300
 Subject: [PATCH] Parallel readDirectory visitor
 
 
 diff --git a/internal/tsoptions/utilities.go b/internal/tsoptions/utilities.go
-index b5889636f..670d19aa6 100644
+index b5889636f..226566373 100644
 --- a/internal/tsoptions/utilities.go
 +++ b/internal/tsoptions/utilities.go
 @@ -3,9 +3,11 @@ package tsoptions
@@ -20,7 +20,7 @@ index b5889636f..670d19aa6 100644
  
  	"github.com/dlclark/regexp2"
  	"github.com/microsoft/typescript-go/internal/core"
-@@ -352,23 +354,60 @@ type visitor struct {
+@@ -352,23 +354,71 @@ type visitor struct {
  	useCaseSensitiveFileNames bool
  	host                      vfs.FS
  	visited                   core.Set[string]
@@ -37,29 +37,40 @@ index b5889636f..670d19aa6 100644
 +	rootJobs []directoryVisitorJob,
 +) []string {
 +	wg := core.NewWorkGroup(false)
-+	jobs := make(chan *directoryVisitorJob, 1024)
++	jobs := make(chan directoryVisitorJob, 2048)
 +	for _, job := range rootJobs {
-+		jobs <- &job
++		jobs <- job
 +	}
 +	var activeWorkers atomic.Int32
++	activeWorkers.Store(int32(len(rootJobs)))
 +	res := make([][]string, runtime.NumCPU())
++	var visitScheduler func(job directoryVisitorJob) []string
++	visitScheduler = func(job directoryVisitorJob) []string {
++		results, newJobs := v.visitDirectory(job.path, job.absolutePath, job.depth)
++
++		if len(newJobs) > 0 {
++			activeWorkers.Add(int32(len(newJobs)))
++		}
++		workersLeft := activeWorkers.Add(-1)
++		if workersLeft == 0 {
++			close(jobs)
++		} else {
++			for _, newJob := range newJobs {
++				select {
++				case jobs <- newJob:
++				default:
++					results = append(results, visitScheduler(newJob)...)
++				}
++			}
++		}
++
++		return results
++	}
 +	for i := range res {
 +		wg.Queue(func() {
 +			matchedFiles := []string{}
 +			for job := range jobs {
-+				activeWorkers.Add(1)
-+				results, newJobs := v.visitDirectory(job.path, job.absolutePath, job.depth)
-+				matchedFiles = append(matchedFiles, results...)
-+
-+				workersLeft := activeWorkers.Add(-1)
-+				if len(newJobs) == 0 && workersLeft == 0 {
-+					close(jobs)
-+				} else {
-+					for _, newJob := range newJobs {
-+						// TODO: couldn't channel congestion lead to deadlock here?
-+						jobs <- &newJob
-+					}
-+				}
++				matchedFiles = append(matchedFiles, visitScheduler(job)...)
 +			}
 +			res[i] = matchedFiles
 +		})
@@ -88,7 +99,7 @@ index b5889636f..670d19aa6 100644
  	for _, current := range files {
  		name := tspath.CombinePaths(path, current)
  		absoluteName := tspath.CombinePaths(absolutePath, current)
-@@ -379,11 +418,11 @@ func (v *visitor) visitDirectory(
+@@ -379,11 +429,11 @@ func (v *visitor) visitDirectory(
  			continue
  		}
  		if v.includeFileRegexes == nil {
@@ -102,7 +113,7 @@ index b5889636f..670d19aa6 100644
  			}
  		}
  	}
-@@ -391,18 +430,26 @@ func (v *visitor) visitDirectory(
+@@ -391,18 +441,26 @@ func (v *visitor) visitDirectory(
  	if depth != nil {
  		newDepth := *depth - 1
  		if newDepth == 0 {
@@ -131,7 +142,7 @@ index b5889636f..670d19aa6 100644
  }
  
  // path is the directory of the tsconfig.json
-@@ -424,18 +471,6 @@ func matchFiles(path string, extensions []string, excludes []string, includes []
+@@ -424,18 +482,6 @@ func matchFiles(path string, extensions []string, excludes []string, includes []
  		excludeRegex = getRegexFromPattern(patterns.excludePattern, useCaseSensitiveFileNames)
  	}
  
@@ -150,7 +161,7 @@ index b5889636f..670d19aa6 100644
  	v := visitor{
  		useCaseSensitiveFileNames: useCaseSensitiveFileNames,
  		host:                      host,
-@@ -443,13 +478,15 @@ func matchFiles(path string, extensions []string, excludes []string, includes []
+@@ -443,13 +489,15 @@ func matchFiles(path string, extensions []string, excludes []string, includes []
  		excludeRegex:              excludeRegex,
  		includeDirectoryRegex:     includeDirectoryRegex,
  		extensions:                extensions,
