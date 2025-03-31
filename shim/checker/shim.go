@@ -187,7 +187,6 @@ type extra_Checker struct {
   reverseHomomorphicMappedCache map[checker.ReverseMappedTypeKey]*checker.Type
   iterationTypesCache map[checker.IterationTypesKey]checker.IterationTypes
   markerTypes core.Set[*checker.Type]
-  identifierSymbols map[*ast.Node]*ast.Symbol
   undefinedSymbol *ast.Symbol
   argumentsSymbol *ast.Symbol
   requireSymbol *ast.Symbol
@@ -211,6 +210,7 @@ type extra_Checker struct {
   factory ast.NodeFactory
   nodeLinks core.LinkStore[*ast.Node, checker.NodeLinks]
   signatureLinks core.LinkStore[*ast.Node, checker.SignatureLinks]
+  symbolNodeLinks core.LinkStore[*ast.Node, checker.SymbolNodeLinks]
   typeNodeLinks core.LinkStore[*ast.Node, checker.TypeNodeLinks]
   enumMemberLinks core.LinkStore[*ast.Node, checker.EnumMemberLinks]
   assertionLinks core.LinkStore[*ast.Node, checker.AssertionLinks]
@@ -814,6 +814,7 @@ type StructuredType = checker.StructuredType
 type SubstitutionType = checker.SubstitutionType
 type SubstitutionTypeKey = checker.SubstitutionTypeKey
 type SwitchStatementLinks = checker.SwitchStatementLinks
+type SymbolNodeLinks = checker.SymbolNodeLinks
 type SymbolReferenceLinks = checker.SymbolReferenceLinks
 type TemplateLiteralType = checker.TemplateLiteralType
 type Ternary = checker.Ternary

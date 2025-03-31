@@ -525,6 +525,8 @@ func IsHeritageClause(node *ast.Node) bool
 func IsIdentifier(node *ast.Node) bool
 //go:linkname IsIdentifierName github.com/microsoft/typescript-go/internal/ast.IsIdentifierName
 func IsIdentifierName(node *ast.Node) bool
+//go:linkname IsIfStatement github.com/microsoft/typescript-go/internal/ast.IsIfStatement
+func IsIfStatement(node *ast.Node) bool
 //go:linkname IsImportAttributes github.com/microsoft/typescript-go/internal/ast.IsImportAttributes
 func IsImportAttributes(node *ast.Node) bool
 //go:linkname IsImportCall github.com/microsoft/typescript-go/internal/ast.IsImportCall
@@ -837,6 +839,8 @@ func IsTypeQueryNode(node *ast.Node) bool
 func IsTypeReferenceNode(node *ast.Node) bool
 //go:linkname IsUnaryExpression github.com/microsoft/typescript-go/internal/ast.IsUnaryExpression
 func IsUnaryExpression(node *ast.Node) bool
+//go:linkname IsUnterminatedLiteral github.com/microsoft/typescript-go/internal/ast.IsUnterminatedLiteral
+func IsUnterminatedLiteral(node *ast.Node) bool
 //go:linkname IsVarAwaitUsing github.com/microsoft/typescript-go/internal/ast.IsVarAwaitUsing
 func IsVarAwaitUsing(node *ast.Node) bool
 //go:linkname IsVarConst github.com/microsoft/typescript-go/internal/ast.IsVarConst
@@ -1739,6 +1743,7 @@ const TokenFlagsOctalSpecifier = ast.TokenFlagsOctalSpecifier
 const TokenFlagsPrecedingJSDocComment = ast.TokenFlagsPrecedingJSDocComment
 const TokenFlagsPrecedingJSDocLeadingAsterisks = ast.TokenFlagsPrecedingJSDocLeadingAsterisks
 const TokenFlagsPrecedingLineBreak = ast.TokenFlagsPrecedingLineBreak
+const TokenFlagsRegularExpressionLiteralFlags = ast.TokenFlagsRegularExpressionLiteralFlags
 const TokenFlagsScientific = ast.TokenFlagsScientific
 const TokenFlagsSingleQuote = ast.TokenFlagsSingleQuote
 const TokenFlagsStringLiteralFlags = ast.TokenFlagsStringLiteralFlags

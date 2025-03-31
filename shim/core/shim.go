@@ -96,6 +96,7 @@ const ScriptTargetES2020 = core.ScriptTargetES2020
 const ScriptTargetES2021 = core.ScriptTargetES2021
 const ScriptTargetES2022 = core.ScriptTargetES2022
 const ScriptTargetES2023 = core.ScriptTargetES2023
+const ScriptTargetES2024 = core.ScriptTargetES2024
 const ScriptTargetES3 = core.ScriptTargetES3
 const ScriptTargetES5 = core.ScriptTargetES5
 const ScriptTargetESNext = core.ScriptTargetESNext
