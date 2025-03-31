@@ -189,7 +189,7 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 }
 
 
-const usage = `tsgolint - linter based on typescript-go
+const usage = `✨ tsgolint - speedy TypeScript linter
 
 Usage:
     tsgolint [OPTIONS]
@@ -375,21 +375,36 @@ func main() {
 
 	wg.Wait()
 
+	errorsColor := "\x1b[1m"
+	if errorsCount == 0 {
+		errorsColor = "\x1b[1;32m"
+	}
 	errorsText := "errors"
 	if errorsCount == 1 {
 		errorsText = "error"
 	}
+	filesText := "files"
+	if len(files) == 1 {
+		filesText = "file"
+	}
+	rulesText := "rules"
+	if len(rules) == 1 {
+		rulesText = "rule"
+	}
 	threadsCount := 1
 	if !singleThreaded {
-		threadsCount = runtime.NumCPU()
+		threadsCount = runtime.GOMAXPROCS(0)
 	}
 	fmt.Fprintf(
 		os.Stdout,
-		"Found \x1b[1m%v\x1b[0m %v \x1b[2m(linted \x1b[1m%v\x1b[22m\x1b[2m files with \x1b[1m%v\x1b[22m\x1b[2m rules in \x1b[1m%v\x1b[22m\x1b[2m using \x1b[1m%v\x1b[22m\x1b[2m threads)\n",
+		"Found %v%v\x1b[0m %v \x1b[2m(linted \x1b[1m%v\x1b[22m\x1b[2m %v with \x1b[1m%v\x1b[22m\x1b[2m %v in \x1b[1m%v\x1b[22m\x1b[2m using \x1b[1m%v\x1b[22m\x1b[2m threads)\n",
+		errorsColor,
 		errorsCount,
 		errorsText,
 		len(files),
+		filesText,
 		len(rules),
+		rulesText,
 		time.Since(timeBefore).Round(time.Millisecond),
 		threadsCount,
 	)

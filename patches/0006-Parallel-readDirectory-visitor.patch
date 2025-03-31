@@ -5,7 +5,7 @@ Subject: [PATCH] Parallel readDirectory visitor
 
 
 diff --git a/internal/tsoptions/utilities.go b/internal/tsoptions/utilities.go
-index b5889636f..226566373 100644
+index b5889636f..bae0c49bc 100644
 --- a/internal/tsoptions/utilities.go
 +++ b/internal/tsoptions/utilities.go
 @@ -3,9 +3,11 @@ package tsoptions
@@ -43,7 +43,7 @@ index b5889636f..226566373 100644
 +	}
 +	var activeWorkers atomic.Int32
 +	activeWorkers.Store(int32(len(rootJobs)))
-+	res := make([][]string, runtime.NumCPU())
++	res := make([][]string, runtime.GOMAXPROCS(0))
 +	var visitScheduler func(job directoryVisitorJob) []string
 +	visitScheduler = func(job directoryVisitorJob) []string {
 +		results, newJobs := v.visitDirectory(job.path, job.absolutePath, job.depth)

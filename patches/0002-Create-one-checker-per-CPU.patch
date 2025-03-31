@@ -5,7 +5,7 @@ Subject: [PATCH] Create one checker per CPU
 
 
 diff --git a/internal/compiler/program.go b/internal/compiler/program.go
-index 47df8bf02..7a945cd55 100644
+index 47df8bf02..6cc9270dc 100644
 --- a/internal/compiler/program.go
 +++ b/internal/compiler/program.go
 @@ -2,6 +2,7 @@ package compiler
@@ -21,7 +21,7 @@ index 47df8bf02..7a945cd55 100644
  func (p *Program) createCheckers() {
  	p.checkersOnce.Do(func() {
 -		p.checkers = make([]*checker.Checker, core.IfElse(p.programOptions.SingleThreaded, 1, 4))
-+		p.checkers = make([]*checker.Checker, core.IfElse(p.programOptions.SingleThreaded, 1, runtime.NumCPU()))
++		p.checkers = make([]*checker.Checker, core.IfElse(p.programOptions.SingleThreaded, 1, runtime.GOMAXPROCS(0)))
  		wg := core.NewWorkGroup(p.programOptions.SingleThreaded)
  		for i := range p.checkers {
  			wg.Queue(func() {
