@@ -151,23 +151,32 @@ func IsReadonlyTypeLike(
 		return checker.Type_alias(subtype).Symbol().Name == "Readonly" && predicate(subtype)
 	})
 }
+
+type builtinPredicateMatches uint8
+
+const (
+	builtinPredicateMatches_Unknown builtinPredicateMatches = iota
+	builtinPredicateMatches_False
+	builtinPredicateMatches_True
+)
+
 func IsBuiltinTypeAliasLike(
 	program *compiler.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type,
 	predicate func(subType *checker.Type) bool,
 ) bool {
-	return IsBuiltinSymbolLikeRecurser(program, typeChecker, t, func(subtype *checker.Type) *bool {
+	return IsBuiltinSymbolLikeRecurser(program, typeChecker, t, func(subtype *checker.Type) builtinPredicateMatches {
 		aliasSymbol := checker.Type_alias(subtype)
 		if aliasSymbol == nil || len(aliasSymbol.TypeArguments()) == 0 {
-			return Ref(false)
+			return builtinPredicateMatches_False
 		}
 
 		if IsSymbolFromDefaultLibrary(program, aliasSymbol.Symbol()) && predicate(subtype) {
-			return Ref(true)
+			return builtinPredicateMatches_True
 		}
 
-		return nil
+		return builtinPredicateMatches_Unknown
 	})
 }
 
@@ -177,19 +186,19 @@ func IsBuiltinSymbolLike(
 	t *checker.Type,
 	symbolNames ...string,
 ) bool {
-	return IsBuiltinSymbolLikeRecurser(program, typeChecker, t, func(subType *checker.Type) *bool {
+	return IsBuiltinSymbolLikeRecurser(program, typeChecker, t, func(subType *checker.Type) builtinPredicateMatches {
 		symbol := checker.Type_symbol(subType)
 		if symbol == nil {
-			return Ref(false)
+			return builtinPredicateMatches_False
 		}
 
 		actualSymbolName := symbol.Name
 
 		if Some(symbolNames, func(name string) bool { return actualSymbolName == name }) && IsSymbolFromDefaultLibrary(program, symbol) {
-			return Ref(true)
+			return builtinPredicateMatches_True
 		}
 
-		return nil
+		return builtinPredicateMatches_Unknown
 	})
 }
 
@@ -198,17 +207,17 @@ func IsAnyBuiltinSymbolLike(
 	typeChecker *checker.Checker,
 	t *checker.Type,
 ) bool {
-	return IsBuiltinSymbolLikeRecurser(program, typeChecker, t, func(subType *checker.Type) *bool {
+	return IsBuiltinSymbolLikeRecurser(program, typeChecker, t, func(subType *checker.Type) builtinPredicateMatches {
 		symbol := checker.Type_symbol(subType)
 		if symbol == nil {
-			return Ref(false)
+			return builtinPredicateMatches_False
 		}
 
 		if IsSymbolFromDefaultLibrary(program, symbol) {
-			return Ref(true)
+			return builtinPredicateMatches_True
 		}
 
-		return nil
+		return builtinPredicateMatches_Unknown
 	})
 }
 
@@ -216,7 +225,7 @@ func IsBuiltinSymbolLikeRecurser(
 	program *compiler.Program,
 	typeChecker *checker.Checker,
 	t *checker.Type,
-	predicate func(subType *checker.Type) *bool,
+	predicate func(subType *checker.Type) builtinPredicateMatches,
 ) bool {
 	if IsIntersectionType(t) {
 		return Some(IntersectionTypeParts(t), func(t *checker.Type) bool {
@@ -239,8 +248,10 @@ func IsBuiltinSymbolLikeRecurser(
 	}
 
 	predicateResult := predicate(t)
-	if predicateResult != nil {
-		return *predicateResult
+	if predicateResult == builtinPredicateMatches_True {
+		return true
+	} else if predicateResult == builtinPredicateMatches_False {
+		return false
 	}
 
 	symbol := checker.Type_symbol(t)

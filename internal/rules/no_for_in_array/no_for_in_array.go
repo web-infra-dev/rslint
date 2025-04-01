@@ -33,10 +33,6 @@ var NoForInArrayRule = rule.Rule{
 
 		return rule.RuleListeners{
 			ast.KindForInStatement: func(node *ast.Node) {
-				if !ast.IsForInStatement(node) {
-					return
-				}
-
 				t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node.AsForInOrOfStatement().Expression)
 
 				if isArrayLike(t) {

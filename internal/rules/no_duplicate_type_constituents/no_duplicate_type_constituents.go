@@ -11,9 +11,9 @@ import (
 	"none.none/tsgolint/internal/utils"
 )
 
-func buildDuplicateMessage(unionOrIntersection UnionOrIntersection, previous string) rule.RuleMessage {
+func buildDuplicateMessage(unionOrIntersection unionOrIntersection, previous string) rule.RuleMessage {
 	var msg string
-	if unionOrIntersection == UnionOrIntersection_Intersection {
+	if unionOrIntersection == unionOrIntersection_Intersection {
 		msg = "Intersection"
 	} else {
 		msg = "Union"
@@ -30,11 +30,11 @@ func buildUnnecessaryMessage() rule.RuleMessage {
 	}
 }
 
-type UnionOrIntersection uint32
+type unionOrIntersection uint8
 
 const (
-	UnionOrIntersection_Union UnionOrIntersection = iota
-	UnionOrIntersection_Intersection
+	unionOrIntersection_Union unionOrIntersection = iota
+	unionOrIntersection_Intersection
 )
 
 type NoDuplicateTypeConstituentsOptions struct {
@@ -72,7 +72,7 @@ var NoDuplicateTypeConstituentsRule = rule.Rule{
 
 		report := func(
 			withFix bool,
-			unionOrIntersection UnionOrIntersection,
+			unionOrIntersection unionOrIntersection,
 			message rule.RuleMessage,
 			constituentNode *ast.Node,
 		) {
@@ -81,7 +81,7 @@ var NoDuplicateTypeConstituentsRule = rule.Rule{
 				return
 			}
 			kind := ast.KindUnionType
-			if unionOrIntersection == UnionOrIntersection_Intersection {
+			if unionOrIntersection == unionOrIntersection_Intersection {
 				kind = ast.KindIntersectionType
 			}
 
@@ -105,21 +105,12 @@ var NoDuplicateTypeConstituentsRule = rule.Rule{
 				s.Scan()
 			}
 			fixes := []rule.RuleFix{
-				{
-					Text:  "",
-					Range: utils.TrimNodeTextRange(ctx.SourceFile, constituentNode),
-				},
+				rule.RuleFixRemoveRange(utils.TrimNodeTextRange(ctx.SourceFile, constituentNode)),
 			}
 			if foundBefore {
-				fixes = append(fixes, rule.RuleFix{
-					Text:  "",
-					Range: core.NewTextRange(prevStart, prevStart+1),
-				})
+				fixes = append(fixes, rule.RuleFixRemoveRange(core.NewTextRange(prevStart, prevStart+1)))
 				for _, before := range bracketBeforeTokens {
-					fixes = append(fixes, rule.RuleFix{
-						Text:  "",
-						Range: before,
-					})
+					fixes = append(fixes, rule.RuleFixRemoveRange(before))
 				}
 				s.ResetPos(constituentNode.End())
 				for range bracketBeforeTokens {
@@ -127,10 +118,7 @@ var NoDuplicateTypeConstituentsRule = rule.Rule{
 					if s.Token() != ast.KindCloseParenToken {
 						panic(fmt.Sprintf("expected next scanned token to be ')', got '%v'", s.Token()))
 					}
-					fixes = append(fixes, rule.RuleFix{
-						Text:  "",
-						Range: s.TokenRange(),
-					})
+					fixes = append(fixes, rule.RuleFixRemoveRange(s.TokenRange()))
 				}
 			} else {
 				s.ResetPos(constituentNode.End())
@@ -144,20 +132,14 @@ var NoDuplicateTypeConstituentsRule = rule.Rule{
 					}
 
 					if s.Token() == ast.KindAmpersandToken || s.Token() == ast.KindBarToken {
-						fixes = append(fixes, rule.RuleFix{
-							Text:  "",
-							Range: s.TokenRange(),
-						})
+						fixes = append(fixes, rule.RuleFixRemoveRange(s.TokenRange()))
 						break
 					}
 					if s.Token() != ast.KindCloseParenToken {
 						panic(fmt.Sprintf("expected next scanned token to be ')', got '%v'", s.Token()))
 					}
 					closingParensCount++
-					fixes = append(fixes, rule.RuleFix{
-						Text:  "",
-						Range: s.TokenRange(),
-					})
+					fixes = append(fixes, rule.RuleFixRemoveRange(s.TokenRange()))
 				}
 
 				openingParens := make([]core.TextRange, 0, closingParensCount)
@@ -180,10 +162,7 @@ var NoDuplicateTypeConstituentsRule = rule.Rule{
 					}
 
 					for _, openingParenRange := range openingParens {
-						fixes = append(fixes, rule.RuleFix{
-							Text:  "",
-							Range: openingParenRange,
-						})
+						fixes = append(fixes, rule.RuleFixRemoveRange(openingParenRange))
 					}
 				}
 			}
@@ -192,14 +171,14 @@ var NoDuplicateTypeConstituentsRule = rule.Rule{
 
 		var checkDuplicateRecursively func(
 			withFix bool,
-			unionOrIntersection UnionOrIntersection,
+			unionOrIntersection unionOrIntersection,
 			constituentNode *ast.Node,
 			cachedTypeMap map[*checker.Type]*ast.Node,
 			forEachNodeType func(t *checker.Type, node *ast.Node),
 		) bool
 		checkDuplicateRecursively = func(
 			withFix bool,
-			unionOrIntersection UnionOrIntersection,
+			unionOrIntersection unionOrIntersection,
 			constituentNode *ast.Node,
 			cachedTypeMap map[*checker.Type]*ast.Node,
 			forEachNodeType func(t *checker.Type, node *ast.Node),
@@ -225,9 +204,9 @@ var NoDuplicateTypeConstituentsRule = rule.Rule{
 
 			var types []*ast.Node
 			withoutParens := ast.SkipTypeParentheses(constituentNode)
-			if unionOrIntersection == UnionOrIntersection_Union && withoutParens.Kind == ast.KindUnionType {
+			if unionOrIntersection == unionOrIntersection_Union && withoutParens.Kind == ast.KindUnionType {
 				types = withoutParens.AsUnionTypeNode().Types.Nodes
-			} else if unionOrIntersection == UnionOrIntersection_Intersection && withoutParens.Kind == ast.KindIntersectionType {
+			} else if unionOrIntersection == unionOrIntersection_Intersection && withoutParens.Kind == ast.KindIntersectionType {
 				types = withoutParens.AsIntersectionTypeNode().Types.Nodes
 			} else {
 				return false
@@ -257,13 +236,13 @@ var NoDuplicateTypeConstituentsRule = rule.Rule{
 		) {
 			cachedTypeMap := map[*checker.Type]*ast.Node{}
 
-			var unionOrIntersection UnionOrIntersection
+			var unionOrIntersection unionOrIntersection
 			var types []*ast.Node
 			if node.Kind == ast.KindIntersectionType {
-				unionOrIntersection = UnionOrIntersection_Intersection
+				unionOrIntersection = unionOrIntersection_Intersection
 				types = node.AsIntersectionTypeNode().Types.Nodes
 			} else if node.Kind == ast.KindUnionType {
-				unionOrIntersection = UnionOrIntersection_Union
+				unionOrIntersection = unionOrIntersection_Union
 				types = node.AsUnionTypeNode().Types.Nodes
 			} else {
 				panic(fmt.Sprintf("expected union or intersection, got %v", node.Kind))
@@ -306,7 +285,7 @@ var NoDuplicateTypeConstituentsRule = rule.Rule{
 						return
 					}
 					if utils.IsTypeFlagSet(constituentNodeType, checker.TypeFlagsUndefined) {
-						report(true, UnionOrIntersection_Union, buildUnnecessaryMessage(), constituentNode)
+						report(true, unionOrIntersection_Union, buildUnnecessaryMessage(), constituentNode)
 					}
 				})
 				return

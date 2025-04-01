@@ -82,8 +82,6 @@ var NoUnnecessaryTypeAssertionRule = rule.Rule{
 				declaration.Parent.Flags == ast.NodeFlagsNone {
 				// If they are not in the same file it will not exist.
 				// This situation must not occur using before defined.
-				// // TODO(port)
-				// services.tsNodeToESTreeNodeMap.has(declaration)
 				declaratorScope := ast.GetEnclosingBlockScopeContainer(declaration)
 				scope := ast.GetEnclosingBlockScopeContainer(node)
 
@@ -122,14 +120,6 @@ var NoUnnecessaryTypeAssertionRule = rule.Rule{
 			}
 
 			return false
-			// TODO(port)
-			// if (
-			//   tsutils.isStrictCompilerOptionEnabled(
-			//     compilerOptions,
-			//     'strictNullChecks',
-			//   ) &&
-			//   ts.isVariableDeclaration(declaration)
-			// ) {
 		}
 		isConstAssertion := func(node *ast.Node) bool {
 			if !ast.IsTypeReferenceNode(node) {

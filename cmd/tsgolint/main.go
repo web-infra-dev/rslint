@@ -197,6 +197,7 @@ Usage:
 
 Options:
     --tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.
+		--list-files      List matched files
     -h, --help        Show help
 `
 
@@ -204,8 +205,9 @@ func main() {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
 	var (
-		help     bool
-		tsconfig string
+		help      bool
+		tsconfig  string
+		listFiles bool
 
 		traceOut       string
 		cpuprofOut     string
@@ -213,6 +215,7 @@ func main() {
 	)
 
 	flag.StringVar(&tsconfig, "tsconfig", "", "which tsconfig to use.")
+	flag.BoolVar(&listFiles, "list-files", false, "list matched files")
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&help, "h", false, "show help")
 
@@ -319,10 +322,23 @@ func main() {
 
 	files := []*ast.SourceFile{}
 	cwdPath := string(tspath.ToPath("", currentDirectory, program.Host().FS().UseCaseSensitiveFileNames()).EnsureTrailingDirectorySeparator())
+	var matchedFiles strings.Builder
 	for _, file := range program.SourceFiles() {
-		if strings.HasPrefix(string(file.Path()), cwdPath) {
+		p := string(file.Path())
+		if strings.Contains(p, "/node_modules/") {
+			continue
+		}
+		if fileName, matched := strings.CutPrefix(p, cwdPath); matched {
+			if listFiles {
+				matchedFiles.WriteString("Found file: ")
+				matchedFiles.WriteString(fileName)
+				matchedFiles.WriteByte('\n')
+			}
 			files = append(files, file)
 		}
+	}
+	if listFiles {
+		os.Stdout.WriteString(matchedFiles.String())
 	}
 	slices.SortFunc(files, func(a *ast.SourceFile, b *ast.SourceFile) int {
 		return len(b.Text) - len(a.Text)
@@ -410,6 +426,4 @@ func main() {
 		time.Since(timeBefore).Round(time.Millisecond),
 		threadsCount,
 	)
-
-	os.Exit(0)
 }

@@ -509,10 +509,10 @@ var NoMisusedPromisesRule = rule.Rule{
 					continue
 				}
 				memberName := nodeMember.Name().Text()
-				if !returnsThenable(nodeMember) {
+				if ast.IsStatic(nodeMember) {
 					continue
 				}
-				if ast.IsStatic(nodeMember) {
+				if !returnsThenable(nodeMember) {
 					continue
 				}
 				for _, heritageType := range heritageTypes {

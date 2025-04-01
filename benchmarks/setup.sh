@@ -7,4 +7,7 @@ for proj in {vscode,typescript,typeorm}; do
   popd
 done
 
-
+pushd vuejs
+cp ../eslint.config.mjs ./eslint.config.mjs
+pnpm install -w -D eslint@latest typescript-eslint@latest
+popd

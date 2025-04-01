@@ -17,12 +17,23 @@ if (TSGOLINT_BENCHMARK_PROJECT === 'vscode') {
 } else if (TSGOLINT_BENCHMARK_PROJECT === 'typeorm') {
   files = ['src/**/*.ts', 'sample/**/*.ts', 'test/**/*.ts']
   project = './tsconfig.json'
+} else if (TSGOLINT_BENCHMARK_PROJECT === 'vuejs') {
+  files = [
+    'packages/global.d.ts',
+    'packages/*/src/**/*.ts',
+    'packages/*/__tests__/**/*.ts',
+    'packages/vue/jsx-runtime/**/*.ts',
+    'packages/runtime-dom/types/jsx.d.ts',
+    'scripts/*.ts',
+  ]
+  project = './tsconfig.json'
 }
-
 
 export default tseslint.config(
   {
-    ignores: ['**/*.js'],
+    ignores: ['**/*.js', '**/*.mjs', '**/*.cjs'],
+  },
+  {
     linterOptions: {
       noInlineConfig: true,
       reportUnusedInlineConfigs: 'off',

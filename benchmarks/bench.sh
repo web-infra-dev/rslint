@@ -17,3 +17,9 @@ hyperfine --warmup 1 --ignore-failure \
   --command-name 'eslint' 'NODE_OPTIONS="--max-old-space-size=16384" TSGOLINT_BENCHMARK_PROJECT=typeorm ./node_modules/eslint/bin/eslint.js --no-inline-config --config ./eslint.config.mjs .' \
   --command-name 'tsgolint' '../../tsgolint --tsconfig ./tsconfig.json'
 popd
+
+pushd vuejs
+hyperfine --warmup 1 --ignore-failure \
+  --command-name 'eslint' 'NODE_OPTIONS="--max-old-space-size=16384" TSGOLINT_BENCHMARK_PROJECT=vuejs ./node_modules/eslint/bin/eslint.js --no-inline-config --config ./eslint.config.mjs .' \
+  --command-name 'tsgolint' '../../tsgolint --tsconfig ./tsconfig.json'
+popd
