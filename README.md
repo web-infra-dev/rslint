@@ -2,6 +2,8 @@
 
 **tsgolint** is an experimental proof-of-concept [typescript-go](https://github.com/microsoft/typescript-go) powered JS/TS linter written in Go.
 
+![Running tsgolint on microsoft/typescript repo](./docs/record.gif)
+
 ## What's done so far
 
 - Primitive linter engine
