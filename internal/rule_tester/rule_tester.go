@@ -9,9 +9,9 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"none.none/tsgolint/internal/linter"
-	"none.none/tsgolint/internal/rule"
-	"none.none/tsgolint/internal/utils"
+	"github.com/typescript-eslint/tsgolint/internal/linter"
+	"github.com/typescript-eslint/tsgolint/internal/rule"
+	"github.com/typescript-eslint/tsgolint/internal/utils"
 
 	"gotest.tools/v3/assert"
 )

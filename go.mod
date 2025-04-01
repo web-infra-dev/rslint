@@ -1,4 +1,4 @@
-module none.none/tsgolint
+module github.com/typescript-eslint/tsgolint
 
 go 1.24.1
 

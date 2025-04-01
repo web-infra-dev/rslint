@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"none.none/tsgolint/internal/rule"
+	"github.com/typescript-eslint/tsgolint/internal/rule"
 )
 
 type LintMessage interface {

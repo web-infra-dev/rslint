@@ -5,7 +5,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
-	"none.none/tsgolint/internal/utils"
+	"github.com/typescript-eslint/tsgolint/internal/utils"
 )
 
 const (

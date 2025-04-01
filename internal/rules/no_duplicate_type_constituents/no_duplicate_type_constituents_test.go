@@ -3,8 +3,8 @@ package no_duplicate_type_constituents
 import (
 	"testing"
 
-	"none.none/tsgolint/internal/rule_tester"
-	"none.none/tsgolint/internal/rules/fixtures"
+	"github.com/typescript-eslint/tsgolint/internal/rule_tester"
+	"github.com/typescript-eslint/tsgolint/internal/rules/fixtures"
 )
 
 func TestNoDuplicateTypeConstituentsRule(t *testing.T) {

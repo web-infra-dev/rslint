@@ -7,8 +7,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
-	"none.none/tsgolint/internal/rule"
-	"none.none/tsgolint/internal/utils"
+	"github.com/typescript-eslint/tsgolint/internal/rule"
+	"github.com/typescript-eslint/tsgolint/internal/utils"
 )
 
 func buildDuplicateMessage(unionOrIntersection unionOrIntersection, previous string) rule.RuleMessage {

@@ -5,9 +5,9 @@ import (
 	"slices"
 	"testing"
 
-	"none.none/tsgolint/internal/rule_tester"
-	"none.none/tsgolint/internal/rules/fixtures"
-	"none.none/tsgolint/internal/utils"
+	"github.com/typescript-eslint/tsgolint/internal/rule_tester"
+	"github.com/typescript-eslint/tsgolint/internal/rules/fixtures"
+	"github.com/typescript-eslint/tsgolint/internal/utils"
 )
 
 func FlatMap[A, B any](input []A, f func(A) []B) []B {
