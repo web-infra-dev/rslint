@@ -60,8 +60,12 @@ func main() {
 	for _, pkg := range packages {
 		shimDirPath := path.Join("./shim/", strings.TrimPrefix(pkg.PkgPath, tsgoInternalPrefix))
 		var extraShim ExtraShim
-		if data, err := os.ReadFile(path.Join(shimDirPath, "extra-shim.json")); err == nil {
-			json.Unmarshal(data, &extraShim)
+		extraShimFilePath := path.Join(shimDirPath, "extra-shim.json")
+		if data, err := os.ReadFile(extraShimFilePath); err == nil {
+			if err := json.Unmarshal(data, &extraShim); err != nil {
+				fmt.Printf("error parsing %v: %v", extraShimFilePath, err)
+				return
+			}
 		}
 		if extraShim.ExtraMethods == nil {
 			extraShim.ExtraMethods = map[string][]string{}
