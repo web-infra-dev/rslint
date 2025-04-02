@@ -201,7 +201,7 @@ Options:
     -h, --help        Show help
 `
 
-func main() {
+func runMain() int {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
 	var (
@@ -227,7 +227,7 @@ func main() {
 
 	if help {
 		flag.Usage()
-		os.Exit(0)
+		return 0
 	}
 
 	enableVirtualTerminalProcessing()
@@ -237,7 +237,7 @@ func main() {
 		f, err := os.Create(traceOut)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error creating trace file: %v\n", err)
-			os.Exit(1)
+			return 1
 		}
 		defer f.Close()
 		trace.Start(f)
@@ -247,13 +247,13 @@ func main() {
 		f, err := os.Create(cpuprofOut)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error creating cpuprof file: %v\n", err)
-			os.Exit(1)
+			return 1
 		}
 		defer f.Close()
 		err = pprof.StartCPUProfile(f)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error starting cpu profiling: %v\n", err)
-			os.Exit(1)
+			return 1
 		}
 		defer pprof.StopCPUProfile()
 	}
@@ -261,7 +261,7 @@ func main() {
 	currentDirectory, err := os.Getwd()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error getting current directory: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 
 	fs := bundled.WrapFS(osvfs.FS())
@@ -277,7 +277,7 @@ func main() {
 		configFileName = tspath.ResolvePath(currentDirectory, tsconfig)
 		if !fs.FileExists(configFileName) {
 			fmt.Fprintf(os.Stderr, "error: tsconfig %q doesn't exist", tsconfig)
-			os.Exit(1)
+			return 1
 		}
 	}
 
@@ -388,7 +388,7 @@ func main() {
 	close(diagnosticsChan)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error running linter: %v\n", err)
-		os.Exit(1)
+		return 1
 	}
 
 	wg.Wait()
@@ -426,4 +426,10 @@ func main() {
 		time.Since(timeBefore).Round(time.Millisecond),
 		threadsCount,
 	)
+
+	return 0
+}
+
+func main() {
+	os.Exit(runMain())
 }
