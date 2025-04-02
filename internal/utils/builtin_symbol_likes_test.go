@@ -7,8 +7,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"gotest.tools/v3/assert"
 	"github.com/typescript-eslint/tsgolint/internal/rules/fixtures"
+	"gotest.tools/v3/assert"
 )
 
 func TestIsSymbolFromDefaultLibrary(t *testing.T) {
