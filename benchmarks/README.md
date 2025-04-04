@@ -18,23 +18,31 @@
 
 Prerequisites:
 
+- Built `tsgolint` binary. See [README.md](../README.md) for how to build it.
 - Node.js & Corepack
 - [`hyperfine`](https://github.com/sharkdp/hyperfine)
 
-### 1. Clone the repositories
+### Running in Docker/Podman
 
-```bash
-./clone-projects.sh
+```shell
+docker build --file ./Containerfile --progress plain ..
+
+# or
+
+podman build --file ./Containerfile --progress plain ..
 ```
 
-### 2. Install deps and setup ESLint configs
+### Running locally
 
-```bash
-./setup.sh
-```
-
-### 3. Run benchmarks
-
-```bash
-./bench.sh
-```
+1. Clone the repositories
+   ```bash
+   ./clone-projects.sh
+   ```
+2. Install deps and setup ESLint configs
+   ```bash
+   ./setup.sh
+   ```
+3. Run benchmarks
+   ```bash
+   ./bench.sh
+   ```
