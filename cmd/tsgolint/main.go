@@ -28,7 +28,11 @@ import (
 	"github.com/typescript-eslint/tsgolint/internal/rules/no_for_in_array"
 	"github.com/typescript-eslint/tsgolint/internal/rules/no_implied_eval"
 	"github.com/typescript-eslint/tsgolint/internal/rules/no_misused_promises"
+	"github.com/typescript-eslint/tsgolint/internal/rules/no_misused_spread"
+	"github.com/typescript-eslint/tsgolint/internal/rules/no_mixed_enums"
 	"github.com/typescript-eslint/tsgolint/internal/rules/no_redundant_type_constituents"
+	"github.com/typescript-eslint/tsgolint/internal/rules/no_unnecessary_boolean_literal_compare"
+	"github.com/typescript-eslint/tsgolint/internal/rules/no_unnecessary_type_arguments"
 	"github.com/typescript-eslint/tsgolint/internal/rules/no_unnecessary_type_assertion"
 	"github.com/typescript-eslint/tsgolint/internal/rules/no_unsafe_argument"
 	"github.com/typescript-eslint/tsgolint/internal/rules/no_unsafe_assignment"
@@ -42,6 +46,7 @@ import (
 	"github.com/typescript-eslint/tsgolint/internal/rules/require_await"
 	"github.com/typescript-eslint/tsgolint/internal/rules/restrict_plus_operands"
 	"github.com/typescript-eslint/tsgolint/internal/rules/restrict_template_expressions"
+	"github.com/typescript-eslint/tsgolint/internal/rules/return_await"
 	"github.com/typescript-eslint/tsgolint/internal/rules/switch_exhaustiveness_check"
 	"github.com/typescript-eslint/tsgolint/internal/rules/unbound_method"
 
@@ -291,7 +296,11 @@ func runMain() int {
 		no_for_in_array.NoForInArrayRule,
 		no_implied_eval.NoImpliedEvalRule,
 		no_misused_promises.NoMisusedPromisesRule,
+		no_misused_spread.NoMisusedSpreadRule,
+		no_mixed_enums.NoMixedEnumsRule,
 		no_redundant_type_constituents.NoRedundantTypeConstituentsRule,
+		no_unnecessary_boolean_literal_compare.NoUnnecessaryBooleanLiteralCompareRule,
+		no_unnecessary_type_arguments.NoUnnecessaryTypeArgumentsRule,
 		no_unnecessary_type_assertion.NoUnnecessaryTypeAssertionRule,
 		no_unsafe_argument.NoUnsafeArgumentRule,
 		no_unsafe_assignment.NoUnsafeAssignmentRule,
@@ -305,6 +314,7 @@ func runMain() int {
 		require_await.RequireAwaitRule,
 		restrict_plus_operands.RestrictPlusOperandsRule,
 		restrict_template_expressions.RestrictTemplateExpressionsRule,
+		return_await.ReturnAwaitRule,
 		switch_exhaustiveness_check.SwitchExhaustivenessCheckRule,
 		unbound_method.UnboundMethodRule,
 	}
