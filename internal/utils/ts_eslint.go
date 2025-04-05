@@ -537,3 +537,20 @@ func IsHigherPrecedenceThanAwait(node *ast.Node) bool {
 	awaitPrecedence := ast.GetOperatorPrecedence(ast.KindAwaitExpression, ast.KindUnknown, ast.OperatorPrecedenceFlagsNone)
 	return nodePrecedence > awaitPrecedence
 }
+
+func IsStrongPrecedenceNode(innerNode *ast.Node) bool {
+	return ast.IsLiteralKind(innerNode.Kind) ||
+		ast.IsBooleanLiteral(innerNode) ||
+		ast.IsParenthesizedExpression(innerNode) ||
+		innerNode.Kind == ast.KindIdentifier ||
+		innerNode.Kind == ast.KindTypeReference ||
+		innerNode.Kind == ast.KindTypeOperator ||
+		innerNode.Kind == ast.KindArrayLiteralExpression ||
+		innerNode.Kind == ast.KindObjectLiteralExpression ||
+		innerNode.Kind == ast.KindPropertyAccessExpression ||
+		innerNode.Kind == ast.KindElementAccessExpression ||
+		innerNode.Kind == ast.KindCallExpression ||
+		innerNode.Kind == ast.KindNewExpression ||
+		innerNode.Kind == ast.KindTaggedTemplateExpression ||
+		innerNode.Kind == ast.KindExpressionWithTypeArguments
+}
