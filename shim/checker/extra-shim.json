@@ -34,7 +34,8 @@
     "Type": [
       "alias",
       "flags",
-      "symbol"
+      "symbol",
+      "objectFlags"
     ],
     "TupleType": [
       "combinedFlags"

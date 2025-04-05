@@ -855,6 +855,9 @@ func Type_flags(v *checker.Type) checker.TypeFlags {
 func Type_symbol(v *checker.Type) *ast.Symbol {
   return ((*extra_Type)(unsafe.Pointer(v))).symbol
 }
+func Type_objectFlags(v *checker.Type) checker.ObjectFlags {
+  return ((*extra_Type)(unsafe.Pointer(v))).objectFlags
+}
 type TypeAlias = checker.TypeAlias
 type TypeAliasLinks = checker.TypeAliasLinks
 type TypeBase = checker.TypeBase
