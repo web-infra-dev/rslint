@@ -112,3 +112,14 @@ type RuleContext struct {
 	ReportNodeWithFixes        func(node *ast.Node, msg RuleMessage, fixes ...RuleFix)
 	ReportNodeWithSuggestions  func(node *ast.Node, msg RuleMessage, suggestions ...RuleSuggestion)
 }
+
+func ReportNodeWithFixesOrSuggestions(ctx RuleContext, node *ast.Node, fix bool, msg RuleMessage, suggestionMsg RuleMessage, fixes ...RuleFix) {
+	if fix {
+		ctx.ReportNodeWithFixes(node, msg, fixes...)
+	} else {
+		ctx.ReportNodeWithSuggestions(node, msg, RuleSuggestion{
+			Message:  suggestionMsg,
+			FixesArr: fixes,
+		})
+	}
+}

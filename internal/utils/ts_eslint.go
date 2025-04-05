@@ -531,3 +531,9 @@ func GetParentFunctionNode(
 
 	return nil
 }
+
+func IsHigherPrecedenceThanAwait(node *ast.Node) bool {
+	nodePrecedence := ast.GetExpressionPrecedence(node)
+	awaitPrecedence := ast.GetOperatorPrecedence(ast.KindAwaitExpression, ast.KindUnknown, ast.OperatorPrecedenceFlagsNone)
+	return nodePrecedence > awaitPrecedence
+}
