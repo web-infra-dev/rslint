@@ -4,8 +4,8 @@ github.com/go-json-experiment/json v0.0.0-20250223041408-d3c622f1b874 h1:F8d1AJ6
 github.com/go-json-experiment/json v0.0.0-20250223041408-d3c622f1b874/go.mod h1:TiCD2a1pcmjd7YnhGH0f/zKNcCD06B029pHhzV23c2M=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
-github.com/microsoft/typescript-go v0.0.0-20250330195803-3a3ff237cf7a h1:tZ04Qo/OpZEAs09/J+rHaksxC+ju8dB201mktIHgzPU=
-github.com/microsoft/typescript-go v0.0.0-20250330195803-3a3ff237cf7a/go.mod h1:BN6lQ1MGol+uWc1EF+pVE5D3xplOL82yUGZ8SgYD7KY=
+github.com/microsoft/typescript-go v0.0.0-20250404225244-5652e65d5ae9 h1:UVAGOU76TY8an7CQEXsbKTN46ZYNs22d0kkcTc/94JA=
+github.com/microsoft/typescript-go v0.0.0-20250404225244-5652e65d5ae9/go.mod h1:OF+dsnshdVmgM0tI0bJ6OPyMEBxY0Ld7194c/uzknDE=
 github.com/pkg/diff v0.0.0-20241224192749-4e6772a4315c h1:8TRxBMS/YsupXoOiGKHr9ZOXo+5DezGWPgBAhBHEHto=
 github.com/pkg/diff v0.0.0-20241224192749-4e6772a4315c/go.mod h1:pJLUxLENpZxwdsKMEsNbx1VGcRFpLqf3715MtcvvzbA=
 golang.org/x/mod v0.23.0 h1:Zb7khfcRGKk+kqfxFaP5tZqCnDZMjC5VtUBs87Hr6QM=

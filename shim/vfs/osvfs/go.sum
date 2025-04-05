@@ -1,7 +1,7 @@
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
-github.com/microsoft/typescript-go v0.0.0-20250330195803-3a3ff237cf7a h1:tZ04Qo/OpZEAs09/J+rHaksxC+ju8dB201mktIHgzPU=
-github.com/microsoft/typescript-go v0.0.0-20250330195803-3a3ff237cf7a/go.mod h1:BN6lQ1MGol+uWc1EF+pVE5D3xplOL82yUGZ8SgYD7KY=
+github.com/microsoft/typescript-go v0.0.0-20250404225244-5652e65d5ae9 h1:UVAGOU76TY8an7CQEXsbKTN46ZYNs22d0kkcTc/94JA=
+github.com/microsoft/typescript-go v0.0.0-20250404225244-5652e65d5ae9/go.mod h1:OF+dsnshdVmgM0tI0bJ6OPyMEBxY0Ld7194c/uzknDE=
 golang.org/x/sys v0.31.0 h1:ioabZlmFYtWhL+TRYpcnNlLwhyxaM9kWTDEmfnprqik=
 golang.org/x/sys v0.31.0/go.mod h1:BJP2sWEmIv4KK5OTEluFJCKSidICx8ciO85XgH3Ak8k=
 gotest.tools/v3 v3.5.2 h1:7koQfIKdy+I8UTetycgUqXWSDwpgv193Ka+qRsmBY8Q=
