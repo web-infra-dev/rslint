@@ -1,6 +1,7 @@
 #!/usr/bin/env -S bash -euxo pipefail
 
 pushd typescript-go
+git switch main
 git reset --hard origin/main
 git pull --prune
 popd
@@ -16,6 +17,6 @@ go mod tidy
 
 go run ./tools/gen_shims
 
-git add ./shim
+git add ./shim ./go.mod ./go.sum
 
 go build ./cmd/tsgolint

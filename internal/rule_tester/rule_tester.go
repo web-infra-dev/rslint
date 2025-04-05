@@ -151,7 +151,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 					assert.Equal(t, expected, outputs[i], "Expected code after fix")
 				}
 			} else {
-				t.Errorf("Expected to have %v outputs but had %v", len(testCase.Output), len(outputs))
+				t.Errorf("Expected to have %v outputs but had %v: %v", len(testCase.Output), len(outputs), outputs)
 			}
 
 			if len(initialDiagnostics) != len(testCase.Errors) {

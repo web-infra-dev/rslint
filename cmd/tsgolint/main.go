@@ -215,14 +215,14 @@ func runMain() int {
 		singleThreaded bool
 	)
 
-	flag.StringVar(&tsconfig, "tsconfig", "", "which tsconfig to use.")
+	flag.StringVar(&tsconfig, "tsconfig", "", "which tsconfig to use")
 	flag.BoolVar(&listFiles, "list-files", false, "list matched files")
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&help, "h", false, "show help")
 
 	flag.StringVar(&traceOut, "trace", "", "file to put trace to")
 	flag.StringVar(&cpuprofOut, "cpuprof", "", "file to put cpu profiling to")
-	flag.BoolVar(&singleThreaded, "singleThreaded", false, "run in single threaded mode.")
+	flag.BoolVar(&singleThreaded, "singleThreaded", false, "run in single threaded mode")
 
 	flag.Parse()
 
