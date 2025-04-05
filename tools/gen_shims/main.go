@@ -36,6 +36,7 @@ func main() {
 		"tsoptions",
 		"tspath",
 		"vfs",
+		"vfs/cachedvfs",
 		"vfs/osvfs",
 	}
 

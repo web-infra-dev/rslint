@@ -49,6 +49,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 )
 
@@ -264,7 +265,7 @@ func runMain() int {
 		return 1
 	}
 
-	fs := bundled.WrapFS(osvfs.FS())
+	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 	var configFileName string
 	if tsconfig == "" {
 		configFileName = tspath.ResolvePath(currentDirectory, "tsconfig.json")
