@@ -27,7 +27,8 @@
       "getReturnTypeOfSignature",
       "getContextualTypeForArgumentAtIndex",
       "getResolvedSignature",
-      "getBaseTypeOfLiteralType"
+      "getBaseTypeOfLiteralType",
+      "isTypeStrictSubtypeOf"
     ]
   },
   "ExtraFields": {
@@ -41,7 +42,8 @@
       "combinedFlags"
     ],
     "Signature": [
-      "parameters"
+      "parameters",
+      "declaration"
     ],
     "Checker": [
       "numberType",
