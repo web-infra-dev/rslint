@@ -5,10 +5,8 @@ package compiler
 
 import "github.com/microsoft/typescript-go/internal/ast"
 import "github.com/microsoft/typescript-go/internal/compiler"
-import "github.com/microsoft/typescript-go/internal/compiler/module"
 import "github.com/microsoft/typescript-go/internal/core"
 import "github.com/microsoft/typescript-go/internal/tsoptions"
-import "github.com/microsoft/typescript-go/internal/tspath"
 import "github.com/microsoft/typescript-go/internal/vfs"
 import _ "unsafe"
 
@@ -35,11 +33,7 @@ func NewProgram(options compiler.ProgramOptions) *compiler.Program
 //go:linkname NewProgramFromParsedCommandLine github.com/microsoft/typescript-go/internal/compiler.NewProgramFromParsedCommandLine
 func NewProgramFromParsedCommandLine(config *tsoptions.ParsedCommandLine, host compiler.CompilerHost) *compiler.Program
 type Program = compiler.Program
-//go:linkname Program_findSourceFile github.com/microsoft/typescript-go/internal/compiler.(*Program).findSourceFile
-func Program_findSourceFile(recv *compiler.Program, candidate string, reason compiler.FileIncludeReason) *ast.SourceFile
 type ProgramOptions = compiler.ProgramOptions
 //go:linkname SortAndDeduplicateDiagnostics github.com/microsoft/typescript-go/internal/compiler.SortAndDeduplicateDiagnostics
 func SortAndDeduplicateDiagnostics(diagnostics []*ast.Diagnostic) []*ast.Diagnostic
 type WriteFileData = compiler.WriteFileData
-//go:linkname ProcessAllProgramFiles github.com/microsoft/typescript-go/internal/compiler.processAllProgramFiles
-func ProcessAllProgramFiles(host compiler.CompilerHost, programOptions compiler.ProgramOptions, compilerOptions *core.CompilerOptions, resolver *module.Resolver, rootFiles []string, libs []string) (files []*ast.SourceFile, resolvedModules map[tspath.Path]module.ModeAwareCache[*module.ResolvedModule], sourceFileMetaDatas map[tspath.Path]*ast.SourceFileMetaData)
