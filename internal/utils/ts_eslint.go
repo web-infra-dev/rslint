@@ -7,6 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 )
 
 type ConstraintTypeInfo struct {
@@ -563,4 +564,39 @@ func IsParenlessArrowFunction(node *ast.Node) bool {
 	n := node.AsArrowFunction()
 
 	return n.Parameters.End() == n.EqualsGreaterThanToken.Pos()
+}
+
+type MemberNameType uint8
+
+const (
+	MemberNameTypePrivate MemberNameType = iota
+	MemberNameTypeQuoted
+	MemberNameTypeNormal
+	MemberNameTypeExpression
+)
+
+/**
+ * Gets a string name representation of the name of the given MethodDefinition
+ * or PropertyDefinition node, with handling for computed property names.
+ */
+func GetNameFromMember(sourceFile *ast.SourceFile, member *ast.Node) (string, MemberNameType) {
+	switch member.Kind {
+	case ast.KindIdentifier:
+		return member.AsIdentifier().Text, MemberNameTypeNormal
+	case ast.KindPrivateIdentifier:
+		return member.AsPrivateIdentifier().Text, MemberNameTypePrivate
+	case ast.KindComputedPropertyName:
+		expr := member.AsComputedPropertyName().Expression
+		// TODO(port): support boolean keywords, null keywords, etc
+		if ast.IsLiteralExpression(expr) {
+			text := expr.Text()
+			if !scanner.IsValidIdentifier(text, sourceFile.LanguageVersion) {
+				return "\"" + text + "\"", MemberNameTypeQuoted
+			}
+			return text, MemberNameTypeNormal
+		}
+	}
+
+	r := TrimNodeTextRange(sourceFile, member)
+	return sourceFile.Text[r.Pos():r.End()], MemberNameTypeExpression
 }
