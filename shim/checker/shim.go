@@ -552,6 +552,23 @@ type InheritanceInfo = checker.InheritanceInfo
 type InstantiationExpressionKey = checker.InstantiationExpressionKey
 type InstantiationExpressionType = checker.InstantiationExpressionType
 type InterfaceType = checker.InterfaceType
+type extra_InterfaceType struct {
+  checker.TypeReference
+  allTypeParameters []*checker.Type
+  outerTypeParameterCount int
+  thisType *checker.Type
+  baseTypesResolved bool
+  declaredMembersResolved bool
+  resolvedBaseConstructorType *checker.Type
+  resolvedBaseTypes []*checker.Type
+  declaredMembers ast.SymbolTable
+  declaredCallSignatures []*checker.Signature
+  declaredConstructSignatures []*checker.Signature
+  declaredIndexInfos []*checker.IndexInfo
+}
+func InterfaceType_thisType(v *checker.InterfaceType) *checker.Type {
+  return ((*extra_InterfaceType)(unsafe.Pointer(v))).thisType
+}
 type IntersectionFlags = checker.IntersectionFlags
 const IntersectionFlagsNoConstraintReduction = checker.IntersectionFlagsNoConstraintReduction
 const IntersectionFlagsNoSupertypeReduction = checker.IntersectionFlagsNoSupertypeReduction

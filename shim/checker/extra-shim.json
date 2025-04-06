@@ -51,6 +51,9 @@
       "numberType",
       "booleanType",
       "globalRegExpType"
+    ],
+    "InterfaceType": [
+      "thisType"
     ]
   }
 }
