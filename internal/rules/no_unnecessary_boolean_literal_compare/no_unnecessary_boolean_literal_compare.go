@@ -129,17 +129,17 @@ var NoUnnecessaryBooleanLiteralCompareRule = rule.Rule{
 				return res, false
 			}
 
-			constraintInfo := utils.GetConstraintInfo(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(res.expression))
+			constraintType, isTypeParameter := utils.GetConstraintInfo(ctx.TypeChecker, ctx.TypeChecker.GetTypeAtLocation(res.expression))
 
-			if constraintInfo.IsTypeParameter && constraintInfo.ConstraintType == nil {
+			if isTypeParameter && constraintType == nil {
 				return res, false
 			}
 
-			if isBooleanType(constraintInfo.ConstraintType) {
+			if isBooleanType(constraintType) {
 				return res, true
 			}
 
-			if isNullableBoolean(constraintInfo.ConstraintType) {
+			if isNullableBoolean(constraintType) {
 				res.expressionIsNullableBoolean = true
 				return res, true
 			}

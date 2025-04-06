@@ -38,18 +38,11 @@ type ConstraintTypeInfo struct {
 func GetConstraintInfo(
 	typeChecker *checker.Checker,
 	t *checker.Type,
-) ConstraintTypeInfo {
+) (constraintType *checker.Type, isTypeParameter bool) {
 	if checker.Type_flags(t)&checker.TypeFlagsTypeParameter != 0 {
-		constraintType := checker.Checker_getBaseConstraintOfType(typeChecker, t)
-		return ConstraintTypeInfo{
-			ConstraintType:  constraintType,
-			IsTypeParameter: true,
-		}
+		return checker.Checker_getBaseConstraintOfType(typeChecker, t), true
 	}
-	return ConstraintTypeInfo{
-		ConstraintType:  t,
-		IsTypeParameter: false,
-	}
+	return t, false
 }
 
 type TypeAwaitable int32
@@ -65,20 +58,20 @@ func NeedsToBeAwaited(
 	node *ast.Node,
 	t *checker.Type,
 ) TypeAwaitable {
-	constraintInfo := GetConstraintInfo(typeChecker, t)
+	constraintType, isTypeParameter := GetConstraintInfo(typeChecker, t)
 
 	// unconstrained generic types should be treated as unknown
-	if constraintInfo.IsTypeParameter && constraintInfo.ConstraintType == nil {
+	if isTypeParameter && constraintType == nil {
 		return TypeAwaitableMay
 	}
 
 	// `any` and `unknown` types may need to be awaited
-	if IsTypeAnyType(constraintInfo.ConstraintType) || IsTypeUnknownType(constraintInfo.ConstraintType) {
+	if IsTypeAnyType(constraintType) || IsTypeUnknownType(constraintType) {
 		return TypeAwaitableMay
 	}
 
 	// 'thenable' values should always be be awaited
-	if IsThenableType(typeChecker, node, constraintInfo.ConstraintType) {
+	if IsThenableType(typeChecker, node, constraintType) {
 		return TypeAwaitableAlways
 	}
 
