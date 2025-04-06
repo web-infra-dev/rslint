@@ -28,6 +28,8 @@
       "getContextualTypeForArgumentAtIndex",
       "getResolvedSignature",
       "getBaseTypeOfLiteralType",
+      "getWidenedType",
+      "isTypeAssignableTo",
       "isTypeStrictSubtypeOf"
     ]
   },

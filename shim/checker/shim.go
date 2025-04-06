@@ -92,6 +92,8 @@ type Checker = checker.Checker
 func Checker_getResolvedSignature(recv *checker.Checker, node *ast.Node, candidatesOutArray *[]*checker.Signature, checkMode checker.CheckMode) *checker.Signature
 //go:linkname Checker_getTypeOfSymbol github.com/microsoft/typescript-go/internal/checker.(*Checker).getTypeOfSymbol
 func Checker_getTypeOfSymbol(recv *checker.Checker, symbol *ast.Symbol) *checker.Type
+//go:linkname Checker_getWidenedType github.com/microsoft/typescript-go/internal/checker.(*Checker).getWidenedType
+func Checker_getWidenedType(recv *checker.Checker, t *checker.Type) *checker.Type
 //go:linkname Checker_getPropertiesOfType github.com/microsoft/typescript-go/internal/checker.(*Checker).getPropertiesOfType
 func Checker_getPropertiesOfType(recv *checker.Checker, t *checker.Type) []*ast.Symbol
 //go:linkname Checker_getPropertyOfType github.com/microsoft/typescript-go/internal/checker.(*Checker).getPropertyOfType
@@ -130,6 +132,8 @@ func Checker_getAwaitedType(recv *checker.Checker, t *checker.Type) *checker.Typ
 func Checker_getAccessedPropertyName(recv *checker.Checker, access *ast.Node) (string, bool)
 //go:linkname Checker_getPropertyNameForKnownSymbolName github.com/microsoft/typescript-go/internal/checker.(*Checker).getPropertyNameForKnownSymbolName
 func Checker_getPropertyNameForKnownSymbolName(recv *checker.Checker, symbolName string) string
+//go:linkname Checker_isTypeAssignableTo github.com/microsoft/typescript-go/internal/checker.(*Checker).isTypeAssignableTo
+func Checker_isTypeAssignableTo(recv *checker.Checker, source *checker.Type, target *checker.Type) bool
 //go:linkname Checker_isTypeStrictSubtypeOf github.com/microsoft/typescript-go/internal/checker.(*Checker).isTypeStrictSubtypeOf
 func Checker_isTypeStrictSubtypeOf(recv *checker.Checker, source *checker.Type, target *checker.Type) bool
 type extra_Checker struct {
