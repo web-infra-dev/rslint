@@ -554,3 +554,13 @@ func IsStrongPrecedenceNode(innerNode *ast.Node) bool {
 		innerNode.Kind == ast.KindTaggedTemplateExpression ||
 		innerNode.Kind == ast.KindExpressionWithTypeArguments
 }
+
+func IsParenlessArrowFunction(node *ast.Node) bool {
+	if !ast.IsArrowFunction(node) {
+		return false
+	}
+
+	n := node.AsArrowFunction()
+
+	return n.Parameters.End() == n.EqualsGreaterThanToken.Pos()
+}
