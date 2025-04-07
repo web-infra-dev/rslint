@@ -3,6 +3,7 @@ package utils
 import (
 	"iter"
 	"slices"
+	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -36,6 +37,13 @@ func GetCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) iter
 			}
 		}
 	}
+}
+
+func HasCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) bool {
+	for range GetCommentsInRange(sourceFile, inRange) {
+		return true
+	}
+	return false
 }
 
 func TypeRecurser(t *checker.Type, predicate func(t *checker.Type) /* should stop */ bool) bool {
@@ -154,4 +162,24 @@ func IncludesModifier(node interface{ Modifiers() *ast.ModifierList }, modifier 
 	return Some(modifiers.NodeList.Nodes, func(m *ast.Node) bool {
 		return m.Kind == modifier
 	})
+}
+
+// Source: https://github.com/microsoft/typescript-go/blob/5652e65d5ae944375676d3955f9755e554576d41/internal/jsnum/string.go#L99
+func IsStrWhiteSpace(r rune) bool {
+	// This is different than stringutil.IsWhiteSpaceLike.
+
+	// https://tc39.es/ecma262/2024/multipage/ecmascript-language-lexical-grammar.html#prod-LineTerminator
+	// https://tc39.es/ecma262/2024/multipage/ecmascript-language-lexical-grammar.html#prod-WhiteSpace
+
+	switch r {
+	// LineTerminator
+	case '\n', '\r', 0x2028, 0x2029:
+		return true
+	// WhiteSpace
+	case '\t', '\v', '\f', 0xFEFF:
+		return true
+	}
+
+	// WhiteSpace
+	return unicode.Is(unicode.Zs, r)
 }
