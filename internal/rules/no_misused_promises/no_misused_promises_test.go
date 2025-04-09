@@ -1547,8 +1547,6 @@ const Component = (obj: O) => null;
 <Component func={async () => 0} />;
       `,
 			Tsx: true,
-			// TODO(port) getContextualTypeForJsxExpression is not yet implemented
-			Skip: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "voidReturnAttribute",
@@ -1585,8 +1583,6 @@ const Component = (obj: O) => null;
 <Component func={g} />;
       `,
 			Tsx: true,
-			// TODO(port) getContextualTypeForJsxExpression is not yet implemented
-			Skip: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "voidReturnAttribute",

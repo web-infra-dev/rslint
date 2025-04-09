@@ -785,8 +785,6 @@ function Test(props: { id?: string | number }) {
   return <div key={props.id!} />;
 }
       `,
-			// TODO(port): enable once tsgo fully supports JSX
-			Skip: true,
 			Output: []string{`
 declare namespace JSX {
   interface IntrinsicElements {

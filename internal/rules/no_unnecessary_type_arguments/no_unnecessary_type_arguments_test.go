@@ -619,8 +619,6 @@ function Button<T = string>() {
 }
 const button = <Button<string>></Button>;
       `,
-			// TODO(port): tsgo doesn't yet support jsxopeningelement signature resolution
-			Skip: true,
 			Output: []string{`
 function Button<T = string>() {
   return <div></div>;
@@ -650,9 +648,7 @@ function Button<T = string>() {
 const button = <Button />;
       `,
 			},
-			// TODO(port): tsgo doesn't yet support jsxopeningelement signature resolution
-			Skip: true,
-			Tsx:  true,
+			Tsx: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unnecessaryTypeParameter",

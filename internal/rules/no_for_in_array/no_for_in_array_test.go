@@ -318,7 +318,6 @@ for (const x in arrayLike) {
   console.log(x);
 }
       `,
-			Skip: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "forInViolation",
@@ -337,7 +336,6 @@ for (const x in arrayLike) {
   console.log(x);
 }
       `,
-			Skip: true,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "forInViolation",

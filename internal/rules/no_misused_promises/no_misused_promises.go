@@ -275,17 +275,20 @@ var NoMisusedPromisesRule = rule.Rule{
 			node *ast.Node,
 			t *checker.Type,
 		) bool {
-			return utils.Some(utils.UnionTypeParts(t), func(t *checker.Type) bool {
-				return utils.Some(utils.GetCallSignatures(ctx.TypeChecker, t), func(sig *checker.Signature) bool {
+			hadVoidReturn := false
+			for _, t := range utils.UnionTypeParts(t) {
+				for _, sig := range utils.GetCallSignatures(ctx.TypeChecker, t) {
 					returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, sig)
 					// If a certain positional argument accepts both thenable and void returns,
 					// a promise-returning function is valid
 					if utils.IsThenableType(ctx.TypeChecker, node, returnType) {
 						return false
 					}
-					return utils.IsTypeFlagSet(returnType, checker.TypeFlagsVoid)
-				})
-			})
+
+					hadVoidReturn = hadVoidReturn || utils.IsTypeFlagSet(returnType, checker.TypeFlagsVoid)
+				}
+			}
+			return hadVoidReturn
 		}
 
 		/**

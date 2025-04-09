@@ -288,11 +288,17 @@ const test: Foo = () => console.log('foo');
 			Options: NoConfusingVoidExpressionOptions{IgnoreVoidReturningFunctions: true},
 		},
 		{
-			Code:    "const foo = <button onClick={() => console.log()} />;",
+			Code: `
+interface Props {
+  onEvent: () => void
+}
+
+declare function Component(props: Props): any;
+
+<Component onEvent={() => console.log()} />;
+			`,
 			Options: NoConfusingVoidExpressionOptions{IgnoreVoidReturningFunctions: true},
 			Tsx:     true,
-			// TODO(port): tsgo's getContextualTypeForJsxExpression is not yet implemented
-			Skip: true,
 		},
 		{
 			Code: `
