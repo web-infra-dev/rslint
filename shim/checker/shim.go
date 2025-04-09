@@ -222,6 +222,7 @@ type extra_Checker struct {
   assertionLinks core.LinkStore[*ast.Node, checker.AssertionLinks]
   arrayLiteralLinks core.LinkStore[*ast.Node, checker.ArrayLiteralLinks]
   switchStatementLinks core.LinkStore[*ast.Node, checker.SwitchStatementLinks]
+  jsxElementLinks core.LinkStore[*ast.Node, checker.JsxElementLinks]
   symbolReferenceLinks core.LinkStore[*ast.Symbol, checker.SymbolReferenceLinks]
   valueSymbolLinks core.LinkStore[*ast.Symbol, checker.ValueSymbolLinks]
   mappedSymbolLinks core.LinkStore[*ast.Symbol, checker.MappedSymbolLinks]
@@ -285,6 +286,7 @@ type extra_Checker struct {
   restrictiveMapper *checker.TypeMapper
   permissiveMapper *checker.TypeMapper
   emptyObjectType *checker.Type
+  emptyJsxObjectType *checker.Type
   emptyTypeLiteralType *checker.Type
   unknownEmptyObjectType *checker.Type
   unknownUnionType *checker.Type
@@ -304,7 +306,7 @@ type extra_Checker struct {
   resolvingSignature *checker.Signature
   silentNeverSignature *checker.Signature
   enumNumberIndexInfo *checker.IndexInfo
-  patternAmbientModules []ast.PatternAmbientModule
+  patternAmbientModules []*ast.PatternAmbientModule
   patternAmbientModuleAugmentations ast.SymbolTable
   globalObjectType *checker.Type
   globalFunctionType *checker.Type
@@ -420,6 +422,8 @@ type extra_Checker struct {
   markNodeAssignments func(*ast.Node) bool
   emitResolver extra_emitResolver
   emitResolverOnce sync.Once
+  _jsxNamespace string
+  _jsxFactoryEntity *ast.Node
 }
 type extra_emitResolver struct {
   checker *checker.Checker
@@ -618,6 +622,17 @@ const IterationUseSpread = checker.IterationUseSpread
 const IterationUseSpreadFlag = checker.IterationUseSpreadFlag
 const IterationUseYieldStar = checker.IterationUseYieldStar
 const IterationUseYieldStarFlag = checker.IterationUseYieldStarFlag
+type JsxElementLinks = checker.JsxElementLinks
+type JsxFlags = checker.JsxFlags
+const JsxFlagsIntrinsicElement = checker.JsxFlagsIntrinsicElement
+const JsxFlagsIntrinsicIndexedElement = checker.JsxFlagsIntrinsicIndexedElement
+const JsxFlagsIntrinsicNamedElement = checker.JsxFlagsIntrinsicNamedElement
+const JsxFlagsNone = checker.JsxFlagsNone
+var JsxNames = checker.JsxNames
+type JsxReferenceKind = checker.JsxReferenceKind
+const JsxReferenceKindComponent = checker.JsxReferenceKindComponent
+const JsxReferenceKindFunction = checker.JsxReferenceKindFunction
+const JsxReferenceKindMixed = checker.JsxReferenceKindMixed
 type KeyBuilder = checker.KeyBuilder
 var LanguageFeatureMinimumTarget = checker.LanguageFeatureMinimumTarget
 type LanguageFeatureMinimumTargetMap = checker.LanguageFeatureMinimumTargetMap
@@ -832,6 +847,8 @@ const SignatureKindConstruct = checker.SignatureKindConstruct
 type SignatureLinks = checker.SignatureLinks
 type SimpleTypeMapper = checker.SimpleTypeMapper
 type SingleSignatureType = checker.SingleSignatureType
+//go:linkname SkipTypeChecking github.com/microsoft/typescript-go/internal/checker.SkipTypeChecking
+func SkipTypeChecking(sourceFile *ast.SourceFile, options *core.CompilerOptions) bool
 type SourceFileLinks = checker.SourceFileLinks
 type SpreadLinks = checker.SpreadLinks
 type StringMappingKey = checker.StringMappingKey

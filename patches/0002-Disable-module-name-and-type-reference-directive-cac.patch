@@ -6,7 +6,7 @@ Subject: [PATCH] Disable module name and type reference directive caches in
 
 
 diff --git a/internal/compiler/module/resolver.go b/internal/compiler/module/resolver.go
-index 1196611c0..485adbfe1 100644
+index 0ef1194f6..cafa691b1 100644
 --- a/internal/compiler/module/resolver.go
 +++ b/internal/compiler/module/resolver.go
 @@ -176,7 +176,7 @@ func (r *Resolver) ResolveTypeReferenceDirective(typeReferenceDirectiveName stri

@@ -5,10 +5,10 @@ Subject: [PATCH] Do not sort symbols in getNamedMembers
 
 
 diff --git a/internal/checker/checker.go b/internal/checker/checker.go
-index 77b962c9b..13f032f3b 100644
+index 01bc42ae5..4961bb135 100644
 --- a/internal/checker/checker.go
 +++ b/internal/checker/checker.go
-@@ -20433,7 +20433,6 @@ func (c *Checker) getNamedMembers(members ast.SymbolTable) []*ast.Symbol {
+@@ -20401,7 +20401,6 @@ func (c *Checker) getNamedMembers(members ast.SymbolTable) []*ast.Symbol {
  			result = append(result, symbol)
  		}
  	}

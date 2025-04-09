@@ -74,6 +74,7 @@ const CheckFlagsSyntheticMethod = ast.CheckFlagsSyntheticMethod
 const CheckFlagsSyntheticProperty = ast.CheckFlagsSyntheticProperty
 const CheckFlagsUnresolved = ast.CheckFlagsUnresolved
 const CheckFlagsWritePartial = ast.CheckFlagsWritePartial
+type CheckJsDirective = ast.CheckJsDirective
 type ClassDeclaration = ast.ClassDeclaration
 type ClassElement = ast.ClassElement
 type ClassElementBase = ast.ClassElementBase
@@ -481,8 +482,8 @@ func IsExternalModuleImportEqualsDeclaration(node *ast.Node) bool
 func IsExternalModuleIndicator(node *ast.Statement) bool
 //go:linkname IsExternalModuleReference github.com/microsoft/typescript-go/internal/ast.IsExternalModuleReference
 func IsExternalModuleReference(node *ast.Node) bool
-//go:linkname IsExternalOrCommonJsModule github.com/microsoft/typescript-go/internal/ast.IsExternalOrCommonJsModule
-func IsExternalOrCommonJsModule(file *ast.SourceFile) bool
+//go:linkname IsExternalOrCommonJSModule github.com/microsoft/typescript-go/internal/ast.IsExternalOrCommonJSModule
+func IsExternalOrCommonJSModule(file *ast.SourceFile) bool
 //go:linkname IsForInOrOfStatement github.com/microsoft/typescript-go/internal/ast.IsForInOrOfStatement
 func IsForInOrOfStatement(node *ast.Node) bool
 //go:linkname IsForInStatement github.com/microsoft/typescript-go/internal/ast.IsForInStatement
@@ -581,16 +582,24 @@ func IsJSDocTag(node *ast.Node) bool
 func IsJSDocTypeTag(node *ast.Node) bool
 //go:linkname IsJSDocUnknownTag github.com/microsoft/typescript-go/internal/ast.IsJSDocUnknownTag
 func IsJSDocUnknownTag(node *ast.Node) bool
+//go:linkname IsJSTypeAliasDeclaration github.com/microsoft/typescript-go/internal/ast.IsJSTypeAliasDeclaration
+func IsJSTypeAliasDeclaration(node *ast.Node) bool
 //go:linkname IsJsonSourceFile github.com/microsoft/typescript-go/internal/ast.IsJsonSourceFile
 func IsJsonSourceFile(file *ast.SourceFile) bool
 //go:linkname IsJsxAttribute github.com/microsoft/typescript-go/internal/ast.IsJsxAttribute
 func IsJsxAttribute(node *ast.Node) bool
+//go:linkname IsJsxAttributeLike github.com/microsoft/typescript-go/internal/ast.IsJsxAttributeLike
+func IsJsxAttributeLike(node *ast.Node) bool
 //go:linkname IsJsxAttributes github.com/microsoft/typescript-go/internal/ast.IsJsxAttributes
 func IsJsxAttributes(node *ast.Node) bool
 //go:linkname IsJsxChild github.com/microsoft/typescript-go/internal/ast.IsJsxChild
 func IsJsxChild(node *ast.Node) bool
 //go:linkname IsJsxClosingElement github.com/microsoft/typescript-go/internal/ast.IsJsxClosingElement
 func IsJsxClosingElement(node *ast.Node) bool
+//go:linkname IsJsxElement github.com/microsoft/typescript-go/internal/ast.IsJsxElement
+func IsJsxElement(node *ast.Node) bool
+//go:linkname IsJsxExpression github.com/microsoft/typescript-go/internal/ast.IsJsxExpression
+func IsJsxExpression(node *ast.Node) bool
 //go:linkname IsJsxNamespacedName github.com/microsoft/typescript-go/internal/ast.IsJsxNamespacedName
 func IsJsxNamespacedName(node *ast.Node) bool
 //go:linkname IsJsxOpeningElement github.com/microsoft/typescript-go/internal/ast.IsJsxOpeningElement
@@ -599,8 +608,12 @@ func IsJsxOpeningElement(node *ast.Node) bool
 func IsJsxOpeningFragment(node *ast.Node) bool
 //go:linkname IsJsxSelfClosingElement github.com/microsoft/typescript-go/internal/ast.IsJsxSelfClosingElement
 func IsJsxSelfClosingElement(node *ast.Node) bool
+//go:linkname IsJsxSpreadAttribute github.com/microsoft/typescript-go/internal/ast.IsJsxSpreadAttribute
+func IsJsxSpreadAttribute(node *ast.Node) bool
 //go:linkname IsJsxTagName github.com/microsoft/typescript-go/internal/ast.IsJsxTagName
 func IsJsxTagName(node *ast.Node) bool
+//go:linkname IsJsxText github.com/microsoft/typescript-go/internal/ast.IsJsxText
+func IsJsxText(node *ast.Node) bool
 //go:linkname IsJumpStatementTarget github.com/microsoft/typescript-go/internal/ast.IsJumpStatementTarget
 func IsJumpStatementTarget(node *ast.Node) bool
 //go:linkname IsKeywordKind github.com/microsoft/typescript-go/internal/ast.IsKeywordKind
@@ -711,8 +724,8 @@ func IsOuterExpression(node *ast.Expression, kinds ast.OuterExpressionKinds) boo
 func IsOutermostOptionalChain(node *ast.Expression) bool
 //go:linkname IsParameter github.com/microsoft/typescript-go/internal/ast.IsParameter
 func IsParameter(node *ast.Node) bool
-//go:linkname IsParameterLikeOrReturnTag github.com/microsoft/typescript-go/internal/ast.IsParameterLikeOrReturnTag
-func IsParameterLikeOrReturnTag(node *ast.Node) bool
+//go:linkname IsParameterLike github.com/microsoft/typescript-go/internal/ast.IsParameterLike
+func IsParameterLike(node *ast.Node) bool
 //go:linkname IsParameterPropertyDeclaration github.com/microsoft/typescript-go/internal/ast.IsParameterPropertyDeclaration
 func IsParameterPropertyDeclaration(node *ast.Node, parent *ast.Node) bool
 //go:linkname IsParenthesizedExpression github.com/microsoft/typescript-go/internal/ast.IsParenthesizedExpression
@@ -829,6 +842,8 @@ func IsTypeNodeKind(kind ast.Kind) bool
 func IsTypeOfExpression(node *ast.Node) bool
 //go:linkname IsTypeOperatorNode github.com/microsoft/typescript-go/internal/ast.IsTypeOperatorNode
 func IsTypeOperatorNode(node *ast.Node) bool
+//go:linkname IsTypeOrJSTypeAliasDeclaration github.com/microsoft/typescript-go/internal/ast.IsTypeOrJSTypeAliasDeclaration
+func IsTypeOrJSTypeAliasDeclaration(node *ast.Node) bool
 //go:linkname IsTypeParameterDeclaration github.com/microsoft/typescript-go/internal/ast.IsTypeParameterDeclaration
 func IsTypeParameterDeclaration(node *ast.Node) bool
 //go:linkname IsTypePredicateNode github.com/microsoft/typescript-go/internal/ast.IsTypePredicateNode
@@ -1130,6 +1145,7 @@ const KindJSDocTypeLiteral = ast.KindJSDocTypeLiteral
 const KindJSDocTypeTag = ast.KindJSDocTypeTag
 const KindJSDocTypedefTag = ast.KindJSDocTypedefTag
 const KindJSDocVariadicType = ast.KindJSDocVariadicType
+const KindJSTypeAliasDeclaration = ast.KindJSTypeAliasDeclaration
 const KindJsxAttribute = ast.KindJsxAttribute
 const KindJsxAttributes = ast.KindJsxAttributes
 const KindJsxClosingElement = ast.KindJsxClosingElement

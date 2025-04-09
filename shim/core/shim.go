@@ -12,8 +12,6 @@ type CompilerOptions = core.CompilerOptions
 func ComputeLineStarts(text string) []core.TextPos
 //go:linkname ComputeLineStartsSeq github.com/microsoft/typescript-go/internal/core.ComputeLineStartsSeq
 func ComputeLineStartsSeq(text string) iter.Seq[core.TextPos]
-//go:linkname FindBestPatternMatch github.com/microsoft/typescript-go/internal/core.FindBestPatternMatch
-func FindBestPatternMatch(patterns []core.Pattern, candidate string) core.Pattern
 //go:linkname GetOutputExtension github.com/microsoft/typescript-go/internal/core.GetOutputExtension
 func GetOutputExtension(fileName string, jsx core.JsxEmit) string
 //go:linkname GetScriptKindFromFileName github.com/microsoft/typescript-go/internal/core.GetScriptKindFromFileName

@@ -48,7 +48,7 @@ func GetTextOfNode(node *ast.Node) string
 //go:linkname GetTextOfNodeFromSourceText github.com/microsoft/typescript-go/internal/scanner.GetTextOfNodeFromSourceText
 func GetTextOfNodeFromSourceText(sourceText string, node *ast.Node, includeTrivia bool) string
 //go:linkname GetTokenPosOfNode github.com/microsoft/typescript-go/internal/scanner.GetTokenPosOfNode
-func GetTokenPosOfNode(node *ast.Node, sourceFile *ast.SourceFile, includeJsDoc bool) int
+func GetTokenPosOfNode(node *ast.Node, sourceFile *ast.SourceFile, includeJSDoc bool) int
 //go:linkname GetTrailingCommentRanges github.com/microsoft/typescript-go/internal/scanner.GetTrailingCommentRanges
 func GetTrailingCommentRanges(f *ast.NodeFactory, text string, pos int) iter.Seq[ast.CommentRange]
 //go:linkname GetViableKeywordSuggestions github.com/microsoft/typescript-go/internal/scanner.GetViableKeywordSuggestions

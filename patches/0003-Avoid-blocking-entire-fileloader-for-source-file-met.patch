@@ -5,7 +5,7 @@ Subject: [PATCH] Avoid blocking entire fileloader for source file metadatas
 
 
 diff --git a/internal/compiler/fileloader.go b/internal/compiler/fileloader.go
-index 62e4f71c2..5836e49b9 100644
+index c0e2ac2bd..d49f687a6 100644
 --- a/internal/compiler/fileloader.go
 +++ b/internal/compiler/fileloader.go
 @@ -23,8 +23,6 @@ type fileLoader struct {
