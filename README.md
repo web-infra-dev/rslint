@@ -52,6 +52,7 @@ See [benchmarks](./benchmarks/README.md) for more info.
 | [prefer-promise-reject-errors](https://typescript-eslint.io/rules/prefer-promise-reject-errors)                     | ✅     |
 | [prefer-reduce-type-parameter](https://typescript-eslint.io/rules/prefer-reduce-type-parameter)                     | ✅     |
 | [prefer-return-this-type](https://typescript-eslint.io/rules/prefer-return-this-type)                               | ✅     |
+| [promise-function-async](https://typescript-eslint.io/rules/promise-function-async)                                 | ✅     |
 | [related-getter-setter-pairs](https://typescript-eslint.io/rules/related-getter-setter-pairs)                       | ✅     |
 | [require-array-sort-compare](https://typescript-eslint.io/rules/require-array-sort-compare)                         | ✅     |
 | [require-await](https://typescript-eslint.io/rules/require-await)                                                   | ✅     |

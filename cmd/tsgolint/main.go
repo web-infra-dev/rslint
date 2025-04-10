@@ -50,6 +50,7 @@ import (
 	"github.com/typescript-eslint/tsgolint/internal/rules/prefer_promise_reject_errors"
 	"github.com/typescript-eslint/tsgolint/internal/rules/prefer_reduce_type_parameter"
 	"github.com/typescript-eslint/tsgolint/internal/rules/prefer_return_this_type"
+	"github.com/typescript-eslint/tsgolint/internal/rules/promise_function_async"
 	"github.com/typescript-eslint/tsgolint/internal/rules/related_getter_setter_pairs"
 	"github.com/typescript-eslint/tsgolint/internal/rules/require_array_sort_compare"
 	"github.com/typescript-eslint/tsgolint/internal/rules/require_await"
@@ -331,6 +332,7 @@ func runMain() int {
 		prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
 		prefer_reduce_type_parameter.PreferReduceTypeParameterRule,
 		prefer_return_this_type.PreferReturnThisTypeRule,
+		promise_function_async.PromiseFunctionAsyncRule,
 		related_getter_setter_pairs.RelatedGetterSetterPairsRule,
 		require_array_sort_compare.RequireArraySortCompareRule,
 		require_await.RequireAwaitRule,

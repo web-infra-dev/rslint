@@ -83,6 +83,7 @@ export default tseslint.config(
       '@typescript-eslint/prefer-promise-reject-errors': 'error',
       '@typescript-eslint/prefer-reduce-type-parameter': 'error',
       '@typescript-eslint/prefer-return-this-type': 'error',
+      '@typescript-eslint/promise-function-async': 'error',
       '@typescript-eslint/related-getter-setter-pairs': 'error',
       '@typescript-eslint/require-array-sort-compare': 'error',
       '@typescript-eslint/require-await': 'error',
