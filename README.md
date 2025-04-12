@@ -2,6 +2,9 @@
 
 **tsgolint** is an experimental proof-of-concept [typescript-go](https://github.com/microsoft/typescript-go) powered JS/TS linter written in Go.
 
+> [!IMPORTANT]
+> **tsgolint** is in the early stages of development. Expect breaking changes to happen.
+
 ![Running tsgolint on microsoft/typescript repo](./docs/record.gif)
 
 ## What's done so far
@@ -9,12 +12,18 @@
 - Primitive linter engine
 - Lint rules tester
 - Source code fixer
-- All recommended type-aware rules from typescript-eslint's [`recommended-type-checked-only`](https://typescript-eslint.io/rules/?=recommended-typeInformation) ruleset
+- 40 [type-aware](https://typescript-eslint.io/blog/typed-linting) typescript-eslint's rules
 - Basic `tsgolint` CLI
 
 ## Speedup over ESLint
 
-tsgolint is **20-40 times faster** than ESLint + typescript-eslint.
+**tsgolint** is **20-40 times faster** than ESLint + typescript-eslint.
+
+Most of the speedup is due to the following facts:
+
+- Native speed parsing and type-checking (thanks to [typescript-go](https://github.com/microsoft/typescript-go))
+- No more [TS AST -> ESTree AST](https://typescript-eslint.io/blog/asts-and-typescript-eslint/#ast-formats) conversions. TS AST is directly used in rules.
+- Parallel parsing, type checking and linting. **tsgolint** uses all available CPU cores.
 
 See [benchmarks](./benchmarks/README.md) for more info.
 
@@ -63,6 +72,14 @@ See [benchmarks](./benchmarks/README.md) for more info.
 | [unbound-method](https://typescript-eslint.io/rules/unbound-method)                                                 | ✅     |
 | [use-unknown-in-catch-callback-variable](https://typescript-eslint.io/rules/use-unknown-in-catch-callback-variable) | ✅     |
 
+## What hasn't been done yet
+
+- Non-type-aware rules
+- Editor extension
+- Rich CLI features
+- Config file
+- Plugin system
+
 ## Building `tsgolint`
 
 ```bash
@@ -72,5 +89,5 @@ cd typescript-go
 git am --3way --no-gpg-sign ../patches/*.patch    # apply typescript-go patches
 cd ..
 
-go build -o tsgolint ./cmd/tsgolint               # build tsgolint
+go build -o tsgolint ./cmd/tsgolint
 ```
