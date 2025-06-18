@@ -80,6 +80,14 @@ See [benchmarks](./benchmarks/README.md) for more info.
 - Config file
 - Plugin system
 
+## What about JS plugins?
+
+JS-based plugins are not currently supported.
+
+- Experimental support is available on the [`experimental-eslint-compat`](https://github.com/typescript-eslint/tsgolint/tree/experimental-eslint-compat) branch using the [goja](https://github.com/dop251/goja) JavaScript engine.
+- While functional, performance was significantly worse than ESLint running in Node.js, so this approach is currently on hold.
+- If a faster, lower-allocation JS interpreter in Go becomes available in the future, we may revisit this idea.
+
 ## Building `tsgolint`
 
 ```bash
