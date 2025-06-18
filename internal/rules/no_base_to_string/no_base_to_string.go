@@ -85,7 +85,7 @@ var NoBaseToStringRule = rule.Rule{
 				return
 			}
 
-			ctx.ReportNode(node, buildBaseToStringMessage(ctx.SourceFile.Text[node.Pos():node.End()], certainty))
+			ctx.ReportNode(node, buildBaseToStringMessage(ctx.SourceFile.Text()[node.Pos():node.End()], certainty))
 		}
 
 		checkExpressionForArrayJoin := func(
@@ -98,7 +98,7 @@ var NoBaseToStringRule = rule.Rule{
 				return
 			}
 
-			ctx.ReportNode(node, buildBaseArrayJoinMessage(ctx.SourceFile.Text[node.Pos():node.End()], certainty))
+			ctx.ReportNode(node, buildBaseArrayJoinMessage(ctx.SourceFile.Text()[node.Pos():node.End()], certainty))
 		}
 
 		collectUnionTypeCertainty := func(

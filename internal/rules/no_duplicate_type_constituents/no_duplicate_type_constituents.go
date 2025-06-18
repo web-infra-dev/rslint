@@ -193,7 +193,7 @@ var NoDuplicateTypeConstituentsRule = rule.Rule{
 			duplicatedPreviousNode, duplicatedPrevious := cachedTypeMap[t]
 
 			if duplicatedPrevious {
-				report(withFix, unionOrIntersection, buildDuplicateMessage(unionOrIntersection, ctx.SourceFile.Text[duplicatedPreviousNode.Pos():duplicatedPreviousNode.End()]), constituentNode)
+				report(withFix, unionOrIntersection, buildDuplicateMessage(unionOrIntersection, ctx.SourceFile.Text()[duplicatedPreviousNode.Pos():duplicatedPreviousNode.End()]), constituentNode)
 				return true
 			}
 

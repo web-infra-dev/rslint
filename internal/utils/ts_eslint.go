@@ -583,7 +583,7 @@ func GetNameFromMember(sourceFile *ast.SourceFile, member *ast.Node) (string, Me
 		// TODO(port): support boolean keywords, null keywords, etc
 		if ast.IsLiteralExpression(expr) {
 			text := expr.Text()
-			if !scanner.IsValidIdentifier(text, sourceFile.LanguageVersion) {
+			if !scanner.IsValidIdentifier(text) {
 				return "\"" + text + "\"", MemberNameTypeQuoted
 			}
 			return text, MemberNameTypeNormal
@@ -591,5 +591,5 @@ func GetNameFromMember(sourceFile *ast.SourceFile, member *ast.Node) (string, Me
 	}
 
 	r := TrimNodeTextRange(sourceFile, member)
-	return sourceFile.Text[r.Pos():r.End()], MemberNameTypeExpression
+	return sourceFile.Text()[r.Pos():r.End()], MemberNameTypeExpression
 }

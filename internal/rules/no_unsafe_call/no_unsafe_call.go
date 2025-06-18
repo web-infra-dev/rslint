@@ -38,7 +38,7 @@ func buildUnsafeTemplateTagMessage(t string) rule.RuleMessage {
 var NoUnsafeCallRule = rule.Rule{
 	Name: "no-unsafe-call",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		compilerOptions := ctx.Program.GetCompilerOptions()
+		compilerOptions := ctx.Program.Options()
 		isNoImplicitThis := utils.IsStrictCompilerOptionEnabled(
 			compilerOptions,
 			compilerOptions.NoImplicitThis,

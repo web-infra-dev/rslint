@@ -28,20 +28,20 @@ require (
 	github.com/microsoft/typescript-go/shim/vfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/cachedvfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/osvfs v0.0.0
-	golang.org/x/sys v0.31.0
-	golang.org/x/tools v0.30.0
+	golang.org/x/sys v0.33.0
+	golang.org/x/tools v0.32.0
 	gotest.tools/v3 v3.5.2
 )
 
 require (
 	github.com/google/go-cmp v0.7.0 // indirect
-	golang.org/x/mod v0.23.0 // indirect
-	golang.org/x/sync v0.12.0 // indirect
+	golang.org/x/mod v0.24.0 // indirect
+	golang.org/x/sync v0.15.0 // indirect
 )
 
 require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
-	github.com/go-json-experiment/json v0.0.0-20250223041408-d3c622f1b874 // indirect
-	github.com/microsoft/typescript-go v0.0.0-20250409030839-09b959223aad // indirect
-	golang.org/x/text v0.23.0
+	github.com/go-json-experiment/json v0.0.0-20250517221953-25912455fbc8 // indirect
+	github.com/microsoft/typescript-go v0.0.0-20250617220127-d561370c3a7e // indirect
+	golang.org/x/text v0.24.0
 )

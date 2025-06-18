@@ -3,7 +3,9 @@
 
 package vfs
 
+import "github.com/dlclark/regexp2"
 import "github.com/microsoft/typescript-go/internal/vfs"
+import _ "unsafe"
 
 type DirEntry = vfs.DirEntry
 type Entries = vfs.Entries
@@ -14,6 +16,14 @@ var ErrNotExist = vfs.ErrNotExist
 var ErrPermission = vfs.ErrPermission
 type FS = vfs.FS
 type FileInfo = vfs.FileInfo
+type FileMatcherPatterns = vfs.FileMatcherPatterns
+//go:linkname GetRegexFromPattern github.com/microsoft/typescript-go/internal/vfs.GetRegexFromPattern
+func GetRegexFromPattern(pattern string, useCaseSensitiveFileNames bool) *regexp2.Regexp
+//go:linkname IsImplicitGlob github.com/microsoft/typescript-go/internal/vfs.IsImplicitGlob
+func IsImplicitGlob(lastPathComponent string) bool
+//go:linkname ReadDirectory github.com/microsoft/typescript-go/internal/vfs.ReadDirectory
+func ReadDirectory(host vfs.FS, currentDir string, path string, extensions []string, excludes []string, includes []string, depth *int) []string
 var SkipAll = vfs.SkipAll
 var SkipDir = vfs.SkipDir
 type WalkDirFunc = vfs.WalkDirFunc
+type WildcardMatcher = vfs.WildcardMatcher

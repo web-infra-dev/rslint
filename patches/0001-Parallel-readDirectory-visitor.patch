@@ -1,14 +1,17 @@
-From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 6beb8276a277ae1c9ff4c79f3ea2afd088d22fe1 Mon Sep 17 00:00:00 2001
 From: auvred <aauvred@gmail.com>
-Date: Mon, 31 Mar 2025 07:48:45 +0300
-Subject: [PATCH] Parallel readDirectory visitor
+Date: Wed, 18 Jun 2025 15:24:34 +0300
+Subject: [PATCH 1/2] Parallel readDirectory visitor
 
+---
+ internal/vfs/utilities.go | 104 ++++++++++++++++++++++++++++----------
+ 1 file changed, 76 insertions(+), 28 deletions(-)
 
-diff --git a/internal/tsoptions/utilities.go b/internal/tsoptions/utilities.go
-index b5889636f..bae0c49bc 100644
---- a/internal/tsoptions/utilities.go
-+++ b/internal/tsoptions/utilities.go
-@@ -3,9 +3,11 @@ package tsoptions
+diff --git a/internal/vfs/utilities.go b/internal/vfs/utilities.go
+index 45c9d0ef8..26c0b97eb 100644
+--- a/internal/vfs/utilities.go
++++ b/internal/vfs/utilities.go
+@@ -3,9 +3,11 @@ package vfs
  import (
  	"fmt"
  	"regexp"
@@ -19,11 +22,11 @@ index b5889636f..bae0c49bc 100644
 +	"sync/atomic"
  
  	"github.com/dlclark/regexp2"
- 	"github.com/microsoft/typescript-go/internal/core"
-@@ -352,23 +354,71 @@ type visitor struct {
+ 	"github.com/microsoft/typescript-go/internal/collections"
+@@ -365,23 +367,71 @@ type visitor struct {
  	useCaseSensitiveFileNames bool
- 	host                      vfs.FS
- 	visited                   core.Set[string]
+ 	host                      FS
+ 	visited                   collections.Set[string]
 -	results                   [][]string
 +}
 +
@@ -99,7 +102,7 @@ index b5889636f..bae0c49bc 100644
  	for _, current := range files {
  		name := tspath.CombinePaths(path, current)
  		absoluteName := tspath.CombinePaths(absolutePath, current)
-@@ -379,11 +429,11 @@ func (v *visitor) visitDirectory(
+@@ -392,11 +442,11 @@ func (v *visitor) visitDirectory(
  			continue
  		}
  		if v.includeFileRegexes == nil {
@@ -113,7 +116,7 @@ index b5889636f..bae0c49bc 100644
  			}
  		}
  	}
-@@ -391,18 +441,26 @@ func (v *visitor) visitDirectory(
+@@ -404,18 +454,26 @@ func (v *visitor) visitDirectory(
  	if depth != nil {
  		newDepth := *depth - 1
  		if newDepth == 0 {
@@ -142,8 +145,8 @@ index b5889636f..bae0c49bc 100644
  }
  
  // path is the directory of the tsconfig.json
-@@ -424,18 +482,6 @@ func matchFiles(path string, extensions []string, excludes []string, includes []
- 		excludeRegex = getRegexFromPattern(patterns.excludePattern, useCaseSensitiveFileNames)
+@@ -437,18 +495,6 @@ func matchFiles(path string, extensions []string, excludes []string, includes []
+ 		excludeRegex = GetRegexFromPattern(patterns.excludePattern, useCaseSensitiveFileNames)
  	}
  
 -	// Associate an array of results with each include regex. This keeps results in order of the "include" order.
@@ -161,7 +164,7 @@ index b5889636f..bae0c49bc 100644
  	v := visitor{
  		useCaseSensitiveFileNames: useCaseSensitiveFileNames,
  		host:                      host,
-@@ -443,13 +489,15 @@ func matchFiles(path string, extensions []string, excludes []string, includes []
+@@ -456,13 +502,15 @@ func matchFiles(path string, extensions []string, excludes []string, includes []
  		excludeRegex:              excludeRegex,
  		includeDirectoryRegex:     includeDirectoryRegex,
  		extensions:                extensions,
@@ -181,4 +184,7 @@ index b5889636f..bae0c49bc 100644
 +	}))
  }
  
- func readDirectory(host vfs.FS, currentDir string, path string, extensions []string, excludes []string, includes []string, depth *int) []string {
+ func ReadDirectory(host FS, currentDir string, path string, extensions []string, excludes []string, includes []string, depth *int) []string {
+-- 
+2.49.0
+

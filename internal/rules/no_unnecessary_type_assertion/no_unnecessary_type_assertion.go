@@ -40,7 +40,7 @@ var NoUnnecessaryTypeAssertionRule = rule.Rule{
 			opts.TypesToIgnore = []string{}
 		}
 
-		compilerOptions := ctx.Program.GetCompilerOptions()
+		compilerOptions := ctx.Program.Options()
 		isStrictNullChecks := utils.IsStrictCompilerOptionEnabled(
 			compilerOptions,
 			compilerOptions.StrictNullChecks,
@@ -194,7 +194,7 @@ var NoUnnecessaryTypeAssertionRule = rule.Rule{
 
 		checkTypeAssertion := func(node *ast.Node) {
 			typeNode := node.Type()
-			if slices.Contains(opts.TypesToIgnore, strings.TrimSpace(ctx.SourceFile.Text[typeNode.Pos():typeNode.End()])) {
+			if slices.Contains(opts.TypesToIgnore, strings.TrimSpace(ctx.SourceFile.Text()[typeNode.Pos():typeNode.End()])) {
 				return
 			}
 

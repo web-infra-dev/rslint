@@ -294,7 +294,10 @@ func main() {
 								}
 							}
 
-							shimBuilder.WriteString(types.TypeString(field.Type(), qualifierOnlyPackageName))
+							shimBuilder.WriteString(
+								// TODO: move to extra-shim.json
+								strings.ReplaceAll(types.TypeString(field.Type(), qualifierOnlyPackageName), "checker.thisAssignmentDeclarationKind", "int32"),
+							)
 						}
 						shimBuilder.WriteString("\n}\n")
 

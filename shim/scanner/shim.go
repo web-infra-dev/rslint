@@ -32,15 +32,17 @@ func GetIdentifierToken(str string) ast.Kind
 //go:linkname GetLeadingCommentRanges github.com/microsoft/typescript-go/internal/scanner.GetLeadingCommentRanges
 func GetLeadingCommentRanges(f *ast.NodeFactory, text string, pos int) iter.Seq[ast.CommentRange]
 //go:linkname GetLineAndCharacterOfPosition github.com/microsoft/typescript-go/internal/scanner.GetLineAndCharacterOfPosition
-func GetLineAndCharacterOfPosition(sourceFile *ast.SourceFile, pos int) (line int, character int)
+func GetLineAndCharacterOfPosition(sourceFile ast.SourceFileLike, pos int) (line int, character int)
 //go:linkname GetLineStarts github.com/microsoft/typescript-go/internal/scanner.GetLineStarts
-func GetLineStarts(sourceFile *ast.SourceFile) []core.TextPos
+func GetLineStarts(sourceFile ast.SourceFileLike) []core.TextPos
 //go:linkname GetPositionOfLineAndCharacter github.com/microsoft/typescript-go/internal/scanner.GetPositionOfLineAndCharacter
 func GetPositionOfLineAndCharacter(sourceFile *ast.SourceFile, line int, character int) int
 //go:linkname GetRangeOfTokenAtPosition github.com/microsoft/typescript-go/internal/scanner.GetRangeOfTokenAtPosition
 func GetRangeOfTokenAtPosition(sourceFile *ast.SourceFile, pos int) core.TextRange
 //go:linkname GetScannerForSourceFile github.com/microsoft/typescript-go/internal/scanner.GetScannerForSourceFile
 func GetScannerForSourceFile(sourceFile *ast.SourceFile, pos int) *scanner.Scanner
+//go:linkname GetShebang github.com/microsoft/typescript-go/internal/scanner.GetShebang
+func GetShebang(text string) string
 //go:linkname GetSourceTextOfNodeFromSourceFile github.com/microsoft/typescript-go/internal/scanner.GetSourceTextOfNodeFromSourceFile
 func GetSourceTextOfNodeFromSourceFile(sourceFile *ast.SourceFile, node *ast.Node, includeTrivia bool) string
 //go:linkname GetTextOfNode github.com/microsoft/typescript-go/internal/scanner.GetTextOfNode
@@ -55,15 +57,18 @@ func GetTrailingCommentRanges(f *ast.NodeFactory, text string, pos int) iter.Seq
 func GetViableKeywordSuggestions() []string
 //go:linkname IdentifierToKeywordKind github.com/microsoft/typescript-go/internal/scanner.IdentifierToKeywordKind
 func IdentifierToKeywordKind(node *ast.Identifier) ast.Kind
+//go:linkname IsIdentifierPart github.com/microsoft/typescript-go/internal/scanner.IsIdentifierPart
+func IsIdentifierPart(ch rune) bool
+//go:linkname IsIdentifierPartEx github.com/microsoft/typescript-go/internal/scanner.IsIdentifierPartEx
+func IsIdentifierPartEx(ch rune, languageVariant core.LanguageVariant) bool
+//go:linkname IsIdentifierStart github.com/microsoft/typescript-go/internal/scanner.IsIdentifierStart
+func IsIdentifierStart(ch rune) bool
 //go:linkname IsIdentifierText github.com/microsoft/typescript-go/internal/scanner.IsIdentifierText
-func IsIdentifierText(name string, languageVersion core.ScriptTarget) bool
+func IsIdentifierText(name string, languageVariant core.LanguageVariant) bool
+//go:linkname IsIntrinsicJsxName github.com/microsoft/typescript-go/internal/scanner.IsIntrinsicJsxName
+func IsIntrinsicJsxName(name string) bool
 //go:linkname IsValidIdentifier github.com/microsoft/typescript-go/internal/scanner.IsValidIdentifier
-func IsValidIdentifier(s string, languageVersion core.ScriptTarget) bool
-type JSDocParsingMode = scanner.JSDocParsingMode
-const JSDocParsingModeParseAll = scanner.JSDocParsingModeParseAll
-const JSDocParsingModeParseForTypeErrors = scanner.JSDocParsingModeParseForTypeErrors
-const JSDocParsingModeParseForTypeInfo = scanner.JSDocParsingModeParseForTypeInfo
-const JSDocParsingModeParseNone = scanner.JSDocParsingModeParseNone
+func IsValidIdentifier(s string) bool
 //go:linkname NewScanner github.com/microsoft/typescript-go/internal/scanner.NewScanner
 func NewScanner() *scanner.Scanner
 //go:linkname ScanTokenAtPosition github.com/microsoft/typescript-go/internal/scanner.ScanTokenAtPosition
@@ -75,5 +80,7 @@ func SkipTrivia(text string, pos int) int
 //go:linkname SkipTriviaEx github.com/microsoft/typescript-go/internal/scanner.SkipTriviaEx
 func SkipTriviaEx(text string, pos int, options *scanner.SkipTriviaOptions) int
 type SkipTriviaOptions = scanner.SkipTriviaOptions
+//go:linkname StringToToken github.com/microsoft/typescript-go/internal/scanner.StringToToken
+func StringToToken(s string) ast.Kind
 //go:linkname TokenToString github.com/microsoft/typescript-go/internal/scanner.TokenToString
 func TokenToString(token ast.Kind) string

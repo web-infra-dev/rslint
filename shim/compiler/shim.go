@@ -4,12 +4,15 @@
 package compiler
 
 import "github.com/microsoft/typescript-go/internal/ast"
+import "github.com/microsoft/typescript-go/internal/collections"
 import "github.com/microsoft/typescript-go/internal/compiler"
 import "github.com/microsoft/typescript-go/internal/core"
 import "github.com/microsoft/typescript-go/internal/tsoptions"
+import "github.com/microsoft/typescript-go/internal/tspath"
 import "github.com/microsoft/typescript-go/internal/vfs"
 import _ "unsafe"
 
+type CheckerPool = compiler.CheckerPool
 type CompilerHost = compiler.CompilerHost
 type EmitHost = compiler.EmitHost
 type EmitOptions = compiler.EmitOptions
@@ -26,14 +29,15 @@ const FileIncludeKindSourceFromProjectReference = compiler.FileIncludeKindSource
 const FileIncludeKindTypeReferenceDirective = compiler.FileIncludeKindTypeReferenceDirective
 type FileIncludeReason = compiler.FileIncludeReason
 type FileInfo = compiler.FileInfo
+//go:linkname NewCachedFSCompilerHost github.com/microsoft/typescript-go/internal/compiler.NewCachedFSCompilerHost
+func NewCachedFSCompilerHost(options *core.CompilerOptions, currentDirectory string, fs vfs.FS, defaultLibraryPath string, extendedConfigCache *collections.SyncMap[tspath.Path, *tsoptions.ExtendedConfigCacheEntry]) compiler.CompilerHost
 //go:linkname NewCompilerHost github.com/microsoft/typescript-go/internal/compiler.NewCompilerHost
-func NewCompilerHost(options *core.CompilerOptions, currentDirectory string, fs vfs.FS, defaultLibraryPath string) compiler.CompilerHost
+func NewCompilerHost(options *core.CompilerOptions, currentDirectory string, fs vfs.FS, defaultLibraryPath string, extendedConfigCache *collections.SyncMap[tspath.Path, *tsoptions.ExtendedConfigCacheEntry]) compiler.CompilerHost
 //go:linkname NewProgram github.com/microsoft/typescript-go/internal/compiler.NewProgram
-func NewProgram(options compiler.ProgramOptions) *compiler.Program
-//go:linkname NewProgramFromParsedCommandLine github.com/microsoft/typescript-go/internal/compiler.NewProgramFromParsedCommandLine
-func NewProgramFromParsedCommandLine(config *tsoptions.ParsedCommandLine, host compiler.CompilerHost) *compiler.Program
+func NewProgram(opts compiler.ProgramOptions) *compiler.Program
 type Program = compiler.Program
 type ProgramOptions = compiler.ProgramOptions
 //go:linkname SortAndDeduplicateDiagnostics github.com/microsoft/typescript-go/internal/compiler.SortAndDeduplicateDiagnostics
 func SortAndDeduplicateDiagnostics(diagnostics []*ast.Diagnostic) []*ast.Diagnostic
+type SourceMapEmitResult = compiler.SourceMapEmitResult
 type WriteFileData = compiler.WriteFileData

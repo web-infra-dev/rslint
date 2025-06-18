@@ -79,7 +79,7 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 	diagnosticEndline, _ := scanner.GetLineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
 
 	lineMap := d.SourceFile.LineMap()
-	text := d.SourceFile.Text
+	text := d.SourceFile.Text()
 
 	codeboxStartLine := max(diagnosticStartLine-1, 0)
 	codeboxEndLine := min(diagnosticEndline+1, len(lineMap)-1)
@@ -377,7 +377,7 @@ func runMain() int {
 		os.Stdout.WriteString(matchedFiles.String())
 	}
 	slices.SortFunc(files, func(a *ast.SourceFile, b *ast.SourceFile) int {
-		return len(b.Text) - len(a.Text)
+		return len(b.Text()) - len(a.Text())
 	})
 
 	var wg sync.WaitGroup

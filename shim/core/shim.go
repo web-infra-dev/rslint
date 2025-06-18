@@ -3,6 +3,7 @@
 
 package core
 
+import "context"
 import "github.com/microsoft/typescript-go/internal/core"
 import "iter"
 import _ "unsafe"
@@ -12,10 +13,13 @@ type CompilerOptions = core.CompilerOptions
 func ComputeLineStarts(text string) []core.TextPos
 //go:linkname ComputeLineStartsSeq github.com/microsoft/typescript-go/internal/core.ComputeLineStartsSeq
 func ComputeLineStartsSeq(text string) iter.Seq[core.TextPos]
-//go:linkname GetOutputExtension github.com/microsoft/typescript-go/internal/core.GetOutputExtension
-func GetOutputExtension(fileName string, jsx core.JsxEmit) string
+var ExclusivelyPrefixedNodeCoreModules = core.ExclusivelyPrefixedNodeCoreModules
+//go:linkname GetRequestID github.com/microsoft/typescript-go/internal/core.GetRequestID
+func GetRequestID(ctx context.Context) string
 //go:linkname GetScriptKindFromFileName github.com/microsoft/typescript-go/internal/core.GetScriptKindFromFileName
 func GetScriptKindFromFileName(fileName string) core.ScriptKind
+//go:linkname IndexAfter github.com/microsoft/typescript-go/internal/core.IndexAfter
+func IndexAfter(s string, pattern string, startIndex int) int
 type JsxEmit = core.JsxEmit
 const JsxEmitNone = core.JsxEmitNone
 const JsxEmitPreserve = core.JsxEmitPreserve
@@ -40,6 +44,7 @@ const ModuleKindES2020 = core.ModuleKindES2020
 const ModuleKindES2022 = core.ModuleKindES2022
 const ModuleKindESNext = core.ModuleKindESNext
 const ModuleKindNode16 = core.ModuleKindNode16
+const ModuleKindNode18 = core.ModuleKindNode18
 const ModuleKindNodeNext = core.ModuleKindNodeNext
 const ModuleKindNone = core.ModuleKindNone
 const ModuleKindPreserve = core.ModuleKindPreserve
@@ -50,7 +55,6 @@ const ModuleResolutionKindBundler = core.ModuleResolutionKindBundler
 const ModuleResolutionKindNode16 = core.ModuleResolutionKindNode16
 const ModuleResolutionKindNodeNext = core.ModuleResolutionKindNodeNext
 const ModuleResolutionKindUnknown = core.ModuleResolutionKindUnknown
-type MultiMap[K, V comparable] = core.MultiMap[K,V]
 type NewLineKind = core.NewLineKind
 const NewLineKindCRLF = core.NewLineKindCRLF
 const NewLineKindLF = core.NewLineKindLF
@@ -59,6 +63,8 @@ const NewLineKindNone = core.NewLineKindNone
 func NewTextRange(pos int, end int) core.TextRange
 //go:linkname NewWorkGroup github.com/microsoft/typescript-go/internal/core.NewWorkGroup
 func NewWorkGroup(singleThreaded bool) core.WorkGroup
+//go:linkname NonRelativeModuleNameForTypingCache github.com/microsoft/typescript-go/internal/core.NonRelativeModuleNameForTypingCache
+func NonRelativeModuleNameForTypingCache(moduleName string) string
 type ParsedOptions = core.ParsedOptions
 type Pattern = core.Pattern
 type PollingKind = core.PollingKind
@@ -75,6 +81,8 @@ type ResolutionMode = core.ResolutionMode
 const ResolutionModeCommonJS = core.ResolutionModeCommonJS
 const ResolutionModeESM = core.ResolutionModeESM
 const ResolutionModeNone = core.ResolutionModeNone
+//go:linkname ResolveProjectReferencePath github.com/microsoft/typescript-go/internal/core.ResolveProjectReferencePath
+func ResolveProjectReferencePath(ref *core.ProjectReference) string
 type ScriptKind = core.ScriptKind
 const ScriptKindDeferred = core.ScriptKindDeferred
 const ScriptKindExternal = core.ScriptKindExternal
@@ -101,7 +109,8 @@ const ScriptTargetESNext = core.ScriptTargetESNext
 const ScriptTargetJSON = core.ScriptTargetJSON
 const ScriptTargetLatest = core.ScriptTargetLatest
 const ScriptTargetNone = core.ScriptTargetNone
-type Set[T comparable] = core.Set[T]
+//go:linkname ShouldRewriteModuleSpecifier github.com/microsoft/typescript-go/internal/core.ShouldRewriteModuleSpecifier
+func ShouldRewriteModuleSpecifier(specifier string, compilerOptions *core.CompilerOptions) bool
 type SourceFileAffectingCompilerOptions = core.SourceFileAffectingCompilerOptions
 type Stack[T any] = core.Stack[T]
 //go:linkname StringifyJson github.com/microsoft/typescript-go/internal/core.StringifyJson
@@ -109,15 +118,20 @@ func StringifyJson(input any, prefix string, indent string) (string, error)
 const TSFalse = core.TSFalse
 const TSTrue = core.TSTrue
 const TSUnknown = core.TSUnknown
+type TextChange = core.TextChange
 type TextPos = core.TextPos
 type TextRange = core.TextRange
 type Tristate = core.Tristate
 //go:linkname TryParsePattern github.com/microsoft/typescript-go/internal/core.TryParsePattern
 func TryParsePattern(pattern string) core.Pattern
+type TypeAcquisition = core.TypeAcquisition
 //go:linkname UndefinedTextRange github.com/microsoft/typescript-go/internal/core.UndefinedTextRange
 func UndefinedTextRange() core.TextRange
-const Version = core.Version
-const VersionMajorMinor = core.VersionMajorMinor
+var UnprefixedNodeCoreModules = core.UnprefixedNodeCoreModules
+//go:linkname Version github.com/microsoft/typescript-go/internal/core.Version
+func Version() string
+//go:linkname VersionMajorMinor github.com/microsoft/typescript-go/internal/core.VersionMajorMinor
+func VersionMajorMinor() string
 type WatchDirectoryKind = core.WatchDirectoryKind
 const WatchDirectoryKindDynamicPriorityPolling = core.WatchDirectoryKindDynamicPriorityPolling
 const WatchDirectoryKindFixedChunkSizePolling = core.WatchDirectoryKindFixedChunkSizePolling
@@ -133,4 +147,6 @@ const WatchFileKindPriorityPollingInterval = core.WatchFileKindPriorityPollingIn
 const WatchFileKindUseFsEvents = core.WatchFileKindUseFsEvents
 const WatchFileKindUseFsEventsOnParentDirectory = core.WatchFileKindUseFsEventsOnParentDirectory
 type WatchOptions = core.WatchOptions
+//go:linkname WithRequestID github.com/microsoft/typescript-go/internal/core.WithRequestID
+func WithRequestID(ctx context.Context, id string) context.Context
 type WorkGroup = core.WorkGroup

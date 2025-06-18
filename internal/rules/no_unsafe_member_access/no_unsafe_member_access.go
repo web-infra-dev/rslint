@@ -46,7 +46,7 @@ func createDataType(t *checker.Type) string {
 var NoUnsafeMemberAccessRule = rule.Rule{
 	Name: "no-unsafe-member-access",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		compilerOptions := ctx.Program.GetCompilerOptions()
+		compilerOptions := ctx.Program.Options()
 		isNoImplicitThis := utils.IsStrictCompilerOptionEnabled(
 			compilerOptions,
 			compilerOptions.NoImplicitThis,
@@ -95,11 +95,11 @@ var NoUnsafeMemberAccessRule = rule.Rule{
 				if ast.IsPropertyAccessExpression(node) {
 					property = node.Name()
 					loc := utils.TrimNodeTextRange(ctx.SourceFile, property)
-					propertyName = "." + ctx.SourceFile.Text[loc.Pos():loc.End()]
+					propertyName = "." + ctx.SourceFile.Text()[loc.Pos():loc.End()]
 				} else if ast.IsElementAccessExpression(node) {
 					property = node.AsElementAccessExpression().ArgumentExpression
 					loc := utils.TrimNodeTextRange(ctx.SourceFile, property)
-					propertyName = "[" + ctx.SourceFile.Text[loc.Pos():loc.End()] + "]"
+					propertyName = "[" + ctx.SourceFile.Text()[loc.Pos():loc.End()] + "]"
 				}
 
 				// let messageId: 'unsafeMemberExpression' | 'unsafeThisMemberExpression' =
@@ -153,7 +153,7 @@ var NoUnsafeMemberAccessRule = rule.Rule{
 
 				if utils.IsTypeAnyType(t) {
 					loc := utils.TrimNodeTextRange(ctx.SourceFile, arg)
-					propertyName := "[" + ctx.SourceFile.Text[loc.Pos():loc.End()] + "]"
+					propertyName := "[" + ctx.SourceFile.Text()[loc.Pos():loc.End()] + "]"
 					ctx.ReportNode(arg, buildUnsafeComputedMemberAccessMessage(propertyName, createDataType(t)))
 				}
 			},

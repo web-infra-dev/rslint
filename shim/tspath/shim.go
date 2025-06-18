@@ -10,6 +10,8 @@ var AllSupportedExtensions = tspath.AllSupportedExtensions
 var AllSupportedExtensionsWithJson = tspath.AllSupportedExtensionsWithJson
 //go:linkname ChangeExtension github.com/microsoft/typescript-go/internal/tspath.ChangeExtension
 func ChangeExtension(path string, newExtension string) string
+//go:linkname ChangeFullExtension github.com/microsoft/typescript-go/internal/tspath.ChangeFullExtension
+func ChangeFullExtension(path string, newExtension string) string
 //go:linkname CombinePaths github.com/microsoft/typescript-go/internal/tspath.CombinePaths
 func CombinePaths(firstPath string, paths ...string) string
 //go:linkname ComparePaths github.com/microsoft/typescript-go/internal/tspath.ComparePaths
@@ -19,11 +21,15 @@ func ComparePathsCaseInsensitive(a string, b string, currentDirectory string) in
 //go:linkname ComparePathsCaseSensitive github.com/microsoft/typescript-go/internal/tspath.ComparePathsCaseSensitive
 func ComparePathsCaseSensitive(a string, b string, currentDirectory string) int
 type ComparePathsOptions = tspath.ComparePathsOptions
+//go:linkname ContainsIgnoredPath github.com/microsoft/typescript-go/internal/tspath.ContainsIgnoredPath
+func ContainsIgnoredPath(path string) bool
 //go:linkname ContainsPath github.com/microsoft/typescript-go/internal/tspath.ContainsPath
 func ContainsPath(parent string, child string, options tspath.ComparePathsOptions) bool
 //go:linkname ConvertToRelativePath github.com/microsoft/typescript-go/internal/tspath.ConvertToRelativePath
 func ConvertToRelativePath(absoluteOrRelativePath string, options tspath.ComparePathsOptions) string
 const DirectorySeparator = tspath.DirectorySeparator
+//go:linkname EnsurePathIsNonModuleName github.com/microsoft/typescript-go/internal/tspath.EnsurePathIsNonModuleName
+func EnsurePathIsNonModuleName(path string) string
 //go:linkname EnsureTrailingDirectorySeparator github.com/microsoft/typescript-go/internal/tspath.EnsureTrailingDirectorySeparator
 func EnsureTrailingDirectorySeparator(path string) string
 const ExtensionCjs = tspath.ExtensionCjs
@@ -31,6 +37,8 @@ const ExtensionCts = tspath.ExtensionCts
 const ExtensionDcts = tspath.ExtensionDcts
 const ExtensionDmts = tspath.ExtensionDmts
 const ExtensionDts = tspath.ExtensionDts
+//go:linkname ExtensionIsOneOf github.com/microsoft/typescript-go/internal/tspath.ExtensionIsOneOf
+func ExtensionIsOneOf(ext string, extensions []string) bool
 //go:linkname ExtensionIsTs github.com/microsoft/typescript-go/internal/tspath.ExtensionIsTs
 func ExtensionIsTs(ext string) bool
 const ExtensionJs = tspath.ExtensionJs
@@ -41,6 +49,7 @@ const ExtensionMts = tspath.ExtensionMts
 const ExtensionTs = tspath.ExtensionTs
 const ExtensionTsBuildInfo = tspath.ExtensionTsBuildInfo
 const ExtensionTsx = tspath.ExtensionTsx
+var ExtensionsNotSupportingExtensionlessResolution = tspath.ExtensionsNotSupportingExtensionlessResolution
 //go:linkname FileExtensionIs github.com/microsoft/typescript-go/internal/tspath.FileExtensionIs
 func FileExtensionIs(path string, extension string) bool
 //go:linkname FileExtensionIsOneOf github.com/microsoft/typescript-go/internal/tspath.FileExtensionIsOneOf
@@ -71,6 +80,8 @@ func GetPathComponentsRelativeTo(from string, to string, options tspath.CompareP
 func GetPathFromPathComponents(pathComponents []string) string
 //go:linkname GetRelativePathFromDirectory github.com/microsoft/typescript-go/internal/tspath.GetRelativePathFromDirectory
 func GetRelativePathFromDirectory(fromDirectory string, to string, options tspath.ComparePathsOptions) string
+//go:linkname GetRelativePathFromFile github.com/microsoft/typescript-go/internal/tspath.GetRelativePathFromFile
+func GetRelativePathFromFile(from string, to string, options tspath.ComparePathsOptions) string
 //go:linkname GetRelativePathToDirectoryOrUrl github.com/microsoft/typescript-go/internal/tspath.GetRelativePathToDirectoryOrUrl
 func GetRelativePathToDirectoryOrUrl(directoryPathOrUrl string, relativeOrAbsolutePath string, isAbsolutePathAnUrl bool, options tspath.ComparePathsOptions) string
 //go:linkname GetRootLength github.com/microsoft/typescript-go/internal/tspath.GetRootLength
@@ -97,6 +108,8 @@ func IsExternalModuleNameRelative(moduleName string) bool
 func IsRootedDiskPath(path string) bool
 //go:linkname IsUrl github.com/microsoft/typescript-go/internal/tspath.IsUrl
 func IsUrl(path string) bool
+//go:linkname IsVolumeCharacter github.com/microsoft/typescript-go/internal/tspath.IsVolumeCharacter
+func IsVolumeCharacter(char byte) bool
 //go:linkname NormalizePath github.com/microsoft/typescript-go/internal/tspath.NormalizePath
 func NormalizePath(path string) string
 //go:linkname NormalizeSlashes github.com/microsoft/typescript-go/internal/tspath.NormalizeSlashes
@@ -116,6 +129,8 @@ func RemoveTrailingDirectorySeparator(path string) string
 func RemoveTrailingDirectorySeparators(path string) string
 //go:linkname ResolvePath github.com/microsoft/typescript-go/internal/tspath.ResolvePath
 func ResolvePath(path string, paths ...string) string
+//go:linkname ResolveTripleslashReference github.com/microsoft/typescript-go/internal/tspath.ResolveTripleslashReference
+func ResolveTripleslashReference(moduleName string, containingFile string) string
 var SupportedJSExtensions = tspath.SupportedJSExtensions
 var SupportedJSExtensionsFlat = tspath.SupportedJSExtensionsFlat
 var SupportedTSExtensions = tspath.SupportedTSExtensions

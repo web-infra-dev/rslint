@@ -21,7 +21,9 @@ func TestIsSymbolFromDefaultLibrary(t *testing.T) {
 		program, err := CreateProgram(true, fs, rootDir, "tsconfig.json", CreateCompilerHost(rootDir, fs))
 		assert.NilError(t, err, "couldn't create program")
 		sourceFile := program.GetSourceFile(filePath)
-		t := program.GetTypeChecker().GetTypeAtLocation(sourceFile.Statements.Nodes[0].AsTypeAliasDeclaration().Name())
+		c, done := program.GetTypeChecker(t.Context())
+		defer done()
+		t := c.GetTypeAtLocation(sourceFile.Statements.Nodes[0].AsTypeAliasDeclaration().Name())
 		return program, checker.Type_symbol(t)
 	}
 

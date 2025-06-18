@@ -1,6 +1,5 @@
 {
   "ExtraFunctions": [
-    "isTupleType",
     "isNonDeferredTypeReference",
     "getFunctionFlags"
   ],

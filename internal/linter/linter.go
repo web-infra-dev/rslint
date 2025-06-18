@@ -1,6 +1,8 @@
 package linter
 
 import (
+	"context"
+
 	"github.com/typescript-eslint/tsgolint/internal/rule"
 	"github.com/typescript-eslint/tsgolint/internal/utils"
 
@@ -23,7 +25,9 @@ func RunLinter(program *compiler.Program, singleThreaded bool, files []*ast.Sour
 	close(queue)
 
 	wg := core.NewWorkGroup(singleThreaded)
-	for _, checker := range program.GetTypeCheckers() {
+	checkers, done := program.GetTypeCheckers(context.Background())
+	defer done()
+	for _, checker := range checkers {
 		wg.Queue(func() {
 			registeredListeners := make(map[ast.Kind][](func(node *ast.Node)), 20)
 

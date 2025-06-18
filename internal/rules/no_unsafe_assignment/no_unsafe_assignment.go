@@ -68,7 +68,7 @@ const (
 var NoUnsafeAssignmentRule = rule.Rule{
 	Name: "no-unsafe-assignment",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		compilerOptions := ctx.Program.GetCompilerOptions()
+		compilerOptions := ctx.Program.Options()
 		isNoImplicitThis := utils.IsStrictCompilerOptionEnabled(
 			compilerOptions,
 			compilerOptions.NoImplicitThis,

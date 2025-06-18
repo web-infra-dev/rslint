@@ -79,7 +79,7 @@ var NoUnnecessaryBooleanLiteralCompareRule = rule.Rule{
 			opts.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing = utils.Ref(false)
 		}
 
-		compilerOptions := ctx.Program.GetCompilerOptions()
+		compilerOptions := ctx.Program.Options()
 		isStrictNullChecks := utils.IsStrictCompilerOptionEnabled(
 			compilerOptions,
 			compilerOptions.StrictNullChecks,
@@ -190,7 +190,7 @@ var NoUnnecessaryBooleanLiteralCompareRule = rule.Rule{
 
 				fixes := make([]rule.RuleFix, 0, 6)
 
-				fixes = append(fixes, rule.RuleFixReplace(ctx.SourceFile, mutatedNode, ctx.SourceFile.Text[comparison.expression.Pos():comparison.expression.End()]))
+				fixes = append(fixes, rule.RuleFixReplace(ctx.SourceFile, mutatedNode, ctx.SourceFile.Text()[comparison.expression.Pos():comparison.expression.End()]))
 
 				if shouldNegate == isUnaryNegation {
 					fixes = append(fixes, rule.RuleFixInsertBefore(ctx.SourceFile, mutatedNode, "!"))

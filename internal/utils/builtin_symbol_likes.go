@@ -24,7 +24,7 @@ func IsSourceFileDefaultLibrary(program *compiler.Program, file *ast.SourceFile)
 		return true
 	}
 
-	options := program.GetCompilerOptions()
+	options := program.Options()
 
 	if options.NoLib.IsTrue() {
 		return false

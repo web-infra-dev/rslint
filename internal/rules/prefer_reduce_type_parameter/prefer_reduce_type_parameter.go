@@ -66,7 +66,7 @@ var PreferReduceTypeParameterRule = rule.Rule{
 					fixes = append(fixes, rule.RuleFixRemoveRange(secondArg.Loc.WithEnd(assertionExpr.Pos())))
 				}
 				if expr.TypeArguments == nil {
-					fixes = append(fixes, rule.RuleFixInsertAfter(callee, "<"+ctx.SourceFile.Text[assertionType.Pos():assertionType.End()]+">"))
+					fixes = append(fixes, rule.RuleFixInsertAfter(callee, "<"+ctx.SourceFile.Text()[assertionType.Pos():assertionType.End()]+">"))
 				}
 				ctx.ReportNodeWithFixes(secondArg, buildPreferTypeParameterMessage(), fixes...)
 			},
