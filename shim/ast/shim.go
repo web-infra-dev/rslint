@@ -33,6 +33,7 @@ type BodyBase = ast.BodyBase
 type BreakOrContinueStatement = ast.BreakOrContinueStatement
 type BreakStatement = ast.BreakStatement
 type CallExpression = ast.CallExpression
+type CallLikeExpression = ast.CallLikeExpression
 type CallSignatureDeclaration = ast.CallSignatureDeclaration
 //go:linkname CanHaveDecorators github.com/microsoft/typescript-go/internal/ast.CanHaveDecorators
 func CanHaveDecorators(node *ast.Node) bool
@@ -681,6 +682,8 @@ func IsInternalModuleImportEqualsDeclaration(node *ast.Node) bool
 func IsIntersectionTypeNode(node *ast.Node) bool
 //go:linkname IsIterationStatement github.com/microsoft/typescript-go/internal/ast.IsIterationStatement
 func IsIterationStatement(node *ast.Node, lookInLabeledStatements bool) bool
+//go:linkname IsJSDocAugmentsTag github.com/microsoft/typescript-go/internal/ast.IsJSDocAugmentsTag
+func IsJSDocAugmentsTag(node *ast.Node) bool
 //go:linkname IsJSDocCommentContainingNode github.com/microsoft/typescript-go/internal/ast.IsJSDocCommentContainingNode
 func IsJSDocCommentContainingNode(node *ast.Node) bool
 //go:linkname IsJSDocDeprecatedTag github.com/microsoft/typescript-go/internal/ast.IsJSDocDeprecatedTag
@@ -1047,8 +1050,6 @@ func IsTypeReferenceType(node *ast.Node) bool
 func IsUnaryExpression(node *ast.Node) bool
 //go:linkname IsUnterminatedLiteral github.com/microsoft/typescript-go/internal/ast.IsUnterminatedLiteral
 func IsUnterminatedLiteral(node *ast.Node) bool
-//go:linkname IsUnterminatedNode github.com/microsoft/typescript-go/internal/ast.IsUnterminatedNode
-func IsUnterminatedNode(node *ast.Node) bool
 //go:linkname IsValidTypeOnlyAliasUseSite github.com/microsoft/typescript-go/internal/ast.IsValidTypeOnlyAliasUseSite
 func IsValidTypeOnlyAliasUseSite(useSite *ast.Node) bool
 //go:linkname IsVarAwaitUsing github.com/microsoft/typescript-go/internal/ast.IsVarAwaitUsing
@@ -1688,7 +1689,6 @@ const NodeFlagsPossiblyContainsDynamicImport = ast.NodeFlagsPossiblyContainsDyna
 const NodeFlagsPossiblyContainsImportMeta = ast.NodeFlagsPossiblyContainsImportMeta
 const NodeFlagsReachabilityCheckFlags = ast.NodeFlagsReachabilityCheckFlags
 const NodeFlagsReparsed = ast.NodeFlagsReparsed
-const NodeFlagsSkipDirectInference = ast.NodeFlagsSkipDirectInference
 const NodeFlagsSynthesized = ast.NodeFlagsSynthesized
 const NodeFlagsThisNodeHasError = ast.NodeFlagsThisNodeHasError
 const NodeFlagsThisNodeOrAnySubNodesHasError = ast.NodeFlagsThisNodeOrAnySubNodesHasError
@@ -1846,8 +1846,10 @@ type StatementList = ast.StatementList
 type StringLiteral = ast.StringLiteral
 type StringLiteralLike = ast.StringLiteralLike
 type StringLiteralNode = ast.StringLiteralNode
+const SubtreeContainsAnyAwait = ast.SubtreeContainsAnyAwait
 const SubtreeContainsAwait = ast.SubtreeContainsAwait
 const SubtreeContainsClassFields = ast.SubtreeContainsClassFields
+const SubtreeContainsClassStaticBlocks = ast.SubtreeContainsClassStaticBlocks
 const SubtreeContainsDecorators = ast.SubtreeContainsDecorators
 const SubtreeContainsDynamicImport = ast.SubtreeContainsDynamicImport
 const SubtreeContainsES2016 = ast.SubtreeContainsES2016
@@ -1857,15 +1859,25 @@ const SubtreeContainsES2019 = ast.SubtreeContainsES2019
 const SubtreeContainsES2020 = ast.SubtreeContainsES2020
 const SubtreeContainsES2021 = ast.SubtreeContainsES2021
 const SubtreeContainsES2022 = ast.SubtreeContainsES2022
+const SubtreeContainsESClassFields = ast.SubtreeContainsESClassFields
+const SubtreeContainsESDecorators = ast.SubtreeContainsESDecorators
 const SubtreeContainsESNext = ast.SubtreeContainsESNext
+const SubtreeContainsESObjectRestOrSpread = ast.SubtreeContainsESObjectRestOrSpread
+const SubtreeContainsExponentiationOperator = ast.SubtreeContainsExponentiationOperator
+const SubtreeContainsForAwaitOrAsyncGenerator = ast.SubtreeContainsForAwaitOrAsyncGenerator
 const SubtreeContainsIdentifier = ast.SubtreeContainsIdentifier
 const SubtreeContainsJsx = ast.SubtreeContainsJsx
 const SubtreeContainsLexicalSuper = ast.SubtreeContainsLexicalSuper
 const SubtreeContainsLexicalThis = ast.SubtreeContainsLexicalThis
 const SubtreeContainsLexicalThisOrSuper = ast.SubtreeContainsLexicalThisOrSuper
+const SubtreeContainsLogicalAssignments = ast.SubtreeContainsLogicalAssignments
+const SubtreeContainsMissingCatchClauseVariable = ast.SubtreeContainsMissingCatchClauseVariable
+const SubtreeContainsNullishCoalescing = ast.SubtreeContainsNullishCoalescing
 const SubtreeContainsObjectRestOrSpread = ast.SubtreeContainsObjectRestOrSpread
+const SubtreeContainsOptionalChaining = ast.SubtreeContainsOptionalChaining
 const SubtreeContainsRest = ast.SubtreeContainsRest
 const SubtreeContainsTypeScript = ast.SubtreeContainsTypeScript
+const SubtreeContainsUsing = ast.SubtreeContainsUsing
 const SubtreeExclusionsAccessor = ast.SubtreeExclusionsAccessor
 const SubtreeExclusionsArrayLiteral = ast.SubtreeExclusionsArrayLiteral
 const SubtreeExclusionsArrowFunction = ast.SubtreeExclusionsArrowFunction

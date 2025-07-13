@@ -14,8 +14,7 @@ import (
 
 func CreateCompilerHost(cwd string, fs vfs.FS) compiler.CompilerHost {
 	defaultLibraryPath := bundled.LibPath()
-	compilerOptions := core.CompilerOptions{}
-	return compiler.NewCompilerHost(&compilerOptions, cwd, fs, defaultLibraryPath, nil)
+	return compiler.NewCompilerHost(cwd, fs, defaultLibraryPath)
 }
 
 func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath string, host compiler.CompilerHost) (*compiler.Program, error) {

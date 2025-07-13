@@ -20,7 +20,7 @@ func IsSourceFileDefaultLibrary(program *compiler.Program, file *ast.SourceFile)
 		return false
 	}
 
-	if file.HasNoDefaultLib {
+	if program.IsSourceFileDefaultLibrary(file.Path()) {
 		return true
 	}
 

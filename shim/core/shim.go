@@ -8,6 +8,8 @@ import "github.com/microsoft/typescript-go/internal/core"
 import "iter"
 import _ "unsafe"
 
+//go:linkname BoolToTristate github.com/microsoft/typescript-go/internal/core.BoolToTristate
+func BoolToTristate(b bool) core.Tristate
 type CompilerOptions = core.CompilerOptions
 //go:linkname ComputeLineStarts github.com/microsoft/typescript-go/internal/core.ComputeLineStarts
 func ComputeLineStarts(text string) []core.TextPos
@@ -49,6 +51,7 @@ const ModuleKindNodeNext = core.ModuleKindNodeNext
 const ModuleKindNone = core.ModuleKindNone
 const ModuleKindPreserve = core.ModuleKindPreserve
 const ModuleKindSystem = core.ModuleKindSystem
+var ModuleKindToModuleResolutionKind = core.ModuleKindToModuleResolutionKind
 const ModuleKindUMD = core.ModuleKindUMD
 type ModuleResolutionKind = core.ModuleResolutionKind
 const ModuleResolutionKindBundler = core.ModuleResolutionKindBundler

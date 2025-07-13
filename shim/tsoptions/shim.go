@@ -6,6 +6,7 @@ package tsoptions
 import "github.com/microsoft/typescript-go/internal/ast"
 import "github.com/microsoft/typescript-go/internal/collections"
 import "github.com/microsoft/typescript-go/internal/core"
+import "github.com/microsoft/typescript-go/internal/diagnostics"
 import "github.com/microsoft/typescript-go/internal/tsoptions"
 import "github.com/microsoft/typescript-go/internal/tspath"
 import "github.com/microsoft/typescript-go/internal/vfs"
@@ -26,6 +27,8 @@ const CommandLineOptionTypeString = tsoptions.CommandLineOptionTypeString
 var CompilerNameMap = tsoptions.CompilerNameMap
 var CompilerOptionsDidYouMeanDiagnostics = tsoptions.CompilerOptionsDidYouMeanDiagnostics
 type CompilerOptionsValue = tsoptions.CompilerOptionsValue
+//go:linkname CreateDiagnosticForNodeInSourceFileOrCompilerDiagnostic github.com/microsoft/typescript-go/internal/tsoptions.CreateDiagnosticForNodeInSourceFileOrCompilerDiagnostic
+func CreateDiagnosticForNodeInSourceFileOrCompilerDiagnostic(sourceFile *ast.SourceFile, node *ast.Node, message *diagnostics.Message, args ...any) *ast.Diagnostic
 type DidYouMeanOptionsDiagnostics = tsoptions.DidYouMeanOptionsDiagnostics
 type ExtendedConfigCacheEntry = tsoptions.ExtendedConfigCacheEntry
 type FileExtensionInfo = tsoptions.FileExtensionInfo
@@ -41,6 +44,7 @@ func GetParsedCommandLineOfConfigFile(configFileName string, options *core.Compi
 func GetParsedCommandLineOfConfigFilePath(configFileName string, path tspath.Path, options *core.CompilerOptions, sys tsoptions.ParseConfigHost, extendedConfigCache *collections.SyncMap[tspath.Path, *tsoptions.ExtendedConfigCacheEntry]) (*tsoptions.ParsedCommandLine, []*ast.Diagnostic)
 //go:linkname GetSupportedExtensionsWithJsonIfResolveJsonModule github.com/microsoft/typescript-go/internal/tsoptions.GetSupportedExtensionsWithJsonIfResolveJsonModule
 func GetSupportedExtensionsWithJsonIfResolveJsonModule(compilerOptions *core.CompilerOptions, supportedExtensions [][]string) [][]string
+var InverseJsxOptionMap = tsoptions.InverseJsxOptionMap
 var LibFilesSet = tsoptions.LibFilesSet
 var Libs = tsoptions.Libs
 type NameMap = tsoptions.NameMap

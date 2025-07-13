@@ -38,17 +38,6 @@ type ArrayLiteralLinks = checker.ArrayLiteralLinks
 type ArrayToSingleTypeMapper = checker.ArrayToSingleTypeMapper
 type ArrayTypeMapper = checker.ArrayTypeMapper
 type AssertionLinks = checker.AssertionLinks
-type AssignmentDeclarationKind = checker.AssignmentDeclarationKind
-const AssignmentDeclarationKindExportsProperty = checker.AssignmentDeclarationKindExportsProperty
-const AssignmentDeclarationKindModuleExports = checker.AssignmentDeclarationKindModuleExports
-const AssignmentDeclarationKindNone = checker.AssignmentDeclarationKindNone
-const AssignmentDeclarationKindObjectDefinePropertyExports = checker.AssignmentDeclarationKindObjectDefinePropertyExports
-const AssignmentDeclarationKindObjectDefinePropertyValue = checker.AssignmentDeclarationKindObjectDefinePropertyValue
-const AssignmentDeclarationKindObjectDefinePrototypeProperty = checker.AssignmentDeclarationKindObjectDefinePrototypeProperty
-const AssignmentDeclarationKindProperty = checker.AssignmentDeclarationKindProperty
-const AssignmentDeclarationKindPrototype = checker.AssignmentDeclarationKindPrototype
-const AssignmentDeclarationKindPrototypeProperty = checker.AssignmentDeclarationKindPrototypeProperty
-const AssignmentDeclarationKindThisProperty = checker.AssignmentDeclarationKindThisProperty
 type AssignmentKind = checker.AssignmentKind
 const AssignmentKindCompound = checker.AssignmentKindCompound
 const AssignmentKindDefinite = checker.AssignmentKindDefinite
@@ -315,6 +304,7 @@ type extra_Checker struct {
   unknownSignature *checker.Signature
   resolvingSignature *checker.Signature
   silentNeverSignature *checker.Signature
+  cachedArgumentsReferenced map[*ast.Node]bool
   enumNumberIndexInfo *checker.IndexInfo
   anyBaseTypeIndexInfo *checker.IndexInfo
   patternAmbientModules []*ast.PatternAmbientModule
@@ -390,6 +380,7 @@ type extra_Checker struct {
   getGlobalRecordSymbol func() *ast.Symbol
   getGlobalTemplateStringsArrayType func() *checker.Type
   getGlobalESSymbolConstructorSymbolOrNil func() *ast.Symbol
+  getGlobalESSymbolConstructorTypeSymbolOrNil func() *ast.Symbol
   getGlobalImportCallOptionsType func() *checker.Type
   getGlobalImportCallOptionsTypeChecked func() *checker.Type
   getGlobalPromiseType func() *checker.Type
@@ -434,18 +425,19 @@ type extra_Checker struct {
   markNodeAssignments func(*ast.Node) bool
   emitResolver extra_emitResolver
   emitResolverOnce sync.Once
-  diagnosticConstructionContext *printer.EmitContext
-  nodeBuilder *checker.NodeBuilder
   _jsxNamespace string
   _jsxFactoryEntity *ast.Node
   skipDirectInferenceNodes collections.Set[*ast.Node]
   ctx context.Context
   packagesMap map[string]bool
+  activeMappers []*checker.TypeMapper
+  activeTypeMappersCaches []map[string]*checker.Type
 }
 type extra_emitResolver struct {
   checker *checker.Checker
   checkerMu sync.Mutex
   isValueAliasDeclaration func(node *ast.Node) bool
+  aliasMarkingVisitor func(node *ast.Node) bool
   referenceResolver binder.ReferenceResolver
   jsxLinks core.LinkStore[*ast.Node, checker.JSXLinks]
   declarationLinks core.LinkStore[*ast.Node, checker.DeclarationLinks]
