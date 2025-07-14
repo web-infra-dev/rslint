@@ -255,7 +255,84 @@ func TestNoMisusedSpreadRule(t *testing.T) {
       `,
 			Options: NoMisusedSpreadOptions{AllowInline: []string{"A"}},
 		},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `declare const data: any;
+      const a = [...data];`},
+		{Code: `declare const data: unknown;
+      const a = [...data];`},
+		{Code: `const a = [1, 2, 3];
+      const b = [...a];`},
+		{Code: `const a = [1, 2, 3] as const;
+      const b = [...a];`},
+		{Code: `declare function getArray(): number[];
+      const a = [...getArray()];`},
+		{Code: `declare function getTuple(): readonly number[];
+      const a = [...getTuple()];`},
+		{Code: `const iterator = {
+        *[Symbol.iterator]() {
+          yield 1;
+          yield 2;
+          yield 3;
+        },
+      };
+
+      const a = [...iterator];`},
+		{Code: `declare const data: Iterable<number> | number[];
+
+      const a = [...data];`},
+		{Code: `declare const data: Iterable<number> & number[];
+
+      const a = [...data];`},
+		{Code: `declare function getIterable(): Iterable<number>;
+
+      const a = [...getIterable()];`},
+		{Code: `declare const data: Uint8Array;
+
+      const a = [...data];`},
+		{Code: `declare const data: TypedArray;
+
+      const a = [...data];`},
+		{Code: `declare const obj: any;
+
+      const o = { ...obj };`},
+		{Code: `declare const obj: { a: number; b: number } | any;
+
+      const o = { ...obj };`},
+		{Code: `declare const obj: { a: number; b: number } & any;
+
+      const o = { ...obj };`},
+		{Code: `const obj = { a: 1, b: 2 };
+      const o = { ...obj };`},
+		{Code: `declare const obj: { a: number; b: number };
+      const o = { ...obj };`},
+		{Code: `declare function getObject(): { a: number; b: number };
+      const o = { ...getObject() };`},
+		{Code: `function f() {}
+
+      f.prop = 1;
+
+      const o = { ...f };`},
+		{Code: `const f = () => {};
+
+      f.prop = 1;
+
+      const o = { ...f };`},
+		{Code: `function* generator() {}
+
+      generator.prop = 1;
+
+      const o = { ...generator };`},
+		{Code: `declare const promiseLike: PromiseLike<number>;
+
+      const o = { ...promiseLike };`},
+		{Code: `const obj = { a: 1, b: 2 };
+        const o = <div {...x} />;`},
+		{Code: `declare const obj: { a: number; b: number } | any;
+        const o = <div {...x} />;`},
+		{Code: `const promise = new Promise(() => {});
+        const o = { ...promise };`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: "const a = [...'test'];",
 			Errors: []rule_tester.InvalidTestCaseError{

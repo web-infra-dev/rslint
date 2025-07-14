@@ -34,7 +34,26 @@ for (const key in obj) {
   console.log(key);
 }
     `},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `for (const x of [3, 4, 5]) {
+  console.log(x);
+}`},
+		{Code: `for (const x in { a: 1, b: 2, c: 3 }) {
+  console.log(x);
+}`},
+		{Code: `declare const nullish: null | undefined;
+// @ts-expect-error
+for (const k in nullish) {
+}`},
+		{Code: `declare const obj: {
+  [key: number]: number;
+};
+
+for (const key in obj) {
+  console.log(key);
+}`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
 for (const x in [3, 4, 5]) {

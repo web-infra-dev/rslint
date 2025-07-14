@@ -328,7 +328,254 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
         }
       }
     `},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `enum Fruit {
+        Apple,
+      }
+      Fruit.Apple === ({} as any);`},
+		{Code: `enum Fruit {
+        Apple,
+      }
+      Fruit.Apple === undefined;`},
+		{Code: `enum Fruit {
+        Apple,
+      }
+      Fruit.Apple === null;`},
+		{Code: `enum Fruit {
+        Apple,
+      }
+      declare const fruit: Fruit | -1;
+      fruit === -1;`},
+		{Code: `enum Fruit {
+        Apple,
+      }
+      declare const fruit: Fruit | number;
+      fruit === -1;`},
+		{Code: `enum Fruit {
+        Apple,
+      }
+      declare const fruit: Fruit | 'apple';
+      fruit === 'apple';`},
+		{Code: `enum Fruit {
+        Apple,
+      }
+      declare const fruit: Fruit | string;
+      fruit === 'apple';`},
+		{Code: `enum Fruit {
+        Apple = 'apple',
+      }
+      declare const fruit: Fruit | 'apple';
+      fruit === 'apple';`},
+		{Code: `enum Fruit {
+        Apple = 'apple',
+      }
+      declare const fruit: Fruit | string;
+      fruit === 'apple';`},
+		{Code: `enum Fruit {
+        Apple = 'apple',
+      }
+      declare const fruit: Fruit | 0;
+      fruit === 0;`},
+		{Code: `enum Fruit {
+        Apple = 'apple',
+      }
+      declare const fruit: Fruit | number;
+      fruit === 0;`},
+		{Code: `enum Fruit {
+        Apple,
+      }
+      declare const fruit: Fruit | 'apple';
+      fruit === Math.random() > 0.5 ? 'apple' : Fruit.Apple;`},
+		{Code: `enum Fruit {
+        Apple = 'apple',
+      }
+      declare const fruit: Fruit | 'apple';
+      fruit === Math.random() > 0.5 ? 'apple' : Fruit.Apple;`},
+		{Code: `enum Fruit {
+        Apple = 'apple',
+      }
+      declare const fruit: Fruit | string;
+      fruit === Math.random() > 0.5 ? 'apple' : Fruit.Apple;`},
+		{Code: `enum Fruit {
+        Apple = 'apple',
+      }
+      declare const fruit: Fruit | 0;
+      fruit === Math.random() > 0.5 ? 0 : Fruit.Apple;`},
+		{Code: `enum Fruit {
+        Apple = 'apple',
+      }
+      declare const fruit: Fruit | number;
+      fruit === Math.random() > 0.5 ? 0 : Fruit.Apple;`},
+		{Code: `enum Fruit {
+        Apple,
+        Banana,
+      }
+      Fruit.Apple === Fruit.Banana;`},
+		{Code: `enum Fruit {
+        Apple = 0,
+        Banana = 1,
+      }
+      Fruit.Apple === Fruit.Banana;`},
+		{Code: `enum Fruit {
+        Apple = 'apple',
+        Banana = 'banana',
+      }
+      Fruit.Apple === Fruit.Banana;`},
+		{Code: `enum Fruit {
+        Apple,
+        Banana,
+      }
+      const fruit = Fruit.Apple;
+      fruit === Fruit.Banana;`},
+		{Code: `enum Vegetable {
+        Asparagus = 'asparagus',
+        Beet = 'beet',
+        Celery = 'celery',
+      }
+      const vegetable = Vegetable.Asparagus;
+      vegetable === Vegetable.Beet;`},
+		{Code: `enum Fruit {
+        Apple,
+        Banana,
+        Cherry,
+      }
+      const fruit1 = Fruit.Apple;
+      const fruit2 = Fruit.Banana;
+      fruit1 === fruit2;`},
+		{Code: `enum Vegetable {
+        Asparagus = 'asparagus',
+        Beet = 'beet',
+        Celery = 'celery',
+      }
+      const vegetable1 = Vegetable.Asparagus;
+      const vegetable2 = Vegetable.Beet;
+      vegetable1 === vegetable2;`},
+		{Code: `enum Fruit {
+        Apple,
+        Banana,
+        Cherry,
+      }
+      enum Fruit2 {
+        Apple2,
+        Banana2,
+        Cherry2,
+      }
+      declare const left: number | Fruit;
+      declare const right: number | Fruit2;
+      left === right;`},
+		{Code: `enum Vegetable {
+        Asparagus = 'asparagus',
+        Beet = 'beet',
+        Celery = 'celery',
+      }
+      enum Vegetable2 {
+        Asparagus2 = 'asparagus2',
+        Beet2 = 'beet2',
+        Celery2 = 'celery2',
+      }
+      declare const left: string | Vegetable;
+      declare const right: string | Vegetable2;
+      left === right;`},
+		{Code: `enum Vegetable {
+        Asparagus = 'asparagus',
+        Beet = 'beet',
+        Celery = 'celery',
+      }
+      const foo = {};
+      const vegetable = Vegetable.Asparagus;
+      vegetable in foo;`},
+		{Code: `enum Fruit {
+        Apple,
+        Banana,
+        Cherry,
+      }
+      declare const fruitOrBoolean: Fruit | boolean;
+      fruitOrBoolean === true;`},
+		{Code: `enum Str {
+        A = 'a',
+      }
+      enum Num {
+        B = 1,
+      }
+      enum Mixed {
+        A = 'a',
+        B = 1,
+      }
+
+      declare const str: Str;
+      declare const strOrString: Str | string;
+
+      declare const num: Num;
+      declare const numOrNumber: Num | number;
+
+      declare const mixed: Mixed;
+      declare const mixedOrStringOrNumber: Mixed | string | number;
+
+      function someFunction() {}
+
+      // following are all ignored due to the presence of "| string" or "| number"
+      strOrString === 'a';
+      numOrNumber === 1;
+      mixedOrStringOrNumber === 'a';
+      mixedOrStringOrNumber === 1;
+
+      // following are all ignored because the value can never be an enum value
+      str === 1;
+      num === 'a';
+      str === {};
+      num === {};
+      mixed === {};
+      str === true;
+      num === true;
+      mixed === true;
+      str === someFunction;
+      num === someFunction;
+      mixed === someFunction;`},
+		{Code: `enum Fruit {
+        Apple,
+      }
+
+      const bitShift = 1 << Fruit.Apple;`},
+		{Code: `enum Fruit {
+        Apple,
+      }
+
+      const bitShift = 1 >> Fruit.Apple;`},
+		{Code: `enum Fruit {
+        Apple,
+      }
+
+      declare const fruit: Fruit;
+
+      switch (fruit) {
+        case Fruit.Apple: {
+          break;
+        }
+      }`},
+		{Code: `enum Vegetable {
+        Asparagus = 'asparagus',
+      }
+
+      declare const vegetable: Vegetable;
+
+      switch (vegetable) {
+        case Vegetable.Asparagus: {
+          break;
+        }
+      }`},
+		{Code: `enum Vegetable {
+        Asparagus = 'asparagus',
+      }
+
+      declare const vegetable: Vegetable;
+
+      switch (vegetable) {
+        default: {
+          break;
+        }
+      }`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
         enum Fruit {
@@ -1365,5 +1612,11 @@ func TestNoUnsafeEnumComparisonRule(t *testing.T) {
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `enum Fruit {
+          Apple,
+        }
+        Fruit.Apple < 1;`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }

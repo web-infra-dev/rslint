@@ -179,7 +179,80 @@ throw new Map();
 				AllowThrowingUnknown: utils.Ref(false),
 			},
 		},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `const e = new Error();
+throw e;`},
+		{Code: `try {
+  throw new Error();
+} catch (e) {
+  throw e;
+}`},
+		{Code: `function foo() {
+  return new Error();
+}
+throw foo();`},
+		{Code: `const foo = {
+  bar: new Error(),
+};
+throw foo.bar;`},
+		{Code: `const foo = {
+  bar: new Error(),
+};
+
+throw foo['bar'];`},
+		{Code: `const foo = {
+  bar: new Error(),
+};
+
+const bar = 'bar';
+throw foo[bar];`},
+		{Code: `class CustomError extends Error {}
+throw new CustomError();`},
+		{Code: `class CustomError1 extends Error {}
+class CustomError2 extends CustomError1 {}
+throw new CustomError2();`},
+		{Code: `function* foo() {
+  let index = 0;
+  throw yield index++;
+}`},
+		{Code: `async function foo() {
+  throw await bar;
+}`},
+		{Code: `import { Error } from './missing';
+throw Error;`},
+		{Code: `class CustomError<T, C> extends Error {}
+throw new CustomError<string, string>();`},
+		{Code: `class CustomError<T = {}> extends Error {}
+throw new CustomError();`},
+		{Code: `class CustomError<T extends object> extends Error {}
+throw new CustomError();`},
+		{Code: `function foo() {
+  throw Object.assign(new Error('message'), { foo: 'bar' });
+}`},
+		{Code: `const foo: Error | SyntaxError = bar();
+function bar() {
+  throw foo;
+}`},
+		{Code: `declare const foo: Error | string;
+throw foo as Error;`},
+		{Code: `declare const nullishError: Error | undefined;
+throw nullishError ?? new Error();`},
+		{Code: `declare const nullishError: Error | undefined;
+throw nullishError || new Error();`},
+		{Code: `declare const nullishError: Error | undefined;
+throw nullishError ? nullishError : new Error();`},
+		{Code: `function fun(value: any) {
+  throw value;
+}`},
+		{Code: `function fun(value: unknown) {
+  throw value;
+}`},
+		{Code: `function fun<T extends Error>(t: T): void {
+  throw t;
+}`},
+		{Code: `throw undefined;`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: "throw undefined;",
 			Errors: []rule_tester.InvalidTestCaseError{

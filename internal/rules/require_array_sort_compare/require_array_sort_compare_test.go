@@ -127,7 +127,65 @@ func TestRequireArraySortCompareRule(t *testing.T) {
         }
       `,
 		},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `function f(a: any[]) {
+        a.sort(undefined);
+      }`},
+		{Code: `function f(a: any[]) {
+        a.sort((a, b) => a - b);
+      }`},
+		{Code: `function f(a: Array<string>) {
+        a.sort(undefined);
+      }`},
+		{Code: `function f(a: Array<number>) {
+        a.sort((a, b) => a - b);
+      }`},
+		{Code: `function f(a: { sort(): void }) {
+        a.sort();
+      }`},
+		{Code: `class A {
+        sort(): void {}
+      }
+      function f(a: A) {
+        a.sort();
+      }`},
+		{Code: `interface A {
+        sort(): void;
+      }
+      function f(a: A) {
+        a.sort();
+      }`},
+		{Code: `interface A {
+        sort(): void;
+      }
+      function f<T extends A>(a: T) {
+        a.sort();
+      }`},
+		{Code: `function f(a: any) {
+        a.sort();
+      }`},
+		{Code: `namespace UserDefined {
+        interface Array {
+          sort(): void;
+        }
+        function f(a: Array) {
+          a.sort();
+        }
+      }`},
+		{Code: `function f(a: any[]) {
+        a?.sort((a, b) => a - b);
+      }`},
+		{Code: `namespace UserDefined {
+        interface Array {
+          sort(): void;
+        }
+        function f(a: Array) {
+          a?.sort();
+        }
+      }`},
+		{Code: `['foo', 'bar', 'baz'].sort();`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
         function f(a: Array<any>) {
@@ -325,5 +383,10 @@ func TestRequireArraySortCompareRule(t *testing.T) {
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `function f(a: Array<any>) {
+          a.sort();
+        }`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }

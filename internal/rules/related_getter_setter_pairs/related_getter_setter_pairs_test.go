@@ -106,7 +106,74 @@ type Example = {
   set value(newValue: number);
 };
     `},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `interface Example {
+  get value(): string;
+  set value(newValue: string);
+}`},
+		{Code: `interface Example {
+  get value(): string | undefined;
+  set value();
+}`},
+		{Code: `interface Example {
+  get value(): string | undefined;
+  set value(newValue: string, invalid: string);
+}`},
+		{Code: `interface Example {
+  get value(): string;
+  set value(newValue: string | undefined);
+}`},
+		{Code: `interface Example {
+  get value(): number;
+}`},
+		{Code: `interface Example {
+  get value(): number;
+  set value();
+}`},
+		{Code: `interface Example {
+  set value(newValue: string);
+}`},
+		{Code: `interface Example {
+  set value();
+}`},
+		{Code: `type Example = {
+  get value();
+};`},
+		{Code: `type Example = {
+  set value();
+};`},
+		{Code: `class Example {
+  get value() {
+    return '';
+  }
+}`},
+		{Code: `class Example {
+  get value() {
+    return '';
+  }
+  set value() {}
+}`},
+		{Code: `class Example {
+  get value() {
+    return '';
+  }
+  set value(param) {}
+}`},
+		{Code: `class Example {
+  get value() {
+    return '';
+  }
+  set value(param: number) {}
+}`},
+		{Code: `class Example {
+  set value() {}
+}`},
+		{Code: `type Example = {
+  get value(): number;
+  set value(newValue: number);
+};`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
 interface Example {
@@ -241,5 +308,11 @@ declare class Foo {
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `interface Example {
+  get value(): string | undefined;
+  set value(newValue: string);
+}`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }

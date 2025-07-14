@@ -27,7 +27,22 @@ function bar(x: never) {
   void x;
 }
     `},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `(() => {})();
+
+function foo() {}
+foo(); // nothing to discard
+
+function bar(x: number) {
+  void x;
+  return 2;
+}
+void bar(); // discarding a number`},
+		{Code: `function bar(x: never) {
+  void x;
+}`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code:   "void (() => {})();",
 			Output: []string{" (() => {})();"},

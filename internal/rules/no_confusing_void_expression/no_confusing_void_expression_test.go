@@ -405,7 +405,10 @@ test((() => {
       `,
 			Options: NoConfusingVoidExpressionOptions{IgnoreVoidReturningFunctions: true},
 		},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `() => console.log('foo');`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
         const x = console.log('foo');
@@ -1389,5 +1392,8 @@ function test(arg?: string): any | void {
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `const x = console.log('foo');`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }

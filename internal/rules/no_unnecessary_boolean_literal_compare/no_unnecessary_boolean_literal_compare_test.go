@@ -127,7 +127,41 @@ function test(a?: boolean): boolean {
       `,
 			Options: NoUnnecessaryBooleanLiteralCompareOptions{AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing: utils.Ref(true)},
 		},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `declare const varAny: any;
+      varAny === true;`},
+		{Code: `declare const varAny: any;
+      varAny == false;`},
+		{Code: `declare const varString: string;
+      varString === false;`},
+		{Code: `declare const varString: string;
+      varString === true;`},
+		{Code: `declare const varObject: {};
+      varObject === true;`},
+		{Code: `declare const varObject: {};
+      varObject == false;`},
+		{Code: `declare const varNullOrUndefined: null | undefined;
+      varNullOrUndefined === false;`},
+		{Code: `declare const varBooleanOrString: boolean | string;
+      varBooleanOrString === false;`},
+		{Code: `declare const varBooleanOrString: boolean | string;
+      varBooleanOrString == true;`},
+		{Code: `declare const varTrueOrStringOrUndefined: true | string | undefined;
+      varTrueOrStringOrUndefined == true;`},
+		{Code: `const test: <T>(someCondition: T) => void = someCondition => {
+        if (someCondition === true) {
+        }
+      };`},
+		{Code: `const test: <T>(someCondition: boolean | string) => void = someCondition => {
+        if (someCondition === true) {
+        }
+      };`},
+		{Code: `declare const varBooleanOrUndefined: boolean | undefined;
+      varBooleanOrUndefined === true;`},
+		{Code: `declare const varBooleanOrUndefined: boolean | undefined;
+        varBooleanOrUndefined === true;`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code:   "true === true;",
 			Output: []string{"true;"},

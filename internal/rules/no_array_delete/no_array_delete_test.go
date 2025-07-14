@@ -44,7 +44,26 @@ func TestNoArrayDeleteRule(t *testing.T) {
 		{Code: `
       delete console.log();
     `},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `declare const obj: { a: 1; b: 2 };
+      delete obj.a;`},
+		{Code: `declare const obj: { a: 1; b: 2 };
+      delete obj['a'];`},
+		{Code: `declare const arr: { a: 1; b: 2 }[][][][];
+      delete arr[0][0][0][0].a;`},
+		{Code: `declare const maybeArray: any;
+      delete maybeArray[0];`},
+		{Code: `declare const maybeArray: unknown;
+      delete maybeArray[0];`},
+		{Code: `declare function getObject<T extends { a: 1; b: 2 }>(): T;
+      delete getObject().a;`},
+		{Code: `declare function getObject<T extends number>(): { a: T; b: 2 };
+      delete getObject().a;`},
+		{Code: `declare const test: never;
+      delete test[0];`},
+		{Code: `delete console.log();`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
         declare const arr: number[];

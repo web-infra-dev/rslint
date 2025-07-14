@@ -160,7 +160,76 @@ func TestNoRedundantTypeConstituentsRule(t *testing.T) {
       type U = T & string;
     `},
 		{Code: "declare function fn(): never | 'foo';"},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `type T = any;
+      type U = T;`},
+		{Code: `type T = never;
+      type U = T;`},
+		{Code: `type T = 1 | 2;
+      type U = T | 3;
+      type V = U;`},
+		{Code: `type B = never;
+      type T = () => B | string;`},
+		{Code: `type B = string;
+      type T = () => B | never;`},
+		{Code: `function _(): string | never {
+        return '';
+      }`},
+		{Code: `const _ = (): string | never => {
+        return '';
+      };`},
+		{Code: `type B = string;
+      type T = { (): B | never };`},
+		{Code: `type B = never;
+      type T = { new (): string | B };`},
+		{Code: `type B = unknown;
+      type T = B;`},
+		{Code: `type B = bigint;
+      type T = B;`},
+		{Code: `type B = 1n;
+      type T = B | 2n;`},
+		{Code: `type B = boolean;
+      type T = B;`},
+		{Code: `type B = false;
+      type T = B | true;`},
+		{Code: `type B = true;
+      type T = B | false;`},
+		{Code: `type B = number;
+      type T = B;`},
+		{Code: `type B = 1;
+      type T = B | 2;`},
+		{Code: `type B = 1;
+      type T = B | false;`},
+		{Code: `type B = string;
+      type T = B;`},
+		{Code: `type B = 'b';
+      type T = 'a' | B;`},
+		{Code: `type B = 'a';
+      type T = B | 'b';`},
+		{Code: `type B = bigint;
+      type T = B | null;`},
+		{Code: `type B = boolean;
+      type T = B | null;`},
+		{Code: `type B = number;
+      type T = B | null;`},
+		{Code: `type B = string;
+      type T = B | null;`},
+		{Code: `type B = bigint;
+      type T = B & null;`},
+		{Code: `type B = boolean;
+      type T = B & null;`},
+		{Code: `type B = number;
+      type T = B & null;`},
+		{Code: `type B = string;
+      type T = B & null;`},
+		{Code: `${string}`},
+		{Code: `type B = \`},
+		{Code: `;
+      type T = B & null;`},
+		{Code: `type T = 'a' | 1 | 'b';
+      type U = T & string;`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: "type T = number | any;",
 			Errors: []rule_tester.InvalidTestCaseError{

@@ -482,7 +482,62 @@ class C<R extends unknown> {
 }
       `,
 		},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `function test() {
+        return;
+      }`},
+		{Code: `function test() {
+        return 1;
+      }`},
+		{Code: `async function test() {
+        return;
+      }`},
+		{Code: `async function test() {
+        return 1;
+      }`},
+		{Code: `async function test() {
+        return Promise.resolve(1);
+      }`},
+		{Code: `async function test() {
+        try {
+          return await Promise.resolve(1);
+        } catch (e) {
+          return await Promise.resolve(2);
+        } finally {
+          console.log('cleanup');
+        }
+      }`},
+		{Code: `const fn = (): any => null;
+async function test() {
+  return await fn();
+}`},
+		{Code: `const fn = (): unknown => null;
+async function test() {
+  return await fn();
+}`},
+		{Code: `async function test(unknownParam: unknown) {
+  try {
+    return await unknownParam;
+  } finally {
+    console.log('In finally block');
+  }
+}`},
+		{Code: `async function test() {
+          if (Math.random() < 0.33) {
+            return await Promise.resolve(1);
+          } else if (Math.random() < 0.5) {
+            return Promise.resolve(2);
+          }
+
+          try {
+          } catch (e) {
+            return await Promise.resolve(3);
+          } finally {
+            console.log('cleanup');
+          }
+        }`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
         async function test() {
@@ -1775,5 +1830,10 @@ class C<R extends number> {
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `async function test() {
+          return await 1;
+        }`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }

@@ -157,7 +157,101 @@ function foo(): Set<number> {
         }
       }
     `},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `function foo() {
+  return;
+}`},
+		{Code: `function foo() {
+  return 1;
+}`},
+		{Code: `function foo() {
+  return '';
+}`},
+		{Code: `function foo() {
+  return true;
+}`},
+		{Code: `never[]`},
+		{Code: `function foo() {
+  return [];
+}`},
+		{Code: `function foo(): any {
+  return {} as any;
+}`},
+		{Code: `declare function foo(arg: () => any): void;
+foo((): any => 'foo' as any);`},
+		{Code: `declare function foo(arg: null | (() => any)): void;
+foo((): any => 'foo' as any);`},
+		{Code: `function foo(): any[] {
+  return [] as any[];
+}`},
+		{Code: `function foo(): Set<any> {
+  return new Set<any>();
+}`},
+		{Code: `async function foo(): Promise<any> {
+  return Promise.resolve({} as any);
+}`},
+		{Code: `async function foo(): Promise<any> {
+  return {} as any;
+}`},
+		{Code: `function foo(): object {
+  return Promise.resolve({} as any);
+}`},
+		{Code: `function foo(): ReadonlySet<number> {
+  return new Set<any>();
+}`},
+		{Code: `function foo(): Set<number> {
+  return new Set([1]);
+}`},
+		{Code: `type Foo<T = number> = { prop: T };
+      function foo(): Foo {
+        return { prop: 1 } as Foo<number>;
+      }`},
+		{Code: `type Foo = { prop: any };
+      function foo(): Foo {
+        return { prop: '' } as Foo;
+      }`},
+		{Code: `function fn<T extends any>(x: T) {
+        return x;
+      }`},
+		{Code: `function fn<T extends any>(x: T): unknown {
+        return x as any;
+      }`},
+		{Code: `function fn<T extends any>(x: T): unknown[] {
+        return x as any[];
+      }`},
+		{Code: `function fn<T extends any>(x: T): Set<unknown> {
+        return x as Set<any>;
+      }`},
+		{Code: `async function fn<T extends any>(x: T): Promise<unknown> {
+        return x as any;
+      }`},
+		{Code: `function fn<T extends any>(x: T): Promise<unknown> {
+        return Promise.resolve(x as any);
+      }`},
+		{Code: `function test(): Map<string, string> {
+        return new Map();
+      }`},
+		{Code: `function foo(): any {
+        return [] as any[];
+      }`},
+		{Code: `function foo(): unknown {
+        return [] as any[];
+      }`},
+		{Code: `declare const value: Promise<any>;
+      function foo() {
+        return value;
+      }`},
+		{Code: `class Foo {
+        public foo(): this {
+          return this;
+        }
+
+        protected then(resolve: () => void): void {
+          resolve();
+        }
+      }`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
 function foo() {
@@ -602,5 +696,11 @@ async function foo() {
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `function foo() {
+  return 1 as any;
+}`, Errors: []rule_tester.InvalidTestCaseError{}},
+		{Code: `any`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }

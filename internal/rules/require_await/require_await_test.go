@@ -225,7 +225,155 @@ async function* foo(): Promise<string> {
         yield new Promise(() => {});
       }
     `},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `function numberOne(): number {
+  return 1;
+}`},
+		{Code: `const numberOne = function (): number {
+  return 1;
+};`},
+		{Code: `const numberOne = (): number => 1;`},
+		{Code: `const numberOne = (): number => {
+  return 1;
+};`},
+		{Code: `function delay() {
+  return Promise.resolve();
+}`},
+		{Code: `const delay = () => {
+  return Promise.resolve();
+};`},
+		{Code: `async function numberOne(): Promise<number> {
+  return await 1;
+}`},
+		{Code: `const numberOne = async function (): Promise<number> {
+  return await 1;
+};`},
+		{Code: `const numberOne = async (): Promise<number> => {
+  return await 1;
+};`},
+		{Code: `async function numberOne(): Promise<number> {
+  return Promise.resolve(1);
+}`},
+		{Code: `const numberOne = async function (): Promise<number> {
+  return Promise.resolve(1);
+};`},
+		{Code: `const numberOne = async (): Promise<number> => {
+  return Promise.resolve(1);
+};`},
+		{Code: `async function numberOne(): Promise<number> {
+  return getAsyncNumber(1);
+}
+async function getAsyncNumber(x: number): Promise<number> {
+  return Promise.resolve(x);
+}`},
+		{Code: `const numberOne = async function (): Promise<number> {
+  return getAsyncNumber(1);
+};
+const getAsyncNumber = async function (x: number): Promise<number> {
+  return Promise.resolve(x);
+};`},
+		{Code: `const numberOne = async (): Promise<number> => getAsyncNumber(1);
+const getAsyncNumber = async function (x: number): Promise<number> {
+  return Promise.resolve(x);
+};`},
+		{Code: `const numberOne = async (): Promise<number> => {
+  return getAsyncNumber(1);
+};
+const getAsyncNumber = async function (x: number): Promise<number> {
+  return Promise.resolve(x);
+};`},
+		{Code: `async function testFunction(): Promise<void> {
+  await Promise.all(
+    [1, 2, 3].map(
+      // this should not trigger an error on the parent function
+      async value => Promise.resolve(value),
+    ),
+  );
+}`},
+		{Code: `function* test6() {
+  yield* syncGenerator();
+}`},
+		{Code: `function* syncGenerator() {
+  yield 1;
+}`},
+		{Code: `async function* asyncGenerator() {
+  await Promise.resolve();
+  yield 1;
+}
+async function* test1() {
+  yield* asyncGenerator();
+}`},
+		{Code: `async function* asyncGenerator() {
+  await Promise.resolve();
+  yield 1;
+}
+async function* test1() {
+  yield* asyncGenerator();
+  yield* 2;
+}`},
+		{Code: `async function* test(source: AsyncIterable<any>) {
+  yield* source;
+}`},
+		{Code: `async function* test(source: Iterable<any> & AsyncIterable<any>) {
+  yield* source;
+}`},
+		{Code: `async function* test(source: Iterable<any> | AsyncIterable<any>) {
+  yield* source;
+}`},
+		{Code: `type MyType = {
+  [Symbol.iterator](): Iterator<any>;
+  [Symbol.asyncIterator](): AsyncIterator<any>;
+};
+async function* test(source: MyType) {
+  yield* source;
+}`},
+		{Code: `type MyType = {
+  [Symbol.asyncIterator]: () => AsyncIterator<any>;
+};
+async function* test(source: MyType) {
+  yield* source;
+}`},
+		{Code: `type MyFunctionType = () => AsyncIterator<any>;
+type MyType = {
+  [Symbol.asyncIterator]: MyFunctionType;
+};
+async function* test(source: MyType) {
+  yield* source;
+}`},
+		{Code: `async function* foo(): Promise<string> {
+  return new Promise(res => res(\`},
+		{Code: `));
+}`},
+		{Code: `async function* f() {
+        let x!: Omit<
+          {
+            [Symbol.asyncIterator](): AsyncIterator<any>;
+          },
+          'z'
+        >;
+        yield* x;
+      }`},
+		{Code: `const fn = async () => {
+        await using foo = new Bar();
+      };`},
+		{Code: `async function* test1() {
+        yield Promise.resolve(1);
+      }`},
+		{Code: `function asyncFunction() {
+        return Promise.resolve(1);
+      }
+      async function* test1() {
+        yield asyncFunction();
+      }`},
+		{Code: `declare const asyncFunction: () => Promise<void>;
+      async function* test1() {
+        yield asyncFunction();
+      }`},
+		{Code: `async function* test1() {
+        yield new Promise(() => {});
+      }`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
 async function numberOne(): Promise<number> {
@@ -614,7 +762,15 @@ async function* asyncGenerator() {
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `async function numberOne(): Promise<number> {
+  return 1;
+}`, Errors: []rule_tester.InvalidTestCaseError{}},
+		{Code: `function numberOne(): number {
+  return 1;
+}`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }
 
 func TestRequireAwaitRuleEslintBase(t *testing.T) {

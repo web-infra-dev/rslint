@@ -80,7 +80,54 @@ safe();
 		{Code: `
       Function('lol');
     `},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `function foo(x: () => void) {
+  x();
+}`},
+		{Code: `function foo(x?: { a: () => void }) {
+  x?.a();
+}`},
+		{Code: `function foo(x: { a?: () => void }) {
+  x.a?.();
+}`},
+		{Code: `foo`},
+		{Code: `let foo: any = 23;
+      String(foo); // ERROR: Unsafe call of an any typed value`},
+		{Code: `function foo<T extends any>(x: T) {
+        x();
+      }`},
+		{Code: `// create a scope since it's illegal to declare a duplicate identifier
+      // 'Function' in the global script scope.
+      {
+        type Function = () => void;
+        const notGlobalFunctionType: Function = (() => {}) as Function;
+        notGlobalFunctionType();
+      }`},
+		{Code: `interface SurprisinglySafe extends Function {
+  (): string;
+}
+declare const safe: SurprisinglySafe;
+safe();`},
+		{Code: `interface CallGoodConstructBad extends Function {
+  (): void;
+}
+declare const safe: CallGoodConstructBad;
+safe();`},
+		{Code: `interface ConstructSignatureMakesSafe extends Function {
+  new (): ConstructSignatureMakesSafe;
+}
+declare const safe: ConstructSignatureMakesSafe;
+new safe();`},
+		{Code: `interface SafeWithNonVoidCallSignature extends Function {
+  (): void;
+  (x: string): string;
+}
+declare const safe: SafeWithNonVoidCallSignature;
+safe();`},
+		{Code: `new Function('lol');`},
+		{Code: `Function('lol');`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
 function foo(x: any) {
@@ -384,5 +431,11 @@ unsafe();
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `function foo(x: any) {
+  x();
+}`, Errors: []rule_tester.InvalidTestCaseError{}},
+		{Code: `any`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }

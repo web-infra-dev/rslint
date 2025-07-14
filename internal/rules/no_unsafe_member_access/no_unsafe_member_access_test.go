@@ -61,7 +61,37 @@ class B implements F.S.T.A {}
 		{Code: `
 interface B extends F.S.T.A {}
     `},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `function foo(x: { a: number }, y: any) {
+  x[y++];
+}`},
+		{Code: `function foo(x: { a: number }) {
+  x.a;
+}`},
+		{Code: `function foo(x?: { a: number }) {
+  x?.a;
+}`},
+		{Code: `function foo(x: { a: number }) {
+  x['a'];
+}`},
+		{Code: `function foo(x?: { a: number }) {
+  x?.['a'];
+}`},
+		{Code: `function foo(x: { a: number }, y: string) {
+  x[y];
+}`},
+		{Code: `function foo(x?: { a: number }, y: string) {
+  x?.[y];
+}`},
+		{Code: `function foo(x: string[]) {
+  x[1];
+}`},
+		{Code: `class B implements FG.A {}`},
+		{Code: `interface B extends FG.A {}`},
+		{Code: `class B implements F.S.T.A {}`},
+		{Code: `interface B extends F.S.T.A {}`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
 function foo(x: any) {
@@ -323,5 +353,11 @@ function log(arg: unknown) {}
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `function foo(x: any) {
+  x.a;
+}`, Errors: []rule_tester.InvalidTestCaseError{}},
+		{Code: `any`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }

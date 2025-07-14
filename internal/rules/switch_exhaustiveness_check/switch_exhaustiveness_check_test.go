@@ -872,7 +872,142 @@ switch (value) {
 				DefaultCaseCommentPattern:          utils.Ref("^skip\\sdefault"),
 			},
 		},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `type Day =
+  | 'Monday'
+  | 'Tuesday'
+  | 'Wednesday'
+  | 'Thursday'
+  | 'Friday'
+  | 'Saturday'
+  | 'Sunday';
+
+const day = 'Monday' as Day;
+let result = 0;
+
+switch (day) {
+  case 'Monday': {
+    result = 1;
+    break;
+  }
+  case 'Tuesday': {
+    result = 2;
+    break;
+  }
+  case 'Wednesday': {
+    result = 3;
+    break;
+  }
+  case 'Thursday': {
+    result = 4;
+    break;
+  }
+  case 'Friday': {
+    result = 5;
+    break;
+  }
+  case 'Saturday': {
+    result = 6;
+    break;
+  }
+  case 'Sunday': {
+    result = 7;
+    break;
+  }
+}`},
+		{Code: `type Num = 0 | 1 | 2;
+
+function test(value: Num): number {
+  switch (value) {
+    case 0:
+      return 0;
+    case 1:
+      return 1;
+    case 2:
+      return 2;
+  }
+}`},
+		{Code: `type Bool = true | false;
+
+function test(value: Bool): number {
+  switch (value) {
+    case true:
+      return 1;
+    case false:
+      return 0;
+  }
+}`},
+		{Code: `type Mix = 0 | 1 | 'two' | 'three' | true;
+
+function test(value: Mix): number {
+  switch (value) {
+    case 0:
+      return 0;
+    case 1:
+      return 1;
+    case 'two':
+      return 2;
+    case 'three':
+      return 3;
+    case true:
+      return 4;
+  }
+}`},
+		{Code: `type A = 'a';
+type B = 'b';
+type C = 'c';
+type Union = A | B | C;
+
+function test(value: Union): number {
+  switch (value) {
+    case 'a':
+      return 1;
+    case 'b':
+      return 2;
+    case 'c':
+      return 3;
+  }
+}`},
+		{Code: `typeof`},
+		{Code: `const A = 'a';
+const B = 1;
+const C = true;
+
+type Union = typeof A | typeof B | typeof C;
+
+function test(value: Union): number {
+  switch (value) {
+    case 'a':
+      return 1;
+    case 1:
+      return 2;
+    case true:
+      return 3;
+  }
+}`},
+		{Code: `type Day =
+  | 'Monday'
+  | 'Tuesday'
+  | 'Wednesday'
+  | 'Thursday'
+  | 'Friday'
+  | 'Saturday'
+  | 'Sunday';
+
+const day = 'Monday' as Day;
+let result = 0;
+
+switch (day) {
+  case 'Monday': {
+    result = 1;
+    break;
+  }
+  default: {
+    result = 42;
+  }
+}`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
 declare const value: 'literal';
@@ -2793,5 +2928,14 @@ switch (literal) {
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `declare const value: 'literal';
+switch (value) {
+}`, Errors: []rule_tester.InvalidTestCaseError{}},
+		{Code: `declare const value: 'literal';
+switch (value) {
+case "literal": { throw new Error('Not implemented yet: "literal" case') }
+}`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }

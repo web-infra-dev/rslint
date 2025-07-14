@@ -253,7 +253,193 @@ function foo<T extends string>() {
 }
     `},
 		{Code: "type T<A extends string> = `${A}`;"},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `a`},
+		{Code: `NaN: ${/* comment */ NaN}`},
+		{Code: `undefined: ${/* comment */ undefined}`},
+		{Code: `Infinity: ${Infinity /* comment */}`},
+		{Code: `declare const string: 'a';
+      \`},
+		{Code: `;`},
+		{Code: `declare const number: 1;
+      \`},
+		{Code: `;`},
+		{Code: `declare const boolean: true;
+      \`},
+		{Code: `;`},
+		{Code: `declare const nullish: null;
+      \`},
+		{Code: `;`},
+		{Code: `declare const undefinedish: undefined;
+      \`},
+		{Code: `;`},
+		{Code: `declare const left: 'a';
+      declare const right: 'b';
+      \`},
+		{Code: `;`},
+		{Code: `declare const left: 'a';
+      declare const right: 'c';
+      \`},
+		{Code: `;`},
+		{Code: `declare const left: 'a';
+      declare const center: 'b';
+      declare const right: 'c';
+      \`},
+		{Code: `;`},
+		{Code: `1 + 1 = ${1 + 1}`},
+		{Code: `true && false = ${true && false}`},
+		{Code: `${'a'}${'b'}`},
+		{Code: `${function () {}}`},
+		{Code: `${() => {}}`},
+		{Code: `${(...args: any[]) => args}`},
+		{Code: `declare const number: 1;
+      \`},
+		{Code: `;`},
+		{Code: `declare const boolean: true;
+      \`},
+		{Code: `;`},
+		{Code: `declare const nullish: null;
+      \`},
+		{Code: `;`},
+		{Code: `declare const union: string | number;
+      \`},
+		{Code: `;`},
+		{Code: `declare const unknown: unknown;
+      \`},
+		{Code: `;`},
+		{Code: `declare const never: never;
+      \`},
+		{Code: `;`},
+		{Code: `declare const any: any;
+      \`},
+		{Code: `;`},
+		{Code: `function func<T extends number>(arg: T) {
+        \`},
+		{Code: `;
+      }`},
+		{Code: `\`},
+		{Code: `;`},
+		{Code: `declare const a: 'a';
+
+      \`},
+		{Code: `;`},
+		{Code: `\`},
+		{Code: `;`},
+		{Code: `\`},
+		{Code: `nested interpolation \${a}\`},
+		{Code: `;`},
+		{Code: `\`},
+		{Code: `;`},
+		{Code: `\`},
+		{Code: `\`},
+		{Code: `;`},
+		{Code: `\`},
+		{Code: `;`},
+		{Code: `\`},
+		{Code: `;`},
+		{Code: `\`},
+		{Code: `;`},
+		{Code: `\`},
+		{Code: `;`},
+		{Code: `\`},
+		{Code: `;`},
+		{Code: `\`},
+		{Code: `;`},
+		{Code: `\`},
+		{Code: `;`},
+		{Code: `\`},
+		{Code: `;`},
+		{Code: `\`},
+		{Code: `;`},
+		{Code: `\`},
+		{Code: `;`},
+		{Code: `function getTpl<T>(input: T) {
+        return \`},
+		{Code: `;
+      }`},
+		{Code: `type FooBarBaz = \`},
+		{Code: `;`},
+		{Code: `enum Foo {
+  A = 'A',
+  B = 'B',
+}
+type Foos = \`},
+		{Code: `;`},
+		{Code: `type Foo = 'A' | 'B';
+type Bar = \`},
+		{Code: `;`},
+		{Code: `type Foo =
+  \`},
+		{Code: `;`},
+		{Code: `type Foo = \`},
+		{Code: `\`},
+		{Code: `;`},
+		{Code: `${'foo' | 'bar' | null}`},
+		{Code: `type StringOrNumber = string | number;
+type Foo = \`},
+		{Code: `;`},
+		{Code: `enum Foo {
+  A = 1,
+  B = 2,
+}
+type Bar = \`},
+		{Code: `;`},
+		{Code: `enum Enum1 {
+  A = 'A1',
+  B = 'B1',
+}
+
+enum Enum2 {
+  A = 'A2',
+  B = 'B2',
+}
+
+type Union = \`},
+		{Code: `;`},
+		{Code: `enum Enum1 {
+  A = 'A1',
+  B = 'B1',
+}
+
+enum Enum2 {
+  A = 'A2',
+  B = 'B2',
+}
+
+type Union = \`},
+		{Code: `;`},
+		{Code: `enum Enum1 {
+  A = 'A1',
+  B = 'B1',
+}
+
+enum Enum2 {
+  A = 'A2',
+  B = 'B2',
+}
+type Enums = Enum1 | Enum2;
+type Union = \`},
+		{Code: `;`},
+		{Code: `enum Enum {
+  A = 'A',
+  B = 'A',
+}
+
+type Intersection = \`},
+		{Code: `;`},
+		{Code: `enum Foo {
+  A = 'A',
+  B = 'B',
+}
+type Bar = \`},
+		{Code: `;`},
+		{Code: `function foo<T extends string>() {
+  const a: \`},
+		{Code: `= 'a';
+}`},
+		{Code: `${A}`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: "`${1}`;",
 			//       Output: []string{"`1`;",
@@ -1749,5 +1935,11 @@ type Bar = ` + "`" + `${` + "`" + `${Foo}` + "`" + `}` + "`" + `;
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `function func<T extends string>(arg: T) {
+          \`, Errors: []rule_tester.InvalidTestCaseError{}},
+		{Code: `;
+        }`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }

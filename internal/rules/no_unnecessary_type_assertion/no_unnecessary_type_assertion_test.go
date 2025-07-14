@@ -402,7 +402,28 @@ foo(baz!);
 declare const foo: any;
 foo!;
 		`},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `import { TSESTree } from '@typescript-eslint/utils';
+declare const member: TSESTree.TSEnumMember;
+if (
+  member.id.type === AST_NODE_TYPES.Literal &&
+  typeof member.id.value === 'string'
+) {
+  const name = member.id as TSESTree.StringLiteral;
+}`},
+		{Code: `const c = 1;
+      let z = c as number;`},
+		{Code: `const c = 1;
+      let z = c as const;`},
+		{Code: `const c = 1;
+      let z = c as 1;`},
+		{Code: `type Bar = 'bar';
+      const data = {
+        x: 'foo' as 'foo',
+        y: 'bar' as Bar,
+      };`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code:   "const a = `a` as const;",
 			Output: []string{"const a = `a`  ;"},

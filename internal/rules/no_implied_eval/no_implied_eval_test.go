@@ -296,7 +296,59 @@ function setTimeout() {}
   setTimeout("alert('evil!')");
 }
     `},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `const foo = () => {};
+
+setTimeout(foo, 0);
+setInterval(foo, 0);
+setImmediate(foo);
+execScript(foo);`},
+		{Code: `const foo = function () {};
+
+setTimeout(foo, 0);
+setInterval(foo, 0);
+setImmediate(foo);
+execScript(foo);`},
+		{Code: `function foo() {}
+
+setTimeout(foo, 0);
+setInterval(foo, 0);
+setImmediate(foo);
+execScript(foo);`},
+		{Code: `const foo = {
+  fn: () => {},
+};
+
+setTimeout(foo.fn, 0);
+setInterval(foo.fn, 0);
+setImmediate(foo.fn);
+execScript(foo.fn);`},
+		{Code: `const foo = {
+  fn: function () {},
+};
+
+setTimeout(foo.fn, 0);
+setInterval(foo.fn, 0);
+setImmediate(foo.fn);
+execScript(foo.fn);`},
+		{Code: `const foo = {
+  fn: function foo() {},
+};
+
+setTimeout(foo.fn, 0);
+setInterval(foo.fn, 0);
+setImmediate(foo.fn);
+execScript(foo.fn);`},
+		{Code: `const foo = {
+  fn() {},
+};
+
+setTimeout(foo.fn, 0);
+setInterval(foo.fn, 0);
+setImmediate(foo.fn);
+execScript(foo.fn);`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
 setTimeout('x = 1', 0);
@@ -908,5 +960,11 @@ setTimeout(foo || bar, 500);
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `setTimeout('x = 1', 0);
+setInterval('x = 1', 0);
+setImmediate('x = 1');
+execScript('x = 1');`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }

@@ -148,7 +148,63 @@ type T = Record<string, A | B>;
 		{
 			Code: "(a: string | undefined) => {};",
 		},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `type A = 'A';
+type B = 'B';
+type T = A | B;`},
+		{Code: `type A = 'A';
+type B = 'B';
+const a: A | B = 'A';`},
+		{Code: `type A = 'A';
+type B = 'B';
+type T = A | /* comment */ B;`},
+		{Code: `type A = 'A';
+type B = 'B';
+type T = 'A' | 'B';`},
+		{Code: `type A = 'A';
+type B = 'B';
+type C = 'C';
+type T = A | B | C;`},
+		{Code: `type A = 'A';
+type B = 'B';
+type C = 'C';
+type D = 'D';
+type T = (A | B) | (C | D);`},
+		{Code: `type A = 'A';
+type B = 'B';
+type T = (A | B) | (A & B);`},
+		{Code: `type A = 'A';
+type B = 'B';
+type T = Record<string, A | B>;`},
+		{Code: `type A = 'A';
+type B = 'B';
+type T = A | B;`},
+		{Code: `type A = 'A';
+type B = 'B';
+const a: A | B = 'A';`},
+		{Code: `type A = 'A';
+type B = 'B';
+type T = A | /* comment */ B;`},
+		{Code: `type A = 'A';
+type B = 'B';
+type T = 'A' | 'B';`},
+		{Code: `type A = 'A';
+type B = 'B';
+type C = 'C';
+type T = A | B | C;`},
+		{Code: `type A = 'A';
+type B = 'B';
+type C = 'C';
+type D = 'D';
+type T = (A | B) | (C | D);`},
+		{Code: `type A = 'A';
+type B = 'B';
+type T = (A | B) | (A & B);`},
+		{Code: `type A = 'A';
+type B = 'B';
+type T = Record<string, A | B>;`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code:   "type T = 1 | 1;",
 			Output: []string{"type T = 1  ;"},

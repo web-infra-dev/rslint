@@ -335,7 +335,33 @@ func TestRestrictTemplateExpressionsRule(t *testing.T) {
 		{Code: "const msg = `arg = ${undefined}`;"},
 		{Code: "const msg = `arg = ${123}`;"},
 		{Code: "const msg = `arg = ${'abc'}`;"},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `const msg = \`},
+		{Code: `;`},
+		{Code: `const arg = 'foo';
+      const msg = \`},
+		{Code: `;`},
+		{Code: `const arg = 'foo';
+      const msg = \`},
+		{Code: `;`},
+		{Code: `function test<T extends string>(arg: T) {
+        return \`},
+		{Code: `;
+      }`},
+		{Code: `function test<T extends string & { _kind: 'MyBrandedString' }>(arg: T) {
+        return \`},
+		{Code: `;
+      }`},
+		{Code: `tag\`},
+		{Code: `;`},
+		{Code: `const arg = {};
+      tag\`},
+		{Code: `;`},
+		{Code: `const arg = 123;
+        const msg = \`},
+		{Code: `;`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
         const msg = ` + "`" + `arg = ${123}` + "`" + `;
@@ -599,5 +625,9 @@ func TestRestrictTemplateExpressionsRule(t *testing.T) {
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `const msg = \`, Errors: []rule_tester.InvalidTestCaseError{}},
+		{Code: `;`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }

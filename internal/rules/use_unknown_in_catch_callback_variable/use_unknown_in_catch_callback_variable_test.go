@@ -164,7 +164,105 @@ Promise.resolve().catch(<InvalidHandler>(
   }
 ));
     `},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `Promise.resolve().catch((err: unknown) => {
+        throw err;
+      });`},
+		{Code: `let x = Math.random() ? 'ca' + 'tch' : 'catch';
+      Promise.resolve()[x]((err: Error) => {});`},
+		{Code: `Promise.resolve().then(
+        () => {},
+        (err: unknown) => {
+          throw err;
+        },
+      );`},
+		{Code: `Promise.resolve().catch(() => {
+        throw new Error();
+      });`},
+		{Code: `Promise.reject(new Error()).catch("not this rule's problem");`},
+		{Code: `declare const crappyHandler: (() => void) | 2;
+      Promise.reject(new Error()).catch(crappyHandler);`},
+		{Code: `Promise.resolve().catch((...args: [unknown]) => {
+        throw args[0];
+      });`},
+		{Code: `Promise.resolve().catch((...args: [a: unknown]) => {
+        const err = args[0];
+      });`},
+		{Code: `Promise.resolve().catch((...args: readonly unknown[]) => {
+        throw args[0];
+      });`},
+		{Code: `declare const notAPromise: { catch: (f: Function) => void };
+      notAPromise.catch((...args: [a: string, string]) => {
+        throw args[0];
+      });`},
+		{Code: `declare const catchArgs: [(x: unknown) => void];
+      Promise.reject(new Error()).catch(...catchArgs);`},
+		{Code: `declare const catchArgs: [
+        string | (() => never),
+        (shouldntFlag: string) => void,
+        number,
+      ];
+      Promise.reject(new Error()).catch(...catchArgs);`},
+		{Code: `declare const catchArgs: ['not callable'];
+      Promise.reject(new Error()).catch(...catchArgs);`},
+		{Code: `declare const emptySpread: [];
+      Promise.reject(new Error()).catch(...emptySpread);`},
+		{Code: `Promise.resolve().catch(
+        (
+          ...err: [unknown, string | ((number | unknown) & { b: () => void }), string]
+        ) => {
+          throw err;
+        },
+      );`},
+		{Code: `declare const notAMemberExpression: (...args: any[]) => {};
+      notAMemberExpression(
+        'This helps get 100% code cov',
+        "but doesn't test anything useful related to the rule.",
+      );`},
+		{Code: `Promise.resolve().catch((...[args]: [unknown]) => {
+        console.log(args);
+      });`},
+		{Code: `Promise.resolve().catch((...{ find }: [unknown]) => {
+        console.log(find);
+      });`},
+		{Code: `declare const singleTupleArg: [() => void];
+      Promise.resolve().then(...singleTupleArg, (error: unknown) => {});`},
+		{Code: `declare const arrayArg: (() => void)[];
+      Promise.resolve().then(...arrayArg, error => {});`},
+		{Code: `declare let iPromiseImAPromise: Promise<any>;
+declare const catchArgs: [(x: any) => void];
+iPromiseImAPromise.catch(...catchArgs);`},
+		{Code: `declare const catchArgs: [
+  string | (() => never) | ((x: string) => void),
+  number,
+];
+Promise.reject(new Error()).catch(...catchArgs);`},
+		{Code: `declare const you: [];
+declare const cannot: [];
+declare const fool: [];
+declare const me: [(x: Error) => void] | undefined;
+Promise.resolve(undefined).catch(...you, ...cannot, ...fool, ...me!);`},
+		{Code: `declare const really: undefined[];
+declare const dumb: [];
+declare const code: (x: Error) => void;
+Promise.resolve(undefined).catch(...really, ...dumb, code);`},
+		{Code: `declare const x: ((x: any) => string)[];
+Promise.resolve('string promise').catch(...x);`},
+		{Code: `declare const x: any;
+Promise.resolve().catch(...x);`},
+		{Code: `declare const thenArgs: [() => {}, (err: any) => {}];
+Promise.resolve().then(...thenArgs);`},
+		{Code: `any`},
+		{Code: `declare const yoloHandler: (x: any) => void;
+Promise.reject(new Error('I will reject!')).catch(yoloHandler);`},
+		{Code: `type InvalidHandler = (arg: any) => void;
+Promise.resolve().catch(<InvalidHandler>(
+  function (err /* awkward spot for comment */) {
+    throw err;
+  }
+));`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
 Promise.resolve().catch((err: Error) => {
@@ -809,5 +907,13 @@ Promise.resolve('foo').catch(
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `Promise.resolve().catch((err: Error) => {
+  throw err;
+});`, Errors: []rule_tester.InvalidTestCaseError{}},
+		{Code: `Promise.resolve().catch((err: unknown) => {
+  throw err;
+});`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }

@@ -93,7 +93,79 @@ class Foo {
   f?: string;
 }
     `},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `class Foo {
+  f1() {}
+  f2(): Foo {
+    return new Foo();
+  }
+  f3() {
+    return this;
+  }
+  f4(): this {
+    return this;
+  }
+  f5(): any {
+    return this;
+  }
+  f6(): unknown {
+    return this;
+  }
+  f7(foo: Foo): Foo {
+    return Math.random() > 0.5 ? foo : this;
+  }
+  f10(this: Foo, that: Foo): Foo;
+  f11(): Foo {
+    return;
+  }
+  f13(this: Foo): Foo {
+    return this;
+  }
+  f14(): { f14: Function } {
+    return this;
+  }
+  f15(): Foo | this {
+    return Math.random() > 0.5 ? new Foo() : this;
+  }
+}`},
+		{Code: `class Foo {
+  f1 = () => {};
+  f2 = (): Foo => {
+    return new Foo();
+  };
+  f3 = () => this;
+  f4 = (): this => {
+    return this;
+  };
+  f5 = (): Foo => new Foo();
+  f6 = '';
+}`},
+		{Code: `const Foo = class {
+  bar() {
+    return this;
+  }
+};`},
+		{Code: `class Base {}
+class Derived extends Base {
+  f(): Base {
+    return this;
+  }
+}`},
+		{Code: `class Foo {
+  accessor f = () => {
+    return this;
+  };
+}`},
+		{Code: `class Foo {
+  accessor f = (): this => {
+    return this;
+  };
+}`},
+		{Code: `class Foo {
+  f?: string;
+}`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
 class Foo {
@@ -401,5 +473,12 @@ class Animal<T> {
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `class Foo {
+  f(): Foo {
+    return this;
+  }
+}`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }

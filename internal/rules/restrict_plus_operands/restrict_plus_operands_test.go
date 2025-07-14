@@ -316,7 +316,98 @@ const f = (a: string | number, b: string | number) => a + b;
 			Code:    "let foo = '1' + 1n;",
 			Options: RestrictPlusOperandsOptions{AllowNumberAndString: utils.Ref(true)},
 		},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `let foo = 1n;
+      foo + 2n;`},
+		{Code: `function test(s: string, n: number): number {
+  return 2;
+}
+let foo = test('5.5', 10) + 10;`},
+		{Code: `let x = 5;
+let z = 8.2;
+let foo = x + z;`},
+		{Code: `let w = '6.5';
+let y = '10';
+let foo = y + w;`},
+		{Code: `let pair: { first: number; second: string } = { first: 5, second: '10' };
+let foo = pair.first + 10;`},
+		{Code: `let pair: { first: number; second: string } = { first: 5, second: '10' };
+let foo = pair.first + (10 as number);`},
+		{Code: `let pair: { first: number; second: string } = { first: 5, second: '10' };
+let foo = '5.5' + pair.second;`},
+		{Code: `let pair: { first: number; second: string } = { first: 5, second: '10' };
+let foo = ('5.5' as string) + pair.second;`},
+		{Code: `const foo =
+        'hello' +
+        (someBoolean ? 'a' : 'b') +
+        (() => (someBoolean ? 'c' : 'd'))() +
+        'e';`},
+		{Code: `function foo<T extends string>(a: T) {
+  return a + '';
+}`},
+		{Code: `function foo<T extends 'a' | 'b'>(a: T) {
+  return a + '';
+}`},
+		{Code: `function foo<T extends number>(a: T) {
+  return a + 1;
+}`},
+		{Code: `function foo<T extends 1>(a: T) {
+  return a + 1;
+}`},
+		{Code: `declare const a: {} & string;
+declare const b: string;
+const x = a + b;`},
+		{Code: `declare const a: unknown & string;
+declare const b: string;
+const x = a + b;`},
+		{Code: `declare const a: string & string;
+declare const b: string;
+const x = a + b;`},
+		{Code: `declare const a: 'string literal' & string;
+declare const b: string;
+const x = a + b;`},
+		{Code: `declare const a: {} & number;
+declare const b: number;
+const x = a + b;`},
+		{Code: `declare const a: unknown & number;
+declare const b: number;
+const x = a + b;`},
+		{Code: `declare const a: number & number;
+declare const b: number;
+const x = a + b;`},
+		{Code: `declare const a: 42 & number;
+declare const b: number;
+const x = a + b;`},
+		{Code: `declare const a: {} & bigint;
+declare const b: bigint;
+const x = a + b;`},
+		{Code: `declare const a: unknown & bigint;
+declare const b: bigint;
+const x = a + b;`},
+		{Code: `declare const a: bigint & bigint;
+declare const b: bigint;
+const x = a + b;`},
+		{Code: `declare const a: 42n & bigint;
+declare const b: bigint;
+const x = a + b;`},
+		{Code: `function A(s: string) {
+  return \`},
+		{Code: `as const;
+}
+const b = A('') + '!';`},
+		{Code: `declare const a: \`},
+		{Code: `;
+declare const b: '';
+const x = a + b;`},
+		{Code: `const a: \`},
+		{Code: `;
+declare const b: '';
+const x = a + b;`},
+		{Code: `declare const a: RegExp;
+        declare const b: string;
+        const x = a + b;`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code:    "let foo = '1' + 1;",
 			Options: RestrictPlusOperandsOptions{AllowNumberAndString: utils.Ref(false)},
@@ -1360,5 +1451,12 @@ const f = (a: any, b: unknown) => a + b;
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `any`, Errors: []rule_tester.InvalidTestCaseError{}},
+		{Code: `boolean`, Errors: []rule_tester.InvalidTestCaseError{}},
+		{Code: `null`, Errors: []rule_tester.InvalidTestCaseError{}},
+		{Code: `RegExp`, Errors: []rule_tester.InvalidTestCaseError{}},
+		{Code: `undefined`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }

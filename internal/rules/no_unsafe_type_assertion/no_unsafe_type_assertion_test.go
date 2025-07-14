@@ -37,7 +37,23 @@ function foo<T extends boolean>(a: T) {
   return a as T | number;
 }
       `},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `declare const a: string;
+a as string | number;`},
+		{Code: `declare const a: string;
+<string | number>a;`},
+		{Code: `declare const a: string;
+a as string | number as string | number | boolean;`},
+		{Code: `declare const a: string;
+a as string;`},
+		{Code: `declare const a: { hello: 'world' };
+a as { hello: string };`},
+		{Code: `'hello' as const;`},
+		{Code: `function foo<T extends boolean>(a: T) {
+  return a as T | number;
+}`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
 declare const a: string | number;
@@ -166,7 +182,11 @@ const bar = foo as number[];
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `declare const a: string | number;
+a as string;`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }
 
 func TestNoUnsafeTypeAssertionRule_AnyAssertions(t *testing.T) {

@@ -93,7 +93,66 @@ func TestPreferReduceTypeParameterRule(t *testing.T) {
 		{Code: `
       ['a', 'b'].reduce((accum, name) => ` + "`" + `${accum} | hello ${name}!` + "`" + `);
     `},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `new (class Mine {
+        reduce() {}
+      })().reduce(() => {}, 1 as any);`},
+		{Code: `class Mine {
+        reduce() {}
+      }
+
+      new Mine().reduce(() => {}, 1 as any);`},
+		{Code: `import { Reducable } from './class';
+
+      new Reducable().reduce(() => {}, 1 as any);`},
+		{Code: `declare const tuple: [number, number, number];
+      tuple.reduce<number[]>((a, s) => a.concat(s * 2), []);`},
+		{Code: `type Reducer = { reduce: (callback: (arg: any) => any, arg: any) => any };
+      declare const tuple: [number, number, number] | Reducer;
+      tuple.reduce(a => {
+        return a.concat(1);
+      }, [] as number[]);`},
+		{Code: `type Reducer = { reduce: (callback: (arg: any) => any, arg: any) => any };
+      declare const arrayOrReducer: number[] & Reducer;
+      arrayOrReducer.reduce(a => {
+        return a.concat(1);
+      }, [] as number[]);`},
+		{Code: `['a', 'b'].reduce(
+        (accum, name) => ({
+          ...accum,
+          [name]: true,
+        }),
+        {} as Record<'a' | 'b', boolean>,
+      );`},
+		{Code: `['a', 'b'].reduce(
+        (accum, name) => ({
+          ...accum,
+          [name]: true,
+        }),
+        { a: true, b: false, c: true } as Record<'a' | 'b', boolean>,
+      );`},
+		{Code: `function f<T extends Record<string, boolean>>() {
+        ['a', 'b'].reduce(
+          (accum, name) => ({
+            ...accum,
+            [name]: true,
+          }),
+          {} as T,
+        );
+      }`},
+		{Code: `function f<T>() {
+        ['a', 'b'].reduce(
+          (accum, name) => ({
+            ...accum,
+            [name]: true,
+          }),
+          {} as T,
+        );
+      }`},
+		{Code: `['a', 'b'].reduce((accum, name) => \`},
+		{Code: `);`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
 declare const arr: string[];

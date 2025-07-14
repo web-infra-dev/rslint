@@ -209,7 +209,101 @@ interface Bar extends Foo {
 function f<T = Foo>() {}
 f<Bar>();
 		`},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `function f<T = number>() {}
+f();`},
+		{Code: `function f<T = number>() {}
+f<string>();`},
+		{Code: `declare const f: (<T = number>() => void) | null;
+f?.();`},
+		{Code: `declare const f: (<T = number>() => void) | null;
+f?.<string>();`},
+		{Code: `declare const f: any;
+f();`},
+		{Code: `declare const f: any;
+f<string>();`},
+		{Code: `declare const f: unknown;
+f();`},
+		{Code: `declare const f: unknown;
+f<string>();`},
+		{Code: `function g<T = number, U = string>() {}
+g<number, number>();`},
+		{Code: `declare const g: any;
+g<string, string>();`},
+		{Code: `declare const g: unknown;
+g<string, string>();`},
+		{Code: `declare const f: unknown;
+f<string>\`},
+		{Code: `;`},
+		{Code: `function f<T = number>(template: TemplateStringsArray) {}
+f<string>\`},
+		{Code: `;`},
+		{Code: `class C<T = number> {}
+new C<string>();`},
+		{Code: `declare const C: any;
+new C<string>();`},
+		{Code: `declare const C: unknown;
+new C<string>();`},
+		{Code: `class C<T = number> {}
+class D extends C<string> {}`},
+		{Code: `declare const C: any;
+class D extends C<string> {}`},
+		{Code: `declare const C: unknown;
+class D extends C<string> {}`},
+		{Code: `interface I<T = number> {}
+class Impl implements I<string> {}`},
+		{Code: `class C<TC = number> {}
+class D<TD = number> extends C {}`},
+		{Code: `declare const C: any;
+class D<TD = number> extends C {}`},
+		{Code: `declare const C: unknown;
+class D<TD = number> extends C {}`},
+		{Code: `class Foo<T> {}
+const foo = new Foo<number>();`},
+		{Code: `class Bar<T = number> {}
+class Foo<T = number> extends Bar<T> {}`},
+		{Code: `interface Bar<T = number> {}
+class Foo<T = number> implements Bar<T> {}`},
+		{Code: `class Bar<T = number> {}
+class Foo<T = number> extends Bar<string> {}`},
+		{Code: `interface Bar<T = number> {}
+class Foo<T = number> implements Bar<string> {}`},
+		{Code: `import { F } from './missing';
+function bar<T = F>() {}
+bar<F<number>>();`},
+		{Code: `type A<T = Element> = T;
+type B = A<HTMLInputElement>;`},
+		{Code: `type A<T = Map<string, string>> = T;
+type B = A<Map<string, number>>;`},
+		{Code: `type A = Map<string, string>;
+type B<T = A> = T;
+type C2 = B<Map<string, number>>;`},
+		{Code: `interface Foo<T = string> {}
+declare var Foo: {
+  new <T>(type: T): any;
+};
+class Bar extends Foo<string> {}`},
+		{Code: `interface Foo<T = string> {}
+class Foo<T> {}
+class Bar extends Foo<string> {}`},
+		{Code: `class Foo<T = string> {}
+interface Foo<T> {}
+class Bar implements Foo<string> {}`},
+		{Code: `class Foo<T> {}
+namespace Foo {
+  export class Bar {}
+}
+class Bar extends Foo<string> {}`},
+		{Code: `function Button<T>() {
+  return <div></div>;
+}
+const button = <Button<string>></Button>;`},
+		{Code: `function Button<T>() {
+  return <div></div>;
+}
+const button = <Button<string> />;`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
 function f<T = number>() {}
@@ -707,5 +801,9 @@ declare type MessageEventHandler = ((ev: MessageEvent) => any) | null;
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `function f<T = number>() {}
+f<number>();`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }

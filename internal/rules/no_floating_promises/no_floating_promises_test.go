@@ -813,7 +813,28 @@ declare function createMyThenable(): MyThenable;
 
 createMyThenable();
     `},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `async function test() {
+  await Promise.resolve('value');
+  Promise.resolve('value').then(
+    () => {},
+    () => {},
+  );
+  Promise.resolve('value')
+    .then(() => {})
+    .catch(() => {});
+  Promise.resolve('value')
+    .then(() => {})
+    .catch(() => {})
+    .finally(() => {});
+  Promise.resolve('value').catch(() => {});
+  return Promise.resolve('value');
+}`},
+		{Code: `async function test() {
+  void Promise.resolve('value');
+}`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
 async function test() {
@@ -5497,5 +5518,25 @@ await (<Promise<number>>{});
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `async function test() {
+  Promise.resolve('value');
+  Promise.resolve('value').then(() => {});
+  Promise.resolve('value').catch();
+  Promise.resolve('value').finally();
+}`, Errors: []rule_tester.InvalidTestCaseError{}},
+		{Code: `async function test() {
+  void Promise.resolve('value');
+  Promise.resolve('value').then(() => {});
+  Promise.resolve('value').catch();
+  Promise.resolve('value').finally();
+}`, Errors: []rule_tester.InvalidTestCaseError{}},
+		{Code: `async function test() {
+  await Promise.resolve('value');
+  Promise.resolve('value').then(() => {});
+  Promise.resolve('value').catch();
+  Promise.resolve('value').finally();
+}`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }

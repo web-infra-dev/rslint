@@ -1071,7 +1071,13 @@ declare const useCallback: <T extends (...args: unknown[]) => unknown>(
 ) => T;
 useCallback<ReturnsVoid | ReturnsPromiseVoid>(async () => {});
     `},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `if (true) {
+}`},
+		{Code: `if (Promise.resolve()) {
+}`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
 if (Promise.resolve()) {
@@ -1356,7 +1362,11 @@ f = async () => {
   return 3;
 };
       `,
-			Options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: utils.Ref(NoMisusedPromisesChecksVoidReturnOptions{Variables: utils.Ref(true)})},
+			Options: NoMisusedPromisesOptions{ChecksVoidReturnOpts: utils.Ref(NoMisusedPromisesChecksVoidReturnOptions{Variables: utils.Ref(true)
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `if (Promise.resolve()) {
+}`, Errors: []rule_tester.InvalidTestCaseError{}},
+})},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "voidReturnVariable",

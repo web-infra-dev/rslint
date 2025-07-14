@@ -212,7 +212,81 @@ function overloadingThatIncludeAny(a?: boolean): any | number {
       `,
 			Options: PromiseFunctionAsyncOptions{AllowAny: utils.Ref(true)},
 		},
-	}, []rule_tester.InvalidTestCase{
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `const nonAsyncNonPromiseArrowFunction = (n: number) => n;`},
+		{Code: `function nonAsyncNonPromiseFunctionDeclaration(n: number) {
+  return n;
+}`},
+		{Code: `const asyncPromiseFunctionExpressionA = async function (p: Promise<void>) {
+  return p;
+};`},
+		{Code: `const asyncPromiseFunctionExpressionB = async function () {
+  return new Promise<void>();
+};`},
+		{Code: `class Test {
+  public nonAsyncNonPromiseArrowFunction = (n: number) => n;
+  public nonAsyncNonPromiseMethod() {
+    return 0;
+  }
+
+  public async asyncPromiseMethodA(p: Promise<void>) {
+    return p;
+  }
+
+  public async asyncPromiseMethodB() {
+    return new Promise<void>();
+  }
+}`},
+		{Code: `class InvalidAsyncModifiers {
+  public constructor() {
+    return new Promise<void>();
+  }
+  public get asyncGetter() {
+    return new Promise<void>();
+  }
+  public set asyncGetter(p: Promise<void>) {
+    return p;
+  }
+  public get asyncGetterFunc() {
+    return async () => new Promise<void>();
+  }
+  public set asyncGetterFunc(p: () => Promise<void>) {
+    return p;
+  }
+}`},
+		{Code: `const invalidAsyncModifiers = {
+  get asyncGetter() {
+    return new Promise<void>();
+  },
+  set asyncGetter(p: Promise<void>) {
+    return p;
+  },
+  get asyncGetterFunc() {
+    return async () => new Promise<void>();
+  },
+  set asyncGetterFunc(p: () => Promise<void>) {
+    return p;
+  },
+};`},
+		{Code: `export function valid(n: number) {
+        return n;
+      }`},
+		{Code: `export default function invalid(n: number) {
+        return n;
+      }`},
+		{Code: `class Foo {
+        constructor() {}
+      }`},
+		{Code: `class Foo {
+  async catch<T>(arg: Promise<T>) {
+    return arg;
+  }
+}`},
+		{Code: `function returnsAny(): any {
+  return 0;
+}`},
+}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
 function returnsAny(): any {
@@ -875,5 +949,10 @@ function overloadingThatIncludeUnknown(a?: boolean): unknown | number {
 				},
 			},
 		},
-	})
+	
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `function returnsAny(): any {
+  return 0;
+}`, Errors: []rule_tester.InvalidTestCaseError{}},
+})
 }
