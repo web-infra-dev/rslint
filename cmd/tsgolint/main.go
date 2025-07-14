@@ -23,6 +23,7 @@ import (
 	"github.com/typescript-eslint/tsgolint/internal/rules/await_thenable"
 	"github.com/typescript-eslint/tsgolint/internal/rules/no_array_delete"
 	"github.com/typescript-eslint/tsgolint/internal/rules/no_base_to_string"
+	"github.com/typescript-eslint/tsgolint/internal/rules/no_explicit_any"
 	"github.com/typescript-eslint/tsgolint/internal/rules/no_confusing_void_expression"
 	"github.com/typescript-eslint/tsgolint/internal/rules/no_duplicate_type_constituents"
 	"github.com/typescript-eslint/tsgolint/internal/rules/no_floating_promises"
@@ -305,6 +306,7 @@ func runMain() int {
 		await_thenable.AwaitThenableRule,
 		no_array_delete.NoArrayDeleteRule,
 		no_base_to_string.NoBaseToStringRule,
+		no_explicit_any.NoExplicitAnyRule,
 		no_confusing_void_expression.NoConfusingVoidExpressionRule,
 		no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule,
 		no_floating_promises.NoFloatingPromisesRule,

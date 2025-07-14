@@ -18,7 +18,7 @@ Based on [typescript-go](https://github.com/microsoft/typescript-go) early explo
 - Primitive linter engine
 - Lint rules tester
 - Source code fixer
-- 40 [type-aware](https://typescript-eslint.io/blog/typed-linting) typescript-eslint's rules
+- 41 [type-aware](https://typescript-eslint.io/blog/typed-linting) typescript-eslint's rules
 - Basic `tsgolint` CLI
 
 ### Speedup over ESLint
@@ -40,6 +40,7 @@ See [benchmarks](./benchmarks/README.md) for more info.
 | [await-thenable](https://typescript-eslint.io/rules/await-thenable)                                                 | ✅     |
 | [no-array-delete](https://typescript-eslint.io/rules/no-array-delete)                                               | ✅     |
 | [no-base-to-string](https://typescript-eslint.io/rules/no-base-to-string)                                           | ✅     |
+| [no-explicit-any](https://typescript-eslint.io/rules/no-explicit-any)                                               | ✅     |
 | [no-confusing-void-expression](https://typescript-eslint.io/rules/no-confusing-void-expression)                     | ✅     |
 | [no-duplicate-type-constituents](https://typescript-eslint.io/rules/no-duplicate-type-constituents)                 | ✅     |
 | [no-floating-promises](https://typescript-eslint.io/rules/no-floating-promises)                                     | ✅     |
