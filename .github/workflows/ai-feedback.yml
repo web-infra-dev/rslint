@@ -1,0 +1,407 @@
+name: AI Feedback
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+
+jobs:
+  ai-feedback:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+    
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24.1'
+    
+    - name: Configure Git
+      run: |
+        git config --global user.email "action@github.com"
+        git config --global user.name "GitHub Action"
+    
+    - name: Apply TypeScript-Go patches
+      run: |
+        cd typescript-go
+        git am --3way --no-gpg-sign ../patches/*.patch
+    
+    - name: Build project
+      run: |
+        go build -o tsgolint ./cmd/tsgolint
+    
+    - name: Generate comprehensive AI feedback
+      run: |
+        # Create structured JSON output for AI consumption
+        cat > ai-feedback.json << 'EOF'
+        {
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "event": "${{ github.event_name }}",
+          "repository": "${{ github.repository }}",
+          "commit": "${{ github.sha }}",
+          "branch": "${{ github.ref_name }}",
+          "pull_request": "${{ github.event.pull_request.number }}",
+          "build_status": "success",
+          "tests": {
+            "total": 0,
+            "passed": 0,
+            "failed": 0,
+            "status": "unknown"
+          },
+          "code_quality": {
+            "formatting": "unknown",
+            "vet": "unknown",
+            "dependencies": "unknown"
+          },
+          "performance": {
+            "binary_size": "unknown",
+            "rules_count": 0
+          },
+          "linter_results": {
+            "files_processed": 0,
+            "issues_found": 0,
+            "rules_triggered": []
+          },
+          "metadata": {
+            "go_version": "$(go version)",
+            "os": "$(uname -s)",
+            "arch": "$(uname -m)"
+          }
+        }
+        EOF
+        
+        # Update timestamp
+        TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        sed -i "s/\$(date -u +%Y-%m-%dT%H:%M:%SZ)/$TIMESTAMP/g" ai-feedback.json
+        
+        # Update other placeholders
+        sed -i "s/\$(go version)/$(go version | sed 's/"/\\"/g')/g" ai-feedback.json
+        sed -i "s/\$(uname -s)/$(uname -s)/g" ai-feedback.json
+        sed -i "s/\$(uname -m)/$(uname -m)/g" ai-feedback.json
+        
+        echo "Initial AI feedback structure created"
+    
+    - name: Run tests and update feedback
+      run: |
+        # Run tests and capture results
+        if go test -timeout 60s ./... -v > test-results.txt 2>&1; then
+          TEST_STATUS="passed"
+          TOTAL_TESTS=$(grep -c "=== RUN" test-results.txt || echo 0)
+          PASSED_TESTS=$(grep -c "--- PASS:" test-results.txt || echo 0)
+          FAILED_TESTS=$(grep -c "--- FAIL:" test-results.txt || echo 0)
+        else
+          TEST_STATUS="failed"
+          TOTAL_TESTS=$(grep -c "=== RUN" test-results.txt || echo 0)
+          PASSED_TESTS=$(grep -c "--- PASS:" test-results.txt || echo 0)
+          FAILED_TESTS=$(grep -c "--- FAIL:" test-results.txt || echo 0)
+        fi
+        
+        # Update JSON with test results
+        cat ai-feedback.json | jq --arg status "$TEST_STATUS" --arg total "$TOTAL_TESTS" --arg passed "$PASSED_TESTS" --arg failed "$FAILED_TESTS" '.tests.status = $status | .tests.total = ($total | tonumber) | .tests.passed = ($passed | tonumber) | .tests.failed = ($failed | tonumber)' > ai-feedback-updated.json
+        mv ai-feedback-updated.json ai-feedback.json
+        
+        echo "Test results updated in AI feedback"
+    
+    - name: Check code quality and update feedback
+      run: |
+        # Check formatting (excluding generated shim files)
+        UNFORMATTED=$(find . -name "*.go" -not -path "./shim/*" -not -path "./typescript-go/*" | xargs gofmt -l)
+        if [ -n "$UNFORMATTED" ]; then
+          FORMATTING_STATUS="issues_found"
+        else
+          FORMATTING_STATUS="passed"
+        fi
+        
+        # Check go vet (allow it to fail gracefully)
+        if go vet ./... 2>/dev/null; then
+          VET_STATUS="passed"
+        else
+          VET_STATUS="issues_found"
+        fi
+        
+        # Check dependencies
+        go mod tidy
+        if [ -n "$(git status --porcelain go.mod go.sum)" ]; then
+          DEPS_STATUS="needs_update"
+        else
+          DEPS_STATUS="up_to_date"
+        fi
+        
+        # Update JSON with code quality results
+        cat ai-feedback.json | jq --arg fmt "$FORMATTING_STATUS" --arg vet "$VET_STATUS" --arg deps "$DEPS_STATUS" '.code_quality.formatting = $fmt | .code_quality.vet = $vet | .code_quality.dependencies = $deps' > ai-feedback-updated.json
+        mv ai-feedback-updated.json ai-feedback.json
+        
+        echo "Code quality results updated in AI feedback"
+    
+    - name: Analyze performance and update feedback
+      run: |
+        # Get binary size
+        BINARY_SIZE=$(du -h tsgolint | cut -f1)
+        
+        # Count rules
+        RULES_COUNT=$(grep -c 'Rule$' cmd/tsgolint/main.go)
+        
+        # Update JSON with performance metrics
+        cat ai-feedback.json | jq --arg size "$BINARY_SIZE" --arg rules "$RULES_COUNT" '.performance.binary_size = $size | .performance.rules_count = ($rules | tonumber)' > ai-feedback-updated.json
+        mv ai-feedback-updated.json ai-feedback.json
+        
+        echo "Performance metrics updated in AI feedback"
+    
+    - name: Run linter analysis and update feedback
+      run: |
+        # Create test files for linter analysis
+        mkdir -p linter-test
+        cat > linter-test/analysis.ts << 'EOF'
+        // Test file for linter analysis
+        
+        // Should trigger no-floating-promises
+        const promise = Promise.resolve(42);
+        promise;
+        
+        // Should trigger no-array-delete
+        const arr = [1, 2, 3];
+        delete arr[0];
+        
+        // Should trigger no-unsafe-* rules
+        function unsafeFunction(): any {
+          return "unsafe";
+        }
+        
+        const result = unsafeFunction();
+        const prop = result.someProperty;
+        
+        // Should trigger no-unnecessary-type-assertion
+        const str = "hello" as string;
+        
+        // Should trigger await-thenable
+        await 42;
+        
+        // Should trigger no-misused-promises
+        if (Promise.resolve(true)) {
+          console.log("This is wrong");
+        }
+        
+        // Should trigger require-await
+        async function noAwait() {
+          return 42;
+        }
+        
+        // Should trigger no-unnecessary-boolean-literal-compare
+        const bool = true;
+        if (bool === true) {
+          console.log("unnecessary comparison");
+        }
+        EOF
+        
+        cat > linter-test/tsconfig.json << 'EOF'
+        {
+          "compilerOptions": {
+            "target": "ES2020",
+            "module": "commonjs",
+            "strict": true,
+            "esModuleInterop": true,
+            "skipLibCheck": true,
+            "forceConsistentCasingInFileNames": true
+          },
+          "include": ["*.ts"]
+        }
+        EOF
+        
+        # Run linter and capture results
+        cd linter-test
+        ../tsgolint --tsconfig tsconfig.json > ../linter-output.txt 2>&1 || true
+        cd ..
+        
+        # Analyze linter output
+        FILES_PROCESSED=$(echo "1") # We know we processed 1 file
+        ISSUES_FOUND=$(grep -c "Found.*error" linter-output.txt || echo 0)
+        
+        # Extract triggered rules
+        RULES_TRIGGERED=$(grep -o '[a-z-]*' linter-output.txt | grep -E '^[a-z-]+$' | sort | uniq | jq -R -s -c 'split("\n")[:-1]' || echo '[]')
+        
+        # Update JSON with linter results
+        cat ai-feedback.json | jq --arg files "$FILES_PROCESSED" --arg issues "$ISSUES_FOUND" --argjson rules "$RULES_TRIGGERED" '.linter_results.files_processed = ($files | tonumber) | .linter_results.issues_found = ($issues | tonumber) | .linter_results.rules_triggered = $rules' > ai-feedback-updated.json
+        mv ai-feedback-updated.json ai-feedback.json
+        
+        echo "Linter analysis updated in AI feedback"
+    
+    - name: Generate human-readable report
+      run: |
+        # Create a human-readable markdown report
+        cat > ai-feedback-report.md << 'EOF'
+        # AI Feedback Report
+        
+        ## Summary
+        
+        - **Event**: ${{ github.event_name }}
+        - **Repository**: ${{ github.repository }}
+        - **Commit**: ${{ github.sha }}
+        - **Branch**: ${{ github.ref_name }}
+        - **Timestamp**: $(date -u +%Y-%m-%dT%H:%M:%SZ)
+        
+        ## Build Status
+        
+        ✅ **BUILD SUCCESSFUL**
+        
+        The project builds successfully with the following components:
+        - TypeScript-Go submodule initialized and patched
+        - Go build completed without errors
+        - Binary generated: `tsgolint`
+        
+        ## Test Results
+        
+        EOF
+        
+        # Add test results from JSON
+        TEST_STATUS=$(cat ai-feedback.json | jq -r '.tests.status')
+        TOTAL_TESTS=$(cat ai-feedback.json | jq -r '.tests.total')
+        PASSED_TESTS=$(cat ai-feedback.json | jq -r '.tests.passed')
+        FAILED_TESTS=$(cat ai-feedback.json | jq -r '.tests.failed')
+        
+        if [ "$TEST_STATUS" = "passed" ]; then
+          echo "✅ **ALL TESTS PASSED**" >> ai-feedback-report.md
+        else
+          echo "❌ **SOME TESTS FAILED**" >> ai-feedback-report.md
+        fi
+        
+        echo "" >> ai-feedback-report.md
+        echo "- Total tests: $TOTAL_TESTS" >> ai-feedback-report.md
+        echo "- Passed: $PASSED_TESTS" >> ai-feedback-report.md
+        echo "- Failed: $FAILED_TESTS" >> ai-feedback-report.md
+        echo "" >> ai-feedback-report.md
+        
+        # Add code quality results
+        echo "## Code Quality" >> ai-feedback-report.md
+        echo "" >> ai-feedback-report.md
+        
+        FORMATTING=$(cat ai-feedback.json | jq -r '.code_quality.formatting')
+        VET=$(cat ai-feedback.json | jq -r '.code_quality.vet')
+        DEPS=$(cat ai-feedback.json | jq -r '.code_quality.dependencies')
+        
+        if [ "$FORMATTING" = "passed" ]; then
+          echo "✅ **Code formatting**: All files properly formatted" >> ai-feedback-report.md
+        else
+          echo "⚠️  **Code formatting**: Issues found - run \`gofmt -w .\`" >> ai-feedback-report.md
+        fi
+        
+        if [ "$VET" = "passed" ]; then
+          echo "✅ **Go vet**: No issues found" >> ai-feedback-report.md
+        else
+          echo "⚠️  **Go vet**: Issues found" >> ai-feedback-report.md
+        fi
+        
+        if [ "$DEPS" = "up_to_date" ]; then
+          echo "✅ **Dependencies**: Up to date" >> ai-feedback-report.md
+        else
+          echo "⚠️  **Dependencies**: Need to run \`go mod tidy\`" >> ai-feedback-report.md
+        fi
+        
+        echo "" >> ai-feedback-report.md
+        
+        # Add performance metrics
+        echo "## Performance Metrics" >> ai-feedback-report.md
+        echo "" >> ai-feedback-report.md
+        
+        BINARY_SIZE=$(cat ai-feedback.json | jq -r '.performance.binary_size')
+        RULES_COUNT=$(cat ai-feedback.json | jq -r '.performance.rules_count')
+        
+        echo "- **Binary size**: $BINARY_SIZE" >> ai-feedback-report.md
+        echo "- **Available rules**: $RULES_COUNT" >> ai-feedback-report.md
+        echo "" >> ai-feedback-report.md
+        
+        # Add linter analysis
+        echo "## Linter Analysis" >> ai-feedback-report.md
+        echo "" >> ai-feedback-report.md
+        
+        FILES_PROCESSED=$(cat ai-feedback.json | jq -r '.linter_results.files_processed')
+        ISSUES_FOUND=$(cat ai-feedback.json | jq -r '.linter_results.issues_found')
+        
+        echo "- **Files processed**: $FILES_PROCESSED" >> ai-feedback-report.md
+        echo "- **Issues found**: $ISSUES_FOUND" >> ai-feedback-report.md
+        echo "" >> ai-feedback-report.md
+        
+        # Add metadata
+        echo "## Environment" >> ai-feedback-report.md
+        echo "" >> ai-feedback-report.md
+        
+        GO_VERSION=$(cat ai-feedback.json | jq -r '.metadata.go_version')
+        OS=$(cat ai-feedback.json | jq -r '.metadata.os')
+        ARCH=$(cat ai-feedback.json | jq -r '.metadata.arch')
+        
+        echo "- **Go version**: $GO_VERSION" >> ai-feedback-report.md
+        echo "- **OS**: $OS" >> ai-feedback-report.md
+        echo "- **Architecture**: $ARCH" >> ai-feedback-report.md
+        echo "" >> ai-feedback-report.md
+        
+        # Add raw linter output
+        echo "## Linter Output Sample" >> ai-feedback-report.md
+        echo "" >> ai-feedback-report.md
+        echo '```' >> ai-feedback-report.md
+        head -20 linter-output.txt >> ai-feedback-report.md
+        echo '```' >> ai-feedback-report.md
+        
+        echo "Human-readable report generated"
+    
+    - name: Output results
+      run: |
+        echo "=== AI FEEDBACK JSON ==="
+        cat ai-feedback.json | jq .
+        echo ""
+        echo "=== AI FEEDBACK REPORT ==="
+        cat ai-feedback-report.md
+    
+    - name: Upload AI feedback artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: ai-feedback-${{ github.run_number }}
+        path: |
+          ai-feedback.json
+          ai-feedback-report.md
+          linter-output.txt
+          test-results.txt
+    
+    - name: Comment on PR (if applicable)
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          
+          // Read the human-readable report
+          const report = fs.readFileSync('ai-feedback-report.md', 'utf8');
+          
+          // Read the JSON feedback
+          const jsonFeedback = JSON.parse(fs.readFileSync('ai-feedback.json', 'utf8'));
+          
+          // Create a comment body
+          const commentBody = `## 🤖 AI Feedback Report
+          
+          ${report}
+          
+          <details>
+          <summary>📊 Structured Data for AI (JSON)</summary>
+          
+          \`\`\`json
+          ${JSON.stringify(jsonFeedback, null, 2)}
+          \`\`\`
+          
+          </details>
+          
+          ---
+          *This report was generated automatically by the AI Feedback workflow*`;
+          
+          // Post the comment
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: commentBody
+          });
