@@ -35,9 +35,5 @@ jobs:
         key: ${{ runner.os }}-go-${{ matrix.go-version }}-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           ${{ runner.os }}-go-${{ matrix.go-version }}-
-
-    - name: Download dependencies
-      run: go mod download
-
     - name: Unit Test
       run: make test
