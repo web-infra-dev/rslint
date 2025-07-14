@@ -523,6 +523,140 @@ String(v);
 declare const v: ('foo' | 'bar')[][];
 String(v);
     `},
+		
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `${''}`},
+		{Code: `${'text'}`},
+		{Code: `${true}`},
+		{Code: `${false}`},
+		{Code: `${1}`},
+		{Code: `${1n}`},
+		{Code: `${[]}`},
+		{Code: `${/regex/}`},
+		{Code: `${__dirname === 'foobar'}`},
+		{Code: `${{}.constructor()}`},
+		{Code: `${() => {}}`},
+		{Code: `${function () {}}`},
+		{Code: `let value = '';
+      value.toString();
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = 'text';
+      value.toString();
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = true;
+      value.toString();
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = false;
+      value.toString();
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = 1;
+      value.toString();
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = 1n;
+      value.toString();
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = [];
+      value.toString();
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = /regex/;
+      value.toString();
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = () => {};
+      value.toString();
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = function () {};
+      value.toString();
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = '';
+      String(value);
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = 'text';
+      String(value);
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = true;
+      String(value);
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = false;
+      String(value);
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = 1;
+      String(value);
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = 1n;
+      String(value);
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = [];
+      String(value);
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = /regex/;
+      String(value);
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = () => {};
+      String(value);
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = function () {};
+      String(value);
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = '';
+      '' + value;
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = 'text';
+      '' + value;
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = true;
+      '' + value;
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = false;
+      '' + value;
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = 1;
+      '' + value;
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = 1n;
+      '' + value;
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = [];
+      '' + value;
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = /regex/;
+      '' + value;
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = () => {};
+      '' + value;
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = function () {};
+      '' + value;
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = '';
+      value += '';
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = 'text';
+      value += '';
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = true;
+      value += '';
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = false;
+      value += '';
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = 1;
+      value += '';
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = 1n;
+      value += '';
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = [];
+      value += '';
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = /regex/;
+      value += '';
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = () => {};
+      value += '';
+      let text = ` + "`" + `${value}` + "`" + `;`},
+		{Code: `let value = function () {};
+      value += '';
+      let text = ` + "`" + `${value}` + "`" + `;`},
 		}), []rule_tester.InvalidTestCase{
 		{
 			Code: "`${{}})`;",

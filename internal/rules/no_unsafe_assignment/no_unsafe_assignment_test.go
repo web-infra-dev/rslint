@@ -152,6 +152,22 @@ let a = 1;
 
 a+= foo;
 		`},
+		
+		// Additional test cases from TypeScript-ESLint repository
+		{Code: `const x = 1;`},
+		{Code: `const x: number = 1;`},
+		{Code: `const x = 1, y = 1;`},
+		{Code: `let x;`},
+		{Code: `let x = 1, y;`},
+		{Code: `function foo(a = 1) {}`},
+		{Code: `class Foo { bar = 1; }`},
+		{Code: `class Foo { bar: number = 1; }`},
+		{Code: `let x: Set<string> = new Set();`},
+		{Code: `let x: Map<string, string> = new Map();`},
+		{Code: `let x: string = y as string;`},
+		{Code: `let x: string[] = y as string[];`},
+		{Code: `let x: Set<string> = y as Set<string>;`},
+		{Code: `let x: Map<string, string> = y as Map<string, string>;`},
 	}, slices.Concat([]rule_tester.InvalidTestCase{
 		{
 			Code: "const x = 1 as any;",
