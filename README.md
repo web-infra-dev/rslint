@@ -1,4 +1,8 @@
-# ✨ tsgolint ✨
+# ✨ Rslint ✨
+
+Rslint aims to be a drop-in replacement for ESLint and TypeScript-ESLint, just as Rspack serves as a drop-in replacement for Webpack and may integrated into Rspack in the future.
+
+Based on [typescript-go](https://github.com/microsoft/typescript-go) early exploration.
 
 **tsgolint** is an experimental proof-of-concept [typescript-go](https://github.com/microsoft/typescript-go) powered JS/TS linter written in Go.
 
