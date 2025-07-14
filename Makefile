@@ -1,6 +1,4 @@
-test: 
+init: 
 	git submodule update --init
-	cd typescript-go
-	git am --3way --no-gpg-sign ../patches/*.patch
-	cd ..
+test:
 	go test ./internal/...
