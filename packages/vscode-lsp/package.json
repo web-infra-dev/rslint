@@ -1,0 +1,69 @@
+{
+  "name": "tsgolint-vscode",
+  "displayName": "TSGoLint",
+  "description": "Language support for TSGoLint",
+  "version": "0.0.1",
+  "publisher": "rslint",
+  "categories": [
+    "Linters"
+  ],
+  "keywords": [
+    "tsgolint",
+    "linter",
+    "typescript",
+    "go"
+  ],
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:typescript",
+    "onLanguage:typescriptreact",
+    "onLanguage:javascript",
+    "onLanguage:javascriptreact"
+  ],
+  "contributes": {
+    "configuration": {
+      "type": "object",
+      "title": "TSGoLint",
+      "properties": {
+        "tsgolint.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable/disable TSGoLint"
+        },
+        "tsgolint.executablePath": {
+          "type": "string",
+          "default": "tsgolint",
+          "description": "Path to tsgolint executable"
+        },
+        "tsgolint.trace.server": {
+          "type": "string",
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
+          "default": "off",
+          "description": "Traces the communication between VS Code and the language server"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "pnpm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.74.0",
+    "typescript": "^5.0.0",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12"
+  }
+}
