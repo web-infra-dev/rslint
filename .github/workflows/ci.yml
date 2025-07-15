@@ -53,3 +53,16 @@ jobs:
 
     - name: Test
       run: pnpm -r test
+
+
+
+  done:
+    needs:
+      - test-go
+      - test-node
+    if: always()
+    runs-on: ubuntu-latest
+    name: CI Done
+    steps:
+      - run: exit 1
+        if: ${{ always() && (contains(needs.*.result, 'failure') || contains(needs.*.result, 'skipped') || contains(needs.*.result, 'cancelled')) }}
