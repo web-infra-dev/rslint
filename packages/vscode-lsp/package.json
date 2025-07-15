@@ -4,8 +4,15 @@
   "description": "Language support for TSGoLint",
   "version": "0.0.1",
   "publisher": "rslint",
-  "categories": ["Linters"],
-  "keywords": ["tsgolint", "linter", "typescript", "go"],
+  "categories": [
+    "Linters"
+  ],
+  "keywords": [
+    "tsgolint",
+    "linter",
+    "typescript",
+    "go"
+  ],
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -33,7 +40,11 @@
         },
         "tsgolint.trace.server": {
           "type": "string",
-          "enum": ["off", "messages", "verbose"],
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
           "default": "off",
           "description": "Traces the communication between VS Code and the language server"
         }
@@ -51,6 +62,8 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.74.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12"
   }
 }
