@@ -11,8 +11,8 @@ env:
   GO_VERSION: '1.24.1'
 
 jobs:
-  test:
-    name: Test
+  test-go:
+    name: Test Go
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -30,3 +30,18 @@ jobs:
     - name: Unit Test
       run: |
         make test
+
+  test-node:
+    name: Test npm packages
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Install dependencies
+      run: pnpm install
+
+    - name: Test
+      run: pnpm -r test
