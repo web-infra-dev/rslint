@@ -5,7 +5,7 @@
   "main": "index.js",
   "private": true,
   "scripts": {
-    "build": "pnpm --filter @rslint/core build"
+    "build": "pnpm -r build"
   },
   "repository": {
     "type": "git",
