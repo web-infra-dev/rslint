@@ -27,6 +27,20 @@ jobs:
       uses: actions/setup-go@v5
       with:
         go-version: ${{ matrix.go-version }}
+    ## reference from https://github.com/microsoft/typescript-go/blob/main/.github/actions/setup-go/action.yml#L26
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/go-build
+          ~/go/pkg/mod
+          ~/Library/Caches/go-build
+          ~/AppData/Local/go-build
+        key: rslint-setup-go-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}-${{ github.workflow }}-
+        restore-keys: |
+          rslint-setup-go-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}-${{ github.workflow }}-
+
+    
     - name: Unit Test
       run: |
         make test
