@@ -281,7 +281,7 @@ Options:
     --tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.
 		--list-files      List matched files
     -h, --help        Show help
-	--format           Output format "default" | "jsonline"
+	--format           Output format: default | jsonline
 `
 
 func runMain() int {
