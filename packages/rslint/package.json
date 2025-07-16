@@ -3,7 +3,8 @@
   "version": "0.0.1",
   "main": "index.js",
   "scripts": {
-    "build": "go build -o bin/rslint ../../cmd/tsgolint"
+    "build": "go build -o bin/rslint ../../cmd/tsgolint",
+    "test": "./bin/rslint --tsconfig=./fixtures/tsconfig.json --format=jsonline"
   },
   "files": ["bin/"],
   "bin": {
