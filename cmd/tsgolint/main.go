@@ -126,7 +126,12 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 
 	jsonBytes, err := json.Marshal(diagnostic)
 	if err != nil {
-		w.WriteString(fmt.Sprintf(`{"error":"Failed to marshal diagnostic: %s"}`, err))
+		type ErrorObject struct {
+			Error string `json:"error"`
+		}
+		errorObject := ErrorObject{Error: fmt.Sprintf("Failed to marshal diagnostic: %s", err)}
+		errorBytes, _ := json.Marshal(errorObject) // Ignoring error since struct is simple
+		w.Write(errorBytes)
 		w.WriteByte('\n')
 		return
 	}
