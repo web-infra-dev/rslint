@@ -13,7 +13,6 @@
     "access": "public"
   },
 
-  "author": "",
   "license": "MIT",
   "description": "rslint cli",
   "publisher": "rslint",
