@@ -1,4 +1,6 @@
-# Rslint(Rocket Speed Linter)
+# Rslint
+
+Rocket Speed Linter.
 
 ## Installation
 ```
