@@ -19,7 +19,6 @@
   "publishConfig": {
     "access": "public"
   },
-
   "license": "MIT",
   "description": "rslint cli",
   "publisher": "rslint",
