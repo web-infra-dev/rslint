@@ -1,7 +1,6 @@
 import child_process from "node:child_process";
 import path from "node:path";
 export async function lint(tsconfig: string) {
-  debugger;
   let binPath = path.resolve(import.meta.dirname, "../bin/rslint");
   let cmd = `${binPath}`;
   let args = ["--format=jsonline", `--tsconfig=${tsconfig}`];
