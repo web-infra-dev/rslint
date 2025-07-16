@@ -1,0 +1,21 @@
+{
+  "name": "rslint",
+  "version": "0.0.1",
+  "description": "Rslint Monorepo",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "build": "pnpm --filter @rslint/core build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/web-infra-dev/rslint.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/web-infra-dev/rslint/issues"
+  },
+  "homepage": "https://github.com/web-infra-dev/rslint#readme"
+}

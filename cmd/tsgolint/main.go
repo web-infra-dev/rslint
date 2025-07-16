@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"math"
@@ -71,7 +72,71 @@ import (
 
 const spaces = "                                                                                                    "
 
-func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions) {
+func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions, format string) {
+	switch format {
+	case "default":
+		printDiagnosticDefault(d, w, comparePathOptions)
+	case "jsonline":
+		printDiagnosticJsonLine(d, w, comparePathOptions)
+	}
+}
+
+// print as [jsonline](https://jsonlines.org/) format which can be used for lsp
+func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions) {
+	diagnosticStart := d.Range.Pos()
+	diagnosticEnd := d.Range.End()
+
+	startLine, startColumn := scanner.GetLineAndCharacterOfPosition(d.SourceFile, diagnosticStart)
+	endLine, endColumn := scanner.GetLineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
+
+	type Location struct {
+		Line   int `json:"line"`
+		Column int `json:"column"`
+	}
+
+	type Range struct {
+		Start Location `json:"start"`
+		End   Location `json:"end"`
+	}
+
+	type Diagnostic struct {
+		RuleName string `json:"ruleName"`
+		Message  string `json:"message"`
+		FilePath string `json:"filePath"`
+		Range    Range  `json:"range"`
+		Severity string `json:"severity"`
+	}
+
+	diagnostic := Diagnostic{
+		RuleName: d.RuleName,
+		Message:  d.Message.Description,
+		FilePath: tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions),
+		Range: Range{
+			Start: Location{
+				Line:   startLine + 1, // Convert to 1-based indexing
+				Column: startColumn + 1,
+			},
+			End: Location{
+				Line:   endLine + 1,
+				Column: endColumn + 1,
+			},
+		},
+		Severity: "error", // Assuming all diagnostics are errors
+	}
+
+	jsonBytes, err := json.Marshal(diagnostic)
+	if err != nil {
+		w.WriteString(fmt.Sprintf(`{"error":"Failed to marshal diagnostic: %s"}`, err))
+		w.WriteByte('\n')
+		return
+	}
+
+	w.Write(jsonBytes)
+	w.WriteByte('\n')
+}
+
+// print a normal logger
+func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions) {
 	diagnosticStart := d.Range.Pos()
 	diagnosticEnd := d.Range.End()
 
@@ -216,6 +281,7 @@ Options:
     --tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.
 		--list-files      List matched files
     -h, --help        Show help
+	--format           Output format "default" | "jsonline"
 `
 
 func runMain() int {
@@ -229,8 +295,9 @@ func runMain() int {
 		traceOut       string
 		cpuprofOut     string
 		singleThreaded bool
+		format         string
 	)
-
+	flag.StringVar(&format, "format", "default", "output format")
 	flag.StringVar(&tsconfig, "tsconfig", "", "which tsconfig to use")
 	flag.BoolVar(&listFiles, "list-files", false, "list matched files")
 	flag.BoolVar(&help, "help", false, "show help")
@@ -246,7 +313,6 @@ func runMain() int {
 		flag.Usage()
 		return 0
 	}
-
 	enableVirtualTerminalProcessing()
 	timeBefore := time.Now()
 
@@ -396,7 +462,7 @@ func runMain() int {
 			if errorsCount == 1 {
 				w.WriteByte('\n')
 			}
-			printDiagnostic(d, w, comparePathOptions)
+			printDiagnostic(d, w, comparePathOptions, format)
 			if w.Available() < 4096 {
 				w.Flush()
 			}
