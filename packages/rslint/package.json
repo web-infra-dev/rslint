@@ -1,5 +1,5 @@
 {
-  "name": "@rslint/cli",
+  "name": "@rslint/core",
   "version": "0.0.1",
   "main": "index.js",
   "scripts": {
