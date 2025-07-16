@@ -1,10 +1,16 @@
 {
   "name": "@rslint/core",
   "version": "0.0.1",
-  "main": "index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "type": "module",
   "scripts": {
-    "build": "go build -o bin/rslint ../../cmd/tsgolint",
-    "test": "./bin/rslint --tsconfig=./fixtures/tsconfig.json --format=jsonline"
+    "build:bin": "go build -o bin/rslint ../../cmd/tsgolint",
+    "build:js": "tsc -b tsconfig.build.json --force",
+    "dev": "tsc -b tsconfig.build.json --force --watch",
+    "build": "pnpm build:bin && pnpm build:js",
+    "test": "node --test 'tests/**.test.mjs'"
   },
   "files": ["bin/"],
   "bin": {
@@ -22,5 +28,9 @@
     "linter",
     "typescript",
     "go"
-  ]
+  ],
+  "devDependencies": {
+    "@types/node": "24.0.14",
+    "typescript": "5.8.3"
+  }
 }

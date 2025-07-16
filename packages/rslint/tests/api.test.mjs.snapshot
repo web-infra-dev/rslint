@@ -1,0 +1,36 @@
+exports[`lint api > diag snapshot 1`] = `
+[
+  {
+    "ruleName": "no-unsafe-member-access",
+    "message": "Unsafe member access .b on an \`any\` value.",
+    "filePath": "src/index.ts",
+    "range": {
+      "start": {
+        "line": 2,
+        "column": 3
+      },
+      "end": {
+        "line": 2,
+        "column": 4
+      }
+    },
+    "severity": ""
+  },
+  {
+    "ruleName": "no-unsafe-member-access",
+    "message": "Unsafe member access .c on an \`any\` value.",
+    "filePath": "src/index.ts",
+    "range": {
+      "start": {
+        "line": 5,
+        "column": 3
+      },
+      "end": {
+        "line": 5,
+        "column": 4
+      }
+    },
+    "severity": ""
+  }
+]
+`;
