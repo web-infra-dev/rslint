@@ -20,7 +20,7 @@ export async function lint(tsconfig: string) {
         .split("\n")
         .filter((x) => {
           // FIXME: we should not generate empty line when generate diags
-          return x.trim().length != 0;
+          return x.trim().length !== 0;
         })
         .map((x) => {
           return JSON.parse(x);
