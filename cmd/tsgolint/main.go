@@ -207,7 +207,7 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 	w.WriteString("  \x1b[2m╰────────────────────────────────\x1b[0m\n\n")
 }
 
-const usage = `✨ rslint - Rocket Speed Linter
+const usage = `✨ Rslint - Rocket Speed Linter
 
 Usage:
     rslint [OPTIONS]
