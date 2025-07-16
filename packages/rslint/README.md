@@ -4,5 +4,5 @@ Rocket Speed Linter.
 
 ## Installation
 ```
-$ npm install -D @rslint/cli
+$ npm install -D @rslint/core
 ```
