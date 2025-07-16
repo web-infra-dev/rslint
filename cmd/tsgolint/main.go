@@ -121,7 +121,6 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 				Column: endColumn + 1,
 			},
 		},
-		Severity: "error", // Assuming all diagnostics are errors
 	}
 
 	jsonBytes, err := json.Marshal(diagnostic)
