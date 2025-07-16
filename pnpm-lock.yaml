@@ -6,6 +6,8 @@ settings:
 
 importers:
 
+  packages/rslint: {}
+
   packages/vscode-lsp:
     dependencies:
       vscode-languageclient:

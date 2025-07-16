@@ -207,10 +207,10 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 	w.WriteString("  \x1b[2m╰────────────────────────────────\x1b[0m\n\n")
 }
 
-const usage = `✨ tsgolint - speedy TypeScript linter
+const usage = `✨ rslint - Rocket Speed Linter
 
 Usage:
-    tsgolint [OPTIONS]
+    rslint [OPTIONS]
 
 Options:
     --tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.
