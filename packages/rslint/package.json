@@ -5,7 +5,6 @@
   "scripts": {
     "build": "go build -o bin/rslint ../../cmd/tsgolint"
   },
-  
   "files": ["bin/"],
   "bin": {
     "rslint": "./bin/rslint"
