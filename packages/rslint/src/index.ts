@@ -27,7 +27,7 @@ export async function lint(tsconfig: string) {
         });
       resolve(diags);
     })
-    child.stdout.on("error", (err) => {
+    child.on("error", (err) => {
       reject(err);
     });
   });
