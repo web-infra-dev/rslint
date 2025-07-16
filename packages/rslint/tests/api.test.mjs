@@ -1,4 +1,3 @@
-import { assert } from 'console';
 import { lint } from '@rslint/core';
 import test from 'node:test';
 import path from 'node:path';
