@@ -1,0 +1,25 @@
+{
+  "name": "@rslint/core",
+  "version": "0.0.1",
+  "main": "index.js",
+  "scripts": {
+    "build": "go build -o bin/rslint ../../cmd/tsgolint"
+  },
+  "files": ["bin/"],
+  "bin": {
+    "rslint": "./bin/rslint"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+
+  "license": "MIT",
+  "description": "rslint cli",
+  "publisher": "rslint",
+  "keywords": [
+    "rslint",
+    "linter",
+    "typescript",
+    "go"
+  ]
+}
