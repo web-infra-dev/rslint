@@ -10,8 +10,12 @@ export async function lint(tsconfig: string) {
     cwd: defaultCwd,
   });
   return new Promise((resolve, reject) => {
+    let chunks: Buffer[] = [];
     child.stdout.on("data", (chunk: Buffer) => {
-      let message = chunk.toString();
+       chunks.push(chunk);
+    });
+    child.stdout.on('end', () => {
+      let message = Buffer.concat(chunks).toString();
       let diags = message
         .split("\n")
         .filter((x) => {
@@ -22,7 +26,7 @@ export async function lint(tsconfig: string) {
           return JSON.parse(x);
         });
       resolve(diags);
-    });
+    })
     child.stdout.on("error", (err) => {
       reject(err);
     });
