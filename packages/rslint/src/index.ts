@@ -30,5 +30,10 @@ export async function lint(tsconfig: string) {
     child.on("error", (err) => {
       reject(err);
     });
+    child.on("exit", (code) => {
+      if (code !== 0) {
+        reject(new Error(`Linting process exited with code ${code}`));
+      }
+    });
   });
 }
