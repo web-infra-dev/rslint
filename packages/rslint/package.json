@@ -15,7 +15,7 @@
   },
 
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "description": "rslint cli",
   "publisher": "rslint",
   "keywords": [
