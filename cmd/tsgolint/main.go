@@ -78,6 +78,8 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 		printDiagnosticDefault(d, w, comparePathOptions)
 	case "jsonline":
 		printDiagnosticJsonLine(d, w, comparePathOptions)
+	default:
+		panic(fmt.Sprintf("not supported format %s", format))
 	}
 }
 
@@ -520,19 +522,21 @@ func runMain() int {
 	if !singleThreaded {
 		threadsCount = runtime.GOMAXPROCS(0)
 	}
-	fmt.Fprintf(
-		os.Stdout,
-		"Found %v%v\x1b[0m %v \x1b[2m(linted \x1b[1m%v\x1b[22m\x1b[2m %v with \x1b[1m%v\x1b[22m\x1b[2m %v in \x1b[1m%v\x1b[22m\x1b[2m using \x1b[1m%v\x1b[22m\x1b[2m threads)\n",
-		errorsColor,
-		errorsCount,
-		errorsText,
-		len(files),
-		filesText,
-		len(rules),
-		rulesText,
-		time.Since(timeBefore).Round(time.Millisecond),
-		threadsCount,
-	)
+	if format == "default" {
+		fmt.Fprintf(
+			os.Stdout,
+			"Found %v%v\x1b[0m %v \x1b[2m(linted \x1b[1m%v\x1b[22m\x1b[2m %v with \x1b[1m%v\x1b[22m\x1b[2m %v in \x1b[1m%v\x1b[22m\x1b[2m using \x1b[1m%v\x1b[22m\x1b[2m threads)\n",
+			errorsColor,
+			errorsCount,
+			errorsText,
+			len(files),
+			filesText,
+			len(rules),
+			rulesText,
+			time.Since(timeBefore).Round(time.Millisecond),
+			threadsCount,
+		)
+	}
 
 	return 0
 }

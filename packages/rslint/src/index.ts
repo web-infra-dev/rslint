@@ -1,0 +1,31 @@
+import child_process from "node:child_process";
+import path from "node:path";
+export async function lint(tsconfig: string) {
+  debugger;
+  let binPath = path.resolve(import.meta.dirname, "../bin/rslint");
+  let cmd = `${binPath}`;
+  let args = ["--format=jsonline", `--tsconfig=${tsconfig}`];
+  let defaultCwd = process.cwd();
+  let child = child_process.spawn(cmd, args, {
+    stdio: ["pipe", "pipe", "inherit"],
+    cwd: defaultCwd,
+  });
+  return new Promise((resolve, reject) => {
+    child.stdout.on("data", (chunk: Buffer) => {
+      let message = chunk.toString();
+      let diags = message
+        .split("\n")
+        .filter((x) => {
+          // FIXME: we should not generate empty line when generate diags
+          return x.trim().length != 0;
+        })
+        .map((x) => {
+          return JSON.parse(x);
+        });
+      resolve(diags);
+    });
+    child.stdout.on("error", (err) => {
+      reject(err);
+    });
+  });
+}
