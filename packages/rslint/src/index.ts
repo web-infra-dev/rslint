@@ -1,9 +1,12 @@
-import { LintResponse, RSLintService } from './service.ts'
-export async function lint(tsconfig: string): Promise<LintResponse> {
+import { LintOptions, LintResponse, RSLintService } from './service.ts'
+
+// Export the RSLintService class for direct usage
+export { RSLintService } from './service.ts';
+
+// For backward compatibility and convenience
+export async function lint(options: LintOptions): Promise<LintResponse> {
   const service = new RSLintService();
-  const result = await service.lint({
-    tsconfig
-  })
+  const result = await service.lint(options)
   await service.close();
   return result;
 }

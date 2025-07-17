@@ -59,6 +59,7 @@ type LintRequest struct {
 	Format           string            `json:"format,omitempty"`
 	WorkingDirectory string            `json:"workingDirectory,omitempty"`
 	RuleOptions      map[string]string `json:"ruleOptions,omitempty"`
+	FileContents     map[string]string `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
 }
 
 // LintResponse represents a lint response from Go to JS

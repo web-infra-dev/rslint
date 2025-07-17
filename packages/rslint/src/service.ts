@@ -30,11 +30,12 @@ export interface LintResponse {
   duration: string;
 }
 
-interface LintOptions {
+export interface LintOptions {
   files?: string[];
   tsconfig?: string;
   workingDirectory?: string;
   ruleOptions?: Record<string, string>;
+  fileContents?: Record<string, string>; // Map of file paths to their contents for VFS
 }
 
 interface RSlintOptions {
@@ -76,15 +77,6 @@ export class RSLintService {
     this.chunks = [];
     this.chunkSize = 0;
     this.expectedSize = null;
-    
-    // Handle process events
-    this.process.on('error', (err) => {
-      console.error('Failed to start rslint:', err);
-    });
-    
-    this.process.on('close', (code) => {
-      console.log(`rslint exited with code ${code}`);
-    });
   }
   
   /**
@@ -173,8 +165,7 @@ export class RSLintService {
    * Run the linter on specified files
    */
   async lint(options: LintOptions = {}): Promise<LintResponse> {
-    const { files, tsconfig, workingDirectory } = options;
-    
+    const { files, tsconfig, workingDirectory, ruleOptions, fileContents } = options;
     // Send handshake
     await this.sendMessage('handshake', { version: '1.0.0' });
     
@@ -183,6 +174,8 @@ export class RSLintService {
       files,
       tsconfig,
       workingDirectory,
+      ruleOptions,
+      fileContents,
       format: 'jsonline'
     });
   }

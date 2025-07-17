@@ -581,6 +581,10 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 
 	// Create filesystem
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	// Apply file contents if provided
+	if len(req.FileContents) > 0 {
+		fs = utils.NewOverlayVFS(fs, req.FileContents)
+	}
 
 	// Handle tsconfig
 	var configFileName string
@@ -597,7 +601,6 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 			return nil, fmt.Errorf("error: tsconfig %q doesn't exist", tsconfig)
 		}
 	}
-
 	currentDirectory = tspath.GetDirectoryPath(configFileName)
 
 	// Create rules
@@ -659,7 +662,6 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 
 	// Find source files
 	files := []*ast.SourceFile{}
-	cwdPath := string(tspath.ToPath("", currentDirectory, program.Host().FS().UseCaseSensitiveFileNames()).EnsureTrailingDirectorySeparator())
 
 	// If specific files are provided, use those
 	if len(req.Files) > 0 {
@@ -673,13 +675,12 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 	} else {
 		// Otherwise use all source files
 		for _, file := range program.SourceFiles() {
+
 			p := string(file.Path())
 			if strings.Contains(p, "/node_modules/") {
 				continue
 			}
-			if _, matched := strings.CutPrefix(p, cwdPath); matched {
-				files = append(files, file)
-			}
+			files = append(files, file)
 		}
 	}
 
@@ -762,7 +763,6 @@ func runIPCMode() int {
 		fmt.Fprintf(os.Stderr, "error in IPC mode: %v\n", err)
 		return 1
 	}
-	fmt.Fprintf(os.Stderr, "golang service exit\n")
 	return 0
 }
 
