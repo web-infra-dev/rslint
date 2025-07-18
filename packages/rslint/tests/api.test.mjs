@@ -2,8 +2,8 @@ import { lint, RSLintService } from '@rslint/core';
 import test from 'node:test';
 import path from 'node:path';
 
-test('lint api', () => {
-    test('virtual file support', async (t) => {
+test('lint api', async (t) => {
+    await t.test('virtual file support', async (t) => {
         let tsconfig = path.resolve(import.meta.dirname, '../fixtures/tsconfig.virtual.json');
         // Use virtual file contents instead of reading from disk
         const diags = await lint({
