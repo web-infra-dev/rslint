@@ -36,8 +36,8 @@ export function activate(context: ExtensionContext) {
   };
 
   client = new LanguageClient(
-    'tsgolint',
-    'TSGoLint Language Server',
+    'rslint',
+    'Rslint Language Server',
     serverOptions,
     clientOptions
   );
@@ -47,7 +47,7 @@ export function activate(context: ExtensionContext) {
   context.subscriptions.push(
     client.onDidChangeState((event) => {
       if (event.newState === 2) {
-        window.showInformationMessage('TSGoLint language server started');
+        window.showInformationMessage('Rslint language server started');
       }
     })
   );

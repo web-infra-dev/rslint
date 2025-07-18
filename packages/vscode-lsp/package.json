@@ -1,14 +1,19 @@
 {
-  "name": "tsgolint-vscode",
-  "displayName": "TSGoLint",
-  "description": "Language support for TSGoLint",
+  "name": "rslint",
+  "displayName": "rslint",
+  "description": "Language support for Rslint",
   "version": "0.0.1",
-  "publisher": "rslint",
+  "publisher": "rstack",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/web-infra-dev/rslint"
+  },
   "categories": [
     "Linters"
   ],
   "keywords": [
-    "tsgolint",
+    "rslint",
     "linter",
     "typescript",
     "go"
@@ -26,19 +31,19 @@
   "contributes": {
     "configuration": {
       "type": "object",
-      "title": "TSGoLint",
+      "title": "rslint",
       "properties": {
-        "tsgolint.enable": {
+        "rslint.enable": {
           "type": "boolean",
           "default": true,
-          "description": "Enable/disable TSGoLint"
+          "description": "Enable/disable rslint"
         },
-        "tsgolint.executablePath": {
+        "rslint.executablePath": {
           "type": "string",
-          "default": "tsgolint",
-          "description": "Path to tsgolint executable"
+          "default": "rslint",
+          "description": "Path to rslint executable"
         },
-        "tsgolint.trace.server": {
+        "rslint.trace.server": {
           "type": "string",
           "enum": [
             "off",
@@ -53,13 +58,16 @@
   },
   "scripts": {
     "vscode:prepublish": "pnpm run compile",
-    "build": "tsc -p ./",
-    "watch": "tsc -watch -p ./"
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package --dependencies",
+    "publish": "vsce publish"
   },
   "dependencies": {
-    "vscode-languageclient": "^9.0.1"
+    
   },
   "devDependencies": {
+    "vscode-languageclient": "^9.0.1",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.74.0",
     "typescript": "^5.0.0",

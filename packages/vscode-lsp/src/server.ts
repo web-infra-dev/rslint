@@ -25,18 +25,18 @@ let hasConfigurationCapability = false;
 let hasWorkspaceFolderCapability = false;
 let hasDiagnosticRelatedInformationCapability = false;
 
-interface TSGoLintSettings {
+interface RslintSettings {
   enable: boolean;
   executablePath: string;
 }
 
-const defaultSettings: TSGoLintSettings = {
+const defaultSettings: RslintSettings = {
   enable: true,
-  executablePath: 'tsgolint'
+  executablePath: 'rslint'
 };
 
-let globalSettings: TSGoLintSettings = defaultSettings;
-const documentSettings: Map<string, Thenable<TSGoLintSettings>> = new Map();
+let globalSettings: RslintSettings = defaultSettings;
+const documentSettings: Map<string, Thenable<RslintSettings>> = new Map();
 
 connection.onInitialize((params: InitializeParams) => {
   const capabilities = params.capabilities;
@@ -89,15 +89,15 @@ connection.onDidChangeConfiguration(change => {
   if (hasConfigurationCapability) {
     documentSettings.clear();
   } else {
-    globalSettings = <TSGoLintSettings>(
-      (change.settings.tsgolint || defaultSettings)
+    globalSettings = <RslintSettings>(
+      (change.settings.rslint || defaultSettings)
     );
   }
 
   documents.all().forEach(validateTextDocument);
 });
 
-function getDocumentSettings(resource: string): Thenable<TSGoLintSettings> {
+function getDocumentSettings(resource: string): Thenable<RslintSettings> {
   if (!hasConfigurationCapability) {
     return Promise.resolve(globalSettings);
   }
@@ -105,7 +105,7 @@ function getDocumentSettings(resource: string): Thenable<TSGoLintSettings> {
   if (!result) {
     result = connection.workspace.getConfiguration({
       scopeUri: resource,
-      section: 'tsgolint'
+      section: 'rslint'
     });
     documentSettings.set(resource, result);
   }
@@ -128,11 +128,11 @@ async function validateTextDocument(textDocument: TextDocument): Promise<void> {
     return;
   }
 
-  const diagnostics = await runTSGoLint(textDocument, settings);
+  const diagnostics = await runRslint(textDocument, settings);
   connection.sendDiagnostics({ uri: textDocument.uri, diagnostics });
 }
 
-interface TSGoLintOutput {
+interface RslintOutput {
   file: string;
   line: number;
   column: number;
@@ -141,33 +141,33 @@ interface TSGoLintOutput {
   rule?: string;
 }
 
-async function runTSGoLint(textDocument: TextDocument, settings: TSGoLintSettings): Promise<Diagnostic[]> {
+async function runRslint(textDocument: TextDocument, settings: RslintSettings): Promise<Diagnostic[]> {
   return new Promise((resolve) => {
     const diagnostics: Diagnostic[] = [];
     const filePath = textDocument.uri.replace('file://', '');
     
-    const tsgolint = spawn(settings.executablePath, [filePath, '--format', 'json'], {
+    const rslint = spawn(settings.executablePath, [filePath, '--format', 'json'], {
       cwd: path.dirname(filePath)
     });
 
     let output = '';
     let errorOutput = '';
 
-    tsgolint.stdout.on('data', (data) => {
+    rslint.stdout.on('data', (data) => {
       output += data.toString();
     });
 
-    tsgolint.stderr.on('data', (data) => {
+    rslint.stderr.on('data', (data) => {
       errorOutput += data.toString();
     });
 
-    tsgolint.on('close', (code) => {
+    rslint.on('close', (code) => {
       if (errorOutput) {
-        connection.console.error(`TSGoLint error: ${errorOutput}`);
+        connection.console.error(`Rslint error: ${errorOutput}`);
       }
 
       try {
-        const results: TSGoLintOutput[] = JSON.parse(output);
+        const results: RslintOutput[] = JSON.parse(output);
         
         for (const result of results) {
           const diagnostic: Diagnostic = {
@@ -179,7 +179,7 @@ async function runTSGoLint(textDocument: TextDocument, settings: TSGoLintSetting
               end: Position.create(result.line - 1, result.column)
             },
             message: result.message,
-            source: 'tsgolint'
+            source: 'rslint'
           };
 
           if (result.rule) {
@@ -189,14 +189,14 @@ async function runTSGoLint(textDocument: TextDocument, settings: TSGoLintSetting
           diagnostics.push(diagnostic);
         }
       } catch (e) {
-        connection.console.error(`Failed to parse TSGoLint output: ${e}`);
+        connection.console.error(`Failed to parse rslint output: ${e}`);
       }
 
       resolve(diagnostics);
     });
 
-    tsgolint.on('error', (err) => {
-      connection.console.error(`Failed to run TSGoLint: ${err.message}`);
+    rslint.on('error', (err) => {
+      connection.console.error(`Failed to run rslint: ${err.message}`);
       resolve([]);
     });
   });
