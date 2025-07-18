@@ -1,0 +1,10 @@
+{
+ "extends": ["../../tsconfig.base.json"],
+ "files": [],
+ "compilerOptions": {
+    "types": ["node"],
+    "allowImportingTsExtensions": true
+ },
+ "include": ["tests/"],
+ "exclude": ["tests/fixtures"]
+}

@@ -154,6 +154,17 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		use_unknown_in_catch_callback_variable.UseUnknownInCatchCallbackVariableRule,
 	}
 
+	// filter rule based on request.RuleOptions
+	if len(req.RuleOptions) > 0 {
+		filteredRules := []rule.Rule{}
+		for _, r := range rules {
+			if _, ok := req.RuleOptions[r.Name]; ok {
+				filteredRules = append(filteredRules, r)
+			}
+		}
+		rules = filteredRules
+	}
+
 	// Create compiler host
 	host := utils.CreateCompilerHost(currentDirectory, fs)
 	comparePathOptions := tspath.ComparePathsOptions{
@@ -254,7 +265,9 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 	if err != nil {
 		return nil, fmt.Errorf("error running linter: %v", err)
 	}
-
+	if diagnostics == nil {
+		diagnostics = []ipc.Diagnostic{}
+	}
 	// Create response
 	return &ipc.LintResponse{
 		Diagnostics: diagnostics,
