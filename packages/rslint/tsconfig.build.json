@@ -10,6 +10,5 @@
         "emitDeclarationOnly": false,
         "noEmit": false,
         "rewriteRelativeImportExtensions": true
-        
     }
 }

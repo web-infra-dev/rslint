@@ -187,10 +187,13 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 			if strings.Contains(p, "/node_modules/") {
 				continue
 			}
+			// skip bundled files
+			if strings.Contains(p, "bundled:") {
+				continue
+			}
 			files = append(files, file)
 		}
 	}
-
 	slices.SortFunc(files, func(a *ast.SourceFile, b *ast.SourceFile) int {
 		return len(b.Text()) - len(a.Text())
 	})

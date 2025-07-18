@@ -40,6 +40,7 @@ export interface LintOptions {
 
 interface RSlintOptions {
   rslintPath?: string;
+  workingDirectory?: string
 }
 
 interface PendingMessage {
@@ -66,6 +67,7 @@ export class RSLintService {
     
     this.process = spawn(this.rslintPath, ['--ipc'], {
       stdio: ['pipe', 'pipe', 'inherit'],
+      cwd: options.workingDirectory || process.cwd(),
       env: {
         ...process.env,
         RSLINT_IPC: '1' // Alternative way to enable IPC mode
