@@ -210,7 +210,7 @@ func (s *Service) handleHandshake(msg *Message) {
 	})
 }
 
-// handle exit msg
+// Handle exit message
 func (s *Service) handleExit(msg *Message) {
 	s.sendResponse(msg.ID, nil)
 }
