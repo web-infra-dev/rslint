@@ -28,7 +28,7 @@ function checkDiagnosticEqual(rslintDiagnostic: Diagnostic[], tsDiagnostic: TsDi
     // check rule match
     assert(toCamelCase(rslintDiag.ruleName) === tsDiag.messageId, `Message mismatch: ${rslintDiag.ruleName} !== ${tsDiag.messageId}`);
 
-    // check ragnge match
+    // check range match
     // tsDiag sometimes doesn't have line and column, so we need to check that
     if(tsDiag.line) {
       assert(rslintDiag.range.start.line === tsDiag.line, `Start line mismatch: ${rslintDiag.range.start.line} !== ${tsDiag.line}`);
