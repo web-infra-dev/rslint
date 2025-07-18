@@ -422,6 +422,21 @@ exports[`lint api > diag snapshot 1`] = `
       }
     },
     {
+      "ruleName": "no-duplicate-type-constituents",
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 1537,
+          "column": 107
+        },
+        "end": {
+          "line": 1537,
+          "column": 116
+        }
+      }
+    },
+    {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2020.bigint.d.ts",
@@ -473,21 +488,6 @@ exports[`lint api > diag snapshot 1`] = `
       "range": {
         "start": {
           "line": 1537,
-          "column": 107
-        },
-        "end": {
-          "line": 1537,
-          "column": 116
-        }
-      }
-    },
-    {
-      "ruleName": "no-duplicate-type-constituents",
-      "message": "Explicit undefined is unnecessary on an optional parameter.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 1537,
           "column": 192
         },
         "end": {
@@ -508,6 +508,21 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 1550,
           "column": 116
+        }
+      }
+    },
+    {
+      "ruleName": "no-duplicate-type-constituents",
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 1550,
+          "column": 192
+        },
+        "end": {
+          "line": 1550,
+          "column": 201
         }
       }
     },
@@ -527,6 +542,21 @@ exports[`lint api > diag snapshot 1`] = `
       }
     },
     {
+      "ruleName": "no-duplicate-type-constituents",
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 1557,
+          "column": 93
+        },
+        "end": {
+          "line": 1557,
+          "column": 102
+        }
+      }
+    },
+    {
       "ruleName": "no-unnecessary-boolean-literal-compare",
       "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
@@ -538,21 +568,6 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 1,
           "column": 1
-        }
-      }
-    },
-    {
-      "ruleName": "no-duplicate-type-constituents",
-      "message": "Explicit undefined is unnecessary on an optional parameter.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 1550,
-          "column": 192
-        },
-        "end": {
-          "line": 1550,
-          "column": 201
         }
       }
     },
@@ -574,6 +589,21 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 1867,
+          "column": 34
+        },
+        "end": {
+          "line": 1867,
+          "column": 49
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.esnext.float16.d.ts",
       "range": {
         "start": {
@@ -583,21 +613,6 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 211,
           "column": 116
-        }
-      }
-    },
-    {
-      "ruleName": "no-duplicate-type-constituents",
-      "message": "Explicit undefined is unnecessary on an optional parameter.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 1557,
-          "column": 93
-        },
-        "end": {
-          "line": 1557,
-          "column": 102
         }
       }
     },
@@ -658,6 +673,21 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 348,
           "column": 65
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 72,
+          "column": 77
+        },
+        "end": {
+          "line": 72,
+          "column": 84
         }
       }
     },
@@ -739,6 +769,36 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 1935,
+          "column": 101
+        },
+        "end": {
+          "line": 1935,
+          "column": 112
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 137,
+          "column": 75
+        },
+        "end": {
+          "line": 137,
+          "column": 82
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.esnext.float16.d.ts",
       "range": {
         "start": {
@@ -778,81 +838,6 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 415,
           "column": 113
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 1867,
-          "column": 34
-        },
-        "end": {
-          "line": 1867,
-          "column": 49
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-boolean-literal-compare",
-      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "bundled:///libs/lib.decorators.d.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 1
-        },
-        "end": {
-          "line": 1,
-          "column": 1
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 72,
-          "column": 77
-        },
-        "end": {
-          "line": 72,
-          "column": 84
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 137,
-          "column": 75
-        },
-        "end": {
-          "line": 137,
-          "column": 82
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 1935,
-          "column": 101
-        },
-        "end": {
-          "line": 1935,
-          "column": 112
         }
       }
     },
@@ -962,6 +947,36 @@ exports[`lint api > diag snapshot 1`] = `
       }
     },
     {
+      "ruleName": "no-unnecessary-boolean-literal-compare",
+      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
+      "filePath": "bundled:///libs/lib.decorators.d.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 266,
+          "column": 78
+        },
+        "end": {
+          "line": 266,
+          "column": 85
+        }
+      }
+    },
+    {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
@@ -1022,36 +1037,6 @@ exports[`lint api > diag snapshot 1`] = `
       }
     },
     {
-      "ruleName": "no-unnecessary-boolean-literal-compare",
-      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "bundled:///libs/lib.es2015.symbol.wellknown.d.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 1
-        },
-        "end": {
-          "line": 1,
-          "column": 1
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 266,
-          "column": 78
-        },
-        "end": {
-          "line": 266,
-          "column": 85
-        }
-      }
-    },
-    {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
@@ -1063,21 +1048,6 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 2217,
           "column": 113
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 295,
-          "column": 49
-        },
-        "end": {
-          "line": 295,
-          "column": 60
         }
       }
     },
@@ -1099,36 +1069,6 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 301,
-          "column": 49
-        },
-        "end": {
-          "line": 301,
-          "column": 60
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 309,
-          "column": 99
-        },
-        "end": {
-          "line": 309,
-          "column": 110
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -1144,21 +1084,6 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 332,
-          "column": 50
-        },
-        "end": {
-          "line": 332,
-          "column": 61
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -1168,21 +1093,6 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 2402,
           "column": 51
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 338,
-          "column": 50
-        },
-        "end": {
-          "line": 338,
-          "column": 61
         }
       }
     },
@@ -1219,21 +1129,6 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 346,
-          "column": 100
-        },
-        "end": {
-          "line": 346,
-          "column": 111
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -1252,12 +1147,12 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 369,
-          "column": 57
+          "line": 295,
+          "column": 49
         },
         "end": {
-          "line": 369,
-          "column": 68
+          "line": 295,
+          "column": 60
         }
       }
     },
@@ -1282,57 +1177,12 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 375,
-          "column": 57
+          "line": 301,
+          "column": 49
         },
         "end": {
-          "line": 375,
-          "column": 68
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 383,
-          "column": 107
-        },
-        "end": {
-          "line": 383,
-          "column": 118
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 405,
-          "column": 50
-        },
-        "end": {
-          "line": 405,
-          "column": 61
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 411,
-          "column": 50
-        },
-        "end": {
-          "line": 411,
-          "column": 61
+          "line": 301,
+          "column": 60
         }
       }
     },
@@ -1357,12 +1207,12 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 419,
-          "column": 100
+          "line": 309,
+          "column": 99
         },
         "end": {
-          "line": 419,
-          "column": 111
+          "line": 309,
+          "column": 110
         }
       }
     },
@@ -1402,12 +1252,12 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 442,
-          "column": 51
+          "line": 332,
+          "column": 50
         },
         "end": {
-          "line": 442,
-          "column": 62
+          "line": 332,
+          "column": 61
         }
       }
     },
@@ -1417,12 +1267,12 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 448,
-          "column": 51
+          "line": 338,
+          "column": 50
         },
         "end": {
-          "line": 448,
-          "column": 62
+          "line": 338,
+          "column": 61
         }
       }
     },
@@ -1447,12 +1297,12 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 456,
-          "column": 101
+          "line": 346,
+          "column": 100
         },
         "end": {
-          "line": 456,
-          "column": 112
+          "line": 346,
+          "column": 111
         }
       }
     },
@@ -1477,12 +1327,12 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 479,
-          "column": 50
+          "line": 369,
+          "column": 57
         },
         "end": {
-          "line": 479,
-          "column": 61
+          "line": 369,
+          "column": 68
         }
       }
     },
@@ -1492,12 +1342,12 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 485,
-          "column": 50
+          "line": 375,
+          "column": 57
         },
         "end": {
-          "line": 485,
-          "column": 61
+          "line": 375,
+          "column": 68
         }
       }
     },
@@ -1519,21 +1369,6 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 493,
-          "column": 100
-        },
-        "end": {
-          "line": 493,
-          "column": 111
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -1543,21 +1378,6 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 2684,
           "column": 58
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 516,
-          "column": 51
-        },
-        "end": {
-          "line": 516,
-          "column": 62
         }
       }
     },
@@ -1582,12 +1402,12 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 522,
-          "column": 51
+          "line": 383,
+          "column": 107
         },
         "end": {
-          "line": 522,
-          "column": 62
+          "line": 383,
+          "column": 118
         }
       }
     },
@@ -1603,21 +1423,6 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 2686,
           "column": 66
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 530,
-          "column": 101
-        },
-        "end": {
-          "line": 530,
-          "column": 112
         }
       }
     },
@@ -1642,12 +1447,57 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 553,
-          "column": 52
+          "line": 405,
+          "column": 50
         },
         "end": {
-          "line": 553,
-          "column": 63
+          "line": 405,
+          "column": 61
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-boolean-literal-compare",
+      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
+      "filePath": "bundled:///libs/lib.es2015.symbol.wellknown.d.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 411,
+          "column": 50
+        },
+        "end": {
+          "line": 411,
+          "column": 61
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 419,
+          "column": 100
+        },
+        "end": {
+          "line": 419,
+          "column": 111
         }
       }
     },
@@ -1672,12 +1522,12 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 559,
-          "column": 52
+          "line": 442,
+          "column": 51
         },
         "end": {
-          "line": 559,
-          "column": 63
+          "line": 442,
+          "column": 62
         }
       }
     },
@@ -1693,6 +1543,21 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 2700,
           "column": 58
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 448,
+          "column": 51
+        },
+        "end": {
+          "line": 448,
+          "column": 62
         }
       }
     },
@@ -1717,12 +1582,12 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 567,
-          "column": 102
+          "line": 456,
+          "column": 101
         },
         "end": {
-          "line": 567,
-          "column": 113
+          "line": 456,
+          "column": 112
         }
       }
     },
@@ -1742,17 +1607,32 @@ exports[`lint api > diag snapshot 1`] = `
       }
     },
     {
-      "ruleName": "no-unnecessary-boolean-literal-compare",
-      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "bundled:///libs/lib.scripthost.d.ts",
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 1,
-          "column": 1
+          "line": 479,
+          "column": 50
         },
         "end": {
-          "line": 1,
-          "column": 1
+          "line": 479,
+          "column": 61
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 485,
+          "column": 50
+        },
+        "end": {
+          "line": 485,
+          "column": 61
         }
       }
     },
@@ -1768,6 +1648,21 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 2781,
           "column": 113
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 493,
+          "column": 100
+        },
+        "end": {
+          "line": 493,
+          "column": 111
         }
       }
     },
@@ -1792,12 +1687,42 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 590,
-          "column": 52
+          "line": 516,
+          "column": 51
         },
         "end": {
-          "line": 590,
-          "column": 63
+          "line": 516,
+          "column": 62
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 522,
+          "column": 51
+        },
+        "end": {
+          "line": 522,
+          "column": 62
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 530,
+          "column": 101
+        },
+        "end": {
+          "line": 530,
+          "column": 112
         }
       }
     },
@@ -1822,11 +1747,11 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 596,
+          "line": 553,
           "column": 52
         },
         "end": {
-          "line": 596,
+          "line": 553,
           "column": 63
         }
       }
@@ -1837,12 +1762,12 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 604,
-          "column": 102
+          "line": 559,
+          "column": 52
         },
         "end": {
-          "line": 604,
-          "column": 113
+          "line": 559,
+          "column": 63
         }
       }
     },
@@ -1858,6 +1783,21 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 2965,
           "column": 51
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 567,
+          "column": 102
+        },
+        "end": {
+          "line": 567,
+          "column": 113
         }
       }
     },
@@ -1894,6 +1834,36 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 590,
+          "column": 52
+        },
+        "end": {
+          "line": 590,
+          "column": 63
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 596,
+          "column": 52
+        },
+        "end": {
+          "line": 596,
+          "column": 63
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -1903,6 +1873,21 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 2969,
           "column": 92
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 604,
+          "column": 102
+        },
+        "end": {
+          "line": 604,
+          "column": 113
         }
       }
     },
@@ -1937,21 +1922,6 @@ exports[`lint api > diag snapshot 1`] = `
       }
     },
     {
-      "ruleName": "no-unnecessary-boolean-literal-compare",
-      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "bundled:///libs/lib.esnext.disposable.d.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 1
-        },
-        "end": {
-          "line": 1,
-          "column": 1
-        }
-      }
-    },
-    {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
@@ -1982,21 +1952,6 @@ exports[`lint api > diag snapshot 1`] = `
       }
     },
     {
-      "ruleName": "no-unnecessary-boolean-literal-compare",
-      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 1
-        },
-        "end": {
-          "line": 1,
-          "column": 1
-        }
-      }
-    },
-    {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
@@ -2008,6 +1963,21 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 3062,
           "column": 114
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-boolean-literal-compare",
+      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
+      "filePath": "bundled:///libs/lib.scripthost.d.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
         }
       }
     },
@@ -2027,111 +1997,6 @@ exports[`lint api > diag snapshot 1`] = `
       }
     },
     {
-      "ruleName": "no-unnecessary-boolean-literal-compare",
-      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "bundled:///libs/lib.es2015.reflect.d.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 1
-        },
-        "end": {
-          "line": 1,
-          "column": 1
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 52,
-          "column": 31
-        },
-        "end": {
-          "line": 52,
-          "column": 46
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 52,
-          "column": 61
-        },
-        "end": {
-          "line": 52,
-          "column": 76
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 52,
-          "column": 91
-        },
-        "end": {
-          "line": 52,
-          "column": 106
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 52,
-          "column": 122
-        },
-        "end": {
-          "line": 52,
-          "column": 137
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 52,
-          "column": 152
-        },
-        "end": {
-          "line": 52,
-          "column": 167
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 52,
-          "column": 183
-        },
-        "end": {
-          "line": 52,
-          "column": 198
-        }
-      }
-    },
-    {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
@@ -2147,92 +2012,17 @@ exports[`lint api > diag snapshot 1`] = `
       }
     },
     {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "ruleName": "no-unnecessary-boolean-literal-compare",
+      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
       "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
       "range": {
         "start": {
-          "line": 59,
-          "column": 31
+          "line": 1,
+          "column": 1
         },
         "end": {
-          "line": 59,
-          "column": 46
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 59,
-          "column": 61
-        },
-        "end": {
-          "line": 59,
-          "column": 76
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 59,
-          "column": 91
-        },
-        "end": {
-          "line": 59,
-          "column": 106
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 59,
-          "column": 122
-        },
-        "end": {
-          "line": 59,
-          "column": 137
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 59,
-          "column": 152
-        },
-        "end": {
-          "line": 59,
-          "column": 167
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 59,
-          "column": 183
-        },
-        "end": {
-          "line": 59,
-          "column": 198
+          "line": 1,
+          "column": 1
         }
       }
     },
@@ -2269,21 +2059,6 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 66,
-          "column": 43
-        },
-        "end": {
-          "line": 66,
-          "column": 58
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -2293,6 +2068,321 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 3249,
           "column": 60
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3251,
+          "column": 82
+        },
+        "end": {
+          "line": 3251,
+          "column": 93
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-boolean-literal-compare",
+      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
+      "filePath": "bundled:///libs/lib.esnext.disposable.d.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 52,
+          "column": 31
+        },
+        "end": {
+          "line": 52,
+          "column": 46
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 52,
+          "column": 61
+        },
+        "end": {
+          "line": 52,
+          "column": 76
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 52,
+          "column": 91
+        },
+        "end": {
+          "line": 52,
+          "column": 106
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3252,
+          "column": 63
+        },
+        "end": {
+          "line": 3252,
+          "column": 74
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 52,
+          "column": 122
+        },
+        "end": {
+          "line": 52,
+          "column": 137
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 52,
+          "column": 152
+        },
+        "end": {
+          "line": 52,
+          "column": 167
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 52,
+          "column": 183
+        },
+        "end": {
+          "line": 52,
+          "column": 198
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3263,
+          "column": 41
+        },
+        "end": {
+          "line": 3263,
+          "column": 52
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3269,
+          "column": 53
+        },
+        "end": {
+          "line": 3269,
+          "column": 64
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3277,
+          "column": 102
+        },
+        "end": {
+          "line": 3277,
+          "column": 113
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 59,
+          "column": 31
+        },
+        "end": {
+          "line": 59,
+          "column": 46
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 59,
+          "column": 61
+        },
+        "end": {
+          "line": 59,
+          "column": 76
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 59,
+          "column": 91
+        },
+        "end": {
+          "line": 59,
+          "column": 106
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 59,
+          "column": 122
+        },
+        "end": {
+          "line": 59,
+          "column": 137
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 59,
+          "column": 152
+        },
+        "end": {
+          "line": 59,
+          "column": 167
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3343,
+          "column": 102
+        },
+        "end": {
+          "line": 3343,
+          "column": 113
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 59,
+          "column": 183
+        },
+        "end": {
+          "line": 59,
+          "column": 198
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3412,
+          "column": 103
+        },
+        "end": {
+          "line": 3412,
+          "column": 114
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 66,
+          "column": 43
+        },
+        "end": {
+          "line": 66,
+          "column": 58
         }
       }
     },
@@ -2377,12 +2467,27 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 3251,
-          "column": 82
+          "line": 3481,
+          "column": 53
         },
         "end": {
-          "line": 3251,
-          "column": 93
+          "line": 3481,
+          "column": 64
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3528,
+          "column": 36
+        },
+        "end": {
+          "line": 3528,
+          "column": 51
         }
       }
     },
@@ -2398,6 +2503,21 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 73,
           "column": 51
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3529,
+          "column": 38
+        },
+        "end": {
+          "line": 3529,
+          "column": 49
         }
       }
     },
@@ -2437,12 +2557,42 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 3252,
-          "column": 63
+          "line": 3530,
+          "column": 48
         },
         "end": {
-          "line": 3252,
-          "column": 74
+          "line": 3530,
+          "column": 59
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3532,
+          "column": 81
+        },
+        "end": {
+          "line": 3532,
+          "column": 92
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3533,
+          "column": 62
+        },
+        "end": {
+          "line": 3533,
+          "column": 73
         }
       }
     },
@@ -2462,6 +2612,66 @@ exports[`lint api > diag snapshot 1`] = `
       }
     },
     {
+      "ruleName": "no-unnecessary-boolean-literal-compare",
+      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
+      "filePath": "bundled:///libs/lib.es2015.reflect.d.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3544,
+          "column": 40
+        },
+        "end": {
+          "line": 3544,
+          "column": 51
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3550,
+          "column": 52
+        },
+        "end": {
+          "line": 3550,
+          "column": 63
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3558,
+          "column": 101
+        },
+        "end": {
+          "line": 3558,
+          "column": 112
+        }
+      }
+    },
+    {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
@@ -2473,21 +2683,6 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 73,
           "column": 172
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3263,
-          "column": 41
-        },
-        "end": {
-          "line": 3263,
-          "column": 52
         }
       }
     },
@@ -2512,27 +2707,12 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 3269,
-          "column": 53
+          "line": 3625,
+          "column": 103
         },
         "end": {
-          "line": 3269,
-          "column": 64
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3277,
-          "column": 102
-        },
-        "end": {
-          "line": 3277,
-          "column": 113
+          "line": 3625,
+          "column": 114
         }
       }
     },
@@ -2587,12 +2767,12 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 3343,
-          "column": 102
+          "line": 3693,
+          "column": 104
         },
         "end": {
-          "line": 3343,
-          "column": 113
+          "line": 3693,
+          "column": 115
         }
       }
     },
@@ -2642,47 +2822,17 @@ exports[`lint api > diag snapshot 1`] = `
       }
     },
     {
-      "ruleName": "no-unnecessary-boolean-literal-compare",
-      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "bundled:///libs/lib.es2015.proxy.d.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 1
-        },
-        "end": {
-          "line": 1,
-          "column": 1
-        }
-      }
-    },
-    {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 3412,
-          "column": 103
+          "line": 3762,
+          "column": 54
         },
         "end": {
-          "line": 3412,
-          "column": 114
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3481,
-          "column": 53
-        },
-        "end": {
-          "line": 3481,
-          "column": 64
+          "line": 3762,
+          "column": 65
         }
       }
     },
@@ -2719,36 +2869,6 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3528,
-          "column": 36
-        },
-        "end": {
-          "line": 3528,
-          "column": 51
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3529,
-          "column": 38
-        },
-        "end": {
-          "line": 3529,
-          "column": 49
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
       "range": {
         "start": {
@@ -2758,21 +2878,6 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 93,
           "column": 105
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3530,
-          "column": 48
-        },
-        "end": {
-          "line": 3530,
-          "column": 59
         }
       }
     },
@@ -2809,6 +2914,21 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3809,
+          "column": 37
+        },
+        "end": {
+          "line": 3809,
+          "column": 52
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
       "range": {
         "start": {
@@ -2822,17 +2942,17 @@ exports[`lint api > diag snapshot 1`] = `
       }
     },
     {
-      "ruleName": "no-unnecessary-boolean-literal-compare",
-      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "bundled:///libs/lib.es2015.collection.d.ts",
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 1,
-          "column": 1
+          "line": 3810,
+          "column": 39
         },
         "end": {
-          "line": 1,
-          "column": 1
+          "line": 3810,
+          "column": 50
         }
       }
     },
@@ -2842,57 +2962,12 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 3532,
-          "column": 81
+          "line": 3811,
+          "column": 49
         },
         "end": {
-          "line": 3532,
-          "column": 92
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3533,
-          "column": 62
-        },
-        "end": {
-          "line": 3533,
-          "column": 73
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3544,
-          "column": 40
-        },
-        "end": {
-          "line": 3544,
-          "column": 51
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3550,
-          "column": 52
-        },
-        "end": {
-          "line": 3550,
-          "column": 63
+          "line": 3811,
+          "column": 60
         }
       }
     },
@@ -2914,21 +2989,6 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3558,
-          "column": 101
-        },
-        "end": {
-          "line": 3558,
-          "column": 112
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
       "range": {
         "start": {
@@ -2938,6 +2998,21 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 99,
           "column": 78
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3813,
+          "column": 82
+        },
+        "end": {
+          "line": 3813,
+          "column": 93
         }
       }
     },
@@ -3007,12 +3082,12 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 3625,
-          "column": 103
+          "line": 3814,
+          "column": 63
         },
         "end": {
-          "line": 3625,
-          "column": 114
+          "line": 3814,
+          "column": 74
         }
       }
     },
@@ -3022,12 +3097,42 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 3693,
-          "column": 104
+          "line": 3825,
+          "column": 41
         },
         "end": {
-          "line": 3693,
-          "column": 115
+          "line": 3825,
+          "column": 52
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3831,
+          "column": 53
+        },
+        "end": {
+          "line": 3831,
+          "column": 64
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-boolean-literal-compare",
+      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
+      "filePath": "bundled:///libs/lib.es2015.proxy.d.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
         }
       }
     },
@@ -3139,21 +3244,6 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3762,
-          "column": 54
-        },
-        "end": {
-          "line": 3762,
-          "column": 65
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
       "range": {
         "start": {
@@ -3172,27 +3262,12 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 3809,
-          "column": 37
+          "line": 3839,
+          "column": 102
         },
         "end": {
-          "line": 3809,
-          "column": 52
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3810,
-          "column": 39
-        },
-        "end": {
-          "line": 3810,
-          "column": 50
+          "line": 3839,
+          "column": 113
         }
       }
     },
@@ -3214,6 +3289,21 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3906,
+          "column": 104
+        },
+        "end": {
+          "line": 3906,
+          "column": 115
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
       "range": {
         "start": {
@@ -3223,21 +3313,6 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 130,
           "column": 76
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3811,
-          "column": 49
-        },
-        "end": {
-          "line": 3811,
-          "column": 60
         }
       }
     },
@@ -3307,126 +3382,6 @@ exports[`lint api > diag snapshot 1`] = `
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 3813,
-          "column": 82
-        },
-        "end": {
-          "line": 3813,
-          "column": 93
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3814,
-          "column": 63
-        },
-        "end": {
-          "line": 3814,
-          "column": 74
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3825,
-          "column": 41
-        },
-        "end": {
-          "line": 3825,
-          "column": 52
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3831,
-          "column": 53
-        },
-        "end": {
-          "line": 3831,
-          "column": 64
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-boolean-literal-compare",
-      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "bundled:///libs/lib.es2016.array.include.d.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 1
-        },
-        "end": {
-          "line": 1,
-          "column": 1
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-boolean-literal-compare",
-      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "bundled:///libs/lib.es2020.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 1
-        },
-        "end": {
-          "line": 1,
-          "column": 1
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3839,
-          "column": 102
-        },
-        "end": {
-          "line": 3839,
-          "column": 113
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3906,
-          "column": 104
-        },
-        "end": {
-          "line": 3906,
-          "column": 115
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
           "line": 3975,
           "column": 105
         },
@@ -3448,21 +3403,6 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 4044,
           "column": 66
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-boolean-literal-compare",
-      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "bundled:///libs/lib.es2015.promise.d.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 1
-        },
-        "end": {
-          "line": 1,
-          "column": 1
         }
       }
     },
@@ -3527,6 +3467,36 @@ exports[`lint api > diag snapshot 1`] = `
       }
     },
     {
+      "ruleName": "no-unnecessary-boolean-literal-compare",
+      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
+      "filePath": "bundled:///libs/lib.es2015.collection.d.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-boolean-literal-compare",
+      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
+      "filePath": "bundled:///libs/lib.es2016.array.include.d.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
@@ -3559,21 +3529,6 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2020.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 27,
-          "column": 35
-        },
-        "end": {
-          "line": 27,
-          "column": 50
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -3589,21 +3544,6 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2020.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 27,
-          "column": 69
-        },
-        "end": {
-          "line": 27,
-          "column": 84
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -3613,6 +3553,231 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 4121,
           "column": 114
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4188,
+          "column": 104
+        },
+        "end": {
+          "line": 4188,
+          "column": 115
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4257,
+          "column": 105
+        },
+        "end": {
+          "line": 4257,
+          "column": 116
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4326,
+          "column": 55
+        },
+        "end": {
+          "line": 4326,
+          "column": 66
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4373,
+          "column": 38
+        },
+        "end": {
+          "line": 4373,
+          "column": 53
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4374,
+          "column": 40
+        },
+        "end": {
+          "line": 4374,
+          "column": 51
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4375,
+          "column": 50
+        },
+        "end": {
+          "line": 4375,
+          "column": 61
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4377,
+          "column": 83
+        },
+        "end": {
+          "line": 4377,
+          "column": 94
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-boolean-literal-compare",
+      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
+      "filePath": "bundled:///libs/lib.es2020.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4378,
+          "column": 64
+        },
+        "end": {
+          "line": 4378,
+          "column": 75
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4389,
+          "column": 42
+        },
+        "end": {
+          "line": 4389,
+          "column": 53
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4395,
+          "column": 54
+        },
+        "end": {
+          "line": 4395,
+          "column": 65
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4403,
+          "column": 103
+        },
+        "end": {
+          "line": 4403,
+          "column": 114
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-boolean-literal-compare",
+      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
+      "filePath": "bundled:///libs/lib.es2015.promise.d.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2020.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 27,
+          "column": 35
+        },
+        "end": {
+          "line": 27,
+          "column": 50
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2020.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 27,
+          "column": 69
+        },
+        "end": {
+          "line": 27,
+          "column": 84
         }
       }
     },
@@ -3664,21 +3829,6 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4188,
-          "column": 104
-        },
-        "end": {
-          "line": 4188,
-          "column": 115
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2020.sharedmemory.d.ts",
       "range": {
         "start": {
@@ -3688,6 +3838,21 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 41,
           "column": 96
+        }
+      }
+    },
+    {
+      "ruleName": "no-redundant-type-constituents",
+      "message": "'never' is overridden by other types in this union type.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4463,
+          "column": 105
+        },
+        "end": {
+          "line": 4463,
+          "column": 149
         }
       }
     },
@@ -3722,17 +3887,17 @@ exports[`lint api > diag snapshot 1`] = `
       }
     },
     {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "ruleName": "no-redundant-type-constituents",
+      "message": "'never' is overridden by other types in this union type.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 4257,
-          "column": 105
+          "line": 4464,
+          "column": 113
         },
         "end": {
-          "line": 4257,
-          "column": 116
+          "line": 4464,
+          "column": 157
         }
       }
     },
@@ -3778,21 +3943,6 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 61,
           "column": 49
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4326,
-          "column": 55
-        },
-        "end": {
-          "line": 4326,
-          "column": 66
         }
       }
     },
@@ -3859,21 +4009,6 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4373,
-          "column": 38
-        },
-        "end": {
-          "line": 4373,
-          "column": 53
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2020.sharedmemory.d.ts",
       "range": {
         "start": {
@@ -3883,66 +4018,6 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 74,
           "column": 84
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-boolean-literal-compare",
-      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "bundled:///libs/lib.es2019.array.d.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 1
-        },
-        "end": {
-          "line": 1,
-          "column": 1
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4374,
-          "column": 40
-        },
-        "end": {
-          "line": 4374,
-          "column": 51
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4375,
-          "column": 50
-        },
-        "end": {
-          "line": 4375,
-          "column": 61
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4377,
-          "column": 83
-        },
-        "end": {
-          "line": 4377,
-          "column": 94
         }
       }
     },
@@ -3964,21 +4039,6 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4378,
-          "column": 64
-        },
-        "end": {
-          "line": 4378,
-          "column": 75
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2020.sharedmemory.d.ts",
       "range": {
         "start": {
@@ -3988,51 +4048,6 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 91,
           "column": 53
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4389,
-          "column": 42
-        },
-        "end": {
-          "line": 4389,
-          "column": 53
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4395,
-          "column": 54
-        },
-        "end": {
-          "line": 4395,
-          "column": 65
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4403,
-          "column": 103
-        },
-        "end": {
-          "line": 4403,
-          "column": 114
         }
       }
     },
@@ -4069,6 +4084,21 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-boolean-literal-compare",
       "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
+      "filePath": "bundled:///libs/lib.es2019.array.d.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-boolean-literal-compare",
+      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
       "filePath": "bundled:///libs/lib.es2018.intl.d.ts",
       "range": {
         "start": {
@@ -4093,36 +4123,6 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 1,
           "column": 1
-        }
-      }
-    },
-    {
-      "ruleName": "no-redundant-type-constituents",
-      "message": "'never' is overridden by other types in this union type.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4463,
-          "column": 105
-        },
-        "end": {
-          "line": 4463,
-          "column": 149
-        }
-      }
-    },
-    {
-      "ruleName": "no-redundant-type-constituents",
-      "message": "'never' is overridden by other types in this union type.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4464,
-          "column": 113
-        },
-        "end": {
-          "line": 4464,
-          "column": 157
         }
       }
     },
@@ -4204,21 +4204,6 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-boolean-literal-compare",
       "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "bundled:///libs/lib.es2017.date.d.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 1
-        },
-        "end": {
-          "line": 1,
-          "column": 1
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-boolean-literal-compare",
-      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
       "filePath": "bundled:///libs/lib.es2018.asynciterable.d.ts",
       "range": {
         "start": {
@@ -4235,6 +4220,21 @@ exports[`lint api > diag snapshot 1`] = `
       "ruleName": "no-unnecessary-boolean-literal-compare",
       "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
       "filePath": "bundled:///libs/lib.es2020.promise.d.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-boolean-literal-compare",
+      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
+      "filePath": "bundled:///libs/lib.es2017.date.d.ts",
       "range": {
         "start": {
           "line": 1,
@@ -4292,21 +4292,6 @@ exports[`lint api > diag snapshot 1`] = `
       }
     },
     {
-      "ruleName": "no-unnecessary-boolean-literal-compare",
-      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "bundled:///libs/lib.es2017.typedarrays.d.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 1
-        },
-        "end": {
-          "line": 1,
-          "column": 1
-        }
-      }
-    },
-    {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2020.symbol.wellknown.d.ts",
@@ -4322,17 +4307,17 @@ exports[`lint api > diag snapshot 1`] = `
       }
     },
     {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "ruleName": "no-unnecessary-boolean-literal-compare",
+      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
       "filePath": "bundled:///libs/lib.es2017.typedarrays.d.ts",
       "range": {
         "start": {
-          "line": 20,
-          "column": 23
+          "line": 1,
+          "column": 1
         },
         "end": {
-          "line": 20,
-          "column": 34
+          "line": 1,
+          "column": 1
         }
       }
     },
@@ -4363,6 +4348,21 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 1,
           "column": 1
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.typedarrays.d.ts",
+      "range": {
+        "start": {
+          "line": 20,
+          "column": 23
+        },
+        "end": {
+          "line": 20,
+          "column": 34
         }
       }
     },
@@ -4504,21 +4504,6 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-boolean-literal-compare",
       "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "dist/service.d.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 1
-        },
-        "end": {
-          "line": 1,
-          "column": 1
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-boolean-literal-compare",
-      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
       "filePath": "bundled:///libs/lib.es2017.intl.d.ts",
       "range": {
         "start": {
@@ -4534,7 +4519,7 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-boolean-literal-compare",
       "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "bundled:///libs/lib.es2018.promise.d.ts",
+      "filePath": "dist/service.d.ts",
       "range": {
         "start": {
           "line": 1,
@@ -4549,7 +4534,7 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-boolean-literal-compare",
       "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "bundled:///libs/lib.es2015.d.ts",
+      "filePath": "bundled:///libs/lib.es2018.promise.d.ts",
       "range": {
         "start": {
           "line": 1,
@@ -4588,6 +4573,21 @@ exports[`lint api > diag snapshot 1`] = `
         "end": {
           "line": 29,
           "column": 49
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-boolean-literal-compare",
+      "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
+      "filePath": "bundled:///libs/lib.es2015.d.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 1
         }
       }
     },
@@ -4639,7 +4639,7 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-boolean-literal-compare",
       "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "bundled:///libs/lib.es2019.d.ts",
+      "filePath": "bundled:///libs/lib.es2018.d.ts",
       "range": {
         "start": {
           "line": 1,
@@ -4654,7 +4654,7 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "ruleName": "no-unnecessary-boolean-literal-compare",
       "message": "This rule requires the \`strictNullChecks\` compiler option to be turned on to function correctly.",
-      "filePath": "bundled:///libs/lib.es2018.d.ts",
+      "filePath": "bundled:///libs/lib.es2019.d.ts",
       "range": {
         "start": {
           "line": 1,
@@ -5609,21 +5609,6 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2020.bigint.d.ts",
-      "range": {
-        "start": {
-          "line": 723,
-          "column": 104
-        },
-        "end": {
-          "line": 723,
-          "column": 115
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.esnext.float16.d.ts",
       "range": {
         "start": {
@@ -5744,21 +5729,6 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 72,
-          "column": 77
-        },
-        "end": {
-          "line": 72,
-          "column": 84
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.esnext.float16.d.ts",
       "range": {
         "start": {
@@ -5768,6 +5738,21 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 319,
           "column": 43
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2020.bigint.d.ts",
+      "range": {
+        "start": {
+          "line": 723,
+          "column": 104
+        },
+        "end": {
+          "line": 723,
+          "column": 115
         }
       }
     },
@@ -5804,21 +5789,6 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 1867,
-          "column": 34
-        },
-        "end": {
-          "line": 1867,
-          "column": 49
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.esnext.float16.d.ts",
       "range": {
         "start": {
@@ -5843,21 +5813,6 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 374,
           "column": 52
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 137,
-          "column": 75
-        },
-        "end": {
-          "line": 137,
-          "column": 82
         }
       }
     },
@@ -5954,15 +5909,30 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 1867,
+          "column": 34
+        },
+        "end": {
+          "line": 1867,
+          "column": 49
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 192,
-          "column": 75
+          "line": 72,
+          "column": 77
         },
         "end": {
-          "line": 192,
-          "column": 82
+          "line": 72,
+          "column": 84
         }
       }
     },
@@ -5984,21 +5954,6 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 266,
-          "column": 78
-        },
-        "end": {
-          "line": 266,
-          "column": 85
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -6008,21 +5963,6 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 2004,
           "column": 113
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 295,
-          "column": 49
-        },
-        "end": {
-          "line": 295,
-          "column": 60
         }
       }
     },
@@ -6047,12 +5987,12 @@ exports[`lint api > virtual file support 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 301,
-          "column": 49
+          "line": 137,
+          "column": 75
         },
         "end": {
-          "line": 301,
-          "column": 60
+          "line": 137,
+          "column": 82
         }
       }
     },
@@ -6068,21 +6008,6 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 2120,
           "column": 50
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 309,
-          "column": 99
-        },
-        "end": {
-          "line": 309,
-          "column": 110
         }
       }
     },
@@ -6119,36 +6044,6 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 332,
-          "column": 50
-        },
-        "end": {
-          "line": 332,
-          "column": 61
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 338,
-          "column": 50
-        },
-        "end": {
-          "line": 338,
-          "column": 61
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -6158,21 +6053,6 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 2124,
           "column": 91
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 346,
-          "column": 100
-        },
-        "end": {
-          "line": 346,
-          "column": 111
         }
       }
     },
@@ -6224,21 +6104,6 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 369,
-          "column": 57
-        },
-        "end": {
-          "line": 369,
-          "column": 68
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -6257,27 +6122,12 @@ exports[`lint api > virtual file support 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 375,
-          "column": 57
+          "line": 192,
+          "column": 75
         },
         "end": {
-          "line": 375,
-          "column": 68
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 383,
-          "column": 107
-        },
-        "end": {
-          "line": 383,
-          "column": 118
+          "line": 192,
+          "column": 82
         }
       }
     },
@@ -6299,21 +6149,6 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 405,
-          "column": 50
-        },
-        "end": {
-          "line": 405,
-          "column": 61
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -6329,36 +6164,6 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 411,
-          "column": 50
-        },
-        "end": {
-          "line": 411,
-          "column": 61
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 419,
-          "column": 100
-        },
-        "end": {
-          "line": 419,
-          "column": 111
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -6368,36 +6173,6 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 2355,
           "column": 64
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 442,
-          "column": 51
-        },
-        "end": {
-          "line": 442,
-          "column": 62
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 448,
-          "column": 51
-        },
-        "end": {
-          "line": 448,
-          "column": 62
         }
       }
     },
@@ -6434,21 +6209,6 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 456,
-          "column": 101
-        },
-        "end": {
-          "line": 456,
-          "column": 112
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -6458,21 +6218,6 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 2404,
           "column": 59
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 479,
-          "column": 50
-        },
-        "end": {
-          "line": 479,
-          "column": 61
         }
       }
     },
@@ -6494,21 +6239,6 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 485,
-          "column": 50
-        },
-        "end": {
-          "line": 485,
-          "column": 61
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -6518,21 +6248,6 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 2407,
           "column": 73
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 493,
-          "column": 100
-        },
-        "end": {
-          "line": 493,
-          "column": 111
         }
       }
     },
@@ -6554,6 +6269,21 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 266,
+          "column": 78
+        },
+        "end": {
+          "line": 266,
+          "column": 85
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -6569,21 +6299,6 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 516,
-          "column": 51
-        },
-        "end": {
-          "line": 516,
-          "column": 62
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -6592,36 +6307,6 @@ exports[`lint api > virtual file support 1`] = `
         },
         "end": {
           "line": 2432,
-          "column": 112
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 522,
-          "column": 51
-        },
-        "end": {
-          "line": 522,
-          "column": 62
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 530,
-          "column": 101
-        },
-        "end": {
-          "line": 530,
           "column": 112
         }
       }
@@ -6647,12 +6332,27 @@ exports[`lint api > virtual file support 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 553,
-          "column": 52
+          "line": 295,
+          "column": 49
         },
         "end": {
-          "line": 553,
-          "column": 63
+          "line": 295,
+          "column": 60
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 301,
+          "column": 49
+        },
+        "end": {
+          "line": 301,
+          "column": 60
         }
       }
     },
@@ -6677,27 +6377,12 @@ exports[`lint api > virtual file support 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 559,
-          "column": 52
+          "line": 309,
+          "column": 99
         },
         "end": {
-          "line": 559,
-          "column": 63
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
-      "range": {
-        "start": {
-          "line": 567,
-          "column": 102
-        },
-        "end": {
-          "line": 567,
-          "column": 113
+          "line": 309,
+          "column": 110
         }
       }
     },
@@ -6722,12 +6407,27 @@ exports[`lint api > virtual file support 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 590,
-          "column": 52
+          "line": 332,
+          "column": 50
         },
         "end": {
-          "line": 590,
-          "column": 63
+          "line": 332,
+          "column": 61
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 338,
+          "column": 50
+        },
+        "end": {
+          "line": 338,
+          "column": 61
         }
       }
     },
@@ -6752,12 +6452,12 @@ exports[`lint api > virtual file support 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 596,
-          "column": 52
+          "line": 346,
+          "column": 100
         },
         "end": {
-          "line": 596,
-          "column": 63
+          "line": 346,
+          "column": 111
         }
       }
     },
@@ -6797,12 +6497,42 @@ exports[`lint api > virtual file support 1`] = `
       "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
       "range": {
         "start": {
-          "line": 604,
-          "column": 102
+          "line": 369,
+          "column": 57
         },
         "end": {
-          "line": 604,
-          "column": 113
+          "line": 369,
+          "column": 68
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 375,
+          "column": 57
+        },
+        "end": {
+          "line": 375,
+          "column": 68
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 383,
+          "column": 107
+        },
+        "end": {
+          "line": 383,
+          "column": 118
         }
       }
     },
@@ -6824,6 +6554,36 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 405,
+          "column": 50
+        },
+        "end": {
+          "line": 405,
+          "column": 61
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 411,
+          "column": 50
+        },
+        "end": {
+          "line": 411,
+          "column": 61
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -6833,6 +6593,21 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 2689,
           "column": 80
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 419,
+          "column": 100
+        },
+        "end": {
+          "line": 419,
+          "column": 111
         }
       }
     },
@@ -6869,6 +6644,21 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 442,
+          "column": 51
+        },
+        "end": {
+          "line": 442,
+          "column": 62
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -6878,6 +6668,36 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 2714,
           "column": 119
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 448,
+          "column": 51
+        },
+        "end": {
+          "line": 448,
+          "column": 62
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 456,
+          "column": 101
+        },
+        "end": {
+          "line": 456,
+          "column": 112
         }
       }
     },
@@ -6899,6 +6719,21 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 479,
+          "column": 50
+        },
+        "end": {
+          "line": 479,
+          "column": 61
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -6908,6 +6743,36 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 2849,
           "column": 114
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 485,
+          "column": 50
+        },
+        "end": {
+          "line": 485,
+          "column": 61
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 493,
+          "column": 100
+        },
+        "end": {
+          "line": 493,
+          "column": 111
         }
       }
     },
@@ -6944,6 +6809,21 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 516,
+          "column": 51
+        },
+        "end": {
+          "line": 516,
+          "column": 62
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -6953,6 +6833,36 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 2966,
           "column": 49
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 522,
+          "column": 51
+        },
+        "end": {
+          "line": 522,
+          "column": 62
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 530,
+          "column": 101
+        },
+        "end": {
+          "line": 530,
+          "column": 112
         }
       }
     },
@@ -6974,6 +6884,36 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 553,
+          "column": 52
+        },
+        "end": {
+          "line": 553,
+          "column": 63
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 559,
+          "column": 52
+        },
+        "end": {
+          "line": 559,
+          "column": 63
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -6983,6 +6923,21 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 2969,
           "column": 92
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 567,
+          "column": 102
+        },
+        "end": {
+          "line": 567,
+          "column": 113
         }
       }
     },
@@ -7049,6 +7004,36 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 590,
+          "column": 52
+        },
+        "end": {
+          "line": 590,
+          "column": 63
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 596,
+          "column": 52
+        },
+        "end": {
+          "line": 596,
+          "column": 63
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -7058,6 +7043,21 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 3062,
           "column": 114
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2015.iterable.d.ts",
+      "range": {
+        "start": {
+          "line": 604,
+          "column": 102
+        },
+        "end": {
+          "line": 604,
+          "column": 113
         }
       }
     },
@@ -7184,6 +7184,96 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 52,
+          "column": 31
+        },
+        "end": {
+          "line": 52,
+          "column": 46
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 52,
+          "column": 61
+        },
+        "end": {
+          "line": 52,
+          "column": 76
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 52,
+          "column": 91
+        },
+        "end": {
+          "line": 52,
+          "column": 106
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 52,
+          "column": 122
+        },
+        "end": {
+          "line": 52,
+          "column": 137
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 52,
+          "column": 152
+        },
+        "end": {
+          "line": 52,
+          "column": 167
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 52,
+          "column": 183
+        },
+        "end": {
+          "line": 52,
+          "column": 198
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -7199,6 +7289,51 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 59,
+          "column": 31
+        },
+        "end": {
+          "line": 59,
+          "column": 46
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 59,
+          "column": 61
+        },
+        "end": {
+          "line": 59,
+          "column": 76
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 59,
+          "column": 91
+        },
+        "end": {
+          "line": 59,
+          "column": 106
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
@@ -7208,6 +7343,51 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 3277,
           "column": 113
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 59,
+          "column": 122
+        },
+        "end": {
+          "line": 59,
+          "column": 137
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 59,
+          "column": 152
+        },
+        "end": {
+          "line": 59,
+          "column": 167
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
+      "range": {
+        "start": {
+          "line": 59,
+          "column": 183
+        },
+        "end": {
+          "line": 59,
+          "column": 198
         }
       }
     },
@@ -7238,321 +7418,6 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 3412,
           "column": 114
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3481,
-          "column": 53
-        },
-        "end": {
-          "line": 3481,
-          "column": 64
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3528,
-          "column": 36
-        },
-        "end": {
-          "line": 3528,
-          "column": 51
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3529,
-          "column": 38
-        },
-        "end": {
-          "line": 3529,
-          "column": 49
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3530,
-          "column": 48
-        },
-        "end": {
-          "line": 3530,
-          "column": 59
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 52,
-          "column": 31
-        },
-        "end": {
-          "line": 52,
-          "column": 46
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 52,
-          "column": 61
-        },
-        "end": {
-          "line": 52,
-          "column": 76
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 52,
-          "column": 91
-        },
-        "end": {
-          "line": 52,
-          "column": 106
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 52,
-          "column": 122
-        },
-        "end": {
-          "line": 52,
-          "column": 137
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 52,
-          "column": 152
-        },
-        "end": {
-          "line": 52,
-          "column": 167
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 52,
-          "column": 183
-        },
-        "end": {
-          "line": 52,
-          "column": 198
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3532,
-          "column": 81
-        },
-        "end": {
-          "line": 3532,
-          "column": 92
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 59,
-          "column": 31
-        },
-        "end": {
-          "line": 59,
-          "column": 46
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 59,
-          "column": 61
-        },
-        "end": {
-          "line": 59,
-          "column": 76
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3533,
-          "column": 62
-        },
-        "end": {
-          "line": 3533,
-          "column": 73
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 59,
-          "column": 91
-        },
-        "end": {
-          "line": 59,
-          "column": 106
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 59,
-          "column": 122
-        },
-        "end": {
-          "line": 59,
-          "column": 137
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3544,
-          "column": 40
-        },
-        "end": {
-          "line": 3544,
-          "column": 51
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 59,
-          "column": 152
-        },
-        "end": {
-          "line": 59,
-          "column": 167
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
-      "range": {
-        "start": {
-          "line": 59,
-          "column": 183
-        },
-        "end": {
-          "line": 59,
-          "column": 198
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3550,
-          "column": 52
-        },
-        "end": {
-          "line": 3550,
-          "column": 63
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3558,
-          "column": 101
-        },
-        "end": {
-          "line": 3558,
-          "column": 112
         }
       }
     },
@@ -7598,21 +7463,6 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 66,
           "column": 118
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3625,
-          "column": 103
-        },
-        "end": {
-          "line": 3625,
-          "column": 114
         }
       }
     },
@@ -7667,12 +7517,42 @@ exports[`lint api > virtual file support 1`] = `
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 3693,
-          "column": 104
+          "line": 3481,
+          "column": 53
         },
         "end": {
-          "line": 3693,
-          "column": 115
+          "line": 3481,
+          "column": 64
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3528,
+          "column": 36
+        },
+        "end": {
+          "line": 3528,
+          "column": 51
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3529,
+          "column": 38
+        },
+        "end": {
+          "line": 3529,
+          "column": 49
         }
       }
     },
@@ -7697,12 +7577,12 @@ exports[`lint api > virtual file support 1`] = `
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 3762,
-          "column": 54
+          "line": 3530,
+          "column": 48
         },
         "end": {
-          "line": 3762,
-          "column": 65
+          "line": 3530,
+          "column": 59
         }
       }
     },
@@ -7787,27 +7667,12 @@ exports[`lint api > virtual file support 1`] = `
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 3809,
-          "column": 37
+          "line": 3532,
+          "column": 81
         },
         "end": {
-          "line": 3809,
-          "column": 52
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3810,
-          "column": 39
-        },
-        "end": {
-          "line": 3810,
-          "column": 50
+          "line": 3532,
+          "column": 92
         }
       }
     },
@@ -7829,36 +7694,6 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3811,
-          "column": 49
-        },
-        "end": {
-          "line": 3811,
-          "column": 60
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3813,
-          "column": 82
-        },
-        "end": {
-          "line": 3813,
-          "column": 93
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
       "range": {
         "start": {
@@ -7874,6 +7709,21 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3533,
+          "column": 62
+        },
+        "end": {
+          "line": 3533,
+          "column": 73
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
       "range": {
         "start": {
@@ -7883,21 +7733,6 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 86,
           "column": 107
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3814,
-          "column": 63
-        },
-        "end": {
-          "line": 3814,
-          "column": 74
         }
       }
     },
@@ -7934,21 +7769,6 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3825,
-          "column": 41
-        },
-        "end": {
-          "line": 3825,
-          "column": 52
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
       "range": {
         "start": {
@@ -7967,12 +7787,12 @@ exports[`lint api > virtual file support 1`] = `
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 3831,
-          "column": 53
+          "line": 3544,
+          "column": 40
         },
         "end": {
-          "line": 3831,
-          "column": 64
+          "line": 3544,
+          "column": 51
         }
       }
     },
@@ -7982,12 +7802,12 @@ exports[`lint api > virtual file support 1`] = `
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 3839,
-          "column": 102
+          "line": 3550,
+          "column": 52
         },
         "end": {
-          "line": 3839,
-          "column": 113
+          "line": 3550,
+          "column": 63
         }
       }
     },
@@ -8003,6 +7823,36 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 93,
           "column": 45
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3558,
+          "column": 101
+        },
+        "end": {
+          "line": 3558,
+          "column": 112
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3625,
+          "column": 103
+        },
+        "end": {
+          "line": 3625,
+          "column": 114
         }
       }
     },
@@ -8069,36 +7919,6 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3906,
-          "column": 104
-        },
-        "end": {
-          "line": 3906,
-          "column": 115
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 3975,
-          "column": 105
-        },
-        "end": {
-          "line": 3975,
-          "column": 116
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
       "range": {
         "start": {
@@ -8117,27 +7937,12 @@ exports[`lint api > virtual file support 1`] = `
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 4044,
-          "column": 55
+          "line": 3693,
+          "column": 104
         },
         "end": {
-          "line": 4044,
-          "column": 66
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4091,
-          "column": 38
-        },
-        "end": {
-          "line": 4091,
-          "column": 53
+          "line": 3693,
+          "column": 115
         }
       }
     },
@@ -8174,21 +7979,6 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4092,
-          "column": 40
-        },
-        "end": {
-          "line": 4092,
-          "column": 51
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
       "range": {
         "start": {
@@ -8204,6 +7994,21 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3762,
+          "column": 54
+        },
+        "end": {
+          "line": 3762,
+          "column": 65
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
       "range": {
         "start": {
@@ -8213,21 +8018,6 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 99,
           "column": 139
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4093,
-          "column": 50
-        },
-        "end": {
-          "line": 4093,
-          "column": 61
         }
       }
     },
@@ -8267,12 +8057,42 @@ exports[`lint api > virtual file support 1`] = `
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 4095,
-          "column": 83
+          "line": 3809,
+          "column": 37
         },
         "end": {
-          "line": 4095,
-          "column": 94
+          "line": 3809,
+          "column": 52
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3810,
+          "column": 39
+        },
+        "end": {
+          "line": 3810,
+          "column": 50
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3811,
+          "column": 49
+        },
+        "end": {
+          "line": 3811,
+          "column": 60
         }
       }
     },
@@ -8294,21 +8114,6 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4096,
-          "column": 64
-        },
-        "end": {
-          "line": 4096,
-          "column": 75
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
       "range": {
         "start": {
@@ -8318,21 +8123,6 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 106,
           "column": 76
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4107,
-          "column": 42
-        },
-        "end": {
-          "line": 4107,
-          "column": 53
         }
       }
     },
@@ -8369,6 +8159,21 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3813,
+          "column": 82
+        },
+        "end": {
+          "line": 3813,
+          "column": 93
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
       "range": {
         "start": {
@@ -8384,21 +8189,6 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4113,
-          "column": 54
-        },
-        "end": {
-          "line": 4113,
-          "column": 65
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
       "range": {
         "start": {
@@ -8408,6 +8198,21 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 106,
           "column": 198
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3814,
+          "column": 63
+        },
+        "end": {
+          "line": 3814,
+          "column": 74
         }
       }
     },
@@ -8432,12 +8237,27 @@ exports[`lint api > virtual file support 1`] = `
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 4121,
-          "column": 103
+          "line": 3825,
+          "column": 41
         },
         "end": {
-          "line": 4121,
-          "column": 114
+          "line": 3825,
+          "column": 52
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3831,
+          "column": 53
+        },
+        "end": {
+          "line": 3831,
+          "column": 64
         }
       }
     },
@@ -8462,12 +8282,12 @@ exports[`lint api > virtual file support 1`] = `
       "filePath": "bundled:///libs/lib.es5.d.ts",
       "range": {
         "start": {
-          "line": 4188,
-          "column": 104
+          "line": 3839,
+          "column": 102
         },
         "end": {
-          "line": 4188,
-          "column": 115
+          "line": 3839,
+          "column": 113
         }
       }
     },
@@ -8489,21 +8309,6 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4257,
-          "column": 105
-        },
-        "end": {
-          "line": 4257,
-          "column": 116
-        }
-      }
-    },
-    {
-      "ruleName": "no-unnecessary-type-arguments",
-      "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2017.sharedmemory.d.ts",
       "range": {
         "start": {
@@ -8513,6 +8318,21 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 130,
           "column": 76
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3906,
+          "column": 104
+        },
+        "end": {
+          "line": 3906,
+          "column": 115
         }
       }
     },
@@ -8573,6 +8393,186 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 130,
           "column": 198
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 3975,
+          "column": 105
+        },
+        "end": {
+          "line": 3975,
+          "column": 116
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4044,
+          "column": 55
+        },
+        "end": {
+          "line": 4044,
+          "column": 66
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4091,
+          "column": 38
+        },
+        "end": {
+          "line": 4091,
+          "column": 53
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4092,
+          "column": 40
+        },
+        "end": {
+          "line": 4092,
+          "column": 51
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4093,
+          "column": 50
+        },
+        "end": {
+          "line": 4093,
+          "column": 61
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4095,
+          "column": 83
+        },
+        "end": {
+          "line": 4095,
+          "column": 94
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4096,
+          "column": 64
+        },
+        "end": {
+          "line": 4096,
+          "column": 75
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4107,
+          "column": 42
+        },
+        "end": {
+          "line": 4107,
+          "column": 53
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4113,
+          "column": 54
+        },
+        "end": {
+          "line": 4113,
+          "column": 65
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4121,
+          "column": 103
+        },
+        "end": {
+          "line": 4121,
+          "column": 114
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4188,
+          "column": 104
+        },
+        "end": {
+          "line": 4188,
+          "column": 115
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-arguments",
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4257,
+          "column": 105
+        },
+        "end": {
+          "line": 4257,
+          "column": 116
         }
       }
     },
@@ -8712,36 +8712,6 @@ exports[`lint api > virtual file support 1`] = `
       }
     },
     {
-      "ruleName": "no-redundant-type-constituents",
-      "message": "'never' is overridden by other types in this union type.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4463,
-          "column": 105
-        },
-        "end": {
-          "line": 4463,
-          "column": 149
-        }
-      }
-    },
-    {
-      "ruleName": "no-redundant-type-constituents",
-      "message": "'never' is overridden by other types in this union type.",
-      "filePath": "bundled:///libs/lib.es5.d.ts",
-      "range": {
-        "start": {
-          "line": 4464,
-          "column": 113
-        },
-        "end": {
-          "line": 4464,
-          "column": 157
-        }
-      }
-    },
-    {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2020.sharedmemory.d.ts",
@@ -8757,6 +8727,21 @@ exports[`lint api > virtual file support 1`] = `
       }
     },
     {
+      "ruleName": "no-redundant-type-constituents",
+      "message": "'never' is overridden by other types in this union type.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4463,
+          "column": 105
+        },
+        "end": {
+          "line": 4463,
+          "column": 149
+        }
+      }
+    },
+    {
       "ruleName": "no-unnecessary-type-arguments",
       "message": "This is the default value for this type parameter, so it can be omitted.",
       "filePath": "bundled:///libs/lib.es2020.sharedmemory.d.ts",
@@ -8768,6 +8753,21 @@ exports[`lint api > virtual file support 1`] = `
         "end": {
           "line": 27,
           "column": 84
+        }
+      }
+    },
+    {
+      "ruleName": "no-redundant-type-constituents",
+      "message": "'never' is overridden by other types in this union type.",
+      "filePath": "bundled:///libs/lib.es5.d.ts",
+      "range": {
+        "start": {
+          "line": 4464,
+          "column": 113
+        },
+        "end": {
+          "line": 4464,
+          "column": 157
         }
       }
     },

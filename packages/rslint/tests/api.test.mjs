@@ -19,7 +19,7 @@ test('lint api', async (t) => {
         t.assert.snapshot(diags);
 
     })
-    test('diag snapshot', async (t) => {
+    await test('diag snapshot', async (t) => {
         let tsconfig = path.resolve(import.meta.dirname, '../fixtures/tsconfig.json');
         const diags = await lint(tsconfig);
         t.assert.snapshot(diags)
