@@ -26,7 +26,7 @@ function checkDiagnosticEqual(rslintDiagnostic: Diagnostic[], tsDiagnostic: TsDi
     const rslintDiag = rslintDiagnostic[i];
     const tsDiag = tsDiagnostic[i];
     // check rule match
-    assert(toCamelCase(rslintDiag.ruleName)=== tsDiag.messageId, `Message mismatch: ${rslintDiag.ruleName} !== ${tsDiag.messageId}`);
+    assert(toCamelCase(rslintDiag.ruleName) === tsDiag.messageId, `Message mismatch: ${rslintDiag.ruleName} !== ${tsDiag.messageId}`);
 
     // check ragnge match
     // tsDiag sometime doesn't have line and column, so we need to check that
