@@ -6,12 +6,13 @@ test('lint api', async (t) => {
     let cwd = path.resolve(import.meta.dirname, '../fixtures');
     await t.test('virtual file support', async (t) => {
         let tsconfig = path.resolve(import.meta.dirname, '../fixtures/tsconfig.virtual.json');
+        let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
         // Use virtual file contents instead of reading from disk
         const diags = await lint({
             tsconfig,
             cwd,
             fileContents: {
-                '/src/virtual.ts': `
+                 [virtual_entry]:`
                     let a:any = 10;
                     a.b =10;
                 `

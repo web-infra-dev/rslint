@@ -44,7 +44,7 @@ exports[`lint api > virtual file support 1`] = `
     {
       "ruleName": "no-unsafe-member-access",
       "message": "Unsafe member access .b on an \`any\` value.",
-      "filePath": "../../../../../../../src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "range": {
         "start": {
           "line": 3,

@@ -2,5 +2,5 @@
     "compilerOptions": {
         "strictNullChecks": true
     },
-    "include": ["/src/virtual.ts"]
+    "include": ["src/virtual.ts"]
 }
