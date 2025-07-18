@@ -14,7 +14,7 @@ interface Range {
   end: Position;
 }
 
-interface Diagnostic {
+export interface Diagnostic {
   ruleName: string;
   message: string;
   filePath: string;
