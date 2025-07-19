@@ -5,6 +5,7 @@ build({
   outfile: 'out/extension.js',
   format: 'cjs',
   bundle: true,
+  sourcemap: true,
   platform: 'node',
   external: ['@rslint/core', 'vscode'],
 });
