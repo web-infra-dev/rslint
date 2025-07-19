@@ -151,7 +151,7 @@ func NewLSPServer() *LSPServer {
 
 func (s *LSPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 	s.conn = conn
-	fmt.Fprintf(os.Stderr, "get %v", req)
+	log.Printf("Received request: %v", req)
 	switch req.Method {
 	case "initialize":
 		return s.handleInitialize(ctx, req)
