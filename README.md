@@ -120,5 +120,7 @@ cd typescript-go
 git am --3way --no-gpg-sign ../patches/*.patch    # apply typescript-go patches
 cd ..
 
+pnpm install
+
 pnpm build
 ```

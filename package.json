@@ -17,5 +17,8 @@
   "bugs": {
     "url": "https://github.com/web-infra-dev/rslint/issues"
   },
-  "homepage": "https://github.com/web-infra-dev/rslint#readme"
+  "homepage": "https://github.com/web-infra-dev/rslint#readme",
+  "engines": {
+    "pnpm": ">=10"
+  }
 }

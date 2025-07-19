@@ -1,0 +1,19 @@
+{
+  "configurations": [
+    {
+      "type": "extensionHost",
+      "request": "launch",
+      "name": "Run Extension",
+      "runtimeExecutable": "${execPath}",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode-extension",
+        "--disable-extensions"
+      ],
+      "autoAttachChildProcesses": true,
+      "outFiles": [
+        "${workspaceFolder}/tools/packages/vscode-extension/out/**/*.js"
+      ],
+      "preLaunchTask": "npm: watch - packages/vscode-extension"
+    }
+  ]
+}
