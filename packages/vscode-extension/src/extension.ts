@@ -1,6 +1,7 @@
 import * as path from 'path';
 import { workspace, ExtensionContext, window } from 'vscode';
 import {
+  Executable,
   LanguageClient,
   LanguageClientOptions,
   ServerOptions,
@@ -10,17 +11,14 @@ import {
 let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
-  const serverModule = context.asAbsolutePath(
-    path.join('out', 'server.js')
-  );
-
+  const binPath = workspace.getConfiguration().get('rslint.binPath') as string;
+  const run: Executable  = {
+    command: binPath,
+    args: ["--lsp"]
+  }
   const serverOptions: ServerOptions = {
-    run: { module: serverModule, transport: TransportKind.ipc },
-    debug: {
-      module: serverModule,
-      transport: TransportKind.ipc,
-      options: { execArgv: ['--nolazy', '--inspect=6009'] }
-    }
+    run,
+    debug: run
   };
 
   const clientOptions: LanguageClientOptions = {
