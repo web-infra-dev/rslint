@@ -127,8 +127,8 @@ type Range struct {
 }
 
 type Position struct {
-	Line   int `json:"line"`
-	Column int `json:"column"`
+	Line      int `json:"line"`
+	Character int `json:"character"`
 }
 
 type PublishDiagnosticsParams struct {
@@ -351,16 +351,16 @@ func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic, content string) Ls
 	return LspDiagnostic{
 		Range: Range{
 			Start: Position{
-				Line:   startLine,
-				Column: startColumn,
+				Line:      startLine,
+				Character: startColumn,
 			},
 			End: Position{
-				Line:   endLine,
-				Column: endColumn,
+				Line:      endLine,
+				Character: endColumn,
 			},
 		},
 		Severity: 1, // Error
-		Source:   ruleDiag.SourceFile.FileName(),
+		Source:   "rslint",
 		Message:  fmt.Sprintf("[%s] %s", ruleDiag.RuleName, ruleDiag.Message.Description),
 	}
 }
