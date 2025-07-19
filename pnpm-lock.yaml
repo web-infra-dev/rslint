@@ -28,6 +28,9 @@ importers:
 
   packages/vscode-extension:
     devDependencies:
+      '@rslint/core':
+        specifier: workspace:*
+        version: link:../rslint
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.7

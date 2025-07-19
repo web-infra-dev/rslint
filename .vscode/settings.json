@@ -1,4 +1,4 @@
 {
-    "rslint.binPath": "./packages/rslint/bin/rslint",
-    "rslint.enable": true
+  "rslint.binPath": "./packages/rslint/bin/rslint",
+  "rslint.enable": true
 }
