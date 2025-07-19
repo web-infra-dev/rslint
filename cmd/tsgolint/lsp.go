@@ -322,7 +322,7 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri, content string) {
 		lspDiag := convertRuleDiagnosticToLSP(diagnostic, content)
 		lsp_diagnostics = append(lsp_diagnostics, lspDiag)
 	}
-	fmt.Fprintf(os.Stderr, "my diags: %v", lsp_diagnostics)
+	log.Printf("Diagnostics collected: %v", lsp_diagnostics)
 	// Publish diagnostics
 	params := PublishDiagnosticsParams{
 		URI:         uri,
