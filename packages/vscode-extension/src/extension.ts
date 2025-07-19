@@ -18,7 +18,7 @@ export function activate(context: ExtensionContext) {
   }
   const serverOptions: ServerOptions = {
     run,
-    debug:run
+    debug: run
   };
 
   const clientOptions: LanguageClientOptions = {
