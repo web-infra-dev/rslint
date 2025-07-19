@@ -38,7 +38,7 @@
           "default": true,
           "description": "Enable/disable rslint"
         },
-        "rslint.executablePath": {
+        "rslint.binPath": {
           "type": "string",
           "default": "rslint",
           "description": "Path to rslint executable"
@@ -58,10 +58,12 @@
   },
   "scripts": {
     "vscode:prepublish": "pnpm run compile",
-    "compile": "tsc -p ./",
+    "compile": "node scripts/build.js",
     "watch": "tsc -watch -p ./",
     "package": "vsce package --dependencies",
+    "prepackage": "pnpm compile",
     "publish": "vsce publish"
+    
   },
   "dependencies": {
     
@@ -72,6 +74,7 @@
     "@types/vscode": "^1.74.0",
     "typescript": "^5.0.0",
     "vscode-languageserver": "^9.0.1",
-    "vscode-languageserver-textdocument": "^1.0.12"
+    "vscode-languageserver-textdocument": "^1.0.12",
+    "esbuild": "0.25.7"
   }
 }
