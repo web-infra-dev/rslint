@@ -506,16 +506,16 @@ func runLint(uri string) ([]rule.RuleDiagnostic, error) {
 	// If specific files are provided, use those
 
 	// Otherwise use all source files
-	fmt.Fprintf(os.Stderr, "uri: %v", uri)
+	log.Printf("uri: %v", uri)
 	for _, file := range program.SourceFiles() {
 
 		p := string(file.Path())
-		fmt.Fprintf(os.Stderr, "file: %v ", p)
+		log.Printf("file: %v", p)
 		// FIXME: should filter file
 		files = append(files, file)
 
 	}
-	fmt.Fprintf(os.Stderr, "files: %v", files)
+	log.Printf("files: %v", files)
 
 	slices.SortFunc(files, func(a *ast.SourceFile, b *ast.SourceFile) int {
 		return len(b.Text()) - len(a.Text())
