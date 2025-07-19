@@ -57,9 +57,9 @@
   },
   "scripts": {
     "vscode:prepublish": "pnpm run build",
-    "prepare": "rm -rf out && mkdir -p ./out && cp ../rslint/bin/rslint ./out/rslint",
-    "build": "npm run prepare && node scripts/build.js",
-    "watch": "npm run prepare && tsc -watch -p ./",
+    "copy-binary": "rimraf out && copyfiles ../rslint/bin/rslint ./out/rslint",
+    "build": "npm run copy-binary && node scripts/build.js",
+    "watch": "pnpm run copy-binary && tsc -watch -p ./",
     "package": "vsce package --dependencies",
     "prepackage": "pnpm build",
     "publish": "vsce publish"
@@ -68,7 +68,9 @@
     "@rslint/core": "workspace:*",
     "@types/node": "^20.0.0",
     "@types/vscode": "^1.74.0",
+    "copyfiles": "2.4.1",
     "esbuild": "0.25.7",
+    "rimraf": "6.0.1",
     "typescript": "^5.0.0",
     "vscode-languageclient": "^9.0.1",
     "vscode-languageserver": "^9.0.1",
