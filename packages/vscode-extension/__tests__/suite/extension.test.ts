@@ -6,7 +6,7 @@ suite('rslint extension', function() {
   this.timeout(50000);
   test('diagnostics', async () => {
     const doc = await vscode.workspace.openTextDocument(
-      path.resolve(__dirname, '../../__tests__/fixtures/a.ts'),
+      path.resolve(require.resolve('@rslint/core'), '../..', 'fixtures/src/index.ts'),
     );
 
     await vscode.window.showTextDocument(doc);
@@ -18,6 +18,6 @@ suite('rslint extension', function() {
     });
 
     const diagnostics = vscode.languages.getDiagnostics(doc.uri);
-    assert.equal(diagnostics.length, 0);
+    assert.ok(diagnostics.length > 0);
   });
 });
