@@ -1,4 +1,7 @@
 {
   "rslint.binPath": "./packages/rslint/bin/rslint",
-  "rslint.enable": true
+  "rslint.enable": true,
+  "[json]": {
+    "editor.tabSize": 2
+  }
 }

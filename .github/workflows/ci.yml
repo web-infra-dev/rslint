@@ -65,12 +65,16 @@ jobs:
     - name: Install dependencies
       run: pnpm install --frozen-lockfile
 
-    - name: Test
-      run: | 
-        pnpm -r build
-        pnpm -r test
+    - name: Build
+      run: pnpm build
 
+    - name: Test on Linux
+      if: runner.os == 'Linux'
+      run: xvfb-run -a pnpm -r test
 
+    - name: Test on non-Linux
+      if: runner.os != 'Linux'
+      run: pnpm -r test
 
   done:
     needs:
