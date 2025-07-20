@@ -5,7 +5,7 @@ Rslint aims to be a drop-in replacement for ESLint and TypeScript-ESLint, just a
 > [!NOTE]
 > Rslint is a fork of [tsgolint](https://github.com/typescript-eslint/tsgolint), an experimental proof-of-concept typescript-go powered JS/TS linter. We would like to express our heartfelt gratitude to the tsgolint team, especially to [@auvred](https://github.com/auvred) for their pioneering work and innovative approach to TypeScript linting. We decided to fork tsgolint because it serves as a proof-of-concept with no current plans for continued development on this direction in the near term ([reference](https://x.com/bradzacher/status/1943475629376282998)). 
 
-Based on [typescript-go](https://github.com/microsoft/typescript-go) early exploration.
+Based on [tsgolint](https://github.com/typescript-eslint/tsgolint) early exploration.
 
 **tsgolint** is an experimental proof-of-concept [typescript-go](https://github.com/microsoft/typescript-go) powered JS/TS linter written in Go.
 
