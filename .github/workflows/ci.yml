@@ -70,11 +70,12 @@ jobs:
 
     - name: Test on Linux
       if: runner.os == 'Linux'
-      run: xvfb-run -a npm test
+      run: xvfb-run -a pnpm -r test
 
     - name: Test on non-Linux
       if: runner.os != 'Linux'
-      run: npm test
+      run: pnpm -r test
+
   done:
     needs:
       - test-go
