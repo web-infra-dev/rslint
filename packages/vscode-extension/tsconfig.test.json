@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "commonjs",
+    "outDir": ".vscode-test-out",
+    "lib": ["ES2019"],
+    "skipLibCheck": true
+  },
+  "include": ["__tests__"]
+}

@@ -8,4 +8,5 @@ build({
   sourcemap: true,
   platform: 'node',
   external: ['@rslint/core', 'vscode'],
+  tsconfig: 'tsconfig.build.json',
 });
