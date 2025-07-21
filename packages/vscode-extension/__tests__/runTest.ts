@@ -5,7 +5,7 @@ import { runTests } from '@vscode/test-electron';
 async function main() {
   try {
     const extensionDevelopmentPath = path.resolve(__dirname, '..');
-    const testWorkspace = path.resolve(process.cwd(), '__tests__', 'fixtures');
+    const testWorkspace = path.resolve(require.resolve('@rslint/core'), '../..', 'fixtures');
 
     const extensionTestsPath = path.resolve(__dirname, './suite');
 
