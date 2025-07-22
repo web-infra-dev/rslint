@@ -57,7 +57,17 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+            ~/Library/Caches/go-build
+            ~/AppData/Local/go-build
+          key: rslint-setup-go-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}-${{ github.workflow }}-
+          restore-keys: |
+            rslint-setup-go-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}-${{ github.workflow }}-
       - name: Install pnpm
         run: corepack enable
 
