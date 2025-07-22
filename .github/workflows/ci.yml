@@ -66,6 +66,8 @@ jobs:
 
       - name: TypeCheck
         run: pnpm typecheck
+      - name: Format
+        run: pnpm format:check
 
       - name: Build
         run: pnpm build
