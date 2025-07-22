@@ -1,6 +1,18 @@
 {
-    "compilerOptions": {
-        "strictNullChecks": true
+  "compilerOptions": {
+    "strictNullChecks": true,
+    "composite": true
+  },
+  "include": ["packages/rslint/fixtures/src/index.ts"],
+  "references": [
+    {
+      "path": "./packages/rslint"
     },
-    "include": ["packages/rslint/fixtures/src/index.ts"]
+    {
+      "path": "./packages/rslint-test-tools"
+    },
+    {
+      "path": "./packages/vscode-extension"
+    }
+  ]
 }

@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "noEmit": true,
+    "tsBuildInfoFile": "${configDir}/dist/tsconfig.build.tsbuildinfo"
+  },
+  "include": ["package.json"]
+}

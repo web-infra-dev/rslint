@@ -5,22 +5,26 @@ import {
   LanguageClient,
   LanguageClientOptions,
   ServerOptions,
-  TransportKind
+  TransportKind,
 } from 'vscode-languageclient/node';
 
 let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
-  
-  const binPathConfig = workspace.getConfiguration().get('rslint.binPath') as string;
-  const binPath = binPathConfig && binPathConfig.trim() !== '' ? binPathConfig : Uri.joinPath(context.extensionUri,'out','rslint').fsPath;
-  const run: Executable  = {
+  const binPathConfig = workspace
+    .getConfiguration()
+    .get('rslint.binPath') as string;
+  const binPath =
+    binPathConfig && binPathConfig.trim() !== ''
+      ? binPathConfig
+      : Uri.joinPath(context.extensionUri, 'out', 'rslint').fsPath;
+  const run: Executable = {
     command: binPath,
-    args: ["--lsp"]
-  }
+    args: ['--lsp'],
+  };
   const serverOptions: ServerOptions = {
     run,
-    debug: run
+    debug: run,
   };
 
   const clientOptions: LanguageClientOptions = {
@@ -28,28 +32,28 @@ export function activate(context: ExtensionContext) {
       { scheme: 'file', language: 'typescript' },
       { scheme: 'file', language: 'typescriptreact' },
       { scheme: 'file', language: 'javascript' },
-      { scheme: 'file', language: 'javascriptreact' }
+      { scheme: 'file', language: 'javascriptreact' },
     ],
     synchronize: {
-      fileEvents: workspace.createFileSystemWatcher('**/.clientrc')
-    }
+      fileEvents: workspace.createFileSystemWatcher('**/.clientrc'),
+    },
   };
 
   client = new LanguageClient(
     'rslint',
     'Rslint Language Server',
     serverOptions,
-    clientOptions
+    clientOptions,
   );
 
   client.start();
 
   context.subscriptions.push(
-    client.onDidChangeState((event) => {
+    client.onDidChangeState(event => {
       if (event.newState === 2) {
         window.showInformationMessage('Rslint language server started');
       }
-    })
+    }),
   );
 }
 

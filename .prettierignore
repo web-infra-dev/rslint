@@ -1,0 +1,11 @@
+**/dist
+**/coverage
+**/.vscode
+**/.nyc_output
+**/.vs
+
+.yarn/plugins
+.yarn/releases
+
+typescript-go/
+packages/vscode-extension/.vscode-test-out

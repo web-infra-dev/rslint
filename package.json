@@ -5,7 +5,11 @@
   "main": "index.js",
   "private": true,
   "scripts": {
-    "build": "pnpm -r build"
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm tsc -b tsconfig.json",
+    "format": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --write .",
+    "format:check": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --check ."
   },
   "repository": {
     "type": "git",
@@ -20,5 +24,9 @@
   "homepage": "https://github.com/web-infra-dev/rslint#readme",
   "engines": {
     "pnpm": ">=10"
+  },
+  "devDependencies": {
+    "typescript": "5.8.3",
+    "prettier": "3.5.0"
   }
 }

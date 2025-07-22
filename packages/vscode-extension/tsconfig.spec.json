@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.spec.json",
+  "compilerOptions": {
+    "outDir": ".vscode-test-out",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "rootDir": "./__tests__",
+    "noEmit": false,
+    "skipLibCheck": true,
+    "allowArbitraryExtensions": true,
+    "allowImportingTsExtensions": false,
+    "rewriteRelativeImportExtensions": true,
+    "emitDeclarationOnly": false
+  },
+  "references": [],
+  "include": ["__tests__"]
+}
