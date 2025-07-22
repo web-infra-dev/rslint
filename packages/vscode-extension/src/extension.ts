@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { workspace, ExtensionContext, window } from 'vscode';
+import { workspace, ExtensionContext, window, Uri } from 'vscode';
 import {
   Executable,
   LanguageClient,
@@ -11,8 +11,9 @@ import {
 let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
+  const extensionUri = context.extensionUri;
   const binPathConfig = workspace.getConfiguration().get('rslint.binPath') as string;
-  const binPath = binPathConfig && binPathConfig.trim() !== '' ? binPathConfig : path.join(__dirname, './rslint');
+  const binPath = binPathConfig && binPathConfig.trim() !== '' ? binPathConfig : Uri.joinPath(extensionUri,'out','rslint').fsPath;
   const run: Executable  = {
     command: binPath,
     args: ["--lsp"]
