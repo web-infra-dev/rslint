@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
-    "strictNullChecks": true
+    "strictNullChecks": true,
+    "noEmit": true
   },
   "include": ["src/**/*.ts"]
 }

@@ -5,7 +5,8 @@
   "main": "index.js",
   "private": true,
   "scripts": {
-    "build": "pnpm -r build"
+    "build": "pnpm -r build",
+    "typecheck": "pnpm tsc -b tsconfig.json"
   },
   "repository": {
     "type": "git",
@@ -20,5 +21,8 @@
   "homepage": "https://github.com/web-infra-dev/rslint#readme",
   "engines": {
     "pnpm": ">=10"
+  },
+  "devDependencies": {
+    "typescript": "5.8.3"
   }
 }

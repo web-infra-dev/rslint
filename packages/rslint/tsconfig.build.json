@@ -1,14 +1,7 @@
 {
-    "extends": ["../../tsconfig.base.json"],
-    "include": ["src/"],
+    "extends": ["../../tsconfig.build.json"],
     "compilerOptions": {
-        "outDir": "dist",
-        "rootDir": "src",
-        "module": "nodenext",
-        "sourceMap": false,
-        "declarationMap": false,
-        "emitDeclarationOnly": false,
-        "noEmit": false,
-        "rewriteRelativeImportExtensions": true
-    }
+        
+    },
+    "references": []
 }

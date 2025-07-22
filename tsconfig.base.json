@@ -10,6 +10,7 @@
     "esModuleInterop": true,
     "experimentalDecorators": false,
     "forceConsistentCasingInFileNames": true,
+    "allowImportingTsExtensions": true,
     "importHelpers": false,
     "incremental": true,
     "isolatedModules": true,
@@ -30,5 +31,8 @@
     "target": "ES2022",
     "verbatimModuleSyntax": false
   },
+  "include": [
+   
+  ],
   "exclude": ["${configDir}/**/fixtures/**"]
 }
