@@ -5,14 +5,18 @@ import { runTests } from '@vscode/test-electron';
 async function main() {
   try {
     const extensionDevelopmentPath = path.resolve(__dirname, '..');
-    const testWorkspace = path.resolve(require.resolve('@rslint/core'), '../..', 'fixtures');
+    const testWorkspace = path.resolve(
+      require.resolve('@rslint/core'),
+      '../..',
+      'fixtures',
+    );
 
     const extensionTestsPath = path.resolve(__dirname, './suite');
 
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath,
-      launchArgs: ['--disable-extensions', testWorkspace]
+      launchArgs: ['--disable-extensions', testWorkspace],
     });
   } catch (err) {
     console.error(err);

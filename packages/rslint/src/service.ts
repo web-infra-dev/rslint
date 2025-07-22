@@ -40,7 +40,7 @@ export interface LintOptions {
 
 interface RSlintOptions {
   rslintPath?: string;
-  workingDirectory?: string
+  workingDirectory?: string;
 }
 
 interface PendingMessage {
@@ -63,24 +63,25 @@ export class RSLintService {
   constructor(options: RSlintOptions = {}) {
     this.nextMessageId = 1;
     this.pendingMessages = new Map();
-    this.rslintPath = options.rslintPath || path.join(import.meta.dirname, '../bin/rslint');
-    
+    this.rslintPath =
+      options.rslintPath || path.join(import.meta.dirname, '../bin/rslint');
+
     this.process = spawn(this.rslintPath, ['--ipc'], {
       stdio: ['pipe', 'pipe', 'inherit'],
       cwd: options.workingDirectory || process.cwd(),
       env: {
         ...process.env,
-        RSLINT_IPC: '1' // Alternative way to enable IPC mode
-      }
+        RSLINT_IPC: '1', // Alternative way to enable IPC mode
+      },
     });
-    
+
     // Set up binary message reading
-    this.process.stdout!.on('data', (data) => this.handleChunk(data));
+    this.process.stdout!.on('data', data => this.handleChunk(data));
     this.chunks = [];
     this.chunkSize = 0;
     this.expectedSize = null;
   }
-  
+
   /**
    * Send a message to the rslint process
    */
@@ -88,49 +89,51 @@ export class RSLintService {
     return new Promise((resolve, reject) => {
       const id = this.nextMessageId++;
       const message = { id, kind, data };
-      
+
       // Register promise callbacks
       this.pendingMessages.set(id, { resolve, reject });
-      
+
       // Write message length as 4 bytes in little endian
       const json = JSON.stringify(message);
       const length = Buffer.alloc(4);
       length.writeUInt32LE(json.length, 0);
-      
+
       // Send message
-      this.process.stdin!.write(Buffer.concat([length, Buffer.from(json, 'utf8')]));
+      this.process.stdin!.write(
+        Buffer.concat([length, Buffer.from(json, 'utf8')]),
+      );
     });
   }
-  
+
   /**
    * Handle incoming binary data chunks
    */
   private handleChunk(chunk: Buffer): void {
     this.chunks.push(chunk);
     this.chunkSize += chunk.length;
-    
+
     // Process complete messages
     while (true) {
       // Read message length if we don't have it yet
       if (this.expectedSize === null) {
         if (this.chunkSize < 4) return;
-        
+
         // Combine chunks to read the message length
         const combined = Buffer.concat(this.chunks);
         this.expectedSize = combined.readUInt32LE(0);
-        
+
         // Remove length bytes from buffer
         this.chunks = [combined.slice(4)];
         this.chunkSize -= 4;
       }
-      
+
       // Check if we have the full message
       if (this.chunkSize < this.expectedSize) return;
-      
+
       // Read the message content
       const combined = Buffer.concat(this.chunks);
       const message = combined.slice(0, this.expectedSize).toString('utf8');
-      
+
       // Handle the message
       try {
         const parsed = JSON.parse(message);
@@ -138,39 +141,44 @@ export class RSLintService {
       } catch (err) {
         console.error('Error parsing message:', err);
       }
-      
+
       // Reset for next message
       this.chunks = [combined.slice(this.expectedSize)];
       this.chunkSize = this.chunks[0].length;
       this.expectedSize = null;
     }
   }
-  
+
   /**
    * Handle a complete message from rslint
    */
-  private handleMessage(message: { id: number; kind: string; data: any }): void {
+  private handleMessage(message: {
+    id: number;
+    kind: string;
+    data: any;
+  }): void {
     const { id, kind, data } = message;
     const pending = this.pendingMessages.get(id);
     if (!pending) return;
-    
+
     this.pendingMessages.delete(id);
-    
+
     if (kind === 'error') {
       pending.reject(new Error(data.message));
     } else {
       pending.resolve(data);
     }
   }
-  
+
   /**
    * Run the linter on specified files
    */
   async lint(options: LintOptions = {}): Promise<LintResponse> {
-    const { files, tsconfig, workingDirectory, ruleOptions, fileContents } = options;
+    const { files, tsconfig, workingDirectory, ruleOptions, fileContents } =
+      options;
     // Send handshake
     await this.sendMessage('handshake', { version: '1.0.0' });
-    
+
     // Send lint request
     return await this.sendMessage('lint', {
       files,
@@ -178,15 +186,15 @@ export class RSLintService {
       workingDirectory,
       ruleOptions,
       fileContents,
-      format: 'jsonline'
+      format: 'jsonline',
     });
   }
-  
+
   /**
    * Close the rslint process
    */
   close(): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       this.sendMessage('exit', {}).finally(() => {
         this.process.stdin!.end();
         resolve();

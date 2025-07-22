@@ -1,0 +1,10 @@
+**/dist
+**/coverage
+**/.vscode
+**/.nyc_output
+**/.vs
+
+.yarn/plugins
+.yarn/releases
+
+typescript-go/

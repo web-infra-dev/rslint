@@ -3,14 +3,13 @@
 Rslint aims to be a drop-in replacement for ESLint and TypeScript-ESLint, just as Rspack serves as a drop-in replacement for webpack and may integrated into Rspack in the future.
 
 > [!NOTE]
-> Rslint is a fork of [tsgolint](https://github.com/typescript-eslint/tsgolint), an experimental proof-of-concept typescript-go powered JS/TS linter. We would like to express our heartfelt gratitude to the tsgolint team, especially to [@auvred](https://github.com/auvred) for their pioneering work and innovative approach to TypeScript linting. We decided to fork tsgolint because it serves as a proof-of-concept with no current plans for continued development on this direction in the near term ([reference](https://x.com/bradzacher/status/1943475629376282998)). 
+> Rslint is a fork of [tsgolint](https://github.com/typescript-eslint/tsgolint), an experimental proof-of-concept typescript-go powered JS/TS linter. We would like to express our heartfelt gratitude to the tsgolint team, especially to [@auvred](https://github.com/auvred) for their pioneering work and innovative approach to TypeScript linting. We decided to fork tsgolint because it serves as a proof-of-concept with no current plans for continued development on this direction in the near term ([reference](https://x.com/bradzacher/status/1943475629376282998)).
 
 Based on [tsgolint](https://github.com/typescript-eslint/tsgolint) early exploration.
 
 **tsgolint** is an experimental proof-of-concept [typescript-go](https://github.com/microsoft/typescript-go) powered JS/TS linter written in Go.
 
-> [!IMPORTANT]
-> **tsgolint** is a prototype in the early stages of development.
+> [!IMPORTANT] > **tsgolint** is a prototype in the early stages of development.
 > It is not actively being worked on, nor is it expected to be production ready.
 > See **[Goals and Non-Goals](#goals-and-non-goals)**.
 
@@ -140,4 +139,3 @@ cp .vscode/launch.template.json .vscode/launch.json
 - Open the Command Palette (`Cmd+Shift+P`)
 - Run `Debug: Start Debugging` or press `F5`
 - Alternatively, go to the `Run and Debug` sidebar and select `Run Extension`
-

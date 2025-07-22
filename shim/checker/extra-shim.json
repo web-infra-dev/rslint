@@ -1,8 +1,5 @@
 {
-  "ExtraFunctions": [
-    "isNonDeferredTypeReference",
-    "getFunctionFlags"
-  ],
+  "ExtraFunctions": ["isNonDeferredTypeReference", "getFunctionFlags"],
   "ExtraMethods": {
     "Checker": [
       "getBaseConstraintOfType",
@@ -33,26 +30,10 @@
     ]
   },
   "ExtraFields": {
-    "Type": [
-      "alias",
-      "flags",
-      "symbol",
-      "objectFlags"
-    ],
-    "TupleType": [
-      "combinedFlags"
-    ],
-    "Signature": [
-      "parameters",
-      "declaration"
-    ],
-    "Checker": [
-      "numberType",
-      "booleanType",
-      "globalRegExpType"
-    ],
-    "InterfaceType": [
-      "thisType"
-    ]
+    "Type": ["alias", "flags", "symbol", "objectFlags"],
+    "TupleType": ["combinedFlags"],
+    "Signature": ["parameters", "declaration"],
+    "Checker": ["numberType", "booleanType", "globalRegExpType"],
+    "InterfaceType": ["thisType"]
   }
 }

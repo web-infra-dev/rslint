@@ -1,7 +1,5 @@
 {
-    "extends": ["../../tsconfig.build.json"],
-    "compilerOptions": {
-        
-    },
-    "references": []
+  "extends": ["../../tsconfig.build.json"],
+  "compilerOptions": {},
+  "references": []
 }

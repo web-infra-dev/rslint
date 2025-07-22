@@ -31,8 +31,6 @@
     "target": "ES2022",
     "verbatimModuleSyntax": false
   },
-  "include": [
-   
-  ],
+  "include": [],
   "exclude": ["${configDir}/**/fixtures/**"]
 }

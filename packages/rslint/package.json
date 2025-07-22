@@ -13,7 +13,9 @@
     "test": "node --test 'tests/**.test.mjs'",
     "test:update": "node --test --test-update-snapshots 'tests/**.test.mjs'"
   },
-  "files": ["bin/"],
+  "files": [
+    "bin/"
+  ],
   "bin": {
     "rslint": "./bin/rslint"
   },

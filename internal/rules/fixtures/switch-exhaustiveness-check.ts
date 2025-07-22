@@ -4,4 +4,3 @@ export namespace A {
     D,
   }
 }
-

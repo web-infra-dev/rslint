@@ -6,4 +6,3 @@ export const console = { log() {} };
 
 // used by no-implied-eval test function imports
 export class Function {}
-

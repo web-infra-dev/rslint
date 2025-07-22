@@ -6,7 +6,8 @@
   "private": true,
   "scripts": {
     "build": "pnpm -r build",
-    "typecheck": "pnpm tsc -b tsconfig.json"
+    "typecheck": "pnpm tsc -b tsconfig.json",
+    "format": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --write ."
   },
   "repository": {
     "type": "git",
@@ -23,6 +24,7 @@
     "pnpm": ">=10"
   },
   "devDependencies": {
-    "typescript": "5.8.3"
+    "typescript": "5.8.3",
+    "prettier": "3.5.0"
   }
 }
