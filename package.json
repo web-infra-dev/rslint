@@ -6,6 +6,7 @@
   "private": true,
   "scripts": {
     "build": "pnpm -r build",
+    "test": "pnpm -r test",
     "typecheck": "pnpm tsc -b tsconfig.json",
     "format": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --write .",
     "format:check": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --check ."
