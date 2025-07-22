@@ -13,6 +13,5 @@
     "emitDeclarationOnly": false
   },
   "references": [],
-  "include": ["__tests__"],
-
+  "include": ["__tests__"]
 }

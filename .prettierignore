@@ -8,3 +8,4 @@
 .yarn/releases
 
 typescript-go/
+packages/vscode-extension/.vscode-test-out
