@@ -3,7 +3,7 @@
     "strictNullChecks": true,
     "composite": true
   },
-  "include": [],
+  "include": ["packages/rslint/fixtures/src/index.ts"],
   "references": [
     {
       "path": "./packages/rslint"
