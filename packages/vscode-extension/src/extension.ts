@@ -11,9 +11,9 @@ import {
 let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
-  const extensionUri = context.extensionUri;
+  
   const binPathConfig = workspace.getConfiguration().get('rslint.binPath') as string;
-  const binPath = binPathConfig && binPathConfig.trim() !== '' ? binPathConfig : Uri.joinPath(extensionUri,'out','rslint').fsPath;
+  const binPath = binPathConfig && binPathConfig.trim() !== '' ? binPathConfig : Uri.joinPath(context.extensionUri,'out','rslint').fsPath;
   const run: Executable  = {
     command: binPath,
     args: ["--lsp"]
