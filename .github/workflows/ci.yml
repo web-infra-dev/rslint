@@ -29,7 +29,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
       - name: Unit Test
         run: |
-          pnpm run test:go
+          go test ./internal/...
 
   test-node:
     name: Test npm packages
