@@ -27,19 +27,6 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
-      ## reference from https://github.com/microsoft/typescript-go/blob/main/.github/actions/setup-go/action.yml#L26
-      - name: Cache Go modules
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-            ~/Library/Caches/go-build
-            ~/AppData/Local/go-build
-          key: rslint-setup-go-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}-${{ github.workflow }}-
-          restore-keys: |
-            rslint-setup-go-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}-${{ github.workflow }}-
-
       - name: Unit Test
         run: |
           make test
@@ -47,6 +34,9 @@ jobs:
   test-node:
     name: Test npm packages
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.24.1']
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -57,17 +47,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Cache Go modules
-        uses: actions/cache@v4
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-            ~/Library/Caches/go-build
-            ~/AppData/Local/go-build
-          key: rslint-setup-go-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}-${{ github.workflow }}-
-          restore-keys: |
-            rslint-setup-go-${{ runner.os }}-${{ env.GO_VERSION }}-${{ hashFiles('**/go.sum') }}-${{ github.workflow }}-
+          go-version: ${{ matrix.go-version }}
       - name: Install pnpm
         run: corepack enable
 
@@ -89,6 +72,9 @@ jobs:
       - name: Test on non-Linux
         if: runner.os != 'Linux'
         run: pnpm -r test
+
+      - name: Lint
+        run: pnpm -r lint
 
   done:
     needs:

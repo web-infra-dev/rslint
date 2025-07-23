@@ -63,7 +63,8 @@
     "package": "vsce package --dependencies",
     "test": "tsc -p tsconfig.spec.json && node .vscode-test-out/runTest.js",
     "prepackage": "pnpm build",
-    "publish": "vsce publish"
+    "publish": "vsce publish",
+    "lint": "rslint --tsconfig tsconfig.build.json"
   },
   "devDependencies": {
     "@rslint/core": "workspace:*",
