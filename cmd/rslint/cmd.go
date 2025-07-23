@@ -17,6 +17,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/fatih/color"
 	"github.com/typescript-eslint/rslint/internal/linter"
 	"github.com/typescript-eslint/rslint/internal/rule"
 	"github.com/typescript-eslint/rslint/internal/utils"
@@ -73,6 +74,52 @@ import (
 )
 
 const spaces = "                                                                                                    "
+
+// ColorScheme contains all the color functions for different UI elements
+type ColorScheme struct {
+	RuleName      func(format string, a ...interface{}) string
+	FileName      func(format string, a ...interface{}) string
+	ErrorText     func(format string, a ...interface{}) string
+	SuccessText   func(format string, a ...interface{}) string
+	DimText       func(format string, a ...interface{}) string
+	BoldText      func(format string, a ...interface{}) string
+	BorderText    func(format string, a ...interface{}) string
+}
+
+// setupColors initializes the color scheme based on environment and flags
+func setupColors() *ColorScheme {
+	// Handle color flags and environment variables
+	if os.Getenv("NO_COLOR") != "" {
+		color.NoColor = true
+	}
+	if os.Getenv("FORCE_COLOR") != "" {
+		color.NoColor = false
+	}
+	
+	// GitHub Actions specific handling
+	if os.Getenv("GITHUB_ACTIONS") != "" {
+		color.NoColor = false // Enable colors in GitHub Actions
+	}
+
+	// Create color functions
+	ruleNameColor := color.New(color.BgWhite, color.FgBlack, color.Bold).SprintfFunc()
+	fileNameColor := color.New(color.FgCyan, color.Italic).SprintfFunc()
+	errorTextColor := color.New(color.FgRed, color.Underline).SprintfFunc()
+	successColor := color.New(color.FgGreen, color.Bold).SprintfFunc()
+	dimColor := color.New(color.Faint).SprintfFunc()
+	boldColor := color.New(color.Bold).SprintfFunc()
+	borderColor := color.New(color.Faint).SprintfFunc()
+
+	return &ColorScheme{
+		RuleName:    ruleNameColor,
+		FileName:    fileNameColor,
+		ErrorText:   errorTextColor,
+		SuccessText: successColor,
+		DimText:     dimColor,
+		BoldText:    boldColor,
+		BorderText:  borderColor,
+	}
+}
 
 func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions, format string) {
 	switch format {
@@ -145,6 +192,8 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 
 // print a normal logger
 func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions) {
+	colors := setupColors()
+	
 	diagnosticStart := d.Range.Pos()
 	diagnosticEnd := d.Range.End()
 
@@ -166,28 +215,36 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	}
 	codeboxEnd := scanner.GetPositionOfLineAndCharacter(d.SourceFile, codeboxEndLine, codeboxEndColumn)
 
-	w.Write([]byte{' ', 0x1b, '[', '7', 'm', 0x1b, '[', '1', 'm', 0x1b, '[', '3', '8', ';', '5', ';', '3', '7', 'm', ' '})
-	w.WriteString(d.RuleName)
-	w.WriteString(" \x1b[0m — ")
+	// Rule name with conditional coloring
+	w.WriteByte(' ')
+	w.WriteString(colors.RuleName(" %s ", d.RuleName))
+	w.WriteString(" — ")
+	
+	// Message handling
 	messageLineStart := 0
 	for i, char := range d.Message.Description {
 		if char == '\n' {
 			w.WriteString(d.Message.Description[messageLineStart : i+1])
 			messageLineStart = i + 1
-			w.WriteString("    \x1b[2m│\x1b[0m")
+			w.WriteString("    ")
+			w.WriteString(colors.BorderText("│"))
 			w.WriteString(spaces[:len(d.RuleName)+1])
 		}
 	}
 	if messageLineStart <= len(d.Message.Description) {
 		w.WriteString(d.Message.Description[messageLineStart:len(d.Message.Description)])
 	}
-	w.WriteString("\n  \x1b[2m╭─┴──────────(\x1b[0m \x1b[3m\x1b[38;5;117m")
-	w.WriteString(tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions))
-	w.WriteByte(':')
-	w.Write([]byte(strconv.Itoa(diagnosticStartLine + 1)))
-	w.WriteByte(':')
-	w.Write([]byte(strconv.Itoa(diagnosticStartColumn + 1)))
-	w.WriteString("\x1b[0m \x1b[2m)─────\x1b[0m\n")
+	
+	// File path with conditional coloring
+	w.WriteString("\n  ")
+	w.WriteString(colors.BorderText("╭─┴──────────("))
+	w.WriteByte(' ')
+	filePath := tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions)
+	location := fmt.Sprintf("%s:%d:%d", filePath, diagnosticStartLine+1, diagnosticStartColumn+1)
+	w.WriteString(colors.FileName("%s", location))
+	w.WriteByte(' ')
+	w.WriteString(colors.BorderText(")─────"))
+	w.WriteByte('\n')
 
 	indentSize := math.MaxInt
 	line := codeboxStartLine
@@ -198,7 +255,12 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	lineEnds := make([]int, 13)
 
 	if codeboxEndLine-codeboxStartLine >= len(lineEnds) {
-		w.WriteString("  \x1b[2m│\x1b[0m  Error range is too big. Skipping code block printing.\n  \x1b[2m╰────────────────────────────────\x1b[0m\n\n")
+		w.WriteString("  ")
+		w.WriteString(colors.BorderText("│"))
+		w.WriteString("  Error range is too big. Skipping code block printing.\n  ")
+		w.WriteString(colors.BorderText("╰────────────────────────────────"))
+		w.WriteByte('\n')
+		w.WriteByte('\n')
 		return
 	}
 
@@ -230,7 +292,8 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	diagnosticHighlightActive := false
 	lastLineNumber := strconv.Itoa(codeboxEndLine + 1)
 	for line := codeboxStartLine; line <= codeboxEndLine; line++ {
-		w.WriteString("  \x1b[2m│ ")
+		w.WriteString("  ")
+		w.WriteString(colors.BorderText("│ "))
 		if line == codeboxEndLine {
 			w.WriteString(lastLineNumber)
 		} else {
@@ -240,7 +303,8 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 			}
 			w.WriteString(number)
 		}
-		w.Write([]byte(" │\x1b[0m  "))
+		w.WriteString(colors.BorderText(" │"))
+		w.WriteString("  ")
 
 		lineTextStart := int(lineMap[line]) + indentSize
 		underlineStart := max(lineTextStart, int(lineMap[line])+lineStarts[line-codeboxStartLine])
@@ -261,15 +325,7 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 
 		if underlineStart != underlineEnd {
 			w.WriteString(text[lineTextStart:underlineStart])
-			w.Write([]byte{
-				0x1b, '[', '4', 'm',
-				0x1b, '[', '4', ':', '3', 'm',
-				0x1b, '[', '5', '8', ':', '5', ':', '1', '6', '0', 'm',
-				0x1b, '[', '3', '8', ';', '5', ';', '1', '6', '0', 'm',
-				0x1b, '[', '2', '2', ';', '4', '9', 'm',
-			})
-			w.WriteString(text[underlineStart:underlineEnd])
-			w.Write([]byte{0x1b, '[', '0', 'm'})
+			w.WriteString(colors.ErrorText("%s", text[underlineStart:underlineEnd]))
 			w.WriteString(text[underlineEnd:lineTextEnd])
 		} else if lineTextStart != lineTextEnd {
 			w.WriteString(text[lineTextStart:lineTextEnd])
@@ -277,7 +333,9 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 
 		w.WriteByte('\n')
 	}
-	w.WriteString("  \x1b[2m╰────────────────────────────────\x1b[0m\n\n")
+	w.WriteString("  ")
+	w.WriteString(colors.BorderText("╰────────────────────────────────"))
+	w.WriteString("\n\n")
 }
 
 const usage = `✨ Rslint - Rocket Speed Linter
@@ -290,7 +348,9 @@ Options:
     --config PATH     Which rslint config file to use. Defaults to rslint.jsonc.
 	--list-files      List matched files
 	--format FORMAT   Output format: default | jsonline
-	 --ipc            Run in IPC mode (for JS integration)
+	--ipc             Run in IPC mode (for JS integration)
+	--no-color        Disable colored output
+	--force-color     Force colored output
 	-h, --help        Show help
 `
 
@@ -347,6 +407,8 @@ func runCMD() int {
 		singleThreaded bool
 		format         string
 		ipcMode        bool
+		noColor        bool
+		forceColor     bool
 	)
 	flag.StringVar(&format, "format", "default", "output format")
 	flag.StringVar(&config, "config", "", "which rslint config to use")
@@ -355,6 +417,8 @@ func runCMD() int {
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&help, "h", false, "show help")
 	flag.BoolVar(&ipcMode, "ipc", false, "run in IPC mode (for JS integration)")
+	flag.BoolVar(&noColor, "no-color", false, "disable colored output")
+	flag.BoolVar(&forceColor, "force-color", false, "force colored output")
 
 	flag.StringVar(&traceOut, "trace", "", "file to put trace to")
 	flag.StringVar(&cpuprofOut, "cpuprof", "", "file to put cpu profiling to")
@@ -365,6 +429,14 @@ func runCMD() int {
 	if help {
 		flag.Usage()
 		return 0
+	}
+
+	// Override color detection based on flags
+	if noColor {
+		color.NoColor = true
+	}
+	if forceColor {
+		color.NoColor = false
 	}
 
 	// Check if we need to run in IPC mode
@@ -566,10 +638,14 @@ func runCMD() int {
 
 	wg.Wait()
 
-	errorsColor := "\x1b[1m"
+	colors := setupColors()
+	var errorsColorFunc func(string, ...interface{}) string
 	if errorsCount == 0 {
-		errorsColor = "\x1b[1;32m"
+		errorsColorFunc = colors.SuccessText
+	} else {
+		errorsColorFunc = colors.BoldText
 	}
+	
 	errorsText := "errors"
 	if errorsCount == 1 {
 		errorsText = "error"
@@ -589,16 +665,17 @@ func runCMD() int {
 	if format == "default" {
 		fmt.Fprintf(
 			os.Stdout,
-			"Found %v%v\x1b[0m %v \x1b[2m(linted \x1b[1m%v\x1b[22m\x1b[2m %v with \x1b[1m%v\x1b[22m\x1b[2m %v in \x1b[1m%v\x1b[22m\x1b[2m using \x1b[1m%v\x1b[22m\x1b[2m threads)\n",
-			errorsColor,
-			errorsCount,
+			"Found %s %s %s(linted %s %s with %s %s in %s using %s threads)%s\n",
+			errorsColorFunc("%d", errorsCount),
 			errorsText,
-			len(files),
+			colors.DimText(""),
+			colors.BoldText("%d", len(files)),
 			filesText,
-			len(rules),
+			colors.BoldText("%d", len(rules)),
 			rulesText,
-			time.Since(timeBefore).Round(time.Millisecond),
-			threadsCount,
+			colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
+			colors.BoldText("%d", threadsCount),
+			color.New().SprintFunc()(""), // Reset
 		)
 	}
 
