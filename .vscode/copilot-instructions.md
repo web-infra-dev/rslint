@@ -141,7 +141,7 @@ pnpm test
 package my_rule
 
 import (
-    "github.com/typescript-eslint/rs/internal/rule"
+    "github.com/typescript-eslint/rslint/internal/rule"
     // other imports
 )
 
