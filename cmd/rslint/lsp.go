@@ -13,6 +13,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
+	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -536,7 +537,7 @@ func runLint(uri string) ([]rule.RuleDiagnostic, error) {
 
 	// Run linter
 	err = linter.RunLinter(
-		program,
+		[]*compiler.Program{program},
 		false, // Don't use single-threaded mode for IPC
 		files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {

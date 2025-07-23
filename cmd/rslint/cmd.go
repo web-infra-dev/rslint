@@ -64,6 +64,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
+	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -285,6 +286,7 @@ Usage:
 
 Options:
     --tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.
+	--config PATH which rslint config file to use. Defaults to rslint.jsonc.
     --list-files      List matched files
     --format FORMAT   Output format: default | jsonline
     --ipc            Run in IPC mode (for JS integration)
@@ -297,6 +299,7 @@ func runCMD() int {
 	var (
 		help      bool
 		tsconfig  string
+		config    string
 		listFiles bool
 
 		traceOut       string
@@ -306,6 +309,7 @@ func runCMD() int {
 		ipcMode        bool
 	)
 	flag.StringVar(&format, "format", "default", "output format")
+	flag.StringVar(&config, "config", "", "which rslint config to use")
 	flag.StringVar(&tsconfig, "tsconfig", "", "which tsconfig to use")
 	flag.BoolVar(&listFiles, "list-files", false, "list matched files")
 	flag.BoolVar(&help, "help", false, "show help")
@@ -485,7 +489,7 @@ func runCMD() int {
 	}()
 
 	err = linter.RunLinter(
-		program,
+		[]*compiler.Program{program},
 		singleThreaded,
 		files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
