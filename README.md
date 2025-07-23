@@ -110,19 +110,16 @@ Experiments such as tsgolint should not be taken as indications of any project d
 
 > If you want faster typed linting with ESLint, see [typescript-eslint/typescript-eslint#10940 Enhancement: Use TypeScript's Go port (tsgo / typescript-go) for type information](https://github.com/typescript-eslint/typescript-eslint/issues/10940).
 
-## Building `tsgolint`
+## 🤝 Contribution
 
-```bash
-git submodule update --init                       # init typescript-go submodule
+> [!NOTE]
+> We highly value any contributions to Rslint!
 
-cd typescript-go
-git am --3way --no-gpg-sign ../patches/*.patch    # apply typescript-go patches
-cd ..
+Please read the [Contributing Guide](https://github.com/web-infra-dev/rslint/blob/main/CONTRIBUTING.md).
 
-pnpm install
+### Code of conduct
 
-pnpm build
-```
+This repo has adopted the ByteDance open source code of conduct. Please check [Code of conduct](./CODE_OF_CONDUCT.md) for more details.
 
 ## Debugging VSCode Extension
 
