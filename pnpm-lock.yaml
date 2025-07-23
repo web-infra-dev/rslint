@@ -7,6 +7,9 @@ settings:
 importers:
   .:
     devDependencies:
+      '@rslint/core':
+        specifier: workspace:*
+        version: link:packages/rslint
       prettier:
         specifier: 3.5.0
         version: 3.5.0

@@ -7,12 +7,12 @@ import (
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/typescript-eslint/rslint/internal/linter"
 	"github.com/typescript-eslint/rslint/internal/rule"
 	"github.com/typescript-eslint/rslint/internal/utils"
-
 	"gotest.tools/v3/assert"
 )
 
@@ -77,7 +77,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 		files := []*ast.SourceFile{program.GetSourceFile(fileName)}
 
 		err = linter.RunLinter(
-			program,
+			[]*compiler.Program{program},
 			true,
 			files,
 			func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {

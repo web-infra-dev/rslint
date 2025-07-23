@@ -21,6 +21,15 @@ import (
 	"github.com/typescript-eslint/rslint/internal/rule"
 	"github.com/typescript-eslint/rslint/internal/utils"
 
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/bundled"
+	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+	"github.com/typescript-eslint/rslint/internal/config"
 	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
 	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
 	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
@@ -61,13 +70,6 @@ import (
 	"github.com/typescript-eslint/rslint/internal/rules/switch_exhaustiveness_check"
 	"github.com/typescript-eslint/rslint/internal/rules/unbound_method"
 	"github.com/typescript-eslint/rslint/internal/rules/use_unknown_in_catch_callback_variable"
-
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/scanner"
-	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 )
 
 const spaces = "                                                                                                    "
@@ -284,19 +286,60 @@ Usage:
     rslint [OPTIONS]
 
 Options:
-    --tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.
-    --list-files      List matched files
-    --format FORMAT   Output format: default | jsonline
-    --ipc            Run in IPC mode (for JS integration)
-    -h, --help        Show help
+	--tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.
+    --config PATH     Which rslint config file to use. Defaults to rslint.jsonc.
+	--list-files      List matched files
+	--format FORMAT   Output format: default | jsonline
+	 --ipc            Run in IPC mode (for JS integration)
+	-h, --help        Show help
 `
 
+// read config and deserialize the jsonc result
+func loadRslintConfig(configPath string, currentDirectory string, fs vfs.FS) (config.RslintConfig, string) {
+	configFileName := tspath.ResolvePath(currentDirectory, configPath)
+	if !fs.FileExists(configFileName) {
+		fmt.Fprintf(os.Stderr, "error: rslint config file %q doesn't exist\n", configFileName)
+		os.Exit(1)
+	}
+
+	data, ok := fs.ReadFile(configFileName)
+	if !ok {
+		fmt.Fprintf(os.Stderr, "error reading rslint config file %q\n", configFileName)
+		os.Exit(1)
+	}
+
+	var config config.RslintConfig
+	if err := json.Unmarshal([]byte(data), &config); err != nil {
+		fmt.Fprintf(os.Stderr, "error parsing rslint config file %q: %v\n", configFileName, err)
+		os.Exit(1)
+	}
+	currentDirectory = tspath.GetDirectoryPath(configFileName)
+	return config, currentDirectory
+}
+func loadTsConfigFromRslintConfig(rslintConfig config.RslintConfig, currentDirectory string, fs vfs.FS) []string {
+	tsConfig := []string{}
+	for _, entry := range rslintConfig {
+
+		for _, config := range entry.LanguageOptions.ParserOptions.Project {
+			tsconfigPath := tspath.ResolvePath(currentDirectory, config)
+
+			if !fs.FileExists(tsconfigPath) {
+				fmt.Fprintf(os.Stderr, "error: tsconfig file %q doesn't exist\n", tsconfigPath)
+				os.Exit(1)
+			}
+			tsConfig = append(tsConfig, tsconfigPath)
+
+		}
+	}
+	return tsConfig
+}
 func runCMD() int {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
 	var (
 		help      bool
 		tsconfig  string
+		config    string
 		listFiles bool
 
 		traceOut       string
@@ -306,6 +349,7 @@ func runCMD() int {
 		ipcMode        bool
 	)
 	flag.StringVar(&format, "format", "default", "output format")
+	flag.StringVar(&config, "config", "", "which rslint config to use")
 	flag.StringVar(&tsconfig, "tsconfig", "", "which tsconfig to use")
 	flag.BoolVar(&listFiles, "list-files", false, "list matched files")
 	flag.BoolVar(&help, "help", false, "show help")
@@ -364,23 +408,28 @@ func runCMD() int {
 	currentDirectory = tspath.NormalizePath(currentDirectory)
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	var configFileName string
+	configs := []string{}
 	if tsconfig == "" {
-		configFileName = tspath.ResolvePath(currentDirectory, "tsconfig.json")
+		configFileName := tspath.ResolvePath(currentDirectory, "tsconfig.json")
 		if !fs.FileExists(configFileName) {
 			fs = utils.NewOverlayVFS(fs, map[string]string{
 				configFileName: "{}",
 			})
 		}
+		configs = append(configs, configFileName)
 	} else {
-		configFileName = tspath.ResolvePath(currentDirectory, tsconfig)
+		configFileName := tspath.ResolvePath(currentDirectory, tsconfig)
 		if !fs.FileExists(configFileName) {
 			fmt.Fprintf(os.Stderr, "error: tsconfig %q doesn't exist", tsconfig)
 			return 1
 		}
+		configs = append(configs, configFileName)
 	}
 
-	currentDirectory = tspath.GetDirectoryPath(configFileName)
+	if config != "" {
+		rslintConfig, cwd := loadRslintConfig(config, currentDirectory, fs)
+		configs = loadTsConfigFromRslintConfig(rslintConfig, cwd, fs)
+	}
 
 	var rules = []rule.Rule{
 		await_thenable.AwaitThenableRule,
@@ -431,36 +480,42 @@ func runCMD() int {
 		CurrentDirectory:          host.GetCurrentDirectory(),
 		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
 	}
+	programs := []*compiler.Program{}
+	for _, configFileName := range configs {
+		program, err := utils.CreateProgram(singleThreaded, fs, currentDirectory, configFileName, host)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
+			return 1
+		}
+		programs = append(programs, program)
 
-	program, err := utils.CreateProgram(singleThreaded, fs, currentDirectory, configFileName, host)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
-		return 1
 	}
 
 	files := []*ast.SourceFile{}
-	cwdPath := string(tspath.ToPath("", currentDirectory, program.Host().FS().UseCaseSensitiveFileNames()).EnsureTrailingDirectorySeparator())
-	var matchedFiles strings.Builder
-	for _, file := range program.SourceFiles() {
-		p := string(file.Path())
-		if strings.Contains(p, "/node_modules/") {
-			continue
-		}
-		if fileName, matched := strings.CutPrefix(p, cwdPath); matched {
-			if listFiles {
-				matchedFiles.WriteString("Found file: ")
-				matchedFiles.WriteString(fileName)
-				matchedFiles.WriteByte('\n')
+	for _, program := range programs {
+		cwdPath := string(tspath.ToPath("", currentDirectory, program.Host().FS().UseCaseSensitiveFileNames()).EnsureTrailingDirectorySeparator())
+		var matchedFiles strings.Builder
+		for _, file := range program.SourceFiles() {
+			p := string(file.Path())
+			if strings.Contains(p, "/node_modules/") {
+				continue
 			}
-			files = append(files, file)
+			if fileName, matched := strings.CutPrefix(p, cwdPath); matched {
+				if listFiles {
+					matchedFiles.WriteString("Found file: ")
+					matchedFiles.WriteString(fileName)
+					matchedFiles.WriteByte('\n')
+				}
+				files = append(files, file)
+			}
 		}
+		if listFiles {
+			os.Stdout.WriteString(matchedFiles.String())
+		}
+		slices.SortFunc(files, func(a *ast.SourceFile, b *ast.SourceFile) int {
+			return len(b.Text()) - len(a.Text())
+		})
 	}
-	if listFiles {
-		os.Stdout.WriteString(matchedFiles.String())
-	}
-	slices.SortFunc(files, func(a *ast.SourceFile, b *ast.SourceFile) int {
-		return len(b.Text()) - len(a.Text())
-	})
 
 	var wg sync.WaitGroup
 
@@ -485,7 +540,7 @@ func runCMD() int {
 	}()
 
 	err = linter.RunLinter(
-		program,
+		programs,
 		singleThreaded,
 		files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {

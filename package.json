@@ -18,11 +18,13 @@
     "format:check": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --check .",
     "test": "pnpm -r test",
     "test:go": "go test ./internal/...",
-    "typecheck": "pnpm tsc -b tsconfig.json"
+    "typecheck": "pnpm tsc -b tsconfig.json",
+    "lint": "rslint --config rslint.json"
   },
   "devDependencies": {
     "prettier": "3.5.0",
-    "typescript": "5.8.3"
+    "typescript": "5.8.3",
+    "@rslint/core": "workspace:*"
   },
   "packageManager": "pnpm@10.13.1",
   "engines": {
