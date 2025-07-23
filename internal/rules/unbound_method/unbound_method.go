@@ -3,8 +3,8 @@ package unbound_method
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/typescript-eslint/tsgolint/internal/rule"
-	"github.com/typescript-eslint/tsgolint/internal/utils"
+	"github.com/typescript-eslint/rslint/internal/rule"
+	"github.com/typescript-eslint/rslint/internal/utils"
 )
 
 //go:generate node ./generate-natively-bound-members.mjs

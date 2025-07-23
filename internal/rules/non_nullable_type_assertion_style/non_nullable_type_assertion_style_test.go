@@ -3,8 +3,8 @@ package non_nullable_type_assertion_style
 import (
 	"testing"
 
-	"github.com/typescript-eslint/tsgolint/internal/rule_tester"
-	"github.com/typescript-eslint/tsgolint/internal/rules/fixtures"
+	"github.com/typescript-eslint/rslint/internal/rule_tester"
+	"github.com/typescript-eslint/rslint/internal/rules/fixtures"
 )
 
 func TestNonNullableTypeAssertionStyleRule(t *testing.T) {

@@ -15,7 +15,7 @@ Rslint is a high-performance TypeScript/JavaScript linter written in Go, designe
 
 ### Key Directories
 ```
-cmd/tsgolint/          # Main Go binary entry point
+cmd/rslint/          # Main Go binary entry point
 internal/
 ├── api/               # API layer
 ├── linter/            # Core linting engine
@@ -141,7 +141,7 @@ pnpm test
 package my_rule
 
 import (
-    "github.com/typescript-eslint/tsgolint/internal/rule"
+    "github.com/typescript-eslint/rs/internal/rule"
     // other imports
 )
 

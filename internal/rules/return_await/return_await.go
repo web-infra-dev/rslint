@@ -3,8 +3,8 @@ package return_await
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
-	"github.com/typescript-eslint/tsgolint/internal/rule"
-	"github.com/typescript-eslint/tsgolint/internal/utils"
+	"github.com/typescript-eslint/rslint/internal/rule"
+	"github.com/typescript-eslint/rslint/internal/utils"
 )
 
 func buildDisallowedPromiseAwaitMessage() rule.RuleMessage {

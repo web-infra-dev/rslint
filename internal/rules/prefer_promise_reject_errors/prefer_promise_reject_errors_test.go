@@ -3,9 +3,9 @@ package prefer_promise_reject_errors
 import (
 	"testing"
 
-	"github.com/typescript-eslint/tsgolint/internal/rule_tester"
-	"github.com/typescript-eslint/tsgolint/internal/rules/fixtures"
-	"github.com/typescript-eslint/tsgolint/internal/utils"
+	"github.com/typescript-eslint/rslint/internal/rule_tester"
+	"github.com/typescript-eslint/rslint/internal/rules/fixtures"
+	"github.com/typescript-eslint/rslint/internal/utils"
 )
 
 func TestPreferPromiseRejectErrorsRule(t *testing.T) {

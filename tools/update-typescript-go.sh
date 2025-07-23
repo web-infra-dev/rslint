@@ -19,4 +19,4 @@ go run ./tools/gen_shims
 
 git add ./shim ./go.mod ./go.sum
 
-go build ./cmd/tsgolint
+go build ./cmd/rslint
