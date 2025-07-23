@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
 	"math"
 	"os"
 	"runtime"
@@ -287,12 +286,12 @@ Usage:
     rslint [OPTIONS]
 
 Options:
-    --tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.
-	--config PATH which rslint config file to use. Defaults to rslint.jsonc.
-    --list-files      List matched files
-    --format FORMAT   Output format: default | jsonline
-    --ipc            Run in IPC mode (for JS integration)
-    -h, --help        Show help
+	--tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.
+    --config PATH     Which rslint config file to use. Defaults to rslint.jsonc.
+	--list-files      List matched files
+	--format FORMAT   Output format: default | jsonline
+	 --ipc            Run in IPC mode (for JS integration)
+	-h, --help        Show help
 `
 
 // read config and deserialize the jsonc result
