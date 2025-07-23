@@ -172,8 +172,8 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, files []*ast.S
 				}
 			})
 		}
-		wg.RunAndWait()
-	}
 
+	}
+	wg.RunAndWait()
 	return nil
 }

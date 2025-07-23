@@ -1,0 +1,19 @@
+[
+  {
+    "language": "javascript",
+    "files": [],
+    "languageOptions": {
+      "parserOptions": {
+        "projectService": false,
+        "project": [
+          "./packages/rslint/tsconfig.build.json",
+          "./packages/rslint-test-tools/tsconfig.spec.json",
+          "./packages/vscode-extension/tsconfig.build.json"
+        ]
+      }
+    },
+    "rules": {
+      
+    }
+  }
+]
