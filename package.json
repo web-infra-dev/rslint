@@ -1,33 +1,30 @@
 {
   "name": "rslint",
   "version": "0.0.1",
-  "description": "Rslint Monorepo",
-  "main": "index.js",
   "private": true,
-  "scripts": {
-    "build": "pnpm -r build",
-    "test": "pnpm -r test",
-    "lint": "pnpm -r lint",
-    "typecheck": "pnpm tsc -b tsconfig.json",
-    "format": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --write .",
-    "format:check": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --check ."
+  "description": "Rslint Monorepo",
+  "homepage": "https://github.com/web-infra-dev/rslint#readme",
+  "bugs": {
+    "url": "https://github.com/web-infra-dev/rslint/issues"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/web-infra-dev/rslint.git"
   },
-  "keywords": [],
-  "author": "",
   "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/web-infra-dev/rslint/issues"
-  },
-  "homepage": "https://github.com/web-infra-dev/rslint#readme",
-  "engines": {
-    "pnpm": ">=10"
+  "scripts": {
+    "build": "pnpm -r build",
+    "format": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --write .",
+    "format:check": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --check .",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm tsc -b tsconfig.json"
   },
   "devDependencies": {
-    "typescript": "5.8.3",
-    "prettier": "3.5.0"
+    "prettier": "3.5.0",
+    "typescript": "5.8.3"
+  },
+  "packageManager": "pnpm@10.13.1",
+  "engines": {
+    "pnpm": ">=10"
   }
 }
