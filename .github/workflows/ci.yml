@@ -90,6 +90,9 @@ jobs:
         if: runner.os != 'Linux'
         run: pnpm -r test
 
+      - name: Lint
+        run:  pnpm -r lint
+
   done:
     needs:
       - test-go
