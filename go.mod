@@ -1,4 +1,4 @@
-module github.com/typescript-eslint/tsgolint
+module github.com/typescript-eslint/rslint
 
 go 1.24.1
 
