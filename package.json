@@ -12,7 +12,6 @@
     "url": "git+https://github.com/web-infra-dev/rslint.git"
   },
   "license": "MIT",
-  "main": "index.js",
   "scripts": {
     "build": "pnpm -r build",
     "format": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --write .",
