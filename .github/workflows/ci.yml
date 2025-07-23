@@ -91,7 +91,7 @@ jobs:
         run: pnpm -r test
 
       - name: Lint
-        run:  pnpm -r lint
+        run: pnpm -r lint
 
   done:
     needs:
