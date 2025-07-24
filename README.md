@@ -24,9 +24,7 @@ Rslint aims to be a drop-in replacement for ESLint and TypeScript-ESLint, just a
 
 ### Non-Goals
 
-- Language Agnosticism: We don’t plan to support non-TypeScript/JavaScript languages (e.g., CSS or HTML) in the near term — though we remain open to exploring this in the long term.
-
-- ESLint Plugin Compatibility: While we may offer a JavaScript plugin API for custom rules, it is not intended to be compatible with the existing ESLint plugin system. The new API is designed with performance in mind rather than compatibility.
+- Language Agnostic: We don’t plan to support non-TypeScript/JavaScript languages (e.g., CSS or HTML) in the near term — though we remain open to exploring this in the long term.
 
 ## 🤝 Contribution
 
