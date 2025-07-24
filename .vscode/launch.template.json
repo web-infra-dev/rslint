@@ -7,7 +7,7 @@
       "runtimeExecutable": "${execPath}",
       "args": [
         "--extensionDevelopmentPath=${workspaceFolder}/packages/vscode-extension",
-        "--disable-extensions"
+        "${workspaceFolder}/packages/vscode-extension"
       ],
       "autoAttachChildProcesses": true,
       "outFiles": [
