@@ -8,7 +8,6 @@ function getBinPath() {
   }
   let platformKey = `${process.platform}-${os.arch()}`;
   return path.resolve(__dirname, `./rslint-${platformKey}`);
-
 }
 function main() {
   const binPath = getBinPath();
@@ -17,4 +16,3 @@ function main() {
   });
 }
 main();
-
