@@ -1,12 +1,15 @@
 {
   "name": "@rslint/core",
-  "version": "0.0.1",
+  "version": "0.0.6",
   "exports": {
     ".": "./dist/index.js"
   },
   "type": "module",
   "scripts": {
     "build:bin": "go build -v -o bin/rslint ../../cmd/rslint",
+    "build:all": "pnpm build:linux && pnpm build:macos",
+    "build:linux": "GOOS=linux GOARCH=amd64 go build -o bin/rslint-linux-x64 ../../cmd/rslint",
+    "build:macos": "GOOS=darwin GOARCH=arm64 go build -o bin/rslint-darwin-arm64 ../../cmd/rslint",
     "build:js": "tsc -b tsconfig.build.json --force",
     "dev": "tsc -b tsconfig.build.json --force --watch",
     "build": "pnpm build:bin && pnpm build:js",

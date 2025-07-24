@@ -77,13 +77,13 @@ const spaces = "                                                                
 
 // ColorScheme contains all the color functions for different UI elements
 type ColorScheme struct {
-	RuleName      func(format string, a ...interface{}) string
-	FileName      func(format string, a ...interface{}) string
-	ErrorText     func(format string, a ...interface{}) string
-	SuccessText   func(format string, a ...interface{}) string
-	DimText       func(format string, a ...interface{}) string
-	BoldText      func(format string, a ...interface{}) string
-	BorderText    func(format string, a ...interface{}) string
+	RuleName    func(format string, a ...interface{}) string
+	FileName    func(format string, a ...interface{}) string
+	ErrorText   func(format string, a ...interface{}) string
+	SuccessText func(format string, a ...interface{}) string
+	DimText     func(format string, a ...interface{}) string
+	BoldText    func(format string, a ...interface{}) string
+	BorderText  func(format string, a ...interface{}) string
 }
 
 // setupColors initializes the color scheme based on environment and flags
@@ -95,14 +95,14 @@ func setupColors() *ColorScheme {
 	if os.Getenv("FORCE_COLOR") != "" {
 		color.NoColor = false
 	}
-	
+
 	// GitHub Actions specific handling
 	if os.Getenv("GITHUB_ACTIONS") != "" {
 		color.NoColor = false // Enable colors in GitHub Actions
 	}
 
 	// Create color functions
-	ruleNameColor := color.New(color.BgWhite, color.FgBlack, color.Bold).SprintfFunc()
+	ruleNameColor := color.New(color.FgHiGreen).SprintfFunc()
 	fileNameColor := color.New(color.FgCyan, color.Italic).SprintfFunc()
 	errorTextColor := color.New(color.FgRed, color.Underline).SprintfFunc()
 	successColor := color.New(color.FgGreen, color.Bold).SprintfFunc()
@@ -193,7 +193,7 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 // print a normal logger
 func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions) {
 	colors := setupColors()
-	
+
 	diagnosticStart := d.Range.Pos()
 	diagnosticEnd := d.Range.End()
 
@@ -219,7 +219,7 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	w.WriteByte(' ')
 	w.WriteString(colors.RuleName(" %s ", d.RuleName))
 	w.WriteString(" — ")
-	
+
 	// Message handling
 	messageLineStart := 0
 	for i, char := range d.Message.Description {
@@ -234,7 +234,7 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	if messageLineStart <= len(d.Message.Description) {
 		w.WriteString(d.Message.Description[messageLineStart:len(d.Message.Description)])
 	}
-	
+
 	// File path with conditional coloring
 	w.WriteString("\n  ")
 	w.WriteString(colors.BorderText("╭─┴──────────("))
@@ -645,7 +645,7 @@ func runCMD() int {
 	} else {
 		errorsColorFunc = colors.BoldText
 	}
-	
+
 	errorsText := "errors"
 	if errorsCount == 1 {
 		errorsText = "error"
