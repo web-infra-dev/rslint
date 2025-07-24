@@ -102,7 +102,7 @@ func setupColors() *ColorScheme {
 	}
 
 	// Create color functions
-	ruleNameColor := color.New(color.FgBlack, color.Bold, color.BgGreen).SprintfFunc()
+	ruleNameColor := color.New(color.FgHiGreen).SprintfFunc()
 	fileNameColor := color.New(color.FgCyan, color.Italic).SprintfFunc()
 	errorTextColor := color.New(color.FgRed, color.Underline).SprintfFunc()
 	successColor := color.New(color.FgGreen, color.Bold).SprintfFunc()
