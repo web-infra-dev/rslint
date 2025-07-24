@@ -16,7 +16,7 @@ Rslint aims to be a drop-in replacement for ESLint and TypeScript-ESLint, just a
 
 - Typed Linting First: We believe typed linting is essential for advanced semantic analysis. Rslint enables typed linting by default and aims to make it effortless to adopt — no complex setup required.
 - Project-Level Analysis First: Unlike ESLint, which defaults to file-level analysis, Rslint performs project-level analysis by default (similar to Clippy). This enables more powerful cross-module analysis and better support for incremental linting.
-- First-Class Monorepo Support: TypeScript already offers strong monorepo support. Rslint builds on this by following TypeScript’s best practices and the excellent design of typescript-eslint's project service to provide robust support for large-scale monorepos.
+- First-Class Monorepo Support: TypeScript already offers strong monorepo support. Rslint builds on this by following TypeScript’s best practices and the excellent design of typescript-eslint's [project service](https://typescript-eslint.io/blog/project-service) to provide robust support for large-scale monorepos.
 
 - Batteries Included: Rslint will include all existing typescript-eslint rules as well as widely used ESLint rules out of the box.
 
