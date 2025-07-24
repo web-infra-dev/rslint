@@ -18,9 +18,12 @@ The Go rule has been written to: `{{GO_RULE_PATH}}`
 4. Ensure the Go code follows idiomatic patterns
 5. Verify imports are correct
 6. Check that the rule structure matches rslint conventions
+7. IMPORTANT: Do NOT attempt to run, compile, or execute the Go code
 
 If you find any issues, fix them. Otherwise, confirm the rule is correctly implemented.
 
 Respond with either:
 - "VERIFIED" if the rule is correct
 - The corrected Go code if fixes are needed
+
+IMPORTANT: Do NOT run or execute any code during verification.

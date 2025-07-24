@@ -2,6 +2,7 @@
 import { program } from 'commander';
 import chalk from 'chalk';
 import ora from 'ora';
+import { readFile } from 'fs/promises';
 import { RuleFetcher } from './fetcher.js';
 import { ClaudePorter } from './claude-porter.js';
 import { TestRunner } from './test-runner.js';
@@ -44,10 +45,21 @@ async function portSingleRule(ruleName: string, showProgress: boolean = false, s
     if (spinner) spinner.text = `Saving test for ${ruleName}...`;
     const testPath = await fetcher.downloadAndSaveTest(ruleInfo.testUrl, ruleName);
     
-    // Port the rule
+    let testSource = '';
+    // Adapt the TypeScript test for rslint cross-validation (if test was downloaded)
+    if (testPath) {
+      if (spinner) spinner.text = `Adapting test for ${ruleName}...`;
+      testSource = await readFile(testPath, 'utf-8');
+      const adapted = await porter.adaptTestFile(ruleName, testSource);
+      if (!adapted) {
+        console.warn(`Warning: ${ruleName} test adaptation failed, continuing...`);
+      }
+    }
+    
+    // Port the rule (passing test source as reference)
     if (spinner) spinner.text = `Converting ${ruleName} to Go...`;
     porter.setProgressMode(showProgress);
-    const result = await porter.portRule(ruleName, ruleSource);
+    const result = await porter.portRule(ruleName, ruleSource, testSource);
     
     if (!result.success) {
       if (spinner) spinner.fail(`Failed to port ${ruleName}: ${result.error}`);
