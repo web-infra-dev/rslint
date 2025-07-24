@@ -1,0 +1,23 @@
+{
+  "name": "eslint-to-go-porter",
+  "version": "1.0.0",
+  "description": "Automated tool to port TypeScript ESLint rules to Go using Claude Code",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^11.1.0",
+    "node-fetch": "^3.3.2",
+    "ora": "^7.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  },
+  "type": "module"
+}
