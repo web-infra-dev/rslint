@@ -8,7 +8,7 @@ Rslint aims to be a drop-in replacement for ESLint and TypeScript-ESLint, just a
 ## Goals and Non-Goals
 
 > [!NOTE]
-> Rslint is more like a TypeScript extension than an ESLint extension — think of it as Rust Clippy for JavaScript.
+> Rslint is more like a TypeScript extension than an ESLint plugin — think of it as Rust Clippy for JavaScript.
 >
 > Rslint is currently in an experimental phase but is under active development.
 
