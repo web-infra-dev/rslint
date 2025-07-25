@@ -89,11 +89,12 @@ type Range struct {
 
 // Diagnostic represents a single lint diagnostic
 type Diagnostic struct {
-	RuleName string `json:"ruleName"`
-	Message  string `json:"message"`
-	FilePath string `json:"filePath"`
-	Range    Range  `json:"range"`
-	Severity string `json:"severity,omitempty"`
+	RuleName  string `json:"ruleName"`
+	MessageID string `json:"messageId,omitempty"`
+	Message   string `json:"message"`
+	FilePath  string `json:"filePath"`
+	Range     Range  `json:"range"`
+	Severity  string `json:"severity,omitempty"`
 }
 
 // Handler defines the interface for handling IPC messages

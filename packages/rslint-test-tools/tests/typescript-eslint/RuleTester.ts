@@ -31,12 +31,12 @@ function checkDiagnosticEqual(
     const rslintDiag = rslintDiagnostic[i];
     const tsDiag = tsDiagnostic[i];
     // check rule match
-    // Note: rslint doesn't expose message IDs, so we skip this check
-    // The important part is that the diagnostics are generated at the correct locations
-    // assert(
-    //   toCamelCase(rslintDiag.ruleName) === tsDiag.messageId,
-    //   `Message mismatch: ${rslintDiag.ruleName} !== ${tsDiag.messageId}`,
-    // );
+    // Use messageId if available, otherwise fall back to ruleName
+    const rslintMessageId = rslintDiag.messageId || toCamelCase(rslintDiag.ruleName);
+    assert(
+      rslintMessageId === tsDiag.messageId,
+      `Message mismatch: ${rslintMessageId} !== ${tsDiag.messageId}`,
+    );
 
     // check range match
     // tsDiag sometimes doesn't have line and column, so we need to check that

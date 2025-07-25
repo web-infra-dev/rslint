@@ -239,9 +239,10 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		endLine, endColumn := scanner.GetLineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
 
 		diagnostic := ipc.Diagnostic{
-			RuleName: d.RuleName,
-			Message:  d.Message.Description,
-			FilePath: tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions),
+			RuleName:  d.RuleName,
+			MessageID: d.Message.Id,
+			Message:   d.Message.Description,
+			FilePath:  tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions),
 			Range: ipc.Range{
 				Start: ipc.Position{
 					Line:   startLine + 1, // Convert to 1-based indexing
