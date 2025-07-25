@@ -73,10 +73,46 @@ func ParseCommentDirectives(sourceFile *ast.SourceFile) []CommentDirective {
 	var directives []CommentDirective
 	text := sourceFile.Text()
 
-	// For now, just return empty to test if this is causing the hang
-	// TODO: implement proper comment parsing
-	_ = text // avoid unused variable error
-	
+	// Use regex to find comments - simpler and safer than scanner approach
+	// Match single-line comments: // comment
+	singleLineRegex := regexp.MustCompile(`//(.*)`)
+	// Match multi-line comments: /* comment */
+	multiLineRegex := regexp.MustCompile(`/\*(.*?)\*/`)
+
+	// Find single-line comments
+	matches := singleLineRegex.FindAllStringSubmatchIndex(text, -1)
+	for _, match := range matches {
+		commentStart := match[0]
+		commentEnd := match[1]
+		contentStart := match[2]
+		contentEnd := match[3]
+		
+		if contentStart >= 0 && contentEnd >= 0 {
+			content := text[contentStart:contentEnd]
+			if directive := parseDirectiveContent(content); directive != nil {
+				directive.Range = core.NewTextRange(commentStart, commentEnd)
+				directives = append(directives, *directive)
+			}
+		}
+	}
+
+	// Find multi-line comments
+	matches = multiLineRegex.FindAllStringSubmatchIndex(text, -1)
+	for _, match := range matches {
+		commentStart := match[0]
+		commentEnd := match[1]
+		contentStart := match[2]
+		contentEnd := match[3]
+		
+		if contentStart >= 0 && contentEnd >= 0 {
+			content := text[contentStart:contentEnd]
+			if directive := parseDirectiveContent(content); directive != nil {
+				directive.Range = core.NewTextRange(commentStart, commentEnd)
+				directives = append(directives, *directive)
+			}
+		}
+	}
+
 	return directives
 }
 

@@ -33,6 +33,10 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, files []*ast.S
 				registeredListeners := make(map[ast.Kind][](func(node *ast.Node)), 20)
 
 				for file := range queue {
+					// Parse comment directives for this file
+					directives := utils.ParseCommentDirectives(file)
+					disableTracker := utils.ApplyDirectives(directives, file)
+					
 					rules := getRulesForFile(file)
 					for _, r := range rules {
 						ctx := rule.RuleContext{
@@ -40,48 +44,66 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, files []*ast.S
 							Program:     program,
 							TypeChecker: checker,
 							ReportRange: func(textRange core.TextRange, msg rule.RuleMessage) {
-								onDiagnostic(rule.RuleDiagnostic{
-									RuleName:   r.Name,
-									Range:      textRange,
-									Message:    msg,
-									SourceFile: file,
-								})
+								// Check if rule is disabled at this position
+								if !disableTracker.IsRuleDisabled(r.Name, core.TextPos(textRange.Pos())) {
+									onDiagnostic(rule.RuleDiagnostic{
+										RuleName:   r.Name,
+										Range:      textRange,
+										Message:    msg,
+										SourceFile: file,
+									})
+								}
 							},
 							ReportRangeWithSuggestions: func(textRange core.TextRange, msg rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
-								onDiagnostic(rule.RuleDiagnostic{
-									RuleName:    r.Name,
-									Range:       textRange,
-									Message:     msg,
-									Suggestions: &suggestions,
-									SourceFile:  file,
-								})
+								// Check if rule is disabled at this position
+								if !disableTracker.IsRuleDisabled(r.Name, core.TextPos(textRange.Pos())) {
+									onDiagnostic(rule.RuleDiagnostic{
+										RuleName:    r.Name,
+										Range:       textRange,
+										Message:     msg,
+										Suggestions: &suggestions,
+										SourceFile:  file,
+									})
+								}
 							},
 							ReportNode: func(node *ast.Node, msg rule.RuleMessage) {
-								onDiagnostic(rule.RuleDiagnostic{
-									RuleName:   r.Name,
-									Range:      utils.TrimNodeTextRange(file, node),
-									Message:    msg,
-									SourceFile: file,
-								})
+								nodeRange := utils.TrimNodeTextRange(file, node)
+								// Check if rule is disabled at this position
+								if !disableTracker.IsRuleDisabled(r.Name, core.TextPos(nodeRange.Pos())) {
+									onDiagnostic(rule.RuleDiagnostic{
+										RuleName:   r.Name,
+										Range:      nodeRange,
+										Message:    msg,
+										SourceFile: file,
+									})
+								}
 							},
 							ReportNodeWithFixes: func(node *ast.Node, msg rule.RuleMessage, fixes ...rule.RuleFix) {
-								onDiagnostic(rule.RuleDiagnostic{
-									RuleName:   r.Name,
-									Range:      utils.TrimNodeTextRange(file, node),
-									Message:    msg,
-									FixesPtr:   &fixes,
-									SourceFile: file,
-								})
+								nodeRange := utils.TrimNodeTextRange(file, node)
+								// Check if rule is disabled at this position
+								if !disableTracker.IsRuleDisabled(r.Name, core.TextPos(nodeRange.Pos())) {
+									onDiagnostic(rule.RuleDiagnostic{
+										RuleName:   r.Name,
+										Range:      nodeRange,
+										Message:    msg,
+										FixesPtr:   &fixes,
+										SourceFile: file,
+									})
+								}
 							},
 
 							ReportNodeWithSuggestions: func(node *ast.Node, msg rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
-								onDiagnostic(rule.RuleDiagnostic{
-									RuleName:    r.Name,
-									Range:       utils.TrimNodeTextRange(file, node),
-									Message:     msg,
-									Suggestions: &suggestions,
-									SourceFile:  file,
-								})
+								nodeRange := utils.TrimNodeTextRange(file, node)
+								// Check if rule is disabled at this position
+								if !disableTracker.IsRuleDisabled(r.Name, core.TextPos(nodeRange.Pos())) {
+									onDiagnostic(rule.RuleDiagnostic{
+										RuleName:    r.Name,
+										Range:       nodeRange,
+										Message:     msg,
+										Suggestions: &suggestions,
+										SourceFile:  file,
+									})
+								}
 							},
 						}
 
