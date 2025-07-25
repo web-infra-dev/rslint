@@ -1,5 +1,7 @@
 {
   "extends": "../../tsconfig.build.json",
-  "compilerOptions": {},
+  "compilerOptions": {
+    "noEmit": true // this is only used for type checking, build is driven by build script
+  },
   "references": []
 }

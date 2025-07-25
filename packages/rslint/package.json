@@ -2,7 +2,8 @@
   "name": "@rslint/core",
   "version": "0.0.6",
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/index.js",
+    "./package.json": "./package.json"
   },
   "type": "module",
   "scripts": {
