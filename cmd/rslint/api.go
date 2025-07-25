@@ -17,6 +17,7 @@ import (
 	ipc "github.com/typescript-eslint/rslint/internal/api"
 	"github.com/typescript-eslint/rslint/internal/linter"
 	"github.com/typescript-eslint/rslint/internal/rule"
+	"github.com/typescript-eslint/rslint/internal/rules/adjacent_overload_signatures"
 	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
 	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
 	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
@@ -114,6 +115,7 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 
 	// Create rules
 	var rules = []rule.Rule{
+		adjacent_overload_signatures.AdjacentOverloadSignaturesRule,
 		await_thenable.AwaitThenableRule,
 		no_array_delete.NoArrayDeleteRule,
 		no_base_to_string.NoBaseToStringRule,

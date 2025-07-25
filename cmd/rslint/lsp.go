@@ -21,6 +21,7 @@ import (
 	"github.com/sourcegraph/jsonrpc2"
 	"github.com/typescript-eslint/rslint/internal/linter"
 	"github.com/typescript-eslint/rslint/internal/rule"
+	"github.com/typescript-eslint/rslint/internal/rules/adjacent_overload_signatures"
 	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
 	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
 	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
@@ -451,6 +452,7 @@ func runLint(uri string) ([]rule.RuleDiagnostic, error) {
 
 	// Create rules
 	var rules = []rule.Rule{
+		adjacent_overload_signatures.AdjacentOverloadSignaturesRule,
 		await_thenable.AwaitThenableRule,
 		no_array_delete.NoArrayDeleteRule,
 		no_base_to_string.NoBaseToStringRule,
