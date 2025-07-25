@@ -32,7 +32,6 @@ export interface ClaudeResponse {
 export interface PortingResult {
   ruleName: string;
   success: boolean;
-  goCode?: string;
   error?: string;
   testPath?: string;
 }

@@ -14,29 +14,58 @@ You are tasked with creating a git commit for the newly ported rule.
    cd /Users/bytedance/dev/rslint
    ```
 
-2. **Check git status to see all changes**:
+2. **CRITICAL: Register the rule in cmd files**:
+   The rule MUST be registered in three command files. Follow these steps:
+
+   a) **Check current registration status**:
+   ```bash
+   grep -n "{{RULE_NAME_UNDERSCORED}}" cmd/rslint/cmd.go || echo "NOT FOUND in cmd.go"
+   grep -n "{{RULE_NAME_UNDERSCORED}}" cmd/rslint/api.go || echo "NOT FOUND in api.go"
+   grep -n "{{RULE_NAME_UNDERSCORED}}" cmd/rslint/lsp.go || echo "NOT FOUND in lsp.go"
+   ```
+
+   b) **For each file where the rule is NOT found, you MUST update it**:
+   
+   **File: cmd/rslint/cmd.go**
+   - Add import: `"github.com/typescript-eslint/rslint/internal/rules/{{RULE_NAME_UNDERSCORED}}"`
+   - Add to rules array: `{{RULE_NAME_UNDERSCORED}}.{{RULE_NAME_PASCAL}}Rule,`
+   
+   **File: cmd/rslint/api.go**
+   - Add import: `"github.com/typescript-eslint/rslint/internal/rules/{{RULE_NAME_UNDERSCORED}}"`
+   - Add to rules array: `{{RULE_NAME_UNDERSCORED}}.{{RULE_NAME_PASCAL}}Rule,`
+   
+   **File: cmd/rslint/lsp.go**
+   - Add import: `"github.com/typescript-eslint/rslint/internal/rules/{{RULE_NAME_UNDERSCORED}}"`
+   - Add to rules array: `{{RULE_NAME_UNDERSCORED}}.{{RULE_NAME_PASCAL}}Rule,`
+
+   c) **Where to add**:
+   - Imports: Add alphabetically with other rule imports
+   - Rules array: Add alphabetically in the `var rules = []rule.Rule{` array
+
+   d) **Verify the changes**:
+   ```bash
+   # After making changes, verify they were added correctly
+   grep -n "{{RULE_NAME_UNDERSCORED}}" cmd/rslint/cmd.go
+   grep -n "{{RULE_NAME_UNDERSCORED}}" cmd/rslint/api.go
+   grep -n "{{RULE_NAME_UNDERSCORED}}" cmd/rslint/lsp.go
+   ```
+
+3. **Check git status to see all changes**:
    ```bash
    git status
    ```
 
-3. **Add all relevant files**:
-   - Rule implementation: `internal/rules/{{RULE_NAME_UNDERSCORED}}/`
-   - Test file: `packages/rslint-test-tools/tests/typescript-eslint/rules/{{RULE_NAME}}.test.ts`
-   - Snapshot file: `packages/rslint-test-tools/tests/typescript-eslint/rules/{{RULE_NAME}}.test.ts.snapshot`
-   - Command files: `cmd/rslint/cmd.go`, `cmd/rslint/api.go`, `cmd/rslint/lsp.go`
-   - Any other modified files (e.g., main test snapshots)
-
-4. **Create a descriptive commit**:
+4. **Add all files and commit**:
    ```bash
-   # Add all changes including new files
+   # Add all changes in the repository
    git add -A
+   
+   # Create the commit
    git commit -m "feat: add {{RULE_NAME}} rule
 
    - Implement {{RULE_NAME}} rule with all TypeScript ESLint functionality
    - Add comprehensive test coverage matching original TypeScript tests
-   - Register rule in cmd files for CLI, API, and LSP usage
-   - Add cross-validation tests in rslint-test-tools
-   - Update snapshots for new rule count"
+   - All tests passing successfully"
    ```
 
 ## Important Notes

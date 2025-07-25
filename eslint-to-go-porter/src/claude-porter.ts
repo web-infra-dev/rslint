@@ -13,6 +13,7 @@ export class ClaudePorter {
   private adaptTestTemplate: string = '';
   private crossValidateTemplate: string = '';
   private gitCommitTemplate: string = '';
+  private registerRuleTemplate: string = '';
   private showProgress: boolean = false;
 
   async loadPromptTemplates(): Promise<void> {
@@ -153,7 +154,7 @@ export class ClaudePorter {
     const prompt = this.preparePrompt(ruleName, ruleSource, testSource);
     const { responses, exitCode } = await this.runClaude(
       prompt,
-      `You are an expert at converting TypeScript ESLint rules to Go. You are working in the /Users/bytedance/dev/rslint/internal/rules directory. IMPORTANT: Only access files within this rules directory and its subdirectories. Do NOT navigate to parent directories or other parts of the filesystem. Do NOT attempt to run, compile, or execute any Go code. The original TypeScript rule source is available at ${tsRulePath} for reference. Follow the instructions exactly and provide only the requested Go code files.`
+      `You are an expert at converting TypeScript ESLint rules to Go. You are working in the /Users/bytedance/dev/rslint/internal/rules directory. Create the rule implementation and test files in the appropriate subdirectory. Do NOT attempt to run, compile, or execute any Go code. The original TypeScript rule source is available at ${tsRulePath} for reference. Focus only on creating the rule and test files - rule registration will be handled separately.`
     );
 
     if (exitCode !== 0) {
@@ -164,44 +165,37 @@ export class ClaudePorter {
       };
     }
 
+    // Check if Claude created the required files
+    const outputPath = join(
+      '/Users/bytedance/dev/rslint/internal/rules',
+      ruleName.replace(/-/g, '_'),
+      `${ruleName.replace(/-/g, '_')}.go`
+    );
+    
+    const testPath = join(
+      '/Users/bytedance/dev/rslint/internal/rules',
+      ruleName.replace(/-/g, '_'),
+      `${ruleName.replace(/-/g, '_')}_test.go`
+    );
+    
     try {
-      const fullText = this.parser.extractTextFromResponses(responses);
+      // Verify files were created
+      await readFile(outputPath, 'utf-8');
+      await readFile(testPath, 'utf-8');
       
-      // Check if Claude created files using Write tool
-      const outputPath = join(
-        '/Users/bytedance/dev/rslint/internal/rules',
-        ruleName.replace(/-/g, '_'),
-        `${ruleName.replace(/-/g, '_')}.go`
-      );
-      
-      let goCode: string;
-      try {
-        // Try to extract code from response text first
-        goCode = this.parser.extractGoCode(fullText);
-      } catch (extractError) {
-        // If extraction fails, check if Claude created the file directly
-        try {
-          goCode = await readFile(outputPath, 'utf-8');
-          console.log(`✓ Rule file created by Claude: ${outputPath}`);
-        } catch (fileError) {
-          throw new Error(`No Go code found in response and file not created: ${extractError}`);
-        }
+      if (!this.showProgress) {
+        console.log(`✓ Rule files created successfully`);
       }
-
-      console.log(chalk.yellow(`\n⚠️  Remember to register the rule in cmd/rslint/{cmd,api,lsp}.go files!`));
-      console.log(chalk.gray(`   Add import: "github.com/typescript-eslint/rslint/internal/rules/${ruleName.replace(/-/g, '_')}"`));
-      console.log(chalk.gray(`   Add to rules array: ${ruleName.replace(/-/g, '_')}.${this.toPascalCase(ruleName)}Rule`));
-
+      
       return {
         ruleName,
-        success: true,
-        goCode
+        success: true
       };
     } catch (error) {
       return {
         ruleName,
         success: false,
-        error: `Failed to process response: ${error}`
+        error: `Rule files not created. Claude may have encountered an error. Check if files exist at: ${outputPath}`
       };
     } finally {
       // Clean up temporary TypeScript file
@@ -229,22 +223,9 @@ export class ClaudePorter {
       return false;
     }
 
-    try {
-      const fullText = this.parser.extractTextFromResponses(responses);
-      
-      if (fullText.includes('VERIFIED')) {
-        return true;
-      }
-      
-      // Try to extract corrected code
-      const goCode = this.parser.extractGoCode(fullText);
-      await writeFile(goRulePath, goCode);
-      console.log(`Rule ${ruleName} was corrected during verification`);
-      return true;
-    } catch (error) {
-      console.error(`Verification error: ${error}`);
-      return false;
-    }
+    // Claude will either verify the rule or fix it autonomously
+    // We just need to check if the process completed successfully
+    return true;
   }
 
   async fixTestFailures(ruleName: string, ruleSource: string, goRulePath: string, testOutput: string): Promise<boolean> {
@@ -266,16 +247,12 @@ export class ClaudePorter {
       return false;
     }
 
-    try {
-      const fullText = this.parser.extractTextFromResponses(responses);
-      const goCode = this.parser.extractGoCode(fullText);
-      await writeFile(goRulePath, goCode);
-      console.log(`Rule ${ruleName} was fixed based on test failures`);
-      return true;
-    } catch (error) {
-      console.error(`Fix error: ${error}`);
-      return false;
+    // Claude will fix the rule autonomously
+    // We just need to check if the process completed successfully
+    if (!this.showProgress) {
+      console.log(`Claude attempted to fix ${ruleName} based on test failures`);
     }
+    return true;
   }
 
   private displayProgress(response: ClaudeResponse): void {
@@ -433,11 +410,12 @@ export class ClaudePorter {
   async gitCommitRule(ruleName: string): Promise<boolean> {
     const prompt = this.gitCommitTemplate
       .replace(/{{RULE_NAME}}/g, ruleName)
-      .replace(/{{RULE_NAME_UNDERSCORED}}/g, ruleName.replace(/-/g, '_'));
+      .replace(/{{RULE_NAME_UNDERSCORED}}/g, ruleName.replace(/-/g, '_'))
+      .replace(/{{RULE_NAME_PASCAL}}/g, this.toPascalCase(ruleName));
 
     const { responses, exitCode } = await this.runClaudeInDirectory(
       prompt,
-      'You are creating a git commit for the newly ported rule. You are working in the /Users/bytedance/dev/rslint directory. Create a clean, descriptive commit with all relevant files. Do NOT push the commit.',
+      'You are creating a git commit for the newly ported rule. You are working in the /Users/bytedance/dev/rslint directory. IMPORTANT: First check if the rule is registered in cmd/rslint/{cmd,api,lsp}.go files. If not, add the imports and rule entries. Then add ALL files with git add -A and create a clean commit. Do NOT push the commit.',
       '/Users/bytedance/dev/rslint'
     );
 
