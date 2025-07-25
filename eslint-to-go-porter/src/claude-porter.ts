@@ -12,6 +12,7 @@ export class ClaudePorter {
   private fixTemplate: string = '';
   private adaptTestTemplate: string = '';
   private crossValidateTemplate: string = '';
+  private gitCommitTemplate: string = '';
   private showProgress: boolean = false;
 
   async loadPromptTemplates(): Promise<void> {
@@ -183,6 +184,10 @@ export class ClaudePorter {
         }
       }
 
+      console.log(chalk.yellow(`\n⚠️  Remember to register the rule in cmd/rslint/{cmd,api,lsp}.go files!`));
+      console.log(chalk.gray(`   Add import: "github.com/typescript-eslint/rslint/internal/rules/${ruleName.replace(/-/g, '_')}"`));
+      console.log(chalk.gray(`   Add to rules array: ${ruleName.replace(/-/g, '_')}.${this.toPascalCase(ruleName)}Rule`));
+
       return {
         ruleName,
         success: true,
@@ -242,7 +247,10 @@ export class ClaudePorter {
     const prompt = this.fixTemplate
       .replace(/{{TEST_OUTPUT}}/g, testOutput)
       .replace(/{{GO_RULE_PATH}}/g, goRulePath)
-      .replace(/{{RULE_SOURCE}}/g, ruleSource);
+      .replace(/{{RULE_SOURCE}}/g, ruleSource)
+      .replace(/{{RULE_NAME}}/g, ruleName)
+      .replace(/{{RULE_NAME_UNDERSCORED}}/g, ruleName.replace(/-/g, '_'))
+      .replace(/{{RULE_NAME_PASCAL}}/g, this.toPascalCase(ruleName));
 
     const { responses, exitCode } = await this.runClaude(
       prompt,

@@ -44,12 +44,47 @@ npm start port --progress no-array-delete
 ## How it works
 
 1. **Fetch**: Downloads TypeScript rule source from typescript-eslint repository
-2. **Test Download**: Saves corresponding test files for reference
+2. **Adapt Test**: Creates cross-validation test file in rslint-test-tools
 3. **Convert**: Uses Claude Code (claude-sonnet-4-20250514) to convert the rule to Go
 4. **Verify**: Second Claude pass to verify the conversion is correct
 5. **Test**: Runs Go tests on the converted rule
 6. **Fix**: If tests fail, uses Claude to fix the implementation based on test output
-7. **Retest**: Runs tests again after fixes
+7. **Cross-Validate**: Runs rslint-test-tools tests to ensure Go rule matches TypeScript behavior
+
+## IMPORTANT: Manual Rule Registration
+
+After porting a rule, you MUST manually register it in the following files:
+
+1. `/Users/bytedance/dev/rslint/cmd/rslint/cmd.go`
+2. `/Users/bytedance/dev/rslint/cmd/rslint/api.go`
+3. `/Users/bytedance/dev/rslint/cmd/rslint/lsp.go`
+
+For each file:
+- Add import: `"github.com/typescript-eslint/rslint/internal/rules/[rule_name_underscored]"`
+- Add to rules array: `[rule_name_underscored].[RuleNamePascal]Rule,`
+
+Example for `prefer-as-const`:
+```go
+// Import section
+import (
+    // ... other imports ...
+    "github.com/typescript-eslint/rslint/internal/rules/prefer_as_const"
+)
+
+// In var rules = []rule.Rule{
+prefer_as_const.PreferAsConstRule,
+```
+
+After registration, rebuild with: `cd /Users/bytedance/dev/rslint && pnpm build`
+
+## Testing Notes
+
+- **Cross-validation**: The RuleTester compares diagnostic locations but skips message ID comparison (rslint only exposes rule names)
+- **Snapshots**: Tests use Node.js snapshot testing. Run with `--test-update-snapshots` flag when creating/updating snapshots
+- **Main tests**: After adding a new rule, update main test snapshots if rule count changes:
+  ```bash
+  cd packages/rslint && node --test --test-update-snapshots 'tests/**.test.mjs'
+  ```
 
 ## Features
 

@@ -38,5 +38,7 @@ You are tasked with running the cross-validation tests in rslint-test-tools to e
 - NEVER modify the Go rule implementation directly - only run and analyze the tests
 - The test framework uses Node.js built-in test runner with snapshot testing
 - Focus on ensuring behavioral equivalence between Go and TypeScript implementations
+- **Note about RuleTester**: The RuleTester has been modified to skip message ID comparison because rslint only exposes rule names, not message IDs. The important validation is that diagnostics are generated at the correct locations with the correct ranges.
+- **Snapshot updates**: When running tests for the first time or after changes, snapshots may need to be created/updated using the `--test-update-snapshots` flag
 
 Begin by navigating to the test directory and running the cross-validation tests.

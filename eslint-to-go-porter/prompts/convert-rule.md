@@ -56,8 +56,8 @@ Only after understanding the API structure, convert the TypeScript ESLint rule a
    - Package declaration
    - Imports
    - Helper functions (if any)
-   - Rule message builder function
-   - Main rule implementation
+   - Rule message builder functions (use descriptive IDs like "preferConstAssertion", not just the rule name)
+   - Main rule implementation with exported variable: `var RuleNamePascalRule = rule.Rule{...}`
 
 5. Ensure the Go code is idiomatic and follows Go conventions
 6. Handle all edge cases from the original TypeScript implementation
@@ -118,5 +118,10 @@ After updating these files, the project needs to be rebuilt:
 ```bash
 cd /Users/bytedance/dev/rslint && pnpm build
 ```
+
+### Additional Notes:
+- The build will compile the new rule into the rslint binary
+- After building, the rule will be available for use in configs like: `{"rules":{"rule-name":"error"}}`
+- Main test snapshots may need updating if rule count changes: `cd packages/rslint && node --test --test-update-snapshots 'tests/**.test.mjs'`
 
 DO NOT attempt to run these commands - just create the files and update the registration.
