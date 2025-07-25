@@ -74,8 +74,24 @@ jobs:
         run: pnpm -r test
 
       - name: Lint
-        run: pnpm run lint
-        continue-on-error: true
+        run: |
+          if ! pnpm run lint > lint_output.txt 2>&1; then
+            echo "## 🚨 Lint Errors Found" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The following lint errors were found:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            cat lint_output.txt >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please fix these issues in your code." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ✅ Lint Check Passed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "No lint errors found." >> $GITHUB_STEP_SUMMARY
+          fi
+          # Always exit 0 to not fail the CI
+          exit 0
 
   done:
     needs:
