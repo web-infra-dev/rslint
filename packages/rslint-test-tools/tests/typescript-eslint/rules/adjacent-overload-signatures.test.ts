@@ -1,10 +1,16 @@
-import { RuleTester } from '@typescript-eslint/rule-tester';
+import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
-import rule from '../../src/rules/adjacent-overload-signatures';
+const rootPath = getFixturesRootDir();
+const ruleTester = new RuleTester({
+  languageOptions: {
+    parserOptions: {
+      project: './tsconfig.json',
+      tsconfigRootDir: rootPath,
+    },
+  },
+});
 
-const ruleTester = new RuleTester();
-
-ruleTester.run('adjacent-overload-signatures', rule, {
+ruleTester.run('adjacent-overload-signatures', {
   valid: [
     {
       code: `
