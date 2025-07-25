@@ -679,5 +679,9 @@ func runCMD() int {
 		)
 	}
 
+	// Exit with non-zero status code if errors were found
+	if errorsCount > 0 {
+		return 1
+	}
 	return 0
 }
