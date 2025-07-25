@@ -50,6 +50,7 @@ npm start port --progress no-array-delete
 5. **Test**: Runs Go tests on the converted rule
 6. **Fix**: If tests fail, uses Claude to fix the implementation based on test output
 7. **Cross-Validate**: Runs rslint-test-tools tests to ensure Go rule matches TypeScript behavior
+8. **Git Commit**: Creates a git commit with all changes (does not push)
 
 ## IMPORTANT: Manual Rule Registration
 
@@ -95,6 +96,7 @@ After registration, rebuild with: `cd /Users/bytedance/dev/rslint && pnpm build`
 - **Batch processing**: Port multiple or all rules with rate limiting
 - **Force mode**: Re-port existing rules with `--force` flag
 - **Status tracking**: Check overall porting progress
+- **Automatic git commits**: Creates descriptive commits for successfully ported rules
 
 ## Output
 

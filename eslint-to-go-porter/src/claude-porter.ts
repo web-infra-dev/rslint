@@ -36,6 +36,10 @@ export class ClaudePorter {
       join(process.cwd(), 'prompts', 'cross-validate.md'),
       'utf-8'
     );
+    this.gitCommitTemplate = await readFile(
+      join(process.cwd(), 'prompts', 'git-commit.md'),
+      'utf-8'
+    );
   }
 
   setProgressMode(showProgress: boolean): void {
@@ -422,6 +426,42 @@ export class ClaudePorter {
       }
     } catch (error) {
       console.error(`Cross-validation error: ${error}`);
+      return false;
+    }
+  }
+
+  async gitCommitRule(ruleName: string): Promise<boolean> {
+    const prompt = this.gitCommitTemplate
+      .replace(/{{RULE_NAME}}/g, ruleName)
+      .replace(/{{RULE_NAME_UNDERSCORED}}/g, ruleName.replace(/-/g, '_'));
+
+    const { responses, exitCode } = await this.runClaudeInDirectory(
+      prompt,
+      'You are creating a git commit for the newly ported rule. You are working in the /Users/bytedance/dev/rslint directory. Create a clean, descriptive commit with all relevant files. Do NOT push the commit.',
+      '/Users/bytedance/dev/rslint'
+    );
+
+    if (exitCode !== 0) {
+      console.error(`Git commit failed with exit code ${exitCode}`);
+      return false;
+    }
+
+    try {
+      const fullText = this.parser.extractTextFromResponses(responses);
+      
+      // Check if commit was successful based on the response
+      if (fullText.toLowerCase().includes('commit') && 
+          (fullText.includes('files changed') || fullText.includes('create mode') || fullText.includes('committed'))) {
+        console.log(`✓ Successfully committed ${ruleName} rule implementation`);
+        return true;
+      } else {
+        console.warn(`⚠️  Git commit may have failed for ${ruleName}`);
+        console.log('Git output:');
+        console.log(fullText);
+        return false;
+      }
+    } catch (error) {
+      console.error(`Git commit error: ${error}`);
       return false;
     }
   }

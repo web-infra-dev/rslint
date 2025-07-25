@@ -91,7 +91,15 @@ async function portSingleRule(ruleName: string, showProgress: boolean = false, s
       const crossValidated = await porter.crossValidateRule(ruleName);
       
       if (crossValidated) {
-        if (spinner) spinner.succeed(`Successfully ported, tested, and cross-validated ${ruleName}`);
+        // Git commit the successful implementation
+        if (spinner) spinner.text = `Creating git commit for ${ruleName}...`;
+        const committed = await porter.gitCommitRule(ruleName);
+        
+        if (committed) {
+          if (spinner) spinner.succeed(`Successfully ported, tested, cross-validated, and committed ${ruleName}`);
+        } else {
+          if (spinner) spinner.succeed(`Successfully ported, tested, and cross-validated ${ruleName} (commit failed)`);
+        }
         return { ...result, testPath };
       } else {
         console.warn(`Warning: ${ruleName} cross-validation failed, but Go tests passed`);
@@ -113,7 +121,15 @@ async function portSingleRule(ruleName: string, showProgress: boolean = false, s
         const crossValidated = await porter.crossValidateRule(ruleName);
         
         if (crossValidated) {
-          if (spinner) spinner.succeed(`Successfully fixed, tested, and cross-validated ${ruleName}`);
+          // Git commit the successful implementation
+          if (spinner) spinner.text = `Creating git commit for ${ruleName}...`;
+          const committed = await porter.gitCommitRule(ruleName);
+          
+          if (committed) {
+            if (spinner) spinner.succeed(`Successfully fixed, tested, cross-validated, and committed ${ruleName}`);
+          } else {
+            if (spinner) spinner.succeed(`Successfully fixed, tested, and cross-validated ${ruleName} (commit failed)`);
+          }
           return { ...result, testPath };
         } else {
           console.warn(`Warning: ${ruleName} cross-validation failed after fix, but Go tests passed`);
