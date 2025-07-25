@@ -21,7 +21,7 @@
   "engines": {
     "vscode": "^1.74.0"
   },
-  "main": "./out/extension.js",
+  "main": "./dist/extension.js",
   "activationEvents": [
     "onLanguage:typescript",
     "onLanguage:typescriptreact",
@@ -57,9 +57,8 @@
   },
   "scripts": {
     "vscode:prepublish": "pnpm run build",
-    "copy-binary": "rimraf out && copyfiles -f ../rslint/bin/rslint ./out",
-    "build": "npm run copy-binary && node scripts/build.js",
-    "watch": "pnpm run copy-binary && tsc -watch -p tsconfig.build.json",
+    "build": "node scripts/build.js",
+    "watch": "node scripts/build.js --watch",
     "package": "vsce package --dependencies",
     "test": "tsc -p tsconfig.spec.json && node .vscode-test-out/runTest.js",
     "prepackage": "pnpm build",
@@ -75,7 +74,6 @@
     "@vscode/test-electron": "2.4.1",
     "@types/mocha": "10.0.10",
     "mocha": "10.8.2",
-    "copyfiles": "2.4.1",
     "esbuild": "0.25.7",
     "fast-glob": "3.2.12",
     "rimraf": "6.0.1",

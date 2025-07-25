@@ -30,13 +30,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
-	"github.com/typescript-eslint/rslint/internal/config"
-	"github.com/typescript-eslint/rslint/internal/rules/array_type"
+	rslintconfig "github.com/typescript-eslint/rslint/internal/config"
 	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
-	"github.com/typescript-eslint/rslint/internal/rules/ban_ts_comment"
-	"github.com/typescript-eslint/rslint/internal/rules/ban_tslint_comment"
-	"github.com/typescript-eslint/rslint/internal/rules/class_literal_property_style"
-	"github.com/typescript-eslint/rslint/internal/rules/class_methods_use_this"
 	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
 	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
 	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_void_expression"
@@ -63,7 +58,6 @@ import (
 	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_unary_minus"
 	"github.com/typescript-eslint/rslint/internal/rules/non_nullable_type_assertion_style"
 	"github.com/typescript-eslint/rslint/internal/rules/only_throw_error"
-	"github.com/typescript-eslint/rslint/internal/rules/prefer_as_const"
 	"github.com/typescript-eslint/rslint/internal/rules/prefer_promise_reject_errors"
 	"github.com/typescript-eslint/rslint/internal/rules/prefer_reduce_type_parameter"
 	"github.com/typescript-eslint/rslint/internal/rules/prefer_return_this_type"
@@ -361,7 +355,7 @@ Options:
 `
 
 // read config and deserialize the jsonc result
-func loadRslintConfig(configPath string, currentDirectory string, fs vfs.FS) (config.RslintConfig, string) {
+func loadRslintConfig(configPath string, currentDirectory string, fs vfs.FS) (rslintconfig.RslintConfig, string) {
 	configFileName := tspath.ResolvePath(currentDirectory, configPath)
 	if !fs.FileExists(configFileName) {
 		fmt.Fprintf(os.Stderr, "error: rslint config file %q doesn't exist\n", configFileName)
@@ -374,7 +368,7 @@ func loadRslintConfig(configPath string, currentDirectory string, fs vfs.FS) (co
 		os.Exit(1)
 	}
 
-	var config config.RslintConfig
+	var config rslintconfig.RslintConfig
 	if err := json.Unmarshal([]byte(data), &config); err != nil {
 		fmt.Fprintf(os.Stderr, "error parsing rslint config file %q: %v\n", configFileName, err)
 		os.Exit(1)
@@ -382,7 +376,7 @@ func loadRslintConfig(configPath string, currentDirectory string, fs vfs.FS) (co
 	currentDirectory = tspath.GetDirectoryPath(configFileName)
 	return config, currentDirectory
 }
-func loadTsConfigFromRslintConfig(rslintConfig config.RslintConfig, currentDirectory string, fs vfs.FS) []string {
+func loadTsConfigFromRslintConfig(rslintConfig rslintconfig.RslintConfig, currentDirectory string, fs vfs.FS) []string {
 	tsConfig := []string{}
 	for _, entry := range rslintConfig {
 
@@ -487,7 +481,7 @@ func runCMD() int {
 	currentDirectory = tspath.NormalizePath(currentDirectory)
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	configs := []string{}
+	tsConfigs := []string{}
 	if tsconfig == "" {
 		configFileName := tspath.ResolvePath(currentDirectory, "tsconfig.json")
 		if !fs.FileExists(configFileName) {
@@ -495,21 +489,27 @@ func runCMD() int {
 				configFileName: "{}",
 			})
 		}
-		configs = append(configs, configFileName)
+		tsConfigs = append(tsConfigs, configFileName)
 	} else {
 		configFileName := tspath.ResolvePath(currentDirectory, tsconfig)
 		if !fs.FileExists(configFileName) {
 			fmt.Fprintf(os.Stderr, "error: tsconfig %q doesn't exist", tsconfig)
 			return 1
 		}
-		configs = append(configs, configFileName)
+		tsConfigs = append(tsConfigs, configFileName)
 	}
 
+	// Initialize rule registry with all available rules
+	rslintconfig.RegisterAllTypeSriptEslintPluginRules()
+	var rslintConfig rslintconfig.RslintConfig
+	var cwd string
+	// Load rslint configuration and determine which rules to enable
 	if config != "" {
-		rslintConfig, cwd := loadRslintConfig(config, currentDirectory, fs)
-		configs = loadTsConfigFromRslintConfig(rslintConfig, cwd, fs)
+		rslintConfig, cwd = loadRslintConfig(config, currentDirectory, fs)
+		tsConfigs = loadTsConfigFromRslintConfig(rslintConfig, cwd, fs)
+	} else {
+		rslintConfig = rslintconfig.RslintConfig{}
 	}
-
 	var rules = []rule.Rule{
 		array_type.ArrayTypeRule,
 		await_thenable.AwaitThenableRule,
@@ -566,7 +566,7 @@ func runCMD() int {
 		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
 	}
 	programs := []*compiler.Program{}
-	for _, configFileName := range configs {
+	for _, configFileName := range tsConfigs {
 		program, err := utils.CreateProgram(singleThreaded, fs, currentDirectory, configFileName, host)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
@@ -629,7 +629,8 @@ func runCMD() int {
 		singleThreaded,
 		files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			return utils.Map(rules, func(r rule.Rule) linter.ConfiguredRule {
+			activeRules := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
+			return utils.Map(activeRules, func(r rule.Rule) linter.ConfiguredRule {
 				return linter.ConfiguredRule{
 					Name: r.Name,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -667,10 +668,6 @@ func runCMD() int {
 	if len(files) == 1 {
 		filesText = "file"
 	}
-	rulesText := "rules"
-	if len(rules) == 1 {
-		rulesText = "rule"
-	}
 	threadsCount := 1
 	if !singleThreaded {
 		threadsCount = runtime.GOMAXPROCS(0)
@@ -678,19 +675,21 @@ func runCMD() int {
 	if format == "default" {
 		fmt.Fprintf(
 			os.Stdout,
-			"Found %s %s %s(linted %s %s with %s %s in %s using %s threads)%s\n",
+			"Found %s %s %s(linted %s %s with in %s using %s threads)%s\n",
 			errorsColorFunc("%d", errorsCount),
 			errorsText,
 			colors.DimText(""),
 			colors.BoldText("%d", len(files)),
 			filesText,
-			colors.BoldText("%d", len(rules)),
-			rulesText,
 			colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
 			colors.BoldText("%d", threadsCount),
 			color.New().SprintFunc()(""), // Reset
 		)
 	}
 
+	// Exit with non-zero status code if errors were found
+	if errorsCount > 0 {
+		return 1
+	}
 	return 0
 }

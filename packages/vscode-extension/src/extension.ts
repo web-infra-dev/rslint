@@ -1,4 +1,3 @@
-import * as path from 'path';
 import { workspace, ExtensionContext, window, Uri } from 'vscode';
 import {
   Executable,
@@ -17,7 +16,7 @@ export function activate(context: ExtensionContext) {
   const binPath =
     binPathConfig && binPathConfig.trim() !== ''
       ? binPathConfig
-      : Uri.joinPath(context.extensionUri, 'out', 'rslint').fsPath;
+      : Uri.joinPath(context.extensionUri, 'dist', 'rslint').fsPath;
   const run: Executable = {
     command: binPath,
     args: ['--lsp'],

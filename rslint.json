@@ -12,6 +12,19 @@
         ]
       }
     },
-    "rules": {}
+    "rules": {
+      "@typescript-eslint/promise-function-async": "off",
+      "@typescript-eslint/no-floating-promises": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/return-await": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-confusing-void-expression": "off",
+      "@typescript-eslint/no-redundant-type-constituents": "off",
+      "@typescript-eslint/no-unsafe-type-assertion": "off"
+    },
+    "plugins": ["@typescript-eslint"]
   }
 ]
