@@ -75,7 +75,6 @@ jobs:
 
       - name: Lint
         run: pnpm run lint
-        continue-on-error: true
 
   done:
     needs:
