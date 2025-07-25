@@ -86,8 +86,18 @@ async function portSingleRule(ruleName: string, showProgress: boolean = false, s
     const testResult = await testRunner.runRuleTest(ruleName);
     
     if (testResult.success) {
-      if (spinner) spinner.succeed(`Successfully ported and tested ${ruleName}`);
-      return { ...result, testPath };
+      // Run cross-validation tests to ensure Go rule matches TypeScript behavior
+      if (spinner) spinner.text = `Running cross-validation for ${ruleName}...`;
+      const crossValidated = await porter.crossValidateRule(ruleName);
+      
+      if (crossValidated) {
+        if (spinner) spinner.succeed(`Successfully ported, tested, and cross-validated ${ruleName}`);
+        return { ...result, testPath };
+      } else {
+        console.warn(`Warning: ${ruleName} cross-validation failed, but Go tests passed`);
+        if (spinner) spinner.succeed(`Successfully ported and tested ${ruleName} (cross-validation failed)`);
+        return { ...result, testPath };
+      }
     }
     
     // If tests failed, try to fix with Claude
@@ -98,8 +108,18 @@ async function portSingleRule(ruleName: string, showProgress: boolean = false, s
       // Run tests again
       const retestResult = await testRunner.runRuleTest(ruleName);
       if (retestResult.success) {
-        if (spinner) spinner.succeed(`Successfully fixed and tested ${ruleName}`);
-        return { ...result, testPath };
+        // Run cross-validation tests after successful fix
+        if (spinner) spinner.text = `Running cross-validation for ${ruleName}...`;
+        const crossValidated = await porter.crossValidateRule(ruleName);
+        
+        if (crossValidated) {
+          if (spinner) spinner.succeed(`Successfully fixed, tested, and cross-validated ${ruleName}`);
+          return { ...result, testPath };
+        } else {
+          console.warn(`Warning: ${ruleName} cross-validation failed after fix, but Go tests passed`);
+          if (spinner) spinner.succeed(`Successfully fixed and tested ${ruleName} (cross-validation failed)`);
+          return { ...result, testPath };
+        }
       }
     }
     

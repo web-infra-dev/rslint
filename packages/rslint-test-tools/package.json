@@ -4,8 +4,8 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "test": "node --test ",
-    "test:update": "node --test --test-update-snapshots "
+    "test": "node --import=tsx/esm --test tests/typescript-eslint/rules/*.test.ts",
+    "test:update": "node --import=tsx/esm --test --test-update-snapshots tests/typescript-eslint/rules/*.test.ts"
   },
   "keywords": [],
   "author": "",
@@ -13,6 +13,7 @@
   "description": "",
   "devDependencies": {
     "@types/node": "24.0.14",
-    "@rslint/core": "workspace:*"
+    "@rslint/core": "workspace:*",
+    "tsx": "^4.6.0"
   }
 }

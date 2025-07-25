@@ -84,3 +84,39 @@ Look at existing rule test files for the correct test structure using `rule_test
 IMPORTANT: Do NOT attempt to run, compile, or execute any of the generated Go code.
 
 Create both files using the Write tool. The files should contain complete, working Go code with no explanations or comments outside the code.
+
+## IMPORTANT: Rule Registration Steps
+
+After creating the rule files, the rule MUST be registered in the rslint command files. Here are the required steps:
+
+### Files to Update:
+
+1. **`/Users/bytedance/dev/rslint/cmd/rslint/cmd.go`**
+   - Add import: `"github.com/typescript-eslint/rslint/internal/rules/{{RULE_NAME_UNDERSCORED}}"`
+   - Add to rules array: `{{RULE_NAME_UNDERSCORED}}.{{RULE_NAME_PASCAL}}Rule,`
+
+2. **`/Users/bytedance/dev/rslint/cmd/rslint/api.go`**
+   - Add import: `"github.com/typescript-eslint/rslint/internal/rules/{{RULE_NAME_UNDERSCORED}}"`
+   - Add to rules array: `{{RULE_NAME_UNDERSCORED}}.{{RULE_NAME_PASCAL}}Rule,`
+
+3. **`/Users/bytedance/dev/rslint/cmd/rslint/lsp.go`**
+   - Add import: `"github.com/typescript-eslint/rslint/internal/rules/{{RULE_NAME_UNDERSCORED}}"`
+   - Add to rules array: `{{RULE_NAME_UNDERSCORED}}.{{RULE_NAME_PASCAL}}Rule,`
+
+### Where to Add:
+
+- **Imports**: Add the import alphabetically with other rule imports (e.g., after `only_throw_error` if your rule starts with 'p')
+- **Rules Array**: Add the rule entry alphabetically in the `var rules = []rule.Rule{` array
+
+### Example:
+If porting `prefer-as-const`, you would:
+1. Add import: `"github.com/typescript-eslint/rslint/internal/rules/prefer_as_const"`
+2. Add to rules array: `prefer_as_const.PreferAsConstRule,`
+
+### Build Command:
+After updating these files, the project needs to be rebuilt:
+```bash
+cd /Users/bytedance/dev/rslint && pnpm build
+```
+
+DO NOT attempt to run these commands - just create the files and update the registration.

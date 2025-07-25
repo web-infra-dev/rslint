@@ -378,4 +378,43 @@ export class ClaudePorter {
       return false;
     }
   }
+
+  async crossValidateRule(ruleName: string): Promise<boolean> {
+    const prompt = this.crossValidateTemplate
+      .replace(/{{RULE_NAME}}/g, ruleName);
+
+    const { responses, exitCode } = await this.runClaudeInDirectory(
+      prompt,
+      'You are running cross-validation tests to ensure the Go rule behaves identically to the TypeScript ESLint rule. You are working in the /Users/bytedance/dev/rslint/packages/rslint-test-tools directory. Run the tests and report the results. Do NOT attempt to modify rule implementations.',
+      '/Users/bytedance/dev/rslint/packages/rslint-test-tools'
+    );
+
+    if (exitCode !== 0) {
+      console.error(`Cross-validation failed with exit code ${exitCode}`);
+      return false;
+    }
+
+    try {
+      const fullText = this.parser.extractTextFromResponses(responses);
+      
+      // Check if tests passed based on the response
+      if (fullText.includes('PASS') || fullText.includes('✓') || fullText.toLowerCase().includes('all tests passed')) {
+        console.log(`✓ Cross-validation tests passed for ${ruleName}`);
+        return true;
+      } else if (fullText.includes('FAIL') || fullText.includes('✗') || fullText.toLowerCase().includes('test failed')) {
+        console.error(`✗ Cross-validation tests failed for ${ruleName}`);
+        console.log('Cross-validation output:');
+        console.log(fullText);
+        return false;
+      } else {
+        console.warn(`⚠️  Cross-validation results unclear for ${ruleName}`);
+        console.log('Cross-validation output:');
+        console.log(fullText);
+        return false;
+      }
+    } catch (error) {
+      console.error(`Cross-validation error: ${error}`);
+      return false;
+    }
+  }
 }
