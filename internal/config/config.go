@@ -1,5 +1,49 @@
 package config
 
+import (
+	"github.com/typescript-eslint/rslint/internal/rule"
+	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
+	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
+	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
+	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_void_expression"
+	"github.com/typescript-eslint/rslint/internal/rules/no_duplicate_type_constituents"
+	"github.com/typescript-eslint/rslint/internal/rules/no_floating_promises"
+	"github.com/typescript-eslint/rslint/internal/rules/no_for_in_array"
+	"github.com/typescript-eslint/rslint/internal/rules/no_implied_eval"
+	"github.com/typescript-eslint/rslint/internal/rules/no_meaningless_void_operator"
+	"github.com/typescript-eslint/rslint/internal/rules/no_misused_promises"
+	"github.com/typescript-eslint/rslint/internal/rules/no_misused_spread"
+	"github.com/typescript-eslint/rslint/internal/rules/no_mixed_enums"
+	"github.com/typescript-eslint/rslint/internal/rules/no_redundant_type_constituents"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_boolean_literal_compare"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_template_expression"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_type_arguments"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_type_assertion"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_argument"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_assignment"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_call"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_enum_comparison"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_member_access"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_return"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_type_assertion"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_unary_minus"
+	"github.com/typescript-eslint/rslint/internal/rules/non_nullable_type_assertion_style"
+	"github.com/typescript-eslint/rslint/internal/rules/only_throw_error"
+	"github.com/typescript-eslint/rslint/internal/rules/prefer_promise_reject_errors"
+	"github.com/typescript-eslint/rslint/internal/rules/prefer_reduce_type_parameter"
+	"github.com/typescript-eslint/rslint/internal/rules/prefer_return_this_type"
+	"github.com/typescript-eslint/rslint/internal/rules/promise_function_async"
+	"github.com/typescript-eslint/rslint/internal/rules/related_getter_setter_pairs"
+	"github.com/typescript-eslint/rslint/internal/rules/require_array_sort_compare"
+	"github.com/typescript-eslint/rslint/internal/rules/require_await"
+	"github.com/typescript-eslint/rslint/internal/rules/restrict_plus_operands"
+	"github.com/typescript-eslint/rslint/internal/rules/restrict_template_expressions"
+	"github.com/typescript-eslint/rslint/internal/rules/return_await"
+	"github.com/typescript-eslint/rslint/internal/rules/switch_exhaustiveness_check"
+	"github.com/typescript-eslint/rslint/internal/rules/unbound_method"
+	"github.com/typescript-eslint/rslint/internal/rules/use_unknown_in_catch_callback_variable"
+)
+
 // RslintConfig represents the top-level configuration array
 type RslintConfig []ConfigEntry
 
@@ -9,6 +53,7 @@ type ConfigEntry struct {
 	Files           []string         `json:"files"`
 	LanguageOptions *LanguageOptions `json:"languageOptions,omitempty"`
 	Rules           Rules            `json:"rules"`
+	Plugins         []string         `json:"plugins,omitempty"` // List of plugin names
 }
 
 // LanguageOptions contains language-specific configuration options
@@ -29,32 +74,32 @@ type Rules map[string]interface{}
 // Alternative: If you want type-safe rule configurations
 type TypedRules struct {
 	// Example rule configurations - extend as needed
-	NoArrayDelete                      *RuleConfig `json:"no-array-delete,omitempty"`
-	NoBaseToString                     *RuleConfig `json:"no-base-to-string,omitempty"`
-	NoForInArray                       *RuleConfig `json:"no-for-in-array,omitempty"`
-	NoImpliedEval                      *RuleConfig `json:"no-implied-eval,omitempty"`
-	OnlyThrowError                     *RuleConfig `json:"only-throw-error,omitempty"`
-	AwaitThenable                      *RuleConfig `json:"await-thenable,omitempty"`
-	NoConfusingVoidExpression          *RuleConfig `json:"no-confusing-void-expression,omitempty"`
-	NoDuplicateTypeConstituents        *RuleConfig `json:"no-duplicate-type-constituents,omitempty"`
-	NoFloatingPromises                 *RuleConfig `json:"no-floating-promises,omitempty"`
-	NoMeaninglessVoidOperator          *RuleConfig `json:"no-meaningless-void-operator,omitempty"`
-	NoMisusedPromises                  *RuleConfig `json:"no-misused-promises,omitempty"`
-	NoMisusedSpread                    *RuleConfig `json:"no-misused-spread,omitempty"`
-	NoMixedEnums                       *RuleConfig `json:"no-mixed-enums,omitempty"`
-	NoRedundantTypeConstituents        *RuleConfig `json:"no-redundant-type-constituents,omitempty"`
-	NoUnnecessaryBooleanLiteralCompare *RuleConfig `json:"no-unnecessary-boolean-literal-compare,omitempty"`
-	NoUnnecessaryTemplateExpression    *RuleConfig `json:"no-unnecessary-template-expression,omitempty"`
-	NoUnnecessaryTypeArguments         *RuleConfig `json:"no-unnecessary-type-arguments,omitempty"`
-	NoUnnecessaryTypeAssertion         *RuleConfig `json:"no-unnecessary-type-assertion,omitempty"`
-	NoUnsafeArgument                   *RuleConfig `json:"no-unsafe-argument,omitempty"`
-	NoUnsafeAssignment                 *RuleConfig `json:"no-unsafe-assignment,omitempty"`
-	NoUnsafeCall                       *RuleConfig `json:"no-unsafe-call,omitempty"`
-	NoUnsafeEnumComparison             *RuleConfig `json:"no-unsafe-enum-comparison,omitempty"`
-	NoUnsafeMemberAccess               *RuleConfig `json:"no-unsafe-member-access,omitempty"`
-	NoUnsafeReturn                     *RuleConfig `json:"no-unsafe-return,omitempty"`
-	NoUnsafeTypeAssertion              *RuleConfig `json:"no-unsafe-type-assertion,omitempty"`
-	NoUnsafeUnaryMinus                 *RuleConfig `json:"no-unsafe-unary-minus,omitempty"`
+	NoArrayDelete                      *RuleConfig `json:"@typescript-eslint/no-array-delete,omitempty"`
+	NoBaseToString                     *RuleConfig `json:"@typescript-eslint/no-base-to-string,omitempty"`
+	NoForInArray                       *RuleConfig `json:"@typescript-eslint/no-for-in-array,omitempty"`
+	NoImpliedEval                      *RuleConfig `json:"@typescript-eslint/no-implied-eval,omitempty"`
+	OnlyThrowError                     *RuleConfig `json:"@typescript-eslint/only-throw-error,omitempty"`
+	AwaitThenable                      *RuleConfig `json:"@typescript-eslint/await-thenable,omitempty"`
+	NoConfusingVoidExpression          *RuleConfig `json:"@typescript-eslint/no-confusing-void-expression,omitempty"`
+	NoDuplicateTypeConstituents        *RuleConfig `json:"@typescript-eslint/no-duplicate-type-constituents,omitempty"`
+	NoFloatingPromises                 *RuleConfig `json:"@typescript-eslint/no-floating-promises,omitempty"`
+	NoMeaninglessVoidOperator          *RuleConfig `json:"@typescript-eslint/no-meaningless-void-operator,omitempty"`
+	NoMisusedPromises                  *RuleConfig `json:"@typescript-eslint/no-misused-promises,omitempty"`
+	NoMisusedSpread                    *RuleConfig `json:"@typescript-eslint/no-misused-spread,omitempty"`
+	NoMixedEnums                       *RuleConfig `json:"@typescript-eslint/no-mixed-enums,omitempty"`
+	NoRedundantTypeConstituents        *RuleConfig `json:"@typescript-eslint/no-redundant-type-constituents,omitempty"`
+	NoUnnecessaryBooleanLiteralCompare *RuleConfig `json:"@typescript-eslint/no-unnecessary-boolean-literal-compare,omitempty"`
+	NoUnnecessaryTemplateExpression    *RuleConfig `json:"@typescript-eslint/no-unnecessary-template-expression,omitempty"`
+	NoUnnecessaryTypeArguments         *RuleConfig `json:"@typescript-eslint/no-unnecessary-type-arguments,omitempty"`
+	NoUnnecessaryTypeAssertion         *RuleConfig `json:"@typescript-eslint/no-unnecessary-type-assertion,omitempty"`
+	NoUnsafeArgument                   *RuleConfig `json:"@typescript-eslint/no-unsafe-argument,omitempty"`
+	NoUnsafeAssignment                 *RuleConfig `json:"@typescript-eslint/no-unsafe-assignment,omitempty"`
+	NoUnsafeCall                       *RuleConfig `json:"@typescript-eslint/no-unsafe-call,omitempty"`
+	NoUnsafeEnumComparison             *RuleConfig `json:"@typescript-eslint/no-unsafe-enum-comparison,omitempty"`
+	NoUnsafeMemberAccess               *RuleConfig `json:"@typescript-eslint/no-unsafe-member-access,omitempty"`
+	NoUnsafeReturn                     *RuleConfig `json:"@typescript-eslint/no-unsafe-return,omitempty"`
+	NoUnsafeTypeAssertion              *RuleConfig `json:"@typescript-eslint/no-unsafe-type-assertion,omitempty"`
+	NoUnsafeUnaryMinus                 *RuleConfig `json:"@typescript-eslint/no-unsafe-unary-minus,omitempty"`
 }
 
 // RuleConfig represents individual rule configuration
@@ -77,6 +122,13 @@ func (rc *RuleConfig) GetLevel() string {
 		return "error"
 	}
 	return rc.Level
+}
+func GetAllRulesForPlugin(plugin string) []rule.Rule {
+	if plugin == "typescript-eslint" {
+		return getAllTypeScriptEslintPluginRules()
+	} else {
+		return []rule.Rule{} // Return empty slice for unsupported plugins
+	}
 }
 
 // GetRulesForFile returns enabled rules for a given file based on the configuration
@@ -105,6 +157,14 @@ func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConf
 		}
 
 		if matches {
+
+			/// Merge rules from plugin
+			for _, plugin := range entry.Plugins {
+
+				for _, rule := range GetAllRulesForPlugin(plugin) {
+					enabledRules[rule.Name] = &RuleConfig{Level: "error"} // Default level for plugin rules
+				}
+			}
 			// Merge rules from this entry
 			for ruleName, ruleValue := range entry.Rules {
 				switch v := ruleValue.(type) {
@@ -144,4 +204,58 @@ func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConf
 	}
 
 	return enabledRules
+}
+
+// RegisterAllTypeSriptEslintPluginRules registers all available rules in the global registry
+func RegisterAllTypeSriptEslintPluginRules() {
+	GlobalRuleRegistry.Register("@typescript-eslint/await-thenable", await_thenable.AwaitThenableRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-array-delete", no_array_delete.NoArrayDeleteRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-base-to-string", no_base_to_string.NoBaseToStringRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-confusing-void-expression", no_confusing_void_expression.NoConfusingVoidExpressionRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-duplicate-type-constituents", no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-floating-promises", no_floating_promises.NoFloatingPromisesRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-for-in-array", no_for_in_array.NoForInArrayRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-implied-eval", no_implied_eval.NoImpliedEvalRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-meaningless-void-operator", no_meaningless_void_operator.NoMeaninglessVoidOperatorRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-misused-promises", no_misused_promises.NoMisusedPromisesRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-misused-spread", no_misused_spread.NoMisusedSpreadRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-mixed-enums", no_mixed_enums.NoMixedEnumsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-redundant-type-constituents", no_redundant_type_constituents.NoRedundantTypeConstituentsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-unnecessary-boolean-literal-compare", no_unnecessary_boolean_literal_compare.NoUnnecessaryBooleanLiteralCompareRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-unnecessary-template-expression", no_unnecessary_template_expression.NoUnnecessaryTemplateExpressionRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-unnecessary-type-arguments", no_unnecessary_type_arguments.NoUnnecessaryTypeArgumentsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-unnecessary-type-assertion", no_unnecessary_type_assertion.NoUnnecessaryTypeAssertionRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-unsafe-argument", no_unsafe_argument.NoUnsafeArgumentRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-unsafe-assignment", no_unsafe_assignment.NoUnsafeAssignmentRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-unsafe-call", no_unsafe_call.NoUnsafeCallRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-unsafe-enum-comparison", no_unsafe_enum_comparison.NoUnsafeEnumComparisonRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-unsafe-member-access", no_unsafe_member_access.NoUnsafeMemberAccessRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-unsafe-return", no_unsafe_return.NoUnsafeReturnRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-unsafe-type-assertion", no_unsafe_type_assertion.NoUnsafeTypeAssertionRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-unsafe-unary-minus", no_unsafe_unary_minus.NoUnsafeUnaryMinusRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/non-nullable-type-assertion-style", non_nullable_type_assertion_style.NonNullableTypeAssertionStyleRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/only-throw-error", only_throw_error.OnlyThrowErrorRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/prefer-promise-reject-errors", prefer_promise_reject_errors.PreferPromiseRejectErrorsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/prefer-reduce-type-parameter", prefer_reduce_type_parameter.PreferReduceTypeParameterRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/prefer-return-this-type", prefer_return_this_type.PreferReturnThisTypeRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/promise-function-async", promise_function_async.PromiseFunctionAsyncRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/related-getter-setter-pairs", related_getter_setter_pairs.RelatedGetterSetterPairsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/require-array-sort-compare", require_array_sort_compare.RequireArraySortCompareRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/require-await", require_await.RequireAwaitRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/restrict-plus-operands", restrict_plus_operands.RestrictPlusOperandsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/restrict-template-expressions", restrict_template_expressions.RestrictTemplateExpressionsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/return-await", return_await.ReturnAwaitRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/switch-exhaustiveness-check", switch_exhaustiveness_check.SwitchExhaustivenessCheckRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/unbound-method", unbound_method.UnboundMethodRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/use-unknown-in-catch-callback-variable", use_unknown_in_catch_callback_variable.UseUnknownInCatchCallbackVariableRule)
+}
+
+// getAllTypeScriptEslintPluginRules returns all registered rules (for backward compatibility when no config is provided)
+func getAllTypeScriptEslintPluginRules() []rule.Rule {
+	allRules := GlobalRuleRegistry.GetAllRules()
+	var rules []rule.Rule
+	for _, rule := range allRules {
+		rules = append(rules, rule)
+	}
+	return rules
 }

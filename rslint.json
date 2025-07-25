@@ -13,7 +13,8 @@
       }
     },
     "rules": {
-      "no-unsafe-call": "error"
-    }
+      "@typescript-eslint/promise-function-async": "error"
+    },
+    "plugins": []
   }
 ]
