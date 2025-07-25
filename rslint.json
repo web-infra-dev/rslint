@@ -15,6 +15,6 @@
     "rules": {
       "@typescript-eslint/promise-function-async": "error"
     },
-    "plugins": []
+    "plugins": ["typescript-eslint"]
   }
 ]
