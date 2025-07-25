@@ -45,3 +45,4 @@ Provide the complete corrected Go code.
 4. **Test Structure**: Ensure test follows the `rule_tester.RunRuleTester` pattern
 5. **Message IDs**: In Go rules, use descriptive message IDs in `RuleMessage.Id` field (e.g., "preferConstAssertion", "variableConstAssertion")
 6. **Rule Variable Export**: Ensure the rule variable is exported with proper naming: `var RuleNamePascalRule = rule.Rule{...}`
+7. **Message Formatting**: Do NOT use template strings with {{placeholders}} in messages. Format messages directly using fmt.Sprintf or string concatenation. The rslint framework does not support template string interpolation.

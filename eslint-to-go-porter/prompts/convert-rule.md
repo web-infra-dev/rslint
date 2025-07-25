@@ -67,8 +67,9 @@ Only after understanding the API structure, convert the TypeScript ESLint rule a
    - All invalid test cases that should trigger the rule with correct error messages
    - All edge cases and complex scenarios from the original test
    - Proper error positioning (line, column, endLine, endColumn)
-9. IMPORTANT: Do NOT attempt to run, compile, or execute the generated Go code
-10. IMPORTANT: Create both the rule implementation (.go) and test file (_test.go)
+9. IMPORTANT: For rule messages, do NOT use template strings with {{placeholders}}. Instead, format the message directly in Go code using fmt.Sprintf or string concatenation. The rslint framework does not support template string interpolation in messages.
+10. IMPORTANT: Do NOT attempt to run, compile, or execute the generated Go code
+11. IMPORTANT: Create both the rule implementation (.go) and test file (_test.go)
 
 ## Output
 
