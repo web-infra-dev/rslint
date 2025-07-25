@@ -12,6 +12,8 @@
         ]
       }
     },
-    "rules": {}
+    "rules": {
+      "no-unsafe-call": "error"
+    }
   }
 ]

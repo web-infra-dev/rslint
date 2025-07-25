@@ -30,7 +30,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
-	"github.com/typescript-eslint/rslint/internal/config"
+	rslintconfig "github.com/typescript-eslint/rslint/internal/config"
 	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
 	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
 	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
@@ -354,8 +354,62 @@ Options:
 	-h, --help        Show help
 `
 
+// registerAllRules registers all available rules in the global registry
+func registerAllRules() {
+	rslintconfig.GlobalRuleRegistry.Register("await-thenable", await_thenable.AwaitThenableRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-array-delete", no_array_delete.NoArrayDeleteRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-base-to-string", no_base_to_string.NoBaseToStringRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-confusing-void-expression", no_confusing_void_expression.NoConfusingVoidExpressionRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-duplicate-type-constituents", no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-floating-promises", no_floating_promises.NoFloatingPromisesRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-for-in-array", no_for_in_array.NoForInArrayRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-implied-eval", no_implied_eval.NoImpliedEvalRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-meaningless-void-operator", no_meaningless_void_operator.NoMeaninglessVoidOperatorRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-misused-promises", no_misused_promises.NoMisusedPromisesRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-misused-spread", no_misused_spread.NoMisusedSpreadRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-mixed-enums", no_mixed_enums.NoMixedEnumsRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-redundant-type-constituents", no_redundant_type_constituents.NoRedundantTypeConstituentsRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-unnecessary-boolean-literal-compare", no_unnecessary_boolean_literal_compare.NoUnnecessaryBooleanLiteralCompareRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-unnecessary-template-expression", no_unnecessary_template_expression.NoUnnecessaryTemplateExpressionRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-unnecessary-type-arguments", no_unnecessary_type_arguments.NoUnnecessaryTypeArgumentsRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-unnecessary-type-assertion", no_unnecessary_type_assertion.NoUnnecessaryTypeAssertionRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-unsafe-argument", no_unsafe_argument.NoUnsafeArgumentRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-unsafe-assignment", no_unsafe_assignment.NoUnsafeAssignmentRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-unsafe-call", no_unsafe_call.NoUnsafeCallRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-unsafe-enum-comparison", no_unsafe_enum_comparison.NoUnsafeEnumComparisonRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-unsafe-member-access", no_unsafe_member_access.NoUnsafeMemberAccessRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-unsafe-return", no_unsafe_return.NoUnsafeReturnRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-unsafe-type-assertion", no_unsafe_type_assertion.NoUnsafeTypeAssertionRule)
+	rslintconfig.GlobalRuleRegistry.Register("no-unsafe-unary-minus", no_unsafe_unary_minus.NoUnsafeUnaryMinusRule)
+	rslintconfig.GlobalRuleRegistry.Register("non-nullable-type-assertion-style", non_nullable_type_assertion_style.NonNullableTypeAssertionStyleRule)
+	rslintconfig.GlobalRuleRegistry.Register("only-throw-error", only_throw_error.OnlyThrowErrorRule)
+	rslintconfig.GlobalRuleRegistry.Register("prefer-promise-reject-errors", prefer_promise_reject_errors.PreferPromiseRejectErrorsRule)
+	rslintconfig.GlobalRuleRegistry.Register("prefer-reduce-type-parameter", prefer_reduce_type_parameter.PreferReduceTypeParameterRule)
+	rslintconfig.GlobalRuleRegistry.Register("prefer-return-this-type", prefer_return_this_type.PreferReturnThisTypeRule)
+	rslintconfig.GlobalRuleRegistry.Register("promise-function-async", promise_function_async.PromiseFunctionAsyncRule)
+	rslintconfig.GlobalRuleRegistry.Register("related-getter-setter-pairs", related_getter_setter_pairs.RelatedGetterSetterPairsRule)
+	rslintconfig.GlobalRuleRegistry.Register("require-array-sort-compare", require_array_sort_compare.RequireArraySortCompareRule)
+	rslintconfig.GlobalRuleRegistry.Register("require-await", require_await.RequireAwaitRule)
+	rslintconfig.GlobalRuleRegistry.Register("restrict-plus-operands", restrict_plus_operands.RestrictPlusOperandsRule)
+	rslintconfig.GlobalRuleRegistry.Register("restrict-template-expressions", restrict_template_expressions.RestrictTemplateExpressionsRule)
+	rslintconfig.GlobalRuleRegistry.Register("return-await", return_await.ReturnAwaitRule)
+	rslintconfig.GlobalRuleRegistry.Register("switch-exhaustiveness-check", switch_exhaustiveness_check.SwitchExhaustivenessCheckRule)
+	rslintconfig.GlobalRuleRegistry.Register("unbound-method", unbound_method.UnboundMethodRule)
+	rslintconfig.GlobalRuleRegistry.Register("use-unknown-in-catch-callback-variable", use_unknown_in_catch_callback_variable.UseUnknownInCatchCallbackVariableRule)
+}
+
+// getAllRules returns all registered rules (for backward compatibility when no config is provided)
+func getAllRules() []rule.Rule {
+	allRules := rslintconfig.GlobalRuleRegistry.GetAllRules()
+	var rules []rule.Rule
+	for _, rule := range allRules {
+		rules = append(rules, rule)
+	}
+	return rules
+}
+
 // read config and deserialize the jsonc result
-func loadRslintConfig(configPath string, currentDirectory string, fs vfs.FS) (config.RslintConfig, string) {
+func loadRslintConfig(configPath string, currentDirectory string, fs vfs.FS) (rslintconfig.RslintConfig, string) {
 	configFileName := tspath.ResolvePath(currentDirectory, configPath)
 	if !fs.FileExists(configFileName) {
 		fmt.Fprintf(os.Stderr, "error: rslint config file %q doesn't exist\n", configFileName)
@@ -368,7 +422,7 @@ func loadRslintConfig(configPath string, currentDirectory string, fs vfs.FS) (co
 		os.Exit(1)
 	}
 
-	var config config.RslintConfig
+	var config rslintconfig.RslintConfig
 	if err := json.Unmarshal([]byte(data), &config); err != nil {
 		fmt.Fprintf(os.Stderr, "error parsing rslint config file %q: %v\n", configFileName, err)
 		os.Exit(1)
@@ -376,7 +430,7 @@ func loadRslintConfig(configPath string, currentDirectory string, fs vfs.FS) (co
 	currentDirectory = tspath.GetDirectoryPath(configFileName)
 	return config, currentDirectory
 }
-func loadTsConfigFromRslintConfig(rslintConfig config.RslintConfig, currentDirectory string, fs vfs.FS) []string {
+func loadTsConfigFromRslintConfig(rslintConfig rslintconfig.RslintConfig, currentDirectory string, fs vfs.FS) []string {
 	tsConfig := []string{}
 	for _, entry := range rslintConfig {
 
@@ -498,52 +552,20 @@ func runCMD() int {
 		configs = append(configs, configFileName)
 	}
 
+	// Initialize rule registry with all available rules
+	registerAllRules()
+
+	// Load rslint configuration and determine which rules to enable
+	var activeRules []rule.Rule
 	if config != "" {
 		rslintConfig, cwd := loadRslintConfig(config, currentDirectory, fs)
 		configs = loadTsConfigFromRslintConfig(rslintConfig, cwd, fs)
-	}
 
-	var rules = []rule.Rule{
-		await_thenable.AwaitThenableRule,
-		no_array_delete.NoArrayDeleteRule,
-		no_base_to_string.NoBaseToStringRule,
-		no_confusing_void_expression.NoConfusingVoidExpressionRule,
-		no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule,
-		no_floating_promises.NoFloatingPromisesRule,
-		no_for_in_array.NoForInArrayRule,
-		no_implied_eval.NoImpliedEvalRule,
-		no_meaningless_void_operator.NoMeaninglessVoidOperatorRule,
-		no_misused_promises.NoMisusedPromisesRule,
-		no_misused_spread.NoMisusedSpreadRule,
-		no_mixed_enums.NoMixedEnumsRule,
-		no_redundant_type_constituents.NoRedundantTypeConstituentsRule,
-		no_unnecessary_boolean_literal_compare.NoUnnecessaryBooleanLiteralCompareRule,
-		no_unnecessary_template_expression.NoUnnecessaryTemplateExpressionRule,
-		no_unnecessary_type_arguments.NoUnnecessaryTypeArgumentsRule,
-		no_unnecessary_type_assertion.NoUnnecessaryTypeAssertionRule,
-		no_unsafe_argument.NoUnsafeArgumentRule,
-		no_unsafe_assignment.NoUnsafeAssignmentRule,
-		no_unsafe_call.NoUnsafeCallRule,
-		no_unsafe_enum_comparison.NoUnsafeEnumComparisonRule,
-		no_unsafe_member_access.NoUnsafeMemberAccessRule,
-		no_unsafe_return.NoUnsafeReturnRule,
-		no_unsafe_type_assertion.NoUnsafeTypeAssertionRule,
-		no_unsafe_unary_minus.NoUnsafeUnaryMinusRule,
-		non_nullable_type_assertion_style.NonNullableTypeAssertionStyleRule,
-		only_throw_error.OnlyThrowErrorRule,
-		prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
-		prefer_reduce_type_parameter.PreferReduceTypeParameterRule,
-		prefer_return_this_type.PreferReturnThisTypeRule,
-		promise_function_async.PromiseFunctionAsyncRule,
-		related_getter_setter_pairs.RelatedGetterSetterPairsRule,
-		require_array_sort_compare.RequireArraySortCompareRule,
-		require_await.RequireAwaitRule,
-		restrict_plus_operands.RestrictPlusOperandsRule,
-		restrict_template_expressions.RestrictTemplateExpressionsRule,
-		return_await.ReturnAwaitRule,
-		switch_exhaustiveness_check.SwitchExhaustivenessCheckRule,
-		unbound_method.UnboundMethodRule,
-		use_unknown_in_catch_callback_variable.UseUnknownInCatchCallbackVariableRule,
+		// Get enabled rules from configuration
+		activeRules = rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, "")
+	} else {
+		// If no config file, use all rules as before (for backward compatibility)
+		activeRules = getAllRules()
 	}
 
 	host := utils.CreateCompilerHost(currentDirectory, fs)
@@ -616,7 +638,7 @@ func runCMD() int {
 		singleThreaded,
 		files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			return utils.Map(rules, func(r rule.Rule) linter.ConfiguredRule {
+			return utils.Map(activeRules, func(r rule.Rule) linter.ConfiguredRule {
 				return linter.ConfiguredRule{
 					Name: r.Name,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
@@ -655,7 +677,7 @@ func runCMD() int {
 		filesText = "file"
 	}
 	rulesText := "rules"
-	if len(rules) == 1 {
+	if len(activeRules) == 1 {
 		rulesText = "rule"
 	}
 	threadsCount := 1
@@ -671,7 +693,7 @@ func runCMD() int {
 			colors.DimText(""),
 			colors.BoldText("%d", len(files)),
 			filesText,
-			colors.BoldText("%d", len(rules)),
+			colors.BoldText("%d", len(activeRules)),
 			rulesText,
 			colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
 			colors.BoldText("%d", threadsCount),
