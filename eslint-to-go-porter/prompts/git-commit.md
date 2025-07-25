@@ -28,10 +28,8 @@ You are tasked with creating a git commit for the newly ported rule.
 
 4. **Create a descriptive commit**:
    ```bash
-   git add internal/rules/{{RULE_NAME_UNDERSCORED}}/
-   git add packages/rslint-test-tools/tests/typescript-eslint/rules/{{RULE_NAME}}*
-   git add cmd/rslint/*.go
-   git add packages/rslint/tests/*.snapshot
+   # Add all changes including new files
+   git add -A
    git commit -m "feat: add {{RULE_NAME}} rule
 
    - Implement {{RULE_NAME}} rule with all TypeScript ESLint functionality

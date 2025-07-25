@@ -44,6 +44,7 @@ import (
 	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_unary_minus"
 	"github.com/typescript-eslint/rslint/internal/rules/non_nullable_type_assertion_style"
 	"github.com/typescript-eslint/rslint/internal/rules/only_throw_error"
+	"github.com/typescript-eslint/rslint/internal/rules/prefer_as_const"
 	"github.com/typescript-eslint/rslint/internal/rules/prefer_promise_reject_errors"
 	"github.com/typescript-eslint/rslint/internal/rules/prefer_reduce_type_parameter"
 	"github.com/typescript-eslint/rslint/internal/rules/prefer_return_this_type"
@@ -140,6 +141,7 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		no_unsafe_unary_minus.NoUnsafeUnaryMinusRule,
 		non_nullable_type_assertion_style.NonNullableTypeAssertionStyleRule,
 		only_throw_error.OnlyThrowErrorRule,
+		prefer_as_const.PreferAsConstRule,
 		prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
 		prefer_reduce_type_parameter.PreferReduceTypeParameterRule,
 		prefer_return_this_type.PreferReturnThisTypeRule,
