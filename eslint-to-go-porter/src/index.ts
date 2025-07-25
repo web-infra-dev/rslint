@@ -229,7 +229,7 @@ program
   .version('1.0.0');
 
 program
-  .command('port <rules...>')
+  .command('port [rules...]')
   .description('Port one or more ESLint rules to Go')
   .option('-a, --all', 'Port all available rules')
   .option('-p, --progress', 'Show JSON streaming progress')
