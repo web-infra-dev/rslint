@@ -124,7 +124,7 @@ func (rc *RuleConfig) GetLevel() string {
 	return rc.Level
 }
 func GetAllRulesForPlugin(plugin string) []rule.Rule {
-	if plugin == "typescript-eslint" {
+	if plugin == "@typescript-eslint" {
 		return getAllTypeScriptEslintPluginRules()
 	} else {
 		return []rule.Rule{} // Return empty slice for unsupported plugins
@@ -167,12 +167,11 @@ func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConf
 			}
 			// Merge rules from this entry
 			for ruleName, ruleValue := range entry.Rules {
+
 				switch v := ruleValue.(type) {
 				case string:
 					// Handle simple string values like "error", "warn", "off"
-					if v != "off" {
-						enabledRules[ruleName] = &RuleConfig{Level: v}
-					}
+					enabledRules[ruleName] = &RuleConfig{Level: v}
 				case map[string]interface{}:
 					// Handle object configuration
 					ruleConfig := &RuleConfig{}
@@ -202,7 +201,6 @@ func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConf
 			}
 		}
 	}
-
 	return enabledRules
 }
 
@@ -255,6 +253,7 @@ func getAllTypeScriptEslintPluginRules() []rule.Rule {
 	allRules := GlobalRuleRegistry.GetAllRules()
 	var rules []rule.Rule
 	for _, rule := range allRules {
+		rule.Name = "@typescript-eslint/" + rule.Name
 		rules = append(rules, rule)
 	}
 	return rules

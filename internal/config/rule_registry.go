@@ -38,10 +38,13 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string) []r
 	var enabledRules []rule.Rule
 
 	for ruleName, ruleConfig := range enabledRuleConfigs {
+
 		if ruleConfig.IsEnabled() {
 			if ruleImpl, exists := r.rules[ruleName]; exists {
 				enabledRules = append(enabledRules, ruleImpl)
 			}
+		} else {
+
 		}
 	}
 
