@@ -8,6 +8,7 @@ import (
 	"github.com/typescript-eslint/rslint/internal/rules/ban_tslint_comment"
 	"github.com/typescript-eslint/rslint/internal/rules/class_literal_property_style"
 	"github.com/typescript-eslint/rslint/internal/rules/class_methods_use_this"
+	"github.com/typescript-eslint/rslint/internal/rules/consistent_generic_constructors"
 	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
 	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
 	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_void_expression"
@@ -213,12 +214,21 @@ func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConf
 // RegisterAllTypeSriptEslintPluginRules registers all available rules in the global registry
 func RegisterAllTypeSriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/array-type", array_type.ArrayTypeRule)
+	GlobalRuleRegistry.Register("array-type", array_type.ArrayTypeRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/await-thenable", await_thenable.AwaitThenableRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/ban-ts-comment", ban_ts_comment.BanTsCommentRule)
+	GlobalRuleRegistry.Register("ban-ts-comment", ban_ts_comment.BanTsCommentRule)
+	GlobalRuleRegistry.Register("ts-expect-error", ban_ts_comment.BanTsCommentRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/ban-tslint-comment", ban_tslint_comment.BanTslintCommentRule)
+	GlobalRuleRegistry.Register("ban-tslint-comment", ban_tslint_comment.BanTslintCommentRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/class-literal-property-style", class_literal_property_style.ClassLiteralPropertyStyleRule)
+	GlobalRuleRegistry.Register("class-literal-property-style", class_literal_property_style.ClassLiteralPropertyStyleRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/class-methods-use-this", class_methods_use_this.ClassMethodsUseThisRule)
+	GlobalRuleRegistry.Register("class-methods-use-this", class_methods_use_this.ClassMethodsUseThisRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/consistent-generic-constructors", consistent_generic_constructors.ConsistentGenericConstructorsRule)
+	GlobalRuleRegistry.Register("consistent-generic-constructors", consistent_generic_constructors.ConsistentGenericConstructorsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-array-delete", no_array_delete.NoArrayDeleteRule)
+	GlobalRuleRegistry.Register("no-array-delete", no_array_delete.NoArrayDeleteRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-base-to-string", no_base_to_string.NoBaseToStringRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-confusing-void-expression", no_confusing_void_expression.NoConfusingVoidExpressionRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-duplicate-type-constituents", no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule)
@@ -245,6 +255,7 @@ func RegisterAllTypeSriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/non-nullable-type-assertion-style", non_nullable_type_assertion_style.NonNullableTypeAssertionStyleRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/only-throw-error", only_throw_error.OnlyThrowErrorRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-as-const", prefer_as_const.PreferAsConstRule)
+	GlobalRuleRegistry.Register("prefer-as-const", prefer_as_const.PreferAsConstRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-promise-reject-errors", prefer_promise_reject_errors.PreferPromiseRejectErrorsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-reduce-type-parameter", prefer_reduce_type_parameter.PreferReduceTypeParameterRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-return-this-type", prefer_return_this_type.PreferReturnThisTypeRule)

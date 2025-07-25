@@ -54,15 +54,17 @@ npm start port --progress no-array-delete
 
 ## IMPORTANT: Manual Rule Registration
 
-After porting a rule, you MUST manually register it in the following files:
+After porting a rule, you MUST manually register it in:
 
-1. `/Users/bytedance/dev/rslint/cmd/rslint/cmd.go`
-2. `/Users/bytedance/dev/rslint/cmd/rslint/api.go`
-3. `/Users/bytedance/dev/rslint/cmd/rslint/lsp.go`
+`/Users/bytedance/dev/rslint/internal/config/config.go`
 
-For each file:
+In the `RegisterAllTypeSriptEslintPluginRules()` function:
 - Add import: `"github.com/typescript-eslint/rslint/internal/rules/[rule_name_underscored]"`
-- Add to rules array: `[rule_name_underscored].[RuleNamePascal]Rule,`
+- Add BOTH registrations (namespaced and non-namespaced):
+  ```go
+  GlobalRuleRegistry.Register("@typescript-eslint/[rule-name]", [rule_name_underscored].[RuleNamePascal]Rule)
+  GlobalRuleRegistry.Register("[rule-name]", [rule_name_underscored].[RuleNamePascal]Rule)
+  ```
 
 Example for `prefer-as-const`:
 ```go
@@ -72,11 +74,14 @@ import (
     "github.com/typescript-eslint/rslint/internal/rules/prefer_as_const"
 )
 
-// In var rules = []rule.Rule{
-prefer_as_const.PreferAsConstRule,
+// In RegisterAllTypeSriptEslintPluginRules()
+GlobalRuleRegistry.Register("@typescript-eslint/prefer-as-const", prefer_as_const.PreferAsConstRule)
+GlobalRuleRegistry.Register("prefer-as-const", prefer_as_const.PreferAsConstRule)
 ```
 
-After registration, rebuild with: `cd /Users/bytedance/dev/rslint && pnpm build`
+After registration:
+1. Rebuild: `cd /Users/bytedance/dev/rslint && pnpm build`
+2. Update test snapshots if needed: `cd packages/rslint && npm test -- --update-snapshots`
 
 ## Testing Notes
 

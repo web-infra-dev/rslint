@@ -192,8 +192,9 @@ func isIncludedInstanceMethod(ctx rule.RuleContext, node *ast.Node, options *Opt
 	// Check if method definition with constructor kind (but constructors are handled above)
 	// This check is redundant since constructors have their own node type
 	
-	// Check enforceForClassFields option for property and accessor declarations
-	if (ast.IsPropertyDeclaration(node) || ast.IsGetAccessorDeclaration(node) || ast.IsSetAccessorDeclaration(node)) {
+	// Check enforceForClassFields option for property declarations only
+	// Accessors (getters/setters) should always be checked
+	if ast.IsPropertyDeclaration(node) {
 		if options.EnforceForClassFields == nil || !*options.EnforceForClassFields {
 			return false
 		}
@@ -245,6 +246,21 @@ func hasPrivateIdentifier(node *ast.Node) bool {
 	}
 	
 	return nameNode != nil && nameNode.Kind == ast.KindPrivateIdentifier
+}
+
+func isNodeOrDescendant(ancestor *ast.Node, descendant *ast.Node) bool {
+	if ancestor == descendant {
+		return true
+	}
+	
+	current := descendant.Parent
+	for current != nil {
+		if current == ancestor {
+			return true
+		}
+		current = current.Parent
+	}
+	return false
 }
 
 func shouldIgnoreMethod(stackContext *StackInfo, options *Options) bool {
@@ -374,11 +390,28 @@ var ClassMethodsUseThisRule = rule.Rule{
 
 		enterFunction := func(node *ast.Node) {
 			var member *ast.Node
-			if node.Parent != nil {
-				switch node.Parent.Kind {
-				case ast.KindMethodDeclaration, ast.KindPropertyDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-					member = node.Parent
+			// For arrow functions and function expressions, we need to find the class member
+			parent := node.Parent
+			for parent != nil {
+				switch parent.Kind {
+				case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
+					member = parent
+					break
+				case ast.KindPropertyDeclaration:
+					// Check if this function is the initializer of the property
+					propDecl := parent.AsPropertyDeclaration()
+					if propDecl.Initializer != nil && isNodeOrDescendant(propDecl.Initializer, node) {
+						member = parent
+					}
+					break
+				case ast.KindClassDeclaration, ast.KindClassExpression:
+					// Stop looking if we reach a class boundary
+					break
 				}
+				if member != nil {
+					break
+				}
+				parent = parent.Parent
 			}
 			pushContext(member)
 		}
@@ -523,10 +556,6 @@ var ClassMethodsUseThisRule = rule.Rule{
 				}
 			},
 
-			// Property declarations
-			rule.ListenerOnExit(ast.KindPropertyDeclaration): func(node *ast.Node) {
-				popContext()
-			},
 
 			// Static blocks have their own `this` context
 			ast.KindClassStaticBlockDeclaration: func(node *ast.Node) {
@@ -545,41 +574,11 @@ var ClassMethodsUseThisRule = rule.Rule{
 			},
 		}
 
-		// Add arrow function handlers for class fields if enforceForClassFields is enabled
-		if opts.EnforceForClassFields != nil && *opts.EnforceForClassFields {
-			// We need to handle arrow functions in property initializers and accessor values
-			// This is more complex in Go AST traversal, so we'll handle it in the enter/exit pattern
+		// Arrow functions
+		listeners[ast.KindArrowFunction] = enterFunction
+		listeners[rule.ListenerOnExit(ast.KindArrowFunction)] = exitFunction
 
-			enterArrowInProperty := func(node *ast.Node) {
-				// Check if this arrow function is inside a property or accessor
-				parent := node.Parent
-				for parent != nil {
-					if ast.IsPropertyDeclaration(parent) || ast.IsGetAccessorDeclaration(parent) || ast.IsSetAccessorDeclaration(parent) {
-						pushContext(parent)
-						return
-					}
-					parent = parent.Parent
-				}
-				pushContext(nil)
-			}
-
-			exitArrowInProperty := func(node *ast.Node) {
-				exitFunction(node)
-			}
-
-			listeners[ast.KindArrowFunction] = enterArrowInProperty
-			listeners[rule.ListenerOnExit(ast.KindArrowFunction)] = exitArrowInProperty
-		} else {
-			// Still need to handle arrow functions but with simpler logic
-			listeners[ast.KindArrowFunction] = enterFunction
-			listeners[rule.ListenerOnExit(ast.KindArrowFunction)] = exitFunction
-		}
-
-		// Handle property declarations
-		listeners[ast.KindPropertyDeclaration] = func(node *ast.Node) {
-			// For property declarations, push context when we enter
-			pushContext(nil)
-		}
+		// Property declarations are handled by the function visitors
 
 		return listeners
 	},

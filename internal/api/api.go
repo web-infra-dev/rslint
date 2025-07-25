@@ -54,12 +54,12 @@ type HandshakeResponse struct {
 
 // LintRequest represents a lint request from JS to Go
 type LintRequest struct {
-	Files            []string          `json:"files,omitempty"`
-	TSConfig         string            `json:"tsconfig,omitempty"`
-	Format           string            `json:"format,omitempty"`
-	WorkingDirectory string            `json:"workingDirectory,omitempty"`
-	RuleOptions      map[string]string `json:"ruleOptions,omitempty"`
-	FileContents     map[string]string `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
+	Files            []string                     `json:"files,omitempty"`
+	TSConfig         string                       `json:"tsconfig,omitempty"`
+	Format           string                       `json:"format,omitempty"`
+	WorkingDirectory string                       `json:"workingDirectory,omitempty"`
+	RuleOptions      map[string]interface{}       `json:"ruleOptions,omitempty"`
+	FileContents     map[string]string            `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
 }
 
 // LintResponse represents a lint response from Go to JS

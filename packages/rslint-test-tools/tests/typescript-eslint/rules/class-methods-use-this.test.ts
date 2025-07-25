@@ -11,7 +11,6 @@ const ruleTester = new RuleTester({
 });
 
 ruleTester.run('class-methods-use-this', {
-  valid: [],
   invalid: [
     {
       code: `

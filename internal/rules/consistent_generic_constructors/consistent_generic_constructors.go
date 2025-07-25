@@ -200,10 +200,20 @@ var ConsistentGenericConstructorsRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		mode := "constructor" // default
 		
-		// Parse options
-		if optionsSlice, ok := options.([]interface{}); ok && len(optionsSlice) > 0 {
-			if modeStr, ok := optionsSlice[0].(string); ok {
+		// Parse options - can be a string directly or in a map
+		if options != nil {
+			if modeStr, ok := options.(string); ok {
 				mode = modeStr
+			} else if optionsMap, ok := options.(map[string]interface{}); ok {
+				if modeStr, ok := optionsMap["mode"].(string); ok {
+					mode = modeStr
+				} else if modeStr, ok := optionsMap["value"].(string); ok {
+					mode = modeStr
+				}
+			} else if optionsSlice, ok := options.([]interface{}); ok && len(optionsSlice) > 0 {
+				if modeStr, ok := optionsSlice[0].(string); ok {
+					mode = modeStr
+				}
 			}
 		}
 
@@ -232,10 +242,16 @@ var ConsistentGenericConstructorsRule = rule.Rule{
 				}
 			}
 
+			// Only process if there are generics involved
+			if lhsTypeAnnotation == nil && rhsTypeArgs == nil {
+				// No generics anywhere, nothing to check
+				return
+			}
+
 			if mode == "type-annotation" {
 				// Prefer type annotation mode
-				if lhsTypeAnnotation == nil && rhsTypeArgs != nil {
-					// No type annotation but constructor has type args - move to type annotation
+				if (lhsTypeAnnotation == nil || lhsTypeArgs == nil) && rhsTypeArgs != nil {
+					// No type annotation or no type args in annotation but constructor has type args - move to type annotation
 					calleeText := getNodeText(ctx, callee)
 					typeArgsText := getNodeListTextWithBrackets(ctx, rhsTypeArgs)
 					typeAnnotation := calleeText + typeArgsText
@@ -270,7 +286,7 @@ var ConsistentGenericConstructorsRule = rule.Rule{
 				}
 			} else {
 				// Prefer constructor mode (default)
-				if lhsTypeArgs != nil && rhsTypeArgs == nil {
+				if lhsTypeAnnotation != nil && lhsTypeArgs != nil && rhsTypeArgs == nil {
 					// Type annotation has type args but constructor doesn't - move to constructor
 					hasParens := hasParenthesesAfter(ctx, callee)
 					typeArgsText := getNodeListTextWithBrackets(ctx, lhsTypeArgs)

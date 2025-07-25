@@ -1,6 +1,6 @@
-# RSLint API Reference
+# RSLint Project Reference
 
-This document provides comprehensive API information for RSLint, a high-performance TypeScript/JavaScript linter written in Go.
+This document provides comprehensive technical information for RSLint, a high-performance TypeScript/JavaScript linter written in Go.
 
 ## Overview
 
@@ -15,7 +15,7 @@ RSLint is a drop-in replacement for ESLint and TypeScript-ESLint, built on top o
   ├── api/                # IPC communication protocol
   ├── linter/             # Core linting engine
   ├── rule/               # Rule system interfaces
-  ├── rules/              # Built-in rules (49 rules)
+  ├── rules/              # Built-in rules (48 rules)
   ├── config/             # Configuration handling
   └── utils/              # Utility functions
 /packages/                # JavaScript/TypeScript packages
@@ -439,7 +439,7 @@ Rules can listen to specific AST node types:
 - `ast.KindDeleteExpression`
 - And many more...
 
-## Built-in Rules (49 total)
+## Built-in Rules (48 total)
 
 ### Type Safety Rules
 - `await-thenable` - Disallows awaiting non-thenable values
@@ -563,6 +563,37 @@ jobs:
 - `0` - Success, no errors found
 - `1` - Linting errors found
 - `2` - Configuration or runtime error
+
+## Common Debugging Patterns & Gotchas
+
+### Rule Registration
+- Rules must be registered with BOTH namespaced and non-namespaced names:
+  ```go
+  GlobalRuleRegistry.Register("@typescript-eslint/array-type", array_type.ArrayTypeRule)
+  GlobalRuleRegistry.Register("array-type", array_type.ArrayTypeRule)  // Also needed for tests!
+  ```
+- Tests often use the non-namespaced version (e.g., "array-type" not "@typescript-eslint/array-type")
+
+### AST Navigation
+- Use `utils.GetNameFromMember()` for robust property name extraction instead of custom implementations
+- Class members are accessed via `node.Members()` which returns `[]*ast.Node` directly (not a NodeList)
+- Accessor properties (`accessor a = ...`) are `PropertyDeclaration` nodes with the accessor modifier
+
+### Position/Range Reporting
+- RSLint uses 1-based line and column numbers for compatibility with TypeScript-ESLint
+- The IPC API uses 0-based positions internally but converts to 1-based for display
+- When reporting on nodes, consider which part should be highlighted (e.g., identifier vs entire declaration)
+
+### Common Issues & Solutions
+1. **Infinite loops/timeouts**: Check for recursive function calls without proper base cases
+2. **Rule not executing**: Verify rule is registered in `config.go` with both naming variants
+3. **Message ID mismatches**: Use camelCase message IDs or ensure `messageId` field is populated
+4. **Test snapshot mismatches**: Update snapshots when rule count changes
+
+### Testing Best Practices
+- Run specific tests with: `node --import=tsx/esm --test tests/typescript-eslint/rules/RULE_NAME.test.ts`
+- Update API test snapshots after rule changes: `cd packages/rslint && npm test -- --update-snapshots`
+- Debug output can be added with `fmt.Printf()` but remember to remove it before committing
 
 # Rslint Project Copilot Instructions
 

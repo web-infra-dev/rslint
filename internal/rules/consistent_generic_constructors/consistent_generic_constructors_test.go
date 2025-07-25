@@ -390,7 +390,7 @@ const a = function (a: Foo<string> = new Foo()) {};
 					{
 						MessageId: "preferConstructor",
 						Line:      2,
-						Column:    25,
+						Column:    21,
 					},
 				},
 				Output: []string{`
@@ -582,7 +582,7 @@ const a = function (a = new Foo<string>()) {};
 					{
 						MessageId: "preferTypeAnnotation",
 						Line:      2,
-						Column:    25,
+						Column:    21,
 					},
 				},
 				Output: []string{`

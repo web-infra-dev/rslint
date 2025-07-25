@@ -191,125 +191,44 @@ var BanTsCommentRule = rule.Rule{
 			}
 		}
 
-		// Process comments immediately, regardless of AST nodes
-		sourceFile := ctx.SourceFile
-		sourceText := string(sourceFile.Text())
-		
-		// Check if we have any directives
-		if !strings.Contains(sourceText, "@ts-") {
-			return rule.RuleListeners{}
-		}
-		
-		// Process all @ts- directives immediately
-		pos := 0
-		for {
-			tsPos := strings.Index(sourceText[pos:], "@ts-")
-			if tsPos == -1 {
-				break
-			}
-			tsPos += pos
-			
-			// Find the start of the comment
-			commentStart := strings.LastIndex(sourceText[:tsPos], "//")
-			if commentStart == -1 {
-				commentStart = strings.LastIndex(sourceText[:tsPos], "/*")
-			}
-			if commentStart == -1 {
-				pos = tsPos + 4
-				continue
-			}
-			
-			// Extract the directive
-			directiveEnd := tsPos + 4
-			for directiveEnd < len(sourceText) && (sourceText[directiveEnd] >= 'a' && sourceText[directiveEnd] <= 'z' || sourceText[directiveEnd] == '-') {
-				directiveEnd++
-			}
-			
-			directive := sourceText[tsPos+4:directiveEnd]
-			description := ""
-			if directiveEnd < len(sourceText) {
-				commentEnd := strings.Index(sourceText[directiveEnd:], "\n")
-				if commentEnd == -1 {
-					commentEnd = strings.Index(sourceText[directiveEnd:], "*/")
-					if commentEnd == -1 {
-						commentEnd = len(sourceText) - directiveEnd
+		return rule.RuleListeners{
+			ast.KindSourceFile: func(node *ast.Node) {
+				sourceFile := node.AsSourceFile()
+				sourceText := string(sourceFile.Text())
+				
+				// Get all comments in the file by scanning the entire text
+				fileRange := utils.TrimNodeTextRange(sourceFile, node)
+				for commentRange := range utils.GetCommentsInRange(sourceFile, fileRange) {
+					directive := findDirectiveInComment(commentRange, sourceText)
+					if directive == nil {
+						continue
 					}
-				}
-				description = sourceText[directiveEnd:directiveEnd+commentEnd]
-			}
-			
-			// Process the directive
-			fullDirective := "ts-" + directive
-			config := directiveConfigs[fullDirective]
-			enabled, mode, _ := parseDirectiveConfig(config)
-			
-			if enabled && mode == "" {
-				// Find comment end for proper range
-				commentEnd := strings.Index(sourceText[commentStart:], "\n")
-				if commentEnd == -1 {
-					commentEnd = strings.Index(sourceText[commentStart:], "*/")
-					if commentEnd != -1 {
-						commentEnd += 2 // Include */
-					} else {
-						commentEnd = len(sourceText) - commentStart
+					
+					directiveName := "ts-" + directive.Directive
+					config, exists := directiveConfigs[directiveName]
+					if !exists {
+						continue
 					}
-				}
-				commentEnd += commentStart
-				
-				// Create range and report
-				textRange := utils.TrimNodeTextRange(sourceFile, sourceFile.AsNode()).WithPos(commentStart).WithEnd(commentEnd)
-				
-				if directive == "ignore" {
-					ctx.ReportRange(textRange, buildTsIgnoreInsteadOfExpectErrorMessage())
-				} else {
-					ctx.ReportRange(textRange, buildTsDirectiveCommentMessage(directive))
-				}
-			}
-			
-			if enabled && (mode == "allow-with-description" || mode == "description-format") {
-				minimumDescriptionLength := defaultMinimumDescriptionLength
-				if opts.MinimumDescriptionLength != nil {
-					minimumDescriptionLength = *opts.MinimumDescriptionLength
-				}
-
-				regex := descriptionFormats[fullDirective]
-				trimmedDescription := strings.TrimSpace(description)
-				
-				if getStringLength(trimmedDescription) < minimumDescriptionLength {
-					commentEnd := strings.Index(sourceText[commentStart:], "\n")
-					if commentEnd == -1 {
-						commentEnd = strings.Index(sourceText[commentStart:], "*/")
-						if commentEnd != -1 {
-							commentEnd += 2
-						} else {
-							commentEnd = len(sourceText) - commentStart
+					
+					enabled, mode, format := parseDirectiveConfig(config)
+					if !enabled {
+						ctx.ReportRange(commentRange.TextRange, buildTsDirectiveCommentMessage(directive.Directive))
+						continue
+					}
+					
+					switch mode {
+					case "allow-with-description":
+						if getStringLength(strings.TrimSpace(directive.Description)) < *opts.MinimumDescriptionLength {
+							ctx.ReportRange(commentRange.TextRange, buildTsDirectiveCommentRequiresDescriptionMessage(directive.Directive, *opts.MinimumDescriptionLength))
+						}
+					case "description-format":
+						regex := descriptionFormats[directiveName]
+						if regex != nil && !regex.MatchString(directive.Description) {
+							ctx.ReportRange(commentRange.TextRange, buildTsDirectiveCommentDescriptionNotMatchPatternMessage(directive.Directive, format))
 						}
 					}
-					commentEnd += commentStart
-					
-					textRange := utils.TrimNodeTextRange(sourceFile, sourceFile.AsNode()).WithPos(commentStart).WithEnd(commentEnd)
-					ctx.ReportRange(textRange, buildTsDirectiveCommentRequiresDescriptionMessage(directive, minimumDescriptionLength))
-				} else if regex != nil && !regex.MatchString(description) {
-					commentEnd := strings.Index(sourceText[commentStart:], "\n")
-					if commentEnd == -1 {
-						commentEnd = strings.Index(sourceText[commentStart:], "*/")
-						if commentEnd != -1 {
-							commentEnd += 2
-						} else {
-							commentEnd = len(sourceText) - commentStart
-						}
-					}
-					commentEnd += commentStart
-					
-					textRange := utils.TrimNodeTextRange(sourceFile, sourceFile.AsNode()).WithPos(commentStart).WithEnd(commentEnd)
-					ctx.ReportRange(textRange, buildTsDirectiveCommentDescriptionNotMatchPatternMessage(directive, regex.String()))
 				}
-			}
-			
-			pos = tsPos + 4
+			},
 		}
-		
-		// Return empty listeners since we've already processed everything
-		return rule.RuleListeners{}
 	},
 }

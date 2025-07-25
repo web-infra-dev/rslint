@@ -1,0 +1,129 @@
+exports[`class-literal-property-style > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferFieldStyle",
+      "message": "Literals should be exposed using readonly fields.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 7
+        },
+        "end": {
+          "line": 3,
+          "column": 9
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-literal-property-style > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferFieldStyle",
+      "message": "Literals should be exposed using readonly fields.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 7
+        },
+        "end": {
+          "line": 3,
+          "column": 9
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-literal-property-style > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferFieldStyle",
+      "message": "Literals should be exposed using readonly fields.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 14
+        },
+        "end": {
+          "line": 3,
+          "column": 16
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-literal-property-style > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferFieldStyle",
+      "message": "Literals should be exposed using readonly fields.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 21
+        },
+        "end": {
+          "line": 3,
+          "column": 24
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-literal-property-style > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferFieldStyle",
+      "message": "Literals should be exposed using readonly fields.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 14
+        },
+        "end": {
+          "line": 3,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

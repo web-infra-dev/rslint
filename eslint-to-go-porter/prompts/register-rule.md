@@ -11,39 +11,48 @@ You are tasked with registering a newly ported rule in the rslint command files.
 
 1. **Check if the rule is already registered**:
    ```bash
-   grep -n "{{RULE_NAME_UNDERSCORED}}" cmd/rslint/cmd.go
-   grep -n "{{RULE_NAME_UNDERSCORED}}" cmd/rslint/api.go
-   grep -n "{{RULE_NAME_UNDERSCORED}}" cmd/rslint/lsp.go
+   grep -n "{{RULE_NAME_UNDERSCORED}}" internal/config/config.go
    ```
 
-2. **If NOT registered, update each file**:
+2. **If NOT registered, update the global registry**:
    
-   For each of the three files (`cmd/rslint/cmd.go`, `cmd/rslint/api.go`, `cmd/rslint/lsp.go`):
+   In `internal/config/config.go`, find the `RegisterAllTypeSriptEslintPluginRules()` function:
    
    a. **Add the import** (alphabetically with other rule imports):
    ```go
    "github.com/typescript-eslint/rslint/internal/rules/{{RULE_NAME_UNDERSCORED}}"
    ```
    
-   b. **Add to the rules array** (alphabetically):
+   b. **Add BOTH registrations to support namespaced and non-namespaced usage**:
    ```go
-   {{RULE_NAME_UNDERSCORED}}.{{RULE_NAME_PASCAL}}Rule,
+   GlobalRuleRegistry.Register("@typescript-eslint/{{RULE_NAME}}", {{RULE_NAME_UNDERSCORED}}.{{RULE_NAME_PASCAL}}Rule)
+   GlobalRuleRegistry.Register("{{RULE_NAME}}", {{RULE_NAME_UNDERSCORED}}.{{RULE_NAME_PASCAL}}Rule)
    ```
+   
+   Note: The dual registration is critical for test compatibility!
 
 3. **Build the project to verify**:
    ```bash
    pnpm build
    ```
 
-4. **Update test snapshots if needed**:
+4. **Update test snapshots if rule count changed**:
+   Since adding a new rule increases the total rule count, you may need to update test snapshots:
    ```bash
-   cd packages/rslint && node --test --test-update-snapshots 'tests/**.test.mjs'
+   cd packages/rslint && npm test
+   ```
+   
+   If tests fail due to rule count mismatch, update snapshots:
+   ```bash
+   cd packages/rslint && npm test -- --update-snapshots
    ```
 
 ## Important Notes
 - Add imports and rule entries alphabetically
 - Ensure proper indentation and formatting
 - The build must succeed after registration
+- Always register rules with BOTH the namespaced (@typescript-eslint/) and non-namespaced versions
+- The non-namespaced version is required for test compatibility
 - If build fails, check for syntax errors or missing imports
 
-Begin by checking if the rule is already registered.
+Begin by checking if the rule is already registered in config.go.

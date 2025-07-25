@@ -35,7 +35,7 @@ export interface LintOptions {
   files?: string[];
   tsconfig?: string;
   workingDirectory?: string;
-  ruleOptions?: Record<string, string>;
+  ruleOptions?: Record<string, any>;
   fileContents?: Record<string, string>; // Map of file paths to their contents for VFS
 }
 
@@ -181,14 +181,21 @@ export class RSLintService {
     await this.sendMessage('handshake', { version: '1.0.0' });
 
     // Send lint request
-    return await this.sendMessage('lint', {
+    const request = {
       files,
       tsconfig,
       workingDirectory,
       ruleOptions,
       fileContents,
       format: 'jsonline',
-    });
+    };
+    
+    // Debug: log what we're sending
+    if (ruleOptions) {
+      console.log('Sending ruleOptions:', JSON.stringify(ruleOptions, null, 2));
+    }
+    
+    return await this.sendMessage('lint', request);
   }
 
   /**

@@ -25,7 +25,10 @@ Before writing any code, examine the existing rslint codebase to understand:
    - `ReportNode`, `ReportNodeWithFixes`, `ReportNodeWithSuggestions` methods
    - `RuleFix` and `RuleSuggestion` constructors (e.g., `RuleFixReplaceNode`, `RuleFixRemove`, etc.)
    - `RuleContext` and `RuleListeners` interfaces
-3. Check the `internal/utils` package for helper functions like `GetNodeText`
+3. Check the `internal/utils` package for helper functions:
+   - `GetNodeText` for getting node text
+   - `GetNameFromMember` for extracting property/method names
+   - `TrimNodeTextRange` for getting accurate node ranges
 4. Understand the AST node types and methods available in the `ast` package
 5. Study TypeScript rule patterns and common ESLint rule structures
 
@@ -72,6 +75,8 @@ Only after understanding the API structure, convert the TypeScript ESLint rule a
 11. IMPORTANT: Do NOT attempt to run, compile, or execute the generated Go code
 12. IMPORTANT: Create both the rule implementation (.go) and test file (_test.go)
 13. IMPORTANT: Follow Go naming conventions and ensure exported identifiers are properly capitalized
+14. IMPORTANT: Avoid recursive calls that could cause infinite loops (e.g., checking if a type reference is simple by recursively calling the same function)
+15. IMPORTANT: Use camelCase for message IDs (e.g., "preferConstAssertion" not "prefer-const-assertion")
 
 ## Output
 

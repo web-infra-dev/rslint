@@ -78,13 +78,13 @@ func isSupportedLiteral(node *ast.Node) bool {
 		ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword:
 		return true
 	case ast.KindTemplateExpression:
-		// Only support template literals with a single element (no interpolation)
+		// Only support template literals with no interpolation
 		template := node.AsTemplateExpression()
 		return template != nil && len(template.TemplateSpans.Nodes) == 0
 	case ast.KindNoSubstitutionTemplateLiteral:
 		return true
 	case ast.KindTaggedTemplateExpression:
-		// Support tagged template expressions with no interpolation
+		// Support tagged template expressions only with no interpolation
 		tagged := node.AsTaggedTemplateExpression()
 		if tagged.Template.Kind == ast.KindNoSubstitutionTemplateLiteral {
 			return true
@@ -231,12 +231,16 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 					return
 				}
 
+				if !ast.IsBlock(getter.Body) {
+					return
+				}
+
 				block := getter.Body.AsBlock()
 				if block == nil || len(block.Statements.Nodes) == 0 {
 					return
 				}
 
-				// Check if it's a single return statement
+				// Check if it's a single return statement with a literal
 				if len(block.Statements.Nodes) != 1 {
 					return
 				}
@@ -251,16 +255,18 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 					return
 				}
 
-				name := getStaticMemberAccessValue(ctx, node)
+				name, _ := utils.GetNameFromMember(ctx.SourceFile, getter.Name())
 
 				// Check if there's a corresponding setter
 				if name != "" && node.Parent != nil {
 					members := node.Parent.Members()
 					if members != nil {
 						for _, member := range members {
-							if ast.IsSetAccessorDeclaration(member) &&
-								isStaticMemberAccessOfValue(ctx, member, name) {
-								return // Skip if there's a setter with the same name
+							if ast.IsSetAccessorDeclaration(member) {
+								setterName, _ := utils.GetNameFromMember(ctx.SourceFile, member.AsSetAccessorDeclaration().Name())
+								if setterName == name {
+									return // Skip if there's a setter with the same name
+								}
 							}
 						}
 					}
@@ -284,7 +290,17 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 				}
 				fixText += fmt.Sprintf(" = %s;", valueText)
 
-				ctx.ReportNodeWithSuggestions(getter.Name(), buildPreferFieldStyleMessage(),
+				// For computed property names, report on the opening bracket
+				// For regular property names, report on the getter name
+				var reportNode *ast.Node
+				if isComputed {
+					// For computed properties, report on the bracket
+					reportNode = getter.Name()
+				} else {
+					reportNode = getter.Name()
+				}
+
+				ctx.ReportNodeWithSuggestions(reportNode, buildPreferFieldStyleMessage(),
 					rule.RuleSuggestion{
 						Message: buildPreferFieldStyleSuggestionMessage(),
 						FixesArr: []rule.RuleFix{
@@ -337,7 +353,11 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 					}
 					fixText += fmt.Sprintf("() { return %s; }", valueText)
 
-					ctx.ReportNodeWithSuggestions(property.Name(), buildPreferGetterStyleMessage(),
+					// For computed property names, report on the entire property
+					// For regular property names, report on the property name
+					reportNode := property.Name()
+
+					ctx.ReportNodeWithSuggestions(reportNode, buildPreferGetterStyleMessage(),
 						rule.RuleSuggestion{
 							Message: buildPreferGetterStyleSuggestionMessage(),
 							FixesArr: []rule.RuleFix{

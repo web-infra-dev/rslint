@@ -1,5 +1,4 @@
-import { noFormat } from '@typescript-eslint/rule-tester';
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
 const ruleTester = new RuleTester({
@@ -11,7 +10,7 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('consistent-generic-constructors', {
+ruleTester.run('@typescript-eslint/consistent-generic-constructors', {
   valid: [
     // default: constructor
     'const a = new Foo();',

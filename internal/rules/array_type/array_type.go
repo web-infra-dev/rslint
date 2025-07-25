@@ -48,8 +48,14 @@ func isSimpleType(node *ast.Node) bool {
 				if typeRef.TypeArguments != nil {
 					return false
 				}
-				return isSimpleType(typeRef.TypeName)
+				return true
 			}
+		} else if ast.IsQualifiedName(typeRef.TypeName) {
+			// TypeReference with a QualifiedName (e.g., fooName.BarType) is simple if it has no type arguments
+			if typeRef.TypeArguments != nil {
+				return false
+			}
+			return true
 		}
 		return false
 	default:
@@ -99,7 +105,7 @@ func buildErrorStringArrayMessage(className, readonlyPrefix, typeStr string) rul
 func buildErrorStringArrayReadonlyMessage(className, readonlyPrefix, typeStr string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "errorStringArrayReadonly",
-		Description: fmt.Sprintf("Array type using '%s<%s>' is forbidden. Use '%s%s' instead.", className, typeStr, readonlyPrefix, typeStr),
+		Description: fmt.Sprintf("Array type using '%s<%s>' is forbidden. Use '%s%s[]' instead.", className, typeStr, readonlyPrefix, typeStr),
 	}
 }
 
@@ -113,7 +119,7 @@ func buildErrorStringArraySimpleMessage(className, readonlyPrefix, typeStr strin
 func buildErrorStringArraySimpleReadonlyMessage(className, readonlyPrefix, typeStr string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "errorStringArraySimpleReadonly",
-		Description: fmt.Sprintf("Array type using '%s<%s>' is forbidden for simple types. Use '%s%s' instead.", className, typeStr, readonlyPrefix, typeStr),
+		Description: fmt.Sprintf("Array type using '%s<%s>' is forbidden for simple types. Use '%s%s[]' instead.", className, typeStr, readonlyPrefix, typeStr),
 	}
 }
 
@@ -260,6 +266,7 @@ var ArrayTypeRule = rule.Rule{
 					currentOption = readonlyOption
 				}
 
+
 				if currentOption == "generic" {
 					return
 				}
@@ -277,7 +284,17 @@ var ArrayTypeRule = rule.Rule{
 					} else {
 						messageId = "errorStringArray"
 					}
-				} else {
+				} else if currentOption == "array-simple" {
+					// For array-simple mode, determine if we have type parameters to check
+					// 'any' (no type params) is considered simple
+					isSimple := typeParams == nil || len(typeParams.Nodes) == 0 || 
+						(len(typeParams.Nodes) == 1 && isSimpleType(typeParams.Nodes[0]))
+					
+					// For array-simple mode, only report errors if the type is simple
+					if !isSimple {
+						return
+					}
+					
 					if isReadonlyArrayType && typeName != "ReadonlyArray" {
 						messageId = "errorStringArraySimpleReadonly"
 					} else {
@@ -309,8 +326,7 @@ var ArrayTypeRule = rule.Rule{
 					return
 				}
 
-				if len(typeParams.Nodes) != 1 ||
-					(currentOption == "array-simple" && !isSimpleType(typeParams.Nodes[0])) {
+				if len(typeParams.Nodes) != 1 {
 					return
 				}
 

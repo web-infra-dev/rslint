@@ -4,6 +4,12 @@ import (
 	"github.com/typescript-eslint/rslint/internal/rule"
 )
 
+// EnabledRuleWithConfig combines a rule with its configuration
+type EnabledRuleWithConfig struct {
+	Rule   rule.Rule
+	Config *RuleConfig
+}
+
 // RuleRegistry manages all available rules
 type RuleRegistry struct {
 	rules map[string]rule.Rule
@@ -45,6 +51,25 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string) []r
 			}
 		} else {
 
+		}
+	}
+
+	return enabledRules
+}
+
+// GetEnabledRulesWithConfig returns rules with their configurations for a given file
+func (r *RuleRegistry) GetEnabledRulesWithConfig(config RslintConfig, filePath string) []EnabledRuleWithConfig {
+	enabledRuleConfigs := config.GetRulesForFile(filePath)
+	var enabledRules []EnabledRuleWithConfig
+
+	for ruleName, ruleConfig := range enabledRuleConfigs {
+		if ruleConfig.IsEnabled() {
+			if ruleImpl, exists := r.rules[ruleName]; exists {
+				enabledRules = append(enabledRules, EnabledRuleWithConfig{
+					Rule:   ruleImpl,
+					Config: ruleConfig,
+				})
+			}
 		}
 	}
 

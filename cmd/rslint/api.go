@@ -15,6 +15,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	ipc "github.com/typescript-eslint/rslint/internal/api"
+	"github.com/typescript-eslint/rslint/internal/config"
 	"github.com/typescript-eslint/rslint/internal/linter"
 	"github.com/typescript-eslint/rslint/internal/rule"
 	"github.com/typescript-eslint/rslint/internal/rules/array_type"
@@ -23,6 +24,7 @@ import (
 	"github.com/typescript-eslint/rslint/internal/rules/ban_tslint_comment"
 	"github.com/typescript-eslint/rslint/internal/rules/class_literal_property_style"
 	"github.com/typescript-eslint/rslint/internal/rules/class_methods_use_this"
+	"github.com/typescript-eslint/rslint/internal/rules/consistent_generic_constructors"
 	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
 	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
 	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_void_expression"
@@ -117,65 +119,107 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 	}
 	currentDirectory = tspath.GetDirectoryPath(configFileName)
 
-	// Create rules
-	var rules = []rule.Rule{
-		array_type.ArrayTypeRule,
-		await_thenable.AwaitThenableRule,
-		ban_ts_comment.BanTsCommentRule,
-		ban_tslint_comment.BanTslintCommentRule,
-		class_literal_property_style.ClassLiteralPropertyStyleRule,
-		class_methods_use_this.ClassMethodsUseThisRule,
-		no_array_delete.NoArrayDeleteRule,
-		no_base_to_string.NoBaseToStringRule,
-		no_confusing_void_expression.NoConfusingVoidExpressionRule,
-		no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule,
-		no_floating_promises.NoFloatingPromisesRule,
-		no_for_in_array.NoForInArrayRule,
-		no_implied_eval.NoImpliedEvalRule,
-		no_meaningless_void_operator.NoMeaninglessVoidOperatorRule,
-		no_misused_promises.NoMisusedPromisesRule,
-		no_misused_spread.NoMisusedSpreadRule,
-		no_mixed_enums.NoMixedEnumsRule,
-		no_redundant_type_constituents.NoRedundantTypeConstituentsRule,
-		no_unnecessary_boolean_literal_compare.NoUnnecessaryBooleanLiteralCompareRule,
-		no_unnecessary_template_expression.NoUnnecessaryTemplateExpressionRule,
-		no_unnecessary_type_arguments.NoUnnecessaryTypeArgumentsRule,
-		no_unnecessary_type_assertion.NoUnnecessaryTypeAssertionRule,
-		no_unsafe_argument.NoUnsafeArgumentRule,
-		no_unsafe_assignment.NoUnsafeAssignmentRule,
-		no_unsafe_call.NoUnsafeCallRule,
-		no_unsafe_enum_comparison.NoUnsafeEnumComparisonRule,
-		no_unsafe_member_access.NoUnsafeMemberAccessRule,
-		no_unsafe_return.NoUnsafeReturnRule,
-		no_unsafe_type_assertion.NoUnsafeTypeAssertionRule,
-		no_unsafe_unary_minus.NoUnsafeUnaryMinusRule,
-		non_nullable_type_assertion_style.NonNullableTypeAssertionStyleRule,
-		only_throw_error.OnlyThrowErrorRule,
-		prefer_as_const.PreferAsConstRule,
-		prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
-		prefer_reduce_type_parameter.PreferReduceTypeParameterRule,
-		prefer_return_this_type.PreferReturnThisTypeRule,
-		promise_function_async.PromiseFunctionAsyncRule,
-		related_getter_setter_pairs.RelatedGetterSetterPairsRule,
-		require_array_sort_compare.RequireArraySortCompareRule,
-		require_await.RequireAwaitRule,
-		restrict_plus_operands.RestrictPlusOperandsRule,
-		restrict_template_expressions.RestrictTemplateExpressionsRule,
-		return_await.ReturnAwaitRule,
-		switch_exhaustiveness_check.SwitchExhaustivenessCheckRule,
-		unbound_method.UnboundMethodRule,
-		use_unknown_in_catch_callback_variable.UseUnknownInCatchCallbackVariableRule,
+	// Create a map of all available rules
+	allRules := map[string]rule.Rule{
+		"array-type":                                  array_type.ArrayTypeRule,
+		"await-thenable":                              await_thenable.AwaitThenableRule,
+		"ban-ts-comment":                              ban_ts_comment.BanTsCommentRule,
+		"ban-tslint-comment":                          ban_tslint_comment.BanTslintCommentRule,
+		"class-literal-property-style":                class_literal_property_style.ClassLiteralPropertyStyleRule,
+		"class-methods-use-this":                      class_methods_use_this.ClassMethodsUseThisRule,
+		"consistent-generic-constructors":             consistent_generic_constructors.ConsistentGenericConstructorsRule,
+		"@typescript-eslint/consistent-generic-constructors": consistent_generic_constructors.ConsistentGenericConstructorsRule,
+		"no-array-delete":                             no_array_delete.NoArrayDeleteRule,
+		"no-base-to-string":                           no_base_to_string.NoBaseToStringRule,
+		"no-confusing-void-expression":                no_confusing_void_expression.NoConfusingVoidExpressionRule,
+		"no-duplicate-type-constituents":              no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule,
+		"no-floating-promises":                        no_floating_promises.NoFloatingPromisesRule,
+		"no-for-in-array":                             no_for_in_array.NoForInArrayRule,
+		"no-implied-eval":                             no_implied_eval.NoImpliedEvalRule,
+		"no-meaningless-void-operator":                no_meaningless_void_operator.NoMeaninglessVoidOperatorRule,
+		"no-misused-promises":                         no_misused_promises.NoMisusedPromisesRule,
+		"no-misused-spread":                           no_misused_spread.NoMisusedSpreadRule,
+		"no-mixed-enums":                              no_mixed_enums.NoMixedEnumsRule,
+		"no-redundant-type-constituents":              no_redundant_type_constituents.NoRedundantTypeConstituentsRule,
+		"no-unnecessary-boolean-literal-compare":      no_unnecessary_boolean_literal_compare.NoUnnecessaryBooleanLiteralCompareRule,
+		"no-unnecessary-template-expression":          no_unnecessary_template_expression.NoUnnecessaryTemplateExpressionRule,
+		"no-unnecessary-type-arguments":               no_unnecessary_type_arguments.NoUnnecessaryTypeArgumentsRule,
+		"no-unnecessary-type-assertion":               no_unnecessary_type_assertion.NoUnnecessaryTypeAssertionRule,
+		"no-unsafe-argument":                          no_unsafe_argument.NoUnsafeArgumentRule,
+		"no-unsafe-assignment":                        no_unsafe_assignment.NoUnsafeAssignmentRule,
+		"no-unsafe-call":                              no_unsafe_call.NoUnsafeCallRule,
+		"no-unsafe-enum-comparison":                   no_unsafe_enum_comparison.NoUnsafeEnumComparisonRule,
+		"no-unsafe-member-access":                     no_unsafe_member_access.NoUnsafeMemberAccessRule,
+		"no-unsafe-return":                            no_unsafe_return.NoUnsafeReturnRule,
+		"no-unsafe-type-assertion":                    no_unsafe_type_assertion.NoUnsafeTypeAssertionRule,
+		"no-unsafe-unary-minus":                       no_unsafe_unary_minus.NoUnsafeUnaryMinusRule,
+		"non-nullable-type-assertion-style":           non_nullable_type_assertion_style.NonNullableTypeAssertionStyleRule,
+		"only-throw-error":                            only_throw_error.OnlyThrowErrorRule,
+		"prefer-as-const":                             prefer_as_const.PreferAsConstRule,
+		"prefer-promise-reject-errors":                prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
+		"prefer-reduce-type-parameter":                prefer_reduce_type_parameter.PreferReduceTypeParameterRule,
+		"prefer-return-this-type":                     prefer_return_this_type.PreferReturnThisTypeRule,
+		"promise-function-async":                      promise_function_async.PromiseFunctionAsyncRule,
+		"related-getter-setter-pairs":                 related_getter_setter_pairs.RelatedGetterSetterPairsRule,
+		"require-array-sort-compare":                  require_array_sort_compare.RequireArraySortCompareRule,
+		"require-await":                               require_await.RequireAwaitRule,
+		"restrict-plus-operands":                      restrict_plus_operands.RestrictPlusOperandsRule,
+		"restrict-template-expressions":               restrict_template_expressions.RestrictTemplateExpressionsRule,
+		"return-await":                                return_await.ReturnAwaitRule,
+		"switch-exhaustiveness-check":                 switch_exhaustiveness_check.SwitchExhaustivenessCheckRule,
+		"unbound-method":                              unbound_method.UnboundMethodRule,
+		"use-unknown-in-catch-callback-variable":      use_unknown_in_catch_callback_variable.UseUnknownInCatchCallbackVariableRule,
 	}
 
-	// filter rule based on request.RuleOptions
+	// Build rules with their configurations from request.RuleOptions
+	var rulesWithConfig []config.EnabledRuleWithConfig
 	if len(req.RuleOptions) > 0 {
-		filteredRules := []rule.Rule{}
-		for _, r := range rules {
-			if _, ok := req.RuleOptions[r.Name]; ok {
-				filteredRules = append(filteredRules, r)
+		for ruleName, ruleConfig := range req.RuleOptions {
+			if rule, exists := allRules[ruleName]; exists {
+				// Parse the rule config - can be just a string or an array with options
+				var options map[string]interface{}
+				var level string
+
+				switch v := ruleConfig.(type) {
+				case string:
+					level = v
+				case []interface{}:
+					if len(v) > 0 {
+						if levelStr, ok := v[0].(string); ok {
+							level = levelStr
+							if len(v) > 1 {
+								if opts, ok := v[1].(map[string]interface{}); ok {
+									options = opts
+								} else {
+									// For rules that expect a simple option value, pass it directly
+									options = map[string]interface{}{"value": v[1]}
+								}
+							}
+						}
+					}
+				}
+
+				if level != "off" {
+					rulesWithConfig = append(rulesWithConfig, config.EnabledRuleWithConfig{
+						Rule: rule,
+						Config: &config.RuleConfig{
+							Level:   level,
+							Options: options,
+						},
+					})
+				}
 			}
 		}
-		rules = filteredRules
+	} else {
+		// If no specific rules requested, use all rules
+		for _, rule := range allRules {
+			rulesWithConfig = append(rulesWithConfig, config.EnabledRuleWithConfig{
+				Rule: rule,
+				Config: &config.RuleConfig{
+					Level: "error",
+				},
+			})
+		}
 	}
 
 	// Create compiler host
@@ -265,11 +309,11 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		false, // Don't use single-threaded mode for IPC
 		files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			return utils.Map(rules, func(r rule.Rule) linter.ConfiguredRule {
+			return utils.Map(rulesWithConfig, func(ruleWithConfig config.EnabledRuleWithConfig) linter.ConfiguredRule {
 				return linter.ConfiguredRule{
-					Name: r.Name,
+					Name: ruleWithConfig.Rule.Name,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return r.Run(ctx, nil)
+						return ruleWithConfig.Rule.Run(ctx, ruleWithConfig.Config.Options)
 					},
 				}
 			})
@@ -287,7 +331,7 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		Diagnostics: diagnostics,
 		ErrorCount:  errorsCount,
 		FileCount:   len(files),
-		RuleCount:   len(rules),
+		RuleCount:   len(rulesWithConfig),
 	}, nil
 }
 

@@ -1,0 +1,883 @@
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferConstructor",
+      "message": "The generic type arguments should be specified as part of the constructor type arguments.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 33
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferConstructor",
+      "message": "The generic type arguments should be specified as part of the constructor type arguments.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 30
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferConstructor",
+      "message": "The generic type arguments should be specified as part of the constructor type arguments.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 32
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferConstructor",
+      "message": "The generic type arguments should be specified as part of the constructor type arguments.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferTypeAnnotation",
+      "message": "The generic type arguments should be specified as part of the type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 34
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferConstructor",
+      "message": "The generic type arguments should be specified as part of the constructor type arguments.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 41
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferConstructor",
+      "message": "The generic type arguments should be specified as part of the constructor type arguments.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 14
+        },
+        "end": {
+          "line": 2,
+          "column": 15
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferConstructor",
+      "message": "The generic type arguments should be specified as part of the constructor type arguments.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 14
+        },
+        "end": {
+          "line": 2,
+          "column": 19
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferConstructor",
+      "message": "The generic type arguments should be specified as part of the constructor type arguments.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 14
+        },
+        "end": {
+          "line": 2,
+          "column": 17
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferConstructor",
+      "message": "The generic type arguments should be specified as part of the constructor type arguments.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 15
+        },
+        "end": {
+          "line": 3,
+          "column": 16
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferConstructor",
+      "message": "The generic type arguments should be specified as part of the constructor type arguments.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 21
+        },
+        "end": {
+          "line": 2,
+          "column": 22
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferConstructor",
+      "message": "The generic type arguments should be specified as part of the constructor type arguments.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 41
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferTypeAnnotation",
+      "message": "The generic type arguments should be specified as part of the type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferTypeAnnotation",
+      "message": "The generic type arguments should be specified as part of the type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 22`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferTypeAnnotation",
+      "message": "The generic type arguments should be specified as part of the type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 38
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 23`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferTypeAnnotation",
+      "message": "The generic type arguments should be specified as part of the type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 38
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 24`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferTypeAnnotation",
+      "message": "The generic type arguments should be specified as part of the type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 25`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferTypeAnnotation",
+      "message": "The generic type arguments should be specified as part of the type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 56
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 26`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferTypeAnnotation",
+      "message": "The generic type arguments should be specified as part of the type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 64
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 27`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferTypeAnnotation",
+      "message": "The generic type arguments should be specified as part of the type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 25
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 28`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferTypeAnnotation",
+      "message": "The generic type arguments should be specified as part of the type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 29`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferTypeAnnotation",
+      "message": "The generic type arguments should be specified as part of the type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 31
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferConstructor",
+      "message": "The generic type arguments should be specified as part of the constructor type arguments.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 42
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 30`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferTypeAnnotation",
+      "message": "The generic type arguments should be specified as part of the type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 14
+        },
+        "end": {
+          "line": 2,
+          "column": 35
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 31`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferTypeAnnotation",
+      "message": "The generic type arguments should be specified as part of the type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 14
+        },
+        "end": {
+          "line": 2,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 32`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferTypeAnnotation",
+      "message": "The generic type arguments should be specified as part of the type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 14
+        },
+        "end": {
+          "line": 2,
+          "column": 37
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 33`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferTypeAnnotation",
+      "message": "The generic type arguments should be specified as part of the type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 15
+        },
+        "end": {
+          "line": 3,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 34`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferTypeAnnotation",
+      "message": "The generic type arguments should be specified as part of the type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 21
+        },
+        "end": {
+          "line": 2,
+          "column": 42
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferConstructor",
+      "message": "The generic type arguments should be specified as part of the constructor type arguments.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 43
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferConstructor",
+      "message": "The generic type arguments should be specified as part of the constructor type arguments.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 42
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferConstructor",
+      "message": "The generic type arguments should be specified as part of the constructor type arguments.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 31
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferConstructor",
+      "message": "The generic type arguments should be specified as part of the constructor type arguments.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 61
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferConstructor",
+      "message": "The generic type arguments should be specified as part of the constructor type arguments.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 61
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-generic-constructors > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-generic-constructors",
+      "messageId": "preferConstructor",
+      "message": "The generic type arguments should be specified as part of the constructor type arguments.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

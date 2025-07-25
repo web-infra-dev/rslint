@@ -3,6 +3,7 @@ exports[`ban-tslint-comment > invalid 1`] = `
   "diagnostics": [
     {
       "ruleName": "ban-tslint-comment",
+      "messageId": "commentDetected",
       "message": "tslint comment detected: \\"/* tslint:disable */\\"",
       "filePath": "src/virtual.ts",
       "range": {
@@ -28,6 +29,7 @@ exports[`ban-tslint-comment > invalid 2`] = `
   "diagnostics": [
     {
       "ruleName": "ban-tslint-comment",
+      "messageId": "commentDetected",
       "message": "tslint comment detected: \\"/* tslint:enable */\\"",
       "filePath": "src/virtual.ts",
       "range": {
@@ -53,6 +55,7 @@ exports[`ban-tslint-comment > invalid 3`] = `
   "diagnostics": [
     {
       "ruleName": "ban-tslint-comment",
+      "messageId": "commentDetected",
       "message": "tslint comment detected: \\"/* tslint:disable:rule1 rule2 rule3... */\\"",
       "filePath": "src/virtual.ts",
       "range": {
@@ -78,6 +81,7 @@ exports[`ban-tslint-comment > invalid 4`] = `
   "diagnostics": [
     {
       "ruleName": "ban-tslint-comment",
+      "messageId": "commentDetected",
       "message": "tslint comment detected: \\"/* tslint:enable:rule1 rule2 rule3... */\\"",
       "filePath": "src/virtual.ts",
       "range": {
@@ -103,6 +107,7 @@ exports[`ban-tslint-comment > invalid 5`] = `
   "diagnostics": [
     {
       "ruleName": "ban-tslint-comment",
+      "messageId": "commentDetected",
       "message": "tslint comment detected: \\"// tslint:disable-next-line\\"",
       "filePath": "src/virtual.ts",
       "range": {
@@ -128,6 +133,7 @@ exports[`ban-tslint-comment > invalid 6`] = `
   "diagnostics": [
     {
       "ruleName": "ban-tslint-comment",
+      "messageId": "commentDetected",
       "message": "tslint comment detected: \\"// tslint:disable-line\\"",
       "filePath": "src/virtual.ts",
       "range": {
@@ -153,6 +159,7 @@ exports[`ban-tslint-comment > invalid 7`] = `
   "diagnostics": [
     {
       "ruleName": "ban-tslint-comment",
+      "messageId": "commentDetected",
       "message": "tslint comment detected: \\"// tslint:disable-next-line:rule1 rule2 rule3...\\"",
       "filePath": "src/virtual.ts",
       "range": {
@@ -178,6 +185,7 @@ exports[`ban-tslint-comment > invalid 8`] = `
   "diagnostics": [
     {
       "ruleName": "ban-tslint-comment",
+      "messageId": "commentDetected",
       "message": "tslint comment detected: \\"// tslint:disable-line\\"",
       "filePath": "src/virtual.ts",
       "range": {

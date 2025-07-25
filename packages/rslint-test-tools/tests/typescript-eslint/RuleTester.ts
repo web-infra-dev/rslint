@@ -31,7 +31,7 @@ function checkDiagnosticEqual(
     const rslintDiag = rslintDiagnostic[i];
     const tsDiag = tsDiagnostic[i];
     // check rule match
-    // Use messageId if available, otherwise fall back to ruleName
+    // Use messageId if available, otherwise fall back to camelCased ruleName
     const rslintMessageId = rslintDiag.messageId || toCamelCase(rslintDiag.ruleName);
     assert(
       rslintMessageId === tsDiag.messageId,
@@ -40,6 +40,7 @@ function checkDiagnosticEqual(
 
     // check range match
     // tsDiag sometimes doesn't have line and column, so we need to check that
+    // RSLint returns 1-based line/column numbers, same as TypeScript-ESLint tests expect
     if (tsDiag.line) {
       assert(
         rslintDiag.range.start.line === tsDiag.line,
@@ -72,11 +73,12 @@ export class RuleTester {
   public run(
     ruleName: string,
     cases: {
-      valid: (string | { code: string; options?: any[] })[];
+      valid: (string | { code: string; options?: any[]; languageOptions?: any })[];
       invalid: {
         code: string;
         errors: any[];
         options?: any[];
+        output?: string | null;
       }[];
     },
   ) {
@@ -92,14 +94,7 @@ export class RuleTester {
           const code = typeof testCase === 'string' ? testCase : testCase.code;
           const options = typeof testCase === 'string' ? undefined : testCase.options;
           
-          const ruleOptions: Record<string, string> = {
-            [ruleName]: 'error',
-          };
-          
-          // If options are provided, pass them as JSON string
-          if (options && options.length > 0) {
-            ruleOptions[ruleName] = JSON.stringify(options[0]);
-          }
+          const ruleConfig = options ? ['error', options[0]] : 'error';
           
           const diags = await lint({
             tsconfig,
@@ -107,8 +102,13 @@ export class RuleTester {
             fileContents: {
               [virtual_entry]: code,
             },
-            ruleOptions,
+            ruleOptions: {
+              [ruleName]: ruleConfig,
+            },
           });
+          if (diags.diagnostics?.length > 0) {
+            console.error('Failed valid test case:', code);
+          }
           assert(
             diags.diagnostics?.length === 0,
             `Expected no diagnostics for valid case, but got: ${JSON.stringify(diags)}`,
@@ -116,15 +116,10 @@ export class RuleTester {
         }
       });
       await test('invalid', async t => {
-        for (const { errors, code, options } of cases.invalid) {
-          const ruleOptions: Record<string, string> = {
-            [ruleName]: 'error',
-          };
+        for (const testCase of cases.invalid) {
+          const { errors, code, options } = testCase;
           
-          // If options are provided, pass them as JSON string
-          if (options && options.length > 0) {
-            ruleOptions[ruleName] = JSON.stringify(options[0]);
-          }
+          const ruleConfig = options ? ['error', options[0]] : 'error';
           
           const diags = await lint({
             tsconfig,
@@ -132,12 +127,14 @@ export class RuleTester {
             fileContents: {
               [virtual_entry]: code,
             },
-            ruleOptions,
+            ruleOptions: {
+              [ruleName]: ruleConfig,
+            },
           });
           t.assert.snapshot(diags);
           assert(
             diags.diagnostics?.length > 0,
-            `Expected diagnostics for invalid case`,
+            `Expected diagnostics for invalid case: ${JSON.stringify({code, options, diags})}`,
           );
           checkDiagnosticEqual(diags.diagnostics, errors);
         }
