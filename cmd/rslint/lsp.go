@@ -25,6 +25,8 @@ import (
 	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
 	"github.com/typescript-eslint/rslint/internal/rules/ban_ts_comment"
 	"github.com/typescript-eslint/rslint/internal/rules/ban_tslint_comment"
+	"github.com/typescript-eslint/rslint/internal/rules/class_literal_property_style"
+	"github.com/typescript-eslint/rslint/internal/rules/class_methods_use_this"
 	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
 	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
 	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_void_expression"
@@ -458,6 +460,8 @@ func runLint(uri string) ([]rule.RuleDiagnostic, error) {
 		await_thenable.AwaitThenableRule,
 		ban_ts_comment.BanTsCommentRule,
 		ban_tslint_comment.BanTslintCommentRule,
+		class_literal_property_style.ClassLiteralPropertyStyleRule,
+		class_methods_use_this.ClassMethodsUseThisRule,
 		no_array_delete.NoArrayDeleteRule,
 		no_base_to_string.NoBaseToStringRule,
 		no_confusing_void_expression.NoConfusingVoidExpressionRule,
