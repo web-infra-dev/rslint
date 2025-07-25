@@ -33,6 +33,10 @@ async function portSingleRule(ruleName: string, showProgress: boolean = false, s
   
   const spinner = showProgress ? null : ora(`Porting ${ruleName}`).start();
   
+  if (showProgress) {
+    console.log(JSON.stringify({ type: 'start', ruleName, message: `Starting to port ${ruleName}` }));
+  }
+  
   try {
     // Fetch rule info
     if (spinner) spinner.text = `Fetching ${ruleName} files...`;
@@ -240,12 +244,16 @@ program
       const skipExisting = !options.force;
       
       if (options.all) {
-        if (!options.progress) {
+        if (options.progress) {
+          console.log(JSON.stringify({ type: 'info', message: 'Progress mode enabled, fetching all available rules...' }));
+        } else {
           console.log(chalk.blue('Fetching all available rules...'));
         }
         const allRules = await fetcher.fetchAvailableRules();
         if (!options.progress) {
           console.log(chalk.gray(`Found ${allRules.length} rules`));
+        } else {
+          console.log(JSON.stringify({ type: 'info', message: `Found ${allRules.length} rules` }));
         }
         await portMultipleRules(allRules, options.progress, skipExisting);
       } else {

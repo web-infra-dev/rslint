@@ -90,10 +90,15 @@ export class ClaudePorter {
       let exitCode = 0;
 
       claudeProcess.stdout?.on('data', (chunk: Buffer) => {
-        const responses = this.parser.processChunk(chunk.toString());
+        const data = chunk.toString();
+        const responses = this.parser.processChunk(data);
         allResponses.push(...responses);
         
         if (this.showProgress) {
+          // Also output raw stream for debugging if no responses parsed
+          if (responses.length === 0 && data.trim()) {
+            console.log(chalk.gray(`[Raw stream]: ${data.trim()}`));
+          }
           for (const response of responses) {
             this.displayProgress(response);
           }
