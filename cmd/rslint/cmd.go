@@ -31,8 +31,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/typescript-eslint/rslint/internal/config"
-	"github.com/typescript-eslint/rslint/internal/rules/adjacent_overload_signatures"
+	"github.com/typescript-eslint/rslint/internal/rules/array_type"
 	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
+	"github.com/typescript-eslint/rslint/internal/rules/ban_ts_comment"
+	"github.com/typescript-eslint/rslint/internal/rules/ban_tslint_comment"
 	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
 	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
 	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_void_expression"
@@ -350,7 +352,7 @@ Options:
     --config PATH     Which rslint config file to use. Defaults to rslint.jsonc.
 	--list-files      List matched files
 	--format FORMAT   Output format: default | jsonline
-	--ipc             Run in IPC mode (for JS integration)
+	--api, --ipc      Run in API/IPC mode (for JS integration)
 	--no-color        Disable colored output
 	--force-color     Force colored output
 	-h, --help        Show help
@@ -419,6 +421,7 @@ func runCMD() int {
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&help, "h", false, "show help")
 	flag.BoolVar(&ipcMode, "ipc", false, "run in IPC mode (for JS integration)")
+	flag.BoolVar(&ipcMode, "api", false, "run in API mode (for JS integration)")
 	flag.BoolVar(&noColor, "no-color", false, "disable colored output")
 	flag.BoolVar(&forceColor, "force-color", false, "force colored output")
 
@@ -506,8 +509,10 @@ func runCMD() int {
 	}
 
 	var rules = []rule.Rule{
-		adjacent_overload_signatures.AdjacentOverloadSignaturesRule,
+		array_type.ArrayTypeRule,
 		await_thenable.AwaitThenableRule,
+		ban_ts_comment.BanTsCommentRule,
+		ban_tslint_comment.BanTslintCommentRule,
 		no_array_delete.NoArrayDeleteRule,
 		no_base_to_string.NoBaseToStringRule,
 		no_confusing_void_expression.NoConfusingVoidExpressionRule,

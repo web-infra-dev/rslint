@@ -28,9 +28,9 @@ Provide the complete corrected Go code.
 ## IMPORTANT: Common Issues to Check
 
 1. **Rule Not Registered**: If tests show no diagnostics being generated, ensure the rule is registered in:
-   - `/Users/bytedance/dev/rslint/cmd/rslint/cmd.go`
-   - `/Users/bytedance/dev/rslint/cmd/rslint/api.go`
-   - `/Users/bytedance/dev/rslint/cmd/rslint/lsp.go`
+   - `cmd/rslint/cmd.go`
+   - `cmd/rslint/api.go`
+   - `cmd/rslint/lsp.go`
    
    Each file needs:
    - Import: `"github.com/typescript-eslint/rslint/internal/rules/{{RULE_NAME_UNDERSCORED}}"`
@@ -38,7 +38,7 @@ Provide the complete corrected Go code.
 
 2. **Build Required**: After registration, the project must be rebuilt:
    ```bash
-   cd /Users/bytedance/dev/rslint && pnpm build
+   pnpm build
    ```
 
 3. **API Mismatches**: Check for incorrect method names or missing imports

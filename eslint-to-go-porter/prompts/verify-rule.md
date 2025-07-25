@@ -24,9 +24,9 @@ The Go rule has been written to: `{{GO_RULE_PATH}}`
 ## Rule Registration Reminder
 
 Remember that after creating the rule, it must be registered in:
-- `/Users/bytedance/dev/rslint/cmd/rslint/cmd.go`
-- `/Users/bytedance/dev/rslint/cmd/rslint/api.go`
-- `/Users/bytedance/dev/rslint/cmd/rslint/lsp.go`
+- `cmd/rslint/cmd.go`
+- `cmd/rslint/api.go`
+- `cmd/rslint/lsp.go`
 
 Each file needs:
 - Import: `"github.com/typescript-eslint/rslint/internal/rules/RULE_NAME_UNDERSCORED"`

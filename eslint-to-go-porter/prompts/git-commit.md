@@ -9,10 +9,7 @@ You are tasked with creating a git commit for the newly ported rule.
 
 ## Your Task
 
-1. **Navigate to the repository root**:
-   ```bash
-   cd /Users/bytedance/dev/rslint
-   ```
+1. **Working in repository root** (already positioned correctly)
 
 2. **CRITICAL: Register the rule in cmd files**:
    The rule MUST be registered in three command files. Follow these steps:

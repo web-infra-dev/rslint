@@ -44,6 +44,6 @@ Convert this test file to work with rslint's cross-validation test framework. Yo
 
 ## Output
 
-Create the adapted test file at: `/Users/bytedance/dev/rslint/packages/rslint-test-tools/tests/typescript-eslint/rules/{{RULE_NAME}}.test.ts`
+Create the adapted test file at: `packages/rslint-test-tools/tests/typescript-eslint/rules/{{RULE_NAME}}.test.ts`
 
 Provide ONLY the adapted TypeScript code without explanations.

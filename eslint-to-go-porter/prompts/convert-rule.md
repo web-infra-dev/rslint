@@ -19,7 +19,6 @@ Use this test as a reference to ensure your Go test covers all the same test cas
 **STEP 1: Research the API**
 Before writing any code, examine the existing rslint codebase to understand:
 
-Note: The original TypeScript rule source is available at `{{RULE_NAME_UNDERSCORED}}/{{RULE_NAME_UNDERSCORED}}.ts` in the current directory for reference.
 1. Look at 2-3 existing rule implementations to understand the `rule.Rule` structure
 2. Examine the `internal/rule` package to understand:
    - `RuleMessage`, `RuleMeta`, `RuleDocs` types
@@ -28,6 +27,7 @@ Note: The original TypeScript rule source is available at `{{RULE_NAME_UNDERSCOR
    - `RuleContext` and `RuleListeners` interfaces
 3. Check the `internal/utils` package for helper functions like `GetNodeText`
 4. Understand the AST node types and methods available in the `ast` package
+5. Study TypeScript rule patterns and common ESLint rule structures
 
 **STEP 2: Convert the Rule**
 Only after understanding the API structure, convert the TypeScript ESLint rule above to Go, following the rslint rule structure:
@@ -68,12 +68,14 @@ Only after understanding the API structure, convert the TypeScript ESLint rule a
    - All edge cases and complex scenarios from the original test
    - Proper error positioning (line, column, endLine, endColumn)
 9. IMPORTANT: For rule messages, do NOT use template strings with {{placeholders}}. Instead, format the message directly in Go code using fmt.Sprintf or string concatenation. The rslint framework does not support template string interpolation in messages.
-10. IMPORTANT: Do NOT attempt to run, compile, or execute the generated Go code
-11. IMPORTANT: Create both the rule implementation (.go) and test file (_test.go)
+10. IMPORTANT: Ensure error positions (line, column, endLine, endColumn) match the TypeScript rule behavior exactly
+11. IMPORTANT: Do NOT attempt to run, compile, or execute the generated Go code
+12. IMPORTANT: Create both the rule implementation (.go) and test file (_test.go)
+13. IMPORTANT: Follow Go naming conventions and ensure exported identifiers are properly capitalized
 
 ## Output
 
-IMPORTANT: You are working in the /Users/bytedance/dev/rslint/internal/rules directory. Only examine existing rules within this directory as examples. Do not navigate to parent directories.
+IMPORTANT: You are working in the repository root. When examining existing rules, look in the `internal/rules` directory for examples.
 
 Please create TWO files:
 

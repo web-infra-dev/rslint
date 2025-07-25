@@ -1,0 +1,283 @@
+exports[`array-type > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "array-type",
+      "message": "Array type using 'Array<number>' is forbidden. Use 'number[]' instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 8
+        },
+        "end": {
+          "line": 1,
+          "column": 21
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`array-type > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "array-type",
+      "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 8
+        },
+        "end": {
+          "line": 1,
+          "column": 30
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`array-type > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "array-type",
+      "message": "Array type using 'ReadonlyArray<number>' is forbidden. Use 'readonly number[]' instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 8
+        },
+        "end": {
+          "line": 1,
+          "column": 29
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`array-type > invalid 12`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`array-type > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "array-type",
+      "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 8
+        },
+        "end": {
+          "line": 1,
+          "column": 30
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`array-type > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "array-type",
+      "message": "Array type using 'ReadonlyArray<number>' is forbidden. Use 'readonly number[]' instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 8
+        },
+        "end": {
+          "line": 1,
+          "column": 29
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`array-type > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "array-type",
+      "message": "Array type using 'ReadonlyArray<T>' is forbidden. Use 'readonly T[]' instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 8
+        },
+        "end": {
+          "line": 1,
+          "column": 38
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`array-type > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "array-type",
+      "message": "Array type using 'Array<number>' is forbidden. Use 'number[]' instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 8
+        },
+        "end": {
+          "line": 1,
+          "column": 21
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`array-type > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "array-type",
+      "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 8
+        },
+        "end": {
+          "line": 1,
+          "column": 30
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`array-type > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "array-type",
+      "message": "Array type using 'ReadonlyArray<number>' is forbidden. Use 'readonly number[]' instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 8
+        },
+        "end": {
+          "line": 1,
+          "column": 29
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`array-type > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "array-type",
+      "message": "Array type using 'ReadonlyArray<T>' is forbidden. Use 'readonly T[]' instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 8
+        },
+        "end": {
+          "line": 1,
+          "column": 38
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`array-type > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "array-type",
+      "message": "Array type using 'Array<number>' is forbidden. Use 'number[]' instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 8
+        },
+        "end": {
+          "line": 1,
+          "column": 21
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

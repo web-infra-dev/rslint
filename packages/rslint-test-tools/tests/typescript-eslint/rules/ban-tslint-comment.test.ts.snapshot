@@ -1,0 +1,199 @@
+exports[`ban-tslint-comment > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "ban-tslint-comment",
+      "message": "tslint comment detected: \\"/* tslint:disable */\\"",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 21
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`ban-tslint-comment > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "ban-tslint-comment",
+      "message": "tslint comment detected: \\"/* tslint:enable */\\"",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 20
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`ban-tslint-comment > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "ban-tslint-comment",
+      "message": "tslint comment detected: \\"/* tslint:disable:rule1 rule2 rule3... */\\"",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 42
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`ban-tslint-comment > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "ban-tslint-comment",
+      "message": "tslint comment detected: \\"/* tslint:enable:rule1 rule2 rule3... */\\"",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 41
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`ban-tslint-comment > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "ban-tslint-comment",
+      "message": "tslint comment detected: \\"// tslint:disable-next-line\\"",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`ban-tslint-comment > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "ban-tslint-comment",
+      "message": "tslint comment detected: \\"// tslint:disable-line\\"",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 13
+        },
+        "end": {
+          "line": 1,
+          "column": 35
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`ban-tslint-comment > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "ban-tslint-comment",
+      "message": "tslint comment detected: \\"// tslint:disable-next-line:rule1 rule2 rule3...\\"",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 49
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`ban-tslint-comment > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "ban-tslint-comment",
+      "message": "tslint comment detected: \\"// tslint:disable-line\\"",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

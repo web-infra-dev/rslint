@@ -17,8 +17,10 @@ import (
 	ipc "github.com/typescript-eslint/rslint/internal/api"
 	"github.com/typescript-eslint/rslint/internal/linter"
 	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/rules/adjacent_overload_signatures"
+	"github.com/typescript-eslint/rslint/internal/rules/array_type"
 	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
+	"github.com/typescript-eslint/rslint/internal/rules/ban_ts_comment"
+	"github.com/typescript-eslint/rslint/internal/rules/ban_tslint_comment"
 	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
 	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
 	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_void_expression"
@@ -115,8 +117,10 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 
 	// Create rules
 	var rules = []rule.Rule{
-		adjacent_overload_signatures.AdjacentOverloadSignaturesRule,
+		array_type.ArrayTypeRule,
 		await_thenable.AwaitThenableRule,
+		ban_ts_comment.BanTsCommentRule,
+		ban_tslint_comment.BanTslintCommentRule,
 		no_array_delete.NoArrayDeleteRule,
 		no_base_to_string.NoBaseToStringRule,
 		no_confusing_void_expression.NoConfusingVoidExpressionRule,

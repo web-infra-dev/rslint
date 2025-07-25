@@ -66,7 +66,7 @@ export class RSLintService {
     this.rslintPath =
       options.rslintPath || path.join(import.meta.dirname, '../bin/rslint');
 
-    this.process = spawn(this.rslintPath, ['--ipc'], {
+    this.process = spawn(this.rslintPath, ['--api'], {
       stdio: ['pipe', 'pipe', 'inherit'],
       cwd: options.workingDirectory || process.cwd(),
       env: {

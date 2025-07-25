@@ -5,13 +5,13 @@ You are tasked with running the cross-validation tests in rslint-test-tools to e
 ## Context
 - Rule name: {{RULE_NAME}}
 - The Go rule has been successfully ported and its Go tests are passing
-- Cross-validation tests exist at: `/Users/bytedance/dev/rslint/packages/rslint-test-tools/tests/typescript-eslint/rules/{{RULE_NAME}}.test.ts`
+- Cross-validation tests exist at: `packages/rslint-test-tools/tests/typescript-eslint/rules/{{RULE_NAME}}.test.ts`
 - These tests compare the Go rule output against the original TypeScript ESLint rule
 
 ## Your Task
 1. **Navigate to the test directory**:
    ```bash
-   cd /Users/bytedance/dev/rslint/packages/rslint-test-tools
+   cd packages/rslint-test-tools
    ```
 
 2. **Run the cross-validation test**:
@@ -24,9 +24,9 @@ You are tasked with running the cross-validation tests in rslint-test-tools to e
    - If there are snapshot mismatches, verify the differences are expected
    - If there are test framework issues, debug the test runner configuration
    - **IMPORTANT**: If tests show "Expected diagnostics for invalid case" but no diagnostics are generated, the rule may not be registered. Check:
-     - `/Users/bytedance/dev/rslint/cmd/rslint/cmd.go`
-     - `/Users/bytedance/dev/rslint/cmd/rslint/api.go`
-     - `/Users/bytedance/dev/rslint/cmd/rslint/lsp.go`
+     - `cmd/rslint/cmd.go`
+     - `cmd/rslint/api.go`
+     - `cmd/rslint/lsp.go`
      Each file needs the rule import and entry in the rules array.
 
 4. **Report Results**:
