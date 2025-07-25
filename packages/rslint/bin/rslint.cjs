@@ -11,8 +11,18 @@ function getBinPath() {
 }
 function main() {
   const binPath = getBinPath();
-  require('child_process').execFileSync(binPath, process.argv.slice(2), {
-    stdio: 'inherit',
-  });
+  try {
+    require('child_process').execFileSync(binPath, process.argv.slice(2), {
+      stdio: 'inherit',
+    });
+  } catch (error) {
+    // Preserve the exit code from the child process
+    if (error.status !== undefined) {
+      process.exit(error.status);
+    } else {
+      console.error(`Failed to execute ${binPath}: ${error.message}`);
+      process.exit(1);
+    }
+  }
 }
 main();
