@@ -24,7 +24,6 @@
       "@typescript-eslint/no-confusing-void-expression": "off",
       "@typescript-eslint/no-redundant-type-constituents": "off",
       "@typescript-eslint/no-unsafe-type-assertion": "off"
-
     },
     "plugins": ["@typescript-eslint"]
   }
