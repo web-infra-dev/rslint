@@ -10,7 +10,7 @@ const https = require('https');
 // Configuration
 const BUILD_COMMAND = 'pnpm';
 const BUILD_ARGS = ['-r', 'build'];
-const TEST_TIMEOUT = 30000; // 30 seconds
+const TEST_TIMEOUT = 120000; // 120 seconds (2 minutes)
 const TEST_DIR = 'packages/rslint-test-tools/tests/typescript-eslint/rules';
 const TSLINT_BASE_URL = 'https://raw.githubusercontent.com/typescript-eslint/typescript-eslint/main';
 
@@ -108,6 +108,82 @@ async function runCommand(command, args, options = {}) {
   });
 }
 
+async function runClaudeWithStreaming(prompt) {
+  return new Promise((resolve) => {
+    const child = spawn('claude', [prompt], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    let fullOutput = '';
+    let fullError = '';
+    let lastChunk = '';
+
+    // Process stdout stream
+    child.stdout.on('data', (data) => {
+      const chunk = data.toString();
+      fullOutput += chunk;
+      lastChunk += chunk;
+      
+      // Try to parse and display JSON chunks
+      const lines = lastChunk.split('\n');
+      lastChunk = lines.pop() || ''; // Keep incomplete line for next chunk
+      
+      for (const line of lines) {
+        if (line.trim()) {
+          try {
+            const json = JSON.parse(line);
+            if (json.type === 'message' && json.content) {
+              logProgress('Claude response chunk', { 
+                type: json.type,
+                content: json.content.slice(0, 200) + (json.content.length > 200 ? '...' : '')
+              });
+            }
+          } catch (e) {
+            // Not JSON, just log as text
+            if (line.length > 0) {
+              logProgress('Claude output', { text: line.slice(0, 200) });
+            }
+          }
+        }
+      }
+    });
+
+    child.stderr.on('data', (data) => {
+      fullError += data.toString();
+    });
+
+    child.on('close', (code) => {
+      // Process any remaining chunk
+      if (lastChunk.trim()) {
+        try {
+          const json = JSON.parse(lastChunk);
+          if (json.type === 'message' && json.content) {
+            logProgress('Claude final response chunk', { content: json.content.slice(0, 200) });
+          }
+        } catch (e) {
+          // Not JSON
+        }
+      }
+      
+      resolve({
+        code,
+        stdout: fullOutput,
+        stderr: fullError
+      });
+    });
+
+    // Set timeout
+    setTimeout(() => {
+      child.kill('SIGKILL');
+      resolve({
+        code: -1,
+        stdout: fullOutput,
+        stderr: 'Process timed out after 60 seconds'
+      });
+    }, 60000);
+  });
+}
+
 async function fixErrorWithClaudeCLI(errorOutput, command, originalSources = null, currentTestContent = null) {
   let prompt = `Error occurred:\n\n${errorOutput}\n\n`;
   
@@ -136,21 +212,28 @@ async function fixErrorWithClaudeCLI(errorOutput, command, originalSources = nul
   prompt += `Fix the error above, then run: ${command}`;
   
   logProgress('Sending error to Claude CLI for fixing', {
+    phase: 'start',
     command,
     hasOriginalSources: !!originalSources,
     hasCurrentTest: !!currentTestContent,
-    errorOutput: errorOutput.slice(0, 1000) + (errorOutput.length > 1000 ? '...' : '')
+    errorPreview: errorOutput.slice(0, 500) + (errorOutput.length > 500 ? '...' : '')
   });
 
   try {
-    const result = await runCommand('claude', [prompt], { timeout: 60000 });
-    logProgress('Claude CLI response received', {
+    const result = await runClaudeWithStreaming(prompt);
+    
+    logProgress('Claude CLI completed', {
+      phase: 'complete',
       success: result.code === 0,
-      stdout: result.stdout.slice(0, 500) + (result.stdout.length > 500 ? '...' : '')
+      exitCode: result.code
     });
+    
     return result.code === 0;
   } catch (error) {
-    logProgress('Claude CLI failed', { error: error.message });
+    logProgress('Claude CLI error', { 
+      phase: 'error',
+      error: error.message 
+    });
     return false;
   }
 }
