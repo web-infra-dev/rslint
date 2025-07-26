@@ -19,18 +19,26 @@ The Go rule has been written to: `{{GO_RULE_PATH}}`
 5. Verify imports are correct
 6. Check that the rule structure matches rslint conventions
 7. Verify the rule variable is exported (e.g., `var PreferAsConstRule = rule.Rule{...}`)
-8. IMPORTANT: Do NOT attempt to run, compile, or execute the Go code
+8. Ensure NO debug output (fmt.Printf, console.log) or temporary code remains in the implementation
+8a. Check for accidental debug logging like "Sending ruleOptions:" or similar output
+8b. Final code must be completely clean of ALL debug statements
+9. IMPORTANT: Do NOT attempt to run, compile, or execute the Go code
+10. IMPORTANT: Do NOT create any temporary files during verification
 
 ## Rule Registration Reminder
 
 Remember that after creating the rule, it must be registered in:
-- `cmd/rslint/cmd.go`
-- `cmd/rslint/api.go`
-- `cmd/rslint/lsp.go`
+- **ONLY** `internal/config/config.go` - BOTH with namespace AND without namespace:
+  ```go
+  GlobalRuleRegistry.Register("@typescript-eslint/rule-name", rule_name.RuleNameRule)
+  GlobalRuleRegistry.Register("rule-name", rule_name.RuleNameRule)  // CRITICAL for tests!
+  ```
 
-Each file needs:
-- Import: `"github.com/typescript-eslint/rslint/internal/rules/RULE_NAME_UNDERSCORED"`
-- In rules array: `RULE_NAME_UNDERSCORED.RuleNamePascalRule,`
+**IMPORTANT**: 
+- The rule is automatically loaded via the config system
+- DO NOT register in cmd/ files - this is incorrect and outdated
+- Both registrations (namespaced + non-namespaced) are absolutely required
+- Missing the non-namespaced registration causes "Expected diagnostics but got none" test failures
 
 ## Common Issues to Verify
 - Message IDs in `RuleMessage.Id` should be descriptive (e.g., "preferConstAssertion"), not just the rule name

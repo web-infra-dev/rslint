@@ -1,6 +1,6 @@
-# Register Rule in Command Files
+# Register Rule in Configuration
 
-You are tasked with registering a newly ported rule in the rslint command files.
+You are tasked with registering a newly ported rule in the rslint configuration system.
 
 ## Context
 - Rule name: {{RULE_NAME}}
@@ -23,36 +23,45 @@ You are tasked with registering a newly ported rule in the rslint command files.
    "github.com/typescript-eslint/rslint/internal/rules/{{RULE_NAME_UNDERSCORED}}"
    ```
    
-   b. **Add BOTH registrations to support namespaced and non-namespaced usage**:
+   b. **CRITICAL: Add BOTH registrations to support namespaced and non-namespaced usage**:
    ```go
    GlobalRuleRegistry.Register("@typescript-eslint/{{RULE_NAME}}", {{RULE_NAME_UNDERSCORED}}.{{RULE_NAME_PASCAL}}Rule)
-   GlobalRuleRegistry.Register("{{RULE_NAME}}", {{RULE_NAME_UNDERSCORED}}.{{RULE_NAME_PASCAL}}Rule)
+   GlobalRuleRegistry.Register("{{RULE_NAME}}", {{RULE_NAME_UNDERSCORED}}.{{RULE_NAME_PASCAL}}Rule)  // REQUIRED for tests!
    ```
    
-   Note: The dual registration is critical for test compatibility!
+   **IMPORTANT**: The dual registration is absolutely critical:
+   - Namespaced version (@typescript-eslint/rule-name) for production use
+   - Non-namespaced version (rule-name) is REQUIRED for test compatibility
+   - Missing the non-namespaced registration will cause test failures
+   
+   **NOTE**: Rules are automatically loaded via the config system. Manual registration in cmd/ files is NOT needed and is incorrect.
 
 3. **Build the project to verify**:
    ```bash
    pnpm build
    ```
 
-4. **Update test snapshots if rule count changed**:
-   Since adding a new rule increases the total rule count, you may need to update test snapshots:
-   ```bash
-   cd packages/rslint && npm test
-   ```
+4. **Run comprehensive tests**:
+   Since adding a new rule increases the total rule count, you need to verify all tests pass.
+   Use the `run-all-tests.md` prompt to run the complete test suite and fix any issues.
    
-   If tests fail due to rule count mismatch, update snapshots:
-   ```bash
-   cd packages/rslint && npm test -- --update-snapshots
-   ```
+   This will automatically handle:
+   - Rule count snapshots updates
+   - Cross-validation test verification  
+   - Any other test dependencies
 
 ## Important Notes
+- **ONLY register in internal/config/config.go** - DO NOT add to cmd/ files
 - Add imports and rule entries alphabetically
 - Ensure proper indentation and formatting
 - The build must succeed after registration
-- Always register rules with BOTH the namespaced (@typescript-eslint/) and non-namespaced versions
-- The non-namespaced version is required for test compatibility
+- **CRITICAL**: Always register rules with BOTH versions:
+  - Namespaced: `@typescript-eslint/rule-name` (for production)
+  - Non-namespaced: `rule-name` (REQUIRED for test compatibility)
+- Missing the non-namespaced registration will cause "Expected diagnostics but got none" test failures
 - If build fails, check for syntax errors or missing imports
+- DO NOT create any temporary files during this process
+- Clean up any debug output before finalizing changes
+- Rules are loaded automatically via config system - no manual cmd/ file changes needed
 
 Begin by checking if the rule is already registered in config.go.

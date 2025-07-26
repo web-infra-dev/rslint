@@ -75,21 +75,39 @@ Only after understanding the API structure, convert the TypeScript ESLint rule a
 11. IMPORTANT: Do NOT attempt to run, compile, or execute the generated Go code
 12. IMPORTANT: Create both the rule implementation (.go) and test file (_test.go)
 13. IMPORTANT: Follow Go naming conventions and ensure exported identifiers are properly capitalized
-14. IMPORTANT: Avoid recursive calls that could cause infinite loops (e.g., checking if a type reference is simple by recursively calling the same function)
-15. IMPORTANT: Use camelCase for message IDs (e.g., "preferConstAssertion" not "prefer-const-assertion")
+14. **CRITICAL**: Avoid recursive calls that could cause infinite loops (e.g., checking if a type reference is simple by recursively calling the same function)
+15. **CRITICAL**: Use camelCase for message IDs (e.g., "preferConstAssertion" not "prefer-const-assertion")
+16. **CRITICAL**: Remove ALL debug output (fmt.Printf, console.log) from final code - no debug statements should remain
+17. **CRITICAL**: When testing, remember that:
+    - RSLint uses 1-based line and column numbers (not 0-based)
+    - Tests often use the non-namespaced version of rule names (e.g., "array-type" not "@typescript-eslint/array-type")
+    - Use `utils.GetNameFromMember()` for robust property name extraction
+    - Class members are accessed via `node.Members()` which returns `[]*ast.Node` directly
+    - Accessor properties (`accessor a = ...`) are `PropertyDeclaration` nodes with the accessor modifier
+18. **RULE REGISTRATION**: The rule MUST be registered in `internal/config/config.go` with BOTH:
+    - Namespaced: `@typescript-eslint/rule-name` (for production use)
+    - Non-namespaced: `rule-name` (REQUIRED for test compatibility)
+    - Missing dual registration causes test failures where no diagnostics are generated
 
 ## Output
 
 IMPORTANT: You are working in the repository root. When examining existing rules, look in the `internal/rules` directory for examples.
 
-Please create TWO files:
+Please create ONLY these TWO files:
 
-1. The rule implementation: `{{RULE_NAME_UNDERSCORED}}/{{RULE_NAME_UNDERSCORED}}.go`
-2. The test file: `{{RULE_NAME_UNDERSCORED}}/{{RULE_NAME_UNDERSCORED}}_test.go`
+1. The rule implementation: `internal/rules/{{RULE_NAME_UNDERSCORED}}/{{RULE_NAME_UNDERSCORED}}.go`
+2. The test file: `internal/rules/{{RULE_NAME_UNDERSCORED}}/{{RULE_NAME_UNDERSCORED}}_test.go`
 
 Look at existing rule test files for the correct test structure using `rule_tester.RunRuleTester`.
 
-IMPORTANT: Do NOT attempt to run, compile, or execute any of the generated Go code.
+IMPORTANT: 
+- Do NOT attempt to run, compile, or execute any of the generated Go code
+- Do NOT create any temporary files, debug files, or log files
+- Do NOT create any additional files beyond the two specified above
+- **CRITICAL**: Do NOT use fmt.Printf or other debug output in the final code
+- **CRITICAL**: Remove ANY and ALL debug logging or temporary code before creating the final files
+- Do NOT add debug output like "Sending ruleOptions:" or similar console logging
+- Final code must be completely clean of debug statements
 
 Create both files using the Write tool. The files should contain complete, working Go code with no explanations or comments outside the code.
 
