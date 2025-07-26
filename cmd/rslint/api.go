@@ -27,6 +27,7 @@ import (
 	"github.com/typescript-eslint/rslint/internal/rules/consistent_generic_constructors"
 	"github.com/typescript-eslint/rslint/internal/rules/consistent_type_exports"
 	"github.com/typescript-eslint/rslint/internal/rules/consistent_type_imports"
+	"github.com/typescript-eslint/rslint/internal/rules/default_param_last"
 	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
 	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
 	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_void_expression"
@@ -135,6 +136,8 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		"@typescript-eslint/consistent-type-exports":  consistent_type_exports.ConsistentTypeExportsRule,
 		"consistent-type-imports":                     consistent_type_imports.ConsistentTypeImportsRule,
 		"@typescript-eslint/consistent-type-imports":  consistent_type_imports.ConsistentTypeImportsRule,
+		"default-param-last":                          default_param_last.DefaultParamLastRule,
+		"@typescript-eslint/default-param-last":       default_param_last.DefaultParamLastRule,
 		"no-array-delete":                             no_array_delete.NoArrayDeleteRule,
 		"no-base-to-string":                           no_base_to_string.NoBaseToStringRule,
 		"no-confusing-void-expression":                no_confusing_void_expression.NoConfusingVoidExpressionRule,

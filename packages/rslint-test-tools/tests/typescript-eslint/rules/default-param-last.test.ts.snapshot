@@ -1,0 +1,1313 @@
+exports[`default-param-last > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 19
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 24
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 22
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 29
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 23
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 23
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    },
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 30
+        },
+        "end": {
+          "line": 1,
+          "column": 35
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 23
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    },
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 41
+        },
+        "end": {
+          "line": 1,
+          "column": 46
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 23
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 23
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 23
+        },
+        "end": {
+          "line": 1,
+          "column": 33
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 19
+        }
+      }
+    },
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 21
+        },
+        "end": {
+          "line": 1,
+          "column": 26
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 34
+        },
+        "end": {
+          "line": 1,
+          "column": 44
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 23
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    },
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 30
+        },
+        "end": {
+          "line": 1,
+          "column": 40
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 22`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 23
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 23`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 23
+        },
+        "end": {
+          "line": 1,
+          "column": 33
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 24`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 23
+        },
+        "end": {
+          "line": 1,
+          "column": 48
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 25`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 23
+        },
+        "end": {
+          "line": 1,
+          "column": 31
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 26`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 23
+        },
+        "end": {
+          "line": 1,
+          "column": 38
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 27`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 19
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 28`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 19
+        }
+      }
+    },
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 21
+        },
+        "end": {
+          "line": 1,
+          "column": 26
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 29`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 19
+        }
+      }
+    },
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 32
+        },
+        "end": {
+          "line": 1,
+          "column": 37
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 19
+        }
+      }
+    },
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 32
+        },
+        "end": {
+          "line": 1,
+          "column": 37
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 30`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 19
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 31`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 19
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 32`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 24
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 33`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 25
+        },
+        "end": {
+          "line": 1,
+          "column": 35
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 34`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 19
+        }
+      }
+    },
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 21
+        },
+        "end": {
+          "line": 1,
+          "column": 31
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 35`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 19
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 36`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 24
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 37`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 38`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 22
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 39`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 29
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 19
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 40`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 5
+        },
+        "end": {
+          "line": 5,
+          "column": 25
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 41`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 5
+        },
+        "end": {
+          "line": 5,
+          "column": 20
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 42`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 5
+        },
+        "end": {
+          "line": 4,
+          "column": 22
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 43`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 5
+        },
+        "end": {
+          "line": 4,
+          "column": 17
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 44`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 15
+        },
+        "end": {
+          "line": 3,
+          "column": 20
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 45`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 15
+        },
+        "end": {
+          "line": 3,
+          "column": 25
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 19
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 24
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 25
+        },
+        "end": {
+          "line": 1,
+          "column": 35
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 19
+        }
+      }
+    },
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 21
+        },
+        "end": {
+          "line": 1,
+          "column": 31
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`default-param-last > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "default-param-last",
+      "messageId": "shouldBeLast",
+      "message": "Default parameters should be last.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 19
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
