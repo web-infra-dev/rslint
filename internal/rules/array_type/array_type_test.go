@@ -10,24 +10,17 @@ import (
 func TestArrayTypeRule(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &ArrayTypeRule, []rule_tester.ValidTestCase{
 		{Code: `
-		let a: Array<string> = [];
+		// let a: string[] = [];
 	`}}, []rule_tester.InvalidTestCase{
-		// {
-		// 	Code: `
-		// type Foo = Array<string>;
-		// `,
-		// 	Errors: []rule_tester.InvalidTestCaseError{
-		// 		{
-		// 			MessageId: "await",
-		// 			Line:      1,
-		// 			Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-		// 				{
-		// 					MessageId: "errorStringGeneric",
-		// 					Output:    " 0;",
-		// 				},
-		// 			},
-		// 		},
-		// 	},
-		// },
+		{
+			Code:   `let a: Array<string> = [];`,
+			Output: []string{`let a: string[] = [];`},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "errorStringArray",
+					Line:      1,
+				},
+			},
+		},
 	})
 }

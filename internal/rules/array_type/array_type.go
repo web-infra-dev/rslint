@@ -149,8 +149,17 @@ var ArrayTypeRule = rule.Rule{
 
 				var typeArgs1 = node.AsTypeReference().TypeArguments
 
-				ctx.ReportNodeWithFixes(node, buildErrorStringArrayMessage("", GetMessageType(typeArgs1.Nodes[0]), identifier.Text), rule.RuleFixReplace(ctx.SourceFile, node, "Array<"+typeName.Text()+">"))
+				if typeArgs1 == nil || len(typeArgs1.Nodes) == 0 {
+					return
+				}
+
+				fmt.Printf("output %v %v\n", count, scanner.GetTextOfNode(node))
+				count++
+
+				ctx.ReportNodeWithFixes(node, buildErrorStringArrayMessage("", GetMessageType(typeArgs1.Nodes[0]), identifier.Text), rule.RuleFixReplace(ctx.SourceFile, node, scanner.GetTextOfNode(typeArgs1.Nodes[0])+"[]"))
 			},
 		}
 	},
 }
+
+var count = 1;
