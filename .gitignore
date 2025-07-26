@@ -138,9 +138,11 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
-.vscode/launch.json
-
 .DS_Store
 **/.DS_Store
+
+# IDE files
+.idea/
+*.iml
 
 rslint
