@@ -99,7 +99,7 @@ var ArrayTypeRule = rule.Rule{
 	Name: "array-type",
 	// Add any additional properties or methods for the rule here
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		
+
 		parsedOptions, ok := options.(ArrayTypeOptions)
 		var defaultOption = "array"
 		var readonlyOption = "readonlyArray"
@@ -153,13 +153,8 @@ var ArrayTypeRule = rule.Rule{
 					return
 				}
 
-				fmt.Printf("output %v %v\n", count, scanner.GetTextOfNode(node))
-				count++
-
 				ctx.ReportNodeWithFixes(node, buildErrorStringArrayMessage("", GetMessageType(typeArgs1.Nodes[0]), identifier.Text), rule.RuleFixReplace(ctx.SourceFile, node, scanner.GetTextOfNode(typeArgs1.Nodes[0])+"[]"))
 			},
 		}
 	},
 }
-
-var count = 1;
