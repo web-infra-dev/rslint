@@ -9,6 +9,11 @@ import (
 	"github.com/typescript-eslint/rslint/internal/rules/class_literal_property_style"
 	"github.com/typescript-eslint/rslint/internal/rules/class_methods_use_this"
 	"github.com/typescript-eslint/rslint/internal/rules/consistent_generic_constructors"
+	"github.com/typescript-eslint/rslint/internal/rules/consistent_indexed_object_style"
+	"github.com/typescript-eslint/rslint/internal/rules/consistent_return"
+	"github.com/typescript-eslint/rslint/internal/rules/consistent_type_assertions"
+	"github.com/typescript-eslint/rslint/internal/rules/consistent_type_definitions"
+	"github.com/typescript-eslint/rslint/internal/rules/consistent_type_exports"
 	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
 	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
 	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_void_expression"
@@ -227,6 +232,16 @@ func RegisterAllTypeSriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("class-methods-use-this", class_methods_use_this.ClassMethodsUseThisRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/consistent-generic-constructors", consistent_generic_constructors.ConsistentGenericConstructorsRule)
 	GlobalRuleRegistry.Register("consistent-generic-constructors", consistent_generic_constructors.ConsistentGenericConstructorsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/consistent-indexed-object-style", consistent_indexed_object_style.ConsistentIndexedObjectStyleRule)
+	GlobalRuleRegistry.Register("consistent-indexed-object-style", consistent_indexed_object_style.ConsistentIndexedObjectStyleRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/consistent-return", consistent_return.ConsistentReturnRule)
+	GlobalRuleRegistry.Register("consistent-return", consistent_return.ConsistentReturnRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/consistent-type-assertions", consistent_type_assertions.ConsistentTypeAssertionsRule)
+	GlobalRuleRegistry.Register("consistent-type-assertions", consistent_type_assertions.ConsistentTypeAssertionsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/consistent-type-definitions", consistent_type_definitions.ConsistentTypeDefinitionsRule)
+	GlobalRuleRegistry.Register("consistent-type-definitions", consistent_type_definitions.ConsistentTypeDefinitionsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/consistent-type-exports", consistent_type_exports.ConsistentTypeExportsRule)
+	GlobalRuleRegistry.Register("consistent-type-exports", consistent_type_exports.ConsistentTypeExportsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-array-delete", no_array_delete.NoArrayDeleteRule)
 	GlobalRuleRegistry.Register("no-array-delete", no_array_delete.NoArrayDeleteRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-base-to-string", no_base_to_string.NoBaseToStringRule)
