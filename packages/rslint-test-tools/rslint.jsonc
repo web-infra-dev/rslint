@@ -1,0 +1,15 @@
+[
+  {
+    "language": "typescript",
+    "files": ["test-consistent-type-exports.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "project": ["./tsconfig.test.json"],
+        "projectService": false
+      }
+    },
+    "rules": {
+      "@typescript-eslint/consistent-type-exports": "error"
+    }
+  }
+]

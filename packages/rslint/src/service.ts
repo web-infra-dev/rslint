@@ -190,11 +190,6 @@ export class RSLintService {
       format: 'jsonline',
     };
     
-    // Debug: log what we're sending
-    if (ruleOptions) {
-      console.log('Sending ruleOptions:', JSON.stringify(ruleOptions, null, 2));
-    }
-    
     return await this.sendMessage('lint', request);
   }
 

@@ -53,12 +53,12 @@ You are tasked with creating a git commit for the newly ported rule.
    # git clean -f <files>
    ```
 
-4. **Check git status to see all changes**:
+5. **Check git status to see all changes**:
    ```bash
    git status
    ```
 
-5. **Add all files and commit**:
+6. **Add all files and commit**:
    ```bash
    # Add all changes in the repository
    git add -A

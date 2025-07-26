@@ -1,0 +1,15 @@
+[
+  {
+    "language": "typescript",
+    "files": ["test-simple.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "project": ["./tsconfig.test.json"],
+        "projectService": false
+      }
+    },
+    "rules": {
+      "no-unsafe-assignment": "error"
+    }
+  }
+]
