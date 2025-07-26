@@ -290,14 +290,29 @@ async function getTestFiles() {
 
 async function runSingleTest(testFile) {
   const testName = basename(testFile);
-  logProgress(`Starting test: ${testName}`, { testFile });
+  const startTime = Date.now();
+  
+  logProgress('Test execution started', { 
+    phase: 'test-start',
+    testName,
+    testFile 
+  });
 
   // Fetch original TypeScript ESLint sources
+  logProgress('Fetching original sources', { 
+    phase: 'fetch-start',
+    testName 
+  });
+  
   const originalSources = await fetchOriginalRule(testName);
   if (originalSources.ruleContent || originalSources.testContent) {
-    logProgress(`Fetched original sources for ${testName}`, {
+    logProgress('Original sources fetched', {
+      phase: 'fetch-complete',
+      testName,
       hasRule: !!originalSources.ruleContent,
-      hasTest: !!originalSources.testContent
+      hasTest: !!originalSources.testContent,
+      ruleSizeBytes: originalSources.ruleContent?.length || 0,
+      testSizeBytes: originalSources.testContent?.length || 0
     });
   }
 
@@ -305,8 +320,17 @@ async function runSingleTest(testFile) {
   let currentTestContent = null;
   try {
     currentTestContent = await readFile(testFile, 'utf8');
+    logProgress('Current test file read', {
+      phase: 'read-test',
+      testName,
+      sizeBytes: currentTestContent.length
+    });
   } catch (err) {
-    logProgress(`Could not read current test file: ${testName}`, { error: err.message });
+    logProgress('Failed to read current test file', { 
+      phase: 'read-test-error',
+      testName,
+      error: err.message 
+    });
   }
 
   try {
@@ -320,14 +344,21 @@ async function runSingleTest(testFile) {
     });
 
     if (result.code === 0) {
-      logProgress(`Test passed: ${testName}`);
+      const duration = Date.now() - startTime;
+      logProgress('Test passed', {
+        phase: 'test-pass',
+        testName,
+        durationMs: duration
+      });
       completedTests++;
       return true;
     } else {
-      logProgress(`Test failed: ${testName}`, {
+      logProgress('Test failed', {
+        phase: 'test-fail',
+        testName,
         exitCode: result.code,
-        stderr: result.stderr,
-        stdout: result.stdout
+        stderr: result.stderr?.slice(0, 1000),
+        stdout: result.stdout?.slice(0, 1000)
       });
 
       const testCommand = `node --import=tsx/esm --test ${testFile}`;
@@ -338,18 +369,26 @@ async function runSingleTest(testFile) {
       
       if (fixed) {
         // Retry test after fix
-        logProgress(`Retrying test after Claude CLI fix: ${testName}`);
+        logProgress('Retrying test after fix', {
+          phase: 'test-retry',
+          testName
+        });
         return await runSingleTest(testFile);
       } else {
-        logProgress(`Failed to fix test error with Claude CLI: ${testName}`);
+        logProgress('Failed to fix test error', {
+          phase: 'test-fix-failed',
+          testName
+        });
         failedTests++;
         return false;
       }
     }
   } catch (error) {
     if (error.message.includes('timed out')) {
-      logProgress(`Test timed out: ${testName}`, { 
-        timeout: TEST_TIMEOUT,
+      logProgress('Test timed out', { 
+        phase: 'test-timeout',
+        testName,
+        timeoutMs: TEST_TIMEOUT,
         error: error.message 
       });
       
@@ -359,11 +398,18 @@ async function runSingleTest(testFile) {
       const fixed = await fixErrorWithClaudeCLI(timeoutError, testCommand, originalSources, currentTestContent);
       
       if (fixed) {
-        logProgress(`Retrying test after timeout fix: ${testName}`);
+        logProgress('Retrying test after timeout fix', {
+          phase: 'test-retry-timeout',
+          testName
+        });
         return await runSingleTest(testFile);
       }
     } else {
-      logProgress(`Test error: ${testName}`, { error: error.message });
+      logProgress('Test error', { 
+        phase: 'test-error',
+        testName,
+        error: error.message 
+      });
     }
     
     failedTests++;
@@ -410,25 +456,46 @@ async function runAllTests() {
 }
 
 async function main() {
-  logProgress('Automation script started');
+  const scriptStartTime = Date.now();
+  
+  logProgress('Automation script started', {
+    phase: 'script-start',
+    pid: process.pid,
+    nodeVersion: process.version
+  });
 
   // Step 1: Build
+  logProgress('Build phase starting', { phase: 'build-phase-start' });
   const buildSuccess = await runBuild();
   
   if (!buildSuccess) {
-    logProgress('Build failed, stopping automation');
+    logProgress('Build failed, stopping automation', {
+      phase: 'build-phase-failed',
+      duration: Date.now() - scriptStartTime
+    });
     process.exit(1);
   }
 
+  logProgress('Build phase completed', { 
+    phase: 'build-phase-complete',
+    duration: Date.now() - scriptStartTime
+  });
+
   // Step 2: Run tests
+  logProgress('Test phase starting', { phase: 'test-phase-start' });
   await runAllTests();
 
+  const totalDuration = Date.now() - scriptStartTime;
   logProgress('Automation completed', {
+    phase: 'script-complete',
+    totalDurationMs: totalDuration,
+    totalDurationMinutes: Math.round(totalDuration / 60000),
     buildSuccess,
     testResults: {
       total: totalTests,
       passed: completedTests,
-      failed: failedTests
+      failed: failedTests,
+      successRate: totalTests > 0 ? Math.round((completedTests / totalTests) * 100) : 0
     }
   });
 
