@@ -1,4 +1,4 @@
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 1`] = `
+exports[`consistent-generic-constructors > invalid 1`] = `
 {
   "diagnostics": [
     {
@@ -24,7 +24,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 1`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 10`] = `
+exports[`consistent-generic-constructors > invalid 10`] = `
 {
   "diagnostics": [
     {
@@ -50,7 +50,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 10`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 11`] = `
+exports[`consistent-generic-constructors > invalid 11`] = `
 {
   "diagnostics": [
     {
@@ -76,7 +76,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 11`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 12`] = `
+exports[`consistent-generic-constructors > invalid 12`] = `
 {
   "diagnostics": [
     {
@@ -102,7 +102,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 12`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 13`] = `
+exports[`consistent-generic-constructors > invalid 13`] = `
 {
   "diagnostics": [
     {
@@ -128,7 +128,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 13`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 14`] = `
+exports[`consistent-generic-constructors > invalid 14`] = `
 {
   "diagnostics": [
     {
@@ -154,7 +154,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 14`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 15`] = `
+exports[`consistent-generic-constructors > invalid 15`] = `
 {
   "diagnostics": [
     {
@@ -180,7 +180,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 15`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 16`] = `
+exports[`consistent-generic-constructors > invalid 16`] = `
 {
   "diagnostics": [
     {
@@ -206,7 +206,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 16`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 17`] = `
+exports[`consistent-generic-constructors > invalid 17`] = `
 {
   "diagnostics": [
     {
@@ -232,7 +232,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 17`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 18`] = `
+exports[`consistent-generic-constructors > invalid 18`] = `
 {
   "diagnostics": [
     {
@@ -258,7 +258,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 18`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 19`] = `
+exports[`consistent-generic-constructors > invalid 19`] = `
 {
   "diagnostics": [
     {
@@ -284,7 +284,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 19`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 2`] = `
+exports[`consistent-generic-constructors > invalid 2`] = `
 {
   "diagnostics": [
     {
@@ -310,7 +310,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 2`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 20`] = `
+exports[`consistent-generic-constructors > invalid 20`] = `
 {
   "diagnostics": [
     {
@@ -336,7 +336,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 20`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 21`] = `
+exports[`consistent-generic-constructors > invalid 21`] = `
 {
   "diagnostics": [
     {
@@ -362,7 +362,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 21`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 22`] = `
+exports[`consistent-generic-constructors > invalid 22`] = `
 {
   "diagnostics": [
     {
@@ -388,7 +388,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 22`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 23`] = `
+exports[`consistent-generic-constructors > invalid 23`] = `
 {
   "diagnostics": [
     {
@@ -414,7 +414,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 23`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 24`] = `
+exports[`consistent-generic-constructors > invalid 24`] = `
 {
   "diagnostics": [
     {
@@ -440,7 +440,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 24`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 25`] = `
+exports[`consistent-generic-constructors > invalid 25`] = `
 {
   "diagnostics": [
     {
@@ -466,7 +466,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 25`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 26`] = `
+exports[`consistent-generic-constructors > invalid 26`] = `
 {
   "diagnostics": [
     {
@@ -492,7 +492,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 26`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 27`] = `
+exports[`consistent-generic-constructors > invalid 27`] = `
 {
   "diagnostics": [
     {
@@ -518,7 +518,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 27`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 28`] = `
+exports[`consistent-generic-constructors > invalid 28`] = `
 {
   "diagnostics": [
     {
@@ -544,7 +544,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 28`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 29`] = `
+exports[`consistent-generic-constructors > invalid 29`] = `
 {
   "diagnostics": [
     {
@@ -570,7 +570,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 29`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 3`] = `
+exports[`consistent-generic-constructors > invalid 3`] = `
 {
   "diagnostics": [
     {
@@ -596,7 +596,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 3`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 30`] = `
+exports[`consistent-generic-constructors > invalid 30`] = `
 {
   "diagnostics": [
     {
@@ -622,7 +622,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 30`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 31`] = `
+exports[`consistent-generic-constructors > invalid 31`] = `
 {
   "diagnostics": [
     {
@@ -648,7 +648,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 31`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 32`] = `
+exports[`consistent-generic-constructors > invalid 32`] = `
 {
   "diagnostics": [
     {
@@ -674,7 +674,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 32`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 33`] = `
+exports[`consistent-generic-constructors > invalid 33`] = `
 {
   "diagnostics": [
     {
@@ -700,7 +700,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 33`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 34`] = `
+exports[`consistent-generic-constructors > invalid 34`] = `
 {
   "diagnostics": [
     {
@@ -726,7 +726,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 34`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 4`] = `
+exports[`consistent-generic-constructors > invalid 4`] = `
 {
   "diagnostics": [
     {
@@ -752,7 +752,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 4`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 5`] = `
+exports[`consistent-generic-constructors > invalid 5`] = `
 {
   "diagnostics": [
     {
@@ -778,7 +778,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 5`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 6`] = `
+exports[`consistent-generic-constructors > invalid 6`] = `
 {
   "diagnostics": [
     {
@@ -804,7 +804,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 6`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 7`] = `
+exports[`consistent-generic-constructors > invalid 7`] = `
 {
   "diagnostics": [
     {
@@ -830,7 +830,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 7`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 8`] = `
+exports[`consistent-generic-constructors > invalid 8`] = `
 {
   "diagnostics": [
     {
@@ -856,7 +856,7 @@ exports[`@typescript-eslint/consistent-generic-constructors > invalid 8`] = `
 }
 `;
 
-exports[`@typescript-eslint/consistent-generic-constructors > invalid 9`] = `
+exports[`consistent-generic-constructors > invalid 9`] = `
 {
   "diagnostics": [
     {

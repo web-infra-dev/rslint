@@ -38,7 +38,7 @@ func unwrapParentheses(node *ast.Node) *ast.Node {
 	if node == nil {
 		return nil
 	}
-	
+
 	current := node
 	for current.Kind == ast.KindParenthesizedType {
 		parenthesized := current.AsParenthesizedTypeNode()
@@ -47,7 +47,7 @@ func unwrapParentheses(node *ast.Node) *ast.Node {
 			break
 		}
 	}
-	
+
 	return current
 }
 
@@ -63,8 +63,8 @@ func isWithinDeclareGlobalModule(ctx rule.RuleContext, node *ast.Node) bool {
 		if current.Kind == ast.KindModuleDeclaration {
 			moduleDecl := current.AsModuleDeclaration()
 			// Check if this is a global module declaration with declare modifier
-			if moduleDecl.Name() != nil && 
-			   ast.IsIdentifier(moduleDecl.Name()) && 
+			if moduleDecl.Name() != nil &&
+			   ast.IsIdentifier(moduleDecl.Name()) &&
 			   moduleDecl.Name().AsIdentifier().Text == "global" {
 				// Check for declare modifier
 				if moduleDecl.Modifiers() != nil {
@@ -86,39 +86,39 @@ func convertTypeToInterface(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix
 	typeAlias := node.AsTypeAliasDeclaration()
 	sourceFile := ctx.SourceFile
 	text := string(sourceFile.Text())
-	
+
 	// Get the actual type literal node, potentially unwrapping parentheses
 	actualTypeLiteral := unwrapParentheses(typeAlias.Type)
 	if actualTypeLiteral.Kind != ast.KindTypeLiteral {
 		return []rule.RuleFix{}
 	}
-	
+
 	// Find 'type' keyword
 	typeStart := int(node.Pos())
 	nameStart := int(typeAlias.Name().Pos())
-	
+
 	typeKeywordStart := -1
 	for i := typeStart; i < nameStart; i++ {
 		if i+4 <= len(text) && text[i:i+4] == "type" {
 			// Make sure it's a word boundary
-			if (i == 0 || !isIdentifierChar(text[i-1])) && 
+			if (i == 0 || !isIdentifierChar(text[i-1])) &&
 			   (i+4 >= len(text) || !isIdentifierChar(text[i+4])) {
 				typeKeywordStart = i
 				break
 			}
 		}
 	}
-	
+
 	if typeKeywordStart == -1 {
 		return []rule.RuleFix{}
 	}
-	
+
 	// Find the end position to replace from (after name/type params)
 	replaceFromPos := int(typeAlias.Name().End())
 	if typeAlias.TypeParameters != nil && len(typeAlias.TypeParameters.Nodes) > 0 {
 		replaceFromPos = int(typeAlias.TypeParameters.End())
 	}
-	
+
 	// Find the equals sign position
 	equalsStart := -1
 	equalsEnd := -1
@@ -129,7 +129,7 @@ func convertTypeToInterface(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix
 			for equalsStart > replaceFromPos && (text[equalsStart-1] == ' ' || text[equalsStart-1] == '\t') {
 				equalsStart--
 			}
-			
+
 			// Find end after equals (including trailing whitespace)
 			equalsEnd = i + 1
 			for equalsEnd < len(text) && (text[equalsEnd] == ' ' || text[equalsEnd] == '\t') {
@@ -138,10 +138,10 @@ func convertTypeToInterface(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix
 			break
 		}
 	}
-	
+
 	// Find the end positions we need
 	statementEnd := int(node.End())
-	
+
 	fixes := []rule.RuleFix{
 		// Replace 'type' with 'interface'
 		{
@@ -149,7 +149,7 @@ func convertTypeToInterface(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix
 			Range: core.TextRange{}.WithPos(typeKeywordStart).WithEnd(typeKeywordStart + 4),
 		},
 	}
-	
+
 	// Replace equals and everything up to the actual type literal
 	if equalsStart >= 0 {
 		// Replace the equals and everything up to the type (including parentheses) with just a space,
@@ -159,7 +159,7 @@ func convertTypeToInterface(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix
 			Range: core.TextRange{}.WithPos(equalsStart).WithEnd(int(typeAlias.Type.End())),
 		})
 	}
-	
+
 	// Remove everything from end of original type to end of statement (semicolon, etc.)
 	if int(typeAlias.Type.End()) < statementEnd {
 		fixes = append(fixes, rule.RuleFix{
@@ -167,7 +167,7 @@ func convertTypeToInterface(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix
 			Range: core.TextRange{}.WithPos(int(typeAlias.Type.End())).WithEnd(statementEnd),
 		})
 	}
-	
+
 	return fixes
 }
 
@@ -175,33 +175,33 @@ func convertTypeToInterface(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix
 func convertInterfaceToType(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix {
 	interfaceDecl := node.AsInterfaceDeclaration()
 	text := string(ctx.SourceFile.Text())
-	
+
 	// Find 'interface' keyword
 	nodeStart := int(node.Pos())
 	nameStart := int(interfaceDecl.Name().Pos())
-	
+
 	interfaceKeywordStart := -1
 	for i := nodeStart; i < nameStart; i++ {
 		if i+9 <= len(text) && text[i:i+9] == "interface" {
 			// Make sure it's a word boundary
-			if (i == 0 || !isIdentifierChar(text[i-1])) && 
+			if (i == 0 || !isIdentifierChar(text[i-1])) &&
 			   (i+9 >= len(text) || !isIdentifierChar(text[i+9])) {
 				interfaceKeywordStart = i
 				break
 			}
 		}
 	}
-	
+
 	if interfaceKeywordStart == -1 {
 		return []rule.RuleFix{}
 	}
-	
+
 	// Find the opening brace by searching forward from the name
 	nameEnd := int(interfaceDecl.Name().End())
 	if interfaceDecl.TypeParameters != nil && len(interfaceDecl.TypeParameters.Nodes) > 0 {
 		nameEnd = int(interfaceDecl.TypeParameters.End())
 	}
-	
+
 	// Find the opening brace
 	openBracePos := -1
 	for i := nameEnd; i < len(text); i++ {
@@ -210,14 +210,14 @@ func convertInterfaceToType(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix
 			break
 		}
 	}
-	
+
 	if openBracePos == -1 {
 		return []rule.RuleFix{} // Can't find opening brace
 	}
-	
+
 	// Find position to start replacement from (should be right after name/type params)
 	replaceFromPos := nameEnd
-	
+
 	// If we have type parameters, we need to ensure we're after the closing >
 	if interfaceDecl.TypeParameters != nil && len(interfaceDecl.TypeParameters.Nodes) > 0 {
 		// Search forward to find the closing >
@@ -228,10 +228,10 @@ func convertInterfaceToType(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix
 			}
 		}
 	}
-	
-	// Find the opening brace position  
+
+	// Find the opening brace position
 	bodyEnd := int(interfaceDecl.Members.End())
-	
+
 	// Find the actual closing brace character
 	closeBracePos := -1
 	for i := bodyEnd - 1; i >= openBracePos && i < len(text); i++ {
@@ -240,7 +240,7 @@ func convertInterfaceToType(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix
 			break
 		}
 	}
-	
+
 	fixes := []rule.RuleFix{
 		// Replace 'interface' with 'type'
 		{
@@ -248,7 +248,7 @@ func convertInterfaceToType(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix
 			Range: core.TextRange{}.WithPos(interfaceKeywordStart).WithEnd(interfaceKeywordStart + 9),
 		},
 	}
-	
+
 	// Insert ' = ' before the opening brace
 	if openBracePos >= 0 {
 		fixes = append(fixes, rule.RuleFix{
@@ -256,7 +256,7 @@ func convertInterfaceToType(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix
 			Range: core.TextRange{}.WithPos(replaceFromPos).WithEnd(openBracePos),
 		})
 	}
-	
+
 	// Handle extends clauses - convert to intersection types
 	if interfaceDecl.HeritageClauses != nil {
 		for _, clause := range interfaceDecl.HeritageClauses.Nodes {
@@ -269,7 +269,7 @@ func convertInterfaceToType(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix
 						typeText := getNodeText(ctx, heritageType)
 						intersectionText += fmt.Sprintf(" & %s", typeText)
 					}
-					
+
 					// Insert all intersection types at once after the closing brace
 					insertPos := bodyEnd
 					if closeBracePos >= 0 {
@@ -283,22 +283,22 @@ func convertInterfaceToType(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix
 			}
 		}
 	}
-	
+
 	// Handle export default interfaces by checking if the text starts with "export default"
 	interfaceNodeStart := int(node.Pos())
 	isExportDefault := false
-	
+
 	// Look backwards from interface keyword to see if we have "export default"
 	searchStart := interfaceNodeStart - 20
 	if searchStart < 0 {
 		searchStart = 0
 	}
-	
+
 	textBefore := text[searchStart:interfaceKeywordStart]
 	if strings.Contains(textBefore, "export") && strings.Contains(textBefore, "default") {
 		isExportDefault = true
 	}
-	
+
 	if isExportDefault {
 		// Find the start of "export"
 		exportStart := -1
@@ -308,20 +308,20 @@ func convertInterfaceToType(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix
 				break
 			}
 		}
-		
+
 		if exportStart >= 0 {
 			// Remove "export default " before interface
 			fixes = append(fixes, rule.RuleFix{
 				Text:  "",
 				Range: core.TextRange{}.WithPos(exportStart).WithEnd(interfaceKeywordStart),
 			})
-			
+
 			// Add export default after the type declaration
 			interfaceName := ""
 			if interfaceDecl.Name() != nil && ast.IsIdentifier(interfaceDecl.Name()) {
 				interfaceName = interfaceDecl.Name().AsIdentifier().Text
 			}
-			
+
 			insertPos := bodyEnd
 			if closeBracePos >= 0 {
 				insertPos = closeBracePos
@@ -332,7 +332,7 @@ func convertInterfaceToType(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix
 			})
 		}
 	}
-	
+
 	return fixes
 }
 
@@ -341,23 +341,31 @@ var ConsistentTypeDefinitionsRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		// Default option is "interface"
 		option := "interface"
-		
+
 		// Parse options
 		if options != nil {
-			if optsArray, ok := options.([]interface{}); ok && len(optsArray) > 0 {
-				if optStr, ok := optsArray[0].(string); ok {
-					option = optStr
+			// Handle different option formats
+			switch v := options.(type) {
+			case string:
+				// Direct string option
+				option = v
+			case []interface{}:
+				// Array format - take first element
+				if len(v) > 0 {
+					if optStr, ok := v[0].(string); ok {
+						option = optStr
+					}
 				}
 			}
 		}
-		
+
 		listeners := rule.RuleListeners{}
-		
+
 		if option == "interface" {
 			// Report type aliases with type literals that should be interfaces
 			listeners[ast.KindTypeAliasDeclaration] = func(node *ast.Node) {
 				typeAlias := node.AsTypeAliasDeclaration()
-				
+
 				// Check if the type is a type literal (object type), potentially wrapped in parentheses
 				if typeAlias.Type != nil {
 					actualType := unwrapParentheses(typeAlias.Type)
@@ -368,16 +376,14 @@ var ConsistentTypeDefinitionsRule = rule.Rule{
 					}
 				}
 			}
-		}
-		
-		if option == "type" {
+		} else if option == "type" {
 			// Report interfaces that should be type aliases
 			listeners[ast.KindInterfaceDeclaration] = func(node *ast.Node) {
 				interfaceDecl := node.AsInterfaceDeclaration()
-				
+
 				// Check if this is within a declare global module - if so, don't provide fixes
 				withinDeclareGlobal := isWithinDeclareGlobalModule(ctx, node)
-				
+
 				if withinDeclareGlobal {
 					// Report without fixes
 					ctx.ReportNode(interfaceDecl.Name(), buildTypeOverInterfaceMessage())
@@ -388,7 +394,7 @@ var ConsistentTypeDefinitionsRule = rule.Rule{
 				}
 			}
 		}
-		
+
 		return listeners
 	},
 }

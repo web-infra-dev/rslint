@@ -26,6 +26,9 @@ import (
 	"github.com/typescript-eslint/rslint/internal/rules/class_methods_use_this"
 	"github.com/typescript-eslint/rslint/internal/rules/consistent_generic_constructors"
 	"github.com/typescript-eslint/rslint/internal/rules/consistent_indexed_object_style"
+	"github.com/typescript-eslint/rslint/internal/rules/consistent_return"
+	"github.com/typescript-eslint/rslint/internal/rules/consistent_type_assertions"
+	"github.com/typescript-eslint/rslint/internal/rules/consistent_type_definitions"
 	"github.com/typescript-eslint/rslint/internal/rules/consistent_type_exports"
 	"github.com/typescript-eslint/rslint/internal/rules/consistent_type_imports"
 	"github.com/typescript-eslint/rslint/internal/rules/default_param_last"
@@ -135,6 +138,12 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		"@typescript-eslint/consistent-generic-constructors": consistent_generic_constructors.ConsistentGenericConstructorsRule,
 		"consistent-indexed-object-style":             consistent_indexed_object_style.ConsistentIndexedObjectStyleRule,
 		"@typescript-eslint/consistent-indexed-object-style": consistent_indexed_object_style.ConsistentIndexedObjectStyleRule,
+		"consistent-return":                           consistent_return.ConsistentReturnRule,
+		"@typescript-eslint/consistent-return":        consistent_return.ConsistentReturnRule,
+		"consistent-type-assertions":                  consistent_type_assertions.ConsistentTypeAssertionsRule,
+		"@typescript-eslint/consistent-type-assertions": consistent_type_assertions.ConsistentTypeAssertionsRule,
+		"consistent-type-definitions":                 consistent_type_definitions.ConsistentTypeDefinitionsRule,
+		"@typescript-eslint/consistent-type-definitions": consistent_type_definitions.ConsistentTypeDefinitionsRule,
 		"consistent-type-exports":                     consistent_type_exports.ConsistentTypeExportsRule,
 		"@typescript-eslint/consistent-type-exports":  consistent_type_exports.ConsistentTypeExportsRule,
 		"consistent-type-imports":                     consistent_type_imports.ConsistentTypeImportsRule,
@@ -325,7 +334,16 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 				return linter.ConfiguredRule{
 					Name: ruleWithConfig.Rule.Name,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return ruleWithConfig.Rule.Run(ctx, ruleWithConfig.Config.Options)
+						// Pass options directly as received - if it's wrapped in {"value": X}, unwrap it
+						options := ruleWithConfig.Config.Options
+						var finalOptions interface{} = options
+						if len(options) == 1 {
+							if val, hasValue := options["value"]; hasValue {
+								// This was a simple option that got wrapped, unwrap it
+								finalOptions = val
+							}
+						}
+						return ruleWithConfig.Rule.Run(ctx, finalOptions)
 					},
 				}
 			})

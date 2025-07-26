@@ -93,7 +93,7 @@ let foo: Foo;
           line: 2,
           column: 1,
           endLine: 2,
-          endColumn: 23,
+          endColumn: 27,
           suggestions: [
             {
               messageId: 'fixToTypeImport',
@@ -117,7 +117,7 @@ let foo: Foo;
           line: 2,
           column: 1,
           endLine: 2,
-          endColumn: 19,
+          endColumn: 23,
           suggestions: [
             {
               messageId: 'fixToTypeImport',

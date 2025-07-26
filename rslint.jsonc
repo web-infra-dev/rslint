@@ -1,7 +1,7 @@
 [
   {
     "language": "javascript", // includes typescript & javascript, we may support register other language in the future
-    "files": [], // extra files out of tsconfig.json
+    "files": ["**/*.ts"], // extra files out of tsconfig.json
     "languageOptions": {
       // enable
       "parserOptions": {
@@ -16,6 +16,8 @@
         ],
       },
     },
-    "rules": {},
+    "rules": {
+      "consistent-indexed-object-style": "error"
+    },
   },
 ]

@@ -4,8 +4,8 @@
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
-    "test": "node --import=tsx/esm --test tests/typescript-eslint/rules/*.test.ts",
-    "test:update": "node --import=tsx/esm --test --test-update-snapshots tests/typescript-eslint/rules/*.test.ts"
+    "test": "node --import=tsx/esm --test-force-exit --test-timeout 25000 --test tests/typescript-eslint/rules/*.test.ts",
+    "test:update": "node --import=tsx/esm --test --test-timeout 25000 --test-update-snapshots --test-force-exit tests/typescript-eslint/rules/*.test.ts"
   },
   "keywords": [],
   "author": "",

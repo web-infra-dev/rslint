@@ -68,7 +68,7 @@ func getMethodName(node *ast.Node) string {
 	if !ast.IsMethodDeclaration(node) {
 		return ""
 	}
-	
+
 	method := node.AsMethodDeclaration()
 	nameNode := method.Name()
 	if nameNode == nil {
@@ -98,7 +98,7 @@ func getMethodName(node *ast.Node) string {
 
 func getStaticMemberAccessValue(ctx rule.RuleContext, node *ast.Node) string {
 	var nameNode *ast.Node
-	
+
 	if ast.IsMethodDeclaration(node) {
 		nameNode = node.AsMethodDeclaration().Name()
 	} else if ast.IsPropertyDeclaration(node) {
@@ -110,11 +110,11 @@ func getStaticMemberAccessValue(ctx rule.RuleContext, node *ast.Node) string {
 	} else {
 		return ""
 	}
-	
+
 	if nameNode == nil {
 		return ""
 	}
-	
+
 	return extractPropertyName(ctx, nameNode)
 }
 
@@ -122,7 +122,7 @@ func extractPropertyName(ctx rule.RuleContext, nameNode *ast.Node) string {
 	if nameNode == nil {
 		return ""
 	}
-	
+
 	switch nameNode.Kind {
 	case ast.KindIdentifier:
 		return nameNode.AsIdentifier().Text
@@ -153,14 +153,14 @@ func isPublicField(node *ast.Node) bool {
 	if node == nil {
 		return true
 	}
-	
+
 	flags := ast.GetCombinedModifierFlags(node)
-	
+
 	// If no explicit modifier or public modifier, it's public
 	if flags&(ast.ModifierFlagsPrivate|ast.ModifierFlagsProtected) == 0 {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -168,30 +168,30 @@ func isIncludedInstanceMethod(ctx rule.RuleContext, node *ast.Node, options *Opt
 	if node == nil {
 		return false
 	}
-	
+
 	// Check if static
 	if ast.HasSyntacticModifier(node, ast.ModifierFlagsStatic) {
 		return false
 	}
-	
+
 	// Check if abstract
 	if ast.HasSyntacticModifier(node, ast.ModifierFlagsAbstract) {
 		return false
 	}
-	
+
 	// Check if constructor
 	if ast.IsConstructorDeclaration(node) {
 		return false
 	}
-	
+
 	// Skip methods with computed property names
 	if hasComputedPropertyName(node) {
 		return false
 	}
-	
+
 	// Check if method definition with constructor kind (but constructors are handled above)
 	// This check is redundant since constructors have their own node type
-	
+
 	// Check enforceForClassFields option for property declarations only
 	// Accessors (getters/setters) should always be checked
 	if ast.IsPropertyDeclaration(node) {
@@ -199,7 +199,7 @@ func isIncludedInstanceMethod(ctx rule.RuleContext, node *ast.Node, options *Opt
 			return false
 		}
 	}
-	
+
 	// Check if method is in except list
 	if len(options.ExceptMethods) > 0 {
 		name := getStaticMemberAccessValue(ctx, node)
@@ -212,13 +212,13 @@ func isIncludedInstanceMethod(ctx rule.RuleContext, node *ast.Node, options *Opt
 			}
 		}
 	}
-	
+
 	return true
 }
 
 func hasComputedPropertyName(node *ast.Node) bool {
 	var nameNode *ast.Node
-	
+
 	if ast.IsMethodDeclaration(node) {
 		nameNode = node.AsMethodDeclaration().Name()
 	} else if ast.IsPropertyDeclaration(node) {
@@ -228,13 +228,13 @@ func hasComputedPropertyName(node *ast.Node) bool {
 	} else if ast.IsSetAccessorDeclaration(node) {
 		nameNode = node.AsSetAccessorDeclaration().Name()
 	}
-	
+
 	return nameNode != nil && nameNode.Kind == ast.KindComputedPropertyName
 }
 
 func hasPrivateIdentifier(node *ast.Node) bool {
 	var nameNode *ast.Node
-	
+
 	if ast.IsMethodDeclaration(node) {
 		nameNode = node.AsMethodDeclaration().Name()
 	} else if ast.IsPropertyDeclaration(node) {
@@ -244,7 +244,7 @@ func hasPrivateIdentifier(node *ast.Node) bool {
 	} else if ast.IsSetAccessorDeclaration(node) {
 		nameNode = node.AsSetAccessorDeclaration().Name()
 	}
-	
+
 	return nameNode != nil && nameNode.Kind == ast.KindPrivateIdentifier
 }
 
@@ -252,7 +252,7 @@ func isNodeOrDescendant(ancestor *ast.Node, descendant *ast.Node) bool {
 	if ancestor == descendant {
 		return true
 	}
-	
+
 	current := descendant.Parent
 	for current != nil {
 		if current == ancestor {
@@ -331,30 +331,28 @@ var ClassMethodsUseThisRule = rule.Rule{
 		}
 
 		if options != nil {
-			if optionsSlice, ok := options.([]interface{}); ok && len(optionsSlice) > 0 {
-				if optMap, ok := optionsSlice[0].(map[string]interface{}); ok {
-					if val, exists := optMap["enforceForClassFields"]; exists {
-						if b, ok := val.(bool); ok {
-							opts.EnforceForClassFields = &b
-						}
+			if optMap, ok := options.(map[string]interface{}); ok {
+				if val, exists := optMap["enforceForClassFields"]; exists {
+					if b, ok := val.(bool); ok {
+						opts.EnforceForClassFields = &b
 					}
-					if val, exists := optMap["exceptMethods"]; exists {
-						if methods, ok := val.([]interface{}); ok {
-							opts.ExceptMethods = make([]string, len(methods))
-							for i, method := range methods {
-								if s, ok := method.(string); ok {
-									opts.ExceptMethods[i] = s
-								}
+				}
+				if val, exists := optMap["exceptMethods"]; exists {
+					if methods, ok := val.([]interface{}); ok {
+						opts.ExceptMethods = make([]string, len(methods))
+						for i, method := range methods {
+							if s, ok := method.(string); ok {
+								opts.ExceptMethods[i] = s
 							}
 						}
 					}
-					if val, exists := optMap["ignoreClassesThatImplementAnInterface"]; exists {
-						opts.IgnoreClassesThatImplementAnInterface = val
-					}
-					if val, exists := optMap["ignoreOverrideMethods"]; exists {
-						if b, ok := val.(bool); ok {
-							opts.IgnoreOverrideMethods = &b
-						}
+				}
+				if val, exists := optMap["ignoreClassesThatImplementAnInterface"]; exists {
+					opts.IgnoreClassesThatImplementAnInterface = val
+				}
+				if val, exists := optMap["ignoreOverrideMethods"]; exists {
+					if b, ok := val.(bool); ok {
+						opts.IgnoreOverrideMethods = &b
 					}
 				}
 			}
@@ -363,12 +361,23 @@ var ClassMethodsUseThisRule = rule.Rule{
 		var stack *StackInfo
 
 		pushContext := func(member *ast.Node) {
-			if member != nil && member.Parent != nil && (member.Parent.Kind == ast.KindClassDeclaration || member.Parent.Kind == ast.KindClassExpression) {
-				stack = &StackInfo{
-					Class:    member.Parent,
-					Member:   member,
-					Parent:   stack,
-					UsesThis: false,
+			if member != nil && member.Parent != nil {
+				// Check if the parent is a class declaration or expression
+				classNode := member.Parent
+				if classNode != nil && (classNode.Kind == ast.KindClassDeclaration || classNode.Kind == ast.KindClassExpression) {
+					stack = &StackInfo{
+						Class:    classNode,
+						Member:   member,
+						Parent:   stack,
+						UsesThis: false,
+					}
+				} else {
+					stack = &StackInfo{
+						Class:    nil,
+						Member:   nil,
+						Parent:   stack,
+						UsesThis: false,
+					}
 				}
 			} else {
 				stack = &StackInfo{
@@ -418,7 +427,7 @@ var ClassMethodsUseThisRule = rule.Rule{
 
 		exitFunction := func(node *ast.Node) {
 			stackContext := popContext()
-			
+
 			if shouldIgnoreMethod(stackContext, opts) {
 				return
 			}
@@ -454,7 +463,7 @@ var ClassMethodsUseThisRule = rule.Rule{
 			},
 			rule.ListenerOnExit(ast.KindMethodDeclaration): func(node *ast.Node) {
 				stackContext := popContext()
-				
+
 				if shouldIgnoreMethod(stackContext, opts) {
 					return
 				}
@@ -490,7 +499,7 @@ var ClassMethodsUseThisRule = rule.Rule{
 			},
 			rule.ListenerOnExit(ast.KindGetAccessor): func(node *ast.Node) {
 				stackContext := popContext()
-				
+
 				if shouldIgnoreMethod(stackContext, opts) {
 					return
 				}
@@ -526,7 +535,7 @@ var ClassMethodsUseThisRule = rule.Rule{
 			},
 			rule.ListenerOnExit(ast.KindSetAccessor): func(node *ast.Node) {
 				stackContext := popContext()
-				
+
 				if shouldIgnoreMethod(stackContext, opts) {
 					return
 				}

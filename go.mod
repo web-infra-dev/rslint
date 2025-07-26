@@ -3,6 +3,7 @@ module github.com/typescript-eslint/rslint
 go 1.24.1
 
 replace (
+	github.com/microsoft/typescript-go => ./typescript-go
 	github.com/microsoft/typescript-go/shim/ast => ./shim/ast
 	github.com/microsoft/typescript-go/shim/bundled => ./shim/bundled
 	github.com/microsoft/typescript-go/shim/checker => ./shim/checker
@@ -17,6 +18,7 @@ replace (
 )
 
 require (
+	github.com/fatih/color v1.18.0
 	github.com/microsoft/typescript-go/shim/ast v0.0.0
 	github.com/microsoft/typescript-go/shim/bundled v0.0.0
 	github.com/microsoft/typescript-go/shim/checker v0.0.0
@@ -34,7 +36,6 @@ require (
 )
 
 require (
-	github.com/fatih/color v1.18.0 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -45,6 +46,7 @@ require (
 require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/go-json-experiment/json v0.0.0-20250517221953-25912455fbc8 // indirect
+	github.com/gobwas/glob v0.2.3
 	github.com/microsoft/typescript-go v0.0.0-20250712173342-2b82831a05b6 // indirect
 	github.com/sourcegraph/jsonrpc2 v0.2.1
 	golang.org/x/text v0.24.0

@@ -25,7 +25,7 @@ var defaultOptions = Options{
 
 func buildAngleBracketMessage(cast string) rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "angleBracket",
+		Id:          "angle-bracket",
 		Description: fmt.Sprintf("Use '<%s>' instead of 'as %s'.", cast, cast),
 	}
 }
@@ -87,26 +87,40 @@ func buildUnexpectedObjectTypeAssertionMessage() rule.RuleMessage {
 }
 
 func isConst(node *ast.Node) bool {
-	if !ast.IsTypeReferenceNode(node) {
+	if node == nil || !ast.IsTypeReferenceNode(node) {
 		return false
 	}
 
 	typeRef := node.AsTypeReferenceNode()
+	if typeRef == nil {
+		return false
+	}
+	
 	typeName := typeRef.TypeName
+	if typeName == nil {
+		return false
+	}
 	
 	return ast.IsIdentifier(typeName) && typeName.Text() == "const"
 }
 
 func checkType(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	
 	switch node.Kind {
 	case ast.KindAnyKeyword, ast.KindUnknownKeyword:
 		return false
 	case ast.KindTypeReference:
-		typeRef := node.AsTypeReferenceNode()
-		// Ignore `as const` and `<const>`
+		// For type references, check if it's `const`
 		if isConst(node) {
-			// Allow qualified names which have dots between identifiers, `Foo.Bar`
-			return ast.IsQualifiedName(typeRef.TypeName)
+			return false
+		}
+		// Also check for qualified names with dots (e.g., Foo.Bar)
+		typeRef := node.AsTypeReferenceNode()
+		if typeRef != nil && typeRef.TypeName != nil && ast.IsQualifiedName(typeRef.TypeName) {
+			return true
 		}
 		return true
 	default:
@@ -115,68 +129,139 @@ func checkType(node *ast.Node) bool {
 }
 
 func isAsParameter(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	
 	parent := node.Parent
 	if parent == nil {
 		return false
 	}
 
+	// Direct check for common parameter contexts
 	switch parent.Kind {
 	case ast.KindNewExpression, ast.KindCallExpression, ast.KindThrowStatement:
-		return true
-	case ast.KindParameter:
 		return true
 	case ast.KindJsxExpression:
 		return true
 	case ast.KindTemplateSpan:
 		// Check if this is part of a tagged template expression
-		templateLiteral := parent.Parent
-		if templateLiteral != nil && templateLiteral.Kind == ast.KindTemplateExpression {
-			return ast.IsTaggedTemplateExpression(templateLiteral.Parent)
+		if parent.Parent != nil && parent.Parent.Kind == ast.KindTemplateExpression {
+			if parent.Parent.Parent != nil {
+				return ast.IsTaggedTemplateExpression(parent.Parent.Parent)
+			}
 		}
-		return false
-	default:
-		return false
+		return true
+	case ast.KindParameter:
+		return true
+	case ast.KindBinaryExpression:
+		// Check if this is a default parameter initialization
+		binExpr := parent.AsBinaryExpression()
+		if binExpr != nil && binExpr.OperatorToken != nil && binExpr.OperatorToken.Kind == ast.KindEqualsToken {
+			if parent.Parent != nil && parent.Parent.Kind == ast.KindParameter {
+				return true
+			}
+		}
 	}
+
+	// Special handling for optional chaining (print?.({ bar: 5 } as Foo))
+	if parent.Kind == ast.KindParenthesizedExpression {
+		grandParent := parent.Parent
+		if grandParent != nil {
+			switch grandParent.Kind {
+			case ast.KindCallExpression:
+				return true
+			case ast.KindPropertyAccessExpression:
+				// Check if this is part of an optional call chain
+				if grandParent.Parent != nil && grandParent.Parent.Kind == ast.KindCallExpression {
+					return true
+				}
+			}
+		}
+	}
+	
+	return false
 }
 
 func getTypeAnnotationText(ctx rule.RuleContext, node *ast.Node) string {
+	if node == nil || ctx.SourceFile == nil {
+		return ""
+	}
 	textRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
-	return ctx.SourceFile.Text()[textRange.Pos():textRange.End()]
+	if !textRange.IsValid() {
+		return ""
+	}
+	text := ctx.SourceFile.Text()
+	if text == "" || textRange.Pos() < 0 || textRange.End() > len(text) || textRange.Pos() >= textRange.End() {
+		return ""
+	}
+	return text[textRange.Pos():textRange.End()]
 }
 
 func getExpressionText(ctx rule.RuleContext, node *ast.Node) string {
+	if node == nil || ctx.SourceFile == nil {
+		return ""
+	}
 	textRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
-	return ctx.SourceFile.Text()[textRange.Pos():textRange.End()]
+	if !textRange.IsValid() {
+		return ""
+	}
+	text := ctx.SourceFile.Text()
+	if text == "" || textRange.Pos() < 0 || textRange.End() > len(text) || textRange.Pos() >= textRange.End() {
+		return ""
+	}
+	return text[textRange.Pos():textRange.End()]
 }
 
 func getSuggestions(ctx rule.RuleContext, node *ast.Node, isAsExpression bool, annotationMessageId, satisfiesMessageId string) []rule.RuleSuggestion {
 	var suggestions []rule.RuleSuggestion
+	if node == nil {
+		return suggestions
+	}
+	
 	var typeAnnotation *ast.Node
 	var expression *ast.Node
 
 	if isAsExpression {
 		asExpr := node.AsAsExpression()
+		if asExpr == nil {
+			return suggestions
+		}
 		typeAnnotation = asExpr.Type
 		expression = asExpr.Expression
 	} else {
 		typeAssertion := node.AsTypeAssertion()
+		if typeAssertion == nil {
+			return suggestions
+		}
 		typeAnnotation = typeAssertion.Type
 		expression = typeAssertion.Expression
+	}
+
+	if typeAnnotation == nil || expression == nil {
+		return suggestions
 	}
 
 	cast := getTypeAnnotationText(ctx, typeAnnotation)
 	
 	// Check if this is a variable declarator that can have type annotation
 	parent := node.Parent
-	if parent != nil && ast.IsVariableDeclaration(parent) {
+	if parent != nil && parent.Kind == ast.KindVariableDeclaration {
 		varDecl := parent.AsVariableDeclaration()
-		if varDecl.Type == nil {
+		if varDecl != nil && varDecl.Type == nil && varDecl.Name() != nil {
 			// Add annotation suggestion
+			annotationMsg := rule.RuleMessage{
+				Id:          annotationMessageId,
+				Description: fmt.Sprintf("Use const x: %s = ... instead.", cast),
+			}
+			if annotationMessageId == "replaceObjectTypeAssertionWithAnnotation" {
+				annotationMsg = buildReplaceObjectTypeAssertionWithAnnotationMessage(cast)
+			} else if annotationMessageId == "replaceArrayTypeAssertionWithAnnotation" {
+				annotationMsg = buildReplaceArrayTypeAssertionWithAnnotationMessage(cast)
+			}
+			
 			suggestions = append(suggestions, rule.RuleSuggestion{
-				Message: rule.RuleMessage{
-					Id:          annotationMessageId,
-					Description: fmt.Sprintf("Use const x: %s = ... instead.", cast),
-				},
+				Message: annotationMsg,
 				FixesArr: []rule.RuleFix{
 					rule.RuleFixInsertAfter(varDecl.Name(), fmt.Sprintf(": %s", cast)),
 					rule.RuleFixReplace(ctx.SourceFile, node, getExpressionText(ctx, expression)),
@@ -186,11 +271,18 @@ func getSuggestions(ctx rule.RuleContext, node *ast.Node, isAsExpression bool, a
 	}
 
 	// Always add satisfies suggestion
+	satisfiesMsg := rule.RuleMessage{
+		Id:          satisfiesMessageId,
+		Description: fmt.Sprintf("Use ... satisfies %s instead.", cast),
+	}
+	if satisfiesMessageId == "replaceObjectTypeAssertionWithSatisfies" {
+		satisfiesMsg = buildReplaceObjectTypeAssertionWithSatisfiesMessage(cast)
+	} else if satisfiesMessageId == "replaceArrayTypeAssertionWithSatisfies" {
+		satisfiesMsg = buildReplaceArrayTypeAssertionWithSatisfiesMessage(cast)
+	}
+	
 	suggestions = append(suggestions, rule.RuleSuggestion{
-		Message: rule.RuleMessage{
-			Id:          satisfiesMessageId,
-			Description: fmt.Sprintf("Use ... satisfies %s instead.", cast),
-		},
+		Message: satisfiesMsg,
 		FixesArr: []rule.RuleFix{
 			rule.RuleFixReplace(ctx.SourceFile, node, getExpressionText(ctx, expression)),
 			rule.RuleFixInsertAfter(node, fmt.Sprintf(" satisfies %s", cast)),
@@ -201,11 +293,23 @@ func getSuggestions(ctx rule.RuleContext, node *ast.Node, isAsExpression bool, a
 }
 
 func reportIncorrectAssertionType(ctx rule.RuleContext, node *ast.Node, options Options, isAsExpression bool) {
+	if node == nil {
+		return
+	}
+	
 	var typeAnnotation *ast.Node
 	if isAsExpression {
-		typeAnnotation = node.AsAsExpression().Type
+		asExpr := node.AsAsExpression()
+		if asExpr == nil {
+			return
+		}
+		typeAnnotation = asExpr.Type
 	} else {
-		typeAnnotation = node.AsTypeAssertion().Type
+		typeAssertion := node.AsTypeAssertion()
+		if typeAssertion == nil {
+			return
+		}
+		typeAnnotation = typeAssertion.Type
 	}
 
 	// If this node is `as const`, then don't report an error when style is 'never'
@@ -228,7 +332,7 @@ func reportIncorrectAssertionType(ctx rule.RuleContext, node *ast.Node, options 
 }
 
 func checkExpressionForObjectAssertion(ctx rule.RuleContext, node *ast.Node, options Options, isAsExpression bool) {
-	if options.AssertionStyle == "never" ||
+	if node == nil || options.AssertionStyle == "never" ||
 		options.ObjectLiteralTypeAssertions == "allow" {
 		return
 	}
@@ -238,15 +342,21 @@ func checkExpressionForObjectAssertion(ctx rule.RuleContext, node *ast.Node, opt
 	
 	if isAsExpression {
 		asExpr := node.AsAsExpression()
+		if asExpr == nil {
+			return
+		}
 		expression = asExpr.Expression
 		typeAnnotation = asExpr.Type
 	} else {
 		typeAssertion := node.AsTypeAssertion()
+		if typeAssertion == nil {
+			return
+		}
 		expression = typeAssertion.Expression
 		typeAnnotation = typeAssertion.Type
 	}
 
-	if !ast.IsObjectLiteralExpression(expression) {
+	if expression == nil || expression.Kind != ast.KindObjectLiteralExpression {
 		return
 	}
 
@@ -264,7 +374,7 @@ func checkExpressionForObjectAssertion(ctx rule.RuleContext, node *ast.Node, opt
 }
 
 func checkExpressionForArrayAssertion(ctx rule.RuleContext, node *ast.Node, options Options, isAsExpression bool) {
-	if options.AssertionStyle == "never" ||
+	if node == nil || options.AssertionStyle == "never" ||
 		options.ArrayLiteralTypeAssertions == "allow" {
 		return
 	}
@@ -274,15 +384,21 @@ func checkExpressionForArrayAssertion(ctx rule.RuleContext, node *ast.Node, opti
 	
 	if isAsExpression {
 		asExpr := node.AsAsExpression()
+		if asExpr == nil {
+			return
+		}
 		expression = asExpr.Expression
 		typeAnnotation = asExpr.Type
 	} else {
 		typeAssertion := node.AsTypeAssertion()
+		if typeAssertion == nil {
+			return
+		}
 		expression = typeAssertion.Expression
 		typeAnnotation = typeAssertion.Type
 	}
 
-	if !ast.IsArrayLiteralExpression(expression) {
+	if expression == nil || expression.Kind != ast.KindArrayLiteralExpression {
 		return
 	}
 

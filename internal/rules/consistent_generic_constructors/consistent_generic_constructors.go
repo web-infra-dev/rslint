@@ -17,13 +17,13 @@ func buildPreferConstructorMessage() rule.RuleMessage {
 
 func buildPreferTypeAnnotationMessage() rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "preferTypeAnnotation", 
+		Id:          "preferTypeAnnotation",
 		Description: "The generic type arguments should be specified as part of the type annotation.",
 	}
 }
 
 type lhsRhsPair struct {
-	lhs *ast.Node // The left-hand side (identifier/binding pattern)  
+	lhs *ast.Node // The left-hand side (identifier/binding pattern)
 	rhs *ast.Node // The right-hand side (initializer/value)
 }
 
@@ -142,7 +142,7 @@ func getNodeListTextWithBrackets(ctx rule.RuleContext, nodeList *ast.NodeList) s
 	}
 	// Find the opening and closing angle brackets using scanner
 	openBracketPos := nodeList.Pos() - 1
-	
+
 	// Find closing bracket after the nodeList
 	s := scanner.GetScannerForSourceFile(ctx.SourceFile, nodeList.End())
 	closeBracketPos := nodeList.End()
@@ -156,7 +156,7 @@ func getNodeListTextWithBrackets(ctx rule.RuleContext, nodeList *ast.NodeList) s
 		}
 		s.Scan()
 	}
-	
+
 	textRange := core.NewTextRange(openBracketPos, closeBracketPos)
 	return string(ctx.SourceFile.Text()[textRange.Pos():textRange.End()])
 }
@@ -186,7 +186,7 @@ func getIDToAttachAnnotation(ctx rule.RuleContext, node *ast.Node, lhsName *ast.
 		}
 		return propDecl.Name()
 	}
-	
+
 	// For binding patterns, attach after the pattern itself
 	if node.Kind == ast.KindObjectBindingPattern || node.Kind == ast.KindArrayBindingPattern {
 		return lhsName
@@ -199,7 +199,7 @@ var ConsistentGenericConstructorsRule = rule.Rule{
 	Name: "consistent-generic-constructors",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		mode := "constructor" // default
-		
+
 		// Parse options - can be a string directly or in a map
 		if options != nil {
 			if modeStr, ok := options.(string); ok {
@@ -278,7 +278,7 @@ var ConsistentGenericConstructorsRule = rule.Rule{
 					if node.Kind == ast.KindVariableDeclaration && node.Parent != nil {
 						reportNode = node.Parent // For variable declarations, report on the statement
 					}
-					
+
 					ctx.ReportNodeWithFixes(reportNode, buildPreferTypeAnnotationMessage(),
 						rule.RuleFixRemoveRange(core.NewTextRange(openBracketPos, closeBracketPos)),
 						rule.RuleFixInsertAfter(idToAttach, ": "+typeAnnotation),
@@ -286,7 +286,9 @@ var ConsistentGenericConstructorsRule = rule.Rule{
 				}
 			} else {
 				// Prefer constructor mode (default)
-				if lhsTypeAnnotation != nil && lhsTypeArgs != nil && rhsTypeArgs == nil {
+				// Check if isolatedDeclarations is enabled - if so, skip this check
+				isolatedDeclarations := ctx.Program.Options().IsolatedDeclarations.IsTrue()
+				if !isolatedDeclarations && lhsTypeAnnotation != nil && lhsTypeArgs != nil && rhsTypeArgs == nil {
 					// Type annotation has type args but constructor doesn't - move to constructor
 					hasParens := hasParenthesesAfter(ctx, callee)
 					typeArgsText := getNodeListTextWithBrackets(ctx, lhsTypeArgs)
@@ -302,7 +304,7 @@ var ConsistentGenericConstructorsRule = rule.Rule{
 							}
 							s.Scan()
 						}
-						
+
 						if colonStart != -1 {
 							fixes = append(fixes, rule.RuleFixReplaceRange(
 								core.NewTextRange(colonStart, lhsTypeAnnotation.End()),

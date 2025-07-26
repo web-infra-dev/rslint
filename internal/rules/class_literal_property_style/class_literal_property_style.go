@@ -6,7 +6,6 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/utils"
 )
 
 type propertiesInfo struct {
@@ -126,38 +125,44 @@ func extractPropertyName(ctx rule.RuleContext, nameNode *ast.Node) string {
 	// Handle computed property names
 	if nameNode.Kind == ast.KindComputedPropertyName {
 		computed := nameNode.AsComputedPropertyName()
-		if ast.IsLiteralExpression(computed.Expression) {
-			nameRange := utils.TrimNodeTextRange(ctx.SourceFile, computed.Expression)
-			text := string(ctx.SourceFile.Text()[nameRange.Pos():nameRange.End()])
-			// Remove quotes for string literals to normalize the name
-			if len(text) >= 2 && ((text[0] == '"' && text[len(text)-1] == '"') || (text[0] == '\'' && text[len(text)-1] == '\'')) {
-				return text[1 : len(text)-1]
-			}
-			return text
-		}
-		// Handle identifier expressions in computed properties
-		if computed.Expression.Kind == ast.KindIdentifier {
-			nameRange := utils.TrimNodeTextRange(ctx.SourceFile, computed.Expression)
-			return string(ctx.SourceFile.Text()[nameRange.Pos():nameRange.End()])
-		}
-		return ""
+		// For computed properties, get the name from the expression itself
+		return extractPropertyNameFromExpression(ctx, computed.Expression)
 	}
 
 	// Handle regular identifiers
 	if nameNode.Kind == ast.KindIdentifier {
-		nameRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
-		return string(ctx.SourceFile.Text()[nameRange.Pos():nameRange.End()])
+		return nameNode.AsIdentifier().Text
 	}
 
 	// Handle string literals as property names
 	if ast.IsLiteralExpression(nameNode) {
-		nameRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
-		text := string(ctx.SourceFile.Text()[nameRange.Pos():nameRange.End()])
+		text := nameNode.Text()
 		// Remove quotes for string literals to normalize the name
 		if len(text) >= 2 && ((text[0] == '"' && text[len(text)-1] == '"') || (text[0] == '\'' && text[len(text)-1] == '\'')) {
 			return text[1 : len(text)-1]
 		}
 		return text
+	}
+
+	return ""
+}
+
+func extractPropertyNameFromExpression(ctx rule.RuleContext, expr *ast.Node) string {
+	// Handle string/numeric literals
+	if ast.IsLiteralExpression(expr) {
+		text := expr.Text()
+		// Remove quotes for string literals to normalize the name
+		if len(text) >= 2 && ((text[0] == '"' && text[len(text)-1] == '"') || (text[0] == '\'' && text[len(text)-1] == '\'')) {
+			return text[1 : len(text)-1]
+		}
+		return text
+	}
+
+	// Handle identifiers (like variable references)
+	if expr.Kind == ast.KindIdentifier {
+		// For identifiers in computed properties, we return a special marker
+		// to indicate this is a dynamic property name
+		return "[" + expr.AsIdentifier().Text + "]"
 	}
 
 	return ""
@@ -204,11 +209,16 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		style := "fields" // default option
 
-		// Parse options
+		// Parse options - handle both string and array formats
 		if options != nil {
-			if optionsSlice, ok := options.([]interface{}); ok && len(optionsSlice) > 0 {
-				if s, ok := optionsSlice[0].(string); ok {
-					style = s
+			switch opts := options.(type) {
+			case string:
+				style = opts
+			case []interface{}:
+				if len(opts) > 0 {
+					if s, ok := opts[0].(string); ok {
+						style = s
+					}
 				}
 			}
 		}
@@ -217,8 +227,8 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 
 		listeners := rule.RuleListeners{}
 
+		// Only add the getter check when style is "fields"
 		if style == "fields" {
-			// When preferring fields, check getters that return literals
 			listeners[ast.KindGetAccessor] = func(node *ast.Node) {
 				getter := node.AsGetAccessorDeclaration()
 
@@ -255,51 +265,48 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 					return
 				}
 
-				name, _ := utils.GetNameFromMember(ctx.SourceFile, getter.Name())
+				name := getStaticMemberAccessValue(ctx, node)
 
 				// Check if there's a corresponding setter
 				if name != "" && node.Parent != nil {
 					members := node.Parent.Members()
 					if members != nil {
 						for _, member := range members {
-							if ast.IsSetAccessorDeclaration(member) {
-								setterName, _ := utils.GetNameFromMember(ctx.SourceFile, member.AsSetAccessorDeclaration().Name())
-								if setterName == name {
-									return // Skip if there's a setter with the same name
-								}
+							if ast.IsSetAccessorDeclaration(member) && isStaticMemberAccessOfValue(ctx, member, name) {
+								return // Skip if there's a setter with the same name
 							}
 						}
 					}
 				}
 
 				// Report with suggestion to convert to readonly field
-				nameRange := utils.TrimNodeTextRange(ctx.SourceFile, getter.Name())
-				valueRange := utils.TrimNodeTextRange(ctx.SourceFile, returnStmt.Expression)
-
-				nameText := string(ctx.SourceFile.Text()[nameRange.Pos():nameRange.End()])
-				valueText := string(ctx.SourceFile.Text()[valueRange.Pos():valueRange.End()])
-
-				isComputed := getter.Name().Kind == ast.KindComputedPropertyName
+				// For the fix text, we need to get the actual text of the name and value
+				nameNode := getter.Name()
+				var nameText string
+				if nameNode.Kind == ast.KindComputedPropertyName {
+					// For computed properties, get the full text including brackets
+					nameText = string(ctx.SourceFile.Text()[nameNode.Pos():nameNode.End()])
+				} else {
+					// For regular identifiers, just get the text
+					nameText = nameNode.Text()
+				}
+				
+				valueText := string(ctx.SourceFile.Text()[returnStmt.Expression.Pos():returnStmt.Expression.End()])
 
 				var fixText string
 				fixText += printNodeModifiers(node, "readonly")
-				if isComputed {
-					fixText += nameText // nameText already includes brackets for computed properties
-				} else {
-					fixText += nameText
-				}
+				fixText += nameText
 				fixText += fmt.Sprintf(" = %s;", valueText)
 
-				// For computed property names, report on the opening bracket
-				// For regular property names, report on the getter name
-				var reportNode *ast.Node
-				if isComputed {
-					// For computed properties, report on the bracket
-					reportNode = getter.Name()
-				} else {
-					reportNode = getter.Name()
+				// Report on the property name (node.key in TypeScript-ESLint)
+				// For computed properties, report on the inner expression rather than the bracket
+				reportNode := getter.Name()
+				if reportNode.Kind == ast.KindComputedPropertyName {
+					computed := reportNode.AsComputedPropertyName()
+					if computed.Expression != nil {
+						reportNode = computed.Expression
+					}
 				}
-
 				ctx.ReportNodeWithSuggestions(reportNode, buildPreferFieldStyleMessage(),
 					rule.RuleSuggestion{
 						Message: buildPreferFieldStyleSuggestionMessage(),
@@ -308,7 +315,9 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 						},
 					})
 			}
-		} else if style == "getters" {
+		}
+
+		if style == "getters" {
 			enterClassBody := func() {
 				propertiesInfoStack = append(propertiesInfoStack, &propertiesInfo{
 					excludeSet: make(map[string]bool),
@@ -336,26 +345,33 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 					}
 
 					// Report with suggestion to convert to getter
-					nameRange := utils.TrimNodeTextRange(ctx.SourceFile, property.Name())
-					valueRange := utils.TrimNodeTextRange(ctx.SourceFile, property.Initializer)
-
-					nameText := string(ctx.SourceFile.Text()[nameRange.Pos():nameRange.End()])
-					valueText := string(ctx.SourceFile.Text()[valueRange.Pos():valueRange.End()])
-
-					isComputed := property.Name().Kind == ast.KindComputedPropertyName
+					// Get the name and value text for the fix
+					nameNode := property.Name()
+					var nameText string
+					if nameNode.Kind == ast.KindComputedPropertyName {
+						// For computed properties, get the full text including brackets
+						nameText = string(ctx.SourceFile.Text()[nameNode.Pos():nameNode.End()])
+					} else {
+						// For regular identifiers, just get the text
+						nameText = nameNode.Text()
+					}
+					
+					valueText := string(ctx.SourceFile.Text()[property.Initializer.Pos():property.Initializer.End()])
 
 					var fixText string
 					fixText += printNodeModifiers(node, "get")
-					if isComputed {
-						fixText += nameText // nameText already includes brackets for computed properties
-					} else {
-						fixText += nameText
-					}
+					fixText += nameText
 					fixText += fmt.Sprintf("() { return %s; }", valueText)
 
-					// For computed property names, report on the entire property
+					// For computed property names, report on the inner expression rather than the bracket
 					// For regular property names, report on the property name
 					reportNode := property.Name()
+					if reportNode.Kind == ast.KindComputedPropertyName {
+						computed := reportNode.AsComputedPropertyName()
+						if computed.Expression != nil {
+							reportNode = computed.Expression
+						}
+					}
 
 					ctx.ReportNodeWithSuggestions(reportNode, buildPreferGetterStyleMessage(),
 						rule.RuleSuggestion{

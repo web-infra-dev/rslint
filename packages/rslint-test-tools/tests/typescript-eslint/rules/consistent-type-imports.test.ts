@@ -10,6 +10,25 @@ const ruleTester = new RuleTester({
   },
 });
 
+// Module declarations for test cases
+declare module 'foo' {
+  export default class Foo {
+    constructor();
+  }
+  export interface A {}
+  export interface B {}
+  export interface C {}
+  export type Type = any;
+}
+
+declare module 'bar' {
+  export default class Bar {
+    constructor();
+  }
+  export interface A {}
+  export interface B {}
+}
+
     ruleTester.run('consistent-type-imports', {
       valid: [
         `
@@ -1906,7 +1925,7 @@ import { Foo, Bar } from 'foo';
 function test(foo: Foo) {}
           `,
           errors: [
-            { column: 1, line: 3, messageId: 'someImportsAreOnlyTypes' },
+            { column: 1, line: 5, messageId: 'typeOverValue' },
           ],
           output: `
 import 'foo';
@@ -1922,7 +1941,7 @@ import { Foo, Bar } from 'foo';
 function test(foo: Foo) {}
           `,
           errors: [
-            { column: 1, line: 3, messageId: 'someImportsAreOnlyTypes' },
+            { column: 1, line: 5, messageId: 'typeOverValue' },
           ],
           output: `
 import {} from 'foo';

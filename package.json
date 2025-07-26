@@ -24,7 +24,8 @@
   "devDependencies": {
     "prettier": "3.5.0",
     "typescript": "5.8.3",
-    "@rslint/core": "workspace:*"
+    "@rslint/core": "workspace:*",
+    "tsx": "^4.20.3"
   },
   "packageManager": "pnpm@10.13.1",
   "engines": {

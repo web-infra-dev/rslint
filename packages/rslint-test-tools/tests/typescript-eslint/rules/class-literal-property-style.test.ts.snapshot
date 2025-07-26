@@ -24,6 +24,266 @@ exports[`class-literal-property-style > invalid 1`] = `
 }
 `;
 
+exports[`class-literal-property-style > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferGetterStyle",
+      "message": "Literals should be exposed using getters.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 19
+        },
+        "end": {
+          "line": 3,
+          "column": 21
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-literal-property-style > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferFieldStyle",
+      "message": "Literals should be exposed using readonly fields.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 17
+        },
+        "end": {
+          "line": 3,
+          "column": 19
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-literal-property-style > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferGetterStyle",
+      "message": "Literals should be exposed using getters.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 22
+        },
+        "end": {
+          "line": 3,
+          "column": 24
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-literal-property-style > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferFieldStyle",
+      "message": "Literals should be exposed using readonly fields.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 21
+        },
+        "end": {
+          "line": 3,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-literal-property-style > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferGetterStyle",
+      "message": "Literals should be exposed using getters.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 26
+        },
+        "end": {
+          "line": 3,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-literal-property-style > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferFieldStyle",
+      "message": "Literals should be exposed using readonly fields.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 14
+        },
+        "end": {
+          "line": 3,
+          "column": 21
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-literal-property-style > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferGetterStyle",
+      "message": "Literals should be exposed using getters.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 19
+        },
+        "end": {
+          "line": 3,
+          "column": 26
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-literal-property-style > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferGetterStyle",
+      "message": "Literals should be exposed using getters.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 20
+        },
+        "end": {
+          "line": 3,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-literal-property-style > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferGetterStyle",
+      "message": "Literals should be exposed using getters.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 24
+        },
+        "end": {
+          "line": 6,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-literal-property-style > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferGetterStyle",
+      "message": "Literals should be exposed using getters.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 20
+        },
+        "end": {
+          "line": 3,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
 exports[`class-literal-property-style > invalid 2`] = `
 {
   "diagnostics": [
@@ -113,11 +373,115 @@ exports[`class-literal-property-style > invalid 5`] = `
       "range": {
         "start": {
           "line": 3,
-          "column": 14
+          "column": 15
         },
         "end": {
           "line": 3,
-          "column": 23
+          "column": 22
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-literal-property-style > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferFieldStyle",
+      "message": "Literals should be exposed using readonly fields.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 15
+        },
+        "end": {
+          "line": 3,
+          "column": 22
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-literal-property-style > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferGetterStyle",
+      "message": "Literals should be exposed using getters.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 20
+        },
+        "end": {
+          "line": 3,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-literal-property-style > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferGetterStyle",
+      "message": "Literals should be exposed using getters.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 12
+        },
+        "end": {
+          "line": 3,
+          "column": 14
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-literal-property-style > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-literal-property-style",
+      "messageId": "preferGetterStyle",
+      "message": "Literals should be exposed using getters.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 12
+        },
+        "end": {
+          "line": 3,
+          "column": 14
         }
       }
     }

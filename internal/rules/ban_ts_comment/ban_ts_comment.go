@@ -7,6 +7,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/typescript-eslint/rslint/internal/rule"
 	"github.com/typescript-eslint/rslint/internal/utils"
 )
@@ -118,25 +119,65 @@ func execDirectiveRegEx(regex *regexp.Regexp, str string) *MatchedTSDirective {
 	}
 }
 
+var (
+	// Compile regex patterns once at package level
+	singleLinePragmaRegEx              = regexp.MustCompile(`^\/\/\/?\s*@ts-(?P<directive>check|nocheck)(?P<description>.*)$`)
+	commentDirectiveRegExSingleLine    = regexp.MustCompile(`^\/*\s*@ts-(?P<directive>expect-error|ignore)(?P<description>.*)`)
+	commentDirectiveRegExMultiLine     = regexp.MustCompile(`^\s*(?:\/|\*)*\s*@ts-(?P<directive>expect-error|ignore)(?P<description>.*)`)
+	singleLinePragmaRegExForMultiLine  = regexp.MustCompile(`^\s*(?:\/|\*)*\s*@ts-(?P<directive>check|nocheck)(?P<description>.*)`)
+)
+
 func findDirectiveInComment(commentRange ast.CommentRange, sourceText string) *MatchedTSDirective {
-	commentText := sourceText[commentRange.Pos():commentRange.End()]
-
-	singleLinePragmaRegEx := regexp.MustCompile(`^\/\/\/?\s*@ts-(?P<directive>check|nocheck)(?P<description>.*)$`)
-	commentDirectiveRegExSingleLine := regexp.MustCompile(`^\/*\s*@ts-(?P<directive>expect-error|ignore)(?P<description>.*)`)
-	commentDirectiveRegExMultiLine := regexp.MustCompile(`^\s*(?:\/|\*)*\s*@ts-(?P<directive>expect-error|ignore)(?P<description>.*)`)
-
+	// Ensure positions are within bounds
+	startPos := commentRange.Pos()
+	endPos := commentRange.End()
+	
+	if startPos < 0 || startPos >= len(sourceText) || endPos <= startPos || endPos > len(sourceText) {
+		return nil
+	}
+	
+	commentText := sourceText[startPos:endPos]
+	
 	if commentRange.Kind == ast.KindSingleLineCommentTrivia {
+		// First check for pragma comments (check/nocheck)
 		if matchedPragma := execDirectiveRegEx(singleLinePragmaRegEx, commentText); matchedPragma != nil {
 			return matchedPragma
 		}
 
-		commentValue := commentText[2:] // Remove "//"
-		return execDirectiveRegEx(commentDirectiveRegExSingleLine, commentValue)
+		// Then check for directive comments (expect-error/ignore)
+		// Single line comments should start with "//"
+		if len(commentText) >= 2 && strings.HasPrefix(commentText, "//") {
+			commentValue := commentText[2:] // Remove "//"
+			return execDirectiveRegEx(commentDirectiveRegExSingleLine, commentValue)
+		}
+		// If no "//" prefix, try matching the whole text
+		return execDirectiveRegEx(commentDirectiveRegExSingleLine, commentText)
 	}
 
-	commentValue := commentText[2 : len(commentText)-2] // Remove "/*" and "*/"
+	// Multi-line comments
+	commentValue := commentText
+	
+	// Check if the comment text includes the delimiters
+	if strings.HasPrefix(commentText, "/*") && strings.HasSuffix(commentText, "*/") {
+		// Remove "/*" and "*/" if present
+		if len(commentText) >= 4 {
+			commentValue = commentText[2 : len(commentText)-2]
+		}
+	}
+	
+	// Split into lines and check the last line
 	commentLines := strings.Split(commentValue, "\n")
+	if len(commentLines) == 0 {
+		return nil
+	}
+	
 	lastLine := commentLines[len(commentLines)-1]
+
+	// Check for pragma comments in the last line of multi-line comments
+	if matchedPragma := execDirectiveRegEx(singleLinePragmaRegExForMultiLine, lastLine); matchedPragma != nil {
+		return matchedPragma
+	}
+
 	return execDirectiveRegEx(commentDirectiveRegExMultiLine, lastLine)
 }
 
@@ -174,7 +215,7 @@ var BanTsCommentRule = rule.Rule{
 		}
 
 		descriptionFormats := make(map[string]*regexp.Regexp)
-		
+
 		directiveConfigs := map[string]DirectiveConfig{
 			"ts-expect-error": opts.TsExpectError,
 			"ts-ignore":       opts.TsIgnore,
@@ -191,42 +232,99 @@ var BanTsCommentRule = rule.Rule{
 			}
 		}
 
+		// Process a comment and report issues if needed
+		processComment := func(commentRange ast.CommentRange, sourceFile *ast.SourceFile, sourceText string, firstStatement *ast.Node) {
+			directive := findDirectiveInComment(commentRange, sourceText)
+			if directive == nil {
+				return
+			}
+
+			// Special handling for ts-nocheck: skip if it appears before the first statement
+			if directive.Directive == "nocheck" && firstStatement != nil {
+				if commentRange.End() <= firstStatement.Pos() {
+					return
+				}
+			}
+
+			directiveName := "ts-" + directive.Directive
+			config, exists := directiveConfigs[directiveName]
+			if !exists {
+				return
+			}
+
+			enabled, mode, descFormat := parseDirectiveConfig(config)
+
+			// Handle when directive is disabled (false)
+			if !enabled {
+				return
+			}
+
+			// Handle when directive is enabled (true) - should report error
+			if enabled && mode == "" {
+				// Special handling for ts-ignore
+				if directive.Directive == "ignore" {
+					// Get the comment text for the fix
+					commentText := sourceText[commentRange.Pos():commentRange.End()]
+
+					// Create suggestion to replace ts-ignore with ts-expect-error
+					suggestion := rule.RuleSuggestion{
+						Message: buildReplaceTsIgnoreWithTsExpectErrorMessage(),
+						FixesArr: []rule.RuleFix{
+							{
+								Text: strings.Replace(commentText, "@ts-ignore", "@ts-expect-error", 1),
+								Range: commentRange.TextRange,
+							},
+						},
+					}
+
+					ctx.ReportRangeWithSuggestions(commentRange.TextRange, buildTsIgnoreInsteadOfExpectErrorMessage(), suggestion)
+				} else {
+					ctx.ReportRange(commentRange.TextRange, buildTsDirectiveCommentMessage(directive.Directive))
+				}
+				return
+			}
+
+			// Handle allow-with-description mode
+			if mode == "allow-with-description" || mode == "description-format" {
+				descriptionLength := getStringLength(strings.TrimSpace(directive.Description))
+
+				// Check minimum description length
+				if descriptionLength < *opts.MinimumDescriptionLength {
+					ctx.ReportRange(commentRange.TextRange, buildTsDirectiveCommentRequiresDescriptionMessage(directive.Directive, *opts.MinimumDescriptionLength))
+					return
+				}
+
+				// Check description format if specified
+				if mode == "description-format" && descFormat != "" {
+					regex := descriptionFormats[directiveName]
+					if regex != nil && !regex.MatchString(directive.Description) {
+						ctx.ReportRange(commentRange.TextRange, buildTsDirectiveCommentDescriptionNotMatchPatternMessage(directive.Directive, descFormat))
+					}
+				}
+			}
+		}
+
 		return rule.RuleListeners{
 			ast.KindSourceFile: func(node *ast.Node) {
 				sourceFile := node.AsSourceFile()
 				sourceText := string(sourceFile.Text())
+
+				// Get the first statement in the file for ts-nocheck handling
+				var firstStatement *ast.Node
+				if sourceFile.Statements != nil && len(sourceFile.Statements.Nodes) > 0 {
+					firstStatement = sourceFile.Statements.Nodes[0]
+				}
+
+				if len(sourceText) == 0 {
+					return
+				}
+
+				// Use GetCommentsInRange to get all comments in the entire file
+				// This is more reliable than trying to scan from specific positions
+				fileRange := core.NewTextRange(0, len(sourceText))
 				
-				// Get all comments in the file by scanning the entire text
-				fileRange := utils.TrimNodeTextRange(sourceFile, node)
 				for commentRange := range utils.GetCommentsInRange(sourceFile, fileRange) {
-					directive := findDirectiveInComment(commentRange, sourceText)
-					if directive == nil {
-						continue
-					}
-					
-					directiveName := "ts-" + directive.Directive
-					config, exists := directiveConfigs[directiveName]
-					if !exists {
-						continue
-					}
-					
-					enabled, mode, format := parseDirectiveConfig(config)
-					if !enabled {
-						ctx.ReportRange(commentRange.TextRange, buildTsDirectiveCommentMessage(directive.Directive))
-						continue
-					}
-					
-					switch mode {
-					case "allow-with-description":
-						if getStringLength(strings.TrimSpace(directive.Description)) < *opts.MinimumDescriptionLength {
-							ctx.ReportRange(commentRange.TextRange, buildTsDirectiveCommentRequiresDescriptionMessage(directive.Directive, *opts.MinimumDescriptionLength))
-						}
-					case "description-format":
-						regex := descriptionFormats[directiveName]
-						if regex != nil && !regex.MatchString(directive.Description) {
-							ctx.ReportRange(commentRange.TextRange, buildTsDirectiveCommentDescriptionNotMatchPatternMessage(directive.Directive, format))
-						}
-					}
+					processComment(commentRange, sourceFile, sourceText, firstStatement)
 				}
 			},
 		}

@@ -36,7 +36,7 @@ exports[`lint api > diag snapshot 1`] = `
   ],
   "errorCount": 2,
   "fileCount": 1,
-  "ruleCount": 54
+  "ruleCount": 63
 }
 `;
 
@@ -62,6 +62,6 @@ exports[`lint api > virtual file support 1`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 54
+  "ruleCount": 63
 }
 `;

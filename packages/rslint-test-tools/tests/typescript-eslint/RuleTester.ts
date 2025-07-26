@@ -108,6 +108,8 @@ export class RuleTester {
           });
           if (diags.diagnostics?.length > 0) {
             console.error('Failed valid test case:', code);
+            console.error('Options:', JSON.stringify(options));
+            console.error('Rule config:', JSON.stringify(ruleConfig));
           }
           assert(
             diags.diagnostics?.length === 0,

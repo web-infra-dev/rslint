@@ -10,12 +10,9 @@ const os = require('os');
 // __dirname is available in CommonJS
 
 // Configuration
-const BUILD_COMMAND = 'pnpm';
-const BUILD_ARGS = ['-r', 'build'];
 const TEST_TIMEOUT = 120000; // 120 seconds (2 minutes)
 const TEST_DIR = 'packages/rslint-test-tools/tests/typescript-eslint/rules';
 const TSLINT_BASE_URL = 'https://raw.githubusercontent.com/typescript-eslint/typescript-eslint/main';
-const MAX_FIX_ATTEMPTS = 500; // Maximum attempts to fix a single test
 
 // Concurrent execution configuration
 const WORK_QUEUE_DIR = join(os.tmpdir(), 'rslint-automation');
@@ -465,99 +462,110 @@ async function runClaudeWithStreaming(prompt) {
   });
 }
 
-async function fixErrorWithClaudeCLI(errorOutput, command, originalSources = null, currentTestContent = null) {
-  let prompt = `Go into plan mode first to analyze this error and plan the fix, performing deep research into the problem and paying attention to the ts versions as a refernce but also carefully considering the go environment.\n\n`;
-
-  prompt += `Error occurred:\n\n${errorOutput}\n\n`;
-
-  if (currentTestContent) {
-    prompt += `\n--- CURRENT RSLINT TEST FILE ---\n`;
-    prompt += `\`\`\`typescript\n${currentTestContent}\n\`\`\`\n`;
-    prompt += `\n--- END CURRENT TEST ---\n\n`;
+async function validatePortWithClaudeCLI(testFile, originalSources) {
+  const testName = basename(testFile);
+  const ruleName = testName.replace('.test.ts', '');
+  
+  // Find the corresponding Go implementation
+  const goRulePath = join(__dirname, 'internal', 'rules', ruleName.replace(/-/g, '_'), ruleName.replace(/-/g, '_') + '.go');
+  let goRuleContent = null;
+  
+  try {
+    goRuleContent = await readFile(goRulePath, 'utf8');
+  } catch (err) {
+    log(`Could not find Go implementation at ${goRulePath}`, 'warning');
+    return false;
   }
 
-  if (originalSources) {
-    prompt += `\n--- ORIGINAL TYPESCRIPT-ESLINT IMPLEMENTATION ---\n`;
+  let prompt = `Your task is to validate that the Go port of a TypeScript-ESLint rule is functionally correct by comparing implementations.
 
-    if (originalSources.ruleContent) {
-      prompt += `\nOriginal rule implementation (${originalSources.ruleName}.ts) from GitHub:\n`;
-      prompt += `\`\`\`typescript\n${originalSources.ruleContent}\n\`\`\`\n`;
-    }
+FOCUS: Study the TypeScript implementation and ensure the Go version captures the same logic, edge cases, and behavior.
 
-    if (originalSources.testContent) {
-      prompt += `\nOriginal test file (${originalSources.ruleName}.test.ts) from GitHub:\n`;
-      prompt += `\`\`\`typescript\n${originalSources.testContent}\n\`\`\`\n`;
-    }
+## Rule: ${ruleName}
 
-    prompt += `\n--- END ORIGINAL SOURCES ---\n\n`;
-  }
-
-  prompt += `After analyzing in plan mode, fix the error above.
-
-IMPORTANT: 
-- ONLY edit files to fix the issue
-- Focus solely on file editing and code fixes
-- This script will handle running: ${command}
+### Original TypeScript Implementation:
 `;
 
-  log('Sending error to Claude CLI for fixing...', 'info');
+  if (originalSources && originalSources.ruleContent) {
+    prompt += `\`\`\`typescript\n${originalSources.ruleContent}\n\`\`\`\n`;
+  } else {
+    prompt += `(TypeScript implementation not available)\n`;
+  }
+
+  prompt += `\n### Go Port Implementation:
+\`\`\`go\n${goRuleContent}\n\`\`\`\n`;
+
+  if (originalSources && originalSources.testContent) {
+    prompt += `\n### Original Test Cases (for reference):
+\`\`\`typescript\n${originalSources.testContent}\n\`\`\`\n`;
+  }
+
+  // Also include the current RSLint test to see what we're testing
+  try {
+    const currentTestContent = await readFile(testFile, 'utf8');
+    prompt += `\n### Current RSLint Test:
+\`\`\`typescript\n${currentTestContent}\n\`\`\`\n`;
+  } catch (err) {
+    log(`Could not read current test file: ${err.message}`, 'warning');
+  }
+
+  prompt += `
+## Validation Tasks:
+
+1. **Core Logic Comparison**: Compare the core rule logic between TypeScript and Go implementations
+2. **Edge Case Coverage**: Ensure the Go version handles the same edge cases as TypeScript
+3. **AST Pattern Matching**: Verify the Go version correctly identifies the same AST patterns
+4. **Error Messages**: Check that error messages are consistent
+5. **Configuration Options**: Ensure rule options are handled equivalently
+6. **Type Checking**: Verify TypeScript type-aware features are properly ported
+
+## Analysis Framework:
+
+For each aspect, provide:
+- ✅ **CORRECT**: When Go implementation matches TypeScript behavior
+- ⚠️ **POTENTIAL ISSUE**: When there might be a discrepancy 
+- ❌ **INCORRECT**: When Go implementation differs from TypeScript
+
+## Output Format:
+
+Provide a structured analysis covering:
+
+### Functional Equivalence Analysis
+- Core rule logic comparison
+- Edge case handling
+- AST pattern matching
+
+### Implementation Details
+- Error message consistency  
+- Configuration option handling
+- Type checking behavior
+
+### Recommendations
+- Any fixes needed for the Go implementation
+- Missing functionality that should be added
+- Test cases that should be enhanced
+
+Focus on ensuring the Go port captures all the nuances of the original TypeScript implementation.
+`;
+
+  log(`Validating port correctness for ${ruleName}...`, 'info');
 
   try {
     const result = await runClaudeWithStreaming(prompt);
 
     if (result.code === 0) {
-      log('Claude CLI completed successfully', 'success');
+      log(`Port validation completed for ${ruleName}`, 'success');
     } else {
-      log(`Claude CLI exited with code ${result.code}`, 'error');
+      log(`Port validation failed for ${ruleName}`, 'error');
     }
 
     return result.code === 0;
   } catch (error) {
-    log(`Claude CLI error: ${error.message}`, 'error');
+    log(`Port validation error: ${error.message}`, 'error');
     return false;
   }
 }
 
-async function runBuild() {
-  log('Starting build process...', 'info');
-
-  try {
-    const result = await runCommand(BUILD_COMMAND, BUILD_ARGS, { timeout: 120000 });
-
-    if (result.code === 0) {
-      log('Build successful', 'success');
-      return true;
-    } else {
-      log(`Build failed with exit code ${result.code}`, 'error');
-      if (result.stderr) {
-        console.log(`${colors.red}Build stderr:${colors.reset}`);
-        console.log(result.stderr);
-      }
-      if (result.stdout) {
-        console.log(`${colors.yellow}Build stdout:${colors.reset}`);
-        console.log(result.stdout);
-      }
-
-      const buildCommand = `${BUILD_COMMAND} ${BUILD_ARGS.join(' ')}`;
-      const errorOutput = result.stderr || result.stdout;
-
-      // Try to fix with Claude CLI
-      const fixed = await fixErrorWithClaudeCLI(errorOutput, buildCommand);
-
-      if (fixed) {
-        // Retry build after fix
-        log('Retrying build after Claude CLI fix...', 'info');
-        return await runBuild();
-      } else {
-        log('Failed to fix build error with Claude CLI', 'error');
-        return false;
-      }
-    }
-  } catch (error) {
-    log(`Build process error: ${error.message}`, 'error');
-    return false;
-  }
-}
 
 async function getTestFiles() {
   try {
@@ -572,135 +580,53 @@ async function getTestFiles() {
   }
 }
 
-async function runSingleTest(testFile, attemptNumber = 1) {
+async function runSingleValidation(testFile) {
   const testName = basename(testFile);
   const startTime = Date.now();
 
-  logProgress('Test execution started', {
-    phase: 'test-start',
+  logProgress('Validation started', {
+    phase: 'validation-start',
     testName,
-    testFile,
-    attempt: attemptNumber,
-    maxAttempts: MAX_FIX_ATTEMPTS
+    testFile
   });
 
-  // Fetch original TypeScript ESLint sources (only on first attempt)
-  let originalSources = null;
-  let currentTestContent = null;
-
-  if (attemptNumber === 1) {
-    log('Fetching original sources from GitHub...', 'info');
-
-    originalSources = await fetchOriginalRule(testName);
-    if (originalSources.ruleContent || originalSources.testContent) {
-      log(`✓ Original sources fetched (rule: ${originalSources.ruleContent ? 'yes' : 'no'}, test: ${originalSources.testContent ? 'yes' : 'no'})`, 'success');
-    }
-  } else {
-    // Re-fetch on subsequent attempts as it might have been fixed
-    originalSources = await fetchOriginalRule(testName);
+  // Fetch original TypeScript ESLint sources
+  log('Fetching original sources from GitHub...', 'info');
+  const originalSources = await fetchOriginalRule(testName);
+  
+  if (!originalSources.ruleContent) {
+    log(`⚠️ Original TypeScript rule not found for ${testName}`, 'warning');
+    // Still proceed with validation using available sources
   }
 
-  // Always read the current RSLint test file (it might have been modified)
-  try {
-    currentTestContent = await readFile(testFile, 'utf8');
-    log(`✓ Current test file read (${currentTestContent.length} bytes)`, 'success');
-  } catch (err) {
-    log(`Failed to read current test file: ${err.message}`, 'error');
+  if (originalSources.ruleContent || originalSources.testContent) {
+    log(`✓ Original sources fetched (rule: ${originalSources.ruleContent ? 'yes' : 'no'}, test: ${originalSources.testContent ? 'yes' : 'no'})`, 'success');
   }
 
+  // Validate the port
   try {
-    const result = await runCommand('node', [
-      '--import=tsx/esm',
-      '--test',
-      testFile
-    ], {
-      timeout: TEST_TIMEOUT,
-      cwd: join(__dirname, 'packages/rslint-test-tools')
-    });
+    const validationSuccess = await validatePortWithClaudeCLI(testFile, originalSources);
+    
+    const duration = Date.now() - startTime;
 
-    if (result.code === 0) {
-      const duration = Date.now() - startTime;
-      logProgress('Test passed', {
-        phase: 'test-pass',
+    if (validationSuccess) {
+      logProgress('Validation completed', {
+        phase: 'validation-complete',
         testName,
         durationMs: duration
       });
       completedTests++;
       return true;
     } else {
-      logProgress('Test failed', {
-        phase: 'test-fail',
-        testName,
-        exitCode: result.code,
-        stderr: result.stderr?.slice(0, 1000),
-        stdout: result.stdout?.slice(0, 1000)
+      logProgress('Validation failed', {
+        phase: 'validation-fail',
+        testName
       });
-
-      const testCommand = `node --import=tsx/esm --test ${testFile}`;
-      const errorOutput = result.stderr || result.stdout;
-
-      if (attemptNumber < MAX_FIX_ATTEMPTS) {
-        // Try to fix with Claude CLI, including original sources and current test
-        log(`Attempting to fix test error (attempt ${attemptNumber}/${MAX_FIX_ATTEMPTS})...`, 'warning');
-
-        const fixed = await fixErrorWithClaudeCLI(errorOutput, testCommand, originalSources, currentTestContent);
-
-        if (fixed) {
-          // Claude thinks it fixed the issue, let's rebuild and retry
-          log('Claude completed fix attempt, rebuilding...', 'info');
-
-          // Run build again to ensure any changes are compiled
-          const buildSuccess = await runBuild();
-
-          if (!buildSuccess) {
-            log(`Build failed after fix attempt ${attemptNumber}`, 'error');
-            failedTests++;
-            return false;
-          }
-
-          // Retry test with incremented attempt number
-          log(`Retrying test after fix and rebuild...`, 'info');
-
-          return await runSingleTest(testFile, attemptNumber + 1);
-        } else {
-          log(`Claude CLI failed to fix the issue`, 'error');
-        }
-      }
-
-      // Max attempts reached or fix failed
-      log(`Test failed after ${attemptNumber} attempts`, 'error');
       failedTests++;
       return false;
     }
   } catch (error) {
-    if (error.message.includes('timed out')) {
-      log(`Test timed out after ${TEST_TIMEOUT}ms`, 'error');
-
-      const testCommand = `node --import=tsx/esm --test ${testFile}`;
-      const timeoutError = `Test timed out after ${TEST_TIMEOUT}ms`;
-
-      const fixed = await fixErrorWithClaudeCLI(timeoutError, testCommand, originalSources, currentTestContent);
-
-      if (fixed) {
-        // Claude thinks it fixed the timeout issue, let's rebuild and retry
-        log('Claude completed timeout fix attempt, rebuilding...', 'info');
-
-        // Run build again to ensure any changes are compiled
-        const buildSuccess = await runBuild();
-
-        if (!buildSuccess) {
-          log(`Build failed after timeout fix attempt`, 'error');
-          failedTests++;
-          return false;
-        }
-
-        log('Retrying test after timeout fix and rebuild...', 'info');
-        return await runSingleTest(testFile, attemptNumber + 1);
-      }
-    } else {
-      log(`Test error: ${error.message}`, 'error');
-    }
-
+    log(`Validation error: ${error.message}`, 'error');
     failedTests++;
     return false;
   }
@@ -712,7 +638,7 @@ async function runAllTests(concurrentMode = false, workerCount = DEFAULT_WORKERS
 
   if (!IS_WORKER) {
     console.log('\n' + '='.repeat(60));
-    log(`Starting test suite with ${totalTests} tests`, 'info');
+    log(`Starting port validation for ${totalTests} rules`, 'info');
     console.log('='.repeat(60));
   }
 
@@ -731,13 +657,13 @@ async function runAllTests(concurrentMode = false, workerCount = DEFAULT_WORKERS
       console.log(`\n${colors.bright}[${i + 1}/${totalTests}] ${testName}${colors.reset}`);
       console.log('-'.repeat(40));
 
-      await runSingleTest(testFile);
+      await runSingleValidation(testFile);
 
       // Show running totals
-      console.log(`\n${colors.dim}Progress: ${completedTests} passed, ${failedTests} failed, ${totalTests - completedTests - failedTests} remaining${colors.reset}`);
+      console.log(`\n${colors.dim}Progress: ${completedTests} validated, ${failedTests} failed, ${totalTests - completedTests - failedTests} remaining${colors.reset}`);
     }
 
-    logProgress('Test suite completed', {
+    logProgress('Port validation completed', {
       phase: 'script-complete',
       totalTests,
       completedTests,
@@ -829,7 +755,7 @@ async function runConcurrentTests(testFiles, workerCount) {
   completedTests = finalProgress.completed;
   failedTests = finalProgress.failed;
 
-  logProgress('Test suite completed', {
+  logProgress('Port validation completed', {
     phase: 'script-complete',
     totalTests,
     completedTests,
@@ -862,13 +788,13 @@ async function runWorker() {
     log(`Worker ${WORKER_ID}: Processing ${basename(work.test)}`, 'info');
 
     try {
-      const success = await runSingleTest(work.test);
+      const success = await runSingleValidation(work.test);
       await workQueue.completeWork(work.id, success);
 
       if (success) {
-        log(`Worker ${WORKER_ID}: Completed ${basename(work.test)} successfully`, 'success');
+        log(`Worker ${WORKER_ID}: Validated ${basename(work.test)} successfully`, 'success');
       } else {
-        log(`Worker ${WORKER_ID}: Failed ${basename(work.test)}`, 'error');
+        log(`Worker ${WORKER_ID}: Failed validation of ${basename(work.test)}`, 'error');
       }
     } catch (err) {
       log(`Worker ${WORKER_ID}: Error processing ${basename(work.test)}: ${err.message}`, 'error');
@@ -1007,18 +933,18 @@ async function runCompleteProcess() {
   const workerCount = workerCountArg ? parseInt(workerCountArg.split('=')[1]) : DEFAULT_WORKERS;
 
   if (showHelp && !IS_WORKER) {
-    console.log(`\nRSLint Automated Build & Test Runner\n\nUsage: node automate-build-test.js [options]\n\nOptions:\n  --concurrent      Run tests in parallel using multiple Claude instances\n  --workers=N       Number of parallel workers (default: ${DEFAULT_WORKERS})\n  --help, -h        Show this help message\n\nExamples:\n  node automate-build-test.js                    # Sequential execution\n  node automate-build-test.js --concurrent       # Parallel with ${DEFAULT_WORKERS} workers\n  node automate-build-test.js --concurrent --workers=8  # Parallel with 8 workers\n`);
+    console.log(`\nRSLint Port Validation Tool\n\nValidates that Go implementations correctly port TypeScript-ESLint rule logic.\n\nUsage: node automate-validate-check.js [options]\n\nOptions:\n  --concurrent      Run validations in parallel using multiple Claude instances\n  --workers=N       Number of parallel workers (default: ${DEFAULT_WORKERS})\n  --help, -h        Show this help message\n\nExamples:\n  node automate-validate-check.js                    # Sequential validation\n  node automate-validate-check.js --concurrent       # Parallel with ${DEFAULT_WORKERS} workers\n  node automate-validate-check.js --concurrent --workers=8  # Parallel with 8 workers\n`);
     process.exit(0);
   }
 
   if (!IS_WORKER) {
     console.clear();
     console.log(`${colors.bright}${colors.cyan}╔═══════════════════════════════════════════════════════════╗${colors.reset}`);
-    console.log(`${colors.bright}${colors.cyan}║          RSLint Automated Build & Test Runner             ║${colors.reset}`);
+    console.log(`${colors.bright}${colors.cyan}║          RSLint Port Validation Tool                      ║${colors.reset}`);
     console.log(`${colors.bright}${colors.cyan}╚═══════════════════════════════════════════════════════════╝${colors.reset}\n`);
 
     log(`Script started (PID: ${process.pid}, Node: ${process.version})`, 'info');
-    log(`Max fix attempts per test: ${MAX_FIX_ATTEMPTS}`, 'info');
+    log(`Validating TypeScript->Go port correctness`, 'info');
 
     if (concurrentMode) {
       log(`Running in concurrent mode with ${workerCount} workers`, 'info');
@@ -1027,20 +953,9 @@ async function runCompleteProcess() {
     log(`Worker ${WORKER_ID} started (PID: ${process.pid})`, 'info');
   }
 
-  // Step 1: Build (only for main process)
+  // Run port validation
   if (!IS_WORKER) {
-    console.log(`\n${colors.bright}=== BUILD PHASE ===${colors.reset}`);
-    const buildSuccess = await runBuild();
-
-    if (!buildSuccess) {
-      log('Build failed, stopping automation', 'error');
-      process.exit(1);
-    }
-  }
-
-  // Step 2: Run tests
-  if (!IS_WORKER) {
-    console.log(`\n${colors.bright}=== TEST PHASE ===${colors.reset}`);
+    console.log(`\n${colors.bright}=== PORT VALIDATION PHASE ===${colors.reset}`);
   }
   await runAllTests(concurrentMode, workerCount);
 
@@ -1075,10 +990,10 @@ async function main() {
   if (!IS_WORKER) {
     console.clear();
     console.log(`${colors.bright}${colors.magenta}╔═══════════════════════════════════════════════════════════╗${colors.reset}`);
-    console.log(`${colors.bright}${colors.magenta}║          RSLint 10x Automated Build & Test Runner         ║${colors.reset}`);
+    console.log(`${colors.bright}${colors.magenta}║          RSLint Port Validation Runner                    ║${colors.reset}`);
     console.log(`${colors.bright}${colors.magenta}╚═══════════════════════════════════════════════════════════╝${colors.reset}\n`);
 
-    log(`Starting ${TOTAL_RUNS} consecutive automation runs`, 'info');
+    log(`Starting ${TOTAL_RUNS} consecutive validation runs`, 'info');
     console.log('='.repeat(80));
   }
 

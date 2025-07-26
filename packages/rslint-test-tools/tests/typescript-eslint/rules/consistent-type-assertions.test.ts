@@ -10,10 +10,17 @@ const ruleTester = new RuleTester({
   },
 });
 
+// Type declarations for test cases
+declare class Generic<T> {
+  constructor();
+}
+declare type Foo = any;
+declare type A = any;
+
 ruleTester.run('consistent-type-assertions', {
   valid: [
     {
-      code: 'const x = new Generic<int>() as Foo;',
+      code: 'const x = new Generic<number>() as Foo;',
       options: [
         {
           assertionStyle: 'as',
@@ -40,7 +47,7 @@ ruleTester.run('consistent-type-assertions', {
       ],
     },
     {
-      code: "const x = 'string' as a | b;",
+      code: "const x = 'string' as string | number;",
       options: [
         {
           assertionStyle: 'as',
@@ -130,7 +137,7 @@ ruleTester.run('consistent-type-assertions', {
       ],
     },
     {
-      code: 'const x = <Foo>new Generic<int>();',
+      code: 'const x = <Foo>new Generic<number>();',
       options: [
         {
           assertionStyle: 'angle-bracket',
@@ -157,7 +164,7 @@ ruleTester.run('consistent-type-assertions', {
       ],
     },
     {
-      code: "const x = <a | b>'string';",
+      code: "const x = <string | number>'string';",
       options: [
         {
           assertionStyle: 'angle-bracket',
@@ -247,11 +254,11 @@ ruleTester.run('consistent-type-assertions', {
       ],
     },
     {
-      code: 'const x = {} as Foo<int>;',
+      code: 'const x = {} as Foo<number>;',
       options: [{ assertionStyle: 'as', objectLiteralTypeAssertions: 'allow' }],
     },
     {
-      code: 'const x = {} as a | b;',
+      code: 'const x = {} as string | number;',
       options: [{ assertionStyle: 'as', objectLiteralTypeAssertions: 'allow' }],
     },
     {
@@ -295,7 +302,7 @@ function foo() {
       options: [{ assertionStyle: 'as', objectLiteralTypeAssertions: 'allow' }],
     },
     {
-      code: 'const x = <Foo<int>>{};',
+      code: 'const x = <Foo<number>>{};',
       options: [
         {
           assertionStyle: 'angle-bracket',
@@ -304,7 +311,7 @@ function foo() {
       ],
     },
     {
-      code: 'const x = <a | b>{};',
+      code: 'const x = <string | number>{};',
       options: [
         {
           assertionStyle: 'angle-bracket',
@@ -726,7 +733,7 @@ const x = { key: 'value' } as unknown;
   ],
   invalid: [
     {
-      code: 'const x = new Generic<int>() as Foo;',
+      code: 'const x = new Generic<number>() as Foo;',
       errors: [
         {
           line: 1,
@@ -756,7 +763,7 @@ const x = { key: 'value' } as unknown;
       options: [{ assertionStyle: 'angle-bracket' }],
     },
     {
-      code: "const x = 'string' as a | b;",
+      code: "const x = 'string' as string | number;",
       errors: [
         {
           line: 1,
@@ -856,7 +863,7 @@ const x = { key: 'value' } as unknown;
       options: [{ assertionStyle: 'angle-bracket' }],
     },
     {
-      code: 'const x = <Foo>new Generic<int>();',
+      code: 'const x = <Foo>new Generic<number>();',
       errors: [
         {
           line: 1,
@@ -864,7 +871,7 @@ const x = { key: 'value' } as unknown;
         },
       ],
       options: [{ assertionStyle: 'as' }],
-      output: 'const x = new Generic<int>() as Foo;',
+      output: 'const x = new Generic<number>() as Foo;',
     },
     {
       code: 'const x = <A>b;',
@@ -889,7 +896,7 @@ const x = { key: 'value' } as unknown;
       output: 'const x = [1] as readonly number[];',
     },
     {
-      code: "const x = <a | b>'string';",
+      code: "const x = <string | number>'string';",
       errors: [
         {
           line: 1,
@@ -897,7 +904,7 @@ const x = { key: 'value' } as unknown;
         },
       ],
       options: [{ assertionStyle: 'as' }],
-      output: "const x = 'string' as a | b;",
+      output: "const x = 'string' as string | number;",
     },
     {
       code: "const x = <A>!'string';",
@@ -999,7 +1006,7 @@ const x = { key: 'value' } as unknown;
       output: "const x = { key: 'value' } as const;",
     },
     {
-      code: 'const x = new Generic<int>() as Foo;',
+      code: 'const x = new Generic<number>() as Foo;',
       errors: [
         {
           line: 1,
@@ -1029,7 +1036,7 @@ const x = { key: 'value' } as unknown;
       options: [{ assertionStyle: 'never' }],
     },
     {
-      code: "const x = 'string' as a | b;",
+      code: "const x = 'string' as string | number;",
       errors: [
         {
           line: 1,
@@ -1119,7 +1126,7 @@ const x = { key: 'value' } as unknown;
       options: [{ assertionStyle: 'never' }],
     },
     {
-      code: 'const x = <Foo>new Generic<int>();',
+      code: 'const x = <Foo>new Generic<number>();',
       errors: [
         {
           line: 1,
@@ -1149,7 +1156,7 @@ const x = { key: 'value' } as unknown;
       options: [{ assertionStyle: 'never' }],
     },
     {
-      code: "const x = <a | b>'string';",
+      code: "const x = <string | number>'string';",
       errors: [
         {
           line: 1,
@@ -1239,21 +1246,21 @@ const x = { key: 'value' } as unknown;
       options: [{ assertionStyle: 'never' }],
     },
     {
-      code: 'const x = {} as Foo<int>;',
+      code: 'const x = {} as Foo<number>;',
       errors: [
         {
           line: 1,
           messageId: 'unexpectedObjectTypeAssertion',
           suggestions: [
             {
-              data: { cast: 'Foo<int>' },
+              data: { cast: 'Foo<number>' },
               messageId: 'replaceObjectTypeAssertionWithAnnotation',
-              output: 'const x: Foo<int> = {};',
+              output: 'const x: Foo<number> = {};',
             },
             {
-              data: { cast: 'Foo<int>' },
+              data: { cast: 'Foo<number>' },
               messageId: 'replaceObjectTypeAssertionWithSatisfies',
-              output: 'const x = {} satisfies Foo<int>;',
+              output: 'const x = {} satisfies Foo<number>;',
             },
           ],
         },
@@ -1266,21 +1273,21 @@ const x = { key: 'value' } as unknown;
       ],
     },
     {
-      code: 'const x = {} as a | b;',
+      code: 'const x = {} as string | number;',
       errors: [
         {
           line: 1,
           messageId: 'unexpectedObjectTypeAssertion',
           suggestions: [
             {
-              data: { cast: 'a | b' },
+              data: { cast: 'string | number' },
               messageId: 'replaceObjectTypeAssertionWithAnnotation',
-              output: 'const x: a | b = {};',
+              output: 'const x: string | number = {};',
             },
             {
-              data: { cast: 'a | b' },
+              data: { cast: 'string | number' },
               messageId: 'replaceObjectTypeAssertionWithSatisfies',
-              output: 'const x = {} satisfies a | b;',
+              output: 'const x = {} satisfies string | number;',
             },
           ],
         },
@@ -1315,21 +1322,21 @@ const x = { key: 'value' } as unknown;
       ],
     },
     {
-      code: 'const x = <Foo<int>>{};',
+      code: 'const x = <Foo<number>>{};',
       errors: [
         {
           line: 1,
           messageId: 'unexpectedObjectTypeAssertion',
           suggestions: [
             {
-              data: { cast: 'Foo<int>' },
+              data: { cast: 'Foo<number>' },
               messageId: 'replaceObjectTypeAssertionWithAnnotation',
-              output: 'const x: Foo<int> = {};',
+              output: 'const x: Foo<number> = {};',
             },
             {
-              data: { cast: 'Foo<int>' },
+              data: { cast: 'Foo<number>' },
               messageId: 'replaceObjectTypeAssertionWithSatisfies',
-              output: 'const x = {} satisfies Foo<int>;',
+              output: 'const x = {} satisfies Foo<number>;',
             },
           ],
         },
@@ -1342,21 +1349,21 @@ const x = { key: 'value' } as unknown;
       ],
     },
     {
-      code: 'const x = <a | b>{};',
+      code: 'const x = <string | number>{};',
       errors: [
         {
           line: 1,
           messageId: 'unexpectedObjectTypeAssertion',
           suggestions: [
             {
-              data: { cast: 'a | b' },
+              data: { cast: 'string | number' },
               messageId: 'replaceObjectTypeAssertionWithAnnotation',
-              output: 'const x: a | b = {};',
+              output: 'const x: string | number = {};',
             },
             {
-              data: { cast: 'a | b' },
+              data: { cast: 'string | number' },
               messageId: 'replaceObjectTypeAssertionWithSatisfies',
-              output: 'const x = {} satisfies a | b;',
+              output: 'const x = {} satisfies string | number;',
             },
           ],
         },
@@ -1391,21 +1398,21 @@ const x = { key: 'value' } as unknown;
       ],
     },
     {
-      code: 'const x = {} as Foo<int>;',
+      code: 'const x = {} as Foo<number>;',
       errors: [
         {
           line: 1,
           messageId: 'unexpectedObjectTypeAssertion',
           suggestions: [
             {
-              data: { cast: 'Foo<int>' },
+              data: { cast: 'Foo<number>' },
               messageId: 'replaceObjectTypeAssertionWithAnnotation',
-              output: 'const x: Foo<int> = {};',
+              output: 'const x: Foo<number> = {};',
             },
             {
-              data: { cast: 'Foo<int>' },
+              data: { cast: 'Foo<number>' },
               messageId: 'replaceObjectTypeAssertionWithSatisfies',
-              output: 'const x = {} satisfies Foo<int>;',
+              output: 'const x = {} satisfies Foo<number>;',
             },
           ],
         },
@@ -1413,21 +1420,21 @@ const x = { key: 'value' } as unknown;
       options: [{ assertionStyle: 'as', objectLiteralTypeAssertions: 'never' }],
     },
     {
-      code: 'const x = {} as a | b;',
+      code: 'const x = {} as string | number;',
       errors: [
         {
           line: 1,
           messageId: 'unexpectedObjectTypeAssertion',
           suggestions: [
             {
-              data: { cast: 'a | b' },
+              data: { cast: 'string | number' },
               messageId: 'replaceObjectTypeAssertionWithAnnotation',
-              output: 'const x: a | b = {};',
+              output: 'const x: string | number = {};',
             },
             {
-              data: { cast: 'a | b' },
+              data: { cast: 'string | number' },
               messageId: 'replaceObjectTypeAssertionWithSatisfies',
-              output: 'const x = {} satisfies a | b;',
+              output: 'const x = {} satisfies string | number;',
             },
           ],
         },
@@ -1596,21 +1603,21 @@ function foo() {
       options: [{ assertionStyle: 'as', objectLiteralTypeAssertions: 'never' }],
     },
     {
-      code: 'const x = <Foo<int>>{};',
+      code: 'const x = <Foo<number>>{};',
       errors: [
         {
           line: 1,
           messageId: 'unexpectedObjectTypeAssertion',
           suggestions: [
             {
-              data: { cast: 'Foo<int>' },
+              data: { cast: 'Foo<number>' },
               messageId: 'replaceObjectTypeAssertionWithAnnotation',
-              output: 'const x: Foo<int> = {};',
+              output: 'const x: Foo<number> = {};',
             },
             {
-              data: { cast: 'Foo<int>' },
+              data: { cast: 'Foo<number>' },
               messageId: 'replaceObjectTypeAssertionWithSatisfies',
-              output: 'const x = {} satisfies Foo<int>;',
+              output: 'const x = {} satisfies Foo<number>;',
             },
           ],
         },
@@ -1623,21 +1630,21 @@ function foo() {
       ],
     },
     {
-      code: 'const x = <a | b>{};',
+      code: 'const x = <string | number>{};',
       errors: [
         {
           line: 1,
           messageId: 'unexpectedObjectTypeAssertion',
           suggestions: [
             {
-              data: { cast: 'a | b' },
+              data: { cast: 'string | number' },
               messageId: 'replaceObjectTypeAssertionWithAnnotation',
-              output: 'const x: a | b = {};',
+              output: 'const x: string | number = {};',
             },
             {
-              data: { cast: 'a | b' },
+              data: { cast: 'string | number' },
               messageId: 'replaceObjectTypeAssertionWithSatisfies',
-              output: 'const x = {} satisfies a | b;',
+              output: 'const x = {} satisfies string | number;',
             },
           ],
         },
