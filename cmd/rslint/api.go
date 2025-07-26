@@ -25,6 +25,7 @@ import (
 	"github.com/typescript-eslint/rslint/internal/rules/class_literal_property_style"
 	"github.com/typescript-eslint/rslint/internal/rules/class_methods_use_this"
 	"github.com/typescript-eslint/rslint/internal/rules/consistent_generic_constructors"
+	"github.com/typescript-eslint/rslint/internal/rules/consistent_indexed_object_style"
 	"github.com/typescript-eslint/rslint/internal/rules/consistent_type_exports"
 	"github.com/typescript-eslint/rslint/internal/rules/consistent_type_imports"
 	"github.com/typescript-eslint/rslint/internal/rules/default_param_last"
@@ -132,6 +133,8 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		"class-methods-use-this":                      class_methods_use_this.ClassMethodsUseThisRule,
 		"consistent-generic-constructors":             consistent_generic_constructors.ConsistentGenericConstructorsRule,
 		"@typescript-eslint/consistent-generic-constructors": consistent_generic_constructors.ConsistentGenericConstructorsRule,
+		"consistent-indexed-object-style":             consistent_indexed_object_style.ConsistentIndexedObjectStyleRule,
+		"@typescript-eslint/consistent-indexed-object-style": consistent_indexed_object_style.ConsistentIndexedObjectStyleRule,
 		"consistent-type-exports":                     consistent_type_exports.ConsistentTypeExportsRule,
 		"@typescript-eslint/consistent-type-exports":  consistent_type_exports.ConsistentTypeExportsRule,
 		"consistent-type-imports":                     consistent_type_imports.ConsistentTypeImportsRule,

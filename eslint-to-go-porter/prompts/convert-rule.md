@@ -91,6 +91,8 @@ Only after understanding the API structure, convert the TypeScript ESLint rule a
 
 ## Output
 
+**CRITICAL: Always work from project root directory (`/Users/bytedance/dev/rslint`)**
+
 IMPORTANT: You are working in the repository root. When examining existing rules, look in the `internal/rules` directory for examples.
 
 Please create ONLY these TWO files:

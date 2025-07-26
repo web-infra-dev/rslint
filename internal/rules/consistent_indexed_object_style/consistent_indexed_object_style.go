@@ -197,7 +197,8 @@ var ConsistentIndexedObjectStyleRule = rule.Rule{
 				}
 				
 				// For type aliases with direct self-reference, skip conversion
-				if valueText == parentName {
+				// Check if the parent type name appears anywhere in the value type (handles union types like "string | Foo")
+				if strings.Contains(valueText, parentName) {
 					// Check if this is a top-level type alias
 					parentDecl := findParentDeclaration(node)
 					if parentDecl != nil {

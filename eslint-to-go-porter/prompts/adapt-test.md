@@ -14,7 +14,11 @@ Convert this test file to work with rslint's cross-validation test framework. Yo
    ```typescript
    import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
    ```
-   Optional: Import `noFormat` if the test uses unformatted code samples
+   **CRITICAL**: Remove ALL @typescript-eslint imports:
+   - Remove `@typescript-eslint/rule-tester`
+   - Remove `@typescript-eslint/utils` 
+   - Remove `@typescript-eslint/types`
+   - Remove any other @typescript-eslint package imports
 
 2. **Remove rule import**: Remove the `import rule from '../../src/rules/...'` line since rslint runs rules by name
 
@@ -39,17 +43,24 @@ Convert this test file to work with rslint's cross-validation test framework. Yo
    });
    ```
 
-5. **Keep test cases identical**: Preserve all valid and invalid test cases exactly as they are
+5. **Simplify test structure**: Remove complex test structures:
+   - Remove `describe.for()` loops - use simple `ruleTester.run()`
+   - Remove AST_NODE_TYPES references 
+   - Remove complex parser option combinations
+   - Use standard single test structure
 
-6. **Test Case Format Notes**:
+6. **Keep test cases identical**: Preserve all valid and invalid test cases exactly as they are
+
+7. **Test Case Format Notes**:
    - Line and column numbers are 1-based (not 0-based)
    - Message IDs should be camelCase and match the rule's defined message IDs
    - Options are passed as an array: `options: [{ configOption: 'value' }]`
    - For invalid cases with fixes, include `output: 'fixed code'` or `output: null` if no fix
    - Suggestions array format: `suggestions: [{ messageId: 'suggestionId', output: 'fixed code' }]`
 
-7. **IMPORTANT**: Do NOT attempt to run, compile, or execute the test file
-8. **IMPORTANT**: Do NOT create any temporary files or debug output
+8. **IMPORTANT**: Always work from project root directory (`/Users/bytedance/dev/rslint`)
+9. **IMPORTANT**: Do NOT attempt to run, compile, or execute the test file
+10. **IMPORTANT**: Do NOT create any temporary files or debug output
 
 ## Output
 
