@@ -14,7 +14,8 @@ exports[`no-array-delete > invalid 1`] = `
           "line": 3,
           "column": 22
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -39,7 +40,8 @@ exports[`no-array-delete > invalid 10`] = `
           "line": 3,
           "column": 22
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -64,7 +66,8 @@ exports[`no-array-delete > invalid 11`] = `
           "line": 3,
           "column": 28
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -89,7 +92,8 @@ exports[`no-array-delete > invalid 12`] = `
           "line": 3,
           "column": 29
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -114,7 +118,8 @@ exports[`no-array-delete > invalid 13`] = `
           "line": 3,
           "column": 29
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -139,7 +144,8 @@ exports[`no-array-delete > invalid 14`] = `
           "line": 3,
           "column": 22
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -164,7 +170,8 @@ exports[`no-array-delete > invalid 15`] = `
           "line": 3,
           "column": 22
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -189,7 +196,8 @@ exports[`no-array-delete > invalid 16`] = `
           "line": 3,
           "column": 22
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -214,7 +222,8 @@ exports[`no-array-delete > invalid 17`] = `
           "line": 3,
           "column": 24
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -239,7 +248,8 @@ exports[`no-array-delete > invalid 18`] = `
           "line": 5,
           "column": 31
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -264,7 +274,8 @@ exports[`no-array-delete > invalid 19`] = `
           "line": 10,
           "column": 30
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -289,7 +300,8 @@ exports[`no-array-delete > invalid 2`] = `
           "line": 4,
           "column": 24
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -314,7 +326,8 @@ exports[`no-array-delete > invalid 20`] = `
           "line": 5,
           "column": 28
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -339,7 +352,8 @@ exports[`no-array-delete > invalid 21`] = `
           "line": 5,
           "column": 36
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -364,7 +378,8 @@ exports[`no-array-delete > invalid 22`] = `
           "line": 3,
           "column": 22
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -389,7 +404,8 @@ exports[`no-array-delete > invalid 3`] = `
           "line": 9,
           "column": 27
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -414,7 +430,8 @@ exports[`no-array-delete > invalid 4`] = `
           "line": 4,
           "column": 34
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -439,7 +456,8 @@ exports[`no-array-delete > invalid 5`] = `
           "line": 3,
           "column": 22
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -464,7 +482,8 @@ exports[`no-array-delete > invalid 6`] = `
           "line": 1,
           "column": 20
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -489,7 +508,8 @@ exports[`no-array-delete > invalid 7`] = `
           "line": 3,
           "column": 42
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -514,7 +534,8 @@ exports[`no-array-delete > invalid 8`] = `
           "line": 3,
           "column": 22
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,
@@ -539,7 +560,8 @@ exports[`no-array-delete > invalid 9`] = `
           "line": 3,
           "column": 22
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,

@@ -14,7 +14,8 @@ exports[`lint api > diag snapshot 1`] = `
           "line": 2,
           "column": 4
         }
-      }
+      },
+      "severity": "error"
     },
     {
       "ruleName": "no-unsafe-member-access",
@@ -29,7 +30,8 @@ exports[`lint api > diag snapshot 1`] = `
           "line": 5,
           "column": 4
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 2,
@@ -54,7 +56,8 @@ exports[`lint api > virtual file support 1`] = `
           "line": 3,
           "column": 24
         }
-      }
+      },
+      "severity": "error"
     }
   ],
   "errorCount": 1,

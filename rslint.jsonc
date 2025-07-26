@@ -16,6 +16,22 @@
         ],
       },
     },
-    "rules": {},
+    "rules": {
+      // Rule levels can be specified as strings: "error", "warn", "off"
+      "@typescript-eslint/promise-function-async": "off",
+      "@typescript-eslint/no-floating-promises": "warn",
+      "@typescript-eslint/no-unsafe-return": "error",
+      
+      // Rules can also be configured as objects with level and options
+      "@typescript-eslint/no-unsafe-assignment": {
+        "level": "warn",
+        "options": {
+          // rule-specific options would go here
+        }
+      },
+      
+      // Array format is also supported: [level, options]
+      "@typescript-eslint/no-unsafe-call": ["error", {}]
+    },
   },
 ]

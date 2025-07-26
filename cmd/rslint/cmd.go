@@ -40,6 +40,7 @@ type ColorScheme struct {
 	RuleName    func(format string, a ...interface{}) string
 	FileName    func(format string, a ...interface{}) string
 	ErrorText   func(format string, a ...interface{}) string
+	WarnText    func(format string, a ...interface{}) string
 	SuccessText func(format string, a ...interface{}) string
 	DimText     func(format string, a ...interface{}) string
 	BoldText    func(format string, a ...interface{}) string
@@ -65,6 +66,7 @@ func setupColors() *ColorScheme {
 	ruleNameColor := color.New(color.FgHiGreen).SprintfFunc()
 	fileNameColor := color.New(color.FgCyan, color.Italic).SprintfFunc()
 	errorTextColor := color.New(color.FgRed, color.Underline).SprintfFunc()
+	warnTextColor := color.New(color.FgYellow, color.Underline).SprintfFunc()
 	successColor := color.New(color.FgGreen, color.Bold).SprintfFunc()
 	dimColor := color.New(color.Faint).SprintfFunc()
 	boldColor := color.New(color.Bold).SprintfFunc()
@@ -74,6 +76,7 @@ func setupColors() *ColorScheme {
 		RuleName:    ruleNameColor,
 		FileName:    fileNameColor,
 		ErrorText:   errorTextColor,
+		WarnText:    warnTextColor,
 		SuccessText: successColor,
 		DimText:     dimColor,
 		BoldText:    boldColor,
@@ -122,6 +125,7 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 		RuleName: d.RuleName,
 		Message:  d.Message.Description,
 		FilePath: tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions),
+		Severity: d.Level.String(), // Add severity based on diagnostic level
 		Range: Range{
 			Start: Location{
 				Line:   startLine + 1, // Convert to 1-based indexing
@@ -175,9 +179,23 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	}
 	codeboxEnd := scanner.GetPositionOfLineAndCharacter(d.SourceFile, codeboxEndLine, codeboxEndColumn)
 
-	// Rule name with conditional coloring
+	// Rule name and severity with conditional coloring
 	w.WriteByte(' ')
-	w.WriteString(colors.RuleName(" %s ", d.RuleName))
+
+	// Color the severity level based on diagnostic level
+	var severityText string
+	switch d.Level {
+	case rule.DiagnosticLevelError:
+		severityText = colors.ErrorText("[%s]", d.Level.String())
+	case rule.DiagnosticLevelWarn:
+		severityText = colors.WarnText("[%s]", d.Level.String())
+	default:
+		severityText = colors.DimText("[%s]", d.Level.String())
+	}
+
+	w.WriteString(severityText)
+	w.WriteByte(' ')
+	w.WriteString(colors.RuleName("%s", d.RuleName))
 	w.WriteString(" — ")
 
 	// Message handling
@@ -517,6 +535,8 @@ func runCMD() int {
 
 	diagnosticsChan := make(chan rule.RuleDiagnostic, 4096)
 	errorsCount := 0
+	warningsCount := 0
+	totalDiagnostics := 0
 
 	wg.Add(1)
 	go func() {
@@ -524,8 +544,17 @@ func runCMD() int {
 		w := bufio.NewWriterSize(os.Stdout, 4096*100)
 		defer w.Flush()
 		for d := range diagnosticsChan {
-			errorsCount++
-			if errorsCount == 1 {
+			totalDiagnostics++
+
+			// Count errors and warnings separately
+			switch d.Level {
+			case rule.DiagnosticLevelError:
+				errorsCount++
+			case rule.DiagnosticLevelWarn:
+				warningsCount++
+			}
+
+			if totalDiagnostics == 1 {
 				w.WriteByte('\n')
 			}
 			printDiagnostic(d, w, comparePathOptions, format)
@@ -541,12 +570,11 @@ func runCMD() int {
 		files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
-			return utils.Map(activeRules, func(r rule.Rule) linter.ConfiguredRule {
+			return utils.Map(activeRules, func(r rslintconfig.ConfiguredRule) linter.ConfiguredRule {
 				return linter.ConfiguredRule{
-					Name: r.Name,
-					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return r.Run(ctx, nil)
-					},
+					Name:  r.Name,
+					Level: r.Level,
+					Run:   r.Run,
 				}
 			})
 		},
@@ -565,16 +593,30 @@ func runCMD() int {
 
 	colors := setupColors()
 	var errorsColorFunc func(string, ...interface{}) string
+	var warningsColorFunc func(string, ...interface{}) string
+
 	if errorsCount == 0 {
 		errorsColorFunc = colors.SuccessText
 	} else {
-		errorsColorFunc = colors.BoldText
+		errorsColorFunc = colors.ErrorText
+	}
+
+	if warningsCount == 0 {
+		warningsColorFunc = colors.DimText
+	} else {
+		warningsColorFunc = colors.WarnText
 	}
 
 	errorsText := "errors"
 	if errorsCount == 1 {
 		errorsText = "error"
 	}
+
+	warningsText := "warnings"
+	if warningsCount == 1 {
+		warningsText = "warning"
+	}
+
 	filesText := "files"
 	if len(files) == 1 {
 		filesText = "file"
@@ -583,19 +625,39 @@ func runCMD() int {
 	if !singleThreaded {
 		threadsCount = runtime.GOMAXPROCS(0)
 	}
+
 	if format == "default" {
-		fmt.Fprintf(
-			os.Stdout,
-			"Found %s %s %s(linted %s %s with in %s using %s threads)%s\n",
-			errorsColorFunc("%d", errorsCount),
-			errorsText,
-			colors.DimText(""),
-			colors.BoldText("%d", len(files)),
-			filesText,
-			colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
-			colors.BoldText("%d", threadsCount),
-			color.New().SprintFunc()(""), // Reset
-		)
+		if totalDiagnostics == 0 {
+			fmt.Fprintf(
+				os.Stdout,
+				"Found %s (linted %s %s with in %s using %s threads)%s\n",
+				colors.SuccessText("no problems"),
+				colors.BoldText("%d", len(files)),
+				filesText,
+				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
+				colors.BoldText("%d", threadsCount),
+				color.New().SprintFunc()(""), // Reset
+			)
+		} else {
+			var parts []string
+			if errorsCount > 0 {
+				parts = append(parts, fmt.Sprintf("%s %s", errorsColorFunc("%d", errorsCount), errorsText))
+			}
+			if warningsCount > 0 {
+				parts = append(parts, fmt.Sprintf("%s %s", warningsColorFunc("%d", warningsCount), warningsText))
+			}
+
+			fmt.Fprintf(
+				os.Stdout,
+				"Found %s (linted %s %s with in %s using %s threads)%s\n",
+				strings.Join(parts, " and "),
+				colors.BoldText("%d", len(files)),
+				filesText,
+				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
+				colors.BoldText("%d", threadsCount),
+				color.New().SprintFunc()(""), // Reset
+			)
+		}
 	}
 
 	// Exit with non-zero status code if errors were found

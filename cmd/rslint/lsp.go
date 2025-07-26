@@ -543,10 +543,9 @@ func runLint(uri string) ([]rule.RuleDiagnostic, error) {
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			return utils.Map(rules, func(r rule.Rule) linter.ConfiguredRule {
 				return linter.ConfiguredRule{
-					Name: r.Name,
-					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return r.Run(ctx, nil)
-					},
+					Name:  r.Name,
+					Level: rule.DiagnosticLevelError, // Default to error for LSP mode
+					Run:   r.Run,
 				}
 			})
 		},

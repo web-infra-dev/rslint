@@ -83,8 +83,9 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 			func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 				return []linter.ConfiguredRule{
 					{
-						Name: "test",
-						Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						Name:  "test",
+						Level: rule.DiagnosticLevelError, // Default to error for testing
+						Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 							return r.Run(ctx, options)
 						},
 					},

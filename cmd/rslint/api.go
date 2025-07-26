@@ -230,6 +230,7 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 			RuleName: d.RuleName,
 			Message:  d.Message.Description,
 			FilePath: tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions),
+			Severity: d.Level.String(), // Add severity based on diagnostic level
 			Range: ipc.Range{
 				Start: ipc.Position{
 					Line:   startLine + 1, // Convert to 1-based indexing
@@ -254,10 +255,9 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			return utils.Map(rules, func(r rule.Rule) linter.ConfiguredRule {
 				return linter.ConfiguredRule{
-					Name: r.Name,
-					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return r.Run(ctx, nil)
-					},
+					Name:  r.Name,
+					Level: rule.DiagnosticLevelError, // Default to error for API mode
+					Run:   r.Run,
 				}
 			})
 		},

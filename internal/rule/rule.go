@@ -8,6 +8,43 @@ import (
 	"github.com/typescript-eslint/rslint/internal/utils"
 )
 
+// DiagnosticLevel represents the severity level of a diagnostic
+type DiagnosticLevel int
+
+const (
+	DiagnosticLevelOff DiagnosticLevel = iota
+	DiagnosticLevelWarn
+	DiagnosticLevelError
+)
+
+// String returns the string representation of the diagnostic level
+func (level DiagnosticLevel) String() string {
+	switch level {
+	case DiagnosticLevelOff:
+		return "off"
+	case DiagnosticLevelWarn:
+		return "warn"
+	case DiagnosticLevelError:
+		return "error"
+	default:
+		return "error" // Default to error
+	}
+}
+
+// ParseDiagnosticLevel parses a string into a DiagnosticLevel
+func ParseDiagnosticLevel(level string) DiagnosticLevel {
+	switch level {
+	case "off":
+		return DiagnosticLevelOff
+	case "warn", "warning":
+		return DiagnosticLevelWarn
+	case "error":
+		return DiagnosticLevelError
+	default:
+		return DiagnosticLevelError // Default to error
+	}
+}
+
 const (
 	lastTokenKind                        ast.Kind = 1000
 	lastOnExitTokenKind                  ast.Kind = 2000
@@ -88,6 +125,7 @@ type RuleDiagnostic struct {
 	Range    core.TextRange
 	RuleName string
 	Message  RuleMessage
+	Level    DiagnosticLevel // The severity level of this diagnostic
 	// nil if no fixes were provided
 	FixesPtr *[]RuleFix
 	// nil if no suggestions were provided

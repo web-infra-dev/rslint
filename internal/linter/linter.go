@@ -11,9 +11,12 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 )
 
+// ConfiguredRule represents a rule with its configuration level
+// Note: This is duplicated from config package to avoid circular import
 type ConfiguredRule struct {
-	Name string
-	Run  func(ctx rule.RuleContext) rule.RuleListeners
+	Name  string
+	Level rule.DiagnosticLevel
+	Run   func(ctx rule.RuleContext, options any) rule.RuleListeners
 }
 
 func RunLinter(programs []*compiler.Program, singleThreaded bool, files []*ast.SourceFile, getRulesForFile func(sourceFile *ast.SourceFile) []ConfiguredRule, onDiagnostic func(diagnostic rule.RuleDiagnostic)) error {
@@ -35,6 +38,11 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, files []*ast.S
 				for file := range queue {
 					rules := getRulesForFile(file)
 					for _, r := range rules {
+						// Skip rules that are turned off
+						if r.Level == rule.DiagnosticLevelOff {
+							continue
+						}
+
 						ctx := rule.RuleContext{
 							SourceFile:  file,
 							Program:     program,
@@ -44,6 +52,7 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, files []*ast.S
 									RuleName:   r.Name,
 									Range:      textRange,
 									Message:    msg,
+									Level:      r.Level,
 									SourceFile: file,
 								})
 							},
@@ -52,6 +61,7 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, files []*ast.S
 									RuleName:    r.Name,
 									Range:       textRange,
 									Message:     msg,
+									Level:       r.Level,
 									Suggestions: &suggestions,
 									SourceFile:  file,
 								})
@@ -61,6 +71,7 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, files []*ast.S
 									RuleName:   r.Name,
 									Range:      utils.TrimNodeTextRange(file, node),
 									Message:    msg,
+									Level:      r.Level,
 									SourceFile: file,
 								})
 							},
@@ -69,6 +80,7 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, files []*ast.S
 									RuleName:   r.Name,
 									Range:      utils.TrimNodeTextRange(file, node),
 									Message:    msg,
+									Level:      r.Level,
 									FixesPtr:   &fixes,
 									SourceFile: file,
 								})
@@ -79,13 +91,14 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, files []*ast.S
 									RuleName:    r.Name,
 									Range:       utils.TrimNodeTextRange(file, node),
 									Message:     msg,
+									Level:       r.Level,
 									Suggestions: &suggestions,
 									SourceFile:  file,
 								})
 							},
 						}
 
-						for kind, listener := range r.Run(ctx) {
+						for kind, listener := range r.Run(ctx, nil) { // Pass nil for options for now
 							listeners, ok := registeredListeners[kind]
 							if !ok {
 								listeners = make([](func(node *ast.Node)), 0, len(rules))
