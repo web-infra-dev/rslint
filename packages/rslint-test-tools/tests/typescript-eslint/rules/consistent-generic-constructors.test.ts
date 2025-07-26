@@ -10,7 +10,7 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('@typescript-eslint/consistent-generic-constructors', {
+ruleTester.run('consistent-generic-constructors', {
   valid: [
     // default: constructor
     'const a = new Foo();',

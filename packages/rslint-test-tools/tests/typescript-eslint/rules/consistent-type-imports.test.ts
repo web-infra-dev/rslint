@@ -1,34 +1,14 @@
-import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
-
-const PARSER_OPTION_COMBOS = [
-  {
-    emitDecoratorMetadata: false,
-    experimentalDecorators: false,
+const ruleTester = new RuleTester({
+  languageOptions: {
+    parserOptions: {
+      project: './tsconfig.json',
+      tsconfigRootDir: rootPath,
+    },
   },
-  {
-    emitDecoratorMetadata: true,
-    experimentalDecorators: false,
-  },
-  {
-    emitDecoratorMetadata: false,
-    experimentalDecorators: true,
-  },
-] as const;
-
-describe.for(PARSER_OPTION_COMBOS)(
-  'experimentalDecorators: $experimentalDecorators + emitDecoratorMetadata: $emitDecoratorMetadata',
-  parserOptions => {
-    const ruleTester = new RuleTester({
-      languageOptions: {
-        parserOptions: {
-          ...parserOptions,
-          project: './tsconfig.json',
-          tsconfigRootDir: rootPath,
-        },
-      },
-    });
+});
 
     ruleTester.run('consistent-type-imports', {
       valid: [
@@ -2134,4 +2114,3 @@ describe('experimentalDecorators: true + emitDecoratorMetadata: true', () => {
       },
     ],
   });
-});

@@ -41,6 +41,10 @@ export class ClaudePorter {
       join(process.cwd(), 'prompts', 'git-commit.md'),
       'utf-8'
     );
+    this.registerRuleTemplate = await readFile(
+      join(process.cwd(), 'prompts', 'register-rule.md'),
+      'utf-8'
+    );
   }
 
   setProgressMode(showProgress: boolean): void {
@@ -127,7 +131,7 @@ export class ClaudePorter {
   }
 
   private runClaude(prompt: string, systemPrompt: string): Promise<{responses: ClaudeResponse[], exitCode: number}> {
-    return this.runClaudeInDirectory(prompt, systemPrompt, '/Users/bytedance/dev/rslint/internal/rules');
+    return this.runClaudeInDirectory(prompt, systemPrompt, '/Users/bytedance/dev/rslint');
   }
 
   async portRule(ruleName: string, ruleSource: string, testSource: string = ''): Promise<PortingResult> {
@@ -154,7 +158,7 @@ export class ClaudePorter {
     const prompt = this.preparePrompt(ruleName, ruleSource, testSource);
     const { responses, exitCode } = await this.runClaude(
       prompt,
-      `You are an expert at converting TypeScript ESLint rules to Go. You are working in the /Users/bytedance/dev/rslint/internal/rules directory. Create the rule implementation and test files in the appropriate subdirectory. Do NOT attempt to run, compile, or execute any Go code. The original TypeScript rule source is available at ${tsRulePath} for reference. Focus only on creating the rule and test files - rule registration will be handled separately.`
+      `You are an expert at converting TypeScript ESLint rules to Go. You are working in the /Users/bytedance/dev/rslint project root directory. Create the rule implementation and test files in the internal/rules subdirectory. Do NOT attempt to run, compile, or execute any Go code. The original TypeScript rule source is available at ${tsRulePath} for reference. Focus only on creating the rule and test files - rule registration will be handled separately.`
     );
 
     if (exitCode !== 0) {
@@ -215,7 +219,7 @@ export class ClaudePorter {
 
     const { responses, exitCode } = await this.runClaude(
       prompt,
-      'You are reviewing a Go rule conversion. Read the file, verify it is correct, and either respond with "VERIFIED" or provide the corrected code. IMPORTANT: Do NOT attempt to run, compile, or execute any Go code during verification.'
+      'You are reviewing a Go rule conversion. You are working in the /Users/bytedance/dev/rslint project root directory. Read the file, verify it is correct, and either respond with "VERIFIED" or provide the corrected code. IMPORTANT: Do NOT attempt to run, compile, or execute any Go code during verification.'
     );
 
     if (exitCode !== 0) {
@@ -239,7 +243,7 @@ export class ClaudePorter {
 
     const { responses, exitCode } = await this.runClaude(
       prompt,
-      'You are fixing a Go rule that is failing tests. Analyze the test output and provide the corrected Go code.'
+      'You are fixing a Go rule that is failing tests. You are working in the /Users/bytedance/dev/rslint project root directory. Analyze the test output and provide the corrected Go code.'
     );
 
     if (exitCode !== 0) {
@@ -342,8 +346,8 @@ export class ClaudePorter {
 
     const { responses, exitCode } = await this.runClaudeInDirectory(
       prompt,
-      'You are adapting a TypeScript ESLint test file to work with rslint cross-validation framework. You are working in the /Users/bytedance/dev/rslint/packages/rslint-test-tools/tests/typescript-eslint/rules directory. Only access files within this test directory. Create the adapted test file and do NOT attempt to run or execute any code.',
-      '/Users/bytedance/dev/rslint/packages/rslint-test-tools/tests/typescript-eslint/rules'
+      'You are adapting a TypeScript ESLint test file to work with rslint cross-validation framework. You are working from the /Users/bytedance/dev/rslint project root directory. Create the adapted test file in packages/rslint-test-tools/tests/typescript-eslint/rules/ and do NOT attempt to run or execute any code.',
+      '/Users/bytedance/dev/rslint'
     );
 
     if (exitCode !== 0) {
@@ -374,8 +378,8 @@ export class ClaudePorter {
 
     const { responses, exitCode } = await this.runClaudeInDirectory(
       prompt,
-      'You are running cross-validation tests to ensure the Go rule behaves identically to the TypeScript ESLint rule. You are working in the /Users/bytedance/dev/rslint/packages/rslint-test-tools directory. Run the tests and report the results. Do NOT attempt to modify rule implementations.',
-      '/Users/bytedance/dev/rslint/packages/rslint-test-tools'
+      'You are running cross-validation tests to ensure the Go rule behaves identically to the TypeScript ESLint rule. You are working from the /Users/bytedance/dev/rslint project root directory. Run the tests and report the results. Do NOT attempt to modify rule implementations.',
+      '/Users/bytedance/dev/rslint'
     );
 
     if (exitCode !== 0) {
@@ -415,7 +419,7 @@ export class ClaudePorter {
 
     const { responses, exitCode } = await this.runClaudeInDirectory(
       prompt,
-      'You are creating a git commit for the newly ported rule. You are working in the /Users/bytedance/dev/rslint directory. IMPORTANT: First check if the rule is registered in cmd/rslint/{cmd,api,lsp}.go files. If not, add the imports and rule entries. Then add ALL files with git add -A and create a clean commit. Do NOT push the commit.',
+      'You are creating a git commit for the newly ported rule. You are working in the /Users/bytedance/dev/rslint project root directory. IMPORTANT: First verify the rule is registered in internal/config/config.go with BOTH namespaced and non-namespaced versions. Then add ALL files with git add -A and create a clean commit. Do NOT push the commit.',
       '/Users/bytedance/dev/rslint'
     );
 
