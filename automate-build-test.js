@@ -375,17 +375,37 @@ async function runAllTests() {
   const testFiles = await getTestFiles();
   totalTests = testFiles.length;
   
-  logProgress('Starting test suite', { totalTests });
+  logProgress('Starting test suite', { 
+    phase: 'start',
+    totalTests,
+    testFiles: testFiles.map(f => basename(f))
+  });
 
-  for (const testFile of testFiles) {
+  for (let i = 0; i < testFiles.length; i++) {
+    const testFile = testFiles[i];
+    logProgress('Test progress', {
+      phase: 'progress',
+      current: i + 1,
+      total: totalTests,
+      currentTest: basename(testFile),
+      completed: completedTests,
+      failed: failedTests
+    });
+    
     await runSingleTest(testFile);
   }
 
   logProgress('Test suite completed', {
+    phase: 'complete',
     totalTests,
     completedTests,
     failedTests,
-    successRate: totalTests > 0 ? Math.round((completedTests / totalTests) * 100) : 0
+    successRate: totalTests > 0 ? Math.round((completedTests / totalTests) * 100) : 0,
+    summary: {
+      passed: completedTests,
+      failed: failedTests,
+      total: totalTests
+    }
   });
 }
 
