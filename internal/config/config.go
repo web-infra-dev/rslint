@@ -14,6 +14,7 @@ import (
 	"github.com/typescript-eslint/rslint/internal/rules/consistent_type_assertions"
 	"github.com/typescript-eslint/rslint/internal/rules/consistent_type_definitions"
 	"github.com/typescript-eslint/rslint/internal/rules/consistent_type_exports"
+	"github.com/typescript-eslint/rslint/internal/rules/consistent_type_imports"
 	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
 	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
 	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_void_expression"
@@ -242,6 +243,8 @@ func RegisterAllTypeSriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("consistent-type-definitions", consistent_type_definitions.ConsistentTypeDefinitionsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/consistent-type-exports", consistent_type_exports.ConsistentTypeExportsRule)
 	GlobalRuleRegistry.Register("consistent-type-exports", consistent_type_exports.ConsistentTypeExportsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/consistent-type-imports", consistent_type_imports.ConsistentTypeImportsRule)
+	GlobalRuleRegistry.Register("consistent-type-imports", consistent_type_imports.ConsistentTypeImportsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-array-delete", no_array_delete.NoArrayDeleteRule)
 	GlobalRuleRegistry.Register("no-array-delete", no_array_delete.NoArrayDeleteRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-base-to-string", no_base_to_string.NoBaseToStringRule)
