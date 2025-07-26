@@ -143,5 +143,6 @@ vite.config.ts.timestamp-*
 .DS_Store
 **/.DS_Store
 
+rslint
 # IntelliJ IDEA
 .idea/
