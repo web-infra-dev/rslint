@@ -314,44 +314,40 @@ Options:
 `
 
 // read config and deserialize the jsonc result
-func loadRslintConfig(configPath string, currentDirectory string, fs vfs.FS) (rslintconfig.RslintConfig, string) {
+func loadRslintConfig(configPath string, currentDirectory string, fs vfs.FS) (rslintconfig.RslintConfig, string, error) {
 	configFileName := tspath.ResolvePath(currentDirectory, configPath)
 	if !fs.FileExists(configFileName) {
-		fmt.Fprintf(os.Stderr, "error: rslint config file %q doesn't exist\n", configFileName)
-		os.Exit(1)
+		return nil, "", fmt.Errorf("rslint config file %q doesn't exist", configFileName)
 	}
 
 	data, ok := fs.ReadFile(configFileName)
 	if !ok {
-		fmt.Fprintf(os.Stderr, "error reading rslint config file %q\n", configFileName)
-		os.Exit(1)
+		return nil, "", fmt.Errorf("error reading rslint config file %q", configFileName)
 	}
 
 	var config rslintconfig.RslintConfig
 	// Use JSONC parser to support comments and trailing commas
 	if err := utils.ParseJSONC([]byte(data), &config); err != nil {
-		fmt.Fprintf(os.Stderr, "error parsing rslint config file %q: %v\n", configFileName, err)
-		os.Exit(1)
+		return nil, "", fmt.Errorf("error parsing rslint config file %q: %v", configFileName, err)
 	}
 	currentDirectory = tspath.GetDirectoryPath(configFileName)
-	return config, currentDirectory
+	return config, currentDirectory, nil
 }
-func loadTsConfigFromRslintConfig(rslintConfig rslintconfig.RslintConfig, currentDirectory string, fs vfs.FS) []string {
+func loadTsConfigFromRslintConfig(rslintConfig rslintconfig.RslintConfig, currentDirectory string, fs vfs.FS) ([]string, error) {
 	tsConfig := []string{}
 	for _, entry := range rslintConfig {
+		if entry.LanguageOptions != nil && entry.LanguageOptions.ParserOptions != nil {
+			for _, config := range entry.LanguageOptions.ParserOptions.Project {
+				tsconfigPath := tspath.ResolvePath(currentDirectory, config)
 
-		for _, config := range entry.LanguageOptions.ParserOptions.Project {
-			tsconfigPath := tspath.ResolvePath(currentDirectory, config)
-
-			if !fs.FileExists(tsconfigPath) {
-				fmt.Fprintf(os.Stderr, "error: tsconfig file %q doesn't exist\n", tsconfigPath)
-				os.Exit(1)
+				if !fs.FileExists(tsconfigPath) {
+					return nil, fmt.Errorf("tsconfig file %q doesn't exist", tsconfigPath)
+				}
+				tsConfig = append(tsConfig, tsconfigPath)
 			}
-			tsConfig = append(tsConfig, tsconfigPath)
-
 		}
 	}
-	return tsConfig
+	return tsConfig, nil
 }
 func runCMD() int {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
@@ -446,8 +442,17 @@ func runCMD() int {
 	var tsConfigs []string
 	// Load rslint configuration and determine which rules to enable
 	if config != "" {
-		rslintConfig, cwd = loadRslintConfig(config, currentDirectory, fs)
-		tsConfigs = loadTsConfigFromRslintConfig(rslintConfig, cwd, fs)
+		var err error
+		rslintConfig, cwd, err = loadRslintConfig(config, currentDirectory, fs)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+		tsConfigs, err = loadTsConfigFromRslintConfig(rslintConfig, cwd, fs)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
 	} else {
 		// Try to load default config files in order of preference
 		defaultConfigs := []string{"rslint.json", "rslint.jsonc"}
@@ -455,8 +460,17 @@ func runCMD() int {
 		for _, defaultConfig := range defaultConfigs {
 			defaultConfigPath := tspath.ResolvePath(currentDirectory, defaultConfig)
 			if fs.FileExists(defaultConfigPath) {
-				rslintConfig, cwd = loadRslintConfig(defaultConfig, currentDirectory, fs)
-				tsConfigs = loadTsConfigFromRslintConfig(rslintConfig, cwd, fs)
+				var err error
+				rslintConfig, cwd, err = loadRslintConfig(defaultConfig, currentDirectory, fs)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: %v\n", err)
+					return 1
+				}
+				tsConfigs, err = loadTsConfigFromRslintConfig(rslintConfig, cwd, fs)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "error: %v\n", err)
+					return 1
+				}
 				configLoaded = true
 				break
 			}

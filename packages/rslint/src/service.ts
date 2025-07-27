@@ -32,7 +32,8 @@ export interface LintResponse {
 
 export interface LintOptions {
   files?: string[];
-  tsconfig?: string;
+  config?: string;                   // Path to rslint.json config file
+  tsconfig?: string;                 // Deprecated: Use config instead
   workingDirectory?: string;
   ruleOptions?: Record<string, string>;
   fileContents?: Record<string, string>; // Map of file paths to their contents for VFS
@@ -174,15 +175,29 @@ export class RSLintService {
    * Run the linter on specified files
    */
   async lint(options: LintOptions = {}): Promise<LintResponse> {
-    const { files, tsconfig, workingDirectory, ruleOptions, fileContents } =
+    const { files, config, tsconfig, workingDirectory, ruleOptions, fileContents } =
       options;
+    
+    // Handle backward compatibility: if tsconfig is provided but config is not, issue a warning
+    let configToUse = config;
+    let tsconfigToUse = undefined;
+    
+    if (tsconfig && !config) {
+      console.warn('Warning: The "tsconfig" parameter is deprecated. Please use "config" parameter with rslint.json instead.');
+      // For backward compatibility, we'll use the tsconfig parameter directly
+      tsconfigToUse = tsconfig;
+    } else if (config) {
+      configToUse = config;
+    }
+    
     // Send handshake
     await this.sendMessage('handshake', { version: '1.0.0' });
 
     // Send lint request
     return await this.sendMessage('lint', {
       files,
-      tsconfig,
+      config: configToUse,
+      tsconfig: tsconfigToUse, // Send both parameters to backend
       workingDirectory,
       ruleOptions,
       fileContents,

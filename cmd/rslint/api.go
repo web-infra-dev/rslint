@@ -15,6 +15,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	ipc "github.com/typescript-eslint/rslint/internal/api"
+	rslintconfig "github.com/typescript-eslint/rslint/internal/config"
 	"github.com/typescript-eslint/rslint/internal/linter"
 	"github.com/typescript-eslint/rslint/internal/rule"
 	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
@@ -65,9 +66,17 @@ type IPCHandler struct{}
 
 // HandleLint handles lint requests in IPC mode
 func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) {
-	var tsconfig string
-	if req.TSConfig != "" {
-		tsconfig = req.TSConfig
+	var configPath string
+	var useLegacyTsConfig bool
+	
+	if req.Config != "" {
+		configPath = req.Config
+	} else if req.TSConfig != "" {
+		// Handle legacy tsconfig parameter
+		useLegacyTsConfig = true
+		configPath = req.TSConfig // We'll use this directly as tsconfig
+	} else {
+		configPath = "rslint.json" // Default to rslint.json
 	}
 
 	// Format is not used for IPC mode as we return structured data
@@ -94,116 +103,156 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		fs = utils.NewOverlayVFS(fs, req.FileContents)
 	}
 
-	// Handle tsconfig
-	var configFileName string
-	if tsconfig == "" {
-		configFileName = tspath.ResolvePath(currentDirectory, "tsconfig.json")
-		if !fs.FileExists(configFileName) {
-			fs = utils.NewOverlayVFS(fs, map[string]string{
-				configFileName: "{}",
-			})
+	var rslintConfig rslintconfig.RslintConfig
+	var cwd string
+	var tsConfigs []string
+
+	if useLegacyTsConfig {
+		// Legacy mode: create a minimal rslint configuration from tsconfig parameter
+		tsConfigPath := tspath.ResolvePath(currentDirectory, configPath)
+		if !fs.FileExists(tsConfigPath) {
+			return nil, fmt.Errorf("error: tsconfig %q doesn't exist", configPath)
 		}
+		
+		// Create a minimal rslint config with the provided tsconfig
+		rslintConfig = rslintconfig.RslintConfig{
+			{
+				Language: "javascript",
+				Files:    []string{},
+				LanguageOptions: &rslintconfig.LanguageOptions{
+					ParserOptions: &rslintconfig.ParserOptions{
+						ProjectService: false,
+						Project:        []string{configPath},
+					},
+				},
+				Rules:   make(map[string]interface{}),
+				Plugins: []string{"@typescript-eslint"},
+			},
+		}
+		cwd = currentDirectory
+		tsConfigs = []string{tsConfigPath}
 	} else {
-		configFileName = tspath.ResolvePath(currentDirectory, tsconfig)
-		if !fs.FileExists(configFileName) {
-			return nil, fmt.Errorf("error: tsconfig %q doesn't exist", tsconfig)
+		// Load rslint configuration (like in CLI mode)
+		rslintConfig, cwd, err = loadRslintConfig(configPath, currentDirectory, fs)
+		if err != nil {
+			return nil, fmt.Errorf("error loading rslint config: %w", err)
+		}
+		currentDirectory = cwd
+
+		// Extract tsconfig paths from rslint configuration
+		tsConfigs, err = loadTsConfigFromRslintConfig(rslintConfig, currentDirectory, fs)
+		if err != nil {
+			return nil, fmt.Errorf("error loading TypeScript configuration from rslint config: %w", err)
+		}
+
+		if len(tsConfigs) == 0 {
+			return nil, fmt.Errorf("no TypeScript configuration found in rslint config")
 		}
 	}
-	currentDirectory = tspath.GetDirectoryPath(configFileName)
 
-	// Create rules
-	var rules = []rule.Rule{
-		await_thenable.AwaitThenableRule,
-		no_array_delete.NoArrayDeleteRule,
-		no_base_to_string.NoBaseToStringRule,
-		no_confusing_void_expression.NoConfusingVoidExpressionRule,
-		no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule,
-		no_floating_promises.NoFloatingPromisesRule,
-		no_for_in_array.NoForInArrayRule,
-		no_implied_eval.NoImpliedEvalRule,
-		no_meaningless_void_operator.NoMeaninglessVoidOperatorRule,
-		no_misused_promises.NoMisusedPromisesRule,
-		no_misused_spread.NoMisusedSpreadRule,
-		no_mixed_enums.NoMixedEnumsRule,
-		no_redundant_type_constituents.NoRedundantTypeConstituentsRule,
-		no_unnecessary_boolean_literal_compare.NoUnnecessaryBooleanLiteralCompareRule,
-		no_unnecessary_template_expression.NoUnnecessaryTemplateExpressionRule,
-		no_unnecessary_type_arguments.NoUnnecessaryTypeArgumentsRule,
-		no_unnecessary_type_assertion.NoUnnecessaryTypeAssertionRule,
-		no_unsafe_argument.NoUnsafeArgumentRule,
-		no_unsafe_assignment.NoUnsafeAssignmentRule,
-		no_unsafe_call.NoUnsafeCallRule,
-		no_unsafe_enum_comparison.NoUnsafeEnumComparisonRule,
-		no_unsafe_member_access.NoUnsafeMemberAccessRule,
-		no_unsafe_return.NoUnsafeReturnRule,
-		no_unsafe_type_assertion.NoUnsafeTypeAssertionRule,
-		no_unsafe_unary_minus.NoUnsafeUnaryMinusRule,
-		non_nullable_type_assertion_style.NonNullableTypeAssertionStyleRule,
-		only_throw_error.OnlyThrowErrorRule,
-		prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
-		prefer_reduce_type_parameter.PreferReduceTypeParameterRule,
-		prefer_return_this_type.PreferReturnThisTypeRule,
-		promise_function_async.PromiseFunctionAsyncRule,
-		related_getter_setter_pairs.RelatedGetterSetterPairsRule,
-		require_array_sort_compare.RequireArraySortCompareRule,
-		require_await.RequireAwaitRule,
-		restrict_plus_operands.RestrictPlusOperandsRule,
-		restrict_template_expressions.RestrictTemplateExpressionsRule,
-		return_await.ReturnAwaitRule,
-		switch_exhaustiveness_check.SwitchExhaustivenessCheckRule,
-		unbound_method.UnboundMethodRule,
-		use_unknown_in_catch_callback_variable.UseUnknownInCatchCallbackVariableRule,
-	}
-
-	// filter rule based on request.RuleOptions
-	if len(req.RuleOptions) > 0 {
-		filteredRules := []rule.Rule{}
-		for _, r := range rules {
-			if _, ok := req.RuleOptions[r.Name]; ok {
-				filteredRules = append(filteredRules, r)
-			}
-		}
-		rules = filteredRules
-	}
-
-	// Create compiler host
+	// Create programs from tsconfig files
 	host := utils.CreateCompilerHost(currentDirectory, fs)
 	comparePathOptions := tspath.ComparePathsOptions{
 		CurrentDirectory:          host.GetCurrentDirectory(),
 		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
 	}
 
-	// Create program
-	program, err := utils.CreateProgram(false, fs, currentDirectory, configFileName, host)
-	if err != nil {
-		return nil, fmt.Errorf("error creating TS program: %v", err)
+	programs := []*compiler.Program{}
+	for _, configFileName := range tsConfigs {
+		program, err := utils.CreateProgram(false, fs, currentDirectory, configFileName, host)
+		if err != nil {
+			return nil, fmt.Errorf("error creating TS program: %v", err)
+		}
+		programs = append(programs, program)
 	}
 
-	// Find source files
-	files := []*ast.SourceFile{}
+	// Initialize rule registry with all available rules
+	rslintconfig.RegisterAllTypeSriptEslintPluginRules()
 
-	// If specific files are provided, use those
-	if len(req.Files) > 0 {
-		for _, filePath := range req.Files {
-			absPath := tspath.ResolvePath(currentDirectory, filePath)
-			sourceFile := program.GetSourceFile(absPath)
-			if sourceFile != nil {
-				files = append(files, sourceFile)
+	// Create rules - either filtered by request or all enabled from config
+	var rules []rule.Rule
+	if len(req.RuleOptions) > 0 {
+		// filter rule based on request.RuleOptions (for backward compatibility)
+		allRules := []rule.Rule{
+			await_thenable.AwaitThenableRule,
+			no_array_delete.NoArrayDeleteRule,
+			no_base_to_string.NoBaseToStringRule,
+			no_confusing_void_expression.NoConfusingVoidExpressionRule,
+			no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule,
+			no_floating_promises.NoFloatingPromisesRule,
+			no_for_in_array.NoForInArrayRule,
+			no_implied_eval.NoImpliedEvalRule,
+			no_meaningless_void_operator.NoMeaninglessVoidOperatorRule,
+			no_misused_promises.NoMisusedPromisesRule,
+			no_misused_spread.NoMisusedSpreadRule,
+			no_mixed_enums.NoMixedEnumsRule,
+			no_redundant_type_constituents.NoRedundantTypeConstituentsRule,
+			no_unnecessary_boolean_literal_compare.NoUnnecessaryBooleanLiteralCompareRule,
+			no_unnecessary_template_expression.NoUnnecessaryTemplateExpressionRule,
+			no_unnecessary_type_arguments.NoUnnecessaryTypeArgumentsRule,
+			no_unnecessary_type_assertion.NoUnnecessaryTypeAssertionRule,
+			no_unsafe_argument.NoUnsafeArgumentRule,
+			no_unsafe_assignment.NoUnsafeAssignmentRule,
+			no_unsafe_call.NoUnsafeCallRule,
+			no_unsafe_enum_comparison.NoUnsafeEnumComparisonRule,
+			no_unsafe_member_access.NoUnsafeMemberAccessRule,
+			no_unsafe_return.NoUnsafeReturnRule,
+			no_unsafe_type_assertion.NoUnsafeTypeAssertionRule,
+			no_unsafe_unary_minus.NoUnsafeUnaryMinusRule,
+			non_nullable_type_assertion_style.NonNullableTypeAssertionStyleRule,
+			only_throw_error.OnlyThrowErrorRule,
+			prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
+			prefer_reduce_type_parameter.PreferReduceTypeParameterRule,
+			prefer_return_this_type.PreferReturnThisTypeRule,
+			promise_function_async.PromiseFunctionAsyncRule,
+			related_getter_setter_pairs.RelatedGetterSetterPairsRule,
+			require_array_sort_compare.RequireArraySortCompareRule,
+			require_await.RequireAwaitRule,
+			restrict_plus_operands.RestrictPlusOperandsRule,
+			restrict_template_expressions.RestrictTemplateExpressionsRule,
+			return_await.ReturnAwaitRule,
+			switch_exhaustiveness_check.SwitchExhaustivenessCheckRule,
+			unbound_method.UnboundMethodRule,
+			use_unknown_in_catch_callback_variable.UseUnknownInCatchCallbackVariableRule,
+		}
+		for _, r := range allRules {
+			if _, ok := req.RuleOptions[r.Name]; ok {
+				rules = append(rules, r)
 			}
 		}
 	} else {
-		// Otherwise use all source files
-		for _, file := range program.SourceFiles() {
+		// Use rules from rslint configuration
+		rules = rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, "")
+	}
 
-			p := string(file.Path())
-			if strings.Contains(p, "/node_modules/") {
-				continue
+	// Find source files from all programs
+	files := []*ast.SourceFile{}
+	
+	// If specific files are provided, use those
+	if len(req.Files) > 0 {
+		for _, program := range programs {
+			for _, filePath := range req.Files {
+				absPath := tspath.ResolvePath(currentDirectory, filePath)
+				sourceFile := program.GetSourceFile(absPath)
+				if sourceFile != nil {
+					files = append(files, sourceFile)
+				}
 			}
-			// skip bundled files
-			if strings.Contains(p, "bundled:") {
-				continue
+		}
+	} else {
+		// Otherwise use all source files from all programs
+		for _, program := range programs {
+			for _, file := range program.SourceFiles() {
+				p := string(file.Path())
+				if strings.Contains(p, "/node_modules/") {
+					continue
+				}
+				// skip bundled files
+				if strings.Contains(p, "bundled:") {
+					continue
+				}
+				files = append(files, file)
 			}
-			files = append(files, file)
 		}
 	}
 	slices.SortFunc(files, func(a *ast.SourceFile, b *ast.SourceFile) int {
@@ -248,11 +297,16 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 
 	// Run linter
 	err = linter.RunLinter(
-		[]*compiler.Program{program},
+		programs,
 		false, // Don't use single-threaded mode for IPC
 		files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			return utils.Map(rules, func(r rule.Rule) linter.ConfiguredRule {
+			// Use rules from rslint configuration if available, otherwise use provided rules
+			activeRules := rules
+			if len(req.RuleOptions) == 0 {
+				activeRules = rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
+			}
+			return utils.Map(activeRules, func(r rule.Rule) linter.ConfiguredRule {
 				return linter.ConfiguredRule{
 					Name: r.Name,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
