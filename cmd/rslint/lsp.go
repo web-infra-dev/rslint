@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -64,95 +65,33 @@ import (
 	"github.com/typescript-eslint/rslint/internal/utils"
 )
 
-// LSP protocol structures
-type InitializeParams struct {
-	ProcessID    *int    `json:"processId"`
-	RootPath     *string `json:"rootPath"`
-	RootURI      *string `json:"rootUri"`
-	Capabilities struct {
-		TextDocument struct {
-			PublishDiagnostics struct {
-				RelatedInformation bool `json:"relatedInformation"`
-				TagSupport         struct {
-					ValueSet []int `json:"valueSet"`
-				} `json:"tagSupport"`
-			} `json:"publishDiagnostics"`
-		} `json:"textDocument"`
-	} `json:"capabilities"`
-}
-
-type InitializeResult struct {
-	Capabilities ServerCapabilities `json:"capabilities"`
-}
-
-type ServerCapabilities struct {
-	TextDocumentSync   int  `json:"textDocumentSync"`
-	DiagnosticProvider bool `json:"diagnosticProvider"`
-}
-
-type DidOpenTextDocumentParams struct {
-	TextDocument TextDocumentItem `json:"textDocument"`
-}
-
-type DidChangeTextDocumentParams struct {
-	TextDocument   VersionedTextDocumentIdentifier  `json:"textDocument"`
-	ContentChanges []TextDocumentContentChangeEvent `json:"contentChanges"`
-}
-
-type TextDocumentItem struct {
-	URI        string `json:"uri"`
-	LanguageID string `json:"languageId"`
-	Version    int    `json:"version"`
-	Text       string `json:"text"`
-}
-
-type VersionedTextDocumentIdentifier struct {
-	URI     string `json:"uri"`
-	Version int    `json:"version"`
-}
-
-type TextDocumentContentChangeEvent struct {
-	Text string `json:"text"`
-}
-
-type LspDiagnostic struct {
-	Range    Range  `json:"range"`
-	Severity int    `json:"severity"`
-	Source   string `json:"source"`
-	Message  string `json:"message"`
-}
-
-type Range struct {
-	Start Position `json:"start"`
-	End   Position `json:"end"`
-}
-
-type Position struct {
-	Line      int `json:"line"`
-	Character int `json:"character"`
-}
-
-type PublishDiagnosticsParams struct {
-	URI         string          `json:"uri"`
-	Diagnostics []LspDiagnostic `json:"diagnostics"`
+func ptrTo[T any](v T) *T {
+	return &v
 }
 
 // LSP Server implementation
 type LSPServer struct {
 	conn      *jsonrpc2.Conn
 	rootURI   string
-	documents map[string]string // URI -> content
+	documents map[lsproto.DocumentUri]string // URI -> content
 }
 
 func NewLSPServer() *LSPServer {
 	return &LSPServer{
-		documents: make(map[string]string),
+		documents: make(map[lsproto.DocumentUri]string),
 	}
 }
 
 func (s *LSPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 	s.conn = conn
-	log.Printf("Received request: %v", req)
+
+	requestJSON, err := json.MarshalIndent(req, "", "  ")
+	if err != nil {
+		log.Printf("Failed to marshal request: %v", err)
+		return nil, err
+	}
+
+	log.Printf("Received request: %s", string(requestJSON))
 	switch req.Method {
 	case "initialize":
 		return s.handleInitialize(ctx, req)
@@ -187,7 +126,7 @@ func (s *LSPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 }
 
 func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
-	var params InitializeParams
+	var params lsproto.InitializeParams
 	if err := json.Unmarshal(*req.Params, &params); err != nil {
 		return nil, &jsonrpc2.Error{
 			Code:    jsonrpc2.CodeParseError,
@@ -195,16 +134,15 @@ func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request)
 		}
 	}
 
-	if params.RootURI != nil {
-		s.rootURI = *params.RootURI
-		// Remove file:// prefix if present
-		s.rootURI = strings.TrimPrefix(s.rootURI, "file://")
+	if params.RootUri.DocumentUri != nil {
+		s.rootURI = uriToPath(string(*params.RootUri.DocumentUri))
 	}
 
-	result := InitializeResult{
-		Capabilities: ServerCapabilities{
-			TextDocumentSync:   1, // Full document sync
-			DiagnosticProvider: true,
+	result := &lsproto.InitializeResult{
+		Capabilities: &lsproto.ServerCapabilities{
+			TextDocumentSync: &lsproto.TextDocumentSyncOptionsOrKind{
+				Kind: ptrTo(lsproto.TextDocumentSyncKindFull),
+			},
 		},
 	}
 
@@ -212,12 +150,12 @@ func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request)
 }
 
 func (s *LSPServer) handleDidOpen(ctx context.Context, req *jsonrpc2.Request) {
-	var params DidOpenTextDocumentParams
+	var params lsproto.DidOpenTextDocumentParams
 	if err := json.Unmarshal(*req.Params, &params); err != nil {
 		return
 	}
 
-	uri := params.TextDocument.URI
+	uri := params.TextDocument.Uri
 	content := params.TextDocument.Text
 
 	s.documents[uri] = content
@@ -225,16 +163,16 @@ func (s *LSPServer) handleDidOpen(ctx context.Context, req *jsonrpc2.Request) {
 }
 
 func (s *LSPServer) handleDidChange(ctx context.Context, req *jsonrpc2.Request) {
-	var params DidChangeTextDocumentParams
+	var params lsproto.DidChangeTextDocumentParams
 	if err := json.Unmarshal(*req.Params, &params); err != nil {
 		return
 	}
 
-	uri := params.TextDocument.URI
+	uri := params.TextDocument.Uri
 
 	// For full document sync, we expect one change with the full text
 	if len(params.ContentChanges) > 0 {
-		content := params.ContentChanges[0].Text
+		content := params.ContentChanges[0].WholeDocument.Text
 		s.documents[uri] = content
 		s.runDiagnostics(ctx, uri, content)
 	}
@@ -242,17 +180,13 @@ func (s *LSPServer) handleDidChange(ctx context.Context, req *jsonrpc2.Request) 
 
 func (s *LSPServer) handleDidSave(ctx context.Context, req *jsonrpc2.Request) {
 	// Re-run diagnostics on save
-	var params struct {
-		TextDocument struct {
-			URI string `json:"uri"`
-		} `json:"textDocument"`
-	}
+	var params lsproto.DidSaveTextDocumentParams
 
 	if err := json.Unmarshal(*req.Params, &params); err != nil {
 		return
 	}
 
-	uri := params.TextDocument.URI
+	uri := params.TextDocument.Uri
 	if content, exists := s.documents[uri]; exists {
 		s.runDiagnostics(ctx, uri, content)
 	}
@@ -262,14 +196,16 @@ func (s *LSPServer) handleShutdown(ctx context.Context, req *jsonrpc2.Request) (
 	return nil, nil
 }
 
-func (s *LSPServer) runDiagnostics(ctx context.Context, uri, content string) {
+func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri, content string) {
+	uriString := string(uri)
+
 	// Only process TypeScript/JavaScript files
-	if !isTypeScriptFile(uri) {
+	if !isTypeScriptFile(uriString) {
 		return
 	}
 
 	// Convert URI to file path
-	filePath := uriToPath(uri)
+	filePath := uriToPath(uriString)
 
 	// Create a temporary file system with the content
 	vfs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
@@ -284,7 +220,7 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri, content string) {
 	host := utils.CreateCompilerHost(workingDir, vfs)
 
 	// Try to find tsconfig.json in the working directory
-	tsconfigPath := workingDir + "/tsconfig.json"
+	tsconfigPath := workingDir + "/rslint.json"
 	if !vfs.FileExists(tsconfigPath) {
 		// If no tsconfig found, skip diagnostics for now
 		// In a real implementation, you'd create a default config
@@ -316,17 +252,22 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri, content string) {
 	}
 
 	// Collect diagnostics
-	var lsp_diagnostics []LspDiagnostic
+	var lsp_diagnostics []*lsproto.Diagnostic
 
 	rule_diags, err := runLint(uri)
+
+	if err != nil {
+		log.Printf("Error running lint: %v", err)
+	}
+
 	for _, diagnostic := range rule_diags {
 		lspDiag := convertRuleDiagnosticToLSP(diagnostic, content)
 		lsp_diagnostics = append(lsp_diagnostics, lspDiag)
 	}
 	log.Printf("Diagnostics collected: %v", lsp_diagnostics)
 	// Publish diagnostics
-	params := PublishDiagnosticsParams{
-		URI:         uri,
+	params := lsproto.PublishDiagnosticsParams{
+		Uri:         uri,
 		Diagnostics: lsp_diagnostics,
 	}
 
@@ -343,25 +284,25 @@ func getAvailableRules() []rule.Rule {
 	}
 }
 
-func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic, content string) LspDiagnostic {
+func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic, content string) *lsproto.Diagnostic {
 	diagnosticStart := ruleDiag.Range.Pos()
 	diagnosticEnd := ruleDiag.Range.End()
 	startLine, startColumn := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, diagnosticStart)
 	endLine, endColumn := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, diagnosticEnd)
 
-	return LspDiagnostic{
-		Range: Range{
-			Start: Position{
-				Line:      startLine,
-				Character: startColumn,
+	return &lsproto.Diagnostic{
+		Range: lsproto.Range{
+			Start: lsproto.Position{
+				Line:      uint32(startLine),
+				Character: uint32(startColumn),
 			},
-			End: Position{
-				Line:      endLine,
-				Character: endColumn,
+			End: lsproto.Position{
+				Line:      uint32(endLine),
+				Character: uint32(endColumn),
 			},
 		},
-		Severity: 1, // Error
-		Source:   "rslint",
+		Severity: ptrTo(lsproto.DiagnosticSeverityError), // Error
+		Source:   ptrTo("rslint"),
 		Message:  fmt.Sprintf("[%s] %s", ruleDiag.RuleName, ruleDiag.Message.Description),
 	}
 }
@@ -412,14 +353,14 @@ func runLSP() int {
 
 // LintResponse represents a lint response from Go to JS
 type LintResponse struct {
-	Diagnostics []LspDiagnostic `json:"diagnostics"`
-	ErrorCount  int             `json:"errorCount"`
-	FileCount   int             `json:"fileCount"`
-	RuleCount   int             `json:"ruleCount"`
+	Diagnostics []lsproto.Diagnostic `json:"diagnostics"`
+	ErrorCount  int                  `json:"errorCount"`
+	FileCount   int                  `json:"fileCount"`
+	RuleCount   int                  `json:"ruleCount"`
 }
 
 // HandleLint handles lint requests in IPC mode
-func runLint(uri string) ([]rule.RuleDiagnostic, error) {
+func runLint(uri lsproto.DocumentUri) ([]rule.RuleDiagnostic, error) {
 	var tsconfig string
 	// Get current directory
 	currentDirectory, err := os.Getwd()

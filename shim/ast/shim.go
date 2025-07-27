@@ -223,8 +223,6 @@ func GetContainingClass(node *ast.Node) *ast.Node
 func GetDeclarationContainer(node *ast.Node) *ast.Node
 //go:linkname GetDeclarationOfKind github.com/microsoft/typescript-go/internal/ast.GetDeclarationOfKind
 func GetDeclarationOfKind(symbol *ast.Symbol, kind ast.Kind) *ast.Node
-//go:linkname GetEffectiveTypeParent github.com/microsoft/typescript-go/internal/ast.GetEffectiveTypeParent
-func GetEffectiveTypeParent(parent *ast.Node) *ast.Node
 //go:linkname GetElementOrPropertyAccessName github.com/microsoft/typescript-go/internal/ast.GetElementOrPropertyAccessName
 func GetElementOrPropertyAccessName(node *ast.Node) *ast.Node
 //go:linkname GetEmitModuleFormatOfFileWorker github.com/microsoft/typescript-go/internal/ast.GetEmitModuleFormatOfFileWorker
@@ -822,6 +820,8 @@ func IsModuleExportsAccessExpression(node *ast.Node) bool
 func IsModuleIdentifier(node *ast.Node) bool
 //go:linkname IsModuleOrEnumDeclaration github.com/microsoft/typescript-go/internal/ast.IsModuleOrEnumDeclaration
 func IsModuleOrEnumDeclaration(node *ast.Node) bool
+//go:linkname IsModuleWithStringLiteralName github.com/microsoft/typescript-go/internal/ast.IsModuleWithStringLiteralName
+func IsModuleWithStringLiteralName(node *ast.Node) bool
 //go:linkname IsNamedExports github.com/microsoft/typescript-go/internal/ast.IsNamedExports
 func IsNamedExports(node *ast.Node) bool
 //go:linkname IsNamedImports github.com/microsoft/typescript-go/internal/ast.IsNamedImports
@@ -980,8 +980,12 @@ func IsStringOrNumericLiteralLike(node *ast.Node) bool
 func IsStringTextContainingNode(node *ast.Node) bool
 //go:linkname IsSuperCall github.com/microsoft/typescript-go/internal/ast.IsSuperCall
 func IsSuperCall(node *ast.Node) bool
+//go:linkname IsSwitchStatement github.com/microsoft/typescript-go/internal/ast.IsSwitchStatement
+func IsSwitchStatement(node *ast.Node) bool
 //go:linkname IsSyntheticExpression github.com/microsoft/typescript-go/internal/ast.IsSyntheticExpression
 func IsSyntheticExpression(node *ast.Node) bool
+//go:linkname IsSyntheticReferenceExpression github.com/microsoft/typescript-go/internal/ast.IsSyntheticReferenceExpression
+func IsSyntheticReferenceExpression(node *ast.Node) bool
 //go:linkname IsTaggedTemplateExpression github.com/microsoft/typescript-go/internal/ast.IsTaggedTemplateExpression
 func IsTaggedTemplateExpression(node *ast.Node) bool
 //go:linkname IsTemplateExpression github.com/microsoft/typescript-go/internal/ast.IsTemplateExpression
@@ -1640,6 +1644,8 @@ func NewCompilerDiagnostic(message *diagnostics.Message, args ...any) *ast.Diagn
 func NewDiagnostic(file *ast.SourceFile, loc core.TextRange, message *diagnostics.Message, args ...any) *ast.Diagnostic
 //go:linkname NewDiagnosticChain github.com/microsoft/typescript-go/internal/ast.NewDiagnosticChain
 func NewDiagnosticChain(chain *ast.Diagnostic, message *diagnostics.Message, args ...any) *ast.Diagnostic
+//go:linkname NewDiagnosticWith github.com/microsoft/typescript-go/internal/ast.NewDiagnosticWith
+func NewDiagnosticWith(file *ast.SourceFile, loc core.TextRange, code int32, category diagnostics.Category, message string, messageChain []*ast.Diagnostic, relatedInformation []*ast.Diagnostic, reportsUnnecessary bool, reportsDeprecated bool, skippedOnNoEmit bool) *ast.Diagnostic
 type NewExpression = ast.NewExpression
 //go:linkname NewFlowReduceLabelData github.com/microsoft/typescript-go/internal/ast.NewFlowReduceLabelData
 func NewFlowReduceLabelData(target *ast.FlowLabel, antecedents *ast.FlowList) *ast.Node
@@ -1979,6 +1985,7 @@ func SymbolName(symbol *ast.Symbol) string
 type SymbolTable = ast.SymbolTable
 type SyntaxList = ast.SyntaxList
 type SyntheticExpression = ast.SyntheticExpression
+type SyntheticReferenceExpression = ast.SyntheticReferenceExpression
 type TaggedTemplateExpression = ast.TaggedTemplateExpression
 type TemplateExpression = ast.TemplateExpression
 type TemplateHead = ast.TemplateHead
