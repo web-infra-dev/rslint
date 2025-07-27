@@ -2,7 +2,6 @@
 
 🚀 Rocket Speed Linter - A high-performance TypeScript/JavaScript linter written in Go.
 
-
 ## Features
 
 - ⚡ **Ultra-fast**: 10x faster than ESLint through Go-powered parallel processing
