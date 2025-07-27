@@ -143,4 +143,6 @@ vite.config.ts.timestamp-*
 .DS_Store
 **/.DS_Store
 
-rslint
+## ignore ai build result
+/rslint
+/bin/rslint

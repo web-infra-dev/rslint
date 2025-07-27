@@ -15,6 +15,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	ipc "github.com/typescript-eslint/rslint/internal/api"
+	rslintconfig "github.com/typescript-eslint/rslint/internal/config"
 	"github.com/typescript-eslint/rslint/internal/linter"
 	"github.com/typescript-eslint/rslint/internal/rule"
 	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
@@ -65,11 +66,6 @@ type IPCHandler struct{}
 
 // HandleLint handles lint requests in IPC mode
 func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) {
-	var tsconfig string
-	if req.TSConfig != "" {
-		tsconfig = req.TSConfig
-	}
-
 	// Format is not used for IPC mode as we return structured data
 	_ = req.Format
 
@@ -94,22 +90,11 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		fs = utils.NewOverlayVFS(fs, req.FileContents)
 	}
 
-	// Handle tsconfig
-	var configFileName string
-	if tsconfig == "" {
-		configFileName = tspath.ResolvePath(currentDirectory, "tsconfig.json")
-		if !fs.FileExists(configFileName) {
-			fs = utils.NewOverlayVFS(fs, map[string]string{
-				configFileName: "{}",
-			})
-		}
-	} else {
-		configFileName = tspath.ResolvePath(currentDirectory, tsconfig)
-		if !fs.FileExists(configFileName) {
-			return nil, fmt.Errorf("error: tsconfig %q doesn't exist", tsconfig)
-		}
-	}
-	currentDirectory = tspath.GetDirectoryPath(configFileName)
+	// Initialize rule registry with all available rules
+	rslintconfig.RegisterAllTypeSriptEslintPluginRules()
+
+	// Load rslint configuration and determine which tsconfig files to use
+	_, tsConfigs, configDirectory := rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
 
 	// Create rules
 	var rules = []rule.Rule{
@@ -167,43 +152,52 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 	}
 
 	// Create compiler host
-	host := utils.CreateCompilerHost(currentDirectory, fs)
+	host := utils.CreateCompilerHost(configDirectory, fs)
 	comparePathOptions := tspath.ComparePathsOptions{
 		CurrentDirectory:          host.GetCurrentDirectory(),
 		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
 	}
 
-	// Create program
-	program, err := utils.CreateProgram(false, fs, currentDirectory, configFileName, host)
-	if err != nil {
-		return nil, fmt.Errorf("error creating TS program: %v", err)
+	// Create programs from all tsconfig files found in rslint config
+	programs := []*compiler.Program{}
+	for _, configFileName := range tsConfigs {
+		program, err := utils.CreateProgram(false, fs, configDirectory, configFileName, host)
+		if err != nil {
+			return nil, fmt.Errorf("error creating TS program for %s: %v", configFileName, err)
+		}
+		programs = append(programs, program)
 	}
 
-	// Find source files
+	// Find source files from all programs
 	files := []*ast.SourceFile{}
 
 	// If specific files are provided, use those
 	if len(req.Files) > 0 {
 		for _, filePath := range req.Files {
-			absPath := tspath.ResolvePath(currentDirectory, filePath)
-			sourceFile := program.GetSourceFile(absPath)
-			if sourceFile != nil {
-				files = append(files, sourceFile)
+			absPath := tspath.ResolvePath(configDirectory, filePath)
+			// Try to find the file in any of the programs
+			for _, program := range programs {
+				sourceFile := program.GetSourceFile(absPath)
+				if sourceFile != nil {
+					files = append(files, sourceFile)
+					break // Found in this program, no need to check others
+				}
 			}
 		}
 	} else {
-		// Otherwise use all source files
-		for _, file := range program.SourceFiles() {
-
-			p := string(file.Path())
-			if strings.Contains(p, "/node_modules/") {
-				continue
+		// Otherwise use all source files from all programs
+		for _, program := range programs {
+			for _, file := range program.SourceFiles() {
+				p := string(file.Path())
+				if strings.Contains(p, "/node_modules/") {
+					continue
+				}
+				// skip bundled files
+				if strings.Contains(p, "bundled:") {
+					continue
+				}
+				files = append(files, file)
 			}
-			// skip bundled files
-			if strings.Contains(p, "bundled:") {
-				continue
-			}
-			files = append(files, file)
 		}
 	}
 	slices.SortFunc(files, func(a *ast.SourceFile, b *ast.SourceFile) int {
@@ -248,7 +242,7 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 
 	// Run linter
 	err = linter.RunLinter(
-		[]*compiler.Program{program},
+		programs,
 		false, // Don't use single-threaded mode for IPC
 		files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
