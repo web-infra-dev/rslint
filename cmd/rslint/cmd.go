@@ -131,6 +131,7 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 				Column: endColumn + 1,
 			},
 		},
+		Severity: d.Severity.String(),
 	}
 
 	jsonBytes, err := json.Marshal(diagnostic)
@@ -178,6 +179,13 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	w.WriteByte(' ')
 	w.WriteString(colors.RuleName(" %s ", d.RuleName))
 	w.WriteString(" — ")
+
+	// Severity level with conditional coloring
+	severityColor := colors.DimText
+	if d.Severity == rule.SeverityError {
+		severityColor = colors.BoldText
+	}
+	w.WriteString(severityColor("[%s] ", d.Severity.String()))
 
 	// Message handling
 	messageLineStart := 0
@@ -504,10 +512,23 @@ func runCMD() int {
 		errorsColorFunc = colors.BoldText
 	}
 
+	var warningsColorFunc func(string, ...interface{}) string
+	if warningsCount == 0 {
+		warningsColorFunc = colors.DimText
+	} else {
+		warningsColorFunc = colors.DimText
+	}
+
 	errorsText := "errors"
 	if errorsCount == 1 {
 		errorsText = "error"
 	}
+
+	warningsText := "warnings"
+	if warningsCount == 1 {
+		warningsText = "warning"
+	}
+
 	filesText := "files"
 	if len(files) == 1 {
 		filesText = "file"
@@ -519,9 +540,11 @@ func runCMD() int {
 	if format == "default" {
 		fmt.Fprintf(
 			os.Stdout,
-			"Found %s %s %s(linted %s %s with in %s using %s threads)%s\n",
+			"Found %s %s and %s %s %s(linted %s %s with in %s using %s threads)%s\n",
 			errorsColorFunc("%d", errorsCount),
 			errorsText,
+			warningsColorFunc("%d", warningsCount),
+			warningsText,
 			colors.DimText(""),
 			colors.BoldText("%d", len(files)),
 			filesText,
