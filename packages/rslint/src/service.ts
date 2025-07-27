@@ -32,7 +32,7 @@ export interface LintResponse {
 
 export interface LintOptions {
   files?: string[];
-  tsconfig?: string;
+  config?: string;    // Path to rslint config file
   workingDirectory?: string;
   ruleOptions?: Record<string, string>;
   fileContents?: Record<string, string>; // Map of file paths to their contents for VFS
@@ -174,7 +174,7 @@ export class RSLintService {
    * Run the linter on specified files
    */
   async lint(options: LintOptions = {}): Promise<LintResponse> {
-    const { files, tsconfig, workingDirectory, ruleOptions, fileContents } =
+    const { files, config, workingDirectory, ruleOptions, fileContents } =
       options;
     // Send handshake
     await this.sendMessage('handshake', { version: '1.0.0' });
@@ -182,7 +182,7 @@ export class RSLintService {
     // Send lint request
     return await this.sendMessage('lint', {
       files,
-      tsconfig,
+      config,
       workingDirectory,
       ruleOptions,
       fileContents,

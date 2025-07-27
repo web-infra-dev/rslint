@@ -5,15 +5,15 @@ import path from 'node:path';
 test('lint api', async t => {
   let cwd = path.resolve(import.meta.dirname, '../fixtures');
   await t.test('virtual file support', async t => {
-    let tsconfig = path.resolve(
+    let config = path.resolve(
       import.meta.dirname,
-      '../fixtures/tsconfig.virtual.json',
+      '../fixtures/rslint.virtual.json',
     );
     let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
     // Use virtual file contents instead of reading from disk
     const diags = await lint({
-      tsconfig,
-      cwd,
+      config,
+      workingDirectory: cwd,
       fileContents: {
         [virtual_entry]: `
                     let a:any = 10;
@@ -25,11 +25,11 @@ test('lint api', async t => {
     t.assert.snapshot(diags);
   });
   await test('diag snapshot', async t => {
-    let tsconfig = path.resolve(
+    let config = path.resolve(
       import.meta.dirname,
-      '../fixtures/tsconfig.json',
+      '../fixtures/rslint.json',
     );
-    const diags = await lint({ tsconfig, workingDirectory: cwd });
+    const diags = await lint({ config, workingDirectory: cwd });
     t.assert.snapshot(diags);
   });
 });

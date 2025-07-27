@@ -55,7 +55,7 @@ type HandshakeResponse struct {
 // LintRequest represents a lint request from JS to Go
 type LintRequest struct {
 	Files            []string          `json:"files,omitempty"`
-	TSConfig         string            `json:"tsconfig,omitempty"`
+	Config           string            `json:"config,omitempty"`      // Path to rslint config file
 	Format           string            `json:"format,omitempty"`
 	WorkingDirectory string            `json:"workingDirectory,omitempty"`
 	RuleOptions      map[string]string `json:"ruleOptions,omitempty"`
