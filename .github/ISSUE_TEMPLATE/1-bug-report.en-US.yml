@@ -1,8 +1,8 @@
-name: "🐞 Bug Report"
+name: '🐞 Bug Report'
 description: Report a bug to Rslint
-title: "[Bug]: "
+title: '[Bug]: '
 type: Bug
-labels: ["pending triage"]
+labels: ['pending triage']
 body:
   - type: markdown
     attributes:
@@ -38,7 +38,7 @@ body:
     id: reproduce
     attributes:
       label: Reproduce link
-      description: "Please provide a URL of the repository that reproduces the problem.
+      description: 'Please provide a URL of the repository that reproduces the problem.'
       placeholder: paste link here
 
   - type: textarea
