@@ -452,6 +452,7 @@ func runCMD() int {
 
 	diagnosticsChan := make(chan rule.RuleDiagnostic, 4096)
 	errorsCount := 0
+	warningsCount := 0
 
 	wg.Add(1)
 	go func() {
@@ -459,8 +460,12 @@ func runCMD() int {
 		w := bufio.NewWriterSize(os.Stdout, 4096*100)
 		defer w.Flush()
 		for d := range diagnosticsChan {
-			errorsCount++
-			if errorsCount == 1 {
+			if d.Severity == rule.SeverityError {
+				errorsCount++
+			} else if d.Severity == rule.SeverityWarning {
+				warningsCount++
+			}
+			if errorsCount+warningsCount == 1 {
 				w.WriteByte('\n')
 			}
 			printDiagnostic(d, w, comparePathOptions, format)
@@ -476,14 +481,7 @@ func runCMD() int {
 		files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
-			return utils.Map(activeRules, func(r rule.Rule) linter.ConfiguredRule {
-				return linter.ConfiguredRule{
-					Name: r.Name,
-					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return r.Run(ctx, nil)
-					},
-				}
-			})
+			return activeRules
 		},
 		func(d rule.RuleDiagnostic) {
 			diagnosticsChan <- d

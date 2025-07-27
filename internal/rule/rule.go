@@ -8,6 +8,43 @@ import (
 	"github.com/typescript-eslint/rslint/internal/utils"
 )
 
+// DiagnosticSeverity represents the severity level of a diagnostic
+type DiagnosticSeverity int
+
+const (
+	SeverityError DiagnosticSeverity = iota
+	SeverityWarning
+	SeverityOff
+)
+
+// String returns the string representation of the severity
+func (s DiagnosticSeverity) String() string {
+	switch s {
+	case SeverityError:
+		return "error"
+	case SeverityWarning:
+		return "warn"
+	case SeverityOff:
+		return "off"
+	default:
+		return "error"
+	}
+}
+
+// ParseSeverity converts a string to DiagnosticSeverity
+func ParseSeverity(level string) DiagnosticSeverity {
+	switch level {
+	case "error":
+		return SeverityError
+	case "warn", "warning":
+		return SeverityWarning
+	case "off":
+		return SeverityOff
+	default:
+		return SeverityError // Default to error for unknown values
+	}
+}
+
 const (
 	lastTokenKind                        ast.Kind = 1000
 	lastOnExitTokenKind                  ast.Kind = 2000
@@ -93,6 +130,7 @@ type RuleDiagnostic struct {
 	// nil if no suggestions were provided
 	Suggestions *[]RuleSuggestion
 	SourceFile  *ast.SourceFile
+	Severity    DiagnosticSeverity
 }
 
 func (d RuleDiagnostic) Fixes() []RuleFix {

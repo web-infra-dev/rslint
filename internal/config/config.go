@@ -123,6 +123,14 @@ func (rc *RuleConfig) GetLevel() string {
 	}
 	return rc.Level
 }
+
+// GetSeverity returns the diagnostic severity for this rule configuration
+func (rc *RuleConfig) GetSeverity() rule.DiagnosticSeverity {
+	if rc == nil {
+		return rule.SeverityError
+	}
+	return rule.ParseSeverity(rc.Level)
+}
 func GetAllRulesForPlugin(plugin string) []rule.Rule {
 	if plugin == "@typescript-eslint" {
 		return getAllTypeScriptEslintPluginRules()
