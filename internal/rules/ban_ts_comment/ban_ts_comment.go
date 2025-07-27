@@ -239,6 +239,14 @@ func findDirectiveInComment(commentRange ast.CommentRange, sourceText string) *M
 	return nil
 }
 
+func createSyntheticCommentRange(start, end int, kind ast.Kind) ast.CommentRange {
+	return ast.CommentRange{
+		TextRange:          core.NewTextRange(start, end),
+		Kind:               kind,
+		HasTrailingNewLine: false,
+	}
+}
+
 var BanTsCommentRule = rule.Rule{
 	Name: "ban-ts-comment",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
@@ -426,27 +434,53 @@ var BanTsCommentRule = rule.Rule{
 				}
 			}
 			
-			// Check for comments in if (false) blocks if needed, but use a more efficient approach
+			// Handle comments in unreachable code blocks (like "if (false) { ... }")
+			// This is needed because these comments aren't associated with any AST node
 			if strings.Contains(sourceText, "if (false)") && strings.Contains(sourceText, "@ts-") {
-				// Use a simple regex-based approach instead of manual parsing
-				// This is much faster than the previous character-by-character approach
-				// Look for if (false) { ... } blocks containing @ts- comments
-				ifFalsePattern := regexp.MustCompile(`if\s*\(\s*false\s*\)\s*\{[^}]*@ts-[^}]*\}`)
-				matches := ifFalsePattern.FindAllString(sourceText, -1)
-				for _, match := range matches {
-					// Find the position of this match in the source
-					matchPos := strings.Index(sourceText, match)
-					if matchPos != -1 {
-						// Process comments in this block using GetCommentsInRange
-						blockRange := core.NewTextRange(matchPos, matchPos+len(match))
-						for commentRange := range utils.GetCommentsInRange(sourceFile, blockRange) {
-							commentKey := fmt.Sprintf("%d-%d", commentRange.Pos(), commentRange.End())
+				// Find all single-line comments that contain @ts- directives
+				lines := strings.Split(sourceText, "\n")
+				lineStart := 0
+				
+				for _, line := range lines {
+					trimmedLine := strings.TrimSpace(line)
+					if strings.HasPrefix(trimmedLine, "//") && strings.Contains(trimmedLine, "@ts-") {
+						// Check if this line is inside an "if (false)" block
+						// Look backwards and forwards to see if we're in such a block
+						inIfFalseBlock := false
+						
+						// Simple heuristic: if there's "if (false)" before this line and no closing brace
+						// or if the line itself is clearly inside a block structure
+						textBeforeLine := sourceText[:lineStart]
+						
+						// Check if we're inside an if (false) block
+						lastIfFalse := strings.LastIndex(textBeforeLine, "if (false)")
+						if lastIfFalse != -1 {
+							// Count braces after the if (false) to see if we're still inside
+							textAfterIfFalse := textBeforeLine[lastIfFalse:]
+							openBraces := strings.Count(textAfterIfFalse, "{")
+							closeBraces := strings.Count(textAfterIfFalse, "}")
+							if openBraces > closeBraces {
+								inIfFalseBlock = true
+							}
+						}
+						
+						if inIfFalseBlock {
+							// Found a TS comment in an unreachable block
+							commentStart := lineStart + strings.Index(line, "//")
+							commentEnd := lineStart + len(line)
+							
+							commentKey := fmt.Sprintf("%d-%d", commentStart, commentEnd)
 							if !processedComments[commentKey] {
 								processedComments[commentKey] = true
+								
+								// Create a synthetic comment range for processing
+								commentRange := createSyntheticCommentRange(commentStart, commentEnd, ast.KindSingleLineCommentTrivia)
 								processComment(commentRange, sourceFile, sourceText, firstStatement)
 							}
 						}
 					}
+					
+					lineStart += len(line) + 1 // +1 for newline
 				}
 			}
 		}
