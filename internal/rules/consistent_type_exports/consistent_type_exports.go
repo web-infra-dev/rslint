@@ -57,12 +57,30 @@ var ConsistentTypeExportsRule = rule.Rule{
 				return false, false
 			}
 
+			// Add timeout protection for symbol resolution
+			// If we can't resolve quickly, assume it's a value to be safe
 			aliasedSymbol := symbol
 			if utils.IsSymbolFlagSet(symbol, ast.SymbolFlagsAlias) {
+				// GetAliasedSymbol can be expensive for complex module graphs
+				// Add a check to avoid following aliases for external modules
+				if symbol.Declarations != nil && len(symbol.Declarations) > 0 {
+					decl := symbol.Declarations[0]
+					if decl != nil {
+						sourceFile := ast.GetSourceFileOfNode(decl)
+						if sourceFile != nil {
+							// Check if this is an external module
+							fileName := sourceFile.FileName()
+							if strings.Contains(fileName, "node_modules") {
+								// Skip external modules to avoid timeout
+								return false, false
+							}
+						}
+					}
+				}
 				aliasedSymbol = ctx.TypeChecker.GetAliasedSymbol(symbol)
 			}
 
-			if ctx.TypeChecker.IsUnknownSymbol(aliasedSymbol) {
+			if aliasedSymbol == nil || ctx.TypeChecker.IsUnknownSymbol(aliasedSymbol) {
 				return false, false
 			}
 

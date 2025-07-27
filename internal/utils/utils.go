@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"iter"
 	"slices"
 	"unicode"
@@ -19,22 +20,34 @@ func GetCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) iter
 	nodeFactory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
 
 	return func(yield func(ast.CommentRange) bool) {
-		// Get all leading comments from the beginning of the file (position 0)
+		// Simple approach: get all comments from position 0 and filter
+		// This is less efficient but more reliable than trying to optimize the start position
+		seenComments := make(map[string]bool)
+		
+		// Get all leading comments from the beginning of the file
 		for commentRange := range scanner.GetLeadingCommentRanges(nodeFactory, sourceFile.Text(), 0) {
 			// Check if comment overlaps with our range (more flexible)
 			if commentRange.Pos() < inRange.End() && commentRange.End() > inRange.Pos() {
-				if !yield(commentRange) {
-					return
+				key := fmt.Sprintf("%d-%d", commentRange.Pos(), commentRange.End())
+				if !seenComments[key] {
+					seenComments[key] = true
+					if !yield(commentRange) {
+						return
+					}
 				}
 			}
 		}
 		
-		// Get all trailing comments from the beginning of the file (position 0)
+		// Get all trailing comments from the beginning of the file
 		for commentRange := range scanner.GetTrailingCommentRanges(nodeFactory, sourceFile.Text(), 0) {
 			// Check if comment overlaps with our range (more flexible)
 			if commentRange.Pos() < inRange.End() && commentRange.End() > inRange.Pos() {
-				if !yield(commentRange) {
-					return
+				key := fmt.Sprintf("%d-%d", commentRange.Pos(), commentRange.End())
+				if !seenComments[key] {
+					seenComments[key] = true
+					if !yield(commentRange) {
+						return
+					}
 				}
 			}
 		}

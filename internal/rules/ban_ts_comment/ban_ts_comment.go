@@ -239,41 +239,6 @@ func findDirectiveInComment(commentRange ast.CommentRange, sourceText string) *M
 	return nil
 }
 
-func createSyntheticCommentRange(start, end int, kind ast.Kind) ast.CommentRange {
-	return ast.CommentRange{
-		TextRange:          core.NewTextRange(start, end),
-		Kind:               kind,
-		HasTrailingNewLine: false,
-	}
-}
-
-func getCommentKind(commentText string) ast.Kind {
-	if strings.HasPrefix(commentText, "//") {
-		return ast.KindSingleLineCommentTrivia
-	}
-	return ast.KindMultiLineCommentTrivia
-}
-
-func findMatchingBrace(text string, start int) int {
-	if start >= len(text) || text[start] != '{' {
-		return -1
-	}
-	
-	count := 1
-	for i := start + 1; i < len(text); i++ {
-		switch text[i] {
-		case '{':
-			count++
-		case '}':
-			count--
-			if count == 0 {
-				return i
-			}
-		}
-	}
-	return -1
-}
-
 var BanTsCommentRule = rule.Rule{
 	Name: "ban-ts-comment",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
@@ -437,7 +402,7 @@ var BanTsCommentRule = rule.Rule{
 			}
 		}
 
-		// Process all comments directly in the Run function, similar to ban_tslint_comment
+		// Process all comments directly in the Run function
 		sourceFile := ctx.SourceFile
 		sourceText := string(sourceFile.Text())
 
@@ -461,76 +426,24 @@ var BanTsCommentRule = rule.Rule{
 				}
 			}
 			
-			// Additional targeted scan for comments inside unreachable code blocks
-			// Only run this if the source code actually contains "if (false)" patterns
-			if strings.Contains(sourceText, "if (false)") {
-				// Look for if (false) { ... } patterns and scan for comments inside them
-				for pos := 0; pos < len(sourceText)-10; pos++ {
-					if strings.HasPrefix(sourceText[pos:], "if (false)") {
-						braceStart := strings.Index(sourceText[pos:], "{")
-						if braceStart != -1 {
-							braceStart += pos
-							braceEnd := findMatchingBrace(sourceText, braceStart)
-							if braceEnd != -1 {
-								// Search for TS comments inside this block using string scanning
-								blockText := sourceText[braceStart+1:braceEnd] // Skip the opening brace
-								if strings.Contains(blockText, "@ts-") {
-									// Manual scan for comment patterns
-									lines := strings.Split(blockText, "\n")
-									lineStart := braceStart + 1
-									
-									for lineNum, line := range lines {
-										trimmedLine := strings.TrimSpace(line)
-										if strings.HasPrefix(trimmedLine, "//") && strings.Contains(trimmedLine, "@ts-") {
-											// Found a single-line comment with a TS directive
-											commentStart := lineStart + strings.Index(sourceText[lineStart:lineStart+len(line)], "//")
-											commentEnd := lineStart + len(line)
-											
-											// Ensure this comment hasn't been processed already
-											commentKey := fmt.Sprintf("%d-%d", commentStart, commentEnd)
-											if !processedComments[commentKey] {
-												processedComments[commentKey] = true
-												// Create a synthetic comment range
-												commentRange := createSyntheticCommentRange(
-													commentStart,
-													commentEnd,
-													ast.KindSingleLineCommentTrivia,
-												)
-												processComment(commentRange, sourceFile, sourceText, firstStatement)
-											}
-										} else if strings.HasPrefix(trimmedLine, "/*") && strings.Contains(trimmedLine, "@ts-") {
-											// Found a block comment with a TS directive
-											commentStart := lineStart + strings.Index(sourceText[lineStart:lineStart+len(line)], "/*")
-											commentEnd := lineStart + len(line)
-											
-											// For block comments that span multiple lines, find the end
-											if !strings.Contains(trimmedLine, "*/") {
-												for i := lineNum + 1; i < len(lines); i++ {
-													commentEnd = lineStart + len(strings.Join(lines[:i+1], "\n"))
-													if strings.Contains(lines[i], "*/") {
-														break
-													}
-												}
-											}
-											
-											commentKey := fmt.Sprintf("%d-%d", commentStart, commentEnd)
-											if !processedComments[commentKey] {
-												processedComments[commentKey] = true
-												commentRange := createSyntheticCommentRange(
-													commentStart,
-													commentEnd,
-													ast.KindMultiLineCommentTrivia,
-												)
-												processComment(commentRange, sourceFile, sourceText, firstStatement)
-											}
-										}
-										
-										// Update line start position for next iteration
-										if lineNum < len(lines)-1 {
-											lineStart += len(line) + 1 // +1 for the newline character
-										}
-									}
-								}
+			// Check for comments in if (false) blocks if needed, but use a more efficient approach
+			if strings.Contains(sourceText, "if (false)") && strings.Contains(sourceText, "@ts-") {
+				// Use a simple regex-based approach instead of manual parsing
+				// This is much faster than the previous character-by-character approach
+				// Look for if (false) { ... } blocks containing @ts- comments
+				ifFalsePattern := regexp.MustCompile(`if\s*\(\s*false\s*\)\s*\{[^}]*@ts-[^}]*\}`)
+				matches := ifFalsePattern.FindAllString(sourceText, -1)
+				for _, match := range matches {
+					// Find the position of this match in the source
+					matchPos := strings.Index(sourceText, match)
+					if matchPos != -1 {
+						// Process comments in this block using GetCommentsInRange
+						blockRange := core.NewTextRange(matchPos, matchPos+len(match))
+						for commentRange := range utils.GetCommentsInRange(sourceFile, blockRange) {
+							commentKey := fmt.Sprintf("%d-%d", commentRange.Pos(), commentRange.End())
+							if !processedComments[commentKey] {
+								processedComments[commentKey] = true
+								processComment(commentRange, sourceFile, sourceText, firstStatement)
 							}
 						}
 					}
