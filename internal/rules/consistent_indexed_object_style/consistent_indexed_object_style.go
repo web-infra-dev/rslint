@@ -132,27 +132,33 @@ func checkInterfaceDeclaration(ctx rule.RuleContext, node *ast.Node) {
 		return
 	}
 
-	// Check for circular references - only block direct self-references
+	// Check for circular references
 	var interfaceName string
 	if interfaceDecl.Name() != nil && ast.IsIdentifier(interfaceDecl.Name()) {
 		interfaceName = interfaceDecl.Name().AsIdentifier().Text
 	}
-	if interfaceName != "" && isDirectSelfReference(valueType, interfaceName) {
-		return // Direct circular reference
-	}
 	
-	// For wrapped self-references like Foo[], () => Foo, etc., allow conversion
-	// For references to other types, check if it would create indirect circular reference
-	if valueType.Kind == ast.KindTypeReference {
-		typeRef := valueType.AsTypeReferenceNode()
-		if typeRef.TypeName != nil && ast.IsIdentifier(typeRef.TypeName) {
-			refName := typeRef.TypeName.AsIdentifier().Text
-			// Check if this is a reference to another interface in the same file
-			// that might have a circular reference back
-			if refName != interfaceName && isInterfaceWithIndexSignature(ctx, refName) {
-				return // Potential indirect circular reference
+	// Check for circular references - be more specific
+	if interfaceName != "" {
+		// For direct self-references, block conversion
+		if isDirectSelfReference(valueType, interfaceName) {
+			return // Direct circular reference like Foo -> Foo
+		}
+		
+		// For indirect references through other interfaces, check for mutual references
+		if valueType.Kind == ast.KindTypeReference {
+			typeRef := valueType.AsTypeReferenceNode()
+			if typeRef.TypeName != nil && ast.IsIdentifier(typeRef.TypeName) {
+				referencedType := typeRef.TypeName.AsIdentifier().Text
+				// Check if this creates a circular chain
+				if referencedType != interfaceName && interfaceReferencesType(ctx, referencedType, interfaceName) {
+					return // Mutual circular reference like Foo1 <-> Foo2
+				}
 			}
 		}
+		
+		// For wrapped references (arrays, functions, etc.), allow conversion
+		// These don't create problematic circular references
 	}
 
 	// Check if interface extends anything - if so, we can't safely convert
@@ -322,7 +328,7 @@ func isDirectSelfReference(typeNode *ast.Node, typeName string) bool {
 	return false
 }
 
-// Check if type contains any reference to the given type name
+// Check if type contains any reference to the given type name that would cause circular dependency
 func containsTypeReference(typeNode *ast.Node, typeName string) bool {
 	if typeNode == nil || typeName == "" {
 		return false
@@ -399,6 +405,18 @@ func containsTypeReference(typeNode *ast.Node, typeName string) bool {
 				}
 			}
 		}
+	case ast.KindConditionalType:
+		// For conditional types like "Foo extends T ? string : number"
+		// Check only the true and false types, not the check or extends types
+		// Because using Foo in "Foo extends T" is not a circular reference - it's just a type predicate
+		conditionalType := typeNode.AsConditionalTypeNode()
+		if conditionalType.TrueType != nil && containsTypeReference(conditionalType.TrueType, typeName) {
+			return true
+		}
+		if conditionalType.FalseType != nil && containsTypeReference(conditionalType.FalseType, typeName) {
+			return true
+		}
+		// Note: We don't check CheckType or ExtendsType as these are type predicates, not circular refs
 	}
 	
 	return false
@@ -436,6 +454,41 @@ func isInterfaceWithIndexSignature(ctx rule.RuleContext, typeName string) bool {
 	
 	ctx.SourceFile.ForEachChild(checkNode)
 	return hasIndexSignature
+}
+
+// Check if an interface references a specific type in its index signature
+func interfaceReferencesType(ctx rule.RuleContext, interfaceName string, targetType string) bool {
+	var found bool
+	
+	var checkNode ast.Visitor
+	checkNode = func(node *ast.Node) bool {
+		if node.Kind == ast.KindInterfaceDeclaration {
+			interfaceDecl := node.AsInterfaceDeclaration()
+			if interfaceDecl.Name() != nil && ast.IsIdentifier(interfaceDecl.Name()) {
+				if interfaceDecl.Name().AsIdentifier().Text == interfaceName {
+					// Found the interface, check if it has an index signature that references targetType
+					if interfaceDecl.Members != nil && len(interfaceDecl.Members.Nodes) == 1 {
+						member := interfaceDecl.Members.Nodes[0]
+						if member.Kind == ast.KindIndexSignature {
+							indexSig := member.AsIndexSignatureDeclaration()
+							if indexSig.Type != nil {
+								found = containsTypeReference(indexSig.Type, targetType)
+								return true // Stop traversal
+							}
+						}
+					}
+					return true // Stop traversal, interface found
+				}
+			}
+		}
+		
+		// Continue traversal
+		node.ForEachChild(checkNode)
+		return false
+	}
+	
+	ctx.SourceFile.ForEachChild(checkNode)
+	return found
 }
 
 func isDeeplyReferencingType(node *ast.Node, superTypeName string, visited map[*ast.Node]bool) bool {
