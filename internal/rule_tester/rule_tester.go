@@ -105,7 +105,6 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 
 	for i, testCase := range validTestCases {
 		t.Run("valid-"+strconv.Itoa(i), func(t *testing.T) {
-			t.Parallel() // Enable parallel execution of test cases
 			if (onlyMode && !testCase.Only) || testCase.Skip {
 				t.SkipNow()
 			}
@@ -124,7 +123,6 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 
 	for i, testCase := range invalidTestCases {
 		t.Run("invalid-"+strconv.Itoa(i), func(t *testing.T) {
-			t.Parallel() // Enable parallel execution of test cases
 			if (onlyMode && !testCase.Only) || testCase.Skip {
 				t.SkipNow()
 			}

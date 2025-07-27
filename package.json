@@ -17,8 +17,7 @@
     "format": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --write .",
     "format:check": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --check .",
     "test": "pnpm -r test",
-    "test:go": "go test -p $(nproc) -parallel $(nproc) ./internal/...",
-    "test:go:fast": "go test -p 4 -parallel 8 ./internal/...",
+    "test:go": "go test -p 4 ./internal/...",
     "typecheck": "pnpm tsc -b tsconfig.json",
     "lint": "rslint --config rslint.json"
   },
