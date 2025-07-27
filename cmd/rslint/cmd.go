@@ -27,7 +27,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/typescript-eslint/rslint/internal/config"
@@ -313,46 +312,6 @@ Options:
 	-h, --help        Show help
 `
 
-// read config and deserialize the jsonc result
-func loadRslintConfig(configPath string, currentDirectory string, fs vfs.FS) (rslintconfig.RslintConfig, string) {
-	configFileName := tspath.ResolvePath(currentDirectory, configPath)
-	if !fs.FileExists(configFileName) {
-		fmt.Fprintf(os.Stderr, "error: rslint config file %q doesn't exist\n", configFileName)
-		os.Exit(1)
-	}
-
-	data, ok := fs.ReadFile(configFileName)
-	if !ok {
-		fmt.Fprintf(os.Stderr, "error reading rslint config file %q\n", configFileName)
-		os.Exit(1)
-	}
-
-	var config rslintconfig.RslintConfig
-	// Use JSONC parser to support comments and trailing commas
-	if err := utils.ParseJSONC([]byte(data), &config); err != nil {
-		fmt.Fprintf(os.Stderr, "error parsing rslint config file %q: %v\n", configFileName, err)
-		os.Exit(1)
-	}
-	currentDirectory = tspath.GetDirectoryPath(configFileName)
-	return config, currentDirectory
-}
-func loadTsConfigFromRslintConfig(rslintConfig rslintconfig.RslintConfig, currentDirectory string, fs vfs.FS) []string {
-	tsConfig := []string{}
-	for _, entry := range rslintConfig {
-
-		for _, config := range entry.LanguageOptions.ParserOptions.Project {
-			tsconfigPath := tspath.ResolvePath(currentDirectory, config)
-
-			if !fs.FileExists(tsconfigPath) {
-				fmt.Fprintf(os.Stderr, "error: tsconfig file %q doesn't exist\n", tsconfigPath)
-				os.Exit(1)
-			}
-			tsConfig = append(tsConfig, tsconfigPath)
-
-		}
-	}
-	return tsConfig
-}
 func runCMD() int {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
@@ -442,35 +401,9 @@ func runCMD() int {
 	// Initialize rule registry with all available rules
 	rslintconfig.RegisterAllTypeSriptEslintPluginRules()
 	var rslintConfig rslintconfig.RslintConfig
-	var cwd string
 	var tsConfigs []string
 	// Load rslint configuration and determine which rules to enable
-	if config != "" {
-		rslintConfig, cwd = loadRslintConfig(config, currentDirectory, fs)
-		tsConfigs = loadTsConfigFromRslintConfig(rslintConfig, cwd, fs)
-	} else {
-		// Try to load default config files in order of preference
-		defaultConfigs := []string{"rslint.json", "rslint.jsonc"}
-		configLoaded := false
-		for _, defaultConfig := range defaultConfigs {
-			defaultConfigPath := tspath.ResolvePath(currentDirectory, defaultConfig)
-			if fs.FileExists(defaultConfigPath) {
-				rslintConfig, cwd = loadRslintConfig(defaultConfig, currentDirectory, fs)
-				tsConfigs = loadTsConfigFromRslintConfig(rslintConfig, cwd, fs)
-				configLoaded = true
-				break
-			}
-		}
-		if !configLoaded {
-			fmt.Fprintf(os.Stderr, "error: no rslint config file found. Expected rslint.json or rslint.jsonc\n")
-			return 1
-		}
-	}
-
-	if len(tsConfigs) == 0 {
-		fmt.Fprintf(os.Stderr, "error: no TypeScript configuration found in rslint config\n")
-		return 1
-	}
+	rslintConfig, tsConfigs, currentDirectory = rslintconfig.LoadConfigurationWithFallback(config, currentDirectory, fs)
 
 	host := utils.CreateCompilerHost(currentDirectory, fs)
 
