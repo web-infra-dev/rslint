@@ -43,6 +43,8 @@ type ColorScheme struct {
 	DimText     func(format string, a ...interface{}) string
 	BoldText    func(format string, a ...interface{}) string
 	BorderText  func(format string, a ...interface{}) string
+	RedText     func(format string, a ...interface{}) string
+	YellowText  func(format string, a ...interface{}) string
 }
 
 // setupColors initializes the color scheme based on environment and flags
@@ -68,6 +70,8 @@ func setupColors() *ColorScheme {
 	dimColor := color.New(color.Faint).SprintfFunc()
 	boldColor := color.New(color.Bold).SprintfFunc()
 	borderColor := color.New(color.Faint).SprintfFunc()
+	redColor := color.New(color.FgRed).SprintfFunc()
+	yellowColor := color.New(color.FgYellow).SprintfFunc()
 
 	return &ColorScheme{
 		RuleName:    ruleNameColor,
@@ -77,6 +81,8 @@ func setupColors() *ColorScheme {
 		DimText:     dimColor,
 		BoldText:    boldColor,
 		BorderText:  borderColor,
+		RedText:     redColor,
+		YellowText:  yellowColor,
 	}
 }
 
@@ -181,9 +187,9 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	w.WriteString(" — ")
 
 	// Severity level with conditional coloring
-	severityColor := colors.DimText
+	severityColor := colors.YellowText
 	if d.Severity == rule.SeverityError {
-		severityColor = colors.BoldText
+		severityColor = colors.RedText
 	}
 	w.WriteString(severityColor("[%s] ", d.Severity.String()))
 
