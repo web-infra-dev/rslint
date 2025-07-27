@@ -1,8 +1,43 @@
 # Rslint Project Copilot Instructions
 
-## Project Overview
-
 Rslint is a high-performance TypeScript/JavaScript linter written in Go, designed as a drop-in replacement for ESLint and TypeScript-ESLint. It leverages [typescript-go](https://github.com/microsoft/typescript-go) to achieve 20-40x speedup over traditional ESLint setups through native parsing, direct TypeScript AST usage, and parallel processing.
+
+## Code Standards
+
+### Required Before Each Commit
+
+- Run `pnpm install` to setup install
+- Run `pnpm run build` to build package
+- Run `pnpm run format` to ensure consistent code formatting
+- Run `pnpm run typecheck` to verify TypeScript types
+- Run `pnpm run lint` to check for linting errors
+- Run `pnpm run test` to execute all tests
+
+### Development Flow
+
+- Install: `pnpm install`
+- Build: `pnpm run build`
+- Format: `pnpm run format`
+- Lint: `pnpm run lint`
+- Type Check: `pnpm run typecheck`
+- Test: `pnpm run test`
+
+### Code Style & Patterns
+
+#### Go Code
+
+- Follow standard Go conventions and `gofmt` formatting
+- Use structured error handling with context
+- Implement rules as separate packages in `internal/rules/`
+- Each rule should have corresponding tests in its directory
+- Use the rule framework defined in `internal/rule/rule.go`
+
+#### TypeScript/JavaScript Code
+
+- Use TypeScript for all new code
+- Follow the existing ESM module structure
+- Maintain compatibility with Node.js APIs
+- Use proper type definitions for Go binary interactions
 
 ## Project Structure
 
@@ -45,62 +80,6 @@ typescript-go/         # TypeScript compiler Go port
 - **pnpm**: Package management (workspace setup)
 - **Go modules**: Go dependency management
 - **TypeScript**: Compilation and type checking
-
-## Development Guidelines
-
-### Code Style & Patterns
-
-#### Go Code
-
-- Follow standard Go conventions and `gofmt` formatting
-- Use structured error handling with context
-- Implement rules as separate packages in `internal/rules/`
-- Each rule should have corresponding tests in its directory
-- Use the rule framework defined in `internal/rule/rule.go`
-
-#### TypeScript/JavaScript Code
-
-- Use TypeScript for all new code
-- Follow the existing ESM module structure
-- Maintain compatibility with Node.js APIs
-- Use proper type definitions for Go binary interactions
-
-### Rule Implementation
-
-When implementing new lint rules:
-
-1. **Create rule directory**: `internal/rules/rule_name/`
-2. **Implement rule logic**: Follow the `Rule` interface
-3. **Add tests**: Include test cases with expected diagnostics
-4. **Register rule**: Add to the rule registry
-5. **Update documentation**: Include rule description and examples
-
-### Testing Strategy
-
-- **Go tests**: Use Go's built-in testing framework
-- **Rule tests**: Utilize the `rule_tester` package
-- **Node.js tests**: Use Node.js test runner for JavaScript API
-- **Integration tests**: Test the complete CLI workflow
-
-### Build Process
-
-```bash
-# Run Install
-pnpm install
-
-# Run build
-pnpm build
-
-# Run format
-pnpm format:check
-
-# Run lint
-pnpm lint
-
-# Run tests
-pnpm test
-
-```
 
 ## API Guidelines
 
