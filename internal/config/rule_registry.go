@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/typescript-eslint/rslint/internal/linter"
 	"github.com/typescript-eslint/rslint/internal/rule"
 )
 
@@ -33,18 +34,22 @@ func (r *RuleRegistry) GetAllRules() map[string]rule.Rule {
 }
 
 // GetEnabledRules returns rules that are enabled in the configuration for a given file
-func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string) []rule.Rule {
+func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string) []linter.ConfiguredRule {
 	enabledRuleConfigs := config.GetRulesForFile(filePath)
-	var enabledRules []rule.Rule
+	var enabledRules []linter.ConfiguredRule
 
 	for ruleName, ruleConfig := range enabledRuleConfigs {
 
 		if ruleConfig.IsEnabled() {
 			if ruleImpl, exists := r.rules[ruleName]; exists {
-				enabledRules = append(enabledRules, ruleImpl)
+				enabledRules = append(enabledRules, linter.ConfiguredRule{
+					Name:     ruleImpl.Name,
+					Severity: ruleConfig.GetSeverity(),
+					Run: func(ctx rule.RuleContext) rule.RuleListeners {
+						return ruleImpl.Run(ctx, nil)
+					},
+				})
 			}
-		} else {
-
 		}
 	}
 

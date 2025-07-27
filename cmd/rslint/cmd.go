@@ -43,6 +43,7 @@ type ColorScheme struct {
 	DimText     func(format string, a ...interface{}) string
 	BoldText    func(format string, a ...interface{}) string
 	BorderText  func(format string, a ...interface{}) string
+	WarnText    func(format string, a ...interface{}) string
 }
 
 // setupColors initializes the color scheme based on environment and flags
@@ -68,6 +69,7 @@ func setupColors() *ColorScheme {
 	dimColor := color.New(color.Faint).SprintfFunc()
 	boldColor := color.New(color.Bold).SprintfFunc()
 	borderColor := color.New(color.Faint).SprintfFunc()
+	WarnColor := color.New(color.FgYellow).SprintfFunc()
 
 	return &ColorScheme{
 		RuleName:    ruleNameColor,
@@ -77,6 +79,7 @@ func setupColors() *ColorScheme {
 		DimText:     dimColor,
 		BoldText:    boldColor,
 		BorderText:  borderColor,
+		WarnText:    WarnColor,
 	}
 }
 
@@ -131,6 +134,7 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 				Column: endColumn + 1,
 			},
 		},
+		Severity: d.Severity.String(),
 	}
 
 	jsonBytes, err := json.Marshal(diagnostic)
@@ -178,6 +182,13 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	w.WriteByte(' ')
 	w.WriteString(colors.RuleName(" %s ", d.RuleName))
 	w.WriteString(" — ")
+
+	// Severity level with conditional coloring
+	severityColor := colors.WarnText
+	if d.Severity == rule.SeverityError {
+		severityColor = colors.ErrorText
+	}
+	w.WriteString(severityColor("[%s] ", d.Severity.String()))
 
 	// Message handling
 	messageLineStart := 0
@@ -452,6 +463,7 @@ func runCMD() int {
 
 	diagnosticsChan := make(chan rule.RuleDiagnostic, 4096)
 	errorsCount := 0
+	warningsCount := 0
 
 	wg.Add(1)
 	go func() {
@@ -459,8 +471,12 @@ func runCMD() int {
 		w := bufio.NewWriterSize(os.Stdout, 4096*100)
 		defer w.Flush()
 		for d := range diagnosticsChan {
-			errorsCount++
-			if errorsCount == 1 {
+			if d.Severity == rule.SeverityError {
+				errorsCount++
+			} else if d.Severity == rule.SeverityWarning {
+				warningsCount++
+			}
+			if errorsCount+warningsCount == 1 {
 				w.WriteByte('\n')
 			}
 			printDiagnostic(d, w, comparePathOptions, format)
@@ -476,14 +492,7 @@ func runCMD() int {
 		files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
-			return utils.Map(activeRules, func(r rule.Rule) linter.ConfiguredRule {
-				return linter.ConfiguredRule{
-					Name: r.Name,
-					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return r.Run(ctx, nil)
-					},
-				}
-			})
+			return activeRules
 		},
 		func(d rule.RuleDiagnostic) {
 			diagnosticsChan <- d
@@ -503,13 +512,26 @@ func runCMD() int {
 	if errorsCount == 0 {
 		errorsColorFunc = colors.SuccessText
 	} else {
-		errorsColorFunc = colors.BoldText
+		errorsColorFunc = colors.ErrorText
+	}
+
+	var warningsColorFunc func(string, ...interface{}) string
+	if warningsCount == 0 {
+		warningsColorFunc = colors.SuccessText
+	} else {
+		warningsColorFunc = colors.WarnText
 	}
 
 	errorsText := "errors"
 	if errorsCount == 1 {
 		errorsText = "error"
 	}
+
+	warningsText := "warnings"
+	if warningsCount == 1 {
+		warningsText = "warning"
+	}
+
 	filesText := "files"
 	if len(files) == 1 {
 		filesText = "file"
@@ -521,9 +543,11 @@ func runCMD() int {
 	if format == "default" {
 		fmt.Fprintf(
 			os.Stdout,
-			"Found %s %s %s(linted %s %s with in %s using %s threads)%s\n",
+			"Found %s %s and %s %s %s(linted %s %s with in %s using %s threads)%s\n",
 			errorsColorFunc("%d", errorsCount),
 			errorsText,
+			warningsColorFunc("%d", warningsCount),
+			warningsText,
 			colors.DimText(""),
 			colors.BoldText("%d", len(files)),
 			filesText,
