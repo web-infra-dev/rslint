@@ -12,7 +12,7 @@ Build the project:
 
 ```bash
 # init typescript-go submodule
-git submodule update --init
+git submodule update --init --recursive
 pnpm install
 pnpm build
 ```
@@ -20,7 +20,35 @@ pnpm build
 Test the setup:
 
 ```bash
-pnpm -r lint
+# Run all tests
+pnpm test
+
+# Run Go tests only
+pnpm run test:go
+
+# Run linting
+pnpm run lint
+
+# Run type checking
+pnpm run typecheck
+
+# Check code formatting
+pnpm run format:check
+```
+
+## Test the CLI
+
+After building, you can test the rslint CLI:
+
+```bash
+# Test the binary
+./packages/rslint/bin/rslint --help
+
+# List files that would be linted
+./packages/rslint/bin/rslint --list-files
+
+# Lint the project itself
+./packages/rslint/bin/rslint --config rslint.json
 ```
 
 ## Debugging VSCode Extension
