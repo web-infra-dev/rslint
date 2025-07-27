@@ -329,7 +329,8 @@ func loadRslintConfig(configPath string, currentDirectory string, fs vfs.FS) (rs
 	}
 
 	var config rslintconfig.RslintConfig
-	if err := json.Unmarshal([]byte(data), &config); err != nil {
+	// Use JSONC parser to support comments and trailing commas
+	if err := utils.ParseJSONC([]byte(data), &config); err != nil {
 		fmt.Fprintf(os.Stderr, "error parsing rslint config file %q: %v\n", configFileName, err)
 		os.Exit(1)
 	}
@@ -467,7 +468,21 @@ func runCMD() int {
 		rslintConfig, cwd = loadRslintConfig(config, currentDirectory, fs)
 		tsConfigs = loadTsConfigFromRslintConfig(rslintConfig, cwd, fs)
 	} else {
-		rslintConfig = rslintconfig.RslintConfig{}
+		// Try to load default config files in order of preference
+		defaultConfigs := []string{"rslint.jsonc", "rslint.json"}
+		configLoaded := false
+		for _, defaultConfig := range defaultConfigs {
+			defaultConfigPath := tspath.ResolvePath(currentDirectory, defaultConfig)
+			if fs.FileExists(defaultConfigPath) {
+				rslintConfig, cwd = loadRslintConfig(defaultConfig, currentDirectory, fs)
+				tsConfigs = loadTsConfigFromRslintConfig(rslintConfig, cwd, fs)
+				configLoaded = true
+				break
+			}
+		}
+		if !configLoaded {
+			rslintConfig = rslintconfig.RslintConfig{}
+		}
 	}
 
 	host := utils.CreateCompilerHost(currentDirectory, fs)

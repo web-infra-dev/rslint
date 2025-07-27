@@ -1,10 +1,14 @@
 [
   {
-    "language": "javascript",
-    "files": [],
+    "language": "javascript", // includes typescript & javascript, we may support register other language in the future
+    "files": [], // extra files out of tsconfig.json
     "languageOptions": {
       "parserOptions": {
+        // enable project service for typed linting which will run tsgo language service behind the scene
         "projectService": false,
+        // FIXME: enable legacy multi tsconfig project
+        // tsgo doesn't support project reference yet, so we have to set config manually
+        // will consider migrate to project service when it's supported
         "project": [
           "./packages/rslint/tsconfig.build.json",
           "./packages/rslint-test-tools/tsconfig.spec.json",
