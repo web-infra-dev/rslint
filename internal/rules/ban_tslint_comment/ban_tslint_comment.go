@@ -34,6 +34,9 @@ var BanTslintCommentRule = rule.Rule{
 		sourceFile := ctx.SourceFile
 		sourceText := string(sourceFile.Text())
 		
+		// Track processed positions to avoid duplicates
+		processed := make(map[int]bool)
+		
 		// Process all tslint comments immediately
 		pos := 0
 		for {
@@ -44,21 +47,38 @@ var BanTslintCommentRule = rule.Rule{
 			tslintPos += pos
 			
 			// Find the start of the comment
-			commentStart := strings.LastIndex(sourceText[:tslintPos], "//")
-			blockCommentStart := strings.LastIndex(sourceText[:tslintPos], "/*")
+			commentStart := -1
+			isBlockComment := false
 			
-			// Use the closest comment start
-			if blockCommentStart > commentStart {
-				commentStart = blockCommentStart
+			// Look for line comment start
+			lineCommentStart := strings.LastIndex(sourceText[:tslintPos], "//")
+			if lineCommentStart != -1 {
+				// Verify there's no newline between // and tslint:
+				if !strings.Contains(sourceText[lineCommentStart:tslintPos], "\n") {
+					commentStart = lineCommentStart
+				}
 			}
 			
-			if commentStart == -1 {
+			// Look for block comment start
+			blockCommentStart := strings.LastIndex(sourceText[:tslintPos], "/*")
+			if blockCommentStart != -1 {
+				// Verify there's no */ between /* and tslint:
+				if !strings.Contains(sourceText[blockCommentStart:tslintPos], "*/") {
+					// Use block comment if it's closer than line comment
+					if blockCommentStart > commentStart {
+						commentStart = blockCommentStart
+						isBlockComment = true
+					}
+				}
+			}
+			
+			if commentStart == -1 || processed[commentStart] {
 				pos = tslintPos + 7
 				continue
 			}
 			
-			// Determine if it's a block comment
-			isBlockComment := strings.HasPrefix(sourceText[commentStart:], "/*")
+			// Mark this comment as processed
+			processed[commentStart] = true
 			
 			// Find the end of the comment
 			var commentEnd int

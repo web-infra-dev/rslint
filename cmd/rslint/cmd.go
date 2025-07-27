@@ -126,7 +126,7 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 		FilePath:  tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions),
 		Range: Range{
 			Start: Location{
-				Line:   startLine + 1, // Convert to 1-based indexing
+				Line:   startLine + 1,
 				Column: startColumn + 1,
 			},
 			End: Location{

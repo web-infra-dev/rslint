@@ -192,9 +192,8 @@ func isIncludedInstanceMethod(ctx rule.RuleContext, node *ast.Node, options *Opt
 	// Check if method definition with constructor kind (but constructors are handled above)
 	// This check is redundant since constructors have their own node type
 
-	// Check enforceForClassFields option for property declarations only
-	// Accessors (getters/setters) should always be checked
-	if ast.IsPropertyDeclaration(node) {
+	// Check enforceForClassFields option for property declarations and accessors
+	if ast.IsPropertyDeclaration(node) || ast.IsGetAccessorDeclaration(node) || ast.IsSetAccessorDeclaration(node) {
 		if options.EnforceForClassFields == nil || !*options.EnforceForClassFields {
 			return false
 		}
@@ -292,15 +291,16 @@ func shouldIgnoreMethod(stackContext *StackInfo, options *Options) bool {
 			return false
 		}
 
-		if classDecl != nil && classDecl.HeritageClauses != nil {
+		if classDecl != nil {
 			hasImplements := false
-			for _, clause := range classDecl.HeritageClauses.Nodes {
-				if clause.AsHeritageClause().Token == ast.KindImplementsKeyword {
-					hasImplements = true
-					break
+			if classDecl.HeritageClauses != nil && len(classDecl.HeritageClauses.Nodes) > 0 {
+				for _, clause := range classDecl.HeritageClauses.Nodes {
+					if clause.AsHeritageClause().Token == ast.KindImplementsKeyword {
+						hasImplements = true
+						break
+					}
 				}
 			}
-
 			if hasImplements {
 				switch v := options.IgnoreClassesThatImplementAnInterface.(type) {
 				case bool:
@@ -331,7 +331,18 @@ var ClassMethodsUseThisRule = rule.Rule{
 		}
 
 		if options != nil {
-			if optMap, ok := options.(map[string]interface{}); ok {
+			var optMap map[string]interface{}
+			
+			// Handle both direct map and array of maps
+			if m, ok := options.(map[string]interface{}); ok {
+				optMap = m
+			} else if arr, ok := options.([]interface{}); ok && len(arr) > 0 {
+				if m, ok := arr[0].(map[string]interface{}); ok {
+					optMap = m
+				}
+			}
+			
+			if optMap != nil {
 				if val, exists := optMap["enforceForClassFields"]; exists {
 					if b, ok := val.(bool); ok {
 						opts.EnforceForClassFields = &b
@@ -398,31 +409,26 @@ var ClassMethodsUseThisRule = rule.Rule{
 		}
 
 		enterFunction := func(node *ast.Node) {
-			var member *ast.Node
-			// For arrow functions and function expressions, we need to find the class member
-			parent := node.Parent
-			for parent != nil {
+			// Simplified context detection to match TypeScript behavior
+			// Check if the immediate parent is a class member (direct relationship)
+			if node.Parent != nil {
+				parent := node.Parent
 				switch parent.Kind {
 				case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-					member = parent
-					break
+					pushContext(parent)
+					return
 				case ast.KindPropertyDeclaration:
-					// Check if this function is the initializer of the property
+					// Check if this function is the direct initializer of the property
 					propDecl := parent.AsPropertyDeclaration()
-					if propDecl.Initializer != nil && isNodeOrDescendant(propDecl.Initializer, node) {
-						member = parent
+					if propDecl.Initializer == node {
+						pushContext(parent)
+						return
 					}
-					break
-				case ast.KindClassDeclaration, ast.KindClassExpression:
-					// Stop looking if we reach a class boundary
-					break
+				// Note: AccessorProperty doesn't exist in current AST, handled via PropertyDeclaration with accessor modifier
 				}
-				if member != nil {
-					break
-				}
-				parent = parent.Parent
 			}
-			pushContext(member)
+			// If not a direct child of a class member, push nil context
+			pushContext(nil)
 		}
 
 		exitFunction := func(node *ast.Node) {
@@ -583,11 +589,118 @@ var ClassMethodsUseThisRule = rule.Rule{
 			},
 		}
 
-		// Arrow functions
-		listeners[ast.KindArrowFunction] = enterFunction
-		listeners[rule.ListenerOnExit(ast.KindArrowFunction)] = exitFunction
+		// Arrow functions - but only handle them if they're not already handled as property initializers
+		listeners[ast.KindArrowFunction] = func(node *ast.Node) {
+			// Check if this arrow function is a property initializer
+			if node.Parent != nil && node.Parent.Kind == ast.KindPropertyDeclaration {
+				propDecl := node.Parent.AsPropertyDeclaration()
+				if propDecl.Initializer == node {
+					// This is handled by PropertyDeclaration logic, skip here
+					return
+				}
+			}
+			enterFunction(node)
+		}
+		listeners[rule.ListenerOnExit(ast.KindArrowFunction)] = func(node *ast.Node) {
+			// Check if this arrow function is a property initializer
+			if node.Parent != nil && node.Parent.Kind == ast.KindPropertyDeclaration {
+				propDecl := node.Parent.AsPropertyDeclaration()
+				if propDecl.Initializer == node {
+					// This is handled by PropertyDeclaration logic, skip here
+					return
+				}
+			}
+			exitFunction(node)
+		}
 
-		// Property declarations are handled by the function visitors
+		// Add specific handling for PropertyDefinition > ArrowFunctionExpression when enforceForClassFields is enabled
+		if opts.EnforceForClassFields != nil && *opts.EnforceForClassFields {
+			listeners[ast.KindPropertyDeclaration] = func(node *ast.Node) {
+				property := node.AsPropertyDeclaration()
+				if property.Initializer != nil && property.Initializer.Kind == ast.KindArrowFunction {
+					// This is a property with arrow function initializer - treat it like a method
+					pushContext(node)
+				}
+			}
+			listeners[rule.ListenerOnExit(ast.KindPropertyDeclaration)] = func(node *ast.Node) {
+				property := node.AsPropertyDeclaration()
+				if property.Initializer != nil && property.Initializer.Kind == ast.KindArrowFunction {
+					// Exit the context for property with arrow function
+					stackContext := popContext()
+					
+					if shouldIgnoreMethod(stackContext, opts) {
+						return
+					}
+					
+					if stackContext.Member != nil && isIncludedInstanceMethod(ctx, stackContext.Member, opts) {
+						// Report the error on the arrow function for better positioning
+						var reportNode *ast.Node
+						if property.Initializer != nil && property.Initializer.Kind == ast.KindArrowFunction {
+							reportNode = property.Initializer
+						} else if property.Name() != nil {
+							reportNode = property.Name()
+						} else {
+							reportNode = node
+						}
+						functionName := "property '" + getStaticMemberAccessValue(ctx, node) + "'"
+						ctx.ReportNode(reportNode, buildMissingThisMessage(functionName))
+					}
+				}
+			}
+		}
+
+		// Handle accessor properties (PropertyDeclaration with accessor modifier)
+		// Since enforceForClassFields affects accessor properties when enabled
+		if opts.EnforceForClassFields != nil && *opts.EnforceForClassFields {
+			// Enhance existing PropertyDeclaration listeners to also handle accessor properties
+			existingEnterListener := listeners[ast.KindPropertyDeclaration]
+			listeners[ast.KindPropertyDeclaration] = func(node *ast.Node) {
+				property := node.AsPropertyDeclaration()
+				
+				// Handle arrow function initializers first
+				if existingEnterListener != nil {
+					existingEnterListener(node)
+				}
+				
+				// Also handle accessor properties
+				if ast.HasAccessorModifier(node) && (property.Initializer == nil || property.Initializer.Kind != ast.KindArrowFunction) {
+					// This is an accessor property without arrow function - treat it like a method
+					pushContext(node)
+				}
+			}
+			
+			existingExitListener := listeners[rule.ListenerOnExit(ast.KindPropertyDeclaration)]
+			listeners[rule.ListenerOnExit(ast.KindPropertyDeclaration)] = func(node *ast.Node) {
+				property := node.AsPropertyDeclaration()
+				
+				// Handle arrow function initializers first
+				if existingExitListener != nil {
+					existingExitListener(node)
+				}
+				
+				// Also handle accessor properties
+				if ast.HasAccessorModifier(node) && (property.Initializer == nil || property.Initializer.Kind != ast.KindArrowFunction) {
+					// Exit the context for accessor property
+					stackContext := popContext()
+					
+					if shouldIgnoreMethod(stackContext, opts) {
+						return
+					}
+					
+					if stackContext.Member != nil && isIncludedInstanceMethod(ctx, stackContext.Member, opts) {
+						// Report the error on the property name
+						var reportNode *ast.Node
+						if property.Name() != nil {
+							reportNode = property.Name()
+						} else {
+							reportNode = node
+						}
+						functionName := "accessor '" + getStaticMemberAccessValue(ctx, node) + "'"
+						ctx.ReportNode(reportNode, buildMissingThisMessage(functionName))
+					}
+				}
+			}
+		}
 
 		return listeners
 	},

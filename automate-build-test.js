@@ -209,7 +209,14 @@ function logProgress(message, data = {}) {
   }
 
   // Regular progress messages
-  if (data.phase === 'test-start') {
+  if (data.phase === 'go-test-start') {
+    console.log('');
+    log(`Testing Go package ${data.packageName} (attempt ${data.attempt}/${data.maxAttempts})`, 'progress');
+  } else if (data.phase === 'go-test-pass') {
+    log(`✓ Go package ${data.packageName} passed in ${data.durationMs}ms`, 'success');
+  } else if (data.phase === 'go-test-fail') {
+    log(`✗ Go package ${data.packageName} failed with exit code ${data.exitCode}`, 'error');
+  } else if (data.phase === 'test-start') {
     console.log('');
     log(`Testing ${data.testName} (attempt ${data.attempt}/${data.maxAttempts})`, 'progress');
   } else if (data.phase === 'test-pass') {
@@ -306,12 +313,13 @@ async function runClaudeWithStreaming(prompt) {
   return new Promise((resolve) => {
     // Use same flags as porter: -p, --verbose, --output-format stream-json
     const settingsFile = join(__dirname, '.claude', 'settings.local.json');
-    const args = [
+ const args = [
       '-p',
       '--verbose',
       '--output-format', 'stream-json',
+      '--model', 'claude-sonnet-4-20250514',
       '--max-turns', '500',
-      '--settings', settingsFile,
+      // '--settings', settingsFile,
       '--dangerously-skip-permissions'
     ];
 
@@ -518,7 +526,30 @@ IMPORTANT:
   }
 }
 
-async function runBuild() {
+// Helper function to chunk error output into equal pieces for workers
+function chunkErrorOutput(errorOutput, numChunks) {
+  const lines = errorOutput.split('\n');
+  const chunks = [];
+  
+  // Calculate lines per chunk
+  const linesPerChunk = Math.ceil(lines.length / numChunks);
+  
+  for (let i = 0; i < numChunks; i++) {
+    const start = i * linesPerChunk;
+    const end = Math.min(start + linesPerChunk, lines.length);
+    
+    if (start < lines.length) {
+      const chunkLines = lines.slice(start, end);
+      if (chunkLines.length > 0) {
+        chunks.push(chunkLines.join('\n'));
+      }
+    }
+  }
+  
+  return chunks;
+}
+
+async function runBuild(concurrentMode = false, workerCount = DEFAULT_WORKERS) {
   log('Starting build process...', 'info');
 
   try {
@@ -541,22 +572,242 @@ async function runBuild() {
       const buildCommand = `${BUILD_COMMAND} ${BUILD_ARGS.join(' ')}`;
       const errorOutput = result.stderr || result.stdout;
 
-      // Try to fix with Claude CLI
-      const fixed = await fixErrorWithClaudeCLI(errorOutput, buildCommand);
+      // Check if error output is very long and we're in concurrent mode
+      const errorLines = errorOutput.split('\n').length;
+      const shouldChunk = errorLines > 100 && concurrentMode && workerCount > 1;
 
-      if (fixed) {
-        // Retry build after fix
-        log('Retrying build after Claude CLI fix...', 'info');
-        return await runBuild();
+      if (shouldChunk) {
+        log(`Build error is large (${errorLines} lines), splitting into ${workerCount} chunks for parallel fixing...`, 'info');
+        
+        // Chunk the error output based on worker count
+        const errorChunks = chunkErrorOutput(errorOutput, workerCount);
+        log(`Split into ${errorChunks.length} chunks for parallel processing`, 'info');
+        
+        // Process chunks in parallel using Promise.all
+        const fixPromises = errorChunks.map(async (chunk, index) => {
+          log(`Processing error chunk ${index + 1}/${errorChunks.length}...`, 'info');
+          
+          // Create a more focused prompt for each chunk
+          const chunkPrompt = `This is error chunk ${index + 1} of ${errorChunks.length} from a build failure.
+Focus on fixing ONLY the errors in this specific chunk:
+
+${chunk}
+
+Build command: ${buildCommand}`;
+          
+          return await fixErrorWithClaudeCLI(chunkPrompt, buildCommand);
+        });
+        
+        // Wait for all chunks to be processed
+        const results = await Promise.all(fixPromises);
+        
+        // If any chunk was fixed, retry the build
+        if (results.some(fixed => fixed)) {
+          log('At least one error chunk was fixed, retrying build...', 'info');
+          return await runBuild(concurrentMode, workerCount);
+        } else {
+          log('Failed to fix any build error chunks', 'error');
+          return false;
+        }
       } else {
-        log('Failed to fix build error with Claude CLI', 'error');
-        return false;
+        // Original single-threaded approach for smaller errors or non-concurrent mode
+        const fixed = await fixErrorWithClaudeCLI(errorOutput, buildCommand);
+
+        if (fixed) {
+          // Retry build after fix
+          log('Retrying build after Claude CLI fix...', 'info');
+          return await runBuild(concurrentMode, workerCount);
+        } else {
+          log('Failed to fix build error with Claude CLI', 'error');
+          return false;
+        }
       }
     }
   } catch (error) {
     log(`Build process error: ${error.message}`, 'error');
     return false;
   }
+}
+
+async function getGoTestPackages() {
+  try {
+    // Get list of all Go packages with tests
+    const result = await runCommand('go', ['list', './internal/...'], {
+      cwd: __dirname
+    });
+    
+    if (result.code === 0) {
+      const packages = result.stdout.trim().split('\n').filter(pkg => pkg.length > 0);
+      return packages;
+    }
+    
+    return [];
+  } catch (error) {
+    log(`Error listing Go packages: ${error.message}`, 'error');
+    return [];
+  }
+}
+
+async function runSingleGoTest(packagePath, attemptNumber = 1) {
+  const packageName = packagePath.split('/').pop();
+  const startTime = Date.now();
+  
+  logProgress('Go test execution started', {
+    phase: 'go-test-start',
+    packageName,
+    packagePath,
+    attempt: attemptNumber,
+    maxAttempts: MAX_FIX_ATTEMPTS
+  });
+  
+  try {
+    const result = await runCommand('go', ['test', packagePath, '-v'], {
+      timeout: 120000, // 2 minutes per package
+      cwd: __dirname
+    });
+
+    if (result.code === 0) {
+      const duration = Date.now() - startTime;
+      logProgress('Go test passed', {
+        phase: 'go-test-pass',
+        packageName,
+        durationMs: duration
+      });
+      return true;
+    } else {
+      logProgress('Go test failed', {
+        phase: 'go-test-fail',
+        packageName,
+        exitCode: result.code,
+        stderr: result.stderr?.slice(0, 1000),
+        stdout: result.stdout?.slice(0, 1000)
+      });
+      
+      const goTestCommand = `go test ${packagePath} -v`;
+      const errorOutput = result.stderr || result.stdout;
+      
+      if (attemptNumber < MAX_FIX_ATTEMPTS) {
+        log(`Attempting to fix Go test error in ${packageName} (attempt ${attemptNumber}/${MAX_FIX_ATTEMPTS})...`, 'warning');
+        
+        // Create a specific prompt for this package's test failures
+        const goTestPrompt = `Go tests are failing for package: ${packagePath}
+
+Error output:
+${errorOutput}
+
+Command that failed: ${goTestCommand}
+
+IMPORTANT:
+- Focus on fixing ONLY the test failures in the ${packageName} package
+- The package is located at: ${packagePath}
+- Common issues include:
+  - Missing test cases
+  - Incorrect assertions
+  - Type mismatches
+  - Missing imports
+  - Rule logic errors
+  - Incorrect expected values
+
+Please fix the failing tests in this specific package.`;
+        
+        const fixed = await fixErrorWithClaudeCLI(goTestPrompt, goTestCommand);
+        
+        if (fixed) {
+          log('Claude completed fix attempt, retrying Go test...', 'info');
+          return await runSingleGoTest(packagePath, attemptNumber + 1);
+        } else {
+          log(`Claude CLI failed to fix ${packageName} test issues`, 'error');
+        }
+      }
+      
+      log(`Go test failed for ${packageName} after ${attemptNumber} attempts`, 'error');
+      return false;
+    }
+  } catch (error) {
+    if (error.message.includes('timed out')) {
+      log(`Go test timed out for ${packageName} after ${TEST_TIMEOUT}ms`, 'error');
+    } else {
+      log(`Go test error for ${packageName}: ${error.message}`, 'error');
+    }
+    return false;
+  }
+}
+
+async function runAllGoTests(concurrentMode = false, workerCount = DEFAULT_WORKERS) {
+  const packages = await getGoTestPackages();
+  const totalGoTests = packages.length;
+  
+  if (totalGoTests === 0) {
+    log('No Go test packages found', 'warning');
+    return true;
+  }
+  
+  log(`Found ${totalGoTests} Go packages to test`, 'info');
+  
+  let passedGoTests = 0;
+  let failedGoTests = 0;
+  
+  if (concurrentMode && workerCount > 1) {
+    // Run Go tests in parallel
+    log(`Running Go tests in parallel with ${workerCount} workers`, 'info');
+    
+    // Process packages in batches
+    const batchSize = Math.ceil(packages.length / workerCount);
+    const batches = [];
+    
+    for (let i = 0; i < packages.length; i += batchSize) {
+      batches.push(packages.slice(i, i + batchSize));
+    }
+    
+    const results = await Promise.all(
+      batches.map(async (batch) => {
+        let batchPassed = 0;
+        let batchFailed = 0;
+        
+        for (const pkg of batch) {
+          const success = await runSingleGoTest(pkg);
+          if (success) {
+            batchPassed++;
+          } else {
+            batchFailed++;
+          }
+        }
+        
+        return { passed: batchPassed, failed: batchFailed };
+      })
+    );
+    
+    // Aggregate results
+    results.forEach(result => {
+      passedGoTests += result.passed;
+      failedGoTests += result.failed;
+    });
+  } else {
+    // Run Go tests sequentially
+    for (let i = 0; i < packages.length; i++) {
+      const pkg = packages[i];
+      const pkgName = pkg.split('/').pop();
+      
+      console.log(`\n${colors.bright}[${i + 1}/${totalGoTests}] Go Test: ${pkgName}${colors.reset}`);
+      console.log('-'.repeat(40));
+      
+      const success = await runSingleGoTest(pkg);
+      
+      if (success) {
+        passedGoTests++;
+      } else {
+        failedGoTests++;
+      }
+      
+      // Show running totals
+      console.log(`\n${colors.dim}Go tests progress: ${passedGoTests} passed, ${failedGoTests} failed, ${totalGoTests - passedGoTests - failedGoTests} remaining${colors.reset}`);
+    }
+  }
+  
+  log(`Go test suite completed: ${passedGoTests}/${totalGoTests} passed (${Math.round((passedGoTests / totalGoTests) * 100)}%)`, 
+      failedGoTests > 0 ? 'warning' : 'success');
+  
+  return failedGoTests === 0;
 }
 
 async function getTestFiles() {
@@ -1030,7 +1281,7 @@ async function runCompleteProcess() {
   // Step 1: Build (only for main process)
   if (!IS_WORKER) {
     console.log(`\n${colors.bright}=== BUILD PHASE ===${colors.reset}`);
-    const buildSuccess = await runBuild();
+    const buildSuccess = await runBuild(concurrentMode, workerCount);
 
     if (!buildSuccess) {
       log('Build failed, stopping automation', 'error');
@@ -1038,9 +1289,20 @@ async function runCompleteProcess() {
     }
   }
 
-  // Step 2: Run tests
+  // Step 2: Run Go tests (only for main process)
   if (!IS_WORKER) {
-    console.log(`\n${colors.bright}=== TEST PHASE ===${colors.reset}`);
+    console.log(`\n${colors.bright}=== GO TEST PHASE ===${colors.reset}`);
+    const goTestSuccess = await runAllGoTests(concurrentMode, workerCount);
+
+    if (!goTestSuccess) {
+      log('Go tests failed, stopping automation', 'error');
+      process.exit(1);
+    }
+  }
+
+  // Step 3: Run TypeScript tests
+  if (!IS_WORKER) {
+    console.log(`\n${colors.bright}=== TYPESCRIPT TEST PHASE ===${colors.reset}`);
   }
   await runAllTests(concurrentMode, workerCount);
 

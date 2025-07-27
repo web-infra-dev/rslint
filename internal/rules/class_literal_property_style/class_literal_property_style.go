@@ -285,13 +285,13 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 				var nameText string
 				if nameNode.Kind == ast.KindComputedPropertyName {
 					// For computed properties, get the full text including brackets
-					nameText = string(ctx.SourceFile.Text()[nameNode.Pos():nameNode.End()])
+					nameText = strings.TrimSpace(string(ctx.SourceFile.Text()[nameNode.Pos():nameNode.End()]))
 				} else {
 					// For regular identifiers, just get the text
 					nameText = nameNode.Text()
 				}
 				
-				valueText := string(ctx.SourceFile.Text()[returnStmt.Expression.Pos():returnStmt.Expression.End()])
+				valueText := strings.TrimSpace(string(ctx.SourceFile.Text()[returnStmt.Expression.Pos():returnStmt.Expression.End()]))
 
 				var fixText string
 				fixText += printNodeModifiers(node, "readonly")
@@ -350,13 +350,13 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 					var nameText string
 					if nameNode.Kind == ast.KindComputedPropertyName {
 						// For computed properties, get the full text including brackets
-						nameText = string(ctx.SourceFile.Text()[nameNode.Pos():nameNode.End()])
+						nameText = strings.TrimSpace(string(ctx.SourceFile.Text()[nameNode.Pos():nameNode.End()]))
 					} else {
 						// For regular identifiers, just get the text
 						nameText = nameNode.Text()
 					}
 					
-					valueText := string(ctx.SourceFile.Text()[property.Initializer.Pos():property.Initializer.End()])
+					valueText := strings.TrimSpace(string(ctx.SourceFile.Text()[property.Initializer.Pos():property.Initializer.End()]))
 
 					var fixText string
 					fixText += printNodeModifiers(node, "get")
@@ -383,7 +383,8 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 				}
 			}
 
-			// When preferring getters, track readonly properties and exclude assigned ones
+			// Track class declarations and expressions to match TypeScript-ESLint ClassBody behavior
+			// Since Go AST doesn't have a separate ClassBody node, use the class nodes themselves
 			listeners[ast.KindClassDeclaration] = func(node *ast.Node) {
 				enterClassBody()
 			}
@@ -397,7 +398,59 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 				exitClassBody()
 			}
 
-			// Track property assignments in constructors
+			// ThisExpression pattern matching for constructor exclusions
+			// This matches the TypeScript-ESLint pattern: 'MethodDefinition[kind="constructor"] ThisExpression'
+			listeners[ast.KindThisKeyword] = func(node *ast.Node) {
+				// Check if this is inside a member expression (this.property or this['property'])
+				if node.Parent == nil || (!ast.IsPropertyAccessExpression(node.Parent) && !ast.IsElementAccessExpression(node.Parent)) {
+					return
+				}
+
+				memberExpr := node.Parent
+				var propName string
+				
+				if ast.IsPropertyAccessExpression(memberExpr) {
+					propAccess := memberExpr.AsPropertyAccessExpression()
+					propName = extractPropertyName(ctx, propAccess.Name())
+				} else if ast.IsElementAccessExpression(memberExpr) {
+					elemAccess := memberExpr.AsElementAccessExpression()
+					if ast.IsLiteralExpression(elemAccess.ArgumentExpression) {
+						propName = extractPropertyName(ctx, elemAccess.ArgumentExpression)
+					}
+				}
+
+				if propName == "" {
+					return
+				}
+
+				// Walk up to find the containing function
+				parent := memberExpr.Parent
+				for parent != nil && !isFunction(parent) {
+					parent = parent.Parent
+				}
+
+				// Check if this function is a constructor by checking its parent
+				if parent != nil && parent.Parent != nil {
+					if ast.IsMethodDeclaration(parent.Parent) {
+						method := parent.Parent.AsMethodDeclaration()
+						if method.Kind == ast.KindConstructorKeyword {
+							// We're in a constructor - exclude this property
+							if len(propertiesInfoStack) > 0 {
+								info := propertiesInfoStack[len(propertiesInfoStack)-1]
+								info.excludeSet[propName] = true
+							}
+						}
+					} else if ast.IsConstructorDeclaration(parent.Parent) {
+						// Direct constructor declaration
+						if len(propertiesInfoStack) > 0 {
+							info := propertiesInfoStack[len(propertiesInfoStack)-1]
+							info.excludeSet[propName] = true
+						}
+					}
+				}
+			}
+
+			// Track property assignments in constructors (keeping existing logic as fallback)
 			listeners[ast.KindBinaryExpression] = func(node *ast.Node) {
 				binary := node.AsBinaryExpression()
 				if binary.OperatorToken.Kind != ast.KindEqualsToken {

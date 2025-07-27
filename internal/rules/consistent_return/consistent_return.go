@@ -346,15 +346,17 @@ var ConsistentReturnRule = rule.Rule{
 				if hasArgument {
 					if funcInfo.hasNoReturnValue {
 						// This return has a value but previous returns didn't
-						// Report error on the entire return statement including the value
-						ctx.ReportRange(utils.TrimNodeTextRange(ctx.SourceFile, node), buildUnexpectedReturnValueMessage(funcInfo.functionName))
+						// Report error on the return expression, not the entire statement
+						ctx.ReportNode(returnStmt.Expression, buildUnexpectedReturnValueMessage(funcInfo.functionName))
 					}
 					funcInfo.hasReturnValue = true
 				} else {
 					if funcInfo.hasReturnValue {
 						// This return has no value but previous returns did
-						// Report error on the return statement (keyword + semicolon)
-						ctx.ReportRange(utils.TrimNodeTextRange(ctx.SourceFile, node), buildMissingReturnValueMessage(funcInfo.functionName))
+						// For missing return value, report on the return statement node
+						// Include the semicolon in the range to match expected behavior
+						nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
+						ctx.ReportRange(nodeRange, buildMissingReturnValueMessage(funcInfo.functionName))
 					}
 					funcInfo.hasNoReturnValue = true
 				}

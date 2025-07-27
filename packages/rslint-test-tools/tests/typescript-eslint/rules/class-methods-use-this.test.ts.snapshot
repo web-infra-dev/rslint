@@ -706,7 +706,7 @@ exports[`class-methods-use-this > invalid 34`] = `
     {
       "ruleName": "class-methods-use-this",
       "messageId": "missingThis",
-      "message": "Expected 'this' to be used by class arrow function.",
+      "message": "Expected 'this' to be used by class property 'property'.",
       "filePath": "src/virtual.ts",
       "range": {
         "start": {
@@ -732,7 +732,7 @@ exports[`class-methods-use-this > invalid 35`] = `
     {
       "ruleName": "class-methods-use-this",
       "messageId": "missingThis",
-      "message": "Expected 'this' to be used by class arrow function.",
+      "message": "Expected 'this' to be used by class property '#property'.",
       "filePath": "src/virtual.ts",
       "range": {
         "start": {
@@ -758,7 +758,7 @@ exports[`class-methods-use-this > invalid 36`] = `
     {
       "ruleName": "class-methods-use-this",
       "messageId": "missingThis",
-      "message": "Expected 'this' to be used by class arrow function.",
+      "message": "Expected 'this' to be used by class property 'property'.",
       "filePath": "src/virtual.ts",
       "range": {
         "start": {
@@ -784,7 +784,7 @@ exports[`class-methods-use-this > invalid 37`] = `
     {
       "ruleName": "class-methods-use-this",
       "messageId": "missingThis",
-      "message": "Expected 'this' to be used by class arrow function.",
+      "message": "Expected 'this' to be used by class property 'property'.",
       "filePath": "src/virtual.ts",
       "range": {
         "start": {
@@ -810,7 +810,7 @@ exports[`class-methods-use-this > invalid 38`] = `
     {
       "ruleName": "class-methods-use-this",
       "messageId": "missingThis",
-      "message": "Expected 'this' to be used by class arrow function.",
+      "message": "Expected 'this' to be used by class property 'property'.",
       "filePath": "src/virtual.ts",
       "range": {
         "start": {
@@ -836,7 +836,7 @@ exports[`class-methods-use-this > invalid 39`] = `
     {
       "ruleName": "class-methods-use-this",
       "messageId": "missingThis",
-      "message": "Expected 'this' to be used by class arrow function.",
+      "message": "Expected 'this' to be used by class property 'property'.",
       "filePath": "src/virtual.ts",
       "range": {
         "start": {
@@ -862,7 +862,7 @@ exports[`class-methods-use-this > invalid 4`] = `
     {
       "ruleName": "class-methods-use-this",
       "messageId": "missingThis",
-      "message": "Expected 'this' to be used by class arrow function.",
+      "message": "Expected 'this' to be used by class property 'method'.",
       "filePath": "src/virtual.ts",
       "range": {
         "start": {
@@ -914,7 +914,7 @@ exports[`class-methods-use-this > invalid 5`] = `
     {
       "ruleName": "class-methods-use-this",
       "messageId": "missingThis",
-      "message": "Expected 'this' to be used by class arrow function.",
+      "message": "Expected 'this' to be used by class property 'method'.",
       "filePath": "src/virtual.ts",
       "range": {
         "start": {
@@ -940,7 +940,7 @@ exports[`class-methods-use-this > invalid 6`] = `
     {
       "ruleName": "class-methods-use-this",
       "messageId": "missingThis",
-      "message": "Expected 'this' to be used by class arrow function.",
+      "message": "Expected 'this' to be used by class property 'method'.",
       "filePath": "src/virtual.ts",
       "range": {
         "start": {

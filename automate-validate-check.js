@@ -307,6 +307,7 @@ async function runClaudeWithStreaming(prompt) {
       '-p',
       '--verbose',
       '--output-format', 'stream-json',
+      '--model', 'claude-sonnet-4-20250514',
       '--max-turns', '500',
       '--settings', settingsFile,
       '--dangerously-skip-permissions'
@@ -465,6 +466,8 @@ async function runClaudeWithStreaming(prompt) {
 async function validatePortWithClaudeCLI(testFile, originalSources) {
   const testName = basename(testFile);
   const ruleName = testName.replace('.test.ts', '');
+  const verificationDir = join(__dirname, 'verification');
+  const validationFile = join(verificationDir, `${ruleName}.md`);
   
   // Find the corresponding Go implementation
   const goRulePath = join(__dirname, 'internal', 'rules', ruleName.replace(/-/g, '_'), ruleName.replace(/-/g, '_') + '.go');
@@ -474,6 +477,11 @@ async function validatePortWithClaudeCLI(testFile, originalSources) {
     goRuleContent = await readFile(goRulePath, 'utf8');
   } catch (err) {
     log(`Could not find Go implementation at ${goRulePath}`, 'warning');
+    
+    // Still write to validation file that Go implementation is missing
+    const missingEntry = `# Rule: ${ruleName}\n\n❌ **MISSING GO IMPLEMENTATION**: No Go implementation found at ${goRulePath}\n\n---\n`;
+    await writeFile(validationFile, missingEntry);
+    
     return false;
   }
 
@@ -510,6 +518,12 @@ FOCUS: Study the TypeScript implementation and ensure the Go version captures th
   }
 
   prompt += `
+## IMPORTANT INSTRUCTIONS:
+
+1. **DO NOT EDIT ANY FILES** - Only analyze and document findings
+2. **WRITE TO validation.md** - Use the Write tool to append your findings to the validation.md file
+3. **DOCUMENT ALL DISCREPANCIES** - Focus on differences that need to be addressed
+
 ## Validation Tasks:
 
 1. **Core Logic Comparison**: Compare the core rule logic between TypeScript and Go implementations
@@ -519,33 +533,49 @@ FOCUS: Study the TypeScript implementation and ensure the Go version captures th
 5. **Configuration Options**: Ensure rule options are handled equivalently
 6. **Type Checking**: Verify TypeScript type-aware features are properly ported
 
-## Analysis Framework:
+## Required Output Format for validation.md:
 
-For each aspect, provide:
-- ✅ **CORRECT**: When Go implementation matches TypeScript behavior
-- ⚠️ **POTENTIAL ISSUE**: When there might be a discrepancy 
-- ❌ **INCORRECT**: When Go implementation differs from TypeScript
+Write your findings in this format:
 
-## Output Format:
+\`\`\`markdown
+## Rule: ${ruleName}
 
-Provide a structured analysis covering:
+### Test File: ${testName}
 
-### Functional Equivalence Analysis
-- Core rule logic comparison
-- Edge case handling
-- AST pattern matching
+### Validation Summary
+- ✅ **CORRECT**: [List aspects that match correctly]
+- ⚠️ **POTENTIAL ISSUES**: [List potential discrepancies]
+- ❌ **INCORRECT**: [List definite discrepancies]
 
-### Implementation Details
-- Error message consistency  
-- Configuration option handling
-- Type checking behavior
+### Discrepancies Found
+
+#### 1. [Issue Title]
+**TypeScript Implementation:**
+\`\`\`typescript
+[relevant code snippet]
+\`\`\`
+
+**Go Implementation:**
+\`\`\`go
+[relevant code snippet]
+\`\`\`
+
+**Issue:** [Explain the discrepancy]
+
+**Impact:** [How this affects rule behavior]
+
+**Test Coverage:** [Which test cases reveal this issue]
 
 ### Recommendations
-- Any fixes needed for the Go implementation
-- Missing functionality that should be added
-- Test cases that should be enhanced
+- [List specific fixes needed]
+- [Missing functionality to add]
+- [Test cases that need enhancement]
 
-Focus on ensuring the Go port captures all the nuances of the original TypeScript implementation.
+---
+\`\`\`
+
+CRITICAL: Use the Write tool to create/overwrite your analysis to the file at path: ${validationFile}
+DO NOT attempt to fix any issues - only document them.
 `;
 
   log(`Validating port correctness for ${ruleName}...`, 'info');
@@ -640,6 +670,11 @@ async function runAllTests(concurrentMode = false, workerCount = DEFAULT_WORKERS
     console.log('\n' + '='.repeat(60));
     log(`Starting port validation for ${totalTests} rules`, 'info');
     console.log('='.repeat(60));
+    
+    // Create verification directory
+    const verificationDir = join(__dirname, 'verification');
+    await mkdir(verificationDir, { recursive: true });
+    log(`Created verification directory: ${verificationDir}`, 'info');
   }
 
   if (concurrentMode && !IS_WORKER) {
@@ -974,6 +1009,10 @@ async function runCompleteProcess() {
       }
     });
 
+    const verificationDir = join(__dirname, 'verification');
+    log(`\n📋 Validation reports written to: ${verificationDir}`, 'info');
+    log(`Review the individual report files for discrepancies that need to be addressed.`, 'info');
+
     return {
       success: failedTests === 0,
       totalTests,
@@ -995,6 +1034,29 @@ async function main() {
 
     log(`Starting ${TOTAL_RUNS} consecutive validation runs`, 'info');
     console.log('='.repeat(80));
+    
+    // Initialize verification directory and README
+    const verificationDir = join(__dirname, 'verification');
+    await mkdir(verificationDir, { recursive: true });
+    
+    const readmeFile = join(verificationDir, 'README.md');
+    const header = `# RSLint Port Validation Reports
+
+Generated: ${new Date().toISOString()}
+
+This directory contains individual validation reports for each TypeScript-ESLint rule and their Go ports.
+
+Note: This validation was run ${TOTAL_RUNS} times. Each rule may have multiple entries if issues were found consistently.
+
+## Files
+
+Each markdown file in this directory corresponds to a specific rule and contains the validation results.
+
+---
+
+`;
+    await writeFile(readmeFile, header);
+    log(`Initialized verification directory: ${verificationDir}`, 'info');
   }
 
   let allRunsResults = [];
@@ -1058,6 +1120,10 @@ async function main() {
 
     console.log(`\n${colors.bright}${colors.magenta}10x automation run completed!${colors.reset}`);
     console.log('='.repeat(80));
+    
+    const verificationDir = join(__dirname, 'verification');
+    console.log(`\n📋 ${colors.bright}Validation reports available in: ${verificationDir}${colors.reset}`);
+    console.log(`   Review the individual files for all discrepancies found during validation.\n`);
 
     process.exit(totalFailedRuns > 0 ? 1 : 0);
   }

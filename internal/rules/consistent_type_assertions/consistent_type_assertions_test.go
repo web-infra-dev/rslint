@@ -305,7 +305,7 @@ function foo() {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
-						MessageId: "angleBracket",
+						MessageId: "angle-bracket",
 						Line:      1,
 						Column:    11,
 					},
@@ -318,7 +318,7 @@ function foo() {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
-						MessageId: "angleBracket",
+						MessageId: "angle-bracket",
 						Line:      1,
 						Column:    11,
 					},

@@ -1,0 +1,1247 @@
+exports[`consistent-type-assertions > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "angle-bracket",
+      "message": "Use '<Foo>' instead of 'as Foo'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "angle-bracket",
+      "message": "Use '<Foo>' instead of 'as Foo'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 17
+        },
+        "end": {
+          "line": 1,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "angle-bracket",
+      "message": "Use '<Foo>' instead of 'as Foo'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 17
+        },
+        "end": {
+          "line": 1,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "angle-bracket",
+      "message": "Use '<Foo>' instead of 'as Foo'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "angle-bracket",
+      "message": "Use '<const>' instead of 'as const'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "as",
+      "message": "Use 'as Foo' instead of '<Foo>'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 37
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "as",
+      "message": "Use 'as A' instead of '<A>'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 15
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "as",
+      "message": "Use 'as readonly number[]' instead of '<readonly number[]>'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 33
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "as",
+      "message": "Use 'as string | number' instead of '<string | number>'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "as",
+      "message": "Use 'as A' instead of '<A>'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "as",
+      "message": "Use 'as A' instead of '<A>'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 15
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "angle-bracket",
+      "message": "Use '<A>' instead of 'as A'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 17
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "as",
+      "message": "Use 'as Foo' instead of '<Foo>'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 37
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "as",
+      "message": "Use 'as Foo' instead of '<Foo>'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 16
+        },
+        "end": {
+          "line": 1,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 22`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "as",
+      "message": "Use 'as Foo' instead of '<Foo>'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 16
+        },
+        "end": {
+          "line": 1,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 23`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "as",
+      "message": "Use 'as Foo' instead of '<Foo>'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 17
+        },
+        "end": {
+          "line": 1,
+          "column": 32
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 24`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "as",
+      "message": "Use 'as Foo' instead of '<Foo>'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 17
+        },
+        "end": {
+          "line": 1,
+          "column": 25
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 25`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "as",
+      "message": "Use 'as Foo' instead of '<Foo>'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 37
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 26`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "as",
+      "message": "Use 'as const' instead of '<const>'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 34
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 27`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 28`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 17
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 29`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 35
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "angle-bracket",
+      "message": "Use '<readonly number[]>' instead of 'as readonly number[]'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 35
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 30`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 38
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 31`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 25
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 32`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 12
+        },
+        "end": {
+          "line": 1,
+          "column": 18
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 33`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 34`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 16
+        },
+        "end": {
+          "line": 1,
+          "column": 38
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 35`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 16
+        },
+        "end": {
+          "line": 1,
+          "column": 38
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 36`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 17
+        },
+        "end": {
+          "line": 1,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 37`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 17
+        },
+        "end": {
+          "line": 1,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 38`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 39`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 37
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "angle-bracket",
+      "message": "Use '<string | number>' instead of 'as string | number'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 38
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 40`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 15
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 41`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 33
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 42`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 43`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 44`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 15
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 45`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 37
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 46`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 16
+        },
+        "end": {
+          "line": 1,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 47`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 16
+        },
+        "end": {
+          "line": 1,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 48`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "never",
+      "message": "Do not use any type assertions.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 17
+        },
+        "end": {
+          "line": 1,
+          "column": 32
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "angle-bracket",
+      "message": "Use '<A>' instead of 'as A'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 25
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "angle-bracket",
+      "message": "Use '<A>' instead of 'as A'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 12
+        },
+        "end": {
+          "line": 1,
+          "column": 18
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "angle-bracket",
+      "message": "Use '<Foo>' instead of 'as Foo'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "angle-bracket",
+      "message": "Use '<Foo>' instead of 'as Foo'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 16
+        },
+        "end": {
+          "line": 1,
+          "column": 38
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "angle-bracket",
+      "message": "Use '<Foo>' instead of 'as Foo'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 16
+        },
+        "end": {
+          "line": 1,
+          "column": 38
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

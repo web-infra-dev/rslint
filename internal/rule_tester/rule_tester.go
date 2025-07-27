@@ -23,6 +23,7 @@ type ValidTestCase struct {
 	Options  any
 	TSConfig string
 	Tsx      bool
+	Filename string
 }
 
 type InvalidTestCaseError struct {
@@ -32,7 +33,11 @@ type InvalidTestCaseError struct {
 	EndLine     int
 	EndColumn   int
 	Suggestions []InvalidTestCaseSuggestion
+	Message     string // For backward compatibility
 }
+
+// For backward compatibility
+type ExpectedDiagnostic = InvalidTestCaseError
 
 type InvalidTestCaseSuggestion struct {
 	MessageId string
@@ -48,19 +53,23 @@ type InvalidTestCase struct {
 	TSConfig string
 	Options  any
 	Tsx      bool
+	Filename string
 }
 
 func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Rule, validTestCases []ValidTestCase, invalidTestCases []InvalidTestCase) {
 	onlyMode := slices.ContainsFunc(validTestCases, func(c ValidTestCase) bool { return c.Only }) ||
 		slices.ContainsFunc(invalidTestCases, func(c InvalidTestCase) bool { return c.Only })
 
-	runLinter := func(t *testing.T, code string, options any, tsconfigPathOverride string, tsx bool) []rule.RuleDiagnostic {
+	runLinter := func(t *testing.T, code string, options any, tsconfigPathOverride string, tsx bool, filename string) []rule.RuleDiagnostic {
 		var diagnosticsMu sync.Mutex
 		diagnostics := make([]rule.RuleDiagnostic, 0, 3)
 
 		fileName := "file.ts"
 		if tsx {
 			fileName = "react.tsx"
+		}
+		if filename != "" {
+			fileName = filename
 		}
 
 		fs := utils.NewOverlayVFSForFile(tspath.ResolvePath(rootDir, fileName), code)
@@ -109,7 +118,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 				t.SkipNow()
 			}
 
-			diagnostics := runLinter(t, testCase.Code, testCase.Options, testCase.TSConfig, testCase.Tsx)
+			diagnostics := runLinter(t, testCase.Code, testCase.Options, testCase.TSConfig, testCase.Tsx, testCase.Filename)
 			if len(diagnostics) != 0 {
 				// TODO: pretty errors
 				t.Errorf("Expected valid test case not to contain errors. Code:\n%v", testCase.Code)
@@ -132,7 +141,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 			code := testCase.Code
 
 			for i := range 10 {
-				diagnostics := runLinter(t, code, testCase.Options, testCase.TSConfig, testCase.Tsx)
+				diagnostics := runLinter(t, code, testCase.Options, testCase.TSConfig, testCase.Tsx, testCase.Filename)
 				if i == 0 {
 					initialDiagnostics = diagnostics
 				}

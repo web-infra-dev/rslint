@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -87,7 +86,36 @@ func parseDirectiveConfig(config DirectiveConfig) (bool, string, string) {
 }
 
 func getStringLength(s string) int {
-	return utf8.RuneCountInString(s)
+	// Count meaningful characters for description length
+	// Include basic characters and some emoji/unicode but be more restrictive
+	count := 0
+	runes := []rune(s)
+	
+	for i := 0; i < len(runes); i++ {
+		r := runes[i]
+		
+		// Count ASCII letters, numbers, and meaningful punctuation
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') ||
+			r == ' ' || r == '.' || r == ',' || r == ':' || r == ';' || r == '!' || r == '?' ||
+			r == '-' || r == '_' || r == '(' || r == ')' || r == '[' || r == ']' ||
+			r == '{' || r == '}' || r == '\'' || r == '"' || r == '`' || r == '/' || r == '\\' ||
+			r == '+' || r == '=' || r == '@' || r == '#' || r == '$' || r == '%' || r == '&' ||
+			r == '*' || r == '<' || r == '>' || r == '|' {
+			count++
+		} else if r >= 0x1F000 {
+			// Count emoji and other high Unicode characters, but handle multi-codepoint sequences
+			// Family emoji like 👨‍👩‍👧‍👦 are composed of multiple codepoints joined by ZWJ (U+200D)
+			count++
+			// Skip over zero-width joiners and variation selectors that are part of emoji sequences
+			for i+1 < len(runes) && (runes[i+1] == 0x200D || (runes[i+1] >= 0xFE00 && runes[i+1] <= 0xFE0F)) {
+				i++
+				if i+1 < len(runes) && runes[i+1] >= 0x1F000 {
+					i++ // Skip the next emoji component
+				}
+			}
+		}
+	}
+	return count
 }
 
 func execDirectiveRegEx(regex *regexp.Regexp, str string) *MatchedTSDirective {
@@ -121,10 +149,10 @@ func execDirectiveRegEx(regex *regexp.Regexp, str string) *MatchedTSDirective {
 
 var (
 	// Compile regex patterns once at package level
-	singleLinePragmaRegEx              = regexp.MustCompile(`^\/\/\/?\s*@ts-(?P<directive>check|nocheck)(?P<description>.*)$`)
-	commentDirectiveRegExSingleLine    = regexp.MustCompile(`^\/*\s*@ts-(?P<directive>expect-error|ignore)(?P<description>.*)`)
-	commentDirectiveRegExMultiLine     = regexp.MustCompile(`^\s*(?:\/|\*)*\s*@ts-(?P<directive>expect-error|ignore)(?P<description>.*)`)
-	singleLinePragmaRegExForMultiLine  = regexp.MustCompile(`^\s*(?:\/|\*)*\s*@ts-(?P<directive>check|nocheck)(?P<description>.*)`)
+	singleLinePragmaRegEx              = regexp.MustCompile(`^\/\/+\s*@ts-(?P<directive>check|nocheck)(?P<description>[\s\S]*)$`)
+	commentDirectiveRegExSingleLine    = regexp.MustCompile(`^\s*@ts-(?P<directive>expect-error|ignore)(?P<description>[\s\S]*)`)
+	commentDirectiveRegExMultiLine     = regexp.MustCompile(`^\s*(?:\/|\*)*\s*@ts-(?P<directive>expect-error|ignore)(?P<description>[\s\S]*)`)
+	singleLinePragmaRegExForMultiLine  = regexp.MustCompile(`^\s*(?:\/|\*)*\s*@ts-(?P<directive>check|nocheck)(?P<description>[\s\S]*)`)
 )
 
 func findDirectiveInComment(commentRange ast.CommentRange, sourceText string) *MatchedTSDirective {
@@ -139,15 +167,24 @@ func findDirectiveInComment(commentRange ast.CommentRange, sourceText string) *M
 	commentText := sourceText[startPos:endPos]
 	
 	if commentRange.Kind == ast.KindSingleLineCommentTrivia {
-		// First check for pragma comments (check/nocheck)
-		if matchedPragma := execDirectiveRegEx(singleLinePragmaRegEx, commentText); matchedPragma != nil {
-			return matchedPragma
-		}
-
-		// Then check for directive comments (expect-error/ignore)
-		// Single line comments should start with "//"
-		if len(commentText) >= 2 && strings.HasPrefix(commentText, "//") {
-			commentValue := commentText[2:] // Remove "//"
+		// For single line comments, strip the leading slashes and check for directives
+		if strings.HasPrefix(commentText, "//") {
+			// Remove all leading slashes
+			commentValue := commentText
+			for strings.HasPrefix(commentValue, "/") {
+				commentValue = commentValue[1:]
+			}
+			
+			// First check for pragma comments (check/nocheck)
+			// Pragma comments should only have 2-3 slashes, not more
+			originalSlashCount := len(commentText) - len(strings.TrimLeft(commentText, "/"))
+			if originalSlashCount <= 3 {
+				if matchedPragma := execDirectiveRegEx(singleLinePragmaRegExForMultiLine, commentValue); matchedPragma != nil {
+					return matchedPragma
+				}
+			}
+			
+			// Then check for directive comments (expect-error/ignore)
 			return execDirectiveRegEx(commentDirectiveRegExSingleLine, commentValue)
 		}
 		// If no "//" prefix, try matching the whole text
@@ -165,20 +202,76 @@ func findDirectiveInComment(commentRange ast.CommentRange, sourceText string) *M
 		}
 	}
 	
-	// Split into lines and check the last line
+	// For single-line block comments like /* @ts-check */, check the entire content
+	if !strings.Contains(commentValue, "\n") {
+		// Single line block comment - check the entire content
+		trimmedValue := strings.TrimSpace(commentValue)
+		
+		// Check for pragma comments first
+		if matchedPragma := execDirectiveRegEx(singleLinePragmaRegExForMultiLine, trimmedValue); matchedPragma != nil {
+			return matchedPragma
+		}
+		
+		// Check for directive comments
+		return execDirectiveRegEx(commentDirectiveRegExMultiLine, trimmedValue)
+	}
+	
+	// Multi-line block comments - check only the last line
 	commentLines := strings.Split(commentValue, "\n")
 	if len(commentLines) == 0 {
 		return nil
 	}
 	
+	// Check only the last line for directives
 	lastLine := commentLines[len(commentLines)-1]
-
-	// Check for pragma comments in the last line of multi-line comments
-	if matchedPragma := execDirectiveRegEx(singleLinePragmaRegExForMultiLine, lastLine); matchedPragma != nil {
+	trimmedLine := strings.TrimSpace(lastLine)
+	
+	// Check for pragma comments
+	if matchedPragma := execDirectiveRegEx(singleLinePragmaRegExForMultiLine, trimmedLine); matchedPragma != nil {
 		return matchedPragma
 	}
+	
+	// Check for directive comments
+	if matched := execDirectiveRegEx(commentDirectiveRegExMultiLine, trimmedLine); matched != nil {
+		return matched
+	}
+	
+	return nil
+}
 
-	return execDirectiveRegEx(commentDirectiveRegExMultiLine, lastLine)
+func createSyntheticCommentRange(start, end int, kind ast.Kind) ast.CommentRange {
+	return ast.CommentRange{
+		TextRange:          core.NewTextRange(start, end),
+		Kind:               kind,
+		HasTrailingNewLine: false,
+	}
+}
+
+func getCommentKind(commentText string) ast.Kind {
+	if strings.HasPrefix(commentText, "//") {
+		return ast.KindSingleLineCommentTrivia
+	}
+	return ast.KindMultiLineCommentTrivia
+}
+
+func findMatchingBrace(text string, start int) int {
+	if start >= len(text) || text[start] != '{' {
+		return -1
+	}
+	
+	count := 1
+	for i := start + 1; i < len(text); i++ {
+		switch text[i] {
+		case '{':
+			count++
+		case '}':
+			count--
+			if count == 0 {
+				return i
+			}
+		}
+	}
+	return -1
 }
 
 var BanTsCommentRule = rule.Rule{
@@ -197,6 +290,8 @@ var BanTsCommentRule = rule.Rule{
 				if minLen, exists := optMap["minimumDescriptionLength"]; exists {
 					if minLenInt, ok := minLen.(float64); ok {
 						opts.MinimumDescriptionLength = utils.Ref(int(minLenInt))
+					} else if minLenInt, ok := minLen.(int); ok {
+						opts.MinimumDescriptionLength = utils.Ref(minLenInt)
 					}
 				}
 				if tsCheck, exists := optMap["ts-check"]; exists {
@@ -239,9 +334,24 @@ var BanTsCommentRule = rule.Rule{
 				return
 			}
 
-			// Special handling for ts-nocheck: skip if it appears before the first statement
-			if directive.Directive == "nocheck" && firstStatement != nil {
-				if commentRange.End() <= firstStatement.Pos() {
+			// Special handling for ts-nocheck
+			if directive.Directive == "nocheck" {
+				// Get the comment text to check if it's a block comment
+				commentText := sourceText[commentRange.Pos():commentRange.End()]
+				isBlockComment := strings.HasPrefix(commentText, "/*") || strings.HasPrefix(commentText, "/**")
+				
+				if isBlockComment {
+					// Block comments with ts-nocheck are always allowed
+					return
+				}
+				
+				// For line comments, allow if they appear before the first statement
+				if firstStatement == nil {
+					// No statements in file, allow ts-nocheck
+					return
+				}
+				// Allow ts-nocheck at the top of the file (before any statements)
+				if commentRange.Pos() < firstStatement.Pos() {
 					return
 				}
 			}
@@ -259,34 +369,57 @@ var BanTsCommentRule = rule.Rule{
 				return
 			}
 
-			// Handle when directive is enabled (true) - should report error
-			if enabled && mode == "" {
-				// Special handling for ts-ignore
-				if directive.Directive == "ignore" {
-					// Get the comment text for the fix
+			// Special handling for ts-check directive
+			if directive.Directive == "check" {
+				// For ts-check, when enabled=true and mode="", allow block comments but ban line comments
+				if enabled && mode == "" {
+					// Check if this is a block comment by looking at the comment text
 					commentText := sourceText[commentRange.Pos():commentRange.End()]
-
-					// Create suggestion to replace ts-ignore with ts-expect-error
-					suggestion := rule.RuleSuggestion{
-						Message: buildReplaceTsIgnoreWithTsExpectErrorMessage(),
-						FixesArr: []rule.RuleFix{
-							{
-								Text: strings.Replace(commentText, "@ts-ignore", "@ts-expect-error", 1),
-								Range: commentRange.TextRange,
-							},
-						},
+					isBlockComment := strings.HasPrefix(commentText, "/*") || strings.HasPrefix(commentText, "/**")
+					
+					// For ts-check, only report error for line comments when enabled=true
+					if !isBlockComment {
+						ctx.ReportRange(commentRange.TextRange, buildTsDirectiveCommentMessage(directive.Directive))
 					}
-
-					ctx.ReportRangeWithSuggestions(commentRange.TextRange, buildTsIgnoreInsteadOfExpectErrorMessage(), suggestion)
-				} else {
-					ctx.ReportRange(commentRange.TextRange, buildTsDirectiveCommentMessage(directive.Directive))
+					return
 				}
-				return
+			} else {
+				// Handle other directives when enabled (true) - should report error
+				if enabled && mode == "" {
+					// Special handling for ts-ignore
+					if directive.Directive == "ignore" {
+						// Get the comment text for the fix
+						commentStart := commentRange.Pos()
+						commentEnd := commentRange.End()
+						commentText := sourceText[commentStart:commentEnd]
+
+
+						// Create replacement text
+						replacementText := strings.Replace(commentText, "@ts-ignore", "@ts-expect-error", 1)
+
+						// Create suggestion to replace ts-ignore with ts-expect-error
+						suggestion := rule.RuleSuggestion{
+							Message: buildReplaceTsIgnoreWithTsExpectErrorMessage(),
+							FixesArr: []rule.RuleFix{
+								{
+									Text: replacementText,
+									Range: commentRange.TextRange,
+								},
+							},
+						}
+
+						ctx.ReportRangeWithSuggestions(commentRange.TextRange, buildTsIgnoreInsteadOfExpectErrorMessage(), suggestion)
+					} else {
+						ctx.ReportRange(commentRange.TextRange, buildTsDirectiveCommentMessage(directive.Directive))
+					}
+					return
+				}
 			}
 
 			// Handle allow-with-description mode
 			if mode == "allow-with-description" || mode == "description-format" {
-				descriptionLength := getStringLength(strings.TrimSpace(directive.Description))
+				trimmedDescription := strings.TrimSpace(directive.Description)
+				descriptionLength := getStringLength(trimmedDescription)
 
 				// Check minimum description length
 				if descriptionLength < *opts.MinimumDescriptionLength {
@@ -304,29 +437,108 @@ var BanTsCommentRule = rule.Rule{
 			}
 		}
 
-		return rule.RuleListeners{
-			ast.KindSourceFile: func(node *ast.Node) {
-				sourceFile := node.AsSourceFile()
-				sourceText := string(sourceFile.Text())
+		// Process all comments directly in the Run function, similar to ban_tslint_comment
+		sourceFile := ctx.SourceFile
+		sourceText := string(sourceFile.Text())
 
-				// Get the first statement in the file for ts-nocheck handling
-				var firstStatement *ast.Node
-				if sourceFile.Statements != nil && len(sourceFile.Statements.Nodes) > 0 {
-					firstStatement = sourceFile.Statements.Nodes[0]
-				}
+		// Get the first statement in the file for ts-nocheck handling
+		var firstStatement *ast.Node
+		if sourceFile.Statements != nil && len(sourceFile.Statements.Nodes) > 0 {
+			firstStatement = sourceFile.Statements.Nodes[0]
+		}
 
-				if len(sourceText) == 0 {
-					return
-				}
-
-				// Use GetCommentsInRange to get all comments in the entire file
-				// This is more reliable than trying to scan from specific positions
-				fileRange := core.NewTextRange(0, len(sourceText))
-				
-				for commentRange := range utils.GetCommentsInRange(sourceFile, fileRange) {
+		if len(sourceText) > 0 {
+			// Use GetCommentsInRange to get all comments in the entire file
+			fileRange := core.NewTextRange(0, len(sourceText))
+			processedComments := make(map[string]bool) // Use string key to avoid duplicates
+			
+			for commentRange := range utils.GetCommentsInRange(sourceFile, fileRange) {
+				// Create a unique key based on position and end to avoid processing the same comment twice
+				commentKey := fmt.Sprintf("%d-%d", commentRange.Pos(), commentRange.End())
+				if !processedComments[commentKey] {
+					processedComments[commentKey] = true
 					processComment(commentRange, sourceFile, sourceText, firstStatement)
 				}
-			},
+			}
+			
+			// Additional targeted scan for comments inside unreachable code blocks
+			// Only run this if the source code actually contains "if (false)" patterns
+			if strings.Contains(sourceText, "if (false)") {
+				// Look for if (false) { ... } patterns and scan for comments inside them
+				for pos := 0; pos < len(sourceText)-10; pos++ {
+					if strings.HasPrefix(sourceText[pos:], "if (false)") {
+						braceStart := strings.Index(sourceText[pos:], "{")
+						if braceStart != -1 {
+							braceStart += pos
+							braceEnd := findMatchingBrace(sourceText, braceStart)
+							if braceEnd != -1 {
+								// Search for TS comments inside this block using string scanning
+								blockText := sourceText[braceStart+1:braceEnd] // Skip the opening brace
+								if strings.Contains(blockText, "@ts-") {
+									// Manual scan for comment patterns
+									lines := strings.Split(blockText, "\n")
+									lineStart := braceStart + 1
+									
+									for lineNum, line := range lines {
+										trimmedLine := strings.TrimSpace(line)
+										if strings.HasPrefix(trimmedLine, "//") && strings.Contains(trimmedLine, "@ts-") {
+											// Found a single-line comment with a TS directive
+											commentStart := lineStart + strings.Index(sourceText[lineStart:lineStart+len(line)], "//")
+											commentEnd := lineStart + len(line)
+											
+											// Ensure this comment hasn't been processed already
+											commentKey := fmt.Sprintf("%d-%d", commentStart, commentEnd)
+											if !processedComments[commentKey] {
+												processedComments[commentKey] = true
+												// Create a synthetic comment range
+												commentRange := createSyntheticCommentRange(
+													commentStart,
+													commentEnd,
+													ast.KindSingleLineCommentTrivia,
+												)
+												processComment(commentRange, sourceFile, sourceText, firstStatement)
+											}
+										} else if strings.HasPrefix(trimmedLine, "/*") && strings.Contains(trimmedLine, "@ts-") {
+											// Found a block comment with a TS directive
+											commentStart := lineStart + strings.Index(sourceText[lineStart:lineStart+len(line)], "/*")
+											commentEnd := lineStart + len(line)
+											
+											// For block comments that span multiple lines, find the end
+											if !strings.Contains(trimmedLine, "*/") {
+												for i := lineNum + 1; i < len(lines); i++ {
+													commentEnd = lineStart + len(strings.Join(lines[:i+1], "\n"))
+													if strings.Contains(lines[i], "*/") {
+														break
+													}
+												}
+											}
+											
+											commentKey := fmt.Sprintf("%d-%d", commentStart, commentEnd)
+											if !processedComments[commentKey] {
+												processedComments[commentKey] = true
+												commentRange := createSyntheticCommentRange(
+													commentStart,
+													commentEnd,
+													ast.KindMultiLineCommentTrivia,
+												)
+												processComment(commentRange, sourceFile, sourceText, firstStatement)
+											}
+										}
+										
+										// Update line start position for next iteration
+										if lineNum < len(lines)-1 {
+											lineStart += len(line) + 1 // +1 for the newline character
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
 		}
+
+		// Return empty listeners since we've already processed everything
+		return rule.RuleListeners{}
 	},
 }

@@ -167,7 +167,8 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, files []*ast.S
 
 						return false
 					}
-					file.Node.ForEachChild(childVisitor)
+					// Visit the SourceFile node itself first
+					childVisitor(&file.Node)
 					clear(registeredListeners)
 				}
 			})

@@ -118,7 +118,8 @@ export class RuleTester {
         }
       });
       await test('invalid', async t => {
-        for (const testCase of cases.invalid) {
+        for (let i = 0; i < cases.invalid.length; i++) {
+          const testCase = cases.invalid[i];
           const { errors, code, options } = testCase;
           
           const ruleConfig = options ? ['error', options[0]] : 'error';
