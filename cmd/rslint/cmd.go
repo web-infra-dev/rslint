@@ -522,7 +522,7 @@ func runCMD() int {
 	if warningsCount == 0 {
 		warningsColorFunc = colors.DimText
 	} else {
-		warningsColorFunc = colors.DimText
+		warningsColorFunc = colors.YellowText
 	}
 
 	errorsText := "errors"
