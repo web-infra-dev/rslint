@@ -304,8 +304,7 @@ Usage:
     rslint [OPTIONS]
 
 Options:
-	--tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.
-    --config PATH     Which rslint config file to use. Defaults to rslint.jsonc.
+    --config PATH     Which rslint config file to use. Defaults to rslint.json.
 	--list-files      List matched files
 	--format FORMAT   Output format: default | jsonline
 	--ipc             Run in IPC mode (for JS integration)
@@ -359,7 +358,6 @@ func runCMD() int {
 
 	var (
 		help      bool
-		tsconfig  string
 		config    string
 		listFiles bool
 
@@ -373,7 +371,6 @@ func runCMD() int {
 	)
 	flag.StringVar(&format, "format", "default", "output format")
 	flag.StringVar(&config, "config", "", "which rslint config to use")
-	flag.StringVar(&tsconfig, "tsconfig", "", "which tsconfig to use")
 	flag.BoolVar(&listFiles, "list-files", false, "list matched files")
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&help, "h", false, "show help")
@@ -441,35 +438,19 @@ func runCMD() int {
 	currentDirectory = tspath.NormalizePath(currentDirectory)
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	tsConfigs := []string{}
-	if tsconfig == "" {
-		configFileName := tspath.ResolvePath(currentDirectory, "tsconfig.json")
-		if !fs.FileExists(configFileName) {
-			fs = utils.NewOverlayVFS(fs, map[string]string{
-				configFileName: "{}",
-			})
-		}
-		tsConfigs = append(tsConfigs, configFileName)
-	} else {
-		configFileName := tspath.ResolvePath(currentDirectory, tsconfig)
-		if !fs.FileExists(configFileName) {
-			fmt.Fprintf(os.Stderr, "error: tsconfig %q doesn't exist", tsconfig)
-			return 1
-		}
-		tsConfigs = append(tsConfigs, configFileName)
-	}
 
 	// Initialize rule registry with all available rules
 	rslintconfig.RegisterAllTypeSriptEslintPluginRules()
 	var rslintConfig rslintconfig.RslintConfig
 	var cwd string
+	var tsConfigs []string
 	// Load rslint configuration and determine which rules to enable
 	if config != "" {
 		rslintConfig, cwd = loadRslintConfig(config, currentDirectory, fs)
 		tsConfigs = loadTsConfigFromRslintConfig(rslintConfig, cwd, fs)
 	} else {
 		// Try to load default config files in order of preference
-		defaultConfigs := []string{"rslint.jsonc", "rslint.json"}
+		defaultConfigs := []string{"rslint.json", "rslint.jsonc"}
 		configLoaded := false
 		for _, defaultConfig := range defaultConfigs {
 			defaultConfigPath := tspath.ResolvePath(currentDirectory, defaultConfig)
@@ -481,8 +462,14 @@ func runCMD() int {
 			}
 		}
 		if !configLoaded {
-			rslintConfig = rslintconfig.RslintConfig{}
+			fmt.Fprintf(os.Stderr, "error: no rslint config file found. Expected rslint.json or rslint.jsonc\n")
+			return 1
 		}
+	}
+
+	if len(tsConfigs) == 0 {
+		fmt.Fprintf(os.Stderr, "error: no TypeScript configuration found in rslint config\n")
+		return 1
 	}
 
 	host := utils.CreateCompilerHost(currentDirectory, fs)
