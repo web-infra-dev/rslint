@@ -79,15 +79,15 @@ export class RuleTester {
   ) {
     test(ruleName, async () => {
       let cwd = path.resolve(import.meta.dirname, './fixtures');
-      const tsconfig = path.resolve(
+      const config = path.resolve(
         import.meta.dirname,
-        './fixtures/tsconfig.virtual.json',
+        './fixtures/rslint.json',
       );
       let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
       await test('valid', async () => {
         for (const code of cases.valid) {
           const diags = await lint({
-            tsconfig,
+            config,
             workingDirectory: cwd,
             fileContents: {
               [virtual_entry]: code,
@@ -105,7 +105,7 @@ export class RuleTester {
       await test('invalid', async t => {
         for (const { errors, code } of cases.invalid) {
           const diags = await lint({
-            tsconfig,
+            config,
             workingDirectory: cwd,
             fileContents: {
               [virtual_entry]: code,
