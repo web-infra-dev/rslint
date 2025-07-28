@@ -14,6 +14,7 @@
   "license": "MIT",
   "scripts": {
     "build": "pnpm -r build",
+    "build:npm": "zx scripts/build-npm.mjs",
     "format": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --write .",
     "format:check": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --check .",
     "test": "pnpm -r test",
@@ -24,7 +25,8 @@
   "devDependencies": {
     "prettier": "3.5.0",
     "typescript": "5.8.3",
-    "@rslint/core": "workspace:*"
+    "@rslint/core": "workspace:*",
+    "zx": "8.7.1"
   },
   "packageManager": "pnpm@10.13.1",
   "engines": {

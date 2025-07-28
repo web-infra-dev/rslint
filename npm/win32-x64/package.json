@@ -1,5 +1,5 @@
 {
-  "name": "@rslint/binding-darwin-x64",
+  "name": "@rslint/binding-win32-x64",
   "version": "1.4.10",
   "license": "MIT",
   "description": "Node binding for rslint",
@@ -16,7 +16,7 @@
     "rslint"
   ],
   "os": [
-    "darwin"
+    "win32"
   ],
   "cpu": [
     "x64"

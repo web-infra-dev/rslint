@@ -1,10 +1,8 @@
 {
-  "name": "@rslint/binding-win32-x64-msvc",
+  "name": "@rslint/binding-linux-arm64",
   "version": "1.4.10",
   "license": "MIT",
   "description": "Node binding for rslint",
-  "main": "rslint.win32-x64-msvc",
-  "homepage": "https://rslint.rs",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",
   "repository": {
     "type": "git",
@@ -15,12 +13,12 @@
     "provenance": true
   },
   "files": [
-    "rslint.win32-x64-msvc"
+    "rslint"
   ],
   "os": [
-    "win32"
+    "linux"
   ],
   "cpu": [
-    "x64"
+    "arm64"
   ]
 }

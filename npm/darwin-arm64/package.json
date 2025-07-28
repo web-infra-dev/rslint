@@ -3,7 +3,6 @@
   "version": "0.0.9",
   "license": "MIT",
   "description": "Node binding for rslint",
-  "main": "rslint.darwin-arm64",
   "homepage": "https://rslint.rs",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",
   "repository": {
@@ -15,7 +14,7 @@
     "provenance": true
   },
   "files": [
-    "rslint.darwin-arm64"
+    "rslint"
   ],
   "os": [
     "darwin"
