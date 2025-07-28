@@ -15,6 +15,7 @@ async function build_all() {
     { os: 'linux', arch: 'amd64', 'node-arch': 'x64' },
     { os: 'linux', arch: 'arm64', 'node-arch': 'arm64' },
     { os: 'windows', arch: 'amd64', 'node-arch': 'x64', 'node-os': 'win32' },
+    { os: 'windows', arch: 'arm64', 'node-arch': 'arm64', 'node-os': 'win32' },
   ];
   for (const platform of platforms) {
     await $`GOOS=${platform.os} GOARCH=${platform.arch} go build -o npm/${platform['node-os'] || platform.os}-${platform['node-arch']}/rslint ./cmd/rslint`;
