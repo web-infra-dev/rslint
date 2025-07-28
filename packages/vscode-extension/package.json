@@ -1,8 +1,8 @@
 {
-  "name": "rslint-vsce",
+  "name": "rslint",
   "displayName": "rslint",
   "description": "Language support for Rslint",
-  "version": "0.0.15",
+  "version": "0.0.19",
   "private": true,
   "publisher": "rstack",
   "license": "MIT",
@@ -57,13 +57,9 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "pnpm run build",
     "build": "node scripts/build.js",
     "watch": "node scripts/build.js --watch",
-    "package": "vsce package --dependencies",
     "test": "tsc -p tsconfig.spec.json && node .vscode-test-out/runTest.js",
-    "prepackage": "pnpm build",
-    "publish": "vsce publish",
     "lint": "rslint --tsconfig tsconfig.build.json"
   },
   "devDependencies": {
