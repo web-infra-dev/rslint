@@ -16,7 +16,7 @@
     "build": "pnpm -r build",
     "build:npm": "zx scripts/build-npm.mjs",
     "version": "zx scripts/version.mjs",
-    "release": "pnpm publish -r ",
+    "release": "pnpm publish -r --no-git-checks ",
     "format": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --write .",
     "format:check": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --check .",
     "test": "pnpm -r test",

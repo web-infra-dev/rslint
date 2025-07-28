@@ -17,7 +17,9 @@
   "files": [
     "bin/rslint.cjs"
   ],
-  "bin": "./bin/rslint.cjs",
+  "bin": {
+    "rslint": "./bin/rslint.cjs"
+  },
   "publishConfig": {
     "access": "public"
   },
