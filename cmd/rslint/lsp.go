@@ -286,7 +286,7 @@ func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic, content string) *l
 				Character: uint32(endColumn),
 			},
 		},
-		Severity: ptrTo(lsproto.DiagnosticSeverityError), // Error
+		Severity: ptrTo(lsproto.DiagnosticSeverity(ruleDiag.Severity.Int())),
 		Source:   ptrTo("rslint"),
 		Message:  fmt.Sprintf("[%s] %s", ruleDiag.RuleName, ruleDiag.Message.Description),
 	}
@@ -404,6 +404,5 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 	if diagnostics == nil {
 		diagnostics = []rule.RuleDiagnostic{}
 	}
-
 	return diagnostics, nil
 }

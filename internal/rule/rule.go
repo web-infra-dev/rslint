@@ -31,6 +31,20 @@ func (s DiagnosticSeverity) String() string {
 	}
 }
 
+// String returns the string representation of the severity
+func (s DiagnosticSeverity) Int() int {
+	switch s {
+	case SeverityError:
+		return 1
+	case SeverityWarning:
+		return 2
+	case SeverityOff:
+		return 0
+	default:
+		return 0
+	}
+}
+
 // ParseSeverity converts a string to DiagnosticSeverity
 func ParseSeverity(level string) DiagnosticSeverity {
 	switch level {
