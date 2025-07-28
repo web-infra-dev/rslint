@@ -1,8 +1,9 @@
 {
-  "name": "rslint",
+  "name": "rslint-vsce",
   "displayName": "rslint",
   "description": "Language support for Rslint",
   "version": "0.0.15",
+  "private":true,
   "publisher": "rstack",
   "license": "MIT",
   "repository": {
@@ -81,5 +82,6 @@
     "vscode-languageclient": "^9.0.1",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.12"
-  }
+  },
+  "files": []
 }
