@@ -16,6 +16,7 @@ async function publish_all() {
   ];
   for (const platform of platforms) {
    console.log(`Start Publishing for ${platform.os}-${platform.arch}`);
+   await $`rm -rf ./packages/vscode-extension/dist/rslint && rm -rf ./packages/vscode-extension/dist/rslint.exe`;
    await $`GOOS=${platform.os} GOARCH=${platform.arch} go build -o ./packages/vscode-extension/dist ./cmd/rslint`;
    const os = platform['node-os'] || platform.os;
    const arch = platform['node-arch'] || platform.arch;
