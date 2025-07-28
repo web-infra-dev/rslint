@@ -9,8 +9,7 @@
     "url": "https://github.com/web-infra-dev/rslint"
   },
   "publishConfig": {
-    "access": "public",
-    "provenance": true
+    "access": "public"
   },
   "files": [
     "rslint"
