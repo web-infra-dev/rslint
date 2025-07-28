@@ -1,6 +1,6 @@
 {
   "name": "@rslint/test-tools",
-  "version": "0.0.1",
+  "version": "0.0.15",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
@@ -14,5 +14,8 @@
   "devDependencies": {
     "@types/node": "24.0.14",
     "@rslint/core": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

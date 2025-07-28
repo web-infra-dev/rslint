@@ -1,10 +1,8 @@
 {
-  "name": "@rslint/binding-linux-x64-gnu",
-  "version": "1.4.10",
+  "name": "@rslint/linux-x64",
+  "version": "0.0.15",
   "license": "MIT",
-  "description": "Node binding for rslint",
-  "main": "rslint.linux-x64-gnu",
-  "homepage": "https://rslint.rs",
+  "description": "binary for rslint",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",
   "repository": {
     "type": "git",
@@ -12,18 +10,17 @@
   },
   "publishConfig": {
     "access": "public",
-    "provenance": true
+    "executableFiles": [
+      "./rslint"
+    ]
   },
   "files": [
-    "rslint.linux-x64-gnu"
+    "rslint"
   ],
   "os": [
     "linux"
   ],
   "cpu": [
     "x64"
-  ],
-  "libc": [
-    "glibc"
   ]
 }

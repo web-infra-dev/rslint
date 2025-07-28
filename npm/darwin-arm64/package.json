@@ -1,9 +1,8 @@
 {
-  "name": "@rslint/binding-darwin-arm64",
-  "version": "0.0.9",
+  "name": "@rslint/darwin-arm64",
+  "version": "0.0.15",
   "license": "MIT",
-  "description": "Node binding for rslint",
-  "main": "rslint.darwin-arm64",
+  "description": "binary for rslint",
   "homepage": "https://rslint.rs",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",
   "repository": {
@@ -12,10 +11,12 @@
   },
   "publishConfig": {
     "access": "public",
-    "provenance": true
+    "executableFiles": [
+      "./rslint"
+    ]
   },
   "files": [
-    "rslint.darwin-arm64"
+    "rslint"
   ],
   "os": [
     "darwin"

@@ -1,6 +1,6 @@
 {
   "name": "@rslint/core",
-  "version": "0.0.9",
+  "version": "0.0.15",
   "exports": {
     ".": "./dist/index.js",
     "./package.json": "./package.json"
@@ -8,9 +8,6 @@
   "type": "module",
   "scripts": {
     "build:bin": "go build -v -o bin/rslint ../../cmd/rslint",
-    "build:all": "pnpm build:linux && pnpm build:macos",
-    "build:linux": "GOOS=linux GOARCH=amd64 go build -o bin/rslint-linux-x64 ../../cmd/rslint",
-    "build:macos": "GOOS=darwin GOARCH=arm64 go build -o bin/rslint-darwin-arm64 ../../cmd/rslint",
     "build:js": "tsc -b tsconfig.build.json --force",
     "dev": "tsc -b tsconfig.build.json --force --watch",
     "build": "pnpm build:bin && pnpm build:js",
@@ -18,7 +15,7 @@
     "test:update": "node --test --test-update-snapshots 'tests/**.test.mjs'"
   },
   "files": [
-    "bin/"
+    "bin/rslint.cjs"
   ],
   "bin": {
     "rslint": "./bin/rslint.cjs"
@@ -38,5 +35,13 @@
   "devDependencies": {
     "@types/node": "24.0.14",
     "typescript": "5.8.3"
+  },
+  "optionalDependencies": {
+    "@rslint/darwin-arm64": "workspace:*",
+    "@rslint/darwin-x64": "workspace:*",
+    "@rslint/linux-arm64": "workspace:*",
+    "@rslint/linux-x64": "workspace:*",
+    "@rslint/win32-arm64": "workspace:*",
+    "@rslint/win32-x64": "workspace:*"
   }
 }

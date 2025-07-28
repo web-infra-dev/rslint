@@ -7,7 +7,8 @@ function getBinPath() {
     return path.resolve(__dirname, './rslint');
   }
   let platformKey = `${process.platform}-${os.arch()}`;
-  return path.resolve(__dirname, `./rslint-${platformKey}`);
+
+  return require.resolve(`@rslint/${platformKey}/rslint`);
 }
 function main() {
   const binPath = getBinPath();
@@ -17,7 +18,7 @@ function main() {
     });
   } catch (error) {
     // Preserve the exit code from the child process
-    if (error.status !== undefined) {
+    if (error.status != null) {
       process.exit(error.status);
     } else {
       console.error(`Failed to execute ${binPath}: ${error.message}`);

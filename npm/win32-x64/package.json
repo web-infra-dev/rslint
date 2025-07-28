@@ -1,5 +1,5 @@
 {
-  "name": "@rslint/darwin-x64",
+  "name": "@rslint/win32-x64",
   "version": "0.0.15",
   "license": "MIT",
   "description": "binary for rslint",
@@ -18,7 +18,7 @@
     "rslint"
   ],
   "os": [
-    "darwin"
+    "win32"
   ],
   "cpu": [
     "x64"
