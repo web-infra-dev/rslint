@@ -15,11 +15,9 @@
     "test:update": "node --test --test-update-snapshots 'tests/**.test.mjs'"
   },
   "files": [
-    "bin/"
+    "bin/rslint.cjs"
   ],
-  "bin": {
-    "rslint": "./bin/rslint.cjs"
-  },
+  "bin":"./bin/rslint.cjs",
   "publishConfig": {
     "access": "public"
   },
@@ -35,5 +33,13 @@
   "devDependencies": {
     "@types/node": "24.0.14",
     "typescript": "5.8.3"
+  },
+  "optionalDependencies": {
+    "@rslint/darwin-arm64": "0.0.9",
+    "@rslint/darwin-x64": "0.0.9",
+    "@rslint/linux-arm64": "0.0.9",
+    "@rslint/linux-x64": "0.0.9",
+    "@rslint/win32-arm64": "0.0.9",
+    "@rslint/win32-x64": "0.0.9"
   }
 }

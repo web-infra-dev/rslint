@@ -1,8 +1,8 @@
 {
-  "name": "@rslint/binding-darwin-arm64",
+  "name": "@rslint/darwin-arm64",
   "version": "0.0.9",
   "license": "MIT",
-  "description": "Node binding for rslint",
+  "description": "binary for rslint",
   "homepage": "https://rslint.rs",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",
   "repository": {

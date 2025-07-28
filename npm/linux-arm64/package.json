@@ -1,8 +1,8 @@
 {
-  "name": "@rslint/binding-linux-arm64",
+  "name": "@rslint/linux-arm64",
   "version": "1.4.10",
   "license": "MIT",
-  "description": "Node binding for rslint",
+  "description": "binary for rslint",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",
   "repository": {
     "type": "git",

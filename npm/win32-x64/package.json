@@ -1,8 +1,8 @@
 {
-  "name": "@rslint/binding-win32-x64",
+  "name": "@rslint/win32-x64",
   "version": "1.4.10",
   "license": "MIT",
-  "description": "Node binding for rslint",
+  "description": "binary for rslint",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",
   "repository": {
     "type": "git",
