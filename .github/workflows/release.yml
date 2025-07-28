@@ -1,0 +1,116 @@
+name: 🚀 Release packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to release'
+        required: true
+        default: 'main'
+      npm_tag:
+        type: choice
+        description: 'Specify npm tag'
+        required: true
+        default: 'alpha'
+        options:
+          - alpha
+          - beta
+          - rc
+          - canary
+          - latest
+      extension_type:
+        type: choice
+        description: 'Specify the release type of extension'
+        required: true
+        default: pre-release
+        options:
+          - official
+          - pre-release
+
+      to_release:
+        description: 'Packages to release'
+        type: choice
+        required: true
+        options:
+          - all
+          - npm
+          - extension
+
+env:
+  GO_VERSION: '1.24.1'
+
+jobs:
+  publish:
+    name: Build
+    env:
+      release_npm: ${{ inputs.to_release == 'all' || inputs.to_release == 'npm' }}
+      release_extension: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.inputs.branch }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Format code
+        run: pnpm format:check
+
+      - name: TypeCheck
+        run: pnpm typecheck
+
+      - name: Lint code
+        run: pnpm lint
+
+      - name: Build packages
+        run: pnpm build
+
+      - name: Test on Linux
+        if: runner.os == 'Linux'
+        run: xvfb-run -a pnpm -r test
+
+      - name: Publish npm packages
+        if: env.release_npm == 'true'
+        env:
+          NPM_TOKEN: ${{ secrets.RSLINT_NPM_TOKEN }}
+        run: |
+          npm config set "//registry.npmjs.org/:_authToken" "${NPM_TOKEN}"
+          pnpm -r publish --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
+
+      - name: Build and publish to Microsoft VS Code Marketplace
+        if: env.release_extension == 'true'
+        env:
+          VSCE_PAT: ${{ secrets.RSLINT_VSCE_PAT }}
+        run: |
+          if [ "${{ github.event.inputs.extension_type }}" = "pre-release" ]; then
+            pnpm publish:vsce --prerelease
+          else
+            pnpm publish:vsce
+          fi
+
+      - name: Build and publish to Open VSX Registry
+        if: env.release_extension == 'true'
+        env:
+          OVSX_PAT: ${{ secrets.RSLINT_OVSX_PAT }}
+        run: |
+          if [ "${{ github.event.inputs.extension_type }}" = "pre-release" ]; then
+            pnpm publish:ovsx --prerelease
+          else
+            pnpm publish:ovsx
+          fi

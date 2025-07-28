@@ -16,7 +16,7 @@
     "build": "pnpm -r build",
     "build:npm": "zx scripts/build-npm.mjs",
     "version": "zx scripts/version.mjs",
-    "release": "pnpm publish -r --no-git-checks ",
+    "release": "pnpm publish -r --no-git-checks",
     "publish:vsce": "zx scripts/publish-marketplace.mjs",
     "publish:ovsx": "zx scripts/publish-marketplace.mjs --marketplace=ovsx",
     "format": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --write .",
