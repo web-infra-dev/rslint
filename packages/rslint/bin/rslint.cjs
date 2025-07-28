@@ -18,7 +18,7 @@ function main() {
     });
   } catch (error) {
     // Preserve the exit code from the child process
-    if (error.status !== undefined) {
+    if (error.status != null) {
       process.exit(error.status);
     } else {
       console.error(`Failed to execute ${binPath}: ${error.message}`);
