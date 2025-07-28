@@ -2,7 +2,7 @@
   "name": "rslint",
   "displayName": "rslint",
   "description": "Language support for Rslint",
-  "version": "0.0.10",
+  "version": "0.0.12",
   "publisher": "rstack",
   "license": "MIT",
   "repository": {

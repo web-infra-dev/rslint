@@ -70,6 +70,7 @@ async function updateWorkspaceDependencies(packagePath, versionMap) {
     'dependencies',
     'devDependencies',
     'peerDependencies',
+    "optionalDependencies",
   ]) {
     const deps = packageJson[depType];
     if (!deps) continue;

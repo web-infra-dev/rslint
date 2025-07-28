@@ -1,6 +1,6 @@
 {
   "name": "rslint",
-  "version": "0.0.10",
+  "version": "0.0.12",
   "private": true,
   "description": "Rslint Monorepo",
   "homepage": "https://github.com/web-infra-dev/rslint#readme",
@@ -16,6 +16,7 @@
     "build": "pnpm -r build",
     "build:npm": "zx scripts/build-npm.mjs",
     "version": "zx scripts/version.mjs",
+    "release": "pnpm publish -r ",
     "format": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --write .",
     "format:check": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --check .",
     "test": "pnpm -r test",
