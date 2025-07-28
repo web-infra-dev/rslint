@@ -11,7 +11,7 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('no-unnecessary-type-parameters', null, {
+ruleTester.run('no-unnecessary-type-parameters', {
   valid: [
     `
       class ClassyArray<T> {

@@ -12,7 +12,7 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('explicit-module-boundary-types', null, {
+ruleTester.run('explicit-module-boundary-types', {
   valid: [
     {
       code: `

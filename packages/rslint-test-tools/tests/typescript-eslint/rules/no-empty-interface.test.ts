@@ -12,7 +12,7 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('no-empty-interface', null, {
+ruleTester.run('no-empty-interface', {
   valid: [
     `
 interface Foo {

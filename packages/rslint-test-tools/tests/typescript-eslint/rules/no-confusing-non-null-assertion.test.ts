@@ -10,7 +10,7 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('no-confusing-non-null-assertion', 'no-confusing-non-null-assertion', {
+ruleTester.run('no-confusing-non-null-assertion', {
   valid: [
     'a == b!;',
     'a = b!;',
