@@ -1,0 +1,3 @@
+function foo() {
+  this.prop;
+}

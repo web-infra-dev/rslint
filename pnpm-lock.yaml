@@ -20,6 +20,21 @@ importers:
       typescript:
         specifier: 5.8.3
         version: 5.8.3
+      zx:
+        specifier: 8.7.1
+        version: 8.7.1
+
+  npm/darwin-arm64: {}
+
+  npm/darwin-x64: {}
+
+  npm/linux-arm64: {}
+
+  npm/linux-x64: {}
+
+  npm/win32-arm64: {}
+
+  npm/win32-x64: {}
 
   packages/rslint:
     devDependencies:
@@ -29,6 +44,25 @@ importers:
       typescript:
         specifier: 5.8.3
         version: 5.8.3
+    optionalDependencies:
+      '@rslint/darwin-arm64':
+        specifier: workspace:*
+        version: link:../../npm/darwin-arm64
+      '@rslint/darwin-x64':
+        specifier: workspace:*
+        version: link:../../npm/darwin-x64
+      '@rslint/linux-arm64':
+        specifier: workspace:*
+        version: link:../../npm/linux-arm64
+      '@rslint/linux-x64':
+        specifier: workspace:*
+        version: link:../../npm/linux-x64
+      '@rslint/win32-arm64':
+        specifier: workspace:*
+        version: link:../../npm/win32-arm64
+      '@rslint/win32-x64':
+        specifier: workspace:*
+        version: link:../../npm/win32-x64
 
   packages/rslint-test-tools:
     devDependencies:
@@ -48,8 +82,8 @@ importers:
         specifier: workspace:*
         version: link:../rslint
       '@types/mocha':
-        specifier: 10.0.10
-        version: 10.0.10
+        specifier: 10.0.9
+        version: 10.0.9
       '@types/node':
         specifier: 24.0.14
         version: 24.0.14
@@ -130,6 +164,7 @@ packages:
     resolution: {integrity: sha512-fCqPIfOcLE+CGqGPd66c8bZpwAji98tZ4JI9i/mlTNTlsIWslCfpg48s/ypyLxZTump5sypjrKn2/kY7q8oAbA==}
     engines: {node: '>=20.0.0'}
 
+<<<<<<< HEAD
   '@azure/msal-browser@4.15.0':
     resolution: {integrity: sha512-+AIGTvpVz+FIx5CsM1y+nW0r/qOb/ChRdM8/Cbp+jKWC0Wdw4ldnwPdYOBi5NaALUQnYITirD9XMZX7LdklEzQ==}
     engines: {node: '>=0.8.0'}
@@ -141,6 +176,28 @@ packages:
   '@azure/msal-node@3.6.3':
     resolution: {integrity: sha512-95wjsKGyUcAd5tFmQBo5Ug/kOj+hFh/8FsXuxluEvdfbgg6xCimhSP9qnyq6+xIg78/jREkBD1/BSqd7NIDDYQ==}
     engines: {node: '>=16'}
+=======
+  '@azure/msal-browser@4.16.0':
+    resolution:
+      {
+        integrity: sha512-yF8gqyq7tVnYftnrWaNaxWpqhGQXoXpDfwBtL7UCGlIbDMQ1PUJF/T2xCL6NyDNHoO70qp1xU8GjjYTyNIefkw==,
+      }
+    engines: { node: '>=0.8.0' }
+
+  '@azure/msal-common@15.9.0':
+    resolution:
+      {
+        integrity: sha512-lbz/D+C9ixUG3hiZzBLjU79a0+5ZXCorjel3mwXluisKNH0/rOS/ajm8yi4yI9RP5Uc70CAcs9Ipd0051Oh/kA==,
+      }
+    engines: { node: '>=0.8.0' }
+
+  '@azure/msal-node@3.6.4':
+    resolution:
+      {
+        integrity: sha512-jMeut9UQugcmq7aPWWlJKhJIse4DQ594zc/JaP6BIxg55XaX3aM/jcPuIQ4ryHnI4QSf03wUspy/uqAvjWKbOg==,
+      }
+    engines: { node: '>=16' }
+>>>>>>> origin/main
 
   '@babel/code-frame@7.27.1':
     resolution: {integrity: sha512-cjQ7ZlQ0Mv3b47hABuTevyTuYN4i+loJKGeV9flcCgIK37cCXRh+L1bd3iBHlynerhQ7BhCkn2BPbQUL+rGqFg==}
@@ -400,6 +457,7 @@ packages:
     resolution: {integrity: sha512-LtoMMhxAlorcGhmFYI+LhPgbPZCkgP6ra1YL604EeF6U98pLlQ3iWIGMdWSC+vWmPBWBNgmDBAhnAobLROJmwg==}
     engines: {node: '>=18'}
 
+<<<<<<< HEAD
   '@textlint/ast-node-types@15.2.0':
     resolution: {integrity: sha512-nr9wEiZCNYafGZ++uWFZgPlDX3Bi7u4T2d5swpaoMvc1G2toXsBfe7UNVwXZq5dvYDbQN7vDeb3ltlKQ8JnPNQ==}
 
@@ -414,12 +472,51 @@ packages:
 
   '@textlint/types@15.2.0':
     resolution: {integrity: sha512-wpF+xjGJgJK2JiwUdYjuNZrbuas3KfC9VDnHKac6aBLFyrI1iXuXtuxKXQDFi5/hebACactSJOuVVbuQbdJZ1Q==}
+=======
+  '@textlint/ast-node-types@15.2.1':
+    resolution:
+      {
+        integrity: sha512-20fEcLPsXg81yWpApv4FQxrZmlFF/Ta7/kz1HGIL+pJo5cSTmkc+eCki3GpOPZIoZk0tbJU8hrlwUb91F+3SNQ==,
+      }
+
+  '@textlint/linter-formatter@15.2.1':
+    resolution:
+      {
+        integrity: sha512-oollG/BHa07+mMt372amxHohteASC+Zxgollc1sZgiyxo4S6EuureV3a4QIQB0NecA+Ak3d0cl0WI/8nou38jw==,
+      }
+
+  '@textlint/module-interop@15.2.1':
+    resolution:
+      {
+        integrity: sha512-b/C/ZNrm05n1ypymDknIcpkBle30V2ZgE3JVqQlA9PnQV46Ky510qrZk6s9yfKgA3m1YRnAw04m8xdVtqjq1qg==,
+      }
+
+  '@textlint/resolver@15.2.1':
+    resolution:
+      {
+        integrity: sha512-FY3aK4tElEcOJVUsaMj4Zro4jCtKEEwUMIkDL0tcn6ljNcgOF7Em+KskRRk/xowFWayqDtdz5T3u7w/6fjjuJQ==,
+      }
+
+  '@textlint/types@15.2.1':
+    resolution:
+      {
+        integrity: sha512-zyqNhSatK1cwxDUgosEEN43hFh3WCty9Zm2Vm3ogU566IYegifwqN54ey/CiRy/DiO4vMcFHykuQnh2Zwp6LLw==,
+      }
+>>>>>>> origin/main
 
   '@types/istanbul-lib-coverage@2.0.6':
     resolution: {integrity: sha512-2QF/t/auWm0lsy8XtKVPG19v3sSOQlJe/YHZgfjb/KBBHOGSV+J2q/S671rcq9uTBrLAXmZpqJiaQbMT+zNU1w==}
 
+<<<<<<< HEAD
   '@types/mocha@10.0.10':
     resolution: {integrity: sha512-xPyYSz1cMPnJQhl0CLMH68j3gprKZaTjG3s5Vi+fDgx+uhG9NOXwbVt52eFS8ECyXhyKcjDLCBEqBExKuiZb7Q==}
+=======
+  '@types/mocha@10.0.9':
+    resolution:
+      {
+        integrity: sha512-sicdRoWtYevwxjOHNMPTl3vSfJM6oyW8o1wXeI7uww6b6xHg8eBznQDNSGBCDJmsE8UMxP05JgZRtsKbTqt//Q==,
+      }
+>>>>>>> origin/main
 
   '@types/node@24.0.14':
     resolution: {integrity: sha512-4zXMWD91vBLGRtHK3YbIoFMia+1nqEz72coM42C5ETjnNCa/heoj7NT1G67iAfOqMmcfhuCZ4uNpyz8EjlAejw==}
@@ -1504,6 +1601,12 @@ packages:
   safe-buffer@5.1.2:
     resolution: {integrity: sha512-Gd2UZBJDkXlY7GbJxfsE8/nvKkUEU1G38c1siN6QP6a9PT9MmHB8GnpscSmMJSoF8LOIrt8ud/wPtojys4G6+g==}
 
+  safe-buffer@5.2.1:
+    resolution:
+      {
+        integrity: sha512-rp3So07KcdmmKbGvgaNxQSJr7bGVSVk5S9Eq1F+ppbRo70+YeaDxkw5Dd8NPN+GD6bjnYm2VuPuCXmpuYvmCXQ==,
+      }
+
   safer-buffer@2.1.2:
     resolution: {integrity: sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg==}
 
@@ -1608,6 +1711,12 @@ packages:
 
   string_decoder@1.1.1:
     resolution: {integrity: sha512-n/ShnvDi6FHbbVfviro+WojiFzv+s8MPMHBczVePfUpDJLwoLT0ht1l4YwBCbi8pJAveEEdnkHyPyTP/mzRfwg==}
+
+  string_decoder@1.3.0:
+    resolution:
+      {
+        integrity: sha512-hkRX8U1WjJFd8LsDJ2yQ/wWWxaopEsABU1XfkM8A+j0+85JAGppt16cr1Whg6KIbb4okU6Mql6BOj+uup/wKeA==,
+      }
 
   strip-ansi@6.0.1:
     resolution: {integrity: sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A==}
@@ -1855,6 +1964,14 @@ packages:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}
     engines: {node: '>=10'}
 
+  zx@8.7.1:
+    resolution:
+      {
+        integrity: sha512-28u1w2LlIfvyvJvYe6pmCipesk8oL5AFMVp+P/U445LcaPgzrU5lNDtAPd6nJvWmoCNyXZz37R/xKOGokccjsw==,
+      }
+    engines: { node: '>= 12.17.0' }
+    hasBin: true
+
 snapshots:
 
   '@azu/format-text@1.0.2': {}
@@ -1920,8 +2037,8 @@ snapshots:
       '@azure/core-tracing': 1.3.0
       '@azure/core-util': 1.13.0
       '@azure/logger': 1.3.0
-      '@azure/msal-browser': 4.15.0
-      '@azure/msal-node': 3.6.3
+      '@azure/msal-browser': 4.16.0
+      '@azure/msal-node': 3.6.4
       open: 10.2.0
       tslib: 2.8.1
     transitivePeerDependencies:
@@ -1934,15 +2051,15 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@azure/msal-browser@4.15.0':
+  '@azure/msal-browser@4.16.0':
     dependencies:
-      '@azure/msal-common': 15.8.1
+      '@azure/msal-common': 15.9.0
 
-  '@azure/msal-common@15.8.1': {}
+  '@azure/msal-common@15.9.0': {}
 
-  '@azure/msal-node@3.6.3':
+  '@azure/msal-node@3.6.4':
     dependencies:
-      '@azure/msal-common': 15.8.1
+      '@azure/msal-common': 15.9.0
       jsonwebtoken: 9.0.2
       uuid: 8.3.2
 
@@ -2103,9 +2220,9 @@ snapshots:
     dependencies:
       '@secretlint/resolver': 10.2.1
       '@secretlint/types': 10.2.1
-      '@textlint/linter-formatter': 15.2.0
-      '@textlint/module-interop': 15.2.0
-      '@textlint/types': 15.2.0
+      '@textlint/linter-formatter': 15.2.1
+      '@textlint/module-interop': 15.2.1
+      '@textlint/types': 15.2.1
       chalk: 5.4.1
       debug: 4.4.1(supports-color@8.1.1)
       pluralize: 8.0.0
@@ -2151,15 +2268,15 @@ snapshots:
 
   '@sindresorhus/merge-streams@2.3.0': {}
 
-  '@textlint/ast-node-types@15.2.0': {}
+  '@textlint/ast-node-types@15.2.1': {}
 
-  '@textlint/linter-formatter@15.2.0':
+  '@textlint/linter-formatter@15.2.1':
     dependencies:
       '@azu/format-text': 1.0.2
       '@azu/style-format': 1.0.1
-      '@textlint/module-interop': 15.2.0
-      '@textlint/resolver': 15.2.0
-      '@textlint/types': 15.2.0
+      '@textlint/module-interop': 15.2.1
+      '@textlint/resolver': 15.2.1
+      '@textlint/types': 15.2.1
       chalk: 4.1.2
       debug: 4.4.1(supports-color@8.1.1)
       js-yaml: 3.14.1
@@ -2172,17 +2289,17 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@textlint/module-interop@15.2.0': {}
+  '@textlint/module-interop@15.2.1': {}
 
-  '@textlint/resolver@15.2.0': {}
+  '@textlint/resolver@15.2.1': {}
 
-  '@textlint/types@15.2.0':
+  '@textlint/types@15.2.1':
     dependencies:
-      '@textlint/ast-node-types': 15.2.0
+      '@textlint/ast-node-types': 15.2.1
 
   '@types/istanbul-lib-coverage@2.0.6': {}
 
-  '@types/mocha@10.0.10': {}
+  '@types/mocha@10.0.9': {}
 
   '@types/node@24.0.14':
     dependencies:
@@ -2204,7 +2321,7 @@ snapshots:
 
   '@vscode/test-cli@0.0.11':
     dependencies:
-      '@types/mocha': 10.0.10
+      '@types/mocha': 10.0.9
       c8: 9.1.0
       chokidar: 3.6.0
       enhanced-resolve: 5.18.2
@@ -2596,7 +2713,7 @@ snapshots:
 
   ecdsa-sig-formatter@1.0.11:
     dependencies:
-      safe-buffer: 5.1.2
+      safe-buffer: 5.2.1
 
   editions@6.21.0:
     dependencies:
@@ -3008,12 +3125,12 @@ snapshots:
     dependencies:
       buffer-equal-constant-time: 1.0.1
       ecdsa-sig-formatter: 1.0.11
-      safe-buffer: 5.1.2
+      safe-buffer: 5.2.1
 
   jws@3.2.2:
     dependencies:
       jwa: 1.4.2
-      safe-buffer: 5.1.2
+      safe-buffer: 5.2.1
 
   keytar@7.9.0:
     dependencies:
@@ -3340,7 +3457,7 @@ snapshots:
 
   randombytes@2.1.0:
     dependencies:
-      safe-buffer: 5.1.2
+      safe-buffer: 5.2.1
 
   rc-config-loader@4.1.3:
     dependencies:
@@ -3384,7 +3501,7 @@ snapshots:
   readable-stream@3.6.2:
     dependencies:
       inherits: 2.0.4
-      string_decoder: 1.1.1
+      string_decoder: 1.3.0
       util-deprecate: 1.0.2
 
   readdirp@3.6.0:
@@ -3418,6 +3535,8 @@ snapshots:
       queue-microtask: 1.2.3
 
   safe-buffer@5.1.2: {}
+
+  safe-buffer@5.2.1: {}
 
   safer-buffer@2.1.2: {}
 
@@ -3543,6 +3662,10 @@ snapshots:
     dependencies:
       safe-buffer: 5.1.2
 
+  string_decoder@1.3.0:
+    dependencies:
+      safe-buffer: 5.2.1
+
   strip-ansi@6.0.1:
     dependencies:
       ansi-regex: 5.0.1
@@ -3636,7 +3759,7 @@ snapshots:
 
   tunnel-agent@0.6.0:
     dependencies:
-      safe-buffer: 5.1.2
+      safe-buffer: 5.2.1
     optional: true
 
   tunnel@0.0.6: {}
@@ -3789,3 +3912,5 @@ snapshots:
       buffer-crc32: 0.2.13
 
   yocto-queue@0.1.0: {}
+
+  zx@8.7.1: {}

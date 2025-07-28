@@ -1,6 +1,6 @@
 {
-  "name": "rslint",
-  "version": "0.0.1",
+  "name": "rslint-monorepo",
+  "version": "0.0.20",
   "private": true,
   "description": "Rslint Monorepo",
   "homepage": "https://github.com/web-infra-dev/rslint#readme",
@@ -14,6 +14,10 @@
   "license": "MIT",
   "scripts": {
     "build": "pnpm -r build",
+    "build:npm": "zx scripts/build-npm.mjs",
+    "version": "zx scripts/version.mjs",
+    "release": "pnpm publish -r --no-git-checks ",
+    "publish:vsce": "zx scripts/publish-vsce.mjs",
     "format": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --write .",
     "format:check": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --check .",
     "test": "pnpm -r test",
@@ -25,10 +29,15 @@
     "prettier": "3.5.0",
     "typescript": "5.8.3",
     "@rslint/core": "workspace:*",
+<<<<<<< HEAD
     "tsx": "^4.20.3"
+=======
+    "zx": "8.7.1"
+>>>>>>> origin/main
   },
   "packageManager": "pnpm@10.13.1",
   "engines": {
     "pnpm": ">=10"
-  }
+  },
+  "files": []
 }

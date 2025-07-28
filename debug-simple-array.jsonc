@@ -1,0 +1,15 @@
+[
+  {
+    "language": "typescript",
+    "files": ["debug-simple-array.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "project": ["./tsconfig.json"],
+        "projectService": false
+      }
+    },
+    "rules": {
+      "array-type": "error"
+    }
+  }
+]

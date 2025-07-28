@@ -2,7 +2,8 @@
   "name": "rslint",
   "displayName": "rslint",
   "description": "Language support for Rslint",
-  "version": "0.0.1",
+  "version": "0.0.20",
+  "private": true,
   "publisher": "rstack",
   "license": "MIT",
   "repository": {
@@ -56,13 +57,9 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "pnpm run build",
     "build": "node scripts/build.js",
     "watch": "node scripts/build.js --watch",
-    "package": "vsce package --dependencies",
     "test": "tsc -p tsconfig.spec.json && node .vscode-test-out/runTest.js",
-    "prepackage": "pnpm build",
-    "publish": "vsce publish",
     "lint": "rslint --tsconfig tsconfig.build.json"
   },
   "devDependencies": {
@@ -72,7 +69,7 @@
     "@vscode/test-cli": "0.0.11",
     "@vscode/vsce": "3.6.0",
     "@vscode/test-electron": "2.4.1",
-    "@types/mocha": "10.0.10",
+    "@types/mocha": "10.0.9",
     "mocha": "10.8.2",
     "esbuild": "0.25.7",
     "fast-glob": "3.2.12",
@@ -81,5 +78,6 @@
     "vscode-languageclient": "^9.0.1",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.12"
-  }
+  },
+  "files": []
 }

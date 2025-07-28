@@ -1,0 +1,16 @@
+[
+  {
+    "language": "typescript",
+    "files": ["*.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "project": ["./debug-type-constraint-tsconfig.json"],
+        "projectService": false
+      }
+    },
+    "rules": {
+      "no-array-delete": "error",
+      "no-unnecessary-type-constraint": "error"
+    }
+  }
+]

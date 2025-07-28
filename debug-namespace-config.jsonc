@@ -1,0 +1,15 @@
+[
+  {
+    "language": "typescript",
+    "files": ["debug-namespace-test.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "project": ["./debug-namespace-tsconfig.json"],
+        "projectService": false
+      }
+    },
+    "rules": {
+      "no-namespace": "error"
+    }
+  }
+]

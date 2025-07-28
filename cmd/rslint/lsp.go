@@ -7,161 +7,50 @@ import (
 	"io"
 	"log"
 	"os"
-	"slices"
 	"strings"
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/scanner"
-	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/sourcegraph/jsonrpc2"
+	"github.com/typescript-eslint/rslint/internal/config"
 	"github.com/typescript-eslint/rslint/internal/linter"
 	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/rules/array_type"
-	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
-	"github.com/typescript-eslint/rslint/internal/rules/ban_ts_comment"
-	"github.com/typescript-eslint/rslint/internal/rules/ban_tslint_comment"
-	"github.com/typescript-eslint/rslint/internal/rules/class_literal_property_style"
-	"github.com/typescript-eslint/rslint/internal/rules/class_methods_use_this"
-	"github.com/typescript-eslint/rslint/internal/rules/consistent_type_exports"
-	"github.com/typescript-eslint/rslint/internal/rules/consistent_type_imports"
-	"github.com/typescript-eslint/rslint/internal/rules/default_param_last"
-	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
-	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
-	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_void_expression"
-	"github.com/typescript-eslint/rslint/internal/rules/no_duplicate_type_constituents"
-	"github.com/typescript-eslint/rslint/internal/rules/no_floating_promises"
-	"github.com/typescript-eslint/rslint/internal/rules/no_for_in_array"
-	"github.com/typescript-eslint/rslint/internal/rules/no_implied_eval"
-	"github.com/typescript-eslint/rslint/internal/rules/no_meaningless_void_operator"
-	"github.com/typescript-eslint/rslint/internal/rules/no_misused_promises"
-	"github.com/typescript-eslint/rslint/internal/rules/no_misused_spread"
-	"github.com/typescript-eslint/rslint/internal/rules/no_mixed_enums"
-	"github.com/typescript-eslint/rslint/internal/rules/no_redundant_type_constituents"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_boolean_literal_compare"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_template_expression"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_type_arguments"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_type_assertion"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_argument"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_assignment"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_call"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_enum_comparison"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_member_access"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_return"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_type_assertion"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_unary_minus"
-	"github.com/typescript-eslint/rslint/internal/rules/non_nullable_type_assertion_style"
-	"github.com/typescript-eslint/rslint/internal/rules/only_throw_error"
-	"github.com/typescript-eslint/rslint/internal/rules/prefer_as_const"
-	"github.com/typescript-eslint/rslint/internal/rules/prefer_promise_reject_errors"
-	"github.com/typescript-eslint/rslint/internal/rules/prefer_reduce_type_parameter"
-	"github.com/typescript-eslint/rslint/internal/rules/prefer_return_this_type"
-	"github.com/typescript-eslint/rslint/internal/rules/promise_function_async"
-	"github.com/typescript-eslint/rslint/internal/rules/related_getter_setter_pairs"
-	"github.com/typescript-eslint/rslint/internal/rules/require_array_sort_compare"
-	"github.com/typescript-eslint/rslint/internal/rules/require_await"
-	"github.com/typescript-eslint/rslint/internal/rules/restrict_plus_operands"
-	"github.com/typescript-eslint/rslint/internal/rules/restrict_template_expressions"
-	"github.com/typescript-eslint/rslint/internal/rules/return_await"
-	"github.com/typescript-eslint/rslint/internal/rules/switch_exhaustiveness_check"
-	"github.com/typescript-eslint/rslint/internal/rules/unbound_method"
-	"github.com/typescript-eslint/rslint/internal/rules/use_unknown_in_catch_callback_variable"
 	"github.com/typescript-eslint/rslint/internal/utils"
 )
 
-// LSP protocol structures
-type InitializeParams struct {
-	ProcessID    *int    `json:"processId"`
-	RootPath     *string `json:"rootPath"`
-	RootURI      *string `json:"rootUri"`
-	Capabilities struct {
-		TextDocument struct {
-			PublishDiagnostics struct {
-				RelatedInformation bool `json:"relatedInformation"`
-				TagSupport         struct {
-					ValueSet []int `json:"valueSet"`
-				} `json:"tagSupport"`
-			} `json:"publishDiagnostics"`
-		} `json:"textDocument"`
-	} `json:"capabilities"`
-}
-
-type InitializeResult struct {
-	Capabilities ServerCapabilities `json:"capabilities"`
-}
-
-type ServerCapabilities struct {
-	TextDocumentSync   int  `json:"textDocumentSync"`
-	DiagnosticProvider bool `json:"diagnosticProvider"`
-}
-
-type DidOpenTextDocumentParams struct {
-	TextDocument TextDocumentItem `json:"textDocument"`
-}
-
-type DidChangeTextDocumentParams struct {
-	TextDocument   VersionedTextDocumentIdentifier  `json:"textDocument"`
-	ContentChanges []TextDocumentContentChangeEvent `json:"contentChanges"`
-}
-
-type TextDocumentItem struct {
-	URI        string `json:"uri"`
-	LanguageID string `json:"languageId"`
-	Version    int    `json:"version"`
-	Text       string `json:"text"`
-}
-
-type VersionedTextDocumentIdentifier struct {
-	URI     string `json:"uri"`
-	Version int    `json:"version"`
-}
-
-type TextDocumentContentChangeEvent struct {
-	Text string `json:"text"`
-}
-
-type LspDiagnostic struct {
-	Range    Range  `json:"range"`
-	Severity int    `json:"severity"`
-	Source   string `json:"source"`
-	Message  string `json:"message"`
-}
-
-type Range struct {
-	Start Position `json:"start"`
-	End   Position `json:"end"`
-}
-
-type Position struct {
-	Line      int `json:"line"`
-	Character int `json:"character"`
-}
-
-type PublishDiagnosticsParams struct {
-	URI         string          `json:"uri"`
-	Diagnostics []LspDiagnostic `json:"diagnostics"`
+func ptrTo[T any](v T) *T {
+	return &v
 }
 
 // LSP Server implementation
 type LSPServer struct {
 	conn      *jsonrpc2.Conn
 	rootURI   string
-	documents map[string]string // URI -> content
+	documents map[lsproto.DocumentUri]string // URI -> content
 }
 
 func NewLSPServer() *LSPServer {
 	return &LSPServer{
-		documents: make(map[string]string),
+		documents: make(map[lsproto.DocumentUri]string),
 	}
 }
 
 func (s *LSPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 	s.conn = conn
-	log.Printf("Received request: %v", req)
+
+	requestJSON, err := json.MarshalIndent(req, "", "  ")
+	if err != nil {
+		log.Printf("Failed to marshal request: %v", err)
+		return nil, err
+	}
+
+	log.Printf("Received request: %s", string(requestJSON))
 	switch req.Method {
 	case "initialize":
 		return s.handleInitialize(ctx, req)
@@ -196,7 +85,7 @@ func (s *LSPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 }
 
 func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
-	var params InitializeParams
+	var params lsproto.InitializeParams
 	if err := json.Unmarshal(*req.Params, &params); err != nil {
 		return nil, &jsonrpc2.Error{
 			Code:    jsonrpc2.CodeParseError,
@@ -204,16 +93,15 @@ func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request)
 		}
 	}
 
-	if params.RootURI != nil {
-		s.rootURI = *params.RootURI
-		// Remove file:// prefix if present
-		s.rootURI = strings.TrimPrefix(s.rootURI, "file://")
+	if params.RootUri.DocumentUri != nil {
+		s.rootURI = uriToPath(string(*params.RootUri.DocumentUri))
 	}
 
-	result := InitializeResult{
-		Capabilities: ServerCapabilities{
-			TextDocumentSync:   1, // Full document sync
-			DiagnosticProvider: true,
+	result := &lsproto.InitializeResult{
+		Capabilities: &lsproto.ServerCapabilities{
+			TextDocumentSync: &lsproto.TextDocumentSyncOptionsOrKind{
+				Kind: ptrTo(lsproto.TextDocumentSyncKindFull),
+			},
 		},
 	}
 
@@ -221,12 +109,12 @@ func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request)
 }
 
 func (s *LSPServer) handleDidOpen(ctx context.Context, req *jsonrpc2.Request) {
-	var params DidOpenTextDocumentParams
+	var params lsproto.DidOpenTextDocumentParams
 	if err := json.Unmarshal(*req.Params, &params); err != nil {
 		return
 	}
 
-	uri := params.TextDocument.URI
+	uri := params.TextDocument.Uri
 	content := params.TextDocument.Text
 
 	s.documents[uri] = content
@@ -234,16 +122,16 @@ func (s *LSPServer) handleDidOpen(ctx context.Context, req *jsonrpc2.Request) {
 }
 
 func (s *LSPServer) handleDidChange(ctx context.Context, req *jsonrpc2.Request) {
-	var params DidChangeTextDocumentParams
+	var params lsproto.DidChangeTextDocumentParams
 	if err := json.Unmarshal(*req.Params, &params); err != nil {
 		return
 	}
 
-	uri := params.TextDocument.URI
+	uri := params.TextDocument.Uri
 
 	// For full document sync, we expect one change with the full text
 	if len(params.ContentChanges) > 0 {
-		content := params.ContentChanges[0].Text
+		content := params.ContentChanges[0].WholeDocument.Text
 		s.documents[uri] = content
 		s.runDiagnostics(ctx, uri, content)
 	}
@@ -251,17 +139,13 @@ func (s *LSPServer) handleDidChange(ctx context.Context, req *jsonrpc2.Request) 
 
 func (s *LSPServer) handleDidSave(ctx context.Context, req *jsonrpc2.Request) {
 	// Re-run diagnostics on save
-	var params struct {
-		TextDocument struct {
-			URI string `json:"uri"`
-		} `json:"textDocument"`
-	}
+	var params lsproto.DidSaveTextDocumentParams
 
 	if err := json.Unmarshal(*req.Params, &params); err != nil {
 		return
 	}
 
-	uri := params.TextDocument.URI
+	uri := params.TextDocument.Uri
 	if content, exists := s.documents[uri]; exists {
 		s.runDiagnostics(ctx, uri, content)
 	}
@@ -271,14 +155,19 @@ func (s *LSPServer) handleShutdown(ctx context.Context, req *jsonrpc2.Request) (
 	return nil, nil
 }
 
-func (s *LSPServer) runDiagnostics(ctx context.Context, uri, content string) {
+func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri, content string) {
+	uriString := string(uri)
+
 	// Only process TypeScript/JavaScript files
-	if !isTypeScriptFile(uri) {
+	if !isTypeScriptFile(uriString) {
 		return
 	}
 
+	// Initialize rule registry with all available rules (ensure it's done once)
+	config.RegisterAllTypeSriptEslintPluginRules()
+
 	// Convert URI to file path
-	filePath := uriToPath(uri)
+	filePath := uriToPath(uriString)
 
 	// Create a temporary file system with the content
 	vfs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
@@ -292,85 +181,113 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri, content string) {
 
 	host := utils.CreateCompilerHost(workingDir, vfs)
 
-	// Try to find tsconfig.json in the working directory
-	tsconfigPath := workingDir + "/tsconfig.json"
-	if !vfs.FileExists(tsconfigPath) {
-		// If no tsconfig found, skip diagnostics for now
+	// Try to find rslint.json in the working directory
+	rslintConfigPath := workingDir + "/rslint.json"
+	if !vfs.FileExists(rslintConfigPath) {
+		// If no rslint.json found, skip diagnostics for now
 		// In a real implementation, you'd create a default config
-		log.Printf("No tsconfig.json found at %s", tsconfigPath)
+		log.Printf("No rslint.json found at %s", rslintConfigPath)
 		return
 	}
 
-	// For simplicity, we'll create a minimal tsconfig for single file analysis
-	program, err := utils.CreateProgram(true, vfs, workingDir, "tsconfig.json", host)
+	// Load rslint configuration and extract tsconfig paths
+	loader := config.NewConfigLoader(vfs, workingDir)
+	rslintConfig, configDirectory, err := loader.LoadRslintConfig("rslint.json")
 	if err != nil {
-		// If we can't create with tsconfig, skip for now
-		log.Printf("Could not create program: %v", err)
+		log.Printf("Could not load rslint config: %v", err)
 		return
 	}
 
-	sourceFiles := program.GetSourceFiles()
+	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, configDirectory)
+	if err != nil {
+		log.Printf("Could not load TypeScript configs from rslint config: %v", err)
+		return
+	}
+
+	if len(tsConfigs) == 0 {
+		log.Printf("No TypeScript configurations found in rslint config")
+		return
+	}
+
+	// Create multiple programs for all tsconfig files
+	var programs []*compiler.Program
+	var allSourceFiles []*ast.SourceFile
 	var targetFile *ast.SourceFile
-	for _, sf := range sourceFiles {
-		if strings.HasSuffix(sf.FileName(), filePath) || sf.FileName() == filePath {
-			targetFile = sf
-			break
+
+	for _, tsConfigPath := range tsConfigs {
+		program, err := utils.CreateProgram(true, vfs, workingDir, tsConfigPath, host)
+		if err != nil {
+			log.Printf("Could not create program for %s: %v", tsConfigPath, err)
+			continue
+		}
+		programs = append(programs, program)
+
+		// Check if the current file is in this program
+		sourceFiles := program.GetSourceFiles()
+		allSourceFiles = append(allSourceFiles, sourceFiles...)
+
+		if targetFile == nil {
+			for _, sf := range sourceFiles {
+				if strings.HasSuffix(sf.FileName(), filePath) || sf.FileName() == filePath {
+					targetFile = sf
+					break
+				}
+			}
 		}
 	}
 
+	if len(programs) == 0 {
+		log.Printf("Could not create any programs")
+		return
+	}
+
 	if targetFile == nil {
-		// If we can't find the file in the program, skip diagnostics
-		log.Printf("Could not find file %s in program", filePath)
+		// If we can't find the file in any program, skip diagnostics
+		log.Printf("Could not find file %s in any program", filePath)
 		return
 	}
 
 	// Collect diagnostics
-	var lsp_diagnostics []LspDiagnostic
+	var lsp_diagnostics []*lsproto.Diagnostic
 
-	rule_diags, err := runLint(uri)
+	rule_diags, err := runLintWithPrograms(uri, programs, rslintConfig)
+
+	if err != nil {
+		log.Printf("Error running lint: %v", err)
+	}
+
 	for _, diagnostic := range rule_diags {
 		lspDiag := convertRuleDiagnosticToLSP(diagnostic, content)
 		lsp_diagnostics = append(lsp_diagnostics, lspDiag)
 	}
-	log.Printf("Diagnostics collected: %v", lsp_diagnostics)
 	// Publish diagnostics
-	params := PublishDiagnosticsParams{
-		URI:         uri,
+	params := lsproto.PublishDiagnosticsParams{
+		Uri:         uri,
 		Diagnostics: lsp_diagnostics,
 	}
 
 	s.conn.Notify(ctx, "textDocument/publishDiagnostics", params)
 }
 
-func getAvailableRules() []rule.Rule {
-	return []rule.Rule{
-		no_array_delete.NoArrayDeleteRule,
-		no_base_to_string.NoBaseToStringRule,
-		no_for_in_array.NoForInArrayRule,
-		no_implied_eval.NoImpliedEvalRule,
-		only_throw_error.OnlyThrowErrorRule,
-	}
-}
-
-func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic, content string) LspDiagnostic {
+func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic, content string) *lsproto.Diagnostic {
 	diagnosticStart := ruleDiag.Range.Pos()
 	diagnosticEnd := ruleDiag.Range.End()
 	startLine, startColumn := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, diagnosticStart)
 	endLine, endColumn := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, diagnosticEnd)
 
-	return LspDiagnostic{
-		Range: Range{
-			Start: Position{
-				Line:      startLine,
-				Character: startColumn,
+	return &lsproto.Diagnostic{
+		Range: lsproto.Range{
+			Start: lsproto.Position{
+				Line:      uint32(startLine),
+				Character: uint32(startColumn),
 			},
-			End: Position{
-				Line:      endLine,
-				Character: endColumn,
+			End: lsproto.Position{
+				Line:      uint32(endLine),
+				Character: uint32(endColumn),
 			},
 		},
-		Severity: 1, // Error
-		Source:   "rslint",
+		Severity: ptrTo(lsproto.DiagnosticSeverity(ruleDiag.Severity.Int())),
+		Source:   ptrTo("rslint"),
 		Message:  fmt.Sprintf("[%s] %s", ruleDiag.RuleName, ruleDiag.Message.Description),
 	}
 }
@@ -421,161 +338,71 @@ func runLSP() int {
 
 // LintResponse represents a lint response from Go to JS
 type LintResponse struct {
-	Diagnostics []LspDiagnostic `json:"diagnostics"`
-	ErrorCount  int             `json:"errorCount"`
-	FileCount   int             `json:"fileCount"`
-	RuleCount   int             `json:"ruleCount"`
+	Diagnostics []lsproto.Diagnostic `json:"diagnostics"`
+	ErrorCount  int                  `json:"errorCount"`
+	FileCount   int                  `json:"fileCount"`
+	RuleCount   int                  `json:"ruleCount"`
 }
 
-// HandleLint handles lint requests in IPC mode
-func runLint(uri string) ([]rule.RuleDiagnostic, error) {
-	var tsconfig string
-	// Get current directory
-	currentDirectory, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("error getting current directory: %v", err)
+func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, rslintConfig config.RslintConfig) ([]rule.RuleDiagnostic, error) {
+	if len(programs) == 0 {
+		return nil, fmt.Errorf("no programs provided")
 	}
-	currentDirectory = tspath.NormalizePath(currentDirectory)
 
-	// Create filesystem
-	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	// Initialize rule registry with all available rules
+	config.RegisterAllTypeSriptEslintPluginRules()
 
-	// Handle tsconfig
-	var configFileName string
-	if tsconfig == "" {
-		configFileName = tspath.ResolvePath(currentDirectory, "tsconfig.json")
-		if !fs.FileExists(configFileName) {
-			fs = utils.NewOverlayVFS(fs, map[string]string{
-				configFileName: "{}",
-			})
+	// Find all source files from all programs, prioritizing the file matching the URI
+	var targetFile *ast.SourceFile
+	uriPath := uriToPath(string(uri))
+
+	for _, program := range programs {
+		for _, file := range program.SourceFiles() {
+
+			if file.FileName() == uriPath {
+				targetFile = file
+			}
 		}
+	}
+
+	// If we found a target file, prioritize it, otherwise use all files
+	var files []*ast.SourceFile
+	if targetFile != nil {
+		files = []*ast.SourceFile{targetFile}
 	} else {
-		configFileName = tspath.ResolvePath(currentDirectory, tsconfig)
-		if !fs.FileExists(configFileName) {
-			return nil, fmt.Errorf("error: tsconfig %q doesn't exist", tsconfig)
-		}
-	}
-	currentDirectory = tspath.GetDirectoryPath(configFileName)
-
-	// Create rules
-	var rules = []rule.Rule{
-		array_type.ArrayTypeRule,
-		await_thenable.AwaitThenableRule,
-		ban_ts_comment.BanTsCommentRule,
-		ban_tslint_comment.BanTslintCommentRule,
-		class_literal_property_style.ClassLiteralPropertyStyleRule,
-		class_methods_use_this.ClassMethodsUseThisRule,
-		consistent_type_exports.ConsistentTypeExportsRule,
-		consistent_type_imports.ConsistentTypeImportsRule,
-		default_param_last.DefaultParamLastRule,
-		no_array_delete.NoArrayDeleteRule,
-		no_base_to_string.NoBaseToStringRule,
-		no_confusing_void_expression.NoConfusingVoidExpressionRule,
-		no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule,
-		no_floating_promises.NoFloatingPromisesRule,
-		no_for_in_array.NoForInArrayRule,
-		no_implied_eval.NoImpliedEvalRule,
-		no_meaningless_void_operator.NoMeaninglessVoidOperatorRule,
-		no_misused_promises.NoMisusedPromisesRule,
-		no_misused_spread.NoMisusedSpreadRule,
-		no_mixed_enums.NoMixedEnumsRule,
-		no_redundant_type_constituents.NoRedundantTypeConstituentsRule,
-		no_unnecessary_boolean_literal_compare.NoUnnecessaryBooleanLiteralCompareRule,
-		no_unnecessary_template_expression.NoUnnecessaryTemplateExpressionRule,
-		no_unnecessary_type_arguments.NoUnnecessaryTypeArgumentsRule,
-		no_unnecessary_type_assertion.NoUnnecessaryTypeAssertionRule,
-		no_unsafe_argument.NoUnsafeArgumentRule,
-		no_unsafe_assignment.NoUnsafeAssignmentRule,
-		no_unsafe_call.NoUnsafeCallRule,
-		no_unsafe_enum_comparison.NoUnsafeEnumComparisonRule,
-		no_unsafe_member_access.NoUnsafeMemberAccessRule,
-		no_unsafe_return.NoUnsafeReturnRule,
-		no_unsafe_type_assertion.NoUnsafeTypeAssertionRule,
-		no_unsafe_unary_minus.NoUnsafeUnaryMinusRule,
-		non_nullable_type_assertion_style.NonNullableTypeAssertionStyleRule,
-		only_throw_error.OnlyThrowErrorRule,
-		prefer_as_const.PreferAsConstRule,
-		prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
-		prefer_reduce_type_parameter.PreferReduceTypeParameterRule,
-		prefer_return_this_type.PreferReturnThisTypeRule,
-		promise_function_async.PromiseFunctionAsyncRule,
-		related_getter_setter_pairs.RelatedGetterSetterPairsRule,
-		require_array_sort_compare.RequireArraySortCompareRule,
-		require_await.RequireAwaitRule,
-		restrict_plus_operands.RestrictPlusOperandsRule,
-		restrict_template_expressions.RestrictTemplateExpressionsRule,
-		return_await.ReturnAwaitRule,
-		switch_exhaustiveness_check.SwitchExhaustivenessCheckRule,
-		unbound_method.UnboundMethodRule,
-		use_unknown_in_catch_callback_variable.UseUnknownInCatchCallbackVariableRule,
+		log.Printf("Target file not found for URI %s, processing all files", uri)
 	}
 
-	// Create compiler host
-	host := utils.CreateCompilerHost(currentDirectory, fs)
-
-	// Create program
-	program, err := utils.CreateProgram(false, fs, currentDirectory, configFileName, host)
-	if err != nil {
-		return nil, fmt.Errorf("error creating TS program: %v", err)
-	}
-
-	// Find source files
-	files := []*ast.SourceFile{}
-
-	// If specific files are provided, use those
-
-	// Otherwise use all source files
-	log.Printf("uri: %v", uri)
-	for _, file := range program.SourceFiles() {
-
-		p := string(file.Path())
-		log.Printf("file: %v", p)
-		// FIXME: should filter file
-		files = append(files, file)
-
-	}
-	log.Printf("files: %v", files)
-
-	slices.SortFunc(files, func(a *ast.SourceFile, b *ast.SourceFile) int {
-		return len(b.Text()) - len(a.Text())
-	})
+	log.Printf("Processing %d files from %d programs", len(files), len(programs))
 
 	// Collect diagnostics
 	var diagnostics []rule.RuleDiagnostic
 	var diagnosticsLock sync.Mutex
-	errorsCount := 0
 
 	// Create collector function
 	diagnosticCollector := func(d rule.RuleDiagnostic) {
 		diagnosticsLock.Lock()
 		defer diagnosticsLock.Unlock()
 		diagnostics = append(diagnostics, d)
-		errorsCount++
 	}
 
-	// Run linter
-	err = linter.RunLinter(
-		[]*compiler.Program{program},
-		false, // Don't use single-threaded mode for IPC
+	// Run linter with all programs using rule registry
+	err := linter.RunLinter(
+		programs,
+		false, // Don't use single-threaded mode for LSP
 		files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			return utils.Map(rules, func(r rule.Rule) linter.ConfiguredRule {
-				return linter.ConfiguredRule{
-					Name: r.Name,
-					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return r.Run(ctx, nil)
-					},
-				}
-			})
+			activeRules := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
+			return activeRules
 		},
 		diagnosticCollector,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error running linter: %v", err)
 	}
+
 	if diagnostics == nil {
 		diagnostics = []rule.RuleDiagnostic{}
 	}
-	// Create response
 	return diagnostics, nil
 }

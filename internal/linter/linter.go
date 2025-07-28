@@ -12,8 +12,9 @@ import (
 )
 
 type ConfiguredRule struct {
-	Name string
-	Run  func(ctx rule.RuleContext) rule.RuleListeners
+	Name     string
+	Severity rule.DiagnosticSeverity
+	Run      func(ctx rule.RuleContext) rule.RuleListeners
 }
 
 func RunLinter(programs []*compiler.Program, singleThreaded bool, files []*ast.SourceFile, getRulesForFile func(sourceFile *ast.SourceFile) []ConfiguredRule, onDiagnostic func(diagnostic rule.RuleDiagnostic)) error {
@@ -45,6 +46,7 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, files []*ast.S
 									Range:      textRange,
 									Message:    msg,
 									SourceFile: file,
+									Severity:   r.Severity,
 								})
 							},
 							ReportRangeWithSuggestions: func(textRange core.TextRange, msg rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
@@ -54,6 +56,7 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, files []*ast.S
 									Message:     msg,
 									Suggestions: &suggestions,
 									SourceFile:  file,
+									Severity:    r.Severity,
 								})
 							},
 							ReportNode: func(node *ast.Node, msg rule.RuleMessage) {
@@ -62,6 +65,7 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, files []*ast.S
 									Range:      utils.TrimNodeTextRange(file, node),
 									Message:    msg,
 									SourceFile: file,
+									Severity:   r.Severity,
 								})
 							},
 							ReportNodeWithFixes: func(node *ast.Node, msg rule.RuleMessage, fixes ...rule.RuleFix) {
@@ -71,6 +75,7 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, files []*ast.S
 									Message:    msg,
 									FixesPtr:   &fixes,
 									SourceFile: file,
+									Severity:   r.Severity,
 								})
 							},
 
@@ -81,6 +86,7 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, files []*ast.S
 									Message:     msg,
 									Suggestions: &suggestions,
 									SourceFile:  file,
+									Severity:    r.Severity,
 								})
 							},
 						}

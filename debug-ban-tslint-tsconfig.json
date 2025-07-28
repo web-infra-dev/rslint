@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "target": "ES2020",
+    "module": "commonjs"
+  },
+  "files": ["debug-ban-tslint.ts"]
+}

@@ -27,7 +27,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/typescript-eslint/rslint/internal/config"
@@ -44,6 +43,7 @@ type ColorScheme struct {
 	DimText     func(format string, a ...interface{}) string
 	BoldText    func(format string, a ...interface{}) string
 	BorderText  func(format string, a ...interface{}) string
+	WarnText    func(format string, a ...interface{}) string
 }
 
 // setupColors initializes the color scheme based on environment and flags
@@ -69,6 +69,7 @@ func setupColors() *ColorScheme {
 	dimColor := color.New(color.Faint).SprintfFunc()
 	boldColor := color.New(color.Bold).SprintfFunc()
 	borderColor := color.New(color.Faint).SprintfFunc()
+	WarnColor := color.New(color.FgYellow).SprintfFunc()
 
 	return &ColorScheme{
 		RuleName:    ruleNameColor,
@@ -78,6 +79,7 @@ func setupColors() *ColorScheme {
 		DimText:     dimColor,
 		BoldText:    boldColor,
 		BorderText:  borderColor,
+		WarnText:    WarnColor,
 	}
 }
 
@@ -134,6 +136,7 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 				Column: endColumn + 1,
 			},
 		},
+		Severity: d.Severity.String(),
 	}
 
 	jsonBytes, err := json.Marshal(diagnostic)
@@ -181,6 +184,13 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	w.WriteByte(' ')
 	w.WriteString(colors.RuleName(" %s ", d.RuleName))
 	w.WriteString(" — ")
+
+	// Severity level with conditional coloring
+	severityColor := colors.WarnText
+	if d.Severity == rule.SeverityError {
+		severityColor = colors.ErrorText
+	}
+	w.WriteString(severityColor("[%s] ", d.Severity.String()))
 
 	// Message handling
 	messageLineStart := 0
@@ -306,8 +316,7 @@ Usage:
     rslint [OPTIONS]
 
 Options:
-	--tsconfig PATH   Which tsconfig to use. Defaults to tsconfig.json.
-    --config PATH     Which rslint config file to use. Defaults to rslint.jsonc.
+    --config PATH     Which rslint config file to use. Defaults to rslint.json.
 	--list-files      List matched files
 	--format FORMAT   Output format: default | jsonline
 	--api, --ipc      Run in API/IPC mode (for JS integration)
@@ -316,51 +325,11 @@ Options:
 	-h, --help        Show help
 `
 
-// read config and deserialize the jsonc result
-func loadRslintConfig(configPath string, currentDirectory string, fs vfs.FS) (rslintconfig.RslintConfig, string) {
-	configFileName := tspath.ResolvePath(currentDirectory, configPath)
-	if !fs.FileExists(configFileName) {
-		fmt.Fprintf(os.Stderr, "error: rslint config file %q doesn't exist\n", configFileName)
-		os.Exit(1)
-	}
-
-	data, ok := fs.ReadFile(configFileName)
-	if !ok {
-		fmt.Fprintf(os.Stderr, "error reading rslint config file %q\n", configFileName)
-		os.Exit(1)
-	}
-
-	var config rslintconfig.RslintConfig
-	if err := json.Unmarshal([]byte(data), &config); err != nil {
-		fmt.Fprintf(os.Stderr, "error parsing rslint config file %q: %v\n", configFileName, err)
-		os.Exit(1)
-	}
-	currentDirectory = tspath.GetDirectoryPath(configFileName)
-	return config, currentDirectory
-}
-func loadTsConfigFromRslintConfig(rslintConfig rslintconfig.RslintConfig, currentDirectory string, fs vfs.FS) []string {
-	tsConfig := []string{}
-	for _, entry := range rslintConfig {
-
-		for _, config := range entry.LanguageOptions.ParserOptions.Project {
-			tsconfigPath := tspath.ResolvePath(currentDirectory, config)
-
-			if !fs.FileExists(tsconfigPath) {
-				fmt.Fprintf(os.Stderr, "error: tsconfig file %q doesn't exist\n", tsconfigPath)
-				os.Exit(1)
-			}
-			tsConfig = append(tsConfig, tsconfigPath)
-
-		}
-	}
-	return tsConfig
-}
 func runCMD() int {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
 	var (
 		help      bool
-		tsconfig  string
 		config    string
 		listFiles bool
 
@@ -374,7 +343,6 @@ func runCMD() int {
 	)
 	flag.StringVar(&format, "format", "default", "output format")
 	flag.StringVar(&config, "config", "", "which rslint config to use")
-	flag.StringVar(&tsconfig, "tsconfig", "", "which tsconfig to use")
 	flag.BoolVar(&listFiles, "list-files", false, "list matched files")
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&help, "h", false, "show help")
@@ -443,35 +411,13 @@ func runCMD() int {
 	currentDirectory = tspath.NormalizePath(currentDirectory)
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	tsConfigs := []string{}
-	if tsconfig == "" {
-		configFileName := tspath.ResolvePath(currentDirectory, "tsconfig.json")
-		if !fs.FileExists(configFileName) {
-			fs = utils.NewOverlayVFS(fs, map[string]string{
-				configFileName: "{}",
-			})
-		}
-		tsConfigs = append(tsConfigs, configFileName)
-	} else {
-		configFileName := tspath.ResolvePath(currentDirectory, tsconfig)
-		if !fs.FileExists(configFileName) {
-			fmt.Fprintf(os.Stderr, "error: tsconfig %q doesn't exist", tsconfig)
-			return 1
-		}
-		tsConfigs = append(tsConfigs, configFileName)
-	}
 
 	// Initialize rule registry with all available rules
 	rslintconfig.RegisterAllTypeSriptEslintPluginRules()
 	var rslintConfig rslintconfig.RslintConfig
-	var cwd string
+	var tsConfigs []string
 	// Load rslint configuration and determine which rules to enable
-	if config != "" {
-		rslintConfig, cwd = loadRslintConfig(config, currentDirectory, fs)
-		tsConfigs = loadTsConfigFromRslintConfig(rslintConfig, cwd, fs)
-	} else {
-		rslintConfig = rslintconfig.RslintConfig{}
-	}
+	rslintConfig, tsConfigs, currentDirectory = rslintconfig.LoadConfigurationWithFallback(config, currentDirectory, fs)
 
 	host := utils.CreateCompilerHost(currentDirectory, fs)
 
@@ -520,6 +466,7 @@ func runCMD() int {
 
 	diagnosticsChan := make(chan rule.RuleDiagnostic, 4096)
 	errorsCount := 0
+	warningsCount := 0
 
 	wg.Add(1)
 	go func() {
@@ -527,8 +474,12 @@ func runCMD() int {
 		w := bufio.NewWriterSize(os.Stdout, 4096*100)
 		defer w.Flush()
 		for d := range diagnosticsChan {
-			errorsCount++
-			if errorsCount == 1 {
+			if d.Severity == rule.SeverityError {
+				errorsCount++
+			} else if d.Severity == rule.SeverityWarning {
+				warningsCount++
+			}
+			if errorsCount+warningsCount == 1 {
 				w.WriteByte('\n')
 			}
 			printDiagnostic(d, w, comparePathOptions, format)
@@ -543,6 +494,7 @@ func runCMD() int {
 		singleThreaded,
 		files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+<<<<<<< HEAD
 			activeRulesWithConfig := rslintconfig.GlobalRuleRegistry.GetEnabledRulesWithConfig(rslintConfig, sourceFile.FileName())
 			return utils.Map(activeRulesWithConfig, func(ruleWithConfig rslintconfig.EnabledRuleWithConfig) linter.ConfiguredRule {
 				return linter.ConfiguredRule{
@@ -552,6 +504,10 @@ func runCMD() int {
 					},
 				}
 			})
+=======
+			activeRules := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
+			return activeRules
+>>>>>>> origin/main
 		},
 		func(d rule.RuleDiagnostic) {
 			diagnosticsChan <- d
@@ -571,13 +527,26 @@ func runCMD() int {
 	if errorsCount == 0 {
 		errorsColorFunc = colors.SuccessText
 	} else {
-		errorsColorFunc = colors.BoldText
+		errorsColorFunc = colors.ErrorText
+	}
+
+	var warningsColorFunc func(string, ...interface{}) string
+	if warningsCount == 0 {
+		warningsColorFunc = colors.SuccessText
+	} else {
+		warningsColorFunc = colors.WarnText
 	}
 
 	errorsText := "errors"
 	if errorsCount == 1 {
 		errorsText = "error"
 	}
+
+	warningsText := "warnings"
+	if warningsCount == 1 {
+		warningsText = "warning"
+	}
+
 	filesText := "files"
 	if len(files) == 1 {
 		filesText = "file"
@@ -589,9 +558,11 @@ func runCMD() int {
 	if format == "default" {
 		fmt.Fprintf(
 			os.Stdout,
-			"Found %s %s %s(linted %s %s with in %s using %s threads)%s\n",
+			"Found %s %s and %s %s %s(linted %s %s with in %s using %s threads)%s\n",
 			errorsColorFunc("%d", errorsCount),
 			errorsText,
+			warningsColorFunc("%d", warningsCount),
+			warningsText,
 			colors.DimText(""),
 			colors.BoldText("%d", len(files)),
 			filesText,

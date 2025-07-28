@@ -1,0 +1,14 @@
+[
+  {
+    "language": "typescript",
+    "files": ["debug-param-props.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "project": ["./debug-param-tsconfig.json"]
+      }
+    },
+    "rules": {
+      "explicit-member-accessibility": ["error", {"accessibility": "no-public"}]
+    }
+  }
+]

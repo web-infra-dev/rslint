@@ -84,12 +84,13 @@ export class RuleTester {
   ) {
     test(ruleName, async () => {
       let cwd = path.resolve(import.meta.dirname, './fixtures');
-      const tsconfig = path.resolve(
+      const config = path.resolve(
         import.meta.dirname,
-        './fixtures/tsconfig.virtual.json',
+        './fixtures/rslint.json',
       );
       let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
       await test('valid', async () => {
+<<<<<<< HEAD
         for (const testCase of cases.valid) {
           const code = typeof testCase === 'string' ? testCase : testCase.code;
           const options = typeof testCase === 'string' ? undefined : testCase.options;
@@ -116,6 +117,19 @@ export class RuleTester {
             console.error('Options:', JSON.stringify(options));
             console.error('Rule config:', JSON.stringify(ruleConfig));
           }
+=======
+        for (const code of cases.valid) {
+          const diags = await lint({
+            config,
+            workingDirectory: cwd,
+            fileContents: {
+              [virtual_entry]: code,
+            },
+            ruleOptions: {
+              [ruleName]: 'error',
+            },
+          });
+>>>>>>> origin/main
           assert(
             diags.diagnostics?.length === 0,
             `Expected no diagnostics for valid case, but got: ${JSON.stringify(diags)}`,
@@ -123,6 +137,7 @@ export class RuleTester {
         }
       });
       await test('invalid', async t => {
+<<<<<<< HEAD
         for (let i = 0; i < cases.invalid.length; i++) {
           const testCase = cases.invalid[i];
           const { errors, code, options } = testCase;
@@ -144,6 +159,19 @@ export class RuleTester {
               setTimeout(() => reject(new Error(`Timeout after 30s for rule ${ruleName} valid case`)), 30000)
             )
           ]);
+=======
+        for (const { errors, code } of cases.invalid) {
+          const diags = await lint({
+            config,
+            workingDirectory: cwd,
+            fileContents: {
+              [virtual_entry]: code,
+            },
+            ruleOptions: {
+              [ruleName]: 'error',
+            },
+          });
+>>>>>>> origin/main
           t.assert.snapshot(diags);
           assert(
             diags.diagnostics?.length > 0,

@@ -1,0 +1,16 @@
+[
+  {
+    "language": "typescript",
+    "files": ["debug-test.d.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "project": ["./debug-namespace-tsconfig.json"],
+        "projectService": false
+      }
+    },
+    "rules": {
+      "no-namespace": ["error", {"allowDefinitionFiles": true}]
+    }
+  }
+]
+EOF < /dev/null

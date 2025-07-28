@@ -1,0 +1,9 @@
+[
+  {
+    "language": "typescript", 
+    "files": ["debug-record.ts"],
+    "rules": {
+      "consistent-indexed-object-style": ["error", "index-signature"]
+    }
+  }
+]

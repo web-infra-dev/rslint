@@ -1,8 +1,9 @@
 {
   "name": "@rslint/test-tools",
-  "version": "0.0.1",
+  "version": "0.0.20",
   "type": "module",
   "main": "src/index.ts",
+  "private": true,
   "scripts": {
     "test": "node --import=tsx/esm --test-force-exit --test-timeout 25000 --test tests/typescript-eslint/rules/*.test.ts",
     "test:update": "node --import=tsx/esm --test --test-timeout 25000 --test-update-snapshots --test-force-exit tests/typescript-eslint/rules/*.test.ts"
@@ -13,7 +14,14 @@
   "description": "",
   "devDependencies": {
     "@types/node": "24.0.14",
+<<<<<<< HEAD
     "@rslint/core": "workspace:*",
     "tsx": "^4.6.0"
+=======
+    "@rslint/core": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+>>>>>>> origin/main
   }
 }

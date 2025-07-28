@@ -1,0 +1,1 @@
+let test = 1; type TestType = typeof test; type Func = (test: string) => typeof test;

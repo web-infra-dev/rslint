@@ -15,7 +15,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	ipc "github.com/typescript-eslint/rslint/internal/api"
-	"github.com/typescript-eslint/rslint/internal/config"
+	rslintconfig "github.com/typescript-eslint/rslint/internal/config"
 	"github.com/typescript-eslint/rslint/internal/linter"
 	"github.com/typescript-eslint/rslint/internal/rule"
 	"github.com/typescript-eslint/rslint/internal/rules/array_type"
@@ -119,11 +119,6 @@ type IPCHandler struct{}
 
 // HandleLint handles lint requests in IPC mode
 func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) {
-	var tsconfig string
-	if req.TSConfig != "" {
-		tsconfig = req.TSConfig
-	}
-
 	// Format is not used for IPC mode as we return structured data
 	_ = req.Format
 
@@ -148,22 +143,11 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		fs = utils.NewOverlayVFS(fs, req.FileContents)
 	}
 
-	// Handle tsconfig
-	var configFileName string
-	if tsconfig == "" {
-		configFileName = tspath.ResolvePath(currentDirectory, "tsconfig.json")
-		if !fs.FileExists(configFileName) {
-			fs = utils.NewOverlayVFS(fs, map[string]string{
-				configFileName: "{}",
-			})
-		}
-	} else {
-		configFileName = tspath.ResolvePath(currentDirectory, tsconfig)
-		if !fs.FileExists(configFileName) {
-			return nil, fmt.Errorf("error: tsconfig %q doesn't exist", tsconfig)
-		}
-	}
-	currentDirectory = tspath.GetDirectoryPath(configFileName)
+	// Initialize rule registry with all available rules
+	rslintconfig.RegisterAllTypeSriptEslintPluginRules()
+
+	// Load rslint configuration and determine which tsconfig files to use
+	_, tsConfigs, configDirectory := rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
 
 	// Create a map of all available rules
 	allRules := map[string]rule.Rule{
@@ -310,7 +294,7 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 	}
 
 	// Build rules with their configurations from request.RuleOptions
-	var rulesWithConfig []config.EnabledRuleWithConfig
+	var rulesWithConfig []rslintconfig.EnabledRuleWithConfig
 	if len(req.RuleOptions) > 0 {
 		for ruleName, ruleConfig := range req.RuleOptions {
 			if rule, exists := allRules[ruleName]; exists {
@@ -338,9 +322,9 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 				}
 
 				if level != "off" {
-					rulesWithConfig = append(rulesWithConfig, config.EnabledRuleWithConfig{
+					rulesWithConfig = append(rulesWithConfig, rslintconfig.EnabledRuleWithConfig{
 						Rule: rule,
-						Config: &config.RuleConfig{
+						Config: &rslintconfig.RuleConfig{
 							Level:   level,
 							Options: options,
 						},
@@ -351,9 +335,9 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 	} else {
 		// If no specific rules requested, use all rules
 		for _, rule := range allRules {
-			rulesWithConfig = append(rulesWithConfig, config.EnabledRuleWithConfig{
+			rulesWithConfig = append(rulesWithConfig, rslintconfig.EnabledRuleWithConfig{
 				Rule: rule,
-				Config: &config.RuleConfig{
+				Config: &rslintconfig.RuleConfig{
 					Level: "error",
 				},
 			})
@@ -361,43 +345,52 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 	}
 
 	// Create compiler host
-	host := utils.CreateCompilerHost(currentDirectory, fs)
+	host := utils.CreateCompilerHost(configDirectory, fs)
 	comparePathOptions := tspath.ComparePathsOptions{
 		CurrentDirectory:          host.GetCurrentDirectory(),
 		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
 	}
 
-	// Create program
-	program, err := utils.CreateProgram(false, fs, currentDirectory, configFileName, host)
-	if err != nil {
-		return nil, fmt.Errorf("error creating TS program: %v", err)
+	// Create programs from all tsconfig files found in rslint config
+	programs := []*compiler.Program{}
+	for _, configFileName := range tsConfigs {
+		program, err := utils.CreateProgram(false, fs, configDirectory, configFileName, host)
+		if err != nil {
+			return nil, fmt.Errorf("error creating TS program for %s: %v", configFileName, err)
+		}
+		programs = append(programs, program)
 	}
 
-	// Find source files
+	// Find source files from all programs
 	files := []*ast.SourceFile{}
 
 	// If specific files are provided, use those
 	if len(req.Files) > 0 {
 		for _, filePath := range req.Files {
-			absPath := tspath.ResolvePath(currentDirectory, filePath)
-			sourceFile := program.GetSourceFile(absPath)
-			if sourceFile != nil {
-				files = append(files, sourceFile)
+			absPath := tspath.ResolvePath(configDirectory, filePath)
+			// Try to find the file in any of the programs
+			for _, program := range programs {
+				sourceFile := program.GetSourceFile(absPath)
+				if sourceFile != nil {
+					files = append(files, sourceFile)
+					break // Found in this program, no need to check others
+				}
 			}
 		}
 	} else {
-		// Otherwise use all source files
-		for _, file := range program.SourceFiles() {
-
-			p := string(file.Path())
-			if strings.Contains(p, "/node_modules/") {
-				continue
+		// Otherwise use all source files from all programs
+		for _, program := range programs {
+			for _, file := range program.SourceFiles() {
+				p := string(file.Path())
+				if strings.Contains(p, "/node_modules/") {
+					continue
+				}
+				// skip bundled files
+				if strings.Contains(p, "bundled:") {
+					continue
+				}
+				files = append(files, file)
 			}
-			// skip bundled files
-			if strings.Contains(p, "bundled:") {
-				continue
-			}
-			files = append(files, file)
 		}
 	}
 	slices.SortFunc(files, func(a *ast.SourceFile, b *ast.SourceFile) int {
@@ -443,11 +436,11 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 
 	// Run linter
 	err = linter.RunLinter(
-		[]*compiler.Program{program},
+		programs,
 		false, // Don't use single-threaded mode for IPC
 		files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			return utils.Map(rulesWithConfig, func(ruleWithConfig config.EnabledRuleWithConfig) linter.ConfiguredRule {
+			return utils.Map(rulesWithConfig, func(ruleWithConfig rslintconfig.EnabledRuleWithConfig) linter.ConfiguredRule {
 				return linter.ConfiguredRule{
 					Name: ruleWithConfig.Rule.Name,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {

@@ -1,0 +1,15 @@
+[
+  {
+    "language": "typescript", 
+    "files": ["debug-function-type.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "project": ["./tsconfig.json"],
+        "projectService": false
+      }
+    },
+    "rules": {
+      "no-magic-numbers": "error"
+    }
+  }
+]

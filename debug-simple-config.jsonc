@@ -1,0 +1,15 @@
+[
+  {
+    "language": "typescript", 
+    "files": ["debug-simple-record.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "project": ["./debug-tsconfig.json"],
+        "projectService": false
+      }
+    },
+    "rules": {
+      "consistent-indexed-object-style": ["error", "index-signature"]
+    }
+  }
+]

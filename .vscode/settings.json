@@ -3,5 +3,16 @@
   "rslint.enable": true,
   "[json]": {
     "editor.tabSize": 2
-  }
+  },
+  "[jsonc]": {
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.detectIndentation": false
+  },
+  "files.associations": {
+    "rslint.json": "jsonc"
+  },
+  "cSpell.words": [
+    "rslint"
+  ]
 }
