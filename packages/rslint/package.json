@@ -1,6 +1,6 @@
 {
   "name": "@rslint/core",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "exports": {
     ".": "./dist/index.js",
     "./package.json": "./package.json"
@@ -17,7 +17,7 @@
   "files": [
     "bin/rslint.cjs"
   ],
-  "bin":"./bin/rslint.cjs",
+  "bin": "./bin/rslint.cjs",
   "publishConfig": {
     "access": "public"
   },

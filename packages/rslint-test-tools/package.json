@@ -1,6 +1,6 @@
 {
   "name": "@rslint/test-tools",
-  "version": "0.0.1",
+  "version": "0.0.10",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {
