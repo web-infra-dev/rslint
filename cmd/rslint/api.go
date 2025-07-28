@@ -72,6 +72,45 @@ import (
 	"github.com/typescript-eslint/rslint/internal/rules/switch_exhaustiveness_check"
 	"github.com/typescript-eslint/rslint/internal/rules/unbound_method"
 	"github.com/typescript-eslint/rslint/internal/rules/use_unknown_in_catch_callback_variable"
+	"github.com/typescript-eslint/rslint/internal/rules/explicit_member_accessibility"
+	"github.com/typescript-eslint/rslint/internal/rules/explicit_module_boundary_types"
+	"github.com/typescript-eslint/rslint/internal/rules/init_declarations"
+	"github.com/typescript-eslint/rslint/internal/rules/max_params"
+	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_non_null_assertion"
+	"github.com/typescript-eslint/rslint/internal/rules/no_dupe_class_members"
+	"github.com/typescript-eslint/rslint/internal/rules/no_duplicate_enum_values"
+	"github.com/typescript-eslint/rslint/internal/rules/no_dynamic_delete"
+	"github.com/typescript-eslint/rslint/internal/rules/no_empty_function"
+	"github.com/typescript-eslint/rslint/internal/rules/no_empty_interface"
+	"github.com/typescript-eslint/rslint/internal/rules/no_empty_object_type"
+	"github.com/typescript-eslint/rslint/internal/rules/no_import_type_side_effects"
+	"github.com/typescript-eslint/rslint/internal/rules/no_inferrable_types"
+	"github.com/typescript-eslint/rslint/internal/rules/no_invalid_this"
+	"github.com/typescript-eslint/rslint/internal/rules/no_invalid_void_type"
+	"github.com/typescript-eslint/rslint/internal/rules/no_loop_func"
+	"github.com/typescript-eslint/rslint/internal/rules/no_loss_of_precision"
+	"github.com/typescript-eslint/rslint/internal/rules/no_magic_numbers"
+	"github.com/typescript-eslint/rslint/internal/rules/no_misused_new"
+	"github.com/typescript-eslint/rslint/internal/rules/no_namespace"
+	"github.com/typescript-eslint/rslint/internal/rules/no_non_null_asserted_nullish_coalescing"
+	"github.com/typescript-eslint/rslint/internal/rules/no_non_null_asserted_optional_chain"
+	"github.com/typescript-eslint/rslint/internal/rules/no_non_null_assertion"
+	"github.com/typescript-eslint/rslint/internal/rules/no_redeclare"
+	"github.com/typescript-eslint/rslint/internal/rules/no_require_imports"
+	"github.com/typescript-eslint/rslint/internal/rules/no_restricted_imports"
+	"github.com/typescript-eslint/rslint/internal/rules/no_restricted_types"
+	"github.com/typescript-eslint/rslint/internal/rules/no_shadow"
+	"github.com/typescript-eslint/rslint/internal/rules/no_this_alias"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_type_constraint"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_type_conversion"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_type_parameters"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_declaration_merging"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_function_type"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unused_expressions"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unused_vars"
+	"github.com/typescript-eslint/rslint/internal/rules/no_use_before_define"
+	"github.com/typescript-eslint/rslint/internal/rules/no_useless_constructor"
+	"github.com/typescript-eslint/rslint/internal/rules/no_useless_empty_export"
 	"github.com/typescript-eslint/rslint/internal/utils"
 )
 
@@ -190,6 +229,84 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		"switch-exhaustiveness-check":                 switch_exhaustiveness_check.SwitchExhaustivenessCheckRule,
 		"unbound-method":                              unbound_method.UnboundMethodRule,
 		"use-unknown-in-catch-callback-variable":      use_unknown_in_catch_callback_variable.UseUnknownInCatchCallbackVariableRule,
+		"@typescript-eslint/explicit-member-accessibility": explicit_member_accessibility.ExplicitMemberAccessibilityRule,
+		"explicit-member-accessibility":               explicit_member_accessibility.ExplicitMemberAccessibilityRule,
+		"@typescript-eslint/explicit-module-boundary-types": explicit_module_boundary_types.ExplicitModuleBoundaryTypesRule,
+		"explicit-module-boundary-types":              explicit_module_boundary_types.ExplicitModuleBoundaryTypesRule,
+		"@typescript-eslint/init-declarations":        init_declarations.InitDeclarationsRule,
+		"init-declarations":                           init_declarations.InitDeclarationsRule,
+		"@typescript-eslint/max-params":               max_params.MaxParamsRule,
+		"max-params":                                  max_params.MaxParamsRule,
+		"@typescript-eslint/no-confusing-non-null-assertion": no_confusing_non_null_assertion.NoConfusingNonNullAssertionRule,
+		"no-confusing-non-null-assertion":            no_confusing_non_null_assertion.NoConfusingNonNullAssertionRule,
+		"@typescript-eslint/no-dupe-class-members":    no_dupe_class_members.NoDupeClassMembersRule,
+		"no-dupe-class-members":                       no_dupe_class_members.NoDupeClassMembersRule,
+		"@typescript-eslint/no-duplicate-enum-values": no_duplicate_enum_values.NoDuplicateEnumValuesRule,
+		"no-duplicate-enum-values":                    no_duplicate_enum_values.NoDuplicateEnumValuesRule,
+		"@typescript-eslint/no-dynamic-delete":        no_dynamic_delete.NoDynamicDeleteRule,
+		"no-dynamic-delete":                           no_dynamic_delete.NoDynamicDeleteRule,
+		"@typescript-eslint/no-empty-function":        no_empty_function.NoEmptyFunctionRule,
+		"no-empty-function":                           no_empty_function.NoEmptyFunctionRule,
+		"@typescript-eslint/no-empty-interface":       no_empty_interface.NoEmptyInterfaceRule,
+		"no-empty-interface":                          no_empty_interface.NoEmptyInterfaceRule,
+		"@typescript-eslint/no-empty-object-type":     no_empty_object_type.NoEmptyObjectTypeRule,
+		"no-empty-object-type":                        no_empty_object_type.NoEmptyObjectTypeRule,
+		"@typescript-eslint/no-import-type-side-effects": no_import_type_side_effects.NoImportTypeSideEffectsRule,
+		"no-import-type-side-effects":                 no_import_type_side_effects.NoImportTypeSideEffectsRule,
+		"@typescript-eslint/no-inferrable-types":      no_inferrable_types.NoInferrableTypesRule,
+		"no-inferrable-types":                         no_inferrable_types.NoInferrableTypesRule,
+		"@typescript-eslint/no-invalid-this":          no_invalid_this.NoInvalidThisRule,
+		"no-invalid-this":                             no_invalid_this.NoInvalidThisRule,
+		"@typescript-eslint/no-invalid-void-type":     no_invalid_void_type.NoInvalidVoidTypeRule,
+		"no-invalid-void-type":                        no_invalid_void_type.NoInvalidVoidTypeRule,
+		"@typescript-eslint/no-loop-func":             no_loop_func.NoLoopFuncRule,
+		"no-loop-func":                                no_loop_func.NoLoopFuncRule,
+		"@typescript-eslint/no-loss-of-precision":     no_loss_of_precision.NoLossOfPrecisionRule,
+		"no-loss-of-precision":                        no_loss_of_precision.NoLossOfPrecisionRule,
+		"@typescript-eslint/no-magic-numbers":         no_magic_numbers.NoMagicNumbersRule,
+		"no-magic-numbers":                            no_magic_numbers.NoMagicNumbersRule,
+		"@typescript-eslint/no-misused-new":           no_misused_new.NoMisusedNewRule,
+		"no-misused-new":                              no_misused_new.NoMisusedNewRule,
+		"@typescript-eslint/no-namespace":             no_namespace.NoNamespaceRule,
+		"no-namespace":                                no_namespace.NoNamespaceRule,
+		"@typescript-eslint/no-non-null-asserted-nullish-coalescing": no_non_null_asserted_nullish_coalescing.NoNonNullAssertedNullishCoalescingRule,
+		"no-non-null-asserted-nullish-coalescing":    no_non_null_asserted_nullish_coalescing.NoNonNullAssertedNullishCoalescingRule,
+		"@typescript-eslint/no-non-null-asserted-optional-chain": no_non_null_asserted_optional_chain.NoNonNullAssertedOptionalChainRule,
+		"no-non-null-asserted-optional-chain":        no_non_null_asserted_optional_chain.NoNonNullAssertedOptionalChainRule,
+		"@typescript-eslint/no-non-null-assertion":    no_non_null_assertion.NoNonNullAssertionRule,
+		"no-non-null-assertion":                      no_non_null_assertion.NoNonNullAssertionRule,
+		"@typescript-eslint/no-redeclare":             no_redeclare.NoRedeclareRule,
+		"no-redeclare":                                no_redeclare.NoRedeclareRule,
+		"@typescript-eslint/no-require-imports":       no_require_imports.NoRequireImportsRule,
+		"no-require-imports":                          no_require_imports.NoRequireImportsRule,
+		"@typescript-eslint/no-restricted-imports":    no_restricted_imports.NoRestrictedImportsRule,
+		"no-restricted-imports":                       no_restricted_imports.NoRestrictedImportsRule,
+		"@typescript-eslint/no-restricted-types":      no_restricted_types.NoRestrictedTypesRule,
+		"no-restricted-types":                         no_restricted_types.NoRestrictedTypesRule,
+		"@typescript-eslint/no-shadow":                no_shadow.NoShadowRule,
+		"no-shadow":                                   no_shadow.NoShadowRule,
+		"@typescript-eslint/no-this-alias":            no_this_alias.NoThisAliasRule,
+		"no-this-alias":                               no_this_alias.NoThisAliasRule,
+		"@typescript-eslint/no-unnecessary-type-constraint": no_unnecessary_type_constraint.NoUnnecessaryTypeConstraintRule,
+		"no-unnecessary-type-constraint":             no_unnecessary_type_constraint.NoUnnecessaryTypeConstraintRule,
+		"@typescript-eslint/no-unnecessary-type-conversion": no_unnecessary_type_conversion.NoUnnecessaryTypeConversionRule,
+		"no-unnecessary-type-conversion":             no_unnecessary_type_conversion.NoUnnecessaryTypeConversionRule,
+		"@typescript-eslint/no-unnecessary-type-parameters": no_unnecessary_type_parameters.NoUnnecessaryTypeParametersRule,
+		"no-unnecessary-type-parameters":             no_unnecessary_type_parameters.NoUnnecessaryTypeParametersRule,
+		"@typescript-eslint/no-unsafe-declaration-merging": no_unsafe_declaration_merging.NoUnsafeDeclarationMergingRule,
+		"no-unsafe-declaration-merging":              no_unsafe_declaration_merging.NoUnsafeDeclarationMergingRule,
+		"@typescript-eslint/no-unsafe-function-type":  no_unsafe_function_type.NoUnsafeFunctionTypeRule,
+		"no-unsafe-function-type":                     no_unsafe_function_type.NoUnsafeFunctionTypeRule,
+		"@typescript-eslint/no-unused-expressions":    no_unused_expressions.NoUnusedExpressionsRule,
+		"no-unused-expressions":                       no_unused_expressions.NoUnusedExpressionsRule,
+		"@typescript-eslint/no-unused-vars":           no_unused_vars.NoUnusedVarsRule,
+		"no-unused-vars":                              no_unused_vars.NoUnusedVarsRule,
+		"@typescript-eslint/no-use-before-define":     no_use_before_define.NoUseBeforeDefineRule,
+		"no-use-before-define":                        no_use_before_define.NoUseBeforeDefineRule,
+		"@typescript-eslint/no-useless-constructor":   no_useless_constructor.NoUselessConstructorRule,
+		"no-useless-constructor":                      no_useless_constructor.NoUselessConstructorRule,
+		"@typescript-eslint/no-useless-empty-export":  no_useless_empty_export.NoUselessEmptyExportRule,
+		"no-useless-empty-export":                     no_useless_empty_export.NoUselessEmptyExportRule,
 	}
 
 	// Build rules with their configurations from request.RuleOptions
