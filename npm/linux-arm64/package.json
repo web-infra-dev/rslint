@@ -1,6 +1,6 @@
 {
   "name": "@rslint/linux-arm64",
-  "version": "0.0.14",
+  "version": "0.0.15",
   "license": "MIT",
   "description": "binary for rslint",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",
@@ -9,7 +9,10 @@
     "url": "https://github.com/web-infra-dev/rslint"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "executableFiles": [
+      "./rslint"
+    ]
   },
   "files": [
     "rslint"
