@@ -35,11 +35,11 @@
     "typescript": "5.8.3"
   },
   "optionalDependencies": {
-    "@rslint/darwin-arm64": "0.0.9",
-    "@rslint/darwin-x64": "0.0.9",
-    "@rslint/linux-arm64": "0.0.9",
-    "@rslint/linux-x64": "0.0.9",
-    "@rslint/win32-arm64": "0.0.9",
-    "@rslint/win32-x64": "0.0.9"
+    "@rslint/darwin-arm64": "0.0.10",
+    "@rslint/darwin-x64": "0.0.10",
+    "@rslint/linux-arm64": "0.0.10",
+    "@rslint/linux-x64": "0.0.10",
+    "@rslint/win32-arm64": "0.0.10",
+    "@rslint/win32-x64": "0.0.10"
   }
 }
