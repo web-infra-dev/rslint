@@ -1,0 +1,26 @@
+{
+  "name": "@rslint/binding-darwin-x64",
+  "version": "1.4.10",
+  "license": "MIT",
+  "description": "Node binding for rslint",
+  "main": "rslint.darwin-x64",
+  "homepage": "https://rslint.rs",
+  "bugs": "https://github.com/web-infra-dev/rslint/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/web-infra-dev/rslint"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "files": [
+    "rslint.darwin-x64"
+  ],
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ]
+}
