@@ -494,20 +494,8 @@ func runCMD() int {
 		singleThreaded,
 		files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-<<<<<<< HEAD
-			activeRulesWithConfig := rslintconfig.GlobalRuleRegistry.GetEnabledRulesWithConfig(rslintConfig, sourceFile.FileName())
-			return utils.Map(activeRulesWithConfig, func(ruleWithConfig rslintconfig.EnabledRuleWithConfig) linter.ConfiguredRule {
-				return linter.ConfiguredRule{
-					Name: ruleWithConfig.Rule.Name,
-					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return ruleWithConfig.Rule.Run(ctx, ruleWithConfig.Config.Options)
-					},
-				}
-			})
-=======
 			activeRules := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
 			return activeRules
->>>>>>> origin/main
 		},
 		func(d rule.RuleDiagnostic) {
 			diagnosticsChan <- d
