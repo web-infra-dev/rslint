@@ -22,8 +22,8 @@ async function publish_all() {
     await $`GOOS=${platform.os} GOARCH=${platform.arch} go build -o ./packages/vscode-extension/dist ./cmd/rslint`;
     const os = platform['node-os'] || platform.os;
     const arch = platform['node-arch'] || platform.arch;
-    await $`cd packages/vscode-extension && vsce package --target ${os}-${arch}`;
-    await $`cd packages/vscode-extension && vsce publish --packagePath ./rslint-${os}-${arch}-${version}.vsix `;
+    await $`cd packages/vscode-extension && pnpm vsce package --target ${os}-${arch}`;
+    await $`cd packages/vscode-extension && pnpm vsce publish --packagePath ./rslint-${os}-${arch}-${version}.vsix `;
     console.log(`Finish Publishing for ${os}-${arch}`);
   }
 }
