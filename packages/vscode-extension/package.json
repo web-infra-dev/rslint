@@ -1,8 +1,8 @@
 {
   "name": "rslint-vsce",
-  "displayName": "rslint",
+  "displayName": "rslint-lsp",
   "description": "Language support for Rslint",
-  "version": "0.0.15",
+  "version": "0.0.16",
   "private": true,
   "publisher": "rstack",
   "license": "MIT",
