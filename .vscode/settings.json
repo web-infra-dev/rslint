@@ -11,5 +11,8 @@
   },
   "files.associations": {
     "rslint.json": "jsonc"
-  }
+  },
+  "cSpell.words": [
+    "rslint"
+  ]
 }

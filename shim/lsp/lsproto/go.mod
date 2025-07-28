@@ -1,8 +1,6 @@
-module github.com/microsoft/typescript-go/shim/ast
+module github.com/microsoft/typescript-go/shim/lsp/lsproto
 
-go 1.24.0
-
-toolchain go1.24.1
+go 1.24.1
 
 require github.com/microsoft/typescript-go v0.0.0-20250725221625-c05da65ec429
 
