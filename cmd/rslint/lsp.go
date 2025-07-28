@@ -15,7 +15,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/scanner"
-	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/sourcegraph/jsonrpc2"
@@ -351,7 +350,6 @@ type LintResponse struct {
 	RuleCount   int                  `json:"ruleCount"`
 }
 
-// HandleLint handles lint requests in IPC mode with multiple programs
 func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, rslintConfig config.RslintConfig) ([]rule.RuleDiagnostic, error) {
 	if len(programs) == 0 {
 		return nil, fmt.Errorf("no programs provided")
@@ -414,55 +412,4 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 	}
 
 	return diagnostics, nil
-}
-
-// HandleLint handles lint requests in IPC mode (legacy single program version)
-func runLint(uri lsproto.DocumentUri) ([]rule.RuleDiagnostic, error) {
-	// Get current directory
-	currentDirectory, err := os.Getwd()
-	if err != nil {
-		return nil, fmt.Errorf("error getting current directory: %v", err)
-	}
-	currentDirectory = tspath.NormalizePath(currentDirectory)
-
-	// Create filesystem
-	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-
-	// Load rslint configuration and extract tsconfig paths
-	loader := config.NewConfigLoader(fs, currentDirectory)
-	rslintConfig, configDirectory, err := loader.LoadDefaultRslintConfig()
-	if err != nil {
-		return nil, fmt.Errorf("error loading rslint config: %v", err)
-	}
-
-	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, configDirectory)
-	if err != nil {
-		return nil, fmt.Errorf("error loading TypeScript configs from rslint config: %v", err)
-	}
-
-	if len(tsConfigs) == 0 {
-		return nil, fmt.Errorf("no TypeScript configurations found in rslint config")
-	}
-
-	// Create compiler host
-	host := utils.CreateCompilerHost(currentDirectory, fs)
-
-	// Create multiple programs for all tsconfig files
-	var programs []*compiler.Program
-	for _, tsConfigPath := range tsConfigs {
-		configDir := tspath.GetDirectoryPath(tsConfigPath)
-		program, err := utils.CreateProgram(false, fs, configDir, tsConfigPath, host)
-		if err != nil {
-			log.Printf("Could not create program for %s: %v", tsConfigPath, err)
-			continue
-		}
-		programs = append(programs, program)
-	}
-
-	if len(programs) == 0 {
-		return nil, fmt.Errorf("could not create any programs")
-	}
-
-	// Use the new multi-program function
-	return runLintWithPrograms(uri, programs, rslintConfig)
 }
