@@ -3,7 +3,7 @@
   "displayName": "rslint",
   "description": "Language support for Rslint",
   "version": "0.0.15",
-  "private":true,
+  "private": true,
   "publisher": "rstack",
   "license": "MIT",
   "repository": {
