@@ -1,6 +1,6 @@
 {
   "name": "@rslint/core",
-  "version": "0.0.15",
+  "version": "0.0.20",
   "exports": {
     ".": "./dist/index.js",
     "./package.json": "./package.json"
