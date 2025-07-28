@@ -269,12 +269,6 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 	s.conn.Notify(ctx, "textDocument/publishDiagnostics", params)
 }
 
-func getAvailableRules() []rule.Rule {
-	// This function is now deprecated since we use the rule registry
-	// Return empty slice to maintain compatibility
-	return []rule.Rule{}
-}
-
 func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic, content string) *lsproto.Diagnostic {
 	diagnosticStart := ruleDiag.Range.Pos()
 	diagnosticEnd := ruleDiag.Range.End()
