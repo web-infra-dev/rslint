@@ -5,7 +5,7 @@ $.verbose = true;
 async function publish_all() {
   const version = JSON.parse(fs.readFileSync('./packages/vscode-extension/package.json', 'utf-8')).version;
   await $`pnpm run --filter @rslint/core build`;
-  await $`pnpm run --filter rslint-vsce build`;
+  await $`pnpm run --filter rslint build`;
   const platforms = [
     { os: 'darwin', arch: 'amd64', 'node-arch': 'x64' },
     { os: 'darwin', arch: 'arm64', 'node-arch': 'arm64' },
@@ -20,7 +20,7 @@ async function publish_all() {
    const os = platform['node-os'] || platform.os;
    const arch = platform['node-arch'] || platform.arch;
    await $`cd packages/vscode-extension && vsce package --target ${os}-${arch}`;
-   await $`cd packages/vscode-extension && vsce publish --packagePath ./rslint-vsce-${os}-${arch}-${version}.vsix `;
+   await $`cd packages/vscode-extension && vsce publish --packagePath ./rslint-${os}-${arch}-${version}.vsix `;
    console.log(`Finish Publishing for ${os}-${arch}`);
   }
 }
