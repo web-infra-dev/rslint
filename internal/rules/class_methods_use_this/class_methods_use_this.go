@@ -663,8 +663,8 @@ var ClassMethodsUseThisRule = rule.Rule{
 				}
 				
 				// Also handle accessor properties
-				if ast.HasAccessorModifier(node) && (property.Initializer == nil || property.Initializer.Kind != ast.KindArrowFunction) {
-					// This is an accessor property without arrow function - treat it like a method
+				if ast.HasAccessorModifier(node) && property.Initializer == nil {
+					// This is an accessor property without initializer - treat it like a method
 					pushContext(node)
 				}
 			}
@@ -679,7 +679,7 @@ var ClassMethodsUseThisRule = rule.Rule{
 				}
 				
 				// Also handle accessor properties
-				if ast.HasAccessorModifier(node) && (property.Initializer == nil || property.Initializer.Kind != ast.KindArrowFunction) {
+				if ast.HasAccessorModifier(node) && property.Initializer == nil {
 					// Exit the context for accessor property
 					stackContext := popContext()
 					

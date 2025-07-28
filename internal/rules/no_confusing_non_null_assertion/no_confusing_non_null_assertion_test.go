@@ -34,18 +34,6 @@ func TestNoConfusingNonNullAssertion(t *testing.T) {
 			Code: `(a || b!) instanceof c;`,
 		},
 		{
-			Code: `(a)! == b;`,
-		},
-		{
-			Code: `(a)! = b;`,
-		},
-		{
-			Code: `(a)! in b;`,
-		},
-		{
-			Code: `(a)! instanceof b;`,
-		},
-		{
 			Code: `a!! == b;`,
 		},
 		{
@@ -196,6 +184,71 @@ a !in b;
 							Output: `
 (a !)in b;
       `,
+						},
+					},
+				},
+			},
+		},
+		// Parenthesized expression cases
+		{
+			Code: `(a)! == b;`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "confusingEqual",
+					Line:      1,
+					Column:    1,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "wrapUpLeft",
+							Output:    `((a)!) == b;`,
+						},
+					},
+				},
+			},
+		},
+		{
+			Code: `(a)! = b;`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "confusingAssign",
+					Line:      1,
+					Column:    1,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "wrapUpLeft",
+							Output:    `((a)!) = b;`,
+						},
+					},
+				},
+			},
+		},
+		{
+			Code: `(a)! in b;`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "confusingOperator",
+					Line:      1,
+					Column:    1,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "wrapUpLeft",
+							Output:    `((a)!) in b;`,
+						},
+					},
+				},
+			},
+		},
+		{
+			Code: `(a)! instanceof b;`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "confusingOperator",
+					Line:      1,
+					Column:    1,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
+						{
+							MessageId: "wrapUpLeft",
+							Output:    `((a)!) instanceof b;`,
 						},
 					},
 				},

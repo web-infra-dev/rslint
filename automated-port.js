@@ -510,7 +510,154 @@ async function fetchOriginalRule(ruleName) {
   };
 }
 
-// Port a single rule using Claude CLI (similar to automate-build-test.js)
+// Run Go build to verify compilation
+async function runGoBuild() {
+  try {
+    log('Running go build...', 'info');
+    const buildResult = await runCommand('go', ['build', './cmd/rslint'], { 
+      timeout: 60000,
+      cwd: __dirname 
+    });
+    
+    if (buildResult.code === 0) {
+      log('✓ Go build successful', 'success');
+      return true;
+    } else {
+      log(`✗ Go build failed (exit code ${buildResult.code})`, 'error');
+      if (buildResult.stderr) {
+        console.log(`${colors.red}Build errors:${colors.reset}`);
+        console.log(buildResult.stderr);
+      }
+      return false;
+    }
+  } catch (error) {
+    log(`Go build error: ${error.message}`, 'error');
+    return false;
+  }
+}
+
+// Run Go test for a specific rule
+async function runGoTest(ruleName) {
+  try {
+    const ruleDir = ruleName.replace(/-/g, '_');
+    log(`Running Go test for ${ruleName}...`, 'info');
+    
+    const testResult = await runCommand('go', ['test', '-v', `./internal/rules/${ruleDir}`], { 
+      timeout: 120000,
+      cwd: __dirname 
+    });
+    
+    if (testResult.code === 0) {
+      log(`✓ Go test passed for ${ruleName}`, 'success');
+      return { success: true, output: testResult.stdout };
+    } else {
+      log(`✗ Go test failed for ${ruleName} (exit code ${testResult.code})`, 'error');
+      return { 
+        success: false, 
+        output: testResult.stdout, 
+        error: testResult.stderr 
+      };
+    }
+  } catch (error) {
+    log(`Go test error for ${ruleName}: ${error.message}`, 'error');
+    return { success: false, error: error.message };
+  }
+}
+
+// Run TypeScript test for a specific rule
+async function runTypeScriptTest(ruleName) {
+  try {
+    log(`Running TypeScript test for ${ruleName}...`, 'info');
+    
+    const testResult = await runCommand('node', [
+      '--import=tsx/esm', 
+      '--test', 
+      `tests/typescript-eslint/rules/${ruleName}.test.ts`
+    ], { 
+      timeout: 120000,
+      cwd: join(__dirname, 'packages/rslint-test-tools')
+    });
+    
+    if (testResult.code === 0) {
+      log(`✓ TypeScript test passed for ${ruleName}`, 'success');
+      return { success: true, output: testResult.stdout };
+    } else {
+      log(`✗ TypeScript test failed for ${ruleName} (exit code ${testResult.code})`, 'error');
+      return { 
+        success: false, 
+        output: testResult.stdout, 
+        error: testResult.stderr 
+      };
+    }
+  } catch (error) {
+    log(`TypeScript test error for ${ruleName}: ${error.message}`, 'error');
+    return { success: false, error: error.message };
+  }
+}
+
+// Fix failed tests using Claude CLI
+async function fixTestFailures(ruleName, goTestResult, tsTestResult, attemptNumber = 1) {
+  const maxFixAttempts = 2;
+  
+  if (attemptNumber > maxFixAttempts) {
+    log(`Max fix attempts reached for ${ruleName}`, 'error');
+    return false;
+  }
+  
+  log(`Attempting to fix test failures for ${ruleName} (attempt ${attemptNumber}/${maxFixAttempts})`, 'warning');
+  
+  let prompt = `Fix the test failures for the RSLint rule "${ruleName}". Here are the test results:\n\n`;
+  
+  if (!goTestResult.success) {
+    prompt += `--- GO TEST FAILURE ---\n`;
+    prompt += `Exit code: Non-zero\n`;
+    if (goTestResult.output) {
+      prompt += `Stdout:\n${goTestResult.output}\n`;
+    }
+    if (goTestResult.error) {
+      prompt += `Stderr:\n${goTestResult.error}\n`;
+    }
+    prompt += `\n`;
+  }
+  
+  if (!tsTestResult.success) {
+    prompt += `--- TYPESCRIPT TEST FAILURE ---\n`;
+    prompt += `Exit code: Non-zero\n`;
+    if (tsTestResult.output) {
+      prompt += `Stdout:\n${tsTestResult.output}\n`;
+    }
+    if (tsTestResult.error) {
+      prompt += `Stderr:\n${tsTestResult.error}\n`;
+    }
+    prompt += `\n`;
+  }
+  
+  prompt += `Please analyze these test failures and fix the implementation. Make sure to:
+
+1. Fix any compilation errors in the Go code
+2. Fix any test assertion failures 
+3. Ensure both Go and TypeScript tests pass
+4. Maintain the rule's intended behavior
+
+Focus on the most critical errors first. Do not run any commands - just edit the files to fix the issues.`;
+
+  try {
+    const result = await runClaudePortingWithStreaming(prompt);
+    
+    if (result.code === 0) {
+      log(`✓ Claude completed fix attempt for ${ruleName}`, 'success');
+      return true;
+    } else {
+      log(`✗ Claude fix attempt failed for ${ruleName}`, 'error');
+      return false;
+    }
+  } catch (error) {
+    log(`Error during fix attempt for ${ruleName}: ${error.message}`, 'error');
+    return false;
+  }
+}
+
+// Port a single rule using Claude CLI with build and test verification
 async function portSingleRule(ruleName, attemptNumber = 1) {
   const startTime = Date.now();
   
@@ -532,7 +679,7 @@ async function portSingleRule(ruleName, attemptNumber = 1) {
   }
 
   try {
-    // Create the porting prompt similar to fixErrorWithClaudeCLI
+    // Create the porting prompt
     let prompt = `Go into plan mode first to analyze this TypeScript-ESLint rule and plan the porting to Go.\n\n`;
     
     prompt += `Task: Port the TypeScript-ESLint rule "${ruleName}" to Go for the RSLint project.\n\n`;
@@ -573,21 +720,15 @@ IMPORTANT:
 - Do NOT execute test commands, build commands, or any bash commands
 - Do NOT try to verify the code by running tests
 - Focus solely on file creation and editing
-- The /Users/bytedance/dev/rslint/automate-build-test.js script will handle all testing and building later
+- This script will handle all testing and building after you're done
 
 Focus on maintaining the same rule logic and behavior as the TypeScript version while following RSLint's Go patterns.`;
 
     const result = await runClaudePortingWithStreaming(prompt);
 
-    if (result.code === 0) {
-      const duration = Date.now() - startTime;
-      log(`✓ Successfully ported ${ruleName} in ${Math.round(duration/1000)}s`, 'success');
-      completedRules++;
-      return true;
-    } else {
+    if (result.code !== 0) {
       log(`✗ Claude CLI failed for ${ruleName} (exit code ${result.code})`, 'error');
       
-      // Log Claude output for debugging
       if (result.stderr) {
         console.log(`${colors.red}Claude stderr:${colors.reset}`);
         console.log(result.stderr);
@@ -595,10 +736,7 @@ Focus on maintaining the same rule logic and behavior as the TypeScript version 
 
       if (attemptNumber < MAX_PORT_ATTEMPTS) {
         log(`Retrying ${ruleName} (attempt ${attemptNumber + 1}/${MAX_PORT_ATTEMPTS})...`, 'warning');
-        
-        // Add a delay before retry to avoid rate limiting
         await new Promise(resolve => setTimeout(resolve, 10000));
-        
         return await portSingleRule(ruleName, attemptNumber + 1);
       } else {
         log(`Failed to port ${ruleName} after ${attemptNumber} attempts`, 'error');
@@ -606,6 +744,102 @@ Focus on maintaining the same rule logic and behavior as the TypeScript version 
         return false;
       }
     }
+
+    log(`✓ Rule porting completed for ${ruleName}, now running build and tests...`, 'success');
+
+    // Step 1: Run go build to verify compilation
+    const buildSuccess = await runGoBuild();
+    if (!buildSuccess) {
+      log(`Build failed after porting ${ruleName}, attempting fix...`, 'warning');
+      
+      const fixSuccess = await fixTestFailures(ruleName, 
+        { success: false, error: 'Build compilation failed' }, 
+        { success: true }, 1);
+      
+      if (fixSuccess) {
+        // Retry build after fix
+        const retryBuildSuccess = await runGoBuild();
+        if (!retryBuildSuccess) {
+          log(`Build still failing after fix attempt for ${ruleName}`, 'error');
+          if (attemptNumber < MAX_PORT_ATTEMPTS) {
+            return await portSingleRule(ruleName, attemptNumber + 1);
+          } else {
+            failedRules++;
+            return false;
+          }
+        }
+      }
+    }
+
+    // Step 2: Run Go tests
+    const goTestResult = await runGoTest(ruleName);
+    
+    // Step 3: Run TypeScript tests  
+    const tsTestResult = await runTypeScriptTest(ruleName);
+
+    // Step 4: Check if both tests passed
+    if (goTestResult.success && tsTestResult.success) {
+      const duration = Date.now() - startTime;
+      log(`✓ Successfully ported and tested ${ruleName} in ${Math.round(duration/1000)}s`, 'success');
+      completedRules++;
+      return true;
+    }
+
+    // Step 5: If tests failed, attempt to fix them
+    log(`Test failures detected for ${ruleName}, attempting fixes...`, 'warning');
+    
+    const fixAttempted = await fixTestFailures(ruleName, goTestResult, tsTestResult, 1);
+    
+    if (fixAttempted) {
+      // Re-run tests after fix attempt
+      log(`Re-running tests after fix attempt for ${ruleName}...`, 'info');
+      
+      // Re-run build first
+      const reBuildSuccess = await runGoBuild();
+      if (!reBuildSuccess) {
+        log(`Build still failing after fix for ${ruleName}`, 'error');
+        if (attemptNumber < MAX_PORT_ATTEMPTS) {
+          return await portSingleRule(ruleName, attemptNumber + 1);
+        } else {
+          failedRules++;
+          return false;
+        }
+      }
+      
+      const reGoTestResult = await runGoTest(ruleName);
+      const reTsTestResult = await runTypeScriptTest(ruleName);
+      
+      if (reGoTestResult.success && reTsTestResult.success) {
+        const duration = Date.now() - startTime;
+        log(`✓ Successfully ported and fixed ${ruleName} in ${Math.round(duration/1000)}s`, 'success');
+        completedRules++;
+        return true;
+      } else {
+        log(`Tests still failing after fix attempt for ${ruleName}`, 'error');
+        
+        // Display final test results for debugging
+        if (!reGoTestResult.success) {
+          console.log(`${colors.red}Final Go test output:${colors.reset}`);
+          console.log(reGoTestResult.output || reGoTestResult.error);
+        }
+        if (!reTsTestResult.success) {
+          console.log(`${colors.red}Final TypeScript test output:${colors.reset}`);
+          console.log(reTsTestResult.output || reTsTestResult.error);
+        }
+      }
+    }
+
+    // If we get here, tests failed and fix didn't work
+    if (attemptNumber < MAX_PORT_ATTEMPTS) {
+      log(`Retrying complete port for ${ruleName} (attempt ${attemptNumber + 1}/${MAX_PORT_ATTEMPTS})...`, 'warning');
+      await new Promise(resolve => setTimeout(resolve, 10000));
+      return await portSingleRule(ruleName, attemptNumber + 1);
+    } else {
+      log(`Failed to port ${ruleName} after ${attemptNumber} attempts with working tests`, 'error');
+      failedRules++;
+      return false;
+    }
+
   } catch (error) {
     if (error.message.includes('timed out')) {
       log(`Rule ${ruleName} timed out after 10 minutes`, 'error');

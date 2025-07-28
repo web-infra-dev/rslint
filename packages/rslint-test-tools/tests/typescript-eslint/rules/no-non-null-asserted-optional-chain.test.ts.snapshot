@@ -1,8 +1,259 @@
 exports[`no-non-null-asserted-optional-chain > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-asserted-optional-chain",
+      "messageId": "noNonNullOptionalChain",
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 10
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 0
+  "ruleCount": 1
+}
+`;
+
+exports[`no-non-null-asserted-optional-chain > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-asserted-optional-chain",
+      "messageId": "noNonNullOptionalChain",
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 2
+        },
+        "end": {
+          "line": 1,
+          "column": 11
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-non-null-asserted-optional-chain > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-asserted-optional-chain",
+      "messageId": "noNonNullOptionalChain",
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 14
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-non-null-asserted-optional-chain > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-asserted-optional-chain",
+      "messageId": "noNonNullOptionalChain",
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 12
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-non-null-asserted-optional-chain > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-asserted-optional-chain",
+      "messageId": "noNonNullOptionalChain",
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 13
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-non-null-asserted-optional-chain > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-asserted-optional-chain",
+      "messageId": "noNonNullOptionalChain",
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 12
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-non-null-asserted-optional-chain > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-asserted-optional-chain",
+      "messageId": "noNonNullOptionalChain",
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 12
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-non-null-asserted-optional-chain > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-asserted-optional-chain",
+      "messageId": "noNonNullOptionalChain",
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 12
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-non-null-asserted-optional-chain > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-asserted-optional-chain",
+      "messageId": "noNonNullOptionalChain",
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 12
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-non-null-asserted-optional-chain > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-asserted-optional-chain",
+      "messageId": "noNonNullOptionalChain",
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 2
+        },
+        "end": {
+          "line": 1,
+          "column": 11
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
 }
 `;

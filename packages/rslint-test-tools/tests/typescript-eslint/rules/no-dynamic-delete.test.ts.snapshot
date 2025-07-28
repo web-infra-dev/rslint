@@ -1,8 +1,259 @@
 exports[`no-dynamic-delete > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "ruleName": "no-dynamic-delete",
+      "messageId": "dynamicDelete",
+      "message": "Do not delete dynamically computed property keys.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 18
+        },
+        "end": {
+          "line": 3,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 0
+  "ruleCount": 1
+}
+`;
+
+exports[`no-dynamic-delete > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-dynamic-delete",
+      "messageId": "dynamicDelete",
+      "message": "Do not delete dynamically computed property keys.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 18
+        },
+        "end": {
+          "line": 3,
+          "column": 26
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-dynamic-delete > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-dynamic-delete",
+      "messageId": "dynamicDelete",
+      "message": "Do not delete dynamically computed property keys.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 18
+        },
+        "end": {
+          "line": 3,
+          "column": 20
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-dynamic-delete > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-dynamic-delete",
+      "messageId": "dynamicDelete",
+      "message": "Do not delete dynamically computed property keys.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 18
+        },
+        "end": {
+          "line": 3,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-dynamic-delete > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-dynamic-delete",
+      "messageId": "dynamicDelete",
+      "message": "Do not delete dynamically computed property keys.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 18
+        },
+        "end": {
+          "line": 3,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-dynamic-delete > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-dynamic-delete",
+      "messageId": "dynamicDelete",
+      "message": "Do not delete dynamically computed property keys.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 18
+        },
+        "end": {
+          "line": 3,
+          "column": 21
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-dynamic-delete > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-dynamic-delete",
+      "messageId": "dynamicDelete",
+      "message": "Do not delete dynamically computed property keys.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 18
+        },
+        "end": {
+          "line": 4,
+          "column": 22
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-dynamic-delete > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-dynamic-delete",
+      "messageId": "dynamicDelete",
+      "message": "Do not delete dynamically computed property keys.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 18
+        },
+        "end": {
+          "line": 4,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-dynamic-delete > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-dynamic-delete",
+      "messageId": "dynamicDelete",
+      "message": "Do not delete dynamically computed property keys.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 18
+        },
+        "end": {
+          "line": 4,
+          "column": 30
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-dynamic-delete > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-dynamic-delete",
+      "messageId": "dynamicDelete",
+      "message": "Do not delete dynamically computed property keys.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 18
+        },
+        "end": {
+          "line": 3,
+          "column": 29
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
 }
 `;

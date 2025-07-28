@@ -3,13 +3,13 @@
 ### Test File: prefer-as-const.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: Basic literal type assertion detection, `as` and type assertion expression handling, core message structure
-- ⚠️ **POTENTIAL ISSUES**: Template literal handling, fix application logic, suggestion implementation complexity
-- ❌ **INCORRECT**: Variable declarator AST mapping, property definition AST mapping, fix range calculation
+- ✅ **CORRECT**: Core logic for detecting literal type assertions that should use `as const`, message handling, fix generation for type assertions, suggestion handling for variable declarations
+- ⚠️ **POTENTIAL ISSUES**: Scanner-based colon token detection in variable declarations, template literal handling edge cases
+- ❌ **INCORRECT**: AST node mapping for variable declarations may miss edge cases like destructuring
 
 ### Discrepancies Found
 
-#### 1. Incorrect AST Node Mapping for Variable Declarations
+#### 1. Variable Declaration AST Node Mismatch
 **TypeScript Implementation:**
 ```typescript
 VariableDeclarator(node): void {
@@ -22,9 +22,7 @@ VariableDeclarator(node): void {
 **Go Implementation:**
 ```go
 ast.KindVariableDeclaration: func(node *ast.Node) {
-  if node.Kind != ast.KindVariableDeclaration {
-    return
-  }
+  // ...
   varDecl := node.AsVariableDeclaration()
   if varDecl.Initializer != nil && varDecl.Type != nil {
     compareTypes(varDecl.Initializer, varDecl.Type, false)
@@ -32,45 +30,45 @@ ast.KindVariableDeclaration: func(node *ast.Node) {
 }
 ```
 
-**Issue:** The TypeScript version listens to `VariableDeclarator` nodes (individual variable bindings within a declaration), while the Go version listens to `VariableDeclaration` nodes (the entire declaration statement). This means the Go version might miss cases with multiple declarators or have different access patterns to the type annotation.
+**Issue:** The TypeScript version targets `VariableDeclarator` nodes, which are individual variable declarations within a declaration list. The Go version targets `VariableDeclaration` nodes, which might be the parent node containing multiple declarators. This could miss cases with destructuring assignments like `let []: 'bar' = 'bar';` which is covered in the test cases.
 
-**Impact:** Test cases like `let foo: 'bar' = 'bar';` may not be properly detected or may fail due to incorrect AST navigation.
+**Impact:** May fail to detect issues in destructuring variable declarations with type annotations.
 
-**Test Coverage:** This affects multiple test cases including basic variable declarations with type annotations.
+**Test Coverage:** Test case `let []: 'bar' = 'bar';` specifically tests this scenario.
 
-#### 2. Incorrect AST Node Mapping for Class Properties
+#### 2. Complex Colon Token Detection
 **TypeScript Implementation:**
 ```typescript
-PropertyDefinition(node): void {
-  if (node.value && node.typeAnnotation) {
-    compareTypes(node.value, node.typeAnnotation.typeAnnotation, false);
-  }
-}
+// Uses direct AST navigation to remove type annotation
+fix: (fixer): TSESLint.RuleFix[] => [
+  fixer.remove(typeNode.parent),
+  fixer.insertTextAfter(valueNode, ' as const'),
+]
 ```
 
 **Go Implementation:**
 ```go
-ast.KindPropertyDeclaration: func(node *ast.Node) {
-  if node.Kind != ast.KindPropertyDeclaration {
-    return
+// Uses scanner to find colon token manually
+s := scanner.GetScannerForSourceFile(ctx.SourceFile, parent.Pos())
+colonStart := -1
+for s.TokenStart() < typeNode.Pos() {
+  if s.Token() == ast.KindColonToken {
+    colonStart = s.TokenStart()
   }
-  propDecl := node.AsPropertyDeclaration()
-  if propDecl.Initializer != nil && propDecl.Type != nil {
-    compareTypes(propDecl.Initializer, propDecl.Type, false)
-  }
+  s.Scan()
 }
 ```
 
-**Issue:** The TypeScript version accesses `node.typeAnnotation.typeAnnotation` (nested structure), while the Go version accesses `propDecl.Type` directly. This suggests a difference in how type annotations are represented in the AST structures.
+**Issue:** The Go implementation uses a manual scanner approach to find the colon token, which is more complex and potentially error-prone compared to the TypeScript version's direct AST manipulation.
 
-**Impact:** Class property test cases like `class foo { bar: 'baz' = 'baz'; }` may not work correctly.
+**Impact:** May fail in edge cases with complex type annotations or unusual formatting.
 
-**Test Coverage:** This affects all class property test cases in the invalid array.
+**Test Coverage:** All variable declaration test cases with type annotations rely on this functionality.
 
-#### 3. Template Literal Exclusion Logic
+#### 3. Template Literal Type Exclusion
 **TypeScript Implementation:**
 ```typescript
-// No explicit template literal exclusion in compareTypes
+// No explicit template literal exclusion logic found
 ```
 
 **Go Implementation:**
@@ -81,86 +79,42 @@ if literalNode.Kind == ast.KindNoSubstitutionTemplateLiteral {
 }
 ```
 
-**Issue:** The Go version explicitly excludes template literals, but the TypeScript version doesn't show this exclusion. This could lead to different behavior for template literal cases.
+**Issue:** The Go version includes explicit exclusion of template literals, but the TypeScript version's handling of this case is not clear from the provided code.
 
-**Impact:** Template literal test cases like `let foo = \`bar\` as \`bar\`;` might behave differently between implementations.
+**Impact:** Might have different behavior for template literal types.
 
-**Test Coverage:** Valid test cases with template literals may be incorrectly flagged or vice versa.
+**Test Coverage:** Test cases like `let foo = \`bar\` as \`bar\`;` should validate this behavior.
 
-#### 4. Complex Fix Range Calculation for Suggestions
+#### 4. Raw Text Comparison Method
 **TypeScript Implementation:**
 ```typescript
-suggest: [
-  {
-    messageId: 'variableSuggest',
-    fix: (fixer): TSESLint.RuleFix[] => [
-      fixer.remove(typeNode.parent),
-      fixer.insertTextAfter(valueNode, ' as const'),
-    ],
-  },
-]
+valueNode.raw === typeNode.literal.raw
 ```
 
 **Go Implementation:**
 ```go
-s := scanner.GetScannerForSourceFile(ctx.SourceFile, parent.Pos())
-colonStart := -1
-for s.TokenStart() < typeNode.Pos() {
-  if s.Token() == ast.KindColonToken {
-    colonStart = s.TokenStart()
-  }
-  s.Scan()
-}
+valueRange := utils.TrimNodeTextRange(ctx.SourceFile, valueNode)
+valueText := ctx.SourceFile.Text()[valueRange.Pos():valueRange.End()]
+typeRange := utils.TrimNodeTextRange(ctx.SourceFile, literalNode)
+typeText := ctx.SourceFile.Text()[typeRange.Pos():typeRange.End()]
 
-if colonStart != -1 {
-  ctx.ReportNodeWithSuggestions(literalNode, buildVariableConstAssertionMessage(),
-    rule.RuleSuggestion{
-      Message: buildVariableSuggestMessage(),
-      FixesArr: []rule.RuleFix{
-        rule.RuleFixReplaceRange(
-          core.NewTextRange(colonStart, typeNode.End()),
-          "",
-        ),
-        rule.RuleFixInsertAfter(valueNode, " as const"),
-      },
-    })
+if valueText == typeText {
+  // ...
 }
 ```
 
-**Issue:** The TypeScript version uses `fixer.remove(typeNode.parent)` to remove the entire type annotation, while the Go version manually scans for the colon token. This could lead to different removal ranges and potentially incorrect fixes.
+**Issue:** The TypeScript version uses the `.raw` property for comparison, while the Go version extracts text from source ranges. This might handle edge cases differently, particularly around string escaping and formatting.
 
-**Impact:** Suggestion fixes for variable declarations may not work correctly or may produce malformed code.
+**Impact:** Could produce different results for literals with escape sequences or unusual formatting.
 
-**Test Coverage:** Test cases with suggestions like `let foo: 'bar' = 'bar';` may have incorrect output.
-
-#### 5. Fix Reporting Target Inconsistency
-**TypeScript Implementation:**
-```typescript
-context.report({
-  node: typeNode,
-  messageId: 'preferConstAssertion',
-  fix: fixer => fixer.replaceText(typeNode, 'const'),
-});
-```
-
-**Go Implementation:**
-```go
-ctx.ReportNodeWithFixes(literalNode, buildPreferConstAssertionMessage(),
-  rule.RuleFixReplace(ctx.SourceFile, typeNode, "const"))
-```
-
-**Issue:** The TypeScript version reports on `typeNode` and replaces `typeNode`, while the Go version reports on `literalNode` but replaces `typeNode`. This inconsistency could affect error positioning and highlighting.
-
-**Impact:** Error messages may appear at incorrect locations in the code.
-
-**Test Coverage:** Column positions in test expectations may not match actual error positions.
+**Test Coverage:** String literals with various formats should be tested.
 
 ### Recommendations
-- Fix AST node type mapping: Use the correct Go AST equivalents for `VariableDeclarator` and `PropertyDefinition`
-- Verify type annotation access patterns: Ensure the Go version correctly navigates nested type annotation structures
-- Align template literal handling: Verify whether template literal exclusion is needed and implement consistently
-- Simplify fix range calculation: Use more reliable methods for determining type annotation ranges for removal
-- Standardize error reporting targets: Ensure consistent node targeting between error reporting and fix application
-- Add comprehensive AST debugging: Use debug output to verify correct node types and structures are being processed
+- Investigate AST node mapping for variable declarations to ensure destructuring assignments are handled correctly
+- Consider simplifying the colon token detection logic or add robust error handling
+- Verify template literal exclusion behavior matches TypeScript-ESLint expectations
+- Test raw text comparison extensively with escape sequences and edge cases
+- Add specific test cases for destructuring assignments with type annotations
+- Validate that the scanner-based approach handles all formatting edge cases correctly
 
 ---

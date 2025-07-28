@@ -1,123 +1,153 @@
-# Rule Validation: explicit-member-accessibility
+# Rule: explicit-member-accessibility
 
-## Rule: explicit-member-accessibility
+## Test File: explicit-member-accessibility.test.ts
 
-### Test File: explicit-member-accessibility.test.ts
+## Validation Summary
+- ✅ **CORRECT**: Basic accessibility checking, configuration parsing, modifier detection, AST node handling for methods/properties/constructors, parameter property handling
+- ⚠️ **POTENTIAL ISSUES**: Abstract member handling, accessor property detection, decorator positioning, fix suggestions, public keyword removal logic
+- ❌ **INCORRECT**: Message ID consistency, fix/suggestion generation, parameter property detection logic, computed property names
 
-### Validation Summary
-- ✅ **CORRECT**: 
-  - Basic accessibility modifier detection for methods, properties, constructors, accessors
-  - Configuration option parsing for `accessibility`, `ignoredMethodNames`, and `overrides`
-  - Private identifier (#private) handling - correctly skipped
-  - Parameter property detection with readonly/accessibility modifiers
-  - Abstract member handling
-  - Accessor property support
-  - Basic error message generation
+## Discrepancies Found
 
-- ⚠️ **POTENTIAL ISSUES**: 
-  - Decorator handling implementation differs significantly
-  - Fix/suggestion generation logic is incomplete in Go version
-  - Public keyword removal logic may not handle all edge cases
-  - Parameter property validation logic may be too restrictive
-
-- ❌ **INCORRECT**: 
-  - Missing comprehensive fix/suggestion functionality
-  - Incomplete handling of comments around public keyword
-  - Parameter property detection logic has gaps
-  - Missing proper head location calculation for error reporting
-
-### Discrepancies Found
-
-#### 1. Fix and Suggestion Generation Missing
+### 1. Message ID Structure Mismatch
 **TypeScript Implementation:**
 ```typescript
-suggest: getMissingAccessibilitySuggestions(methodDefinition),
-// and
-fix: fixer => fixer.removeRange(publicKeyword.rangeToRemove),
+export type MessageIds =
+  | 'addExplicitAccessibility'
+  | 'missingAccessibility'
+  | 'unwantedPublicAccessibility';
+
+messages: {
+  addExplicitAccessibility: "Add '{{ type }}' accessibility modifier",
+  missingAccessibility: 'Missing accessibility modifier on {{type}} {{name}}.',
+  unwantedPublicAccessibility: 'Public accessibility modifier on {{type}} {{name}}.',
+},
 ```
 
 **Go Implementation:**
 ```go
-// Missing fix and suggestion generation in ReportNode calls
 ctx.ReportNode(node, rule.RuleMessage{
     Id:          "missingAccessibility",
     Description: fmt.Sprintf("Missing accessibility modifier on %s %s.", nodeType, methodName),
 })
 ```
 
-**Issue:** The Go implementation doesn't provide fixes or suggestions for missing accessibility modifiers, while the TypeScript version includes comprehensive fix suggestions.
+**Issue:** The Go implementation uses hardcoded descriptions instead of message IDs with data placeholders. The TypeScript version uses template variables like `{{type}}` and `{{name}}`.
 
-**Impact:** Users won't get auto-fix capabilities or helpful suggestions for resolving violations.
+**Impact:** Error messages may not match exactly, and internationalization/customization is not supported.
 
-**Test Coverage:** All invalid test cases expect suggestions but Go version doesn't provide them.
+**Test Coverage:** All test cases that check messageId values will fail in Go implementation.
 
-#### 2. Public Keyword Removal Logic Incomplete
+### 2. Parameter Property Detection Logic
+**TypeScript Implementation:**
+```typescript
+function checkParameterPropertyAccessibilityModifier(
+  node: TSESTree.TSParameterProperty,
+): void {
+  const nodeType = 'parameter property';
+  // HAS to be an identifier or assignment or TSC will throw
+  if (
+    node.parameter.type !== AST_NODE_TYPES.Identifier &&
+    node.parameter.type !== AST_NODE_TYPES.AssignmentPattern
+  ) {
+    return;
+  }
+```
+
+**Go Implementation:**
+```go
+checkParameterPropertyAccessibilityModifier := func(node *ast.Node) {
+    if node.Kind != ast.KindParameter {
+        return
+    }
+    param := node.AsParameterDeclaration()
+    
+    // Check if it's a parameter property (has modifiers)
+    if param.Modifiers() == nil {
+        return
+    }
+
+    // Check if it has readonly or accessibility modifiers
+    hasReadonly := false
+    hasAccessibility := false
+    // ... modifier checking logic
+    
+    // A parameter property must have readonly OR accessibility modifier
+    if !hasReadonly && !hasAccessibility {
+        return
+    }
+```
+
+**Issue:** The Go implementation checks for different AST node types and uses different logic to determine if a parameter is a parameter property. The TypeScript version specifically handles `TSParameterProperty` nodes, while Go checks regular parameters with modifiers.
+
+**Impact:** Parameter properties may not be detected correctly in all cases, especially complex destructuring patterns.
+
+**Test Coverage:** Tests with parameter properties like `constructor(readonly foo: string)` may not work correctly.
+
+### 3. Fix and Suggestion Generation Missing
 **TypeScript Implementation:**
 ```typescript
 function findPublicKeyword(node): { range: TSESLint.AST.Range; rangeToRemove: TSESLint.AST.Range } {
   const tokens = context.sourceCode.getTokens(node);
-  // Complex logic to handle comments and whitespace
-  const commensAfterPublicKeyword = context.sourceCode.getCommentsAfter(token);
-  if (commensAfterPublicKeyword.length) {
-    rangeToRemove = [token.range[0], commensAfterPublicKeyword[0].range[0]];
-  } else {
-    rangeToRemove = [token.range[0], tokens[i + 1].range[0]];
+  let rangeToRemove!: TSESLint.AST.Range;
+  let keywordRange!: TSESLint.AST.Range;
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (token.type === AST_TOKEN_TYPES.Keyword && token.value === 'public') {
+      keywordRange = structuredClone(token.range);
+      const commensAfterPublicKeyword = context.sourceCode.getCommentsAfter(token);
+      if (commensAfterPublicKeyword.length) {
+        rangeToRemove = [token.range[0], commensAfterPublicKeyword[0].range[0]];
+        break;
+      } else {
+        rangeToRemove = [token.range[0], tokens[i + 1].range[0]];
+        break;
+      }
+    }
   }
+  return { range: keywordRange, rangeToRemove };
 }
 ```
 
 **Go Implementation:**
 ```go
 func findPublicKeywordRange(ctx rule.RuleContext, node *ast.Node) (core.TextRange, core.TextRange) {
-  // Simplified logic that doesn't handle comments properly
-  for removeEnd < len(text) && (text[removeEnd] == ' ' || text[removeEnd] == '\t') {
-    removeEnd++
-  }
+    // ... get modifiers from different node types
+    for i, mod := range modifiers.NodeList.Nodes {
+        if mod.Kind == ast.KindPublicKeyword {
+            keywordRange := core.NewTextRange(mod.Pos(), mod.End())
+            
+            // Calculate range to remove (including following whitespace)
+            removeEnd := mod.End()
+            if i+1 < len(modifiers.NodeList.Nodes) {
+                removeEnd = modifiers.NodeList.Nodes[i+1].Pos()
+            } else {
+                // Find next token after public keyword
+                text := string(ctx.SourceFile.Text())
+                for removeEnd < len(text) && (text[removeEnd] == ' ' || text[removeEnd] == '\t') {
+                    removeEnd++
+                }
+            }
+            
+            removeRange := core.NewTextRange(mod.Pos(), removeEnd)
+            return keywordRange, removeRange
+        }
+    }
+    return core.NewTextRange(0, 0), core.NewTextRange(0, 0)
 }
 ```
 
-**Issue:** Go version doesn't properly handle comments after public keyword and has simplified whitespace handling.
+**Issue:** The Go implementation has the keyword finding logic but doesn't use it in actual fix generation. The tests show `output` properties with fixed code, but the Go version doesn't provide these fixes.
 
-**Impact:** Auto-fixes may not work correctly when comments are present after `public` keyword.
+**Impact:** Auto-fixes for removing unwanted public modifiers don't work, causing test output mismatches.
 
-**Test Coverage:** Test case with `public /*public*/constructor` and `public /* Hi there */ readonly` may fail.
+**Test Coverage:** All test cases with `output` properties showing removed `public` keywords.
 
-#### 3. Parameter Property Detection Logic Gaps
+#### 4. Decorator Handling
 **TypeScript Implementation:**
 ```typescript
-function checkParameterPropertyAccessibilityModifier(node: TSESTree.TSParameterProperty): void {
-  // Directly works with TSParameterProperty nodes
-  if (node.parameter.type !== AST_NODE_TYPES.Identifier && 
-      node.parameter.type !== AST_NODE_TYPES.AssignmentPattern) {
-    return;
-  }
-}
-```
-
-**Go Implementation:**
-```go
-checkParameterPropertyAccessibilityModifier := func(node *ast.Node) {
-  if node.Kind != ast.KindParameter {
-    return
-  }
-  // Checks for modifiers to determine if it's a parameter property
-  if !hasReadonly && !hasAccessibility {
-    return
-  }
-}
-```
-
-**Issue:** Go version uses different logic to identify parameter properties. It listens to all parameters and filters, while TypeScript directly receives parameter property nodes.
-
-**Impact:** May miss some parameter properties or incorrectly identify regular parameters as parameter properties.
-
-**Test Coverage:** Parameter property test cases may behave differently.
-
-#### 4. Decorator Handling Implementation Differs
-**TypeScript Implementation:**
-```typescript
-function getMissingAccessibilitySuggestions(node): TSESLint.ReportSuggestionArray<MessageIds> {
-  function fix(accessibility: TSESTree.Accessibility, fixer: TSESLint.RuleFixer): TSESLint.RuleFix | null {
+function getMissingAccessibilitySuggestions(node) {
+  function fix(accessibility, fixer) {
     if (node.decorators.length) {
       const lastDecorator = node.decorators[node.decorators.length - 1];
       const nextToken = nullThrows(context.sourceCode.getTokenAfter(lastDecorator));
@@ -131,41 +161,18 @@ function getMissingAccessibilitySuggestions(node): TSESLint.ReportSuggestionArra
 **Go Implementation:**
 ```go
 func hasDecorators(node *ast.Node) bool {
-  return ast.GetCombinedModifierFlags(node)&ast.ModifierFlagsDecorator != 0
+    // Check if node has decorator modifiers
+    return ast.GetCombinedModifierFlags(node)&ast.ModifierFlagsDecorator != 0
 }
-// But then decorator handling is commented out:
-// TODO: Update decorator handling when API is stabilized
 ```
 
-**Issue:** Go version has incomplete decorator handling with TODO comments.
+**Issue:** The Go implementation has a basic decorator detection function but doesn't use it properly in fix positioning. The TypeScript version carefully positions fixes after decorators.
 
-**Impact:** Fixes for decorated members may not insert accessibility modifiers in the correct position.
+**Impact:** Incorrect positioning of accessibility modifiers when decorators are present.
 
-**Test Coverage:** Decorator test cases will likely fail or behave incorrectly.
+**Test Coverage:** Test cases with `@foo @bar()` decorators show this issue.
 
-#### 5. Missing Head Location Calculation
-**TypeScript Implementation:**
-```typescript
-import { getMemberHeadLoc, getParameterPropertyHeadLoc } from '../util/getMemberHeadLoc';
-// Used for precise error positioning:
-loc: getMemberHeadLoc(context.sourceCode, methodDefinition),
-loc: getParameterPropertyHeadLoc(context.sourceCode, node, nodeName),
-```
-
-**Go Implementation:**
-```go
-// Comments indicate these were removed:
-// Removed getMemberHeadLoc and getParameterPropertyHeadLoc functions
-// Now using ReportNode directly which handles positioning correctly
-```
-
-**Issue:** Go version relies on ReportNode for positioning instead of calculating precise head locations.
-
-**Impact:** Error locations may not be as precise as the TypeScript version, potentially affecting IDE experience.
-
-**Test Coverage:** Error position assertions in tests may not match exactly.
-
-#### 6. Abstract Member Handling Edge Cases
+#### 5. Abstract Member Handling
 **TypeScript Implementation:**
 ```typescript
 // Handles both TSAbstractMethodDefinition and TSAbstractPropertyDefinition
@@ -175,63 +182,68 @@ loc: getParameterPropertyHeadLoc(context.sourceCode, node, nodeName),
 
 **Go Implementation:**
 ```go
-// Only handles concrete nodes, relies on isAbstract() function
-func isAbstract(node *ast.Node) bool {
-  // Checks for abstract modifier in existing nodes
+return rule.RuleListeners{
+    ast.KindMethodDeclaration: checkMethodAccessibilityModifier,
+    ast.KindConstructor: checkMethodAccessibilityModifier,
+    ast.KindGetAccessor: checkMethodAccessibilityModifier,
+    ast.KindSetAccessor: checkMethodAccessibilityModifier,
+    ast.KindPropertyDeclaration: checkPropertyAccessibilityModifier,
+    ast.KindParameter: checkParameterPropertyAccessibilityModifier,
 }
 ```
 
-**Issue:** Go version doesn't have separate handling for abstract vs concrete members.
+**Issue:** The Go implementation doesn't explicitly handle abstract method and property declarations as separate cases, relying on the `isAbstract()` helper function instead.
 
-**Impact:** May not properly distinguish between abstract and concrete members in all cases.
+**Impact:** May miss some abstract member cases or handle them incorrectly compared to the TypeScript version.
 
-**Test Coverage:** Abstract member tests may not behave identically.
+**Test Coverage:** Test cases with `abstract class` and `abstract method()` patterns.
 
-#### 7. Message ID vs Description Mismatch
+#### 6. Node Type Determination
 **TypeScript Implementation:**
 ```typescript
-messageId: 'missingAccessibility',
-// With predefined messages:
-messages: {
-  missingAccessibility: 'Missing accessibility modifier on {{type}} {{name}}.',
-  unwantedPublicAccessibility: 'Public accessibility modifier on {{type}} {{name}}.',
+let nodeType = 'method definition';
+let check = baseCheck;
+switch (methodDefinition.kind) {
+  case 'method': check = methodCheck; break;
+  case 'constructor': check = ctorCheck; break;
+  case 'get':
+  case 'set':
+    check = accessorCheck;
+    nodeType = `${methodDefinition.kind} property accessor`;
+    break;
 }
 ```
 
 **Go Implementation:**
 ```go
-rule.RuleMessage{
-  Id:          "missingAccessibility",
-  Description: fmt.Sprintf("Missing accessibility modifier on %s %s.", nodeType, methodName),
+func getNodeType(node *ast.Node, memberKind string) string {
+    switch memberKind {
+    case "constructor":
+        return "constructor"
+    case "get", "set":
+        return fmt.Sprintf("%s property accessor", memberKind)
+    default:
+        if node.Kind == ast.KindPropertyDeclaration {
+            return "class property"
+        }
+        return "method definition"
+    }
 }
 ```
 
-**Issue:** Go version uses hardcoded descriptions instead of message templates with data interpolation.
+**Issue:** The logic is similar but the Go version has a different flow and may not handle all edge cases the same way.
 
-**Impact:** Error messages may not match exactly, and internationalization/customization is harder.
+**Impact:** Error messages might have slightly different node type descriptions.
 
-**Test Coverage:** Message content assertions may fail.
+**Test Coverage:** Test cases checking specific error message content with node types.
 
 ### Recommendations
-- **High Priority:**
-  - Implement comprehensive fix and suggestion generation functionality
-  - Add proper comment handling in public keyword removal logic
-  - Review and fix parameter property detection to match TypeScript behavior
-  - Implement proper decorator position handling
-
-- **Medium Priority:**
-  - Add precise head location calculation for better error positioning
-  - Implement message template system instead of hardcoded descriptions
-  - Review abstract member handling to ensure parity with TypeScript
-
-- **Low Priority:**
-  - Add comprehensive test coverage for edge cases
-  - Consider performance optimizations for modifier detection
-
-- **Missing Functionality:**
-  - Auto-fix capabilities for all violation types
-  - Suggestion system for accessibility modifiers
-  - Comment-aware text manipulation
-  - Decorator-aware positioning
+- Implement proper fix/suggestion integration with the reporting mechanism
+- Add auto-fix functionality for removing unwanted public modifiers  
+- Improve parameter property detection to match TypeScript AST behavior exactly
+- Enhance decorator handling in fix positioning
+- Add comprehensive abstract member support
+- Verify error message consistency with original implementation
+- Add missing test coverage for edge cases like computed property names and complex decorator scenarios
 
 ---

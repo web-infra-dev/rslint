@@ -1,8 +1,103 @@
 exports[`@typescript-eslint/no-import-type-side-effects > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "ruleName": "no-import-type-side-effects",
+      "messageId": "useTopLevelQualifier",
+      "message": "TypeScript will only remove the inline type specifiers which will leave behind a side effect import at runtime. Convert this to a top-level type qualifier to properly remove the entire import.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 30
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 0
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-import-type-side-effects > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-import-type-side-effects",
+      "messageId": "useTopLevelQualifier",
+      "message": "TypeScript will only remove the inline type specifiers which will leave behind a side effect import at runtime. Convert this to a top-level type qualifier to properly remove the entire import.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-import-type-side-effects > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-import-type-side-effects",
+      "messageId": "useTopLevelQualifier",
+      "message": "TypeScript will only remove the inline type specifiers which will leave behind a side effect import at runtime. Convert this to a top-level type qualifier to properly remove the entire import.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 38
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-import-type-side-effects > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-import-type-side-effects",
+      "messageId": "useTopLevelQualifier",
+      "message": "TypeScript will only remove the inline type specifiers which will leave behind a side effect import at runtime. Convert this to a top-level type qualifier to properly remove the entire import.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 50
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
 }
 `;

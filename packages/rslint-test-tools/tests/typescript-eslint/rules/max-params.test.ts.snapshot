@@ -1,8 +1,233 @@
 exports[`max-params > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "ruleName": "max-params",
+      "messageId": "exceed",
+      "message": "Function 'foo' has too many parameters (4). Maximum allowed is 3.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 0
+  "ruleCount": 1
+}
+`;
+
+exports[`max-params > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "max-params",
+      "messageId": "exceed",
+      "message": "Function has too many parameters (4). Maximum allowed is 3.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 13
+        },
+        "end": {
+          "line": 1,
+          "column": 37
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`max-params > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "max-params",
+      "messageId": "exceed",
+      "message": "Arrow function has too many parameters (4). Maximum allowed is 3.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 13
+        },
+        "end": {
+          "line": 1,
+          "column": 31
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`max-params > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "max-params",
+      "messageId": "exceed",
+      "message": "Arrow function has too many parameters (1). Maximum allowed is 0.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 13
+        },
+        "end": {
+          "line": 1,
+          "column": 20
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`max-params > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "max-params",
+      "messageId": "exceed",
+      "message": "Method 'method' has too many parameters (4). Maximum allowed is 3.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`max-params > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "max-params",
+      "messageId": "exceed",
+      "message": "Method 'method' has too many parameters (2). Maximum allowed is 1.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`max-params > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "max-params",
+      "messageId": "exceed",
+      "message": "Method 'method' has too many parameters (4). Maximum allowed is 3.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 32
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`max-params > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "max-params",
+      "messageId": "exceed",
+      "message": "Function 'makeDate' has too many parameters (3). Maximum allowed is 1.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 66
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`max-params > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "max-params",
+      "messageId": "exceed",
+      "message": "Function has too many parameters (2). Maximum allowed is 1.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 12
+        },
+        "end": {
+          "line": 2,
+          "column": 44
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
 }
 `;

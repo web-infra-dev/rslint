@@ -3,6 +3,6 @@ exports[`no-restricted-imports > invalid 1`] = `
   "diagnostics": [],
   "errorCount": 0,
   "fileCount": 1,
-  "ruleCount": 0
+  "ruleCount": 1
 }
 `;

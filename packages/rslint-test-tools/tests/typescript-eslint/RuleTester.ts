@@ -94,7 +94,7 @@ export class RuleTester {
           const code = typeof testCase === 'string' ? testCase : testCase.code;
           const options = typeof testCase === 'string' ? undefined : testCase.options;
           
-          const ruleConfig = options ? ['error', options[0]] : 'error';
+          const ruleConfig = options ? ['error', ...options] : 'error';
           
           const diags = await Promise.race([
             lint({
@@ -127,7 +127,7 @@ export class RuleTester {
           const testCase = cases.invalid[i];
           const { errors, code, options } = testCase;
           
-          const ruleConfig = options ? ['error', options[0]] : 'error';
+          const ruleConfig = options ? ['error', ...options] : 'error';
           
           const diags = await Promise.race([
             lint({

@@ -4,27 +4,97 @@
 
 ### Validation Summary
 - ✅ **CORRECT**: 
-  - Basic mode handling ("always" vs "never")
-  - Option parsing for arrays and strings
-  - Variable declaration identification
-  - TypeScript ambient declaration handling
-  - For-in/for-of loop special cases
-  - Error message formatting with variable names
-  - Report location handling for identifiers
-  - `ignoreForLoopInit` option support
+  - Basic rule structure and configuration parsing
+  - Handling of "always" and "never" modes
+  - Support for `ignoreForLoopInit` option
+  - Ambient/declare context detection
+  - Identifier-only reporting (skips destructuring patterns)
+  - For-in/for-of loop variable handling
+  - TypeScript-specific features (namespaces, declare statements)
 
-- ⚠️ **POTENTIAL ISSUES**: 
-  - Context override logic differs significantly from TypeScript implementation
-  - For loop variable declaration handling may have edge cases
-  - Namespace and module detection may need refinement
+- ⚠️ **POTENTIAL ISSUES**:
+  - Different AST event handling pattern may cause edge cases
+  - Report location calculation differences
+  - Debug output left in production code
 
-- ❌ **INCORRECT**: 
-  - Missing `VariableDeclaration:exit` pattern matching from TypeScript implementation
-  - Different AST traversal approach may cause subtle behavioral differences
+- ❌ **INCORRECT**:
+  - Missing base rule context override functionality
+  - Inconsistent message IDs with TypeScript-ESLint
 
 ### Discrepancies Found
 
-#### 1. AST Pattern Matching Strategy Difference
+#### 1. Base Rule Context Override Missing
+**TypeScript Implementation:**
+```typescript
+function getBaseContextOverride(): typeof context {
+  const reportOverride: typeof context.report = descriptor => {
+    if ('node' in descriptor && descriptor.loc == null) {
+      const { node, ...rest } = descriptor;
+      if (
+        node.type === AST_NODE_TYPES.VariableDeclarator &&
+        node.init == null
+      ) {
+        context.report({
+          ...rest,
+          loc: getReportLoc(node),
+        });
+        return;
+      }
+    }
+    context.report(descriptor);
+  };
+  // ... proxy setup
+}
+```
+
+**Go Implementation:**
+```go
+// Missing equivalent functionality
+getReportLoc := func(node *ast.Node) core.TextRange {
+  // Basic implementation without override pattern
+  declarator := node.AsVariableDeclaration()
+  if declarator.Name().Kind == ast.KindIdentifier {
+    identifier := declarator.Name()
+    return utils.TrimNodeTextRange(ctx.SourceFile, identifier)
+  }
+  return utils.TrimNodeTextRange(ctx.SourceFile, node)
+}
+```
+
+**Issue:** The Go implementation lacks the sophisticated context override mechanism that TypeScript uses to customize report locations specifically for uninitialized variables.
+
+**Impact:** May lead to different highlighting/error positioning in the editor, especially for variables with type annotations.
+
+**Test Coverage:** All test cases with location expectations rely on this functionality.
+
+#### 2. Message ID Mismatch
+**TypeScript Implementation:**
+```typescript
+// Uses base rule's message IDs from ESLint core
+messages: baseRule.meta.messages,
+// Expected message IDs: 'initialized', 'notInitialized'
+```
+
+**Go Implementation:**
+```go
+ctx.ReportRange(getReportLoc(decl), rule.RuleMessage{
+  Id:          "initialized",
+  Description: fmt.Sprintf("Variable '%s' should be initialized at declaration.", idName),
+})
+// ...
+ctx.ReportRange(getReportLoc(decl), rule.RuleMessage{
+  Id:          "notInitialized", 
+  Description: fmt.Sprintf("Variable '%s' should not be initialized.", idName),
+})
+```
+
+**Issue:** The Go implementation hardcodes message IDs and descriptions instead of using the base ESLint rule's messages, which may lead to inconsistencies.
+
+**Impact:** Different error messages and message IDs compared to ESLint/TypeScript-ESLint.
+
+**Test Coverage:** All test cases expect specific message IDs that may not match.
+
+#### 3. Event Handler Pattern Differences
 **TypeScript Implementation:**
 ```typescript
 return {
@@ -46,46 +116,50 @@ return {
 ```go
 return rule.RuleListeners{
   ast.KindVariableStatement: func(node *ast.Node) {
-    varStmt := node.AsVariableStatement()
-    if varStmt.DeclarationList == nil {
-      return
-    }
-    varDeclList := varStmt.DeclarationList.AsVariableDeclarationList()
-    handleVarDeclList(varDeclList, node)
+    // Handle VariableStatement
   },
   ast.KindVariableDeclarationList: func(node *ast.Node) {
-    // Handle for loop cases
+    // Handle VariableDeclarationList in for loops
   },
 }
 ```
 
-**Issue:** The TypeScript version listens to `VariableDeclaration:exit` events and uses the base ESLint rule with a custom context override, while the Go version directly processes `VariableStatement` and `VariableDeclarationList` nodes. This fundamental difference could lead to different behavior in edge cases.
+**Issue:** The TypeScript version uses `:exit` event and delegates to base rule, while Go implementation processes AST nodes directly with different node types.
 
-**Impact:** The Go implementation may miss or double-process certain variable declarations that the TypeScript version handles through the base rule delegation.
+**Impact:** May miss edge cases or handle node traversal differently than the base rule.
 
-**Test Coverage:** This affects all test cases, particularly complex nested declarations.
+**Test Coverage:** Complex nested scenarios and edge cases may behave differently.
 
-#### 2. Context Override vs Direct Implementation
+#### 4. Debug Code in Production
 **TypeScript Implementation:**
 ```typescript
-function getBaseContextOverride(): typeof context {
-  const reportOverride: typeof context.report = descriptor => {
-    if ('node' in descriptor && descriptor.loc == null) {
-      const { node, ...rest } = descriptor;
-      if (
-        node.type === AST_NODE_TYPES.VariableDeclarator &&
-        node.init == null
-      ) {
-        context.report({
-          ...rest,
-          loc: getReportLoc(node),
-        });
-        return;
-      }
-    }
-    context.report(descriptor);
+// No debug output in production code
+```
+
+**Go Implementation:**
+```go
+// Debug info
+if varDeclList.Parent != nil && varDeclList.Parent.Kind == ast.KindForStatement {
+  fmt.Printf("DEBUG: In for loop, ignoreForLoopInit=%v, isForLoopInit=%v, mode=%s\n", opts.IgnoreForLoopInit, isForLoopInit, opts.Mode)
+}
+```
+
+**Issue:** Debug print statements are left in production code.
+
+**Impact:** Unwanted console output in production usage.
+
+**Test Coverage:** Any for-loop test cases will produce debug output.
+
+#### 5. Type Annotation Handling in Report Location
+**TypeScript Implementation:**
+```typescript
+function getReportLoc(node: TSESTree.VariableDeclarator): TSESTree.SourceLocation {
+  const start: TSESTree.Position = structuredClone(node.loc.start);
+  const end: TSESTree.Position = {
+    line: node.loc.start.line,
+    column: node.loc.start.column + (node.id as TSESTree.Identifier).name.length,
   };
-  // Custom proxy logic for context override
+  return { start, end };
 }
 ```
 
@@ -101,79 +175,18 @@ getReportLoc := func(node *ast.Node) core.TextRange {
 }
 ```
 
-**Issue:** The TypeScript version overrides the context to adjust reporting locations specifically for uninitialized variable declarators, while the Go version implements its own location calculation. The TypeScript approach is more sophisticated and handles edge cases with type annotations.
+**Issue:** The TypeScript version specifically calculates the range to exclude type annotations, while the Go version relies on `utils.TrimNodeTextRange` which may not handle this precisely.
 
-**Impact:** Different reporting locations, especially for variables with type annotations.
+**Impact:** Different highlighting ranges, especially for variables with type annotations like `let arr: string;`.
 
-**Test Coverage:** All error cases where location precision matters, particularly TypeScript-specific syntax.
-
-#### 3. Base Rule Delegation vs Full Reimplementation
-**TypeScript Implementation:**
-```typescript
-const baseRule = getESLintCoreRule('init-declarations');
-// ... uses baseRule.create(getBaseContextOverride())
-```
-
-**Go Implementation:**
-```go
-// Full custom implementation without base rule delegation
-```
-
-**Issue:** The TypeScript version leverages the existing ESLint core rule and only customizes behavior for TypeScript-specific features, while the Go version is a complete reimplementation. This could lead to missing edge cases handled by the base ESLint rule.
-
-**Impact:** Potential missing functionality that exists in the base ESLint rule but isn't reimplemented in Go.
-
-**Test Coverage:** Complex JavaScript patterns that the base ESLint rule handles but may not be covered in current tests.
-
-#### 4. For Loop Handling Differences
-**TypeScript Implementation:**
-```typescript
-// Relies on base rule for for-loop handling with TypeScript-specific overrides
-```
-
-**Go Implementation:**
-```go
-isInForLoopInit := func(node *ast.Node) bool {
-  // Complex logic to detect for loop contexts
-  // Handles both direct parent and VariableDeclarationList cases
-}
-```
-
-**Issue:** The Go implementation has custom logic for detecting for-loop contexts, which may not perfectly match the base ESLint rule's behavior.
-
-**Impact:** Different behavior for for-loop variable declarations, especially with the `ignoreForLoopInit` option.
-
-**Test Coverage:** Test cases with `ignoreForLoopInit` option and complex for-loop patterns.
-
-#### 5. Ambient Declaration Detection
-**TypeScript Implementation:**
-```typescript
-if (isAncestorNamespaceDeclared(node)) {
-  return;
-}
-// Only applies in "always" mode
-```
-
-**Go Implementation:**
-```go
-if isAncestorNamespaceDeclared(parentNode) {
-  return;
-}
-// Applies regardless of mode
-```
-
-**Issue:** The TypeScript version only checks for ancestor namespace declarations in "always" mode, while the Go version checks it regardless of mode.
-
-**Impact:** Different behavior for variables in declare namespaces when using "never" mode.
-
-**Test Coverage:** Test cases with declare namespaces in both "always" and "never" modes.
+**Test Coverage:** Test cases with type annotations may show different column positions.
 
 ### Recommendations
-- Consider adopting the TypeScript approach of delegating to a base rule implementation for better compatibility
-- Implement proper context override logic to match TypeScript's location reporting behavior
-- Ensure ambient declaration detection logic matches the TypeScript version's mode-specific behavior
-- Add more comprehensive test cases for edge cases around for-loop handling
-- Verify that all base ESLint rule functionality is properly reimplemented in the Go version
-- Test complex nested scenarios and TypeScript-specific syntax more thoroughly
+- Remove debug print statements from production code (lines 145-148)
+- Implement proper message ID compatibility with base ESLint rule
+- Consider implementing a context override pattern similar to TypeScript version
+- Verify that `utils.TrimNodeTextRange` properly handles type annotation exclusion
+- Add comprehensive tests for edge cases around AST node handling differences
+- Ensure report location calculation matches TypeScript-ESLint exactly for type-annotated variables
 
 ---

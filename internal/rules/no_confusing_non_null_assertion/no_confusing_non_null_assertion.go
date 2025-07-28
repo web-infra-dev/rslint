@@ -21,6 +21,33 @@ var NoConfusingNonNullAssertionRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		sourceFile := ctx.SourceFile
 		
+		// Helper function to check if a node ends with a non-null assertion
+		var endsWithNonNull func(node *ast.Node) (*ast.Node, bool)
+		endsWithNonNull = func(node *ast.Node) (*ast.Node, bool) {
+			switch node.Kind {
+			case ast.KindNonNullExpression:
+				// Direct non-null expression
+				return node, true
+			case ast.KindBinaryExpression:
+				// Check if the right side of the binary expression ends with non-null
+				binaryExpr := node.AsBinaryExpression()
+				return endsWithNonNull(binaryExpr.Right)
+			case ast.KindPropertyAccessExpression:
+				// Check if accessing a property that ends with non-null
+				propAccess := node.AsPropertyAccessExpression()  
+				return endsWithNonNull(propAccess.Expression)
+			case ast.KindElementAccessExpression:
+				// Check if accessing an element that ends with non-null
+				elemAccess := node.AsElementAccessExpression()
+				return endsWithNonNull(elemAccess.Expression)
+			case ast.KindCallExpression:
+				// Check if calling a function that ends with non-null
+				callExpr := node.AsCallExpression()
+				return endsWithNonNull(callExpr.Expression)
+			}
+			return nil, false
+		}
+		
 		checkNode := func(node *ast.Node) {
 			var operator ast.Kind
 			var left *ast.Node
@@ -41,6 +68,12 @@ var NoConfusingNonNullAssertionRule = rule.Rule{
 				return
 			}
 			
+			// Check if the left side ends with a non-null expression
+			_, hasNonNull := endsWithNonNull(left)
+			if !hasNonNull {
+				return
+			}
+			
 			// Get the last token of the left side
 			leftRange := utils.TrimNodeTextRange(sourceFile, left)
 			
@@ -54,14 +87,10 @@ var NoConfusingNonNullAssertionRule = rule.Rule{
 			// Find the position of the exclamation mark
 			exclamationPos := leftRange.End() - 1
 			
-			// Check various cases where we should NOT report:
+			// Check if we should skip reporting
+			// Only skip if there's another ! before !, like a!!
 			if exclamationPos > 0 {
 				charBeforeExclamation := sourceFile.Text()[exclamationPos-1]
-				// 1. If there's a closing parenthesis before !, like (a)!
-				if charBeforeExclamation == ')' {
-					return
-				}
-				// 2. If there's another ! before !, like a!!
 				if charBeforeExclamation == '!' {
 					return
 				}

@@ -3,51 +3,133 @@
 ### Test File: no-unnecessary-type-parameters.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: Basic type parameter detection, simple usage counting, error message structure, support for function and class type parameters
-- ⚠️ **POTENTIAL ISSUES**: Type-aware analysis implementation, scope management, AST traversal completeness, fix generation functionality
-- ❌ **INCORRECT**: Missing sophisticated type analysis, incomplete scope-based reference tracking, simplified type parameter usage counting
+- ✅ **CORRECT**: Basic AST node type handling, message structure, rule registration pattern
+- ⚠️ **POTENTIAL ISSUES**: Scope/reference tracking implementation, type parameter usage counting methodology, type-aware analysis depth
+- ❌ **INCORRECT**: Complete absence of scope manager functionality, oversimplified type parameter usage counting, missing complex type analysis
 
 ### Discrepancies Found
 
-#### 1. Type-Aware Analysis Implementation
+#### 1. **Missing Scope Manager Integration**
 **TypeScript Implementation:**
 ```typescript
+// Get the scope in which the type parameters are declared.
+const scope = context.sourceCode.getScope(node);
+
+const smTypeParameterVariable = nullThrows(
+  (() => {
+    const variable = scope.set.get(esTypeParameter.name.name);
+    return variable?.isTypeVariable ? variable : undefined;
+  })(),
+  "Type parameter should be present in scope's variables.",
+);
+
+// Quick path: if the type parameter is used multiple times in the AST,
+// we don't need to dip into types to know it's repeated.
+if (
+  isTypeParameterRepeatedInAST(
+    esTypeParameter,
+    smTypeParameterVariable.references,
+    node.body?.range[0] ?? node.returnType?.range[1],
+  )
+) {
+  continue;
+}
+```
+
+**Go Implementation:**
+```go
+// Scope functionality not available - simplified implementation
+counter := newTypeParameterCounter(checker, descriptor == "class")
+
+// Count type parameter usages
+usageCount := countTypeParameterUsages(ctx, node, typeParamName, typeParam)
+```
+
+**Issue:** The Go implementation completely lacks scope manager functionality, which is crucial for accurately tracking type parameter references and distinguishing between different scopes.
+
+**Impact:** Cannot properly detect type parameter shadowing, cannot track references across scopes, may produce false positives/negatives.
+
+**Test Coverage:** All test cases that involve nested functions or complex scoping scenarios.
+
+#### 2. **Oversimplified Type Parameter Usage Counting**
+**TypeScript Implementation:**
+```typescript
+// For any inferred types, we have to dip into type checking.
+counts ??= countTypeParameterUsage(checker, tsNode);
+const identifierCounts = counts.get(typeParameter.name);
+if (!identifierCounts || identifierCounts > 2) {
+  continue;
+}
+
 function countTypeParameterUsage(
   checker: ts.TypeChecker,
   node: NodeWithTypeParameters,
 ): Map<ts.Identifier, number> {
-  const counts = new Map<ts.Identifier, number>();
-  // Comprehensive type analysis with TypeScript compiler APIs
-  if (ts.isClassLike(node)) {
-    for (const typeParameter of node.typeParameters) {
-      collectTypeParameterUsageCounts(checker, typeParameter, counts, true);
-    }
-    for (const member of node.members) {
-      collectTypeParameterUsageCounts(checker, member, counts, true);
-    }
-  } else {
-    collectTypeParameterUsageCounts(checker, node, counts, false);
-  }
+  // Complex type-aware counting with recursive type analysis
 }
 ```
 
 **Go Implementation:**
 ```go
 func countTypeParameterUsages(ctx rule.RuleContext, node *ast.Node, typeParamName string, typeParamNode *ast.Node) int {
-  // Text-based approach to count meaningful occurrences
+  // Use text-based approach to count meaningful occurrences
   nodeText := string(ctx.SourceFile.Text()[node.Pos():node.End()])
+  
+  // Count occurrences of the type parameter name in the node text
   count := 0
-  // Simple string matching without deep type analysis
+  // ... simple string matching
 }
 ```
 
-**Issue:** The Go implementation uses basic text-based counting instead of leveraging the TypeScript type checker for sophisticated type analysis. The TypeScript version performs deep type traversal including inferred types, mapped types, conditional types, and other complex type constructs.
+**Issue:** Go implementation uses basic string matching instead of proper type-aware analysis, missing complex type relationships.
 
-**Impact:** May miss complex type parameter usages in inferred return types, mapped types, conditional types, and other advanced TypeScript constructs. Could result in false positives or negatives.
+**Impact:** Cannot detect type parameter usage in inferred return types, mapped types, conditional types, or other complex TypeScript constructs.
 
-**Test Coverage:** Tests involving complex generic types, mapped types, conditional types, and inferred types may fail.
+**Test Coverage:** Test cases involving complex generic types, inferred types, and type transformations will fail.
 
-#### 2. Scope-Based Reference Tracking
+#### 3. **Missing Complex Type Analysis**
+**TypeScript Implementation:**
+```typescript
+function collectTypeParameterUsageCounts(
+  checker: ts.TypeChecker,
+  node: ts.Node,
+  foundIdentifierUsages: Map<ts.Identifier, number>,
+  fromClass: boolean,
+): void {
+  // Comprehensive type analysis including:
+  // - Union/intersection types
+  // - Index access types  
+  // - Template literal types
+  // - Conditional types
+  // - Mapped types
+  // - Object type properties
+  // - Call/construct signatures
+}
+```
+
+**Go Implementation:**
+```go
+func (c *typeParameterCounter) visitType(t *checker.Type, assumeMultipleUses, isReturnType bool) {
+  if t == nil || c.incrementTypeUsage(t) > 9 {
+    return
+  }
+
+  // Simplified type checking using available methods
+  if c.checker.IsArrayLikeType(t) {
+    // Handle array-like types
+    return
+  }
+  // ... very basic type handling
+}
+```
+
+**Issue:** Go implementation lacks comprehensive type analysis capabilities present in the TypeScript version.
+
+**Impact:** Cannot properly analyze complex type relationships, missing many legitimate use cases.
+
+**Test Coverage:** Tests involving complex type operations, mapped types, conditional types will produce incorrect results.
+
+#### 4. **Inadequate AST Reference Tracking**
 **TypeScript Implementation:**
 ```typescript
 function isTypeParameterRepeatedInAST(
@@ -55,34 +137,67 @@ function isTypeParameterRepeatedInAST(
   references: Reference[],
   startOfBody = Infinity,
 ): boolean {
-  // Uses ESLint scope manager for precise reference tracking
-  for (const reference of references) {
-    if (!reference.isTypeReference || 
-        reference.identifier.name !== node.name.name) {
-      continue;
-    }
-    // Sophisticated reference analysis
-  }
+  // Sophisticated reference analysis with:
+  // - Reference scope checking
+  // - Type vs value reference distinction
+  // - Parent node analysis for type arguments
+  // - Special handling for Array/ReadonlyArray
 }
 ```
 
 **Go Implementation:**
 ```go
 func isTypeParameterRepeatedInAST(typeParam *ast.Node, references []*ast.Node, startOfBody int) bool {
-  // Simplified implementation without scope manager
   count := 0
   typeParamName := typeParam.AsTypeParameter().Name().Text()
-  // Basic reference counting without scope analysis
+  
+  for _, ref := range references {
+    // Basic position and name checking
+    // Missing sophisticated reference analysis
+  }
 }
 ```
 
-**Issue:** The Go version lacks the sophisticated scope management system that the TypeScript version uses. It cannot distinguish between type references and value references, or properly track variable scoping.
+**Issue:** Go implementation lacks proper reference tracking and analysis.
 
-**Impact:** May incorrectly count references that are in different scopes or incorrectly categorize value references as type references.
+**Impact:** Cannot distinguish between type and value references, missing context-aware reference counting.
 
-**Test Coverage:** Tests with shadowed type parameters or complex scoping scenarios may produce incorrect results.
+**Test Coverage:** Tests with complex reference patterns will be affected.
 
-#### 3. AST Node Type Coverage
+#### 5. **Missing Fix/Suggestion Generation**
+**TypeScript Implementation:**
+```typescript
+suggest: [
+  {
+    messageId: 'replaceUsagesWithConstraint',
+    *fix(fixer): Generator<TSESLint.RuleFix> {
+      // Complex fix generation including:
+      // - Constraint text handling
+      // - Reference replacement with proper parentheses
+      // - Type parameter removal from declaration
+      // - Comma handling for multiple parameters
+    },
+  },
+],
+```
+
+**Go Implementation:**
+```go
+// Report without suggestions to match test expectations
+// Use the full type parameter position instead of just the name
+ctx.ReportRange(
+  core.NewTextRange(startPos, endPos),
+  message,
+)
+```
+
+**Issue:** Go implementation completely omits fix/suggestion generation.
+
+**Impact:** Users don't get automated fixes, reducing rule utility.
+
+**Test Coverage:** All test cases expect suggestions, so this is a major functionality gap.
+
+#### 6. **Incomplete AST Node Kind Coverage**
 **TypeScript Implementation:**
 ```typescript
 return {
@@ -104,168 +219,26 @@ return {
 **Go Implementation:**
 ```go
 return rule.RuleListeners{
-  ast.KindArrowFunction: func(node *ast.Node) {
-    if node.TypeParameters() != nil {
-      checkNode(node, "function")
-    }
-  },
+  ast.KindArrowFunction: func(node *ast.Node) { /* ... */ },
+  ast.KindFunctionDeclaration: func(node *ast.Node) { /* ... */ },
   // Missing: ast.KindDeclareFunction, ast.KindTSEmptyBodyFunctionExpression
   // Commented out due to compilation issues
 }
 ```
 
-**Issue:** The Go implementation is missing support for some AST node types that the TypeScript version handles, particularly `DeclareFunction` and `TSEmptyBodyFunctionExpression`.
+**Issue:** Go implementation doesn't cover all AST node types that the TypeScript version handles.
 
-**Impact:** May miss type parameter violations in declare functions and certain function expression types.
+**Impact:** Some function-like constructs won't be analyzed by the rule.
 
-**Test Coverage:** Tests with declare functions may not trigger the rule appropriately.
-
-#### 4. Type Parameter Constraint Analysis
-**TypeScript Implementation:**
-```typescript
-collectTypeParameterUsageCounts(checker, node, counts, false);
-
-// Deep analysis of constraints
-if (declaration.constraint && !visitedConstraints.has(declaration.constraint)) {
-  visitedConstraints.add(declaration.constraint);
-  visitType(checker.getTypeAtLocation(declaration.constraint), false);
-}
-```
-
-**Go Implementation:**
-```go
-// Check if this type parameter has a constraint
-if typeParamDecl.Constraint != nil {
-  constraintText := string(ctx.SourceFile.Text()[typeParamDecl.Constraint.Pos():typeParamDecl.Constraint.End()])
-  // If constraint involves another type parameter, this is meaningful
-  for _, otherTypeParam := range node.TypeParameters() {
-    // Simple text-based constraint analysis
-  }
-}
-```
-
-**Issue:** The Go version uses simple text-based analysis for constraints instead of leveraging type checker information to understand constraint relationships properly.
-
-**Impact:** May incorrectly evaluate complex constraint relationships and miss sophisticated type parameter interdependencies.
-
-**Test Coverage:** Tests with complex generic constraints may not be handled correctly.
-
-#### 5. Fix Generation and Suggestions
-**TypeScript Implementation:**
-```typescript
-suggest: [
-  {
-    messageId: 'replaceUsagesWithConstraint',
-    *fix(fixer): Generator<TSESLint.RuleFix> {
-      // Comprehensive fix generation with proper constraint handling
-      const constraint = esTypeParameter.constraint;
-      const constraintText = constraint != null &&
-        constraint.type !== AST_NODE_TYPES.TSAnyKeyword
-        ? context.sourceCode.getText(constraint)
-        : 'unknown';
-      
-      // Replace all usages and remove type parameter
-      for (const reference of smTypeParameterVariable.references) {
-        // Complex fix logic with parentheses handling
-      }
-    },
-  },
-],
-```
-
-**Go Implementation:**
-```go
-// Report without suggestions to match test expectations
-// Use the full type parameter position instead of just the name
-ctx.ReportRange(
-  core.NewTextRange(startPos, endPos),
-  message,
-)
-```
-
-**Issue:** The Go implementation completely omits fix generation and suggestions, which are a key feature of the TypeScript version.
-
-**Impact:** Users won't get automatic fixes for type parameter issues, reducing the rule's usefulness.
-
-**Test Coverage:** All test cases expecting suggestions will fail.
-
-#### 6. Type Checker Integration
-**TypeScript Implementation:**
-```typescript
-function visitType(type: ts.Type | undefined, assumeMultipleUses: boolean, isReturnType = false): void {
-  // Deep integration with TypeScript type checker
-  if (tsutils.isTypeParameter(type)) {
-    // Handle type parameters with full type information
-  } else if (type.aliasTypeArguments) {
-    // Handle generic type aliases
-  } else if (tsutils.isUnionOrIntersectionType(type)) {
-    // Handle union/intersection types
-  }
-  // ... many more type-specific handlers
-}
-```
-
-**Go Implementation:**
-```go
-func (c *typeParameterCounter) visitType(t *checker.Type, assumeMultipleUses, isReturnType bool) {
-  if t == nil || c.incrementTypeUsage(t) > 9 {
-    return
-  }
-  
-  // Simplified type checking using available methods
-  if c.checker.IsArrayLikeType(t) {
-    // Handle array-like types
-    return
-  }
-  // Basic type checking without full TypeScript utilities
-}
-```
-
-**Issue:** The Go version lacks access to the comprehensive TypeScript type utilities (tsutils) and has a much simpler type analysis system.
-
-**Impact:** Cannot perform the sophisticated type analysis that the TypeScript version relies on for accurate type parameter usage detection.
-
-**Test Coverage:** Tests involving complex type structures may produce different results.
-
-#### 7. Message ID and Data Handling
-**TypeScript Implementation:**
-```typescript
-context.report({
-  node: esTypeParameter,
-  messageId: 'sole',
-  data: {
-    name: typeParameter.name.text,
-    descriptor,
-    uses: identifierCounts === 1 ? 'never used' : 'used only once',
-  },
-  suggest: [/* fix suggestions */]
-});
-```
-
-**Go Implementation:**
-```go
-message := rule.RuleMessage{
-  Id: "sole",
-  Description: fmt.Sprintf("Type parameter %s is %s in the %s signature.", typeParamName, uses, descriptor),
-}
-```
-
-**Issue:** The Go version embeds the data directly into the description instead of using a template-based message system with separate data fields.
-
-**Impact:** Less flexible message formatting and potential inconsistencies in message presentation.
-
-**Test Coverage:** Tests expecting specific data fields in error messages may fail.
+**Test Coverage:** Tests involving declare functions and other specific AST constructs.
 
 ### Recommendations
-- Implement proper TypeScript type checker integration for sophisticated type analysis
-- Add scope-based reference tracking system similar to ESLint's scope manager
-- Complete AST node type coverage including declare functions and other missing types
-- Implement fix generation and suggestion system
-- Add support for complex type constructs (mapped types, conditional types, etc.)
-- Enhance constraint analysis with proper type checking
-- Implement template-based message system with data interpolation
-- Add comprehensive type parameter usage detection for inferred types
-- Include support for type predicates and advanced TypeScript features
-- Test against all original TypeScript-ESLint test cases to ensure compatibility
+- **Implement proper scope tracking**: Add scope manager functionality or equivalent reference tracking system
+- **Enhance type analysis**: Implement comprehensive type-aware analysis using available checker methods
+- **Add fix generation**: Implement suggestion/fix generation to match TypeScript functionality
+- **Complete AST coverage**: Add support for all relevant AST node kinds
+- **Improve reference tracking**: Implement sophisticated reference analysis similar to TypeScript version
+- **Add constraint handling**: Properly handle type parameter constraints and their relationships
+- **Implement type-aware counting**: Replace string-based counting with proper type system integration
 
 ---

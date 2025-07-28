@@ -1,33 +1,18 @@
-# Rule Validation: no-empty-object-type
+## Rule: no-empty-object-type
 
-## Test File: no-empty-object-type.test.ts
+### Test File: no-empty-object-type.test.ts
 
-## Validation Summary
-- ✅ **CORRECT**: 
-  - Core rule logic for detecting empty interfaces and object types
-  - Configuration options handling (allowInterfaces, allowObjectTypes, allowWithName)
-  - Basic AST pattern matching for InterfaceDeclaration and TypeLiteral nodes
-  - Error message structure and IDs match TypeScript implementation
-  - Suggestion generation for autofix recommendations
-  - Heritage clause processing for extends relationships
-  - Regex support for allowWithName option
+### Validation Summary
+- ✅ **CORRECT**: Core empty interface detection, empty object type detection, allowInterfaces/allowObjectTypes options, allowWithName regex matching, class declaration merging detection, suggestion generation for fixes
+- ⚠️ **POTENTIAL ISSUES**: AST node kind checking patterns, type parameter handling in suggestions, export modifier preservation in fixes
+- ❌ **INCORRECT**: Class expression vs class declaration distinction in merged interface detection
 
-- ⚠️ **POTENTIAL ISSUES**:
-  - Class declaration merging detection may not fully match TypeScript's scope resolution
-  - Export modifier handling in type alias replacement might differ from original implementation
-  - Type parameter extraction using scanner might have edge cases
+### Discrepancies Found
 
-- ❌ **INCORRECT**:
-  - Missing proper scope resolution for merged declarations
-  - Type parameter text extraction implementation differs significantly
-
-## Discrepancies Found
-
-### 1. Scope Resolution for Merged Declarations
+#### 1. Class Expression vs Class Declaration Distinction
 
 **TypeScript Implementation:**
 ```typescript
-const scope = context.sourceCode.getScope(node);
 const mergedWithClassDeclaration = scope.set
   .get(node.id.name)
   ?.defs.some(
@@ -37,6 +22,7 @@ const mergedWithClassDeclaration = scope.set
 
 **Go Implementation:**
 ```go
+// Check if merged with class declaration (not class expression)
 mergedWithClass := false
 if interfaceDecl.Name() != nil {
     symbol := ctx.TypeChecker.GetSymbolAtLocation(interfaceDecl.Name())
@@ -52,13 +38,51 @@ if interfaceDecl.Name() != nil {
 }
 ```
 
-**Issue:** The Go implementation uses TypeScript's symbol resolution while the original uses ESLint's scope resolution. These may produce different results in edge cases.
+**Issue:** The TypeScript implementation specifically excludes class expressions from being considered as "merged" interfaces, while the Go implementation only checks for `KindClassDeclaration`. However, the Go comment indicates awareness of this distinction, so this may be correct.
 
-**Impact:** Could affect when suggestions are provided for empty interfaces that are merged with class declarations.
+**Impact:** Test case with `const derived = class Derived {};` should still show suggestions, which the current Go implementation should handle correctly.
 
-**Test Coverage:** Test case with `interface Derived extends Base {}` and `class Derived {}` may behave differently.
+**Test Coverage:** The test case `const derived = class Derived {};` validates this behavior.
 
-### 2. Type Parameter Text Extraction
+#### 2. AST Node Access Patterns
+
+**TypeScript Implementation:**
+```typescript
+TSInterfaceDeclaration(node): void {
+  const extend = node.extends;
+  if (node.body.body.length !== 0 || ...)
+}
+```
+
+**Go Implementation:**
+```go
+listeners[ast.KindInterfaceDeclaration] = func(node *ast.Node) {
+    interfaceDecl := node.AsInterfaceDeclaration()
+    
+    var extendsList []*ast.Node
+    if interfaceDecl.HeritageClauses != nil {
+        for _, clause := range interfaceDecl.HeritageClauses.Nodes {
+            if clause.AsHeritageClause().Token == ast.KindExtendsKeyword {
+                extendsList = clause.AsHeritageClause().Types.Nodes
+                break
+            }
+        }
+    }
+    
+    // Check if interface has members
+    if interfaceDecl.Members != nil && len(interfaceDecl.Members.Nodes) > 0 {
+        return
+    }
+}
+```
+
+**Issue:** The Go implementation uses `HeritageClauses` and searches for `ExtendsKeyword`, which is more verbose but functionally equivalent to the TypeScript `node.extends` direct access.
+
+**Impact:** No functional impact - both approaches correctly identify extends clauses.
+
+**Test Coverage:** All interface extension test cases validate this.
+
+#### 3. Type Parameter Text Extraction
 
 **TypeScript Implementation:**
 ```typescript
@@ -69,27 +93,24 @@ const typeParam = node.typeParameters
 
 **Go Implementation:**
 ```go
-func getNodeListTextWithBrackets(ctx rule.RuleContext, nodeList *ast.NodeList) string {
-    if nodeList == nil {
-        return ""
-    }
-    // Find the opening and closing angle brackets using scanner
-    openBracketPos := nodeList.Pos() - 1
-    // ... complex scanner logic
+// Get type parameters if any
+typeParamsText := ""
+if interfaceDecl.TypeParameters != nil {
+    typeParamsText = getNodeListTextWithBrackets(ctx, interfaceDecl.TypeParameters)
 }
 ```
 
-**Issue:** The Go implementation manually reconstructs the type parameter text including brackets, while TypeScript simply gets the text. The Go approach is more complex and may miss edge cases.
+**Issue:** The Go implementation uses a custom `getNodeListTextWithBrackets` function that manually reconstructs angle brackets, while TypeScript gets the text directly.
 
-**Impact:** Type parameter text in autofix suggestions might not exactly match the original source formatting.
+**Impact:** Potential formatting differences in the generated fix text, especially around whitespace and bracket positioning.
 
-**Test Coverage:** Test case `interface Base<T> extends Derived<T> {}` could reveal formatting differences.
+**Test Coverage:** The test case `interface Base<T> extends Derived<T> {}` validates this.
 
-### 3. Export Modifier Detection
+#### 4. Export Modifier Detection
 
 **TypeScript Implementation:**
 ```typescript
-// Not explicitly handled in the original - relies on getText() to preserve modifiers
+// Not explicitly shown in the provided code, but TypeScript ESLint automatically handles export modifiers
 ```
 
 **Go Implementation:**
@@ -106,48 +127,46 @@ if interfaceDecl.Modifiers() != nil {
 }
 ```
 
-**Issue:** The Go implementation explicitly checks for export modifiers while the TypeScript version implicitly handles them through getText(). This could lead to differences in edge cases with multiple modifiers or different modifier orders.
+**Issue:** The Go implementation explicitly searches for export modifiers, which is good, but the TypeScript implementation might handle this automatically.
 
-**Impact:** Autofix suggestions for exported interfaces might have different formatting.
+**Impact:** Should correctly preserve export modifiers in fix suggestions.
 
-**Test Coverage:** Test case with `export interface Derived extends Base {}` in namespace might show differences.
+**Test Coverage:** The test case with `export interface Derived extends Base {}` validates this.
 
-### 4. Class vs Class Expression Distinction
+#### 5. Intersection Type Detection
 
 **TypeScript Implementation:**
 ```typescript
-const mergedWithClassDeclaration = scope.set
-  .get(node.id.name)
-  ?.defs.some(
-    def => def.node.type === AST_NODE_TYPES.ClassDeclaration,
-  );
+if (
+  node.members.length ||
+  node.parent.type === AST_NODE_TYPES.TSIntersectionType ||
+  ...
+) {
+  return;
+}
 ```
 
 **Go Implementation:**
 ```go
-// Only count class declarations, not class expressions
-if decl.Kind == ast.KindClassDeclaration {
-    mergedWithClass = true
-    break
+// Don't report if part of intersection type
+if node.Parent != nil && ast.IsIntersectionTypeNode(node.Parent) {
+    return
 }
 ```
 
-**Issue:** Both implementations correctly distinguish class declarations from class expressions, but they use different mechanisms (scope-based vs symbol-based).
+**Issue:** Both implementations correctly skip empty object types in intersection types, using different but equivalent approaches.
 
-**Impact:** The distinction between class declarations and class expressions should work correctly in both, but edge cases might differ.
+**Impact:** No functional impact.
 
-**Test Coverage:** Test case with `const derived = class Derived {};` should behave the same in both implementations.
+**Test Coverage:** The test case `type MyNonNullable<T> = T & {};` validates this.
 
-## Recommendations
+### Recommendations
+- **Verify bracket positioning**: Test the `getNodeListTextWithBrackets` function to ensure it produces the same output format as TypeScript ESLint
+- **Validate export handling**: Ensure the export modifier detection works correctly with all export syntax variations
+- **Test class expression edge cases**: Verify that class expressions (not declarations) don't suppress suggestions as intended
+- **Check whitespace handling**: Ensure the fix suggestions maintain proper spacing and formatting
 
-- **Symbol vs Scope Resolution**: Verify that TypeScript's symbol resolution produces the same results as ESLint's scope resolution for merged declarations, especially in complex scenarios with modules and namespaces.
-
-- **Type Parameter Handling**: Simplify the type parameter extraction in Go to match TypeScript's approach more closely, or add comprehensive tests to ensure the scanner-based approach handles all edge cases.
-
-- **Export Modifier Testing**: Add test cases with various export scenarios to ensure the Go implementation's explicit export detection matches the TypeScript version's implicit handling.
-
-- **Scanner Edge Cases**: The Go implementation's use of scanner for bracket detection should be tested with malformed or unusual TypeScript syntax to ensure robustness.
-
-- **Integration Testing**: Run the complete test suite against both implementations to identify any behavioral differences in real-world scenarios.
+### Overall Assessment
+The Go implementation appears to be functionally correct and handles the same core logic as the TypeScript version. The main differences are in implementation details rather than behavioral differences. The rule should work equivalently to the TypeScript-ESLint version.
 
 ---

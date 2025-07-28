@@ -3,13 +3,20 @@
 ### Test File: no-unused-vars.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: Basic option parsing structure, message ID definitions, regex pattern compilation
-- ⚠️ **POTENTIAL ISSUES**: Incomplete AST traversal, simplified scope analysis, missing type-aware features
-- ❌ **INCORRECT**: Missing scope manager integration, incomplete variable collection, missing ambient declaration handling
+- ⚠️ **POTENTIAL ISSUES**: Basic structure in place, some configuration handling
+- ❌ **INCORRECT**: 
+  - Missing core scope analysis functionality
+  - No ambient declaration handling
+  - Incomplete AST traversal
+  - Missing export statement analysis
+  - No type-only usage detection
+  - Simplified variable collection logic
+  - Missing complex visitor patterns
+  - No proper scope chain tracking
 
 ### Discrepancies Found
 
-#### 1. Missing Scope Manager Integration
+#### 1. Missing Scope Analysis Engine
 **TypeScript Implementation:**
 ```typescript
 const analysisResults = collectVariables(context);
@@ -40,47 +47,45 @@ func collectVariables(ctx rule.RuleContext, sourceFile *ast.Node) map[*ast.Node]
 }
 ```
 
-**Issue:** The Go implementation lacks proper scope analysis using a scope manager. The TypeScript version uses `collectVariables(context)` which provides comprehensive scope analysis, while the Go version has a placeholder with manual AST traversal.
+**Issue:** The Go implementation lacks the sophisticated scope analysis that the TypeScript version relies on. The TypeScript version uses `collectVariables(context)` which leverages ESLint's scope-manager to properly track variable definitions, references, and scopes.
 
-**Impact:** This will cause incorrect reporting of unused variables because scope boundaries, variable shadowing, and reference resolution won't work properly.
+**Impact:** This will cause the rule to miss many unused variables and incorrectly flag used variables as unused.
 
-**Test Coverage:** Most test cases will fail due to incorrect variable collection and scope analysis.
+**Test Coverage:** All test cases will likely fail due to incorrect variable analysis.
 
-#### 2. Incomplete AST Traversal
+#### 2. Missing Ambient Declaration Handling
 **TypeScript Implementation:**
 ```typescript
-return {
-  // Multiple AST selectors for ambient declarations
-  [ambientDeclarationSelector(AST_NODE_TYPES.Program)](node: DeclarationSelectorNode): void {
-    // Ambient declaration handling
-  },
-  [ambientDeclarationSelector('TSModuleDeclaration[declare = true] > TSModuleBlock')](node: DeclarationSelectorNode): void {
-    // Namespace handling
-  },
-  'Program:exit'(programNode): void {
-    const unusedVars = collectUnusedVariables();
-    // Process all variables at program exit
-  },
-};
+// top-level declaration file handling
+[ambientDeclarationSelector(AST_NODE_TYPES.Program)](
+  node: DeclarationSelectorNode,
+): void {
+  if (!isDefinitionFile(context.filename)) {
+    return;
+  }
+  const moduleDecl = nullThrows(
+    node.parent,
+    NullThrowsReasons.MissingParent,
+  ) as TSESTree.Program;
+  if (checkForOverridingExportStatements(moduleDecl)) {
+    return;
+  }
+  markDeclarationChildAsUsed(node);
+},
 ```
 
 **Go Implementation:**
 ```go
-return rule.RuleListeners{
-	ast.KindSourceFile: func(node *ast.Node) {
-		// Process all variables at the end of the file
-		collectAndReportUnusedVariables(ctx, opts, node)
-	},
-}
+// No equivalent handling for ambient declarations
 ```
 
-**Issue:** The Go implementation only listens to `KindSourceFile` and doesn't handle ambient declarations, module declarations, or use the proper program exit pattern.
+**Issue:** The Go version completely lacks handling for ambient declarations in TypeScript definition files (.d.ts), which should be automatically marked as used.
 
-**Impact:** Ambient declarations, TypeScript modules, and definition files won't be handled correctly.
+**Impact:** Definition files will incorrectly report unused variables for ambient declarations.
 
-**Test Coverage:** Tests involving ambient declarations and module scoping will fail.
+**Test Coverage:** Test cases with `declare` statements and `.d.ts` files will fail.
 
-#### 3. Missing Type-Only Reference Detection
+#### 3. Missing Type-Only Usage Detection
 **TypeScript Implementation:**
 ```typescript
 const usedOnlyAsType = unusedVar.references.some(ref =>
@@ -104,7 +109,6 @@ func isTypeOnlyUsage(node *ast.Node) bool {
 	if parent == nil {
 		return false
 	}
-
 	// Check if the identifier is used in a type context
 	switch parent.Kind {
 	case ast.KindTypeReference:
@@ -114,26 +118,120 @@ func isTypeOnlyUsage(node *ast.Node) bool {
 	case ast.KindQualifiedName:
 		return isTypeOnlyUsage(parent)
 	}
-
 	return false
 }
 ```
 
-**Issue:** The Go implementation has a simplified type-only detection that doesn't use the sophisticated `referenceContainsTypeQuery` function and doesn't properly handle import bindings.
+**Issue:** The Go implementation has a basic type-only detection but lacks the sophisticated logic for handling type imports and the `referenceContainsTypeQuery` functionality.
 
-**Impact:** Type-only imports and references won't be handled correctly, causing false positives for unused variables that are only used in type positions.
+**Impact:** Type-only imports may be incorrectly flagged as unused, and variables used only in type positions may not be properly detected.
 
-**Test Coverage:** Tests for type-only imports and `typeof` references will fail.
+**Test Coverage:** Tests with type-only imports and `typeof` usage will fail.
 
-#### 4. Missing Parameter Position Analysis
+#### 4. Incomplete AST Traversal
+**TypeScript Implementation:**
+```typescript
+function visitPattern(
+  node: TSESTree.Node,
+  cb: (node: TSESTree.Identifier) => void,
+): void {
+  const visitor = new PatternVisitor({}, node, cb);
+  visitor.visit(node);
+}
+```
+
+**Go Implementation:**
+```go
+func collectVariableInfo(ctx rule.RuleContext, node *ast.Node, variables map[*ast.Node]*VariableInfo) {
+	// Handle variable declarations
+	switch node.Kind {
+	case ast.KindVariableStatement:
+		// Limited handling
+	}
+	// Recursively process children - simplified traversal
+	// In a real implementation, we would need proper AST traversal
+}
+```
+
+**Issue:** The Go implementation has incomplete AST traversal that doesn't properly walk all node types or handle complex patterns like destructuring.
+
+**Impact:** Many variable declarations and references will be missed, leading to incorrect results.
+
+**Test Coverage:** Tests with destructuring patterns, nested scopes, and complex expressions will fail.
+
+#### 5. Missing Export Statement Analysis
+**TypeScript Implementation:**
+```typescript
+function hasOverridingExportStatement(
+  body: TSESTree.ProgramStatement[],
+): boolean {
+  for (const statement of body) {
+    if (
+      (statement.type === AST_NODE_TYPES.ExportNamedDeclaration &&
+        statement.declaration == null) ||
+      statement.type === AST_NODE_TYPES.ExportAllDeclaration ||
+      statement.type === AST_NODE_TYPES.TSExportAssignment
+    ) {
+      return true;
+    }
+    // ... more export checks
+  }
+  return false;
+}
+```
+
+**Go Implementation:**
+```go
+// No equivalent export statement analysis
+```
+
+**Issue:** The Go version doesn't check for export statements that would make variables used implicitly.
+
+**Impact:** Exported variables may be incorrectly flagged as unused.
+
+**Test Coverage:** Tests with export statements will fail.
+
+#### 6. Simplified Reference Analysis
+**TypeScript Implementation:**
+```typescript
+const writeReferences = unusedVar.references.filter(
+  ref =>
+    ref.isWrite() &&
+    ref.from.variableScope === unusedVar.scope.variableScope,
+);
+```
+
+**Go Implementation:**
+```go
+func isWriteReference(node *ast.Node) bool {
+	parent := node.Parent
+	if parent == nil {
+		return false
+	}
+	// Check if this is a write reference
+	if ast.IsBinaryExpression(parent) {
+		binExpr := parent.AsBinaryExpression()
+		if binExpr.Left == node && isAssignmentOperator(binExpr.OperatorToken.Kind) {
+			return true
+		}
+	}
+	return false
+}
+```
+
+**Issue:** The Go implementation has overly simplified write reference detection that doesn't handle all assignment contexts or scope considerations.
+
+**Impact:** The distinction between "defined" and "assigned a value" in error messages will be incorrect.
+
+**Test Coverage:** Tests expecting different messages for assigned vs defined variables will fail.
+
+#### 7. Missing Complex Option Handling
 **TypeScript Implementation:**
 ```typescript
 function isAfterLastUsedArg(variable: ScopeVariable): boolean {
   const def = variable.defs[0];
   const params = context.sourceCode.getDeclaredVariables(def.node);
   const posteriorParams = params.slice(params.indexOf(variable) + 1);
-
-  // If any used parameters occur after this parameter, do not report.
   return !posteriorParams.some(
     v => v.references.length > 0 || v.eslintUsed,
   );
@@ -149,13 +247,13 @@ func isAfterLastUsedParam(ctx rule.RuleContext, varInfo *VariableInfo) bool {
 }
 ```
 
-**Issue:** The Go implementation doesn't properly implement the "after-used" parameter logic, which requires analyzing parameter order and usage.
+**Issue:** The Go implementation doesn't properly implement the "after-used" parameter logic.
 
-**Impact:** The `args: "after-used"` option won't work correctly.
+**Impact:** The `args: "after-used"` option will not work correctly.
 
-**Test Coverage:** Tests with `args: "after-used"` will fail.
+**Test Coverage:** Tests with `args: "after-used"` option will fail.
 
-#### 5. Missing Rest Sibling Detection
+#### 8. Missing Rest Sibling Analysis
 **TypeScript Implementation:**
 ```typescript
 function hasRestSibling(node: TSESTree.Node): boolean {
@@ -166,21 +264,6 @@ function hasRestSibling(node: TSESTree.Node): boolean {
       AST_NODE_TYPES.RestElement
   );
 }
-
-function hasRestSpreadSibling(variable: ScopeVariable): boolean {
-  if (options.ignoreRestSiblings) {
-    const hasRestSiblingDefinition = variable.defs.some(def =>
-      hasRestSibling(def.name.parent),
-    );
-    const hasRestSiblingReference = variable.references.some(ref =>
-      hasRestSibling(ref.identifier.parent),
-    );
-
-    return hasRestSiblingDefinition || hasRestSiblingReference;
-  }
-
-  return false;
-}
 ```
 
 **Go Implementation:**
@@ -190,170 +273,33 @@ func hasRestSibling(varInfo *VariableInfo) bool {
 	if varInfo.Definition == nil {
 		return false
 	}
-	
 	parent := varInfo.Definition.Parent
 	if parent != nil && parent.Kind == ast.KindObjectBindingPattern {
 		// Check if there's a rest element in the pattern
 		// This is simplified - would need proper implementation
 		return false
 	}
-	
 	return false
 }
 ```
 
-**Issue:** The Go implementation doesn't properly detect rest siblings in destructuring patterns and doesn't check both definitions and references.
+**Issue:** The Go implementation doesn't properly detect rest siblings in destructuring patterns.
 
-**Impact:** The `ignoreRestSiblings` option won't work correctly.
+**Impact:** The `ignoreRestSiblings` option will not work correctly.
 
 **Test Coverage:** Tests with rest sibling destructuring will fail.
 
-#### 6. Missing Static Init Block Detection
-**TypeScript Implementation:**
-```typescript
-if (def.type === TSESLint.Scope.DefinitionType.ClassName) {
-  const hasStaticBlock = def.node.body.body.some(
-    node => node.type === AST_NODE_TYPES.StaticBlock,
-  );
-
-  if (options.ignoreClassWithStaticInitBlock && hasStaticBlock) {
-    continue;
-  }
-}
-```
-
-**Go Implementation:**
-```go
-func isClassWithStaticInitBlock(definition *ast.Node) bool {
-	if definition == nil || definition.Kind != ast.KindClassDeclaration {
-		return false
-	}
-	
-	classDecl := definition.AsClassDeclaration()
-	if classDecl.Members != nil {
-		for _, member := range classDecl.Members.Nodes {
-			// Check for static blocks - using a different approach since KindStaticBlock may not be available
-			if member.Kind == ast.KindMethodDeclaration {
-				// This is a simplified check
-				return false
-			}
-		}
-	}
-	
-	return false
-}
-```
-
-**Issue:** The Go implementation doesn't properly detect static init blocks (`static {}`) in classes.
-
-**Impact:** The `ignoreClassWithStaticInitBlock` option won't work correctly.
-
-**Test Coverage:** Tests with static init blocks will fail.
-
-#### 7. Missing Global Directive Comment Handling
-**TypeScript Implementation:**
-```typescript
-// If there are no regular declaration, report the first `/*globals*/` comment directive.
-} else if (
-  'eslintExplicitGlobalComments' in unusedVar &&
-  unusedVar.eslintExplicitGlobalComments
-) {
-  const directiveComment = unusedVar.eslintExplicitGlobalComments[0];
-
-  context.report({
-    loc: getNameLocationInGlobalDirectiveComment(
-      context.sourceCode,
-      directiveComment,
-      unusedVar.name,
-    ),
-    node: programNode,
-    messageId: 'unusedVar',
-    data: getDefinedMessageData(unusedVar),
-  });
-}
-```
-
-**Go Implementation:**
-```go
-// No equivalent handling for global directive comments
-```
-
-**Issue:** The Go implementation doesn't handle variables declared via `/* global */` comments.
-
-**Impact:** Global directive comments won't be processed for unused variable detection.
-
-**Test Coverage:** Tests with global directive comments will fail.
-
-#### 8. Incomplete Variable Type Detection
-**TypeScript Implementation:**
-```typescript
-function defToVariableType(def: Definition): VariableType {
-  if (
-    options.destructuredArrayIgnorePattern &&
-    def.name.parent.type === AST_NODE_TYPES.ArrayPattern
-  ) {
-    return 'array-destructure';
-  }
-
-  switch (def.type) {
-    case DefinitionType.CatchClause:
-      return 'catch-clause';
-    case DefinitionType.Parameter:
-      return 'parameter';
-    default:
-      return 'variable';
-  }
-}
-```
-
-**Go Implementation:**
-```go
-func getVariableType(definition *ast.Node) VariableType {
-	if definition == nil {
-		return VariableTypeVariable
-	}
-
-	parent := definition.Parent
-	if parent == nil {
-		return VariableTypeVariable
-	}
-
-	// Check for array destructuring
-	if parent.Kind == ast.KindArrayBindingPattern {
-		return VariableTypeArrayDestructure
-	}
-
-	// Check for catch clause
-	if parent.Kind == ast.KindCatchClause {
-		return VariableTypeCatchClause
-	}
-
-	// Check for parameter
-	if definition.Kind == ast.KindParameter {
-		return VariableTypeParameter
-	}
-
-	return VariableTypeVariable
-}
-```
-
-**Issue:** The Go implementation doesn't consider the destructured array ignore pattern option when determining variable type, and the logic for detecting destructuring patterns may be incomplete.
-
-**Impact:** Array destructuring pattern detection won't align with the ignore pattern logic.
-
-**Test Coverage:** Tests with destructured array patterns will have inconsistent behavior.
-
 ### Recommendations
-- Implement proper scope manager integration to track variable declarations and references across scopes
-- Add comprehensive AST traversal to handle all node types and patterns
-- Implement sophisticated type-only reference detection using TypeScript type information
-- Add proper parameter position analysis for "after-used" args option
-- Implement complete rest sibling detection for object/array destructuring
-- Add static init block detection for classes
-- Handle global directive comments (/* global */ declarations)
-- Ensure variable type detection aligns with all configuration options
-- Add comprehensive test coverage for all edge cases mentioned in the TypeScript implementation comments
-- Consider implementing the ambient declaration selectors for TypeScript module handling
-- Add proper write reference detection for assignment vs definition reporting
+- **Critical**: Implement proper scope analysis equivalent to ESLint's scope-manager
+- **Critical**: Add comprehensive AST traversal to collect all variable declarations and references
+- **Critical**: Implement ambient declaration handling for TypeScript definition files
+- **High**: Add sophisticated type-only usage detection using TypeScript's type checker
+- **High**: Implement export statement analysis to mark exported variables as used
+- **High**: Add proper "after-used" parameter analysis
+- **Medium**: Implement rest sibling detection for destructuring patterns
+- **Medium**: Add comprehensive write reference detection
+- **Low**: Enhance error message generation to match TypeScript implementation exactly
+
+The Go implementation needs a fundamental rewrite to match the TypeScript version's functionality. The current implementation is too simplified and will not pass the majority of test cases.
 
 ---

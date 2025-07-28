@@ -1,0 +1,14 @@
+[
+  {
+    "language": "typescript",
+    "files": ["debug-*.ts", "*.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "project": ["./debug-tsconfig.json"]
+      }
+    },
+    "rules": {
+      "class-methods-use-this": "error"
+    }
+  }
+]

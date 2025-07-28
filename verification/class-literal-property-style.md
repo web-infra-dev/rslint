@@ -1,255 +1,186 @@
-# Validation Report: class-literal-property-style
-
 ## Rule: class-literal-property-style
 
 ### Test File: class-literal-property-style.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: 
-  - Basic rule structure and listener pattern
-  - Option parsing for 'fields' vs 'getters' modes
-  - Message IDs and descriptions match exactly
-  - Supported literal detection covers most cases
-  - Basic getter-to-field and field-to-getter conversion logic
-  - Override modifier handling
-  - Static modifier handling
-  - Accessibility modifier handling
-  - Computed property name support
-  - Constructor assignment exclusion logic
-  - Setter duplicate detection
-
-- ⚠️ **POTENTIAL ISSUES**: 
-  - Template literal handling may differ slightly between implementations
-  - AST traversal patterns might have subtle differences
-  - Error positioning/reporting nodes may not be identical
-
-- ❌ **INCORRECT**: 
-  - Missing support for method declarations in AST pattern matching
-  - Template expression validation logic is incomplete
-  - Nested class constructor exclusion logic may be flawed
+- ✅ **CORRECT**: Core rule logic structure, option parsing, literal detection, modifier handling, basic getter-to-field and field-to-getter conversions
+- ⚠️ **POTENTIAL ISSUES**: Constructor detection pattern differences, nested class handling, abstract method detection 
+- ❌ **INCORRECT**: Setter duplicate detection logic, computed property name handling, AST node type checking
 
 ### Discrepancies Found
 
-#### 1. Method Declaration Support Missing
-
+#### 1. Setter Duplicate Detection Logic
 **TypeScript Implementation:**
 ```typescript
-interface NodeWithModifiers {
-  accessibility?: TSESTree.Accessibility;
-  static: boolean;
-}
-
-const printNodeModifiers = (
-  node: NodeWithModifiers,
-  final: 'get' | 'readonly',
-): string =>
-  `${node.accessibility ?? ''}${
-    node.static ? ' static' : ''
-  } ${final} `.trimStart();
+const hasDuplicateKeySetter =
+  name &&
+  node.parent.body.some(element => {
+    return (
+      element.type === AST_NODE_TYPES.MethodDefinition &&
+      element.kind === 'set' &&
+      isStaticMemberAccessOfValue(element, context, name)
+    );
+  });
 ```
 
 **Go Implementation:**
 ```go
-func getStaticMemberAccessValue(ctx rule.RuleContext, node *ast.Node) string {
-	var nameNode *ast.Node
-
-	if ast.IsPropertyDeclaration(node) {
-		nameNode = node.AsPropertyDeclaration().Name()
-	} else if ast.IsMethodDeclaration(node) {
-		nameNode = node.AsMethodDeclaration().Name()
-	} else if ast.IsGetAccessorDeclaration(node) {
-		nameNode = node.AsGetAccessorDeclaration().Name()
-	} else if ast.IsSetAccessorDeclaration(node) {
-		nameNode = node.AsSetAccessorDeclaration().Name()
-	} else {
-		return ""
-	}
-}
-```
-
-**Issue:** The Go implementation includes method declarations in `getStaticMemberAccessValue` but the TypeScript version focuses on class members with specific patterns. This might lead to different behavior.
-
-**Impact:** Could cause the rule to incorrectly process method declarations that shouldn't be considered for this rule.
-
-**Test Coverage:** This might affect test cases with regular methods vs getters.
-
-#### 2. Template Expression Validation Logic
-
-**TypeScript Implementation:**
-```typescript
-const isSupportedLiteral = (
-  node: TSESTree.Node,
-): node is TSESTree.LiteralExpression => {
-  switch (node.type) {
-    case AST_NODE_TYPES.TaggedTemplateExpression:
-      return node.quasi.quasis.length === 1;
-
-    case AST_NODE_TYPES.TemplateLiteral:
-      return node.quasis.length === 1;
+if name != "" && node.Parent != nil {
+  members := node.Parent.Members()
+  if members != nil {
+    for _, member := range members {
+      if ast.IsSetAccessorDeclaration(member) && isStaticMemberAccessOfValue(ctx, member, name) {
+        return // Skip if there's a setter with the same name
+      }
+    }
   }
-};
+}
+```
+
+**Issue:** The Go version calls `node.Parent.Members()` directly, but `node.Parent` may not be the class declaration. The TypeScript version correctly accesses `node.parent.body` which is specifically the class body.
+
+**Impact:** May miss setter detection when the getter's parent is not directly the class, leading to false positives.
+
+**Test Coverage:** Test cases with getters that have corresponding setters may not be handled correctly.
+
+#### 2. Abstract Method Detection
+**TypeScript Implementation:**
+```typescript
+if (
+  node.kind !== 'get' ||
+  node.override ||
+  !node.value.body ||
+  node.value.body.body.length === 0
+) {
+  return;
+}
 ```
 
 **Go Implementation:**
 ```go
-case ast.KindTemplateExpression:
-	// Only support template literals with no interpolation
-	template := node.AsTemplateExpression()
-	return template != nil && len(template.TemplateSpans.Nodes) == 0
-case ast.KindTaggedTemplateExpression:
-	// Support tagged template expressions only with no interpolation
-	tagged := node.AsTaggedTemplateExpression()
-	if tagged.Template.Kind == ast.KindNoSubstitutionTemplateLiteral {
-		return true
-	}
-	if tagged.Template.Kind == ast.KindTemplateExpression {
-		template := tagged.Template.AsTemplateExpression()
-		return template != nil && len(template.TemplateSpans.Nodes) == 0
-	}
-	return false
+if getter.Body == nil {
+  return
+}
+
+if !ast.IsBlock(getter.Body) {
+  return
+}
 ```
 
-**Issue:** The validation logic for template expressions differs. TypeScript checks `quasis.length === 1` while Go checks `len(template.TemplateSpans.Nodes) == 0`. These are checking different aspects of template literals.
+**Issue:** The Go version doesn't explicitly check for abstract getters (those without body implementation). The TypeScript version checks `!node.value.body` which catches abstract methods.
 
-**Impact:** May incorrectly accept or reject template literals with different interpolation patterns.
+**Impact:** May incorrectly flag abstract getters for conversion to fields.
 
-**Test Coverage:** Test cases with template literals and tagged template expressions may behave differently.
+**Test Coverage:** The valid test case with `abstract get p1(): string;` may fail.
 
-#### 3. Constructor Assignment Exclusion Logic
-
+#### 3. Constructor Detection Pattern
 **TypeScript Implementation:**
 ```typescript
 'MethodDefinition[kind="constructor"] ThisExpression'(
   node: TSESTree.ThisExpression,
 ): void {
-  if (node.parent.type === AST_NODE_TYPES.MemberExpression) {
-    let parent: TSESTree.Node | undefined = node.parent;
-
-    while (!isFunction(parent)) {
-      parent = parent.parent;
-    }
-
-    if (
-      parent.parent.type === AST_NODE_TYPES.MethodDefinition &&
-      parent.parent.kind === 'constructor'
-    ) {
-      excludeAssignedProperty(node.parent);
-    }
-  }
+  // Specific selector for this expressions inside constructors
 }
 ```
 
 **Go Implementation:**
 ```go
 listeners[ast.KindThisKeyword] = func(node *ast.Node) {
-	// Check if this is inside a member expression (this.property or this['property'])
-	if node.Parent == nil || (!ast.IsPropertyAccessExpression(node.Parent) && !ast.IsElementAccessExpression(node.Parent)) {
-		return
-	}
-
-	// Walk up to find the containing function
-	parent := memberExpr.Parent
-	for parent != nil && !isFunction(parent) {
-		parent = parent.Parent
-	}
-
-	// Check if this function is a constructor by checking its parent
-	if parent != nil && parent.Parent != nil {
-		if ast.IsMethodDeclaration(parent.Parent) {
-			method := parent.Parent.AsMethodDeclaration()
-			if method.Kind == ast.KindConstructorKeyword {
-				// We're in a constructor - exclude this property
-				if len(propertiesInfoStack) > 0 {
-					info := propertiesInfoStack[len(propertiesInfoStack)-1]
-					info.excludeSet[propName] = true
-				}
-			}
-		} else if ast.IsConstructorDeclaration(parent.Parent) {
-			// Direct constructor declaration
-			if len(propertiesInfoStack) > 0 {
-				info := propertiesInfoStack[len(propertiesInfoStack)-1]
-				info.excludeSet[propName] = true
-			}
-		}
-	}
+  // Broader listener that checks all this expressions
+  // Then walks up to find if we're in a constructor
 }
 ```
 
-**Issue:** The Go implementation has a more complex logic for detecting constructor assignments, but it doesn't match the precise TypeScript pattern. The TypeScript version uses a selector pattern while Go manually traverses the AST.
+**Issue:** The Go version uses a broader approach that may catch `this` expressions outside of constructors, then tries to filter. The TypeScript version uses a specific selector that only matches `this` expressions directly inside constructor method definitions.
 
-**Impact:** May incorrectly exclude or include properties that are assigned in constructors, especially in nested class scenarios.
+**Impact:** May have different behavior for nested functions or complex constructor patterns.
 
-**Test Coverage:** Test cases with nested classes and constructor assignments may fail.
+**Test Coverage:** Test cases with nested classes or functions inside constructors may behave differently.
 
-#### 4. Property Name Extraction for String Literals
-
+#### 4. Computed Property Name Handling
 **TypeScript Implementation:**
 ```typescript
-const name = getStaticMemberAccessValue(node, context);
+// Uses getStaticMemberAccessValue utility from @typescript-eslint/utils
+// which has sophisticated computed property handling
 ```
 
 **Go Implementation:**
 ```go
 func extractPropertyName(ctx rule.RuleContext, nameNode *ast.Node) string {
-	// Handle string literals as property names
-	if ast.IsLiteralExpression(nameNode) {
-		text := nameNode.Text()
-		// Remove quotes for string literals to normalize the name
-		if len(text) >= 2 && ((text[0] == '"' && text[len(text)-1] == '"') || (text[0] == '\'' && text[len(text)-1] == '\'')) {
-			return text[1 : len(text)-1]
-		}
-		return text
-	}
+  if nameNode.Kind == ast.KindComputedPropertyName {
+    computed := nameNode.AsComputedPropertyName()
+    return extractPropertyNameFromExpression(ctx, computed.Expression)
+  }
+  // ...
 }
 ```
 
-**Issue:** The Go implementation manually handles quote removal for string literals, but the TypeScript implementation may handle this differently through the ESLint utilities.
+**Issue:** The Go version's computed property handling may not match the TypeScript-ESLint utility's behavior exactly, particularly for complex expressions.
 
-**Impact:** Could cause mismatches in property name comparison when dealing with quoted property names.
+**Impact:** Properties with computed names may not be properly identified or excluded.
 
-**Test Coverage:** Test cases with quoted property names like `['foo']` vs `foo` may behave inconsistently.
+**Test Coverage:** Test cases with computed property names like `[myValue]` may behave differently.
 
-#### 5. Class Body Listener Pattern
-
+#### 5. Template Literal Support
 **TypeScript Implementation:**
 ```typescript
-return {
-  ...(style === 'getters' && {
-    ClassBody: enterClassBody,
-    'ClassBody:exit': exitClassBody,
-  }),
-};
+case AST_NODE_TYPES.TaggedTemplateExpression:
+  return node.quasi.quasis.length === 1;
+
+case AST_NODE_TYPES.TemplateLiteral:
+  return node.quasis.length === 1;
+```
+
+**Go Implementation:**
+```go
+case ast.KindTemplateExpression:
+  template := node.AsTemplateExpression()
+  return template != nil && len(template.TemplateSpans.Nodes) == 0
+case ast.KindTaggedTemplateExpression:
+  // Support tagged template expressions only with no interpolation
+  tagged := node.AsTaggedTemplateExpression()
+  if tagged.Template.Kind == ast.KindNoSubstitutionTemplateLiteral {
+    return true
+  }
+  // ...
+```
+
+**Issue:** Different AST node kinds and property names for template literal checking. The logic may not be equivalent.
+
+**Impact:** Template literals with or without interpolation may be handled differently.
+
+**Test Coverage:** Test cases with template literals and tagged template expressions may have different behavior.
+
+#### 6. Class Body Event Handling
+**TypeScript Implementation:**
+```typescript
+ClassBody: enterClassBody,
+'ClassBody:exit': exitClassBody,
 ```
 
 **Go Implementation:**
 ```go
 listeners[ast.KindClassDeclaration] = func(node *ast.Node) {
-	enterClassBody()
+  enterClassBody()
 }
 listeners[rule.ListenerOnExit(ast.KindClassDeclaration)] = func(node *ast.Node) {
-	exitClassBody()
-}
-listeners[ast.KindClassExpression] = func(node *ast.Node) {
-	enterClassBody()
-}
-listeners[rule.ListenerOnExit(ast.KindClassExpression)] = func(node *ast.Node) {
-	exitClassBody()
+  exitClassBody()
 }
 ```
 
-**Issue:** TypeScript uses `ClassBody` as the node type while Go uses `ClassDeclaration` and `ClassExpression`. This is a fundamental difference in AST structure.
+**Issue:** The TypeScript version specifically listens to ClassBody enter/exit events, while the Go version listens to class declaration events. These may not be equivalent in all cases.
 
-**Impact:** The scope tracking for properties might be incorrect if the AST traversal doesn't match exactly.
+**Impact:** Stack management for properties may not work correctly with nested classes or class expressions.
 
-**Test Coverage:** All test cases with the 'getters' option could be affected.
+**Test Coverage:** Nested class scenarios may behave differently.
 
 ### Recommendations
-- Verify template literal validation logic matches exactly between implementations
-- Review constructor assignment exclusion to ensure nested class scenarios work correctly
-- Ensure property name normalization is consistent between quoted and unquoted names
-- Validate that class body traversal correctly tracks property scope
-- Add specific test cases for edge cases around template literals and constructor assignments
-- Review AST node type mappings between TypeScript ESTree and Go typescript-go
-- Consider adding debug logging to compare behavior on specific test cases
+- **Fix setter detection**: Access the class body correctly by walking up to find the class declaration/expression, then access its members
+- **Add abstract method check**: Verify that getters have actual bodies before suggesting conversion to fields
+- **Improve constructor detection**: Make the `this` expression filtering more precise to match TypeScript-ESLint's selector behavior
+- **Enhance computed property handling**: Ensure the property name extraction matches TypeScript-ESLint's utilities exactly
+- **Verify template literal logic**: Double-check the AST node type mappings and property access for template literals
+- **Fix class body event handling**: Consider listening to class body-specific events if available, or ensure proper class member access
+- **Add comprehensive test coverage**: Test all edge cases mentioned, particularly nested classes, abstract methods, and computed properties
 
 ---

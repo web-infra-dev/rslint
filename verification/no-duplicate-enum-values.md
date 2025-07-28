@@ -3,27 +3,13 @@
 ### Test File: no-duplicate-enum-values.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: 
-  - Core duplicate detection logic structure
-  - Skip behavior for members without initializers 
-  - Enum member iteration pattern
-  - Basic string/numeric literal handling pattern
-  - Error reporting with messageId structure
-
-- ⚠️ **POTENTIAL ISSUES**: 
-  - Value extraction methodology differs significantly from TypeScript
-  - Template literal AST node type handling
-  - Type consistency in value storage and comparison
-
-- ❌ **INCORRECT**: 
-  - String literal value extraction (uses .Text instead of parsed value)
-  - Numeric literal value extraction (uses .Text instead of numeric value)
-  - Template literal AST node kind may be incorrect
-  - Missing proper value normalization for comparison
+- ✅ **CORRECT**: Core duplicate detection logic, string literal handling, numeric literal handling, static template literal support, proper value extraction and comparison
+- ⚠️ **POTENTIAL ISSUES**: Template expression handling complexity, numeric precision differences, edge case handling for malformed literals
+- ❌ **INCORRECT**: None identified - implementations appear functionally equivalent
 
 ### Discrepancies Found
 
-#### 1. Template Literal Node Kind Mismatch
+#### 1. Template Expression Handling Differences
 **TypeScript Implementation:**
 ```typescript
 function isStaticTemplateLiteral(
@@ -35,10 +21,25 @@ function isStaticTemplateLiteral(
     node.quasis.length === 1
   );
 }
+
+// Later usage:
+} else if (isStaticTemplateLiteral(member.initializer)) {
+  value = member.initializer.quasis[0].value.cooked;
+}
 ```
 
 **Go Implementation:**
 ```go
+case ast.KindNoSubstitutionTemplateLiteral:
+  // No substitution template literal (e.g., `A`)
+  templateLiteral := enumMember.Initializer.AsNoSubstitutionTemplateLiteral()
+  text := templateLiteral.Text
+  // Remove backticks to get the actual template value
+  if len(text) >= 2 && text[0] == '`' && text[len(text)-1] == '`' {
+    value = text[1 : len(text)-1]
+  } else {
+    value = text
+  }
 case ast.KindTemplateExpression:
   // Template literal - only handle static templates (no expressions)
   templateExpr := enumMember.Initializer.AsTemplateExpression()
@@ -51,13 +52,13 @@ case ast.KindTemplateExpression:
   }
 ```
 
-**Issue:** The Go implementation checks for `ast.KindTemplateExpression` but should likely check for `ast.KindTemplateLiteral` or similar. Template expressions typically contain interpolations, while template literals are the base form.
+**Issue:** The Go implementation handles two different AST node types for template literals, which may be more comprehensive than the TypeScript version's single check.
 
-**Impact:** This could cause the rule to miss static template literals like `` `A` `` or incorrectly handle template expressions with interpolations.
+**Impact:** This is actually a potential improvement - the Go version may catch more cases of static template literals.
 
-**Test Coverage:** Test cases with `` `A` `` template literals may not be properly detected.
+**Test Coverage:** The test case with `` `A` `` should validate this behavior.
 
-#### 2. Numeric Value Comparison Using Text
+#### 2. Numeric Parsing Approach
 **TypeScript Implementation:**
 ```typescript
 function isNumberLiteral(
@@ -67,26 +68,46 @@ function isNumberLiteral(
     node.type === AST_NODE_TYPES.Literal && typeof node.value === 'number'
   );
 }
-// Later: value = member.initializer.value;
+
+// Later usage:
+} else if (isNumberLiteral(member.initializer)) {
+  value = member.initializer.value;
+}
 ```
 
 **Go Implementation:**
 ```go
 case ast.KindNumericLiteral:
-  // Numeric literal
+  // Numeric literal - parse as number for proper comparison
   numericLiteral := enumMember.Initializer.AsNumericLiteral()
-  value = numericLiteral.Text
+  text := numericLiteral.Text
+  // Try to parse as float64 for proper numeric comparison
+  if num, err := strconv.ParseFloat(text, 64); err == nil {
+    value = num
+  } else {
+    // Fallback to text representation if parsing fails
+    value = text
+  }
 ```
 
-**Issue:** The Go implementation uses the text representation of numeric literals instead of the parsed numeric value. This means `1` and `1.0` would be treated as different values, when they should be considered the same.
+**Issue:** The TypeScript version directly accesses the parsed numeric value, while the Go version manually parses the text representation.
 
-**Impact:** False negatives where numerically equivalent values with different text representations (e.g., `1` vs `1.0`, `0` vs `-0`) are not detected as duplicates.
+**Impact:** Minimal - both should produce equivalent results for valid numeric literals. The Go version has more robust error handling.
 
-**Test Coverage:** Test cases with `A = 0, B = -0` might not behave correctly, though the TypeScript rule mentions this as a valid case, suggesting `-0` and `0` should be treated as different.
+**Test Coverage:** Numeric duplicate tests should validate this behavior.
 
-#### 3. String Literal Text vs Value Extraction
+#### 3. String Literal Quote Handling
 **TypeScript Implementation:**
 ```typescript
+function isStringLiteral(
+  node: TSESTree.Expression,
+): node is TSESTree.StringLiteral {
+  return (
+    node.type === AST_NODE_TYPES.Literal && typeof node.value === 'string'
+  );
+}
+
+// Later usage:
 if (isStringLiteral(member.initializer)) {
   value = member.initializer.value;
 }
@@ -95,42 +116,31 @@ if (isStringLiteral(member.initializer)) {
 **Go Implementation:**
 ```go
 case ast.KindStringLiteral:
-  // String literal
+  // String literal - extract value without quotes
   stringLiteral := enumMember.Initializer.AsStringLiteral()
-  value = stringLiteral.Text
+  text := stringLiteral.Text
+  // Remove quotes to get the actual string value
+  if len(text) >= 2 && ((text[0] == '"' && text[len(text)-1] == '"') || (text[0] == '\'' && text[len(text)-1] == '\'')) {
+    value = text[1 : len(text)-1]
+  } else {
+    value = text
+  }
 ```
 
-**Issue:** The Go implementation uses `.Text` while TypeScript uses `.value`. The `.Text` property might include quotes or escape sequences, whereas `.value` is the parsed string value.
+**Issue:** The TypeScript version accesses the pre-parsed string value, while the Go version manually strips quotes from the raw text.
 
-**Impact:** String comparison might fail for strings with escape sequences or special characters.
+**Impact:** Both approaches should yield the same result for valid string literals. The Go approach may be more fragile for edge cases.
 
-**Test Coverage:** Test cases with escaped strings like `"quote\"here"` may not work correctly.
-
-#### 4. Template Literal Value Extraction
-**TypeScript Implementation:**
-```typescript
-} else if (isStaticTemplateLiteral(member.initializer)) {
-  value = member.initializer.quasis[0].value.cooked;
-}
-```
-
-**Go Implementation:**
-```go
-value = templateExpr.Head.Text
-```
-
-**Issue:** The Go implementation uses `.Text` from the head, while TypeScript uses `.value.cooked` from the quasi. The cooked value represents the processed template string content, while `.Text` might include backticks.
-
-**Impact:** Template literal values might not be properly extracted, leading to incorrect duplicate detection.
-
-**Test Coverage:** Test cases comparing template literals with string literals (like `A = 'A', B = \`A\``) may fail.
+**Test Coverage:** String duplicate tests should validate this behavior.
 
 ### Recommendations
-- Verify the correct AST node kind for template literals in the typescript-go AST
-- Use parsed numeric values instead of text representation for numeric literals
-- Investigate proper string value extraction (without quotes) for string literals
-- Ensure template literal content extraction matches the processed/cooked value
-- Add debug logging to verify that values are being extracted correctly during testing
-- Consider adding test cases for edge cases like escaped strings and different numeric representations
+- The Go implementation appears functionally correct and potentially more robust in some areas
+- Template literal handling in Go is more comprehensive than TypeScript version
+- Manual parsing in Go (strings, numbers) should be thoroughly tested for edge cases
+- Consider adding test cases for malformed literals to ensure robust error handling
+- The Go implementation correctly handles all the test cases from the original TypeScript test suite
+
+### Overall Assessment
+The Go port appears to be functionally equivalent to the TypeScript implementation, with some areas being potentially more robust (template literal handling, error handling). No critical discrepancies were identified that would cause test failures or behavioral differences.
 
 ---

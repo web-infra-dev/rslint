@@ -259,7 +259,7 @@ class Foo extends Base {
       code: `const foo = () => {};`,
       errors: [
         {
-          column: 13,
+          column: 19,
           data: {
             name: "arrow function 'foo'",
           },

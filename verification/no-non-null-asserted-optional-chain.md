@@ -1,174 +1,119 @@
-# Rule Validation: no-non-null-asserted-optional-chain
-
 ## Rule: no-non-null-asserted-optional-chain
 
 ### Test File: no-non-null-asserted-optional-chain.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: Basic non-null assertion detection on optional chains, message IDs and descriptions match, suggestion-based fixes (not auto-fixes), terminal assertion logic for TypeScript 3.9+ compatibility
-- ⚠️ **POTENTIAL ISSUES**: Complex AST pattern matching approach differs significantly, reliance on `ast.IsOptionalChain()` without validation, position calculation for fix suggestions may be inaccurate
-- ❌ **INCORRECT**: Missing selector-based pattern matching from TypeScript implementation, overly complex logic that may miss edge cases, potential issues with parenthesized expression handling
+- ✅ **CORRECT**: Core detection of non-null assertions on optional chains, message IDs and descriptions, suggestion-based fixes with range removal, terminal assertion detection for TypeScript 3.9+ compatibility
+- ⚠️ **POTENTIAL ISSUES**: AST traversal approach differs significantly, reliance on `ast.IsOptionalChain()` without verification of its behavior
+- ❌ **INCORRECT**: Missing detection of parenthesized optional chains `(foo?.bar)!`, incomplete pattern matching compared to TypeScript selectors
 
 ### Discrepancies Found
 
-#### 1. Fundamental Pattern Matching Approach Difference
+#### 1. Missing Parenthesized Optional Chain Detection
 **TypeScript Implementation:**
 ```typescript
-return {
-  // Pattern 1: (x?.y)! - non-nulling a wrapped chain
-  'TSNonNullExpression > ChainExpression'(node: TSESTree.ChainExpression): void {
-    // selector guarantees this assertion
-    const parent = node.parent as TSESTree.TSNonNullExpression;
-    // ... report error
-  },
-
-  // Pattern 2: x?.y! - non-nulling at the end of a chain  
-  'ChainExpression > TSNonNullExpression'(node: TSESTree.TSNonNullExpression): void {
-    // ... report error
-  },
-};
-```
-
-**Go Implementation:**
-```go
-return rule.RuleListeners{
-  ast.KindNonNullExpression: func(node *ast.Node) {
-    nonNullExpr := node.AsNonNullExpression()
-    expression := nonNullExpr.Expression
-    
-    if isDirectOptionalChainAssertion(expression, node) {
-      reportError(ctx, node, node)
-    }
-  },
+// Selector specifically targets: TSNonNullExpression > ChainExpression
+'TSNonNullExpression > ChainExpression'(
+  node: TSESTree.ChainExpression,
+): void {
+  // This catches cases like (foo?.bar)! where the chain is wrapped
+  const parent = node.parent as TSESTree.TSNonNullExpression;
+  context.report({
+    node,
+    messageId: 'noNonNullOptionalChain',
+    // ...
+  });
 }
 ```
 
-**Issue:** The TypeScript implementation uses two specific CSS-like selectors to target exact AST patterns: `TSNonNullExpression > ChainExpression` and `ChainExpression > TSNonNullExpression`. The Go implementation uses a single listener on `KindNonNullExpression` and tries to recreate the selector logic manually.
-
-**Impact:** The Go approach may miss cases or incorrectly flag valid code because it doesn't precisely match the TypeScript selector semantics.
-
-**Test Coverage:** This affects all test cases, particularly the parenthesized cases like `(foo?.bar)!`
-
-#### 2. Parenthesized Expression Handling
-**TypeScript Implementation:**
-```typescript
-// Directly targets: TSNonNullExpression > ChainExpression
-// This automatically handles (foo?.bar)! because the ChainExpression is directly under TSNonNullExpression
-'TSNonNullExpression > ChainExpression'(node: TSESTree.ChainExpression): void
-```
-
 **Go Implementation:**
 ```go
-// Pattern 1: NonNullExpression > ChainExpression (parenthesized optional chain)
+// Only checks if expression is ParenthesizedExpression, but doesn't handle the case
+// where a ChainExpression is directly the child of NonNullExpression
 if expression.Kind == ast.KindParenthesizedExpression {
-  parenExpr := expression.AsParenthesizedExpression()
-  return hasOptionalChaining(parenExpr.Expression)
+    parenExpr := expression.AsParenthesizedExpression()
+    return hasOptionalChaining(parenExpr.Expression)
 }
 ```
 
-**Issue:** The Go implementation assumes parenthesized expressions are the way to handle `(foo?.bar)!`, but this may not be correct. The TypeScript selector `TSNonNullExpression > ChainExpression` suggests the ChainExpression is a direct child, not necessarily wrapped in parentheses.
+**Issue:** The Go implementation attempts to handle parenthesized expressions but doesn't correctly match the TypeScript selector pattern `TSNonNullExpression > ChainExpression`. The TypeScript version has two separate handlers - one for when a ChainExpression is directly under a NonNullExpression, and another for the reverse.
 
-**Impact:** May miss or incorrectly handle parenthesized optional chain assertions.
+**Impact:** Test cases like `(foo?.bar)!`, `(foo?.bar)!()`, and `(foo?.bar)!.baz` may not be detected correctly.
 
-**Test Coverage:** Affects test cases like `(foo?.bar)!`, `(foo?.bar)!()`, `(foo?.bar!)`, `(foo?.bar!)()`
+**Test Coverage:** Invalid test cases 5-8 in the test suite cover this pattern.
 
-#### 3. Terminal Assertion Logic Complexity
+#### 2. Selector Pattern Mismatch
 **TypeScript Implementation:**
 ```typescript
-// Simple and direct - uses two separate selectors
-// No complex "terminal" logic needed because selectors handle the patterns
+// Two complementary selectors:
+'TSNonNullExpression > ChainExpression' // Catches (chain)!
+'ChainExpression > TSNonNullExpression' // Catches chain!
 ```
 
 **Go Implementation:**
 ```go
+// Single listener on NonNullExpression only
+ast.KindNonNullExpression: func(node *ast.Node) {
+    // Tries to handle both patterns in one function
+}
+```
+
+**Issue:** The TypeScript implementation uses CSS-like selectors that precisely target the parent-child relationships. The Go version uses a single listener approach that may miss certain AST structures.
+
+**Impact:** The dual-selector approach in TypeScript ensures comprehensive coverage of both patterns, while the Go single-listener approach may have gaps.
+
+**Test Coverage:** All invalid test cases rely on this pattern detection.
+
+#### 3. AST Navigation Assumptions
+**TypeScript Implementation:**
+```typescript
+// Direct selector guarantees the relationship
+const parent = node.parent as TSESTree.TSNonNullExpression;
+```
+
+**Go Implementation:**
+```go
+// Manual parent traversal with assumptions
 func isTerminalAssertion(nonNullNode *ast.Node) bool {
-  if nonNullNode.Parent == nil {
-    return true
-  }
-  
-  parent := nonNullNode.Parent
-  switch parent.Kind {
-  case ast.KindPropertyAccessExpression:
-    propAccess := parent.AsPropertyAccessExpression()
-    return propAccess.Expression != nonNullNode
-  case ast.KindElementAccessExpression:
-    elemAccess := parent.AsElementAccessExpression()
-    return elemAccess.Expression != nonNullNode
-  case ast.KindCallExpression:
-    callExpr := parent.AsCallExpression()
-    return callExpr.Expression != nonNullNode
-  default:
-    return true
-  }
+    if nonNullNode.Parent == nil {
+        return true
+    }
+    parent := nonNullNode.Parent
+    // Complex logic to determine if assertion is terminal
 }
 ```
 
-**Issue:** The Go implementation introduces complex "terminal assertion" logic that doesn't exist in the TypeScript version. This may be unnecessary and could introduce bugs.
+**Issue:** The Go version makes assumptions about AST structure and parent relationships that may not hold in all cases. The TypeScript selectors provide guaranteed structural relationships.
 
-**Impact:** May incorrectly flag valid TypeScript 3.9+ patterns like `foo?.bar!.baz` as invalid.
+**Impact:** May incorrectly classify some assertions as terminal or non-terminal, affecting the rule's accuracy.
 
-**Test Coverage:** Could affect valid test cases like `foo?.bar!.baz`, `foo?.bar!()`, `foo?.['bar']!.baz`
+**Test Coverage:** Valid test cases like `foo?.bar!.baz` and `foo?.bar!()` test the terminal detection logic.
 
-#### 4. Missing Direct Selector Equivalent
+#### 4. Reliance on `ast.IsOptionalChain()`
 **TypeScript Implementation:**
 ```typescript
-// Pattern 2: ChainExpression > TSNonNullExpression
-// This catches cases like foo?.bar! where the NonNull is inside the chain
-'ChainExpression > TSNonNullExpression'(node: TSESTree.TSNonNullExpression): void
+// Direct pattern matching through selectors - no need for helper functions
+'ChainExpression > TSNonNullExpression'
 ```
 
 **Go Implementation:**
 ```go
-// Only listens to KindNonNullExpression, no equivalent to the reverse pattern
-// where the NonNull is a child of the ChainExpression
+// Relies on utility function
+return ast.IsOptionalChain(node)
 ```
 
-**Issue:** The Go implementation doesn't have an equivalent to the `ChainExpression > TSNonNullExpression` pattern, which may miss certain cases.
+**Issue:** The Go implementation depends on `ast.IsOptionalChain()` which is not defined in the provided code. Its behavior and reliability are unknown.
 
-**Impact:** Could miss violations where the non-null assertion is embedded within the chain expression.
+**Impact:** If `ast.IsOptionalChain()` doesn't correctly identify all optional chain patterns, the rule will miss violations.
 
-**Test Coverage:** May affect test cases like `(foo?.bar!)` where the assertion is inside parentheses
-
-#### 5. Fix Position Calculation
-**TypeScript Implementation:**
-```typescript
-// For TSNonNullExpression > ChainExpression
-fix(fixer): TSESLint.RuleFix {
-  return fixer.removeRange([
-    parent.range[1] - 1,  // parent is the TSNonNullExpression
-    parent.range[1],
-  ]);
-},
-
-// For ChainExpression > TSNonNullExpression  
-fix(fixer): TSESLint.RuleFix {
-  return fixer.removeRange([node.range[1] - 1, node.range[1]]);
-},
-```
-
-**Go Implementation:**
-```go
-nonNullEnd := nonNullNode.End()
-exclamationStart := nonNullEnd - 1
-exclamationRange := core.NewTextRange(exclamationStart, nonNullEnd)
-```
-
-**Issue:** The Go implementation always calculates the fix position based on the nonNullNode, but the TypeScript implementation uses different calculation strategies depending on which pattern matched.
-
-**Impact:** Fix suggestions may target incorrect positions in the source code.
-
-**Test Coverage:** Could affect the accuracy of suggested fixes in all invalid test cases.
+**Test Coverage:** All test cases involving optional chains depend on this function.
 
 ### Recommendations
-- **Implement equivalent selector patterns**: Create separate handlers that mimic `TSNonNullExpression > ChainExpression` and `ChainExpression > TSNonNullExpression` patterns
-- **Simplify logic**: Remove the complex terminal assertion logic and rely on the selector patterns like the TypeScript version
-- **Validate AST pattern assumptions**: Test the assumptions about how parenthesized expressions and chain expressions are represented in the Go AST
-- **Fix position calculation**: Use pattern-specific fix calculations that match the TypeScript implementation
-- **Add comprehensive testing**: Verify each test case individually to ensure the Go port produces identical results
-
-### Critical Issues Requiring Immediate Attention
-1. The Go implementation may fail to catch violations that the TypeScript version would catch due to missing the `ChainExpression > TSNonNullExpression` pattern
-2. The terminal assertion logic could incorrectly allow valid TypeScript 3.9+ code patterns
-3. Fix suggestions may be positioned incorrectly, breaking the user experience
+- Implement dual AST node listeners to match TypeScript's selector pattern: one for `NonNullExpression` and one for `ChainExpression`
+- Verify the behavior of `ast.IsOptionalChain()` and potentially implement custom optional chain detection
+- Add specific handling for parenthesized optional chains that matches the TypeScript selector `TSNonNullExpression > ChainExpression`
+- Simplify the terminal assertion detection logic by leveraging AST structure more directly
+- Add comprehensive test cases to verify all parenthesized optional chain patterns are caught
+- Consider implementing the exact same logic flow as TypeScript: separate handlers for the two main patterns rather than trying to unify them
 
 ---

@@ -1,0 +1,14 @@
+[
+  {
+    "language": "typescript",
+    "files": ["debug-*.ts", "*.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "project": ["./debug-tsconfig.json"]
+      }
+    },
+    "rules": {
+      "consistent-indexed-object-style": "error"
+    }
+  }
+]

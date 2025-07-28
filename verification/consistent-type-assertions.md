@@ -3,54 +3,40 @@
 ### Test File: consistent-type-assertions.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: Basic assertion style enforcement, object/array literal detection, const assertion special handling, message ID structure
-- ⚠️ **POTENTIAL ISSUES**: AST node kind mapping, parameter detection logic, qualified name handling, fix generation for style conversion
-- ❌ **INCORRECT**: Missing auto-fix functionality for style conversion, incomplete parameter context detection, suggestion implementation gaps
+- ✅ **CORRECT**: Core rule logic, basic AST node type mapping, error message IDs and templates, default options structure, basic type assertion detection
+- ⚠️ **POTENTIAL ISSUES**: isAsParameter() context detection completeness, JSX expression handling, template literal contexts, qualified name type references
+- ❌ **INCORRECT**: Missing fix generation for style conversions, incomplete suggestion fix implementations, potential gaps in parameter context detection
 
 ### Discrepancies Found
 
-#### 1. Missing Auto-Fix for Style Conversion
+#### 1. Missing Fix Generation for Style Conversions
 **TypeScript Implementation:**
 ```typescript
 fix:
   messageId === 'as'
     ? (fixer): TSESLint.RuleFix => {
-        // Complex precedence-aware fix logic
-        const tsNode = getParserServices(context, true).esTreeNodeToTSNodeMap.get(node);
+        // Complex precedence-aware fix generation
         const expressionCode = context.sourceCode.getText(node.expression);
         const typeAnnotationCode = context.sourceCode.getText(node.typeAnnotation);
-        
-        const asPrecedence = getOperatorPrecedence(ts.SyntaxKind.AsExpression, ts.SyntaxKind.Unknown);
-        const parentPrecedence = getOperatorPrecedence(tsNode.parent.kind, ...);
-        
-        const expressionCodeWrapped = getWrappedCode(expressionCode, expressionPrecedence, asPrecedence);
-        const text = `${expressionCodeWrapped} as ${typeAnnotationCode}`;
-        return fixer.replaceText(node, isParenthesized(node, context.sourceCode) ? text : getWrappedCode(text, asPrecedence, parentPrecedence));
+        // ... complex precedence calculations
+        return fixer.replaceText(node, wrappedText);
       }
     : undefined,
 ```
 
 **Go Implementation:**
 ```go
-func reportIncorrectAssertionType(ctx rule.RuleContext, node *ast.Node, options Options, isAsExpression bool) {
-    // Reports message but no fix implementation
-    switch options.AssertionStyle {
-    case "as":
-        cast := getTypeAnnotationText(ctx, typeAnnotation)
-        // For angle-bracket to as conversion, we'd need complex fix logic
-        // For now, just report without fix
-        ctx.ReportNode(node, buildAsMessage(cast))
-    }
-}
+// No fix generation implemented for style conversions
+ctx.ReportNode(node, buildAsMessage(cast))
 ```
 
-**Issue:** The Go implementation lacks the sophisticated auto-fix functionality for converting between assertion styles, particularly the precedence-aware parentheses handling.
+**Issue:** The Go implementation doesn't provide automatic fixes for converting between `as` and angle-bracket assertion styles, while the TypeScript version includes sophisticated precedence-aware fix generation.
 
-**Impact:** Users won't get automatic fixes when using wrong assertion style, reducing developer experience.
+**Impact:** Users won't get automatic fixes for style violations, reducing developer experience.
 
-**Test Coverage:** All invalid test cases with `output` property expecting auto-fixes.
+**Test Coverage:** All style conversion test cases expect fixes but Go version won't provide them.
 
-#### 2. Incomplete Parameter Context Detection
+#### 2. Incomplete isAsParameter() Context Detection
 **TypeScript Implementation:**
 ```typescript
 function isAsParameter(node: AsExpressionOrTypeAssertion): boolean {
@@ -69,59 +55,76 @@ function isAsParameter(node: AsExpressionOrTypeAssertion): boolean {
 **Go Implementation:**
 ```go
 func isAsParameter(node *ast.Node) bool {
-    // Missing AssignmentPattern and JSXExpressionContainer checks
-    switch parent.Kind {
-    case ast.KindNewExpression, ast.KindCallExpression, ast.KindThrowStatement:
-        return true
-    case ast.KindJsxExpression:
-        return true
-    // Missing: AssignmentPattern equivalent
-    // Missing: Proper TemplateLiteral + TaggedTemplate check
-    }
+  // Missing AST_NODE_TYPES.AssignmentPattern handling
+  // Missing proper JSX context detection
+  // Simplified template literal handling
+  switch parent.Kind {
+  case ast.KindNewExpression, ast.KindCallExpression, ast.KindThrowStatement:
+    return true
+  case ast.KindJsxExpression: // May not be equivalent to JSXExpressionContainer
+    return true
+  // ... incomplete pattern matching
+  }
 }
 ```
 
-**Issue:** Go implementation doesn't detect all parameter contexts, particularly assignment patterns (default parameters) and has incomplete template literal handling.
+**Issue:** The Go version may miss some parameter contexts, particularly assignment patterns (default parameters) and JSX expression containers.
 
-**Impact:** Rules with `allow-as-parameter` option may incorrectly flag valid parameter usages.
+**Impact:** False positives where the rule reports violations in contexts where `allow-as-parameter` should apply.
 
-**Test Coverage:** Test cases with default parameters like `function b(x = {} as Foo.Bar) {}`.
+**Test Coverage:** Test cases with default parameters and JSX contexts may fail.
 
-#### 3. AST Node Kind Mapping Issues
+#### 3. Simplified getSuggestions() Implementation
 **TypeScript Implementation:**
 ```typescript
-return {
-  TSAsExpression(node): void { /* ... */ },
-  TSTypeAssertion(node): void { /* ... */ }
-};
+function getSuggestions(
+  node: AsExpressionOrTypeAssertion,
+  annotationMessageId: MessageIds,
+  satisfiesMessageId: MessageIds,
+): TSESLint.ReportSuggestionArray<MessageIds> {
+  const suggestions: TSESLint.ReportSuggestionArray<MessageIds> = [];
+  if (
+    node.parent.type === AST_NODE_TYPES.VariableDeclarator &&
+    !node.parent.id.typeAnnotation
+  ) {
+    // Complex suggestion generation with proper fixes
+  }
+  // Always add satisfies suggestion with proper fix
+}
 ```
 
 **Go Implementation:**
 ```go
-return rule.RuleListeners{
-    ast.KindAsExpression: func(node *ast.Node) { /* ... */ },
-    ast.KindTypeAssertionExpression: func(node *ast.Node) { /* ... */ },
+func getSuggestions(ctx rule.RuleContext, node *ast.Node, isAsExpression bool, annotationMessageId, satisfiesMessageId string) []rule.RuleSuggestion {
+  // Simplified parent detection
+  if parent != nil && parent.Kind == ast.KindVariableDeclaration {
+    // May not properly detect variable declarators vs declarations
+    // Fix implementation may be incomplete
+  }
 }
 ```
 
-**Issue:** Need to verify that `ast.KindTypeAssertionExpression` correctly maps to TypeScript's angle-bracket assertions (`<Type>expr`).
+**Issue:** The Go version uses `KindVariableDeclaration` instead of checking for variable declarators specifically, and fix implementations may not work correctly.
 
-**Impact:** Rule might not trigger on angle-bracket assertions if the AST kind mapping is incorrect.
+**Impact:** Suggestions may not be offered in the right contexts or may produce incorrect fixes.
 
-**Test Coverage:** All test cases using angle-bracket syntax like `<Foo>expr`.
+**Test Coverage:** Suggestion test cases may fail or produce wrong outputs.
 
-#### 4. Qualified Name Handling in checkType Function
+#### 4. checkType() Function Logic Differences
 **TypeScript Implementation:**
 ```typescript
 function checkType(node: TSESTree.TypeNode): boolean {
   switch (node.type) {
+    case AST_NODE_TYPES.TSAnyKeyword:
+    case AST_NODE_TYPES.TSUnknownKeyword:
+      return false;
     case AST_NODE_TYPES.TSTypeReference:
       return (
-        // Ignore `as const` and `<const>`
         !isConst(node) ||
-        // Allow qualified names which have dots between identifiers, `Foo.Bar`
         node.typeName.type === AST_NODE_TYPES.TSQualifiedName
       );
+    default:
+      return true;
   }
 }
 ```
@@ -129,93 +132,64 @@ function checkType(node: TSESTree.TypeNode): boolean {
 **Go Implementation:**
 ```go
 func checkType(node *ast.Node) bool {
-    switch node.Kind {
-    case ast.KindTypeReference:
-        // For type references, check if it's `const`
-        if isConst(node) {
-            return false
-        }
-        // Also check for qualified names with dots (e.g., Foo.Bar)
-        typeRef := node.AsTypeReferenceNode()
-        if typeRef != nil && typeRef.TypeName != nil && ast.IsQualifiedName(typeRef.TypeName) {
-            return true
-        }
-        return true
+  switch node.Kind {
+  case ast.KindAnyKeyword, ast.KindUnknownKeyword:
+    return false
+  case ast.KindTypeReference:
+    if isConst(node) {
+      return false  // Missing qualified name check
     }
-}
-```
-
-**Issue:** The logic differs - TypeScript uses OR (`!isConst(node) || node.typeName.type === AST_NODE_TYPES.TSQualifiedName`) while Go uses separate if statements that change the behavior.
-
-**Impact:** Qualified const types like `Foo.Bar.const` might be handled differently.
-
-**Test Coverage:** Test cases with qualified type names in assertions.
-
-#### 5. Suggestion Implementation Gaps
-**TypeScript Implementation:**
-```typescript
-function getSuggestions(node, annotationMessageId, satisfiesMessageId): TSESLint.ReportSuggestionArray<MessageIds> {
-  const suggestions: TSESLint.ReportSuggestionArray<MessageIds> = [];
-  if (node.parent.type === AST_NODE_TYPES.VariableDeclarator && !node.parent.id.typeAnnotation) {
-    // Add annotation suggestion with proper fix logic
-    suggestions.push({
-      messageId: annotationMessageId,
-      data: { cast: context.sourceCode.getText(node.typeAnnotation) },
-      fix: fixer => [
-        fixer.insertTextAfter(parent.id, `: ${context.sourceCode.getText(node.typeAnnotation)}`),
-        fixer.replaceText(node, getTextWithParentheses(context.sourceCode, node.expression)),
-      ],
-    });
+    // Additional qualified name handling
+    return true
+  default:
+    return true
   }
-  // Always add satisfies suggestion
-  suggestions.push({...});
-  return suggestions;
 }
 ```
 
-**Go Implementation:**
-```go
-func getSuggestions(ctx rule.RuleContext, node *ast.Node, isAsExpression bool, annotationMessageId, satisfiesMessageId string) []rule.RuleSuggestion {
-    // Check if this is a variable declarator that can have type annotation
-    parent := node.Parent
-    if parent != nil && parent.Kind == ast.KindVariableDeclaration {
-        // Missing proper type annotation check (!node.parent.id.typeAnnotation)
-        // Fix implementation is basic compared to TypeScript version
-    }
-}
-```
+**Issue:** The Go version doesn't properly handle the qualified name exception for const types (e.g., `Foo.const` should still be checked).
 
-**Issue:** Go implementation doesn't properly check if variable already has type annotation and the fix logic is incomplete.
+**Impact:** May incorrectly skip type assertions with qualified const-like type names.
 
-**Impact:** Suggestions might be offered even when not appropriate, or fixes might not work correctly.
+**Test Coverage:** Test cases with qualified type names may behave differently.
 
-**Test Coverage:** Test cases expecting suggestions for variable declaration conversions.
-
-#### 6. Missing `getTextWithParentheses` Utility
+#### 5. Text Range and Source Code Extraction
 **TypeScript Implementation:**
 ```typescript
-fixer.replaceText(node, getTextWithParentheses(context.sourceCode, node.expression))
+const expressionCode = context.sourceCode.getText(node.expression);
+const typeAnnotationCode = context.sourceCode.getText(node.typeAnnotation);
 ```
 
 **Go Implementation:**
 ```go
-rule.RuleFixReplace(ctx.SourceFile, node, getExpressionText(ctx, expression))
+func getTypeAnnotationText(ctx rule.RuleContext, node *ast.Node) string {
+  // Complex range calculation with validation
+  textRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
+  // Manual text extraction with bounds checking
+}
 ```
 
-**Issue:** Go implementation uses simple text extraction without considering when parentheses are needed around expressions.
+**Issue:** Different approaches to text extraction may lead to inconsistent results, especially with edge cases or malformed code.
 
-**Impact:** Generated fixes might produce syntactically incorrect code when parentheses are required.
+**Impact:** Error messages and suggestions may contain incorrect or truncated text.
 
-**Test Coverage:** Complex expression cases in suggestions.
+**Test Coverage:** All test cases rely on accurate text extraction for messages and fixes.
 
 ### Recommendations
-- Implement comprehensive auto-fix functionality with proper precedence handling
-- Complete the `isAsParameter` function to detect all parameter contexts including assignment patterns
-- Verify and fix AST node kind mappings for angle-bracket assertions
-- Correct the `checkType` function logic to match TypeScript behavior exactly
-- Enhance suggestion implementation with proper type annotation checking
-- Add parentheses-aware text extraction utilities for fix generation
-- Add comprehensive test coverage for edge cases around parameter detection
-- Implement proper JSX support detection and handling
+- **High Priority**: Implement fix generation for assertion style conversions with proper precedence handling
+- **High Priority**: Fix isAsParameter() to correctly detect all parameter contexts, especially assignment patterns and JSX expression containers
+- **High Priority**: Correct checkType() logic to properly handle qualified const type references
+- **Medium Priority**: Improve getSuggestions() to match TypeScript logic for variable declarator detection
+- **Medium Priority**: Ensure text extraction methods produce consistent results with TypeScript version
+- **Low Priority**: Add comprehensive test coverage for edge cases involving complex AST patterns
+
+### Missing Test Cases in Go Version
+The current RSLint test doesn't include several edge cases from the original:
+- Complex precedence expressions requiring parentheses
+- Generator function yield expressions
+- Assignment operators with type assertions
+- Ternary expressions with type assertions
+- JSX expression containers
+- Some template literal contexts
 
 ---

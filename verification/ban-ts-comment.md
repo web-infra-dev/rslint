@@ -4,25 +4,22 @@
 
 ### Validation Summary
 - ✅ **CORRECT**: 
-  - Core directive detection logic (ts-expect-error, ts-ignore, ts-nocheck, ts-check)
-  - Configuration option parsing and handling
-  - Error message generation and suggestion system
-  - Description length validation with Unicode support
-  - Regular expression pattern matching for directive extraction
-  - Multi-line comment processing (last line detection)
-  - Special handling for ts-ignore to suggest ts-expect-error replacement
+  - Core directive detection for all 4 types (ts-check, ts-expect-error, ts-ignore, ts-nocheck)
+  - Configuration parsing for boolean, "allow-with-description", and descriptionFormat options
+  - Special ts-ignore handling with suggestions to replace with ts-expect-error
+  - Unicode-aware string length counting for emoji descriptions
+  - Description format validation with regex patterns
+  - Minimum description length validation
+  - Comment range reporting and error messages
 
 - ⚠️ **POTENTIAL ISSUES**:
-  - Regex pattern differences for pragma comments (slash count handling)
-  - Comment text extraction methodology differences
-  - ts-nocheck positioning logic complexity
-  - Unicode string length calculation variations
-  - Comment scanning in unreachable code blocks
+  - Regex pattern differences for pragma comments (slash counting)
+  - Different approaches to comment parsing and processing
+  - Complex multi-line comment handling logic differences
+  - Unreachable code detection mechanism
 
 - ❌ **INCORRECT**:
-  - Pragma comment slash count validation
-  - ts-check block comment vs line comment handling logic
-  - Comment position boundary checking
+  - ts-nocheck pragma comment validation logic has behavioral differences
 
 ### Discrepancies Found
 
@@ -31,171 +28,184 @@
 **TypeScript Implementation:**
 ```typescript
 const singleLinePragmaRegEx = /^\/\/\/?\s*@ts-(?<directive>check|nocheck)(?<description>.*)$/;
-// Later used with:
-const matchedPragma = execDirectiveRegEx(singleLinePragmaRegEx, `//${comment.value}`);
+// Only matches 2-3 slashes (// or ///)
 ```
 
 **Go Implementation:**
 ```go
 singleLinePragmaRegEx = regexp.MustCompile(`^\/\/+\s*@ts-(?P<directive>check|nocheck)(?P<description>[\s\S]*)$`)
-// With additional check:
-originalSlashCount := len(commentText) - len(strings.TrimLeft(commentText, "/"))
-if originalSlashCount <= 3 {
-    if matchedPragma := execDirectiveRegEx(singleLinePragmaRegExForMultiLine, commentValue); matchedPragma != nil {
-        return matchedPragma
-    }
-}
+// Matches 2 or more slashes (// or /// or ////)
 ```
 
-**Issue:** TypeScript allows exactly 2-3 slashes (`\/\/\/?`) while Go allows 1+ slashes (`\/\/+`) but then manually checks for ≤3 slashes. This creates inconsistent behavior.
+**Issue:** The Go version uses `\/\/+` which matches 2 or more slashes, while TypeScript uses `\/\/\/?` which only matches exactly 2 or 3 slashes. This means Go would incorrectly match comments like `///// @ts-check` which TypeScript would reject.
 
-**Impact:** Test case `//// @ts-nocheck` (4 slashes) should be valid according to TypeScript-ESLint tests, but the implementations handle this differently.
+**Impact:** More permissive matching in Go could lead to false positives for heavily commented pragma directives.
 
-**Test Coverage:** The test case `//// @ts-nocheck - pragma comments may contain 2 or 3 leading slashes` appears to contradict the regex pattern.
+**Test Coverage:** Test case `'//// @ts-check - pragma comments may contain 2 or 3 leading slashes'` should fail in Go but pass in TypeScript.
 
-#### 2. ts-check Block Comment Handling
+#### 2. Multi-line Comment Processing Logic
 
 **TypeScript Implementation:**
 ```typescript
-// No special logic distinguishing block vs line comments for ts-check
-if (option === true) {
-    context.report({
-        node: comment,
-        messageId: 'tsDirectiveComment',
-        data: { directive },
-    });
+function findDirectiveInComment(comment: TSESTree.Comment): MatchedTSDirective | null {
+  if (comment.type === AST_TOKEN_TYPES.Line) {
+    // Handle single line comments
+    const matchedPragma = execDirectiveRegEx(singleLinePragmaRegEx, `//${comment.value}`);
+    if (matchedPragma) return matchedPragma;
+    return execDirectiveRegEx(commentDirectiveRegExSingleLine, comment.value);
+  }
+  
+  // Multi-line: check only the last line
+  const commentLines = comment.value.split('\n');
+  return execDirectiveRegEx(commentDirectiveRegExMultiLine, commentLines[commentLines.length - 1]);
 }
 ```
 
 **Go Implementation:**
 ```go
-if directive.Directive == "check" {
-    if enabled && mode == "" {
-        commentText := sourceText[commentRange.Pos():commentRange.End()]
-        isBlockComment := strings.HasPrefix(commentText, "/*") || strings.HasPrefix(commentText, "/**")
-        
-        if !isBlockComment {
-            ctx.ReportRange(commentRange.TextRange, buildTsDirectiveCommentMessage(directive.Directive))
-        }
-        return
-    }
+func findDirectiveInComment(commentRange ast.CommentRange, sourceText string) *MatchedTSDirective {
+  // Complex logic with manual delimiter handling
+  // Checks both single-line block comments and multi-line logic
+  // Different approach to extracting comment content
 }
 ```
 
-**Issue:** Go implementation adds special logic to allow block comments with ts-check when enabled=true, but only reports line comments. TypeScript implementation treats all comments equally.
+**Issue:** The Go implementation has significantly more complex logic for handling comment delimiters and multi-line processing, which may not match the TypeScript behavior exactly.
 
-**Impact:** Test cases expecting `/* @ts-check */` to be valid with `ts-check: true` option would behave differently.
+**Impact:** Could lead to different directive detection in edge cases involving block comments.
 
-**Test Coverage:** Multiple test cases show block comments should be valid: `/* @ts-check */`, `/** @ts-check */`
+**Test Coverage:** Multi-line comment test cases may behave differently.
 
-#### 3. Comment Text Extraction and Boundary Handling
-
-**TypeScript Implementation:**
-```typescript
-const commentLines = comment.value.split('\n');
-return execDirectiveRegEx(commentDirectiveRegExMultiLine, commentLines[commentLines.length - 1]);
-```
-
-**Go Implementation:**
-```go
-if startPos < 0 || startPos >= len(sourceText) || endPos <= startPos || endPos > len(sourceText) {
-    return nil
-}
-commentText := sourceText[startPos:endPos]
-```
-
-**Issue:** TypeScript works with preprocessed comment values while Go extracts raw text including delimiters, requiring additional processing to handle `/*` and `*/`.
-
-**Impact:** Edge cases with malformed comments or boundary conditions might behave differently.
-
-**Test Coverage:** Tests with complex multi-line comment structures may reveal parsing differences.
-
-#### 4. ts-nocheck Position Logic Complexity
+#### 3. ts-nocheck Position Validation
 
 **TypeScript Implementation:**
 ```typescript
-if (directive === 'nocheck' && firstStatement && firstStatement.loc.start.line <= comment.loc.start.line) {
-    return;
+if (directive === 'nocheck' && firstStatement && 
+    firstStatement.loc.start.line <= comment.loc.start.line) {
+  return; // Skip reporting
 }
 ```
 
 **Go Implementation:**
 ```go
+// Special handling for ts-nocheck
 if directive.Directive == "nocheck" {
-    commentText := sourceText[commentRange.Pos():commentRange.End()]
-    isBlockComment := strings.HasPrefix(commentText, "/*") || strings.HasPrefix(commentText, "/**")
-    
-    if isBlockComment {
-        return  // Block comments with ts-nocheck are always allowed
-    }
-    
-    if firstStatement == nil {
-        return  // No statements in file, allow ts-nocheck
-    }
-    if commentRange.Pos() < firstStatement.Pos() {
-        return
-    }
+  // Get the comment text to check if it's a block comment
+  commentText := sourceText[commentRange.Pos():commentRange.End()]
+  isBlockComment := strings.HasPrefix(commentText, "/*") || strings.HasPrefix(commentText, "/**")
+  
+  // Block comments with ts-nocheck are always allowed (regardless of configuration)
+  if isBlockComment {
+    return
+  }
+  // Additional complex logic for line vs block comment handling
 }
 ```
 
-**Issue:** Go adds complexity by treating block comments with ts-nocheck as always valid, while TypeScript only checks line position regardless of comment type.
+**Issue:** The Go implementation has additional logic that always allows block comments with ts-nocheck regardless of configuration, while TypeScript applies position-based validation consistently.
 
-**Impact:** Block comments with ts-nocheck might be incorrectly allowed in positions where they shouldn't be.
+**Impact:** Block comments with ts-nocheck may be handled differently between implementations.
 
-**Test Coverage:** Test case with ts-nocheck after first statement should fail, but block comment behavior differs.
+**Test Coverage:** Test cases with block comment ts-nocheck directives may show different behavior.
 
-#### 5. Unicode String Length Calculation
+#### 4. Unreachable Code Detection
 
 **TypeScript Implementation:**
 ```typescript
-// Uses getStringLength utility from '@typescript-eslint/utils'
-if (getStringLength(description.trim()) < nullThrows(minimumDescriptionLength))
+// Uses standard ESLint comment traversal
+const comments = context.sourceCode.getAllComments();
+comments.forEach(comment => {
+  // Process each comment found by ESLint
+});
+```
+
+**Go Implementation:**
+```go
+// Has special logic for unreachable code
+if strings.Contains(sourceText, "if (false)") && strings.Contains(sourceText, "@ts-") {
+  // Custom logic to find comments in unreachable blocks
+  // Manual line-by-line parsing for specific patterns
+}
+```
+
+**Issue:** The Go implementation has custom unreachable code detection logic that may not accurately replicate ESLint's comment traversal behavior.
+
+**Impact:** Comments in unreachable code blocks may be processed differently.
+
+**Test Coverage:** The test case with `if (false) { // @ts-ignore }` may not work consistently.
+
+#### 5. String Length Calculation Differences
+
+**TypeScript Implementation:**
+```typescript
+// Uses utility function getStringLength from utils
+import { getStringLength } from '../util';
 ```
 
 **Go Implementation:**
 ```go
 func getStringLength(s string) int {
-    count := 0
-    runes := []rune(s)
-    
-    for i := 0; i < len(runes); i++ {
-        r := runes[i]
-        
-        // Count ASCII letters, numbers, and meaningful punctuation
-        if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') ||
-            r == ' ' || r == '.' || /* ... many specific chars ... */ {
-            count++
-        } else if r >= 0x1F000 {
-            // Complex emoji handling logic
-            count++
-            // Skip over zero-width joiners and variation selectors
-        }
-    }
-    return count
+  // Custom implementation with manual grapheme cluster counting
+  // Complex logic for zero-width joiners and emoji sequences
+  // May not match exactly with TypeScript's implementation
 }
 ```
 
-**Issue:** The Go implementation has custom Unicode counting logic that may differ from TypeScript-ESLint's `getStringLength` utility, particularly for complex emoji sequences.
+**Issue:** Different Unicode handling implementations may calculate string lengths differently for complex emoji sequences.
 
-**Impact:** Test cases with emoji descriptions like `👨‍👩‍👧‍👦` might count differently, affecting minimum length validation.
+**Impact:** Description length validation may differ for complex Unicode characters.
 
-**Test Coverage:** Tests with emoji in descriptions verify proper Unicode length calculation.
+**Test Coverage:** Test cases with family emoji `👨‍👩‍👧‍👦` may show different behavior.
+
+#### 6. ts-check Block vs Line Comment Differentiation
+
+**TypeScript Implementation:**
+```typescript
+// No special differentiation between block and line comments for ts-check
+// All ts-check comments are processed with the same logic
+if (option === true) {
+  context.report({
+    node: comment,
+    messageId: 'tsDirectiveComment',
+    data: { directive },
+  });
+}
+```
+
+**Go Implementation:**
+```go
+// Special handling for ts-check directive
+if directive.Directive == "check" {
+  // For ts-check, when enabled=true and mode="", allow block comments but ban line comments
+  if enabled && mode == "" {
+    commentText := sourceText[commentRange.Pos():commentRange.End()]
+    isBlockComment := strings.HasPrefix(commentText, "/*") || strings.HasPrefix(commentText, "/**")
+    
+    // For ts-check, only report error for line comments when enabled=true
+    if !isBlockComment {
+      ctx.ReportRange(commentRange.TextRange, buildTsDirectiveCommentMessage(directive.Directive))
+    }
+    return
+  }
+}
+```
+
+**Issue:** The Go implementation has special logic for ts-check that allows block comments but reports errors for line comments when `ts-check: true`, while TypeScript treats both comment types equally.
+
+**Impact:** Different error reporting behavior for ts-check directives depending on whether they're in block or line comments.
+
+**Test Coverage:** Test cases like `/* @ts-check */` and `/** @ts-check */` vs `// @ts-check` with `{ 'ts-check': true }` option may show different results.
 
 ### Recommendations
 
-- **Fix pragma comment regex**: Align Go regex pattern to match TypeScript's exact 2-3 slash requirement
-- **Standardize ts-check handling**: Remove Go's special block comment logic for ts-check or verify it matches expected behavior
-- **Validate Unicode counting**: Ensure Go's `getStringLength` produces identical results to TypeScript-ESLint's utility
-- **Simplify ts-nocheck logic**: Align Go's position checking with TypeScript's simpler line-based approach
-- **Test comment boundary cases**: Add tests for edge cases in comment parsing and delimiter handling
-- **Verify unreachable code scanning**: The Go implementation has additional scanning logic for comments in `if (false)` blocks that may not be necessary
-
-### Test Cases Requiring Attention
-
-1. `//// @ts-nocheck` - Should this be valid with 4 slashes?
-2. `/* @ts-check */` with `ts-check: true` - Should block comments be allowed?
-3. Block comment `/* @ts-nocheck */` positioning - Should location matter?
-4. Emoji length counting consistency across implementations
-5. Complex multi-line comment directive detection on last line only
+- **Fix pragma comment regex**: Change `\/\/+` to `\/\/\/?` to match exactly 2-3 slashes
+- **Simplify multi-line comment logic**: Align with TypeScript's approach of checking only the last line for multi-line comments
+- **Remove special block comment handling**: Apply ts-nocheck position validation consistently for all comment types
+- **Align ts-check behavior**: Remove the special block vs line comment differentiation for ts-check and treat both comment types equally when `ts-check: true`
+- **Replace custom unreachable code detection**: Use standard comment traversal instead of custom pattern matching
+- **Validate Unicode string length handling**: Ensure emoji counting matches TypeScript-ESLint's utility function behavior
+- **Add missing test cases**: Include tests for 4+ slash pragma comments to ensure they're rejected
+- **Test block comment ts-nocheck behavior**: Verify consistent handling with TypeScript implementation
+- **Test ts-check consistency**: Ensure both `/* @ts-check */` and `// @ts-check` behave identically with `{ 'ts-check': true }` configuration
 
 ---

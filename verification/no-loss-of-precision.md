@@ -1,139 +1,125 @@
-# Rule Validation: no-loss-of-precision
-
 ## Rule: no-loss-of-precision
 
 ### Test File: no-loss-of-precision.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: 
-  - Basic numeric literal detection using `ast.KindNumericLiteral`
-  - Handling of numeric separators (underscores) by removing them
-  - Check for MAX_SAFE_INTEGER threshold (9007199254740991)
-  - Integer precision loss detection for values exceeding safe range
-  - Proper error message structure with messageId
-
-- ⚠️ **POTENTIAL ISSUES**: 
-  - Scientific notation handling may not fully match ESLint's behavior
-  - Complex precision loss logic differs from base ESLint rule delegation
-  - May not handle all edge cases that the original ESLint rule covers
-
-- ❌ **INCORRECT**: 
-  - Go implementation doesn't delegate to base ESLint rule like TypeScript version
-  - Scientific notation detection logic is custom and may miss cases
-  - Potential precision loss detection algorithm differs from ESLint's proven implementation
+- ✅ **CORRECT**: Basic precision loss detection for integers exceeding MAX_SAFE_INTEGER, numeric separator handling, scientific notation detection
+- ⚠️ **POTENTIAL ISSUES**: Complex scientific notation handling logic, potential edge cases with TypeScript's numeric literal conversion
+- ❌ **INCORRECT**: Scientific notation precision loss detection logic is overly complex and potentially incorrect
 
 ### Discrepancies Found
 
-#### 1. Rule Implementation Architecture
+#### 1. Overly Complex Scientific Notation Logic
 **TypeScript Implementation:**
 ```typescript
+// Uses ESLint's base rule which has simpler, battle-tested logic
 export default createRule<Options, MessageIds>({
-  name: 'no-loss-of-precision',
-  // ... meta configuration
   create(context) {
-    return baseRule.create(context);  // Delegates to ESLint core rule
+    return baseRule.create(context);
   },
 });
 ```
 
 **Go Implementation:**
 ```go
-var NoLossOfPrecisionRule = rule.Rule{
-	Name: "no-loss-of-precision",
-	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		return rule.RuleListeners{
-			ast.KindNumericLiteral: func(node *ast.Node) {
-				// Custom implementation of precision loss detection
-			},
-		}
-	},
-}
-```
-
-**Issue:** The TypeScript version delegates to the proven ESLint core rule implementation, while the Go version implements custom precision loss detection logic.
-
-**Impact:** The Go version may miss edge cases or have different behavior than the well-tested ESLint implementation.
-
-**Test Coverage:** All test cases are affected, but especially edge cases around scientific notation and complex numeric formats.
-
-#### 2. Scientific Notation Handling
-**TypeScript Implementation:**
-```typescript
-// Relies on ESLint's battle-tested scientific notation handling
-return baseRule.create(context);
-```
-
-**Go Implementation:**
-```go
 if tokenFlags&ast.TokenFlagsScientific != 0 || strings.Contains(cleanText, "e") || strings.Contains(cleanText, "E") {
-	// Scientific notation
-	if tokenFlags&ast.TokenFlagsScientific != 0 {
-		// User wrote explicit scientific notation like 9.007199254740993e3
-		if math.Abs(value) > maxSafeInteger && value == math.Trunc(value) {
-			return true
-		}
-	} else {
-		// TypeScript auto-converted to scientific notation (like 1.23e+25)
-		return false
-	}
-	return false
+    // Scientific notation
+    
+    // If the tokenFlags indicate scientific notation was in the original source,
+    // check if it represents a precise integer that exceeds MAX_SAFE_INTEGER
+    if tokenFlags&ast.TokenFlagsScientific != 0 {
+        // User wrote explicit scientific notation like 9.007199254740993e3
+        if math.Abs(value) > maxSafeInteger && value == math.Trunc(value) {
+            return true
+        }
+    } else {
+        // TypeScript auto-converted to scientific notation (like 1.23e+25)
+        // These are generally acceptable as they represent very large numbers
+        // that JavaScript naturally represents in scientific notation
+        return false
+    }
+    return false
 }
 ```
 
-**Issue:** The Go implementation has custom logic for scientific notation that may not match ESLint's behavior. The logic seems to have conflicting return paths and unclear handling of different scientific notation cases.
+**Issue:** The Go implementation has complex branching logic for scientific notation that doesn't align with ESLint's base rule behavior. The TypeScript version simply delegates to ESLint's proven implementation.
 
-**Impact:** Test cases like `'const x = 9_007_199_254_740.993e3;'` may not be handled correctly.
+**Impact:** May miss or incorrectly flag scientific notation cases that the original ESLint rule would handle correctly.
 
-**Test Coverage:** The invalid test case `9_007_199_254_740.993e3` specifically tests this functionality.
+**Test Coverage:** The test case `'const x = 9_007_199_254_740.993e3;'` should trigger an error, but the complex logic might not handle it correctly.
 
-#### 3. Precision Loss Detection Algorithm
+#### 2. Missing Decimal Precision Loss Detection
 **TypeScript Implementation:**
 ```typescript
-// Uses ESLint's proven algorithm for detecting precision loss
-// Handles various number formats, edge cases, and browser compatibility
+// ESLint's base rule handles all numeric formats including decimals
+// that lose precision when converted to JavaScript numbers
 ```
 
 **Go Implementation:**
 ```go
-func isLossOfPrecision(value float64, originalText string, tokenFlags ast.TokenFlags) bool {
-	// Custom implementation that primarily checks MAX_SAFE_INTEGER threshold
-	// May miss other forms of precision loss that ESLint detects
+if value == math.Trunc(value) {
+    // It's an integer value
+    if math.Abs(value) > maxSafeInteger {
+        return true
+    }
 }
 ```
 
-**Issue:** The Go version only checks if integer values exceed MAX_SAFE_INTEGER, but precision loss can occur in other scenarios that ESLint's rule handles.
+**Issue:** The Go implementation only checks for precision loss in integers, but decimal numbers can also lose precision. For example, `9007199254740992.1` would lose the decimal part when represented in JavaScript.
 
-**Impact:** May miss precision loss cases that don't involve exceeding MAX_SAFE_INTEGER, potentially giving false negatives.
+**Impact:** Decimal numbers that lose precision will not be flagged, creating incomplete rule coverage.
 
-**Test Coverage:** Current test cases may pass, but additional edge cases from ESLint might fail.
+**Test Coverage:** Missing test cases for decimal precision loss scenarios.
 
-#### 4. Token Flags and AST Handling
+#### 3. Inconsistent Error Message Structure
 **TypeScript Implementation:**
 ```typescript
-// Relies on ESLint's AST traversal and token analysis
-// Handles all JavaScript/TypeScript numeric literal formats
+// Uses ESLint base rule messages which follow established patterns
+messages: baseRule.meta.messages,
 ```
 
 **Go Implementation:**
 ```go
-// Parse the numeric value - since TypeScript has already converted 
-// hex/binary/octal to decimal in the text, just parse as float
-value, err := strconv.ParseFloat(cleanText, 64)
+func buildNoLossOfPrecisionMessage() rule.RuleMessage {
+    return rule.RuleMessage{
+        Id:          "noLossOfPrecision",
+        Description: "This number literal will lose precision at runtime.",
+    }
+}
 ```
 
-**Issue:** The comment suggests TypeScript converts non-decimal formats to decimal, but the parsing logic may not handle all cases correctly.
+**Issue:** The Go implementation uses a custom message that may not match ESLint's exact wording and message ID format.
 
-**Impact:** Binary, octal, and hexadecimal literals might not be processed correctly for precision loss detection.
+**Impact:** Inconsistent user experience compared to ESLint, potentially confusing for users migrating from ESLint.
 
-**Test Coverage:** Test cases with `0x`, `0b`, and `0o` prefixes test this functionality.
+**Test Coverage:** Test cases expect `messageId: 'noLossOfPrecision'` which should match the Go implementation's message ID.
+
+#### 4. Incomplete Binary/Octal/Hex Handling
+**TypeScript Implementation:**
+```typescript
+// ESLint's base rule comprehensively handles all numeric literal formats
+// including edge cases in binary, octal, and hexadecimal representations
+```
+
+**Go Implementation:**
+```go
+// For all other number formats (hex, binary, octal, decimal)
+// TypeScript has already converted them to decimal representation
+// Check if it's an integer that exceeds MAX_SAFE_INTEGER
+```
+
+**Issue:** The comment suggests TypeScript has already converted all formats to decimal, but the implementation doesn't verify this assumption or handle potential edge cases in the conversion process.
+
+**Impact:** May miss precision loss in non-decimal numeric literals that don't follow expected conversion patterns.
+
+**Test Coverage:** Test cases include binary, octal, and hex literals that should be flagged when they exceed safe integer bounds.
 
 ### Recommendations
-- Consider researching ESLint's core `no-loss-of-precision` rule implementation to understand the complete precision loss detection algorithm
-- Test the Go implementation against ESLint's comprehensive test suite to identify missing cases
-- Simplify the scientific notation handling logic and ensure it matches ESLint's behavior
-- Add comprehensive test cases that cover all numeric literal formats and edge cases
-- Consider adding comments explaining the precision loss detection algorithm and its limitations
-- Verify that the `TokenFlags` handling correctly identifies different numeric literal types
-- Test floating-point precision loss cases, not just integer overflow cases
+- Simplify the scientific notation logic to match ESLint's base rule behavior
+- Add decimal precision loss detection for non-integer values
+- Verify that the message ID and description exactly match ESLint's base rule
+- Add comprehensive test cases for decimal precision loss scenarios
+- Consider delegating complex numeric parsing logic to a more battle-tested implementation
+- Add validation that TypeScript's numeric literal conversion assumptions hold true across all cases
 
 ---

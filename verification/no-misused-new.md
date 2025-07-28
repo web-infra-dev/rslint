@@ -1,42 +1,26 @@
-# Rule Validation: no-misused-new
-
 ## Rule: no-misused-new
 
 ### Test File: no-misused-new.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: 
-  - Error message definitions match exactly
-  - Basic AST pattern matching for method declarations with name 'new'
-  - Constructor signature detection in interfaces
-  - Method signature detection with name 'constructor'
-  - Type reference name extraction logic
-
-- ⚠️ **POTENTIAL ISSUES**: 
-  - Parent navigation logic differs significantly from TypeScript version
-  - AST structure assumptions may not match typescript-go's actual structure
-  - Missing handling of TSEmptyBodyFunctionExpression equivalent
-
-- ❌ **INCORRECT**: 
-  - Selector pattern matching doesn't align with TypeScript's CSS-like selectors
-  - Interface body detection logic is incorrect
-  - Class body detection logic is incorrect
-  - Return type handling for generic types may be incomplete
+- ✅ **CORRECT**: Error message definitions, basic structure, and type reference name extraction
+- ⚠️ **POTENTIAL ISSUES**: AST node type handling, parent traversal logic, method body detection
+- ❌ **INCORRECT**: CSS selector pattern matching not properly translated, missing TSEmptyBodyFunctionExpression detection, incomplete interface body validation
 
 ### Discrepancies Found
 
-#### 1. CSS Selector vs Manual AST Navigation
+#### 1. CSS Selector Pattern Not Properly Translated
 **TypeScript Implementation:**
 ```typescript
-return {
-  "ClassBody > MethodDefinition[key.name='new']"(node: TSESTree.MethodDefinition): void {
-    // Automatically gets methods named 'new' in class bodies
-  },
-  'TSInterfaceBody > TSConstructSignatureDeclaration'(node: TSESTree.TSConstructSignatureDeclaration): void {
-    // Automatically gets construct signatures in interface bodies
-  },
-  "TSMethodSignature[key.name='constructor']"(node: TSESTree.TSMethodSignature): void {
-    // Automatically gets method signatures named 'constructor'
+"ClassBody > MethodDefinition[key.name='new']"(node: TSESTree.MethodDefinition): void {
+  if (
+    node.value.type === AST_NODE_TYPES.TSEmptyBodyFunctionExpression &&
+    isMatchingParentType(node.parent.parent, node.value.returnType)
+  ) {
+    context.report({
+      node,
+      messageId: 'errorMessageClass',
+    });
   }
 }
 ```
@@ -44,82 +28,142 @@ return {
 **Go Implementation:**
 ```go
 ast.KindMethodDeclaration: func(node *ast.Node) {
-  // Manual checks for parent structure and method name
+  methodDecl := node.AsMethodDeclaration()
+  
+  // Check if the method name is 'new'
+  methodName, _ := utils.GetNameFromMember(ctx.SourceFile, &methodDecl.Node)
+  if methodName != "new" {
+    return
+  }
+
+  // Check if it's in a class body
   if node.Parent == nil || node.Parent.Kind != ast.KindBlock {
     return
   }
-  // ... more manual navigation
+  // ... rest of logic
 }
 ```
 
-**Issue:** The Go version manually navigates the AST tree and makes assumptions about parent-child relationships that may not be correct for the typescript-go AST structure.
+**Issue:** The TypeScript version uses a CSS selector that specifically targets `MethodDefinition` nodes inside `ClassBody` with `key.name='new'`. The Go version listens to all `MethodDeclaration` nodes and then filters, which may catch different AST structures.
 
-**Impact:** The rule may miss valid cases or trigger on invalid cases due to incorrect parent detection.
+**Impact:** May miss or incorrectly flag methods depending on AST structure differences between TypeScript-ESLint and typescript-go.
 
-**Test Coverage:** Multiple test cases would be affected, particularly those involving class expressions and interface declarations.
+**Test Coverage:** This affects test cases with class methods named 'new'.
 
-#### 2. Empty Body Function Detection
+#### 2. Missing TSEmptyBodyFunctionExpression Detection
 **TypeScript Implementation:**
 ```typescript
 if (
   node.value.type === AST_NODE_TYPES.TSEmptyBodyFunctionExpression &&
   isMatchingParentType(node.parent.parent, node.value.returnType)
-) {
-  // Only report if method has empty body AND return type matches class
-}
+)
 ```
 
 **Go Implementation:**
 ```go
+// Check if the method has an empty body (TSEmptyBodyFunctionExpression)
 if methodDecl.Body != nil {
   // Method has a body, so it's OK
   return
 }
-// Always check return type if no body
 ```
 
-**Issue:** The Go version doesn't explicitly check for the equivalent of `TSEmptyBodyFunctionExpression`. It only checks if `Body != nil`, which may not be the same condition.
+**Issue:** The TypeScript version specifically checks for `TSEmptyBodyFunctionExpression` type, while the Go version only checks if `Body` is nil. This is a critical difference as it affects when the rule triggers.
 
-**Impact:** May incorrectly flag methods that have bodies or miss methods that should be flagged.
+**Impact:** The Go version may not properly distinguish between different types of empty methods (abstract methods, method signatures, etc.).
 
-**Test Coverage:** The valid test case `class C { new() {} }` expects no error because it has a body.
+**Test Coverage:** This affects the valid test case `class C { new() {} }` which should be OK because it has a body.
 
-#### 3. Interface Body Detection
+#### 3. Interface Constructor Signature Pattern Mismatch
 **TypeScript Implementation:**
 ```typescript
-'TSInterfaceBody > TSConstructSignatureDeclaration'(node) {
-  // CSS selector automatically ensures we're in an interface body
+'TSInterfaceBody > TSConstructSignatureDeclaration'(node: TSESTree.TSConstructSignatureDeclaration): void {
+  if (
+    isMatchingParentType(
+      node.parent.parent as TSESTree.TSInterfaceDeclaration,
+      node.returnType,
+    )
+  ) {
+    context.report({
+      node,
+      messageId: 'errorMessageInterface',
+    });
+  }
 }
 ```
 
 **Go Implementation:**
 ```go
-if node.Parent == nil || node.Parent.Kind != ast.KindBlock {
-  return
-}
-interfaceBody := node.Parent
-if interfaceBody.Parent == nil || interfaceBody.Parent.Kind != ast.KindInterfaceDeclaration {
-  return
+ast.KindConstructSignature: func(node *ast.Node) {
+  constructSig := node.AsConstructSignatureDeclaration()
+
+  // Check if it's in an interface body
+  if node.Parent == nil || node.Parent.Kind != ast.KindBlock {
+    return
+  }
+
+  interfaceBody := node.Parent
+  if interfaceBody.Parent == nil || interfaceBody.Parent.Kind != ast.KindInterfaceDeclaration {
+    return
+  }
+  // ... rest of logic
 }
 ```
 
-**Issue:** The Go version assumes interface bodies are represented as `ast.KindBlock`, but typescript-go may use a different AST node kind for interface bodies.
+**Issue:** The TypeScript version uses specific CSS selector targeting, while Go version manually traverses parent hierarchy. The AST structure assumptions may not match.
 
-**Impact:** Constructor signatures in interfaces may not be detected at all.
+**Impact:** May miss construct signatures in interfaces or flag incorrect nodes.
 
-**Test Coverage:** All interface-related test cases would fail: `interface I { new (): I; constructor(): void; }`
+**Test Coverage:** This affects interface test cases with `new (): I` patterns.
 
-#### 4. Generic Type Handling
+#### 4. Method Signature Constructor Detection Scope
+**TypeScript Implementation:**
+```typescript
+"TSMethodSignature[key.name='constructor']"(node: TSESTree.TSMethodSignature): void {
+  context.report({
+    node,
+    messageId: 'errorMessageInterface',
+  });
+}
+```
+
+**Go Implementation:**
+```go
+ast.KindMethodSignature: func(node *ast.Node) {
+  methodSig := node.AsMethodSignatureDeclaration()
+
+  // Check if the method name is 'constructor'
+  methodName, _ := utils.GetNameFromMember(ctx.SourceFile, &methodSig.Node)
+  if methodName != "constructor" {
+    return
+  }
+
+  // Report error for any method signature named 'constructor' in interfaces
+  ctx.ReportNode(node, buildErrorMessageInterfaceMessage())
+}
+```
+
+**Issue:** The TypeScript version reports ALL method signatures named 'constructor' without context checking, while the Go implementation has the same logic but may have different AST node coverage.
+
+**Impact:** Should work similarly, but AST node type differences might affect coverage.
+
+**Test Coverage:** This affects the test case with `constructor(): void;` in type literals and interfaces.
+
+#### 5. Type Reference Name Extraction Logic Gap
 **TypeScript Implementation:**
 ```typescript
 function getTypeReferenceName(node): string | null {
-  switch (node.type) {
-    case AST_NODE_TYPES.TSTypeAnnotation:
-      return getTypeReferenceName(node.typeAnnotation);
-    case AST_NODE_TYPES.TSTypeReference:
-      return getTypeReferenceName(node.typeName);
-    case AST_NODE_TYPES.Identifier:
-      return node.name;
+  if (node) {
+    switch (node.type) {
+      case AST_NODE_TYPES.TSTypeAnnotation:
+        return getTypeReferenceName(node.typeAnnotation);
+      case AST_NODE_TYPES.TSTypeReference:
+        return getTypeReferenceName(node.typeName);
+      case AST_NODE_TYPES.Identifier:
+        return node.name;
+      default:
+        break;
+    }
   }
   return null;
 }
@@ -128,46 +172,34 @@ function getTypeReferenceName(node): string | null {
 **Go Implementation:**
 ```go
 func getTypeReferenceName(node *ast.Node) string {
+  if node == nil {
+    return ""
+  }
+
   switch node.Kind {
   case ast.KindTypeReference:
     typeRef := node.AsTypeReferenceNode()
     return getTypeReferenceName(typeRef.TypeName)
   case ast.KindIdentifier:
     return node.AsIdentifier().Text
+  default:
+    return ""
   }
-  return ""
 }
 ```
 
-**Issue:** The Go version doesn't handle `TSTypeAnnotation` equivalent, which may be needed for proper type extraction.
+**Issue:** The Go version is missing the `TSTypeAnnotation` case, which is crucial for extracting type names from annotated return types.
 
-**Impact:** Generic types like `G<T>` in return types may not be properly matched to interface names.
+**Impact:** May fail to properly match return types in methods with type annotations, leading to missed violations.
 
-**Test Coverage:** The test case `interface G { new <T>(): G<T>; }` expects an error.
-
-#### 5. Type Literal Handling
-**TypeScript Implementation:**
-```typescript
-// The CSS selectors naturally exclude type literals since they target specific parent types
-```
-
-**Go Implementation:**
-```go
-// Manual parent checking may incorrectly include type literals
-```
-
-**Issue:** The Go version's manual parent navigation might incorrectly flag constructor signatures in type literals, which should be allowed.
-
-**Impact:** False positives on valid code like `type T = { constructor(): void; }`.
-
-**Test Coverage:** The test case `type T = { constructor(): void; };` expects an error, but `type T = { new (): T };` should be valid.
+**Test Coverage:** This affects test cases where methods have explicit return type annotations like `new(): C`.
 
 ### Recommendations
-- **Fix AST Navigation**: Research the actual typescript-go AST structure for interfaces and classes to correct parent-child relationships
-- **Implement Proper Body Detection**: Find the typescript-go equivalent of `TSEmptyBodyFunctionExpression` checking
-- **Add TSTypeAnnotation Handling**: Extend `getTypeReferenceName` to handle type annotations
-- **Verify Selector Equivalence**: Ensure the manual AST navigation truly matches the behavior of the TypeScript CSS selectors
-- **Add Debug Logging**: Temporarily add logging to understand the actual AST structure typescript-go produces
-- **Test with Real AST**: Run the Go implementation against the test cases and examine what AST nodes are actually produced
+- Add handling for `TSTypeAnnotation` equivalent in Go's `getTypeReferenceName` function
+- Investigate the correct AST node types in typescript-go that correspond to TypeScript-ESLint's `TSEmptyBodyFunctionExpression`
+- Verify the AST structure for method declarations in classes vs. method signatures in interfaces
+- Add more specific parent traversal validation to ensure correct context detection
+- Test the rule with actual TypeScript code to verify AST node type mappings
+- Consider adding debug output to compare AST structures between the two implementations
 
 ---

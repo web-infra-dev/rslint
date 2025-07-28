@@ -222,7 +222,14 @@ function logProgress(message, data = {}) {
   } else if (data.phase === 'test-pass') {
     log(`✓ ${data.testName} passed in ${data.durationMs}ms`, 'success');
   } else if (data.phase === 'test-fail') {
-    log(`✗ ${data.testName} failed with exit code ${data.exitCode}`, 'error');
+    if (data.exitCode) {
+      log(`✗ ${data.testName} failed with exit code ${data.exitCode}`, 'error');
+    } else {
+      let failureDetails = [];
+      if (data.goFailed) failureDetails.push('Go test');
+      if (data.tsFailed) failureDetails.push('TypeScript test');
+      log(`✗ ${data.testName} failed (${failureDetails.join(' and ')})`, 'error');
+    }
   } else if (data.phase === 'script-complete') {
     console.log('\n' + '='.repeat(60));
     log('Automation Complete', 'info');
@@ -473,6 +480,92 @@ async function runClaudeWithStreaming(prompt) {
   });
 }
 
+async function fixRuleTestsWithClaude(ruleName, goTestResult, tsTestResult, originalSources = null, currentTestContent = null) {
+  let prompt = `Go into plan mode first to analyze these test failures and plan the fix, performing deep research into the problem and paying attention to the TypeScript versions as a reference but also carefully considering the Go environment.\n\n`;
+
+  prompt += `Rule: ${ruleName}\n\n`;
+
+  // Add Go test results if available
+  if (goTestResult && !goTestResult.success) {
+    prompt += `--- GO TEST FAILURE ---\n`;
+    prompt += `Command: ${goTestResult.command}\n`;
+    if (goTestResult.output) {
+      prompt += `Stdout:\n${goTestResult.output}\n`;
+    }
+    if (goTestResult.error) {
+      prompt += `Stderr:\n${goTestResult.error}\n`;
+    }
+    prompt += `\n`;
+  }
+
+  // Add TypeScript test results if available
+  if (tsTestResult && !tsTestResult.success) {
+    prompt += `--- TYPESCRIPT TEST FAILURE ---\n`;
+    prompt += `Command: ${tsTestResult.command}\n`;
+    if (tsTestResult.output) {
+      prompt += `Stdout:\n${tsTestResult.output}\n`;
+    }
+    if (tsTestResult.error) {
+      prompt += `Stderr:\n${tsTestResult.error}\n`;
+    }
+    prompt += `\n`;
+  }
+
+  if (currentTestContent) {
+    prompt += `\n--- CURRENT RSLINT TEST FILE ---\n`;
+    prompt += `\`\`\`typescript\n${currentTestContent}\n\`\`\`\n`;
+    prompt += `\n--- END CURRENT TEST ---\n\n`;
+  }
+
+  if (originalSources) {
+    prompt += `\n--- ORIGINAL TYPESCRIPT-ESLINT IMPLEMENTATION ---\n`;
+
+    if (originalSources.ruleContent) {
+      prompt += `\nOriginal rule implementation (${originalSources.ruleName}.ts) from GitHub:\n`;
+      prompt += `\`\`\`typescript\n${originalSources.ruleContent}\n\`\`\`\n`;
+    }
+
+    if (originalSources.testContent) {
+      prompt += `\nOriginal test file (${originalSources.ruleName}.test.ts) from GitHub:\n`;
+      prompt += `\`\`\`typescript\n${originalSources.testContent}\n\`\`\`\n`;
+    }
+
+    prompt += `\n--- END ORIGINAL SOURCES ---\n\n`;
+  }
+
+  prompt += `After analyzing in plan mode, fix the test failures above.
+
+IMPORTANT: 
+- ONLY edit files to fix the issues
+- Focus on fixing BOTH Go and TypeScript test failures if both exist
+- Ensure consistency between Go implementation and TypeScript test expectations
+- Common issues include:
+  - Go rule logic not matching TypeScript expectations
+  - Missing test cases in Go tests
+  - Incorrect assertions or expected values
+  - Type mismatches between Go and TypeScript
+  - Missing imports or dependencies
+- This script will handle re-running the tests after your fixes
+`;
+
+  log(`Sending rule test failures to Claude CLI for fixing: ${ruleName}`, 'info');
+
+  try {
+    const result = await runClaudeWithStreaming(prompt);
+
+    if (result.code === 0) {
+      log('Claude CLI completed successfully', 'success');
+    } else {
+      log(`Claude CLI exited with code ${result.code}`, 'error');
+    }
+
+    return result.code === 0;
+  } catch (error) {
+    log(`Claude CLI error: ${error.message}`, 'error');
+    return false;
+  }
+}
+
 async function fixErrorWithClaudeCLI(errorOutput, command, originalSources = null, currentTestContent = null) {
   let prompt = `Go into plan mode first to analyze this error and plan the fix, performing deep research into the problem and paying attention to the ts versions as a refernce but also carefully considering the go environment.\n\n`;
 
@@ -648,17 +741,76 @@ async function getGoTestPackages() {
   }
 }
 
-async function runSingleGoTest(packagePath, attemptNumber = 1) {
+async function getRuleTestPairs() {
+  try {
+    // Get TypeScript test files
+    const testPath = join(__dirname, TEST_DIR);
+    const tsTestFiles = await readdir(testPath);
+    const tsTests = tsTestFiles
+      .filter(file => file.endsWith('.test.ts'))
+      .map(file => ({
+        tsTestFile: join(testPath, file),
+        ruleName: file.replace('.test.ts', ''),
+        goRuleName: file.replace('.test.ts', '').replace(/-/g, '_')
+      }));
+
+    // Get Go packages with tests
+    const goPackages = await getGoTestPackages();
+    
+    // Create rule test pairs by matching rule names
+    const ruleTestPairs = [];
+    
+    for (const tsTest of tsTests) {
+      // Find corresponding Go package
+      const goPackage = goPackages.find(pkg => 
+        pkg.includes(`/internal/rules/${tsTest.goRuleName}`)
+      );
+      
+      if (goPackage) {
+        ruleTestPairs.push({
+          ruleName: tsTest.ruleName,
+          goRuleName: tsTest.goRuleName,
+          goPackage: goPackage,
+          tsTestFile: tsTest.tsTestFile
+        });
+      } else {
+        // TypeScript test without corresponding Go test
+        log(`Warning: TypeScript test ${tsTest.ruleName} has no corresponding Go test`, 'warning');
+        ruleTestPairs.push({
+          ruleName: tsTest.ruleName,
+          goRuleName: tsTest.goRuleName,
+          goPackage: null,
+          tsTestFile: tsTest.tsTestFile
+        });
+      }
+    }
+    
+    // Add Go-only packages (those without TypeScript tests)
+    for (const goPackage of goPackages) {
+      const goRuleName = goPackage.split('/').pop();
+      const tsRuleName = goRuleName.replace(/_/g, '-');
+      
+      const alreadyIncluded = ruleTestPairs.find(pair => pair.goPackage === goPackage);
+      if (!alreadyIncluded) {
+        log(`Warning: Go package ${goRuleName} has no corresponding TypeScript test`, 'warning');
+        ruleTestPairs.push({
+          ruleName: tsRuleName,
+          goRuleName: goRuleName,
+          goPackage: goPackage,
+          tsTestFile: null
+        });
+      }
+    }
+    
+    return ruleTestPairs;
+  } catch (error) {
+    log(`Error getting rule test pairs: ${error.message}`, 'error');
+    return [];
+  }
+}
+
+async function runGoTestForRule(packagePath) {
   const packageName = packagePath.split('/').pop();
-  const startTime = Date.now();
-  
-  logProgress('Go test execution started', {
-    phase: 'go-test-start',
-    packageName,
-    packagePath,
-    attempt: attemptNumber,
-    maxAttempts: MAX_FIX_ATTEMPTS
-  });
   
   try {
     const result = await runCommand('go', ['test', packagePath, '-v'], {
@@ -667,198 +819,27 @@ async function runSingleGoTest(packagePath, attemptNumber = 1) {
     });
 
     if (result.code === 0) {
-      const duration = Date.now() - startTime;
-      logProgress('Go test passed', {
-        phase: 'go-test-pass',
-        packageName,
-        durationMs: duration
-      });
-      return true;
+      return { success: true, output: result.stdout };
     } else {
-      logProgress('Go test failed', {
-        phase: 'go-test-fail',
-        packageName,
-        exitCode: result.code,
-        stderr: result.stderr?.slice(0, 1000),
-        stdout: result.stdout?.slice(0, 1000)
-      });
-      
-      const goTestCommand = `go test ${packagePath} -v`;
-      const errorOutput = result.stderr || result.stdout;
-      
-      if (attemptNumber < MAX_FIX_ATTEMPTS) {
-        log(`Attempting to fix Go test error in ${packageName} (attempt ${attemptNumber}/${MAX_FIX_ATTEMPTS})...`, 'warning');
-        
-        // Create a specific prompt for this package's test failures
-        const goTestPrompt = `Go tests are failing for package: ${packagePath}
-
-Error output:
-${errorOutput}
-
-Command that failed: ${goTestCommand}
-
-IMPORTANT:
-- Focus on fixing ONLY the test failures in the ${packageName} package
-- The package is located at: ${packagePath}
-- Common issues include:
-  - Missing test cases
-  - Incorrect assertions
-  - Type mismatches
-  - Missing imports
-  - Rule logic errors
-  - Incorrect expected values
-
-Please fix the failing tests in this specific package.`;
-        
-        const fixed = await fixErrorWithClaudeCLI(goTestPrompt, goTestCommand);
-        
-        if (fixed) {
-          log('Claude completed fix attempt, retrying Go test...', 'info');
-          return await runSingleGoTest(packagePath, attemptNumber + 1);
-        } else {
-          log(`Claude CLI failed to fix ${packageName} test issues`, 'error');
-        }
-      }
-      
-      log(`Go test failed for ${packageName} after ${attemptNumber} attempts`, 'error');
-      return false;
+      return { 
+        success: false, 
+        output: result.stdout, 
+        error: result.stderr,
+        command: `go test ${packagePath} -v`
+      };
     }
   } catch (error) {
-    if (error.message.includes('timed out')) {
-      log(`Go test timed out for ${packageName} after ${TEST_TIMEOUT}ms`, 'error');
-    } else {
-      log(`Go test error for ${packageName}: ${error.message}`, 'error');
-    }
-    return false;
+    return {
+      success: false,
+      error: error.message,
+      command: `go test ${packagePath} -v`
+    };
   }
 }
 
-async function runAllGoTests(concurrentMode = false, workerCount = DEFAULT_WORKERS) {
-  const packages = await getGoTestPackages();
-  const totalGoTests = packages.length;
-  
-  if (totalGoTests === 0) {
-    log('No Go test packages found', 'warning');
-    return true;
-  }
-  
-  log(`Found ${totalGoTests} Go packages to test`, 'info');
-  
-  let passedGoTests = 0;
-  let failedGoTests = 0;
-  
-  if (concurrentMode && workerCount > 1) {
-    // Run Go tests in parallel
-    log(`Running Go tests in parallel with ${workerCount} workers`, 'info');
-    
-    // Process packages in batches
-    const batchSize = Math.ceil(packages.length / workerCount);
-    const batches = [];
-    
-    for (let i = 0; i < packages.length; i += batchSize) {
-      batches.push(packages.slice(i, i + batchSize));
-    }
-    
-    const results = await Promise.all(
-      batches.map(async (batch) => {
-        let batchPassed = 0;
-        let batchFailed = 0;
-        
-        for (const pkg of batch) {
-          const success = await runSingleGoTest(pkg);
-          if (success) {
-            batchPassed++;
-          } else {
-            batchFailed++;
-          }
-        }
-        
-        return { passed: batchPassed, failed: batchFailed };
-      })
-    );
-    
-    // Aggregate results
-    results.forEach(result => {
-      passedGoTests += result.passed;
-      failedGoTests += result.failed;
-    });
-  } else {
-    // Run Go tests sequentially
-    for (let i = 0; i < packages.length; i++) {
-      const pkg = packages[i];
-      const pkgName = pkg.split('/').pop();
-      
-      console.log(`\n${colors.bright}[${i + 1}/${totalGoTests}] Go Test: ${pkgName}${colors.reset}`);
-      console.log('-'.repeat(40));
-      
-      const success = await runSingleGoTest(pkg);
-      
-      if (success) {
-        passedGoTests++;
-      } else {
-        failedGoTests++;
-      }
-      
-      // Show running totals
-      console.log(`\n${colors.dim}Go tests progress: ${passedGoTests} passed, ${failedGoTests} failed, ${totalGoTests - passedGoTests - failedGoTests} remaining${colors.reset}`);
-    }
-  }
-  
-  log(`Go test suite completed: ${passedGoTests}/${totalGoTests} passed (${Math.round((passedGoTests / totalGoTests) * 100)}%)`, 
-      failedGoTests > 0 ? 'warning' : 'success');
-  
-  return failedGoTests === 0;
-}
-
-async function getTestFiles() {
-  try {
-    const testPath = join(__dirname, TEST_DIR);
-    const files = await readdir(testPath);
-    return files
-      .filter(file => file.endsWith('.test.ts'))
-      .map(file => join(testPath, file));
-  } catch (error) {
-    log(`Error reading test directory: ${error.message}`, 'error');
-    return [];
-  }
-}
-
-async function runSingleTest(testFile, attemptNumber = 1) {
+async function runTsTestForRule(testFile) {
   const testName = basename(testFile);
-  const startTime = Date.now();
-
-  logProgress('Test execution started', {
-    phase: 'test-start',
-    testName,
-    testFile,
-    attempt: attemptNumber,
-    maxAttempts: MAX_FIX_ATTEMPTS
-  });
-
-  // Fetch original TypeScript ESLint sources (only on first attempt)
-  let originalSources = null;
-  let currentTestContent = null;
-
-  if (attemptNumber === 1) {
-    log('Fetching original sources from GitHub...', 'info');
-
-    originalSources = await fetchOriginalRule(testName);
-    if (originalSources.ruleContent || originalSources.testContent) {
-      log(`✓ Original sources fetched (rule: ${originalSources.ruleContent ? 'yes' : 'no'}, test: ${originalSources.testContent ? 'yes' : 'no'})`, 'success');
-    }
-  } else {
-    // Re-fetch on subsequent attempts as it might have been fixed
-    originalSources = await fetchOriginalRule(testName);
-  }
-
-  // Always read the current RSLint test file (it might have been modified)
-  try {
-    currentTestContent = await readFile(testFile, 'utf8');
-    log(`✓ Current test file read (${currentTestContent.length} bytes)`, 'success');
-  } catch (err) {
-    log(`Failed to read current test file: ${err.message}`, 'error');
-  }
-
+  
   try {
     const result = await runCommand('node', [
       '--import=tsx/esm',
@@ -870,125 +851,177 @@ async function runSingleTest(testFile, attemptNumber = 1) {
     });
 
     if (result.code === 0) {
-      const duration = Date.now() - startTime;
-      logProgress('Test passed', {
-        phase: 'test-pass',
-        testName,
-        durationMs: duration
-      });
-      completedTests++;
-      return true;
+      return { success: true, output: result.stdout };
     } else {
-      logProgress('Test failed', {
-        phase: 'test-fail',
-        testName,
-        exitCode: result.code,
-        stderr: result.stderr?.slice(0, 1000),
-        stdout: result.stdout?.slice(0, 1000)
-      });
-
-      const testCommand = `node --import=tsx/esm --test ${testFile}`;
-      const errorOutput = result.stderr || result.stdout;
-
-      if (attemptNumber < MAX_FIX_ATTEMPTS) {
-        // Try to fix with Claude CLI, including original sources and current test
-        log(`Attempting to fix test error (attempt ${attemptNumber}/${MAX_FIX_ATTEMPTS})...`, 'warning');
-
-        const fixed = await fixErrorWithClaudeCLI(errorOutput, testCommand, originalSources, currentTestContent);
-
-        if (fixed) {
-          // Claude thinks it fixed the issue, let's rebuild and retry
-          log('Claude completed fix attempt, rebuilding...', 'info');
-
-          // Run build again to ensure any changes are compiled
-          const buildSuccess = await runBuild();
-
-          if (!buildSuccess) {
-            log(`Build failed after fix attempt ${attemptNumber}`, 'error');
-            failedTests++;
-            return false;
-          }
-
-          // Retry test with incremented attempt number
-          log(`Retrying test after fix and rebuild...`, 'info');
-
-          return await runSingleTest(testFile, attemptNumber + 1);
-        } else {
-          log(`Claude CLI failed to fix the issue`, 'error');
-        }
-      }
-
-      // Max attempts reached or fix failed
-      log(`Test failed after ${attemptNumber} attempts`, 'error');
-      failedTests++;
-      return false;
+      return { 
+        success: false, 
+        output: result.stdout, 
+        error: result.stderr,
+        command: `node --import=tsx/esm --test ${testFile}`
+      };
     }
   } catch (error) {
-    if (error.message.includes('timed out')) {
-      log(`Test timed out after ${TEST_TIMEOUT}ms`, 'error');
-
-      const testCommand = `node --import=tsx/esm --test ${testFile}`;
-      const timeoutError = `Test timed out after ${TEST_TIMEOUT}ms`;
-
-      const fixed = await fixErrorWithClaudeCLI(timeoutError, testCommand, originalSources, currentTestContent);
-
-      if (fixed) {
-        // Claude thinks it fixed the timeout issue, let's rebuild and retry
-        log('Claude completed timeout fix attempt, rebuilding...', 'info');
-
-        // Run build again to ensure any changes are compiled
-        const buildSuccess = await runBuild();
-
-        if (!buildSuccess) {
-          log(`Build failed after timeout fix attempt`, 'error');
-          failedTests++;
-          return false;
-        }
-
-        log('Retrying test after timeout fix and rebuild...', 'info');
-        return await runSingleTest(testFile, attemptNumber + 1);
-      }
-    } else {
-      log(`Test error: ${error.message}`, 'error');
-    }
-
-    failedTests++;
-    return false;
+    return {
+      success: false,
+      error: error.message,
+      command: `node --import=tsx/esm --test ${testFile}`
+    };
   }
 }
 
-async function runAllTests(concurrentMode = false, workerCount = DEFAULT_WORKERS) {
-  const testFiles = await getTestFiles();
-  totalTests = testFiles.length;
+async function runSingleRuleTest(ruleTestPair, attemptNumber = 1) {
+  const { ruleName, goRuleName, goPackage, tsTestFile } = ruleTestPair;
+  const startTime = Date.now();
+
+  logProgress('Rule test execution started', {
+    phase: 'test-start',
+    testName: ruleName,
+    attempt: attemptNumber,
+    maxAttempts: MAX_FIX_ATTEMPTS
+  });
+
+  // Fetch original TypeScript ESLint sources (only on first attempt)
+  let originalSources = null;
+  let currentTestContent = null;
+
+  if (attemptNumber === 1) {
+    log('Fetching original sources from GitHub...', 'info');
+
+    originalSources = await fetchOriginalRule(ruleName);
+    if (originalSources.ruleContent || originalSources.testContent) {
+      log(`✓ Original sources fetched (rule: ${originalSources.ruleContent ? 'yes' : 'no'}, test: ${originalSources.testContent ? 'yes' : 'no'})`, 'success');
+    }
+  } else {
+    // Re-fetch on subsequent attempts as it might have been fixed
+    originalSources = await fetchOriginalRule(ruleName);
+  }
+
+  // Always read the current RSLint test file if it exists
+  if (tsTestFile) {
+    try {
+      currentTestContent = await readFile(tsTestFile, 'utf8');
+      log(`✓ Current test file read (${currentTestContent.length} bytes)`, 'success');
+    } catch (err) {
+      log(`Failed to read current test file: ${err.message}`, 'error');
+    }
+  }
+
+  // Run both Go and TypeScript tests
+  let goTestResult = null;
+  let tsTestResult = null;
+
+  // Run Go test if package exists
+  if (goPackage) {
+    log(`Running Go test for ${goRuleName}...`, 'info');
+    goTestResult = await runGoTestForRule(goPackage);
+    
+    if (goTestResult.success) {
+      log(`✓ Go test passed for ${goRuleName}`, 'success');
+    } else {
+      log(`✗ Go test failed for ${goRuleName}`, 'error');
+    }
+  }
+
+  // Run TypeScript test if file exists
+  if (tsTestFile) {
+    log(`Running TypeScript test for ${ruleName}...`, 'info');
+    tsTestResult = await runTsTestForRule(tsTestFile);
+    
+    if (tsTestResult.success) {
+      log(`✓ TypeScript test passed for ${ruleName}`, 'success');
+    } else {
+      log(`✗ TypeScript test failed for ${ruleName}`, 'error');
+    }
+  }
+
+  // Check if both tests passed (or if only one test exists and it passed)
+  const goSuccess = !goPackage || goTestResult.success;
+  const tsSuccess = !tsTestFile || tsTestResult.success;
+
+  if (goSuccess && tsSuccess) {
+    const duration = Date.now() - startTime;
+    logProgress('Test passed', {
+      phase: 'test-pass',
+      testName: ruleName,
+      durationMs: duration
+    });
+    completedTests++;
+    return true;
+  }
+
+  // If we get here, at least one test failed
+  logProgress('Test failed', {
+    phase: 'test-fail',
+    testName: ruleName,
+    goFailed: !goSuccess,
+    tsFailed: !tsSuccess
+  });
+
+  if (attemptNumber < MAX_FIX_ATTEMPTS) {
+    // Try to fix with Claude CLI, passing both Go and TypeScript test results
+    log(`Attempting to fix rule test failures (attempt ${attemptNumber}/${MAX_FIX_ATTEMPTS})...`, 'warning');
+
+    const fixed = await fixRuleTestsWithClaude(ruleName, goTestResult, tsTestResult, originalSources, currentTestContent);
+
+    if (fixed) {
+      // Claude thinks it fixed the issues, let's rebuild and retry
+      log('Claude completed fix attempt, rebuilding...', 'info');
+
+      // Run build again to ensure any changes are compiled
+      const buildSuccess = await runBuild(false, 1); // Use non-concurrent mode for individual rule fixes
+
+      if (!buildSuccess) {
+        log(`Build failed after fix attempt ${attemptNumber}`, 'error');
+        failedTests++;
+        return false;
+      }
+
+      // Retry test with incremented attempt number
+      log(`Retrying rule tests after fix and rebuild...`, 'info');
+      return await runSingleRuleTest(ruleTestPair, attemptNumber + 1);
+    } else {
+      log(`Claude CLI failed to fix the rule test issues`, 'error');
+    }
+  }
+
+  // Max attempts reached or fix failed
+  log(`Rule test failed after ${attemptNumber} attempts`, 'error');
+  failedTests++;
+  return false;
+}
+
+async function runAllRuleTests(concurrentMode = false, workerCount = DEFAULT_WORKERS) {
+  const ruleTestPairs = await getRuleTestPairs();
+  totalTests = ruleTestPairs.length;
 
   if (!IS_WORKER) {
     console.log('\n' + '='.repeat(60));
-    log(`Starting test suite with ${totalTests} tests`, 'info');
+    log(`Starting combined rule test suite with ${totalTests} rules`, 'info');
     console.log('='.repeat(60));
   }
 
   if (concurrentMode && !IS_WORKER) {
     // Main process in concurrent mode
-    await runConcurrentTests(testFiles, workerCount);
+    await runConcurrentRuleTests(ruleTestPairs, workerCount);
   } else if (IS_WORKER) {
     // Worker process
     await runWorker();
   } else {
     // Sequential mode
-    for (let i = 0; i < testFiles.length; i++) {
-      const testFile = testFiles[i];
-      const testName = basename(testFile);
+    for (let i = 0; i < ruleTestPairs.length; i++) {
+      const ruleTestPair = ruleTestPairs[i];
+      const ruleName = ruleTestPair.ruleName;
 
-      console.log(`\n${colors.bright}[${i + 1}/${totalTests}] ${testName}${colors.reset}`);
+      console.log(`\n${colors.bright}[${i + 1}/${totalTests}] ${ruleName}${colors.reset}`);
       console.log('-'.repeat(40));
 
-      await runSingleTest(testFile);
+      await runSingleRuleTest(ruleTestPair);
 
       // Show running totals
       console.log(`\n${colors.dim}Progress: ${completedTests} passed, ${failedTests} failed, ${totalTests - completedTests - failedTests} remaining${colors.reset}`);
     }
 
-    logProgress('Test suite completed', {
+    logProgress('Rule test suite completed', {
       phase: 'script-complete',
       totalTests,
       completedTests,
@@ -1004,13 +1037,13 @@ async function runAllTests(concurrentMode = false, workerCount = DEFAULT_WORKERS
   }
 }
 
-async function runConcurrentTests(testFiles, workerCount) {
+async function runConcurrentRuleTests(ruleTestPairs, workerCount) {
   const workQueue = new WorkQueue(WORK_QUEUE_DIR);
   await workQueue.initialize();
 
-  // Add all tests to work queue
-  await workQueue.addWork(testFiles);
-  log(`Added ${testFiles.length} tests to work queue`, 'info');
+  // Add all rule test pairs to work queue
+  await workQueue.addWork(ruleTestPairs);
+  log(`Added ${ruleTestPairs.length} rule test pairs to work queue`, 'info');
 
   // Create hook configuration
   const hookConfig = {
@@ -1110,19 +1143,19 @@ async function runWorker() {
       break;
     }
 
-    log(`Worker ${WORKER_ID}: Processing ${basename(work.test)}`, 'info');
+    log(`Worker ${WORKER_ID}: Processing ${work.test.ruleName}`, 'info');
 
     try {
-      const success = await runSingleTest(work.test);
+      const success = await runSingleRuleTest(work.test);
       await workQueue.completeWork(work.id, success);
 
       if (success) {
-        log(`Worker ${WORKER_ID}: Completed ${basename(work.test)} successfully`, 'success');
+        log(`Worker ${WORKER_ID}: Completed ${work.test.ruleName} successfully`, 'success');
       } else {
-        log(`Worker ${WORKER_ID}: Failed ${basename(work.test)}`, 'error');
+        log(`Worker ${WORKER_ID}: Failed ${work.test.ruleName}`, 'error');
       }
     } catch (err) {
-      log(`Worker ${WORKER_ID}: Error processing ${basename(work.test)}: ${err.message}`, 'error');
+      log(`Worker ${WORKER_ID}: Error processing ${work.test.ruleName}: ${err.message}`, 'error');
       await workQueue.completeWork(work.id, false);
     }
   }
@@ -1289,22 +1322,11 @@ async function runCompleteProcess() {
     }
   }
 
-  // Step 2: Run Go tests (only for main process)
+  // Step 2: Run combined rule tests (Go + TypeScript together)
   if (!IS_WORKER) {
-    console.log(`\n${colors.bright}=== GO TEST PHASE ===${colors.reset}`);
-    const goTestSuccess = await runAllGoTests(concurrentMode, workerCount);
-
-    if (!goTestSuccess) {
-      log('Go tests failed, stopping automation', 'error');
-      process.exit(1);
-    }
+    console.log(`\n${colors.bright}=== COMBINED RULE TEST PHASE ===${colors.reset}`);
   }
-
-  // Step 3: Run TypeScript tests
-  if (!IS_WORKER) {
-    console.log(`\n${colors.bright}=== TYPESCRIPT TEST PHASE ===${colors.reset}`);
-  }
-  await runAllTests(concurrentMode, workerCount);
+  await runAllRuleTests(concurrentMode, workerCount);
 
   if (!IS_WORKER) {
     const totalDuration = Date.now() - scriptStartTime;

@@ -1,30 +1,15 @@
-# Rule Validation: no-useless-empty-export
-
 ## Rule: no-useless-empty-export
 
 ### Test File: no-useless-empty-export.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: 
-  - Basic empty export detection logic (`export {}`)
-  - Definition file handling (`.d.ts` files are excluded)
-  - Core rule message and messageId
-  - Fix functionality (removal of empty exports)
-  - Import and export assignment detection
-
-- ⚠️ **POTENTIAL ISSUES**: 
-  - Immediate processing approach may miss some edge cases
-  - Debug statements left in production code
-  - Handling of module declarations might be incomplete
-
-- ❌ **INCORRECT**: 
-  - Missing TSModuleDeclaration support
-  - Incomplete AST node type coverage
-  - Different processing logic that may affect correctness
+- ✅ **CORRECT**: Error messages match, definition file handling, basic empty export detection, fix generation
+- ⚠️ **POTENTIAL ISSUES**: AST node type mapping differences, TSModuleDeclaration handling, complex type-only logic
+- ❌ **INCORRECT**: Missing module declaration traversal, export default detection gaps, potential AST structure mismatches
 
 ### Discrepancies Found
 
-#### 1. Missing TSModuleDeclaration Support
+#### 1. Missing TSModuleDeclaration Traversal
 **TypeScript Implementation:**
 ```typescript
 return {
@@ -35,64 +20,21 @@ return {
 
 **Go Implementation:**
 ```go
-// Only listens to individual node types, no TSModuleDeclaration equivalent
-return rule.RuleListeners{
-  ast.KindExportDeclaration: func(node *ast.Node) { ... },
-  // ... other listeners
+// Only processes SourceFile.Statements directly
+for _, statement := range ctx.SourceFile.Statements.Nodes {
+  // ...
 }
+// Return empty listeners since we already processed everything
+return rule.RuleListeners{}
 ```
 
-**Issue:** The TypeScript version checks both Program and TSModuleDeclaration nodes, but the Go version only processes individual export/import nodes without considering module declarations.
+**Issue:** The TypeScript version registers listeners for both `Program` and `TSModuleDeclaration` nodes, allowing it to check for empty exports within module declarations. The Go version only processes top-level statements and returns empty listeners, missing nested module declarations.
 
-**Impact:** Empty exports within TypeScript module declarations may not be detected.
+**Impact:** Empty exports within `declare module` or `namespace` declarations would not be detected by the Go implementation.
 
-**Test Coverage:** May miss cases with `declare module` blocks containing empty exports.
+**Test Coverage:** This affects any test cases with nested module declarations (though none are present in the current test suite).
 
-#### 2. Different Processing Logic
-**TypeScript Implementation:**
-```typescript
-function checkNode(node: TSESTree.Program | TSESTree.TSModuleDeclaration): void {
-  const emptyExports: TSESTree.ExportNamedDeclaration[] = [];
-  let foundOtherExport = false;
-
-  for (const statement of node.body) {
-    if (isEmptyExport(statement)) {
-      emptyExports.push(statement);
-    } else if (exportOrImportNodeTypes.has(statement.type)) {
-      foundOtherExport = true;
-    }
-  }
-
-  if (foundOtherExport) {
-    // Report all empty exports at once
-  }
-}
-```
-
-**Go Implementation:**
-```go
-// Immediate processing per node type
-ast.KindExportDeclaration: func(node *ast.Node) {
-  if isEmptyExport(node) {
-    emptyExports = append(emptyExports, node)
-  } else {
-    hasOtherExportsOrImports = true
-  }
-  
-  // Process immediately
-  if hasOtherExportsOrImports {
-    // Report and clear
-  }
-}
-```
-
-**Issue:** The TypeScript version processes all statements in a module/program at once, while the Go version processes nodes individually and immediately reports when other exports are found.
-
-**Impact:** The Go version may miss some empty exports or report them in different order, and may not handle all cases where multiple empty exports exist.
-
-**Test Coverage:** Test cases with multiple empty exports may behave differently.
-
-#### 3. Incomplete AST Node Type Coverage
+#### 2. AST Node Type Mapping Inconsistencies
 **TypeScript Implementation:**
 ```typescript
 const exportOrImportNodeTypes = new Set([
@@ -108,21 +50,21 @@ const exportOrImportNodeTypes = new Set([
 
 **Go Implementation:**
 ```go
-// Only handles specific cases:
-ast.KindExportDeclaration: // covers ExportNamedDeclaration
-ast.KindExportAssignment: // covers TSExportAssignment  
-ast.KindImportDeclaration: // covers ImportDeclaration
-ast.KindImportEqualsDeclaration: // covers TSImportEqualsDeclaration
-// Missing: ExportAllDeclaration, ExportDefaultDeclaration, ExportSpecifier
+case ast.KindExportDeclaration, ast.KindExportAssignment:
+  return true 
+case ast.KindImportDeclaration:
+  // ...
+case ast.KindImportEqualsDeclaration:
+  return true
 ```
 
-**Issue:** The Go version doesn't listen for all the node types that the TypeScript version considers as "other exports/imports".
+**Issue:** The TypeScript version explicitly includes `ExportDefaultDeclaration` and `ExportSpecifier` in its export/import detection, while the Go version may not handle these correctly. The Go version uses `KindExportDeclaration` which may not map directly to TypeScript's `ExportNamedDeclaration`.
 
-**Impact:** `export * from 'module'` and `export default` statements may not trigger the rule to report empty exports.
+**Impact:** Export default statements and individual export specifiers might not be properly detected as "other exports" in the Go version.
 
-**Test Coverage:** Test cases like `export * from '_'; export {};` may fail.
+**Test Coverage:** This affects test cases with `export default` statements.
 
-#### 4. Empty Export Detection Logic Difference
+#### 3. Empty Export Detection Logic Differences
 **TypeScript Implementation:**
 ```typescript
 function isEmptyExport(node: TSESTree.Node): node is TSESTree.ExportNamedDeclaration {
@@ -140,47 +82,85 @@ func isEmptyExport(node *ast.Node) bool {
   if node.Kind != ast.KindExportDeclaration {
     return false
   }
-
+  
   exportDecl := node.AsExportDeclaration()
-  // Empty export is when there's no export clause and no module specifier
-  // This represents `export {}`
-  return exportDecl.ExportClause == nil && exportDecl.ModuleSpecifier == nil
+  if exportDecl.ModuleSpecifier != nil {
+    return false
+  }
+  
+  if exportDecl.ExportClause == nil {
+    return false
+  }
+  
+  if exportDecl.ExportClause.Kind == ast.KindNamedExports {
+    namedExports := exportDecl.ExportClause.AsNamedExports()
+    return len(namedExports.Elements.Nodes) == 0
+  }
+  
+  return false
 }
 ```
 
-**Issue:** The logic is checking different properties. TypeScript checks `specifiers.length === 0 && !node.declaration`, while Go checks `ExportClause == nil && ModuleSpecifier == nil`.
+**Issue:** The TypeScript version checks for `!node.declaration` to ensure it's not a declaration export (like `export const x = 1`), while the Go version doesn't have this check. The Go version also has more complex module specifier handling.
 
-**Impact:** May not correctly identify all forms of empty exports.
+**Impact:** The Go version might incorrectly identify some declaration exports as empty exports, or miss some edge cases.
 
-**Test Coverage:** Need to verify this works for all test cases with `export {}`.
+**Test Coverage:** This could affect the behavior with mixed export types.
 
-#### 5. Debug Statements in Production Code
+#### 4. Type-Only Import/Export Filtering Complexity
 **TypeScript Implementation:**
 ```typescript
-// No debug statements
+// Simple node type checking without explicit type-only filtering
+exportOrImportNodeTypes.has(statement.type)
 ```
 
 **Go Implementation:**
 ```go
-fmt.Printf("DEBUG: Found ExportDeclaration\n")
-fmt.Printf("DEBUG: Found empty export\n")
-fmt.Printf("DEBUG: Found non-empty export\n")
-fmt.Printf("DEBUG: Reporting %d empty exports\n", len(emptyExports))
+case ast.KindExportDeclaration:
+  exportDecl := node.AsExportDeclaration()
+  // Check if it's a type-only export
+  if exportDecl.IsTypeOnly {
+    return false
+  }
+  // ... complex logic for different export types
+
+case ast.KindImportDeclaration:
+  importDecl := node.AsImportDeclaration()
+  // Skip type-only imports
+  if importDecl.ImportClause != nil && importDecl.ImportClause.IsTypeOnly() {
+    return false
+  }
 ```
 
-**Issue:** Debug print statements are left in the production code.
+**Issue:** The Go version has extensive type-only filtering logic that the TypeScript version doesn't seem to have. This could lead to different behavior for type-only imports/exports.
 
-**Impact:** Will produce unwanted output during rule execution.
+**Impact:** Type-only imports and exports might be handled differently between the two implementations, potentially affecting when empty exports are considered "useless".
 
-**Test Coverage:** All test cases will produce debug output.
+**Test Coverage:** The test suite includes type-only cases in definition files, which might reveal discrepancies.
+
+#### 5. Missing Support for Export Specifiers
+**TypeScript Implementation:**
+```typescript
+AST_NODE_TYPES.ExportSpecifier, // Included in exportOrImportNodeTypes
+```
+
+**Go Implementation:**
+```go
+// No explicit handling for individual export specifiers
+```
+
+**Issue:** The TypeScript version includes `ExportSpecifier` as a type that indicates the presence of other exports, but the Go version doesn't have equivalent logic.
+
+**Impact:** Files with only export specifiers (like re-exports) might not be properly detected as having "other exports".
+
+**Test Coverage:** This affects test cases with `export { _ }` syntax.
 
 ### Recommendations
-- Remove all debug print statements
-- Add listeners for missing AST node types: ExportAllDeclaration (likely `ast.KindExportDeclaration` with different structure), ExportDefaultDeclaration  
-- Implement proper module-level processing similar to TypeScript's `checkNode` function
-- Add support for TSModuleDeclaration equivalent if available in Go AST
-- Review and correct the empty export detection logic to match TypeScript behavior
-- Restructure the processing logic to collect all statements first, then process them together
-- Add comprehensive test cases to verify all edge cases work correctly
+- **Add TSModuleDeclaration traversal**: Implement proper AST traversal to handle nested module declarations
+- **Fix AST node type mapping**: Ensure Go AST node types properly correspond to TypeScript ESLint node types
+- **Add declaration export filtering**: Include logic to distinguish between empty exports and declaration exports
+- **Simplify type-only logic**: Align type-only import/export filtering with the TypeScript implementation
+- **Add export specifier detection**: Ensure individual export specifiers are properly detected as "other exports"
+- **Add comprehensive test cases**: Include tests for nested modules, export defaults, and mixed export scenarios
 
 ---

@@ -3,27 +3,9 @@
 ### Test File: no-invalid-this.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: 
-  - Basic stack-based context tracking mechanism
-  - Handling of explicit `this` parameters in TypeScript functions
-  - Class method and property context validation
-  - Constructor detection via capitalization pattern
-  - Basic JSDoc `@this` tag detection
-  - Core AST node type coverage for most function types
-
-- ⚠️ **POTENTIAL ISSUES**: 
-  - JSDoc `@this` tag detection is overly simplistic
-  - Array method validation may be incomplete
-  - Variable assignment context detection might miss edge cases
-  - Stack initialization logic differs from TypeScript version
-
-- ❌ **INCORRECT**: 
-  - Missing `AccessorProperty` (TypeScript accessor fields) handling
-  - No handling of `bind`/`call`/`apply` context validation
-  - Missing `PropertyDefinition` context tracking
-  - Incomplete array method thisArg validation
-  - Missing proper Object.defineProperty detection
-  - Arrow function context inheritance not properly implemented
+- ✅ **CORRECT**: Basic stack management for function contexts, TypeScript 'this' parameter detection, basic JSDoc @this comment parsing, constructor detection via capitalization, class context handling
+- ⚠️ **POTENTIAL ISSUES**: Arrow function handling differs significantly, complex method context detection may be over-engineered, JSDoc parsing edge cases, base rule delegation missing
+- ❌ **INCORRECT**: Missing AccessorProperty handling, incorrect arrow function stack management, overly complex valid context detection, missing base rule integration
 
 ### Discrepancies Found
 
@@ -40,85 +22,23 @@ AccessorProperty(): void {
 
 **Go Implementation:**
 ```go
-// No equivalent handling for AccessorProperty
-```
-
-**Issue:** The Go implementation completely lacks handling for TypeScript's `accessor` property syntax (e.g., `accessor c = this.a;`).
-
-**Impact:** Test case `accessor c = this.a;` in classes will incorrectly flag `this` as invalid.
-
-**Test Coverage:** The valid test case with `accessor c = this.a;` will fail.
-
-#### 2. Missing PropertyDefinition Context
-**TypeScript Implementation:**
-```typescript
-PropertyDefinition(): void {
-  thisIsValidStack.push(true);
-},
-'PropertyDefinition:exit'(): void {
-  thisIsValidStack.pop();
-},
-```
-
-**Go Implementation:**
-```go
-// Only handles PropertyDeclaration, missing PropertyDefinition
+// No AccessorProperty handling - only PropertyDeclaration
 ast.KindPropertyDeclaration: func(node *ast.Node) {
   tracker.pushValid()
 },
 ```
 
-**Issue:** TypeScript distinguishes between `PropertyDefinition` (class properties) and `PropertyDeclaration`. The Go version only handles one type.
+**Issue:** The Go version doesn't handle TypeScript accessor properties, which are distinct from regular property declarations.
 
-**Impact:** Some class property contexts may not be properly tracked.
+**Impact:** Accessor property declarations like `accessor prop = value;` may not be properly recognized as valid `this` contexts.
 
-**Test Coverage:** Class property test cases may behave inconsistently.
+**Test Coverage:** The test case `accessor c = this.a;` in class context may fail.
 
-#### 3. Incomplete bind/call/apply Validation
+#### 2. Arrow Function Stack Management
 **TypeScript Implementation:**
 ```typescript
-// The TypeScript version delegates to baseRule which handles complex bind/call/apply validation
-// including checking for null/undefined/void arguments
-```
-
-**Go Implementation:**
-```go
-case "bind", "call", "apply":
-  // Check if not binding to null/undefined/void
-  args := callExpr.Arguments.Nodes
-  if len(args) > 0 {
-    firstArg := args[0]
-    if firstArg.Kind == ast.KindNullKeyword || ast.IsIdentifier(firstArg) {
-      if ast.IsIdentifier(firstArg) {
-        argName := firstArg.AsIdentifier().Text
-        if argName == "undefined" || argName == "null" {
-          return false
-        }
-      } else {
-        return false
-      }
-    }
-    if ast.IsVoidExpression(firstArg) {
-      return false
-    }
-    return true
-  }
-```
-
-**Issue:** The Go implementation has incomplete logic for validating bind/call/apply contexts. It doesn't properly determine when these functions make `this` valid vs invalid.
-
-**Impact:** Test cases with `.bind(null)`, `.call(undefined)`, `.apply(void 0)` will not be correctly flagged as invalid.
-
-**Test Coverage:** Multiple bind/call/apply test cases will fail, including:
-- `.bind(null)` should be invalid
-- `.call(undefined)` should be invalid  
-- `.apply(void 0)` should be invalid
-
-#### 4. Arrow Function Context Inheritance
-**TypeScript Implementation:**
-```typescript
-// Arrow functions are not explicitly handled because they inherit parent context
-// The stack is not modified for arrow functions
+// Arrow functions don't modify the stack - they inherit parent context
+// No listeners for ArrowFunction
 ```
 
 **Go Implementation:**
@@ -129,93 +49,150 @@ ast.KindArrowFunction: func(node *ast.Node) {
 },
 ```
 
-**Issue:** While the Go implementation correctly doesn't modify the stack for arrow functions, it doesn't account for the fact that the TypeScript version uses a more sophisticated base rule that handles arrow function edge cases.
+**Issue:** Both implementations handle arrow functions correctly by not modifying the stack, but the Go version explicitly defines a no-op listener while TypeScript omits it entirely.
 
-**Impact:** Some complex arrow function nesting scenarios may behave differently.
+**Impact:** This is actually correct behavior - no issue here.
 
-**Test Coverage:** Arrow function test cases may have subtle differences.
+**Test Coverage:** Arrow function tests should pass correctly.
 
-#### 5. Overly Simplistic JSDoc Detection
+#### 3. Base Rule Integration Missing
 **TypeScript Implementation:**
 ```typescript
-// Relies on sophisticated baseRule JSDoc parsing
+const baseRule = getESLintCoreRule('no-invalid-this');
+const rules = baseRule.create(context);
+// ...
+// baseRule's work
+rules.ThisExpression(node);
+```
+
+**Go Implementation:**
+```go
+// Complete standalone implementation without base rule delegation
+ctx.ReportNode(node, rule.RuleMessage{
+  Id:          "unexpectedThis",
+  Description: "Unexpected 'this'.",
+})
+```
+
+**Issue:** The Go version doesn't delegate to the base ESLint rule for additional checks and error handling.
+
+**Impact:** May miss some edge cases that the base ESLint rule handles, but the standalone implementation appears comprehensive.
+
+**Test Coverage:** Most test cases should still pass as the Go implementation covers the main scenarios.
+
+#### 4. Overly Complex Context Detection
+**TypeScript Implementation:**
+```typescript
+// Simple approach - only specific nodes push valid context
+// Relies on base rule for most logic
+```
+
+**Go Implementation:**
+```go
+// Extensive context detection with multiple helper functions:
+// isValidMethodContext, isInDefinePropertyContext, isInObjectLiteralContext,
+// isInFunctionBinding, isReturnedFromIIFE, etc.
+```
+
+**Issue:** The Go implementation has much more complex context detection logic that may not match the original ESLint behavior exactly.
+
+**Impact:** Could produce different results for edge cases, either being more permissive or more restrictive than the original rule.
+
+**Test Coverage:** Complex assignment patterns and method contexts need careful validation.
+
+#### 5. JSDoc Comment Parsing Complexity
+**TypeScript Implementation:**
+```typescript
+// Relies on base rule for JSDoc parsing
 ```
 
 **Go Implementation:**
 ```go
 func hasThisJSDocTag(node *ast.Node, sourceFile *ast.SourceFile) bool {
-  // Simplified approach - check for @this in comments near the node
-  text := string(sourceFile.Text())
-  
-  // Look backwards from node position for JSDoc comment
-  start := node.Pos()
-  if start > 100 {
-    start = start - 100
-  } else {
-    start = 0
-  }
-  
-  commentArea := text[start:node.Pos()]
-  return strings.Contains(commentArea, "@this")
+  // Complex string parsing logic with multiple patterns
+  // Handles both /* @this */ and /** @this */ comments
+  // Extensive position-based text searching
 }
 ```
 
-**Issue:** The Go implementation uses a crude string search approach rather than proper JSDoc comment parsing.
+**Issue:** The Go implementation has very complex JSDoc parsing that may not handle all edge cases correctly, especially with whitespace and comment positioning.
 
-**Impact:** May incorrectly detect `@this` tags in strings or non-comment contexts, or miss properly formatted JSDoc.
+**Impact:** JSDoc @this comments may be missed or incorrectly detected in some cases.
 
-**Test Coverage:** JSDoc `@this` test cases may have false positives/negatives.
+**Test Coverage:** JSDoc test cases need thorough validation, especially edge cases with spacing and comment formats.
 
-#### 6. Array Method thisArg Validation
+#### 6. Constructor Detection Logic
 **TypeScript Implementation:**
 ```typescript
-// Complex logic in baseRule for validating array methods with thisArg parameter
+// Uses base rule logic for constructor detection
 ```
 
 **Go Implementation:**
 ```go
-case "every", "filter", "find", "findIndex", "forEach", "map", "some":
-  // Array methods with optional thisArg
-  args := callExpr.Arguments.Nodes
-  if len(args) > 1 {
-    return true
-  }
+func isConstructor(node *ast.Node, capIsConstructor bool) bool {
+  // Only checks capitalization of function names
+  // Checks assignment contexts for capitalized variables
+}
 ```
 
-**Issue:** The Go implementation only checks if there are enough arguments but doesn't validate the actual thisArg value (e.g., null should make this invalid).
+**Issue:** The Go implementation only uses name capitalization for constructor detection, missing other constructor patterns that the base rule might handle.
 
-**Impact:** Test case `foo.forEach(function () { console.log(this); }, null);` should be invalid but may be marked as valid.
+**Impact:** Some constructor patterns may not be recognized as valid `this` contexts.
 
-**Test Coverage:** Array method test cases with null thisArg will fail.
+**Test Coverage:** Constructor test cases should be verified, especially edge cases.
 
-#### 7. Stack Initialization Difference
+#### 7. Call Context Validation
 **TypeScript Implementation:**
 ```typescript
-const thisIsValidStack: boolean[] = [];
-// Stack starts empty, relies on baseRule for global context
+// Handled by base rule
 ```
 
 **Go Implementation:**
 ```go
-tracker := &contextTracker{
-  stack: []bool{false}, // Start with global scope (invalid)
+func isValidCallContext(parent *ast.Node, funcNode *ast.Node) bool {
+  // Complex logic for bind/call/apply and array methods
+  // Checks for null/undefined thisArg
 }
 ```
 
-**Issue:** The Go implementation pre-initializes the stack with a global scope state, while TypeScript starts empty and relies on the base rule.
+**Issue:** The Go implementation has detailed call context validation that may be more strict than the base rule.
 
-**Impact:** Global scope handling may differ, affecting top-level `this` expressions.
+**Impact:** Array method calls and function binding may behave differently than expected.
 
-**Test Coverage:** Global scope test cases may behave differently.
+**Test Coverage:** Array method tests and bind/call/apply tests need validation.
+
+#### 8. Missing PropertyDeclaration vs AccessorProperty Distinction
+**TypeScript Implementation:**
+```typescript
+AccessorProperty(): void {
+  thisIsValidStack.push(true);
+},
+PropertyDefinition(): void {
+  thisIsValidStack.push(true);
+},
+```
+
+**Go Implementation:**
+```go
+ast.KindPropertyDeclaration: func(node *ast.Node) {
+  tracker.pushValid()
+},
+// Missing separate handling for accessor properties
+```
+
+**Issue:** TypeScript distinguishes between regular properties and accessor properties, but Go only handles PropertyDeclaration.
+
+**Impact:** TypeScript accessor syntax may not be properly handled.
+
+**Test Coverage:** The `accessor c = this.a;` test case specifically tests this.
 
 ### Recommendations
-- **Critical**: Add support for `AccessorProperty` AST nodes to handle TypeScript accessor syntax
-- **Critical**: Implement proper `bind`/`call`/`apply` validation logic that correctly identifies when thisArg makes context valid/invalid
-- **Critical**: Fix array method thisArg validation to check for null/undefined values
-- **High**: Implement proper JSDoc comment parsing instead of simple string matching
-- **High**: Ensure `PropertyDefinition` vs `PropertyDeclaration` distinction is correctly handled
-- **Medium**: Review stack initialization strategy to match TypeScript base rule behavior
-- **Medium**: Add comprehensive test cases for Object.defineProperty and Object.defineProperties patterns
-- **Low**: Verify arrow function edge cases match TypeScript-ESLint behavior exactly
+- Add separate handling for accessor properties (ast.KindAccessorDeclaration or similar)
+- Simplify the context detection logic to more closely match the base rule behavior
+- Review JSDoc comment parsing for edge cases and correctness
+- Consider whether the complex call context validation is necessary or if it should match base rule behavior
+- Add validation for PropertyDeclaration vs AccessorProperty distinction
+- Test thoroughly with the provided test cases to identify behavioral differences
+- Consider adding integration with base rule logic if available, or ensure standalone implementation covers all base rule cases
 
 ---

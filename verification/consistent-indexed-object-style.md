@@ -1,16 +1,92 @@
-# Rule Validation: consistent-indexed-object-style
+## Rule: consistent-indexed-object-style
 
-## Test File: consistent-indexed-object-style.test.ts
+### Test File: consistent-indexed-object-style.test.ts
 
-## Validation Summary
-- ✅ **CORRECT**: Basic rule structure, option handling, core listeners, mapped type handling, readonly modifier support
-- ⚠️ **POTENTIAL ISSUES**: Circular reference detection logic, qualified name handling, nested type literal processing
-- ❌ **INCORRECT**: Critical circular reference prevention logic is overly permissive
+### Validation Summary
+- ✅ **CORRECT**: Basic record/index-signature mode switching, interface to type conversion, readonly modifier handling, generic parameter preservation, type literal conversion, basic circular reference detection
+- ⚠️ **POTENTIAL ISSUES**: Mapped type handling not implemented, suggestion system missing, complex circular reference detection may be incomplete
+- ❌ **INCORRECT**: Missing TSMappedType handler, missing suggestion support for complex Record types, missing comprehensive scope-based circular reference detection
 
-## Discrepancies Found
+### Discrepancies Found
 
-### 1. **CRITICAL: Circular Reference Detection Logic**
+#### 1. Missing TSMappedType Handler
+**TypeScript Implementation:**
+```typescript
+TSMappedType(node): void {
+  const key = node.key;
+  const scope = context.sourceCode.getScope(key);
+  
+  const scopeManagerKey = nullThrows(
+    scope.variables.find(
+      value => value.name === key.name && value.isTypeVariable,
+    ),
+    'key type parameter must be a defined type variable in its scope',
+  );
 
+  // If the key is used to compute the value, we can't convert to a Record.
+  if (
+    scopeManagerKey.references.some(
+      reference => reference.isTypeReference,
+    )
+  ) {
+    return;
+  }
+  // ... rest of mapped type logic
+}
+```
+
+**Go Implementation:**
+```go
+// Missing entirely - no handler for mapped types like { [K in keyof T]: V }
+```
+
+**Issue:** The Go implementation doesn't handle mapped types at all. The TypeScript version has comprehensive logic for converting mapped types to Record when appropriate.
+
+**Impact:** Test cases with mapped types like `{ [key in string]: number }` won't be processed correctly.
+
+**Test Coverage:** Multiple test cases use mapped types, including ones with readonly, optional, and required modifiers.
+
+#### 2. Missing Suggestion System
+**TypeScript Implementation:**
+```typescript
+context.report({
+  node,
+  messageId: 'preferIndexSignature',
+  ...getFixOrSuggest({
+    fixOrSuggest: shouldFix ? 'fix' : 'suggest',
+    suggestion: {
+      messageId: 'preferIndexSignatureSuggestion',
+      fix: fixer => {
+        const key = context.sourceCode.getText(params[0]);
+        const type = context.sourceCode.getText(params[1]);
+        return fixer.replaceText(node, `{ [key: ${key}]: ${type} }`);
+      },
+    },
+  }),
+});
+```
+
+**Go Implementation:**
+```go
+if shouldFix {
+  ctx.ReportNodeWithFixes(node, rule.RuleMessage{
+    Id:          "preferIndexSignature",
+    Description: "An index signature is preferred over a record.",
+  }, rule.RuleFix{...})
+} else {
+  // For complex key types, just report without fix/suggestion 
+  // (test framework doesn't support suggestions)
+  ctx.ReportNode(node, rule.RuleMessage{...})
+}
+```
+
+**Issue:** The Go implementation doesn't provide suggestions for complex Record types, only reports errors without fixes.
+
+**Impact:** Test cases expecting suggestions for complex types like `Record<string | number, any>` will fail.
+
+**Test Coverage:** Tests with `suggestions` array in error objects will not pass.
+
+#### 3. Incomplete Circular Reference Detection
 **TypeScript Implementation:**
 ```typescript
 function isDeeplyReferencingType(
@@ -18,207 +94,141 @@ function isDeeplyReferencingType(
   superVar: ScopeVariable,
   visited: Set<TSESTree.Node>,
 ): boolean {
-  // Complex recursive traversal with scope-aware variable checking
-  // Uses TypeScript-ESLint's scope manager to track variable references
-  if (superVar.references.some(ref => isNodeEqual(ref.identifier, node))) {
-    return true;
+  if (visited.has(node)) {
+    // something on the chain is circular but it's not the reference being checked
+    return false;
   }
+
+  visited.add(node);
+  // ... comprehensive AST traversal with scope analysis
 }
 ```
 
 **Go Implementation:**
 ```go
-func hasProblematicSelfReference(node *ast.Node, typeName string) bool {
-  // Always returns false - completely disabled
-  return false  // Never block conversions due to self-references
-}
-
-func hasCircularReference(sourceFile *ast.SourceFile, typeName string) bool {
-  // Always returns false - completely disabled  
-  return false  // Never block conversions due to circular references
+func isDeeplyReferencingType(node *ast.Node, superTypeName string, visited map[*ast.Node]bool) bool {
+  // ... simpler traversal without scope analysis
+  // Only checks type names, not variable scope references
 }
 ```
 
-**Issue:** The Go implementation has completely disabled circular reference detection, making it overly permissive compared to TypeScript-ESLint.
+**Issue:** The Go implementation uses simple string-based type name matching instead of proper scope-based variable reference analysis.
 
-**Impact:** The rule will convert types that should remain as index signatures due to problematic circular references, potentially breaking TypeScript compilation.
+**Impact:** May miss some circular references or incorrectly identify others, especially in complex nested scenarios.
 
-**Test Coverage:** Several valid test cases rely on circular reference detection:
-- `'type Foo = { [key: string]: Foo };'`
-- Complex circular chains with interfaces
-- Indirect circular references
+**Test Coverage:** Some circular reference test cases may not behave identically.
 
-### 2. **Scope-Aware Variable Tracking Missing**
-
+#### 4. Missing Conditional Type Handling
 **TypeScript Implementation:**
 ```typescript
-const scope = context.sourceCode.getScope(parentId);
-const superVar = ASTUtils.findVariable(scope, parentId.name);
-if (superVar && isDeeplyReferencingType(node, superVar, new Set([parentId]))) {
-  return;
-}
+case AST_NODE_TYPES.TSConditionalType:
+  return [
+    node.checkType,
+    node.extendsType,
+    node.falseType,
+    node.trueType,
+  ].some(type => isDeeplyReferencingType(type, superVar, visited));
 ```
 
 **Go Implementation:**
 ```go
-// No scope-aware variable tracking implemented
-// Uses simple string-based type name matching instead
-func containsSelfReference(node *ast.Node, typeName string) bool {
-  // Basic string matching without scope awareness
-}
-```
-
-**Issue:** The Go implementation lacks TypeScript-ESLint's sophisticated scope-aware variable tracking, using only basic string matching.
-
-**Impact:** May incorrectly identify or miss circular references in complex scoping scenarios.
-
-### 3. **SCC-Based Circular Detection Incorrect**
-
-**TypeScript Implementation:**
-```typescript
-// TypeScript-ESLint uses deep recursive traversal with visited tracking
-// Checks actual variable references and definitions
-```
-
-**Go Implementation:**
-```go
-func getCircularChainTypes(sourceFile *ast.SourceFile, typeName string) []string {
-  // Uses Strongly Connected Components (SCC) algorithm
-  // But then blocks ALL types in circular chains with len(circularChain) > 1
-  if len(circularChain) > 1 {
-    return // Don't convert any types in circular chains
+case ast.KindConditionalType:
+  // For conditional types like "Foo extends T ? string : number"
+  // Check only the true and false types, not the check or extends types
+  conditionalType := node.AsConditionalTypeNode()
+  if conditionalType.TrueType != nil && containsTypeReference(conditionalType.TrueType, typeName) {
+    return true
   }
-}
+  if conditionalType.FalseType != nil && containsTypeReference(conditionalType.FalseType, typeName) {
+    return true
+  }
+  // Note: We don't check CheckType or ExtendsType as these are type predicates, not circular refs
 ```
 
-**Issue:** The SCC approach is more aggressive than TypeScript-ESLint and blocks conversions that should be allowed.
+**Issue:** Different handling of conditional types - the Go version explicitly excludes checkType and extendsType while the TypeScript version includes all parts.
 
-**Impact:** Will incorrectly prevent valid conversions in complex type dependency graphs.
+**Impact:** May lead to different circular reference detection behavior for conditional types.
 
-### 4. **Qualified Name Handling**
+**Test Coverage:** Tests with conditional types in circular scenarios may behave differently.
 
-**TypeScript Implementation:**
-```typescript
-if (typeName.type !== AST_NODE_TYPES.Identifier) {
-  return; // Skip qualified names like A.B
-}
-```
-
-**Go Implementation:**
-```go
-} else if typeRef.TypeName != nil && ast.IsQualifiedName(typeRef.TypeName) {
-  // For qualified names like A.Foo, we don't treat them as references to Foo
-  // since they are in a different namespace. These should NOT prevent conversion.
-}
-```
-
-**Issue:** The Go implementation correctly identifies qualified names but the comment suggests they should NOT prevent conversion, while TypeScript-ESLint simply skips them.
-
-**Impact:** Potentially allows conversions that TypeScript-ESLint would prevent.
-
-### 5. **Missing Index Signature Validation**
-
+#### 5. Missing Index Signature Parameter Validation
 **TypeScript Implementation:**
 ```typescript
 const parameter = member.parameters.at(0);
 if (parameter?.type !== AST_NODE_TYPES.Identifier) {
   return;
 }
-```
 
-**Go Implementation:**
-```go
-parameter := indexSig.Parameters.Nodes[0]
-if parameter.Kind != ast.KindParameter {
-  return;
-}
-// Missing validation that parameter name is an Identifier
-```
-
-**Issue:** The Go implementation doesn't validate that the index signature parameter is an Identifier node.
-
-**Impact:** May attempt to process malformed index signatures that TypeScript-ESLint would skip.
-
-### 6. **Conditional Type Detection Logic**
-
-**TypeScript Implementation:**
-```typescript
-// Specific handling in isDeeplyReferencingType for conditional types
-case AST_NODE_TYPES.TSConditionalType:
-  return [node.checkType, node.extendsType, node.falseType, node.trueType]
-    .some(type => isDeeplyReferencingType(type, superVar, visited));
-```
-
-**Go Implementation:**
-```go
-func containsConditionalType(node *ast.Node) bool {
-  // Correctly identifies conditional types but separate from circular reference logic
-  // Used to skip conversion, but not integrated with self-reference detection
-}
-```
-
-**Issue:** Conditional type detection is separated from circular reference logic, unlike TypeScript-ESLint.
-
-**Impact:** May not properly handle edge cases involving conditional types in circular references.
-
-### 7. **Mapped Type Key Usage Detection**
-
-**TypeScript Implementation:**
-```typescript
-// Uses scope manager to check if key is used in value computation
-if (scopeManagerKey.references.some(reference => reference.isTypeReference)) {
+const keyType = parameter.typeAnnotation;
+if (!keyType) {
   return;
 }
 ```
 
 **Go Implementation:**
 ```go
-if mappedType.Type != nil {
-  var keyName string
-  if name := typeParam.Name(); name != nil && name.Kind == ast.KindIdentifier {
-    keyName = name.AsIdentifier().Text
-  }
-  valueText := getNodeText(ctx.SourceFile, mappedType.Type)
-  if strings.Contains(valueText, keyName) {
-    return; // Simple string-based check
-  }
+param := indexSig.Parameters.Nodes[0]
+if param.Kind != ast.KindParameter {
+  return
+}
+
+paramDecl := param.AsParameterDeclaration()
+keyType := paramDecl.Type
+if keyType == nil {
+  return
 }
 ```
 
-**Issue:** The Go implementation uses simple string containment rather than proper scope-aware reference checking.
+**Issue:** The Go version doesn't validate that the parameter is an Identifier before proceeding, only checks if it's a Parameter.
 
-**Impact:** May incorrectly detect key usage in string literals or comments, or miss usage in complex expressions.
+**Impact:** May process invalid index signatures that should be ignored.
 
-## Recommendations
+**Test Coverage:** Edge cases with malformed index signatures may behave differently.
 
-### Critical Fixes Needed:
+#### 6. Missing Parent Declaration Context Handling
+**TypeScript Implementation:**
+```typescript
+function findParentDeclaration(
+  node: TSESTree.Node,
+): TSESTree.TSTypeAliasDeclaration | undefined {
+  if (node.parent && node.parent.type !== AST_NODE_TYPES.TSTypeAnnotation) {
+    if (node.parent.type === AST_NODE_TYPES.TSTypeAliasDeclaration) {
+      return node.parent;
+    }
+    return findParentDeclaration(node.parent);
+  }
+  return undefined;
+}
+```
 
-1. **Implement Proper Circular Reference Detection:**
-   - Port TypeScript-ESLint's `isDeeplyReferencingType` logic
-   - Add scope-aware variable tracking
-   - Remove the overly permissive approach that always returns false
+**Go Implementation:**
+```go
+func findParentDeclaration(node *ast.Node) *ast.Node {
+  parent := node.Parent
+  for parent != nil {
+    if parent.Kind == ast.KindTypeAliasDeclaration {
+      return parent
+    }
+    parent = parent.Parent
+  }
+  return nil
+}
+```
 
-2. **Fix SCC-Based Approach:**
-   - Either properly implement TypeScript-ESLint's recursive approach OR
-   - Adjust SCC logic to match TypeScript-ESLint's permissive behavior for valid circular references
+**Issue:** The Go version doesn't handle the TSTypeAnnotation exclusion logic that prevents finding parent declarations across type annotation boundaries.
 
-3. **Add Missing Validations:**
-   - Validate index signature parameters are Identifiers
-   - Integrate conditional type detection with circular reference logic
+**Impact:** May incorrectly identify parent declarations in some contexts.
 
-4. **Improve Key Usage Detection:**
-   - Replace string-based matching with proper AST traversal
-   - Implement scope-aware reference checking for mapped type keys
+**Test Coverage:** Complex nested type scenarios may behave differently.
 
-### Test Cases Needing Review:
-
-1. All circular reference test cases in the valid array
-2. Complex interface dependency chains
-3. Mapped types with key usage in value expressions
-4. Qualified name references (A.Foo patterns)
-
-### Priority Level: **HIGH**
-
-The circular reference detection is a critical safety feature that prevents TypeScript compilation errors. The current Go implementation is dangerously permissive and will likely cause issues in real-world usage.
+### Recommendations
+- Implement TSMappedType handler with proper key usage detection and modifier handling (readonly, optional, required)
+- Add suggestion system support for complex Record types that can't be auto-fixed
+- Enhance circular reference detection with proper scope analysis instead of simple string matching
+- Add comprehensive parameter validation for index signatures
+- Implement proper parent declaration finding with TSTypeAnnotation boundary handling
+- Add support for all mapped type modifiers (+readonly, -readonly, +?, -?, etc.)
+- Ensure all AST node types are handled in circular reference detection
+- Add proper scope-based variable reference tracking
 
 ---

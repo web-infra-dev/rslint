@@ -3,88 +3,101 @@
 ### Test File: no-import-type-side-effects.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: Core logic pattern matching for import declarations, checking for inline type qualifiers, skipping type-only imports, handling named imports correctly
-- ⚠️ **POTENTIAL ISSUES**: Fix generation logic may have positioning issues, AST node access patterns differ significantly
-- ❌ **INCORRECT**: Fix implementation has fundamental flaws in text range calculation and keyword positioning
+- ✅ **CORRECT**: Basic rule logic pattern, correct AST node targeting, proper message ID and description
+- ⚠️ **POTENTIAL ISSUES**: Fix generation logic may not handle text positioning accurately, missing utility functions for token detection
+- ❌ **INCORRECT**: Fix implementation uses hardcoded positions instead of proper token detection, may produce malformed fixes
 
 ### Discrepancies Found
 
-#### 1. Fix Generation - Type Keyword Removal Logic
+#### 1. Fix Generation Logic - Token Detection vs Hardcoded Positions
+
 **TypeScript Implementation:**
 ```typescript
-for (const specifier of specifiers) {
-  const qualifier = nullThrows(
-    context.sourceCode.getFirstToken(specifier, isTypeKeyword),
-    NullThrowsReasons.MissingToken('type keyword', 'import specifier'),
+fix(fixer) {
+  const fixes: TSESLint.RuleFix[] = [];
+  for (const specifier of specifiers) {
+    const qualifier = nullThrows(
+      context.sourceCode.getFirstToken(specifier, isTypeKeyword),
+      NullThrowsReasons.MissingToken('type keyword', 'import specifier'),
+    );
+    fixes.push(
+      fixer.removeRange([
+        qualifier.range[0],
+        specifier.imported.range[0],
+      ]),
+    );
+  }
+
+  const importKeyword = nullThrows(
+    context.sourceCode.getFirstToken(node, isImportKeyword),
+    NullThrowsReasons.MissingToken('import keyword', 'import'),
   );
-  fixes.push(
-    fixer.removeRange([
-      qualifier.range[0],
-      specifier.imported.range[0],
-    ]),
-  );
+  fixes.push(fixer.insertTextAfter(importKeyword, ' type'));
+
+  return fixes;
 }
 ```
 
 **Go Implementation:**
 ```go
-for _, specifier := range specifiers {
-  specifierRange := utils.TrimNodeTextRange(ctx.SourceFile, specifier.AsNode())
-  var identifierNode *ast.Node
-  if specifier.PropertyName != nil {
-    identifierNode = specifier.PropertyName
-  } else {
-    identifierNode = specifier.Name()
-  }
-  
-  if identifierNode != nil {
-    identifierRange := utils.TrimNodeTextRange(ctx.SourceFile, identifierNode)
-    removeStart := specifierRange.Pos()
-    removeEnd := identifierRange.Pos()
+func createFix(ctx rule.RuleContext, importNode *ast.Node, specifiers []*ast.ImportSpecifier) []rule.RuleFix {
+  // ...
+  for _, specifier := range specifiers {
+    // Gets the entire specifier range and identifier range
+    specifierRange := utils.TrimNodeTextRange(ctx.SourceFile, specifier.AsNode())
     
-    if removeEnd > removeStart {
-      fixes = append(fixes, rule.RuleFix{
-        Range: core.NewTextRange(removeStart, removeEnd),
-        Text: "",
-      })
+    var identifierNode *ast.Node
+    if specifier.PropertyName != nil {
+      identifierNode = specifier.PropertyName
+    } else {
+      identifierNode = specifier.Name()
+    }
+    
+    if identifierNode != nil {
+      identifierRange := utils.TrimNodeTextRange(ctx.SourceFile, identifierNode)
+      removeStart := specifierRange.Pos()
+      removeEnd := identifierRange.Pos()
+      // ...
     }
   }
+  
+  // Hardcoded position calculation
+  importStart := importNode.Pos()
+  insertPos := importStart + 6  // "import" is 6 characters long
+  // ...
 }
 ```
 
-**Issue:** The Go implementation uses a crude approach to find the "type" keyword by calculating the range between specifier start and identifier start. The TypeScript version uses `getFirstToken(specifier, isTypeKeyword)` to precisely locate the type keyword token.
+**Issue:** The Go implementation uses hardcoded position arithmetic (`importStart + 6`) instead of properly detecting the import keyword token, and calculates remove ranges based on node positions rather than finding the actual "type" keyword tokens.
 
-**Impact:** The Go version may remove incorrect text ranges, potentially including commas, whitespace, or other tokens that should be preserved.
+**Impact:** This could produce incorrect fixes if there are comments, whitespace, or other tokens between elements. The TypeScript version uses proper token detection to find exact keyword positions.
 
-**Test Coverage:** All invalid test cases would be affected by incorrect fix generation.
+**Test Coverage:** All invalid test cases rely on fix functionality, so this affects all of them.
 
-#### 2. Import Keyword Positioning for Type Insertion
+#### 2. Missing Utility Functions for Token Detection
+
 **TypeScript Implementation:**
 ```typescript
-const importKeyword = nullThrows(
-  context.sourceCode.getFirstToken(node, isImportKeyword),
-  NullThrowsReasons.MissingToken('import keyword', 'import'),
-);
-fixes.push(fixer.insertTextAfter(importKeyword, ' type'));
+// Uses utility functions for precise token detection
+isImportKeyword, isTypeKeyword, nullThrows
+context.sourceCode.getFirstToken(specifier, isTypeKeyword)
+context.sourceCode.getFirstToken(node, isImportKeyword)
 ```
 
 **Go Implementation:**
 ```go
-importStart := importNode.Pos()
-insertPos := importStart + 6  // "import" is 6 characters long
-fixes = append(fixes, rule.RuleFix{
-  Range: core.NewTextRange(insertPos, insertPos),
-  Text: " type",
-})
+// No equivalent token detection utilities used
+// Relies on AST node ranges and hardcoded offsets
 ```
 
-**Issue:** The Go implementation hardcodes the import keyword length as 6 characters and adds it to the node position. This is fragile and may not account for whitespace or other tokens between "import" and the import clause.
+**Issue:** The Go implementation lacks the token-level precision of the TypeScript version. It doesn't have equivalents to `isImportKeyword`, `isTypeKeyword`, or `getFirstToken` utilities.
 
-**Impact:** The "type" keyword may be inserted at the wrong position, potentially breaking the syntax.
+**Impact:** Less robust fix generation that may fail with unusual formatting or syntax variations.
 
-**Test Coverage:** All invalid test cases rely on correct insertion of the "type" keyword.
+**Test Coverage:** Could cause issues with any test case involving fixes, especially with complex formatting.
 
-#### 3. AST Node Access Pattern Differences
+#### 3. Specifier Type Checking Logic
+
 **TypeScript Implementation:**
 ```typescript
 for (const specifier of node.specifiers) {
@@ -116,42 +129,45 @@ for _, element := range namedImports.Elements.Nodes {
 }
 ```
 
-**Issue:** The property names differ: TypeScript uses `importKind !== 'type'` while Go uses `!specifier.IsTypeOnly`. While functionally equivalent, this needs verification that the Go AST property correctly maps to the TypeScript equivalent.
+**Issue:** The logic structure is slightly different. TypeScript checks each specifier individually and returns early if any non-type specifier is found. Go uses a flag-based approach but the core logic should be equivalent.
 
-**Impact:** Potential mismatch in detecting type-only specifiers, though this appears to be a correct mapping.
+**Impact:** Minimal - both approaches should catch the same cases, but the Go version is more verbose.
 
-**Test Coverage:** Valid test cases like `"import { type T, U } from 'mod';"` would reveal issues here.
+**Test Coverage:** Should work correctly for all test cases.
 
-#### 4. Edge Case Handling - Mixed Import Types
+#### 4. Property Name vs Imported Name Handling
+
 **TypeScript Implementation:**
 ```typescript
-if (
-  specifier.type !== AST_NODE_TYPES.ImportSpecifier ||
-  specifier.importKind !== 'type'
-) {
-  return;  // Early return if ANY specifier is not type-only
-}
+// Uses specifier.imported.range[0] directly
+fixer.removeRange([
+  qualifier.range[0],
+  specifier.imported.range[0],
+])
 ```
 
 **Go Implementation:**
 ```go
-if !specifier.IsTypeOnly {
-  allTypeOnly = false
-  break  // Continue checking but mark as not all type-only
+var identifierNode *ast.Node
+if specifier.PropertyName != nil {
+  identifierNode = specifier.PropertyName
+} else {
+  identifierNode = specifier.Name()
 }
 ```
 
-**Issue:** Both implementations correctly handle the case where not all specifiers are type-only, but the Go version continues processing while TypeScript returns immediately.
+**Issue:** The Go implementation checks for PropertyName vs Name, but the TypeScript version uses `specifier.imported` which may map differently in the AST structure.
 
-**Impact:** Minimal - both achieve the correct result of not reporting when mixed import types exist.
+**Impact:** Could affect handling of aliased imports (`import { type A as B }`).
 
-**Test Coverage:** Valid test case `"import { type T, U } from 'mod';"` verifies this behavior.
+**Test Coverage:** Test cases with aliases (`type A as AA`) may reveal discrepancies.
 
 ### Recommendations
-- **Critical Fix Required**: Rewrite the fix generation logic to properly locate and remove type keywords using token-based positioning rather than crude range calculations
-- **Import Keyword Detection**: Implement proper token scanning to find the import keyword position instead of hardcoding offsets
-- **AST Property Verification**: Verify that `specifier.IsTypeOnly` in Go correctly maps to `specifier.importKind === 'type'` in TypeScript
-- **Token-Based Text Manipulation**: Consider implementing utility functions similar to TypeScript's `getFirstToken()` for precise token location
-- **Test Enhanced Validation**: Add specific test cases to verify fix output matches expected results exactly
+- Implement proper token detection utilities similar to `isImportKeyword` and `isTypeKeyword`
+- Replace hardcoded position arithmetic with token-based positioning
+- Add utility functions to find specific tokens within nodes (equivalent to `getFirstToken`)
+- Verify the PropertyName vs Name logic matches TypeScript's `imported` property semantics
+- Add error handling for cases where expected tokens are not found
+- Consider implementing a source code utility similar to TypeScript's `sourceCode` for token-level operations
 
 ---

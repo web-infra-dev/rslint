@@ -105,7 +105,7 @@ type Handler interface {
 // Service manages the IPC communication
 type Service struct {
 	reader  *bufio.Reader
-	writer  io.Writer
+	writer  *bufio.Writer
 	handler Handler
 	mutex   sync.Mutex
 }
@@ -113,8 +113,8 @@ type Service struct {
 // NewService creates a new IPC service
 func NewService(reader io.Reader, writer io.Writer, handler Handler) *Service {
 	return &Service{
-		reader:  bufio.NewReader(reader),
-		writer:  writer,
+		reader:  bufio.NewReaderSize(reader, 1024*1024), // 1MB buffer
+		writer:  bufio.NewWriterSize(writer, 1024*1024), // 1MB buffer
 		handler: handler,
 	}
 }
@@ -127,10 +127,16 @@ func (s *Service) readMessage() (*Message, error) {
 		return nil, fmt.Errorf("failed to read message length: %w", err)
 	}
 
+	// Validate message length
+	if length > 10*1024*1024 { // 10MB limit
+		return nil, fmt.Errorf("message too large: %d bytes", length)
+	}
+	
 	// Read message content
 	data := make([]byte, length)
-	if _, err := io.ReadFull(s.reader, data); err != nil {
-		return nil, fmt.Errorf("failed to read message content: %w", err)
+	n, err := io.ReadFull(s.reader, data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read message content (read %d/%d bytes): %w", n, length, err)
 	}
 
 	// Unmarshal message
@@ -152,6 +158,7 @@ func (s *Service) writeMessage(msg *Message) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal message: %w", err)
 	}
+	
 
 	// Write message length (4 bytes)
 	if err := binary.Write(s.writer, binary.LittleEndian, uint32(len(data))); err != nil {
@@ -161,6 +168,11 @@ func (s *Service) writeMessage(msg *Message) error {
 	// Write message content
 	if _, err := s.writer.Write(data); err != nil {
 		return fmt.Errorf("failed to write message content: %w", err)
+	}
+
+	// Flush the buffer to ensure the message is sent immediately
+	if err := s.writer.Flush(); err != nil {
+		return fmt.Errorf("failed to flush writer: %w", err)
 	}
 
 	return nil
@@ -194,14 +206,16 @@ func (s *Service) Start() error {
 // handleHandshake handles handshake messages
 func (s *Service) handleHandshake(msg *Message) {
 	var req HandshakeRequest
-	data, err := json.Marshal(msg.Data)
-	if err != nil {
-		s.sendError(msg.ID, fmt.Sprintf("failed to marshal data: %v", err))
-		return
-	}
-
-	if err := json.Unmarshal(data, &req); err != nil {
-		s.sendError(msg.ID, fmt.Sprintf("failed to parse handshake request: %v", err))
+	// Convert msg.Data to the correct type
+	if reqMap, ok := msg.Data.(map[string]interface{}); ok {
+		// Marshal and unmarshal to convert map to struct
+		data, _ := json.Marshal(reqMap)
+		if err := json.Unmarshal(data, &req); err != nil {
+			s.sendError(msg.ID, fmt.Sprintf("failed to parse handshake request: %v", err))
+			return
+		}
+	} else {
+		s.sendError(msg.ID, "invalid handshake request format")
 		return
 	}
 
@@ -219,14 +233,16 @@ func (s *Service) handleExit(msg *Message) {
 // handleLint handles lint messages
 func (s *Service) handleLint(msg *Message) {
 	var req LintRequest
-	data, err := json.Marshal(msg.Data)
-	if err != nil {
-		s.sendError(msg.ID, fmt.Sprintf("failed to marshal data: %v", err))
-		return
-	}
-
-	if err := json.Unmarshal(data, &req); err != nil {
-		s.sendError(msg.ID, fmt.Sprintf("failed to parse lint request: %v", err))
+	// Convert msg.Data to the correct type
+	if reqMap, ok := msg.Data.(map[string]interface{}); ok {
+		// Marshal and unmarshal to convert map to struct
+		data, _ := json.Marshal(reqMap)
+		if err := json.Unmarshal(data, &req); err != nil {
+			s.sendError(msg.ID, fmt.Sprintf("failed to parse lint request: %v", err))
+			return
+		}
+	} else {
+		s.sendError(msg.ID, "invalid lint request format")
 		return
 	}
 

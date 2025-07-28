@@ -1,37 +1,62 @@
-# Rule: consistent-return
+## Rule: consistent-return
 
-## Test File: consistent-return.test.ts
+### Test File: consistent-return.test.ts
 
-## Validation Summary
+### Validation Summary
 - ✅ **CORRECT**: 
-  - Basic return consistency checking
-  - Function stack management for nested functions
-  - Support for various function types (declaration, expression, arrow, method, accessor)
+  - Basic function tracking and return statement analysis
+  - Error message structure and content
   - treatUndefinedAsUnspecified option handling
-  - Error message formatting with function names
-  - Async function detection and naming
+  - Async function detection
+  - Function name extraction logic
+  - Method and accessor support (Go version is more comprehensive)
 
-- ⚠️ **POTENTIAL ISSUES**:
-  - Complex Promise<void> type detection logic may have subtle differences
-  - Union type handling for Promise return types needs verification
-  - Edge cases with deeply nested Promise types
+- ⚠️ **POTENTIAL ISSUES**: 
+  - Different architectural approach to void return type handling
+  - Base rule integration vs from-scratch implementation
+  - Union type handling complexity differences
+  - Return policy system may not fully match TypeScript behavior
 
-- ❌ **INCORRECT**:
-  - Missing proper handling of union types that include void (non-Promise cases)
-  - Incomplete implementation of the return policy system
-  - Error reporting location differs from TypeScript implementation
+- ❌ **INCORRECT**: 
+  - Missing base rule integration means some edge cases may not be handled
+  - Return policy system (0/1/2) doesn't directly correspond to TypeScript logic
+  - Complex nested Promise type analysis may differ
 
-## Discrepancies Found
+### Discrepancies Found
 
-### 1. Union Type Handling for Non-Promise Functions
+#### 1. Base Rule Integration Missing
+**TypeScript Implementation:**
+```typescript
+const baseRule = getESLintCoreRule('consistent-return');
+const rules = baseRule.create(context);
+// ... delegates to base rule for core logic
+rules.ReturnStatement(node);
+```
 
+**Go Implementation:**
+```go
+// Implements everything from scratch without base rule
+funcInfo.hasReturn = true
+if hasArgument {
+    if funcInfo.hasNoReturnValue {
+        ctx.ReportNode(returnStmt.Expression, buildUnexpectedReturnValueMessage(funcInfo.functionName))
+    }
+    funcInfo.hasReturnValue = true
+}
+```
+
+**Issue:** The TypeScript version extends ESLint's base consistent-return rule which handles many edge cases, while the Go version implements all logic from scratch.
+
+**Impact:** May miss edge cases that the base ESLint rule handles, such as specific control flow patterns or nested function scenarios.
+
+**Test Coverage:** All test cases, but especially complex nested scenarios may fail.
+
+#### 2. Void Return Type Detection Logic
 **TypeScript Implementation:**
 ```typescript
 function isReturnVoidOrThenableVoid(node: FunctionNode): boolean {
   const functionType = services.getTypeAtLocation(node);
-  const tsNode = services.esTreeNodeToTSNodeMap.get(node);
   const callSignatures = functionType.getCallSignatures();
-
   return callSignatures.some(signature => {
     const returnType = signature.getReturnType();
     if (node.async) {
@@ -45,53 +70,24 @@ function isReturnVoidOrThenableVoid(node: FunctionNode): boolean {
 **Go Implementation:**
 ```go
 getReturnPolicy := func(funcNode *ast.Node) int {
-  // ... complex logic with 3 return policies ...
-  // Policy 2 (mixed returns) only handles Promise union types
-  // Missing direct union type handling for sync functions
+    // Returns 0 = strict, 1 = empty allowed, 2 = mixed allowed
+    t := ctx.TypeChecker.GetTypeAtLocation(funcNode)
+    signatures := utils.GetCallSignatures(ctx.TypeChecker, t)
+    // Complex policy-based logic...
 }
 ```
 
-**Issue:** The TypeScript version has a simpler boolean check for void/thenable-void returns, while the Go version implements a more complex 3-tier policy system. However, the Go version doesn't properly handle sync functions with union return types that include void (e.g., `string | void`).
+**Issue:** The Go version uses a policy-based system (0/1/2) instead of the binary void detection used in TypeScript. This may not capture the exact same conditions.
 
-**Impact:** Test cases with union types like `number | void` may not behave correctly - the rule should allow mixed returns but might enforce strict consistency instead.
+**Impact:** May allow/disallow returns in different scenarios than the TypeScript version.
 
-**Test Coverage:** This affects the valid test case: `function foo(flag?: boolean): number | void { ... }`
+**Test Coverage:** Tests involving void functions, Promise<void>, and union types with void.
 
-### 2. Error Reporting Location Differences
-
-**TypeScript Implementation:**
-```typescript
-ReturnStatement(node): void {
-  // ... logic ...
-  rules.ReturnStatement(node); // Delegates to base ESLint rule for reporting
-}
-```
-
-**Go Implementation:**
-```go
-if hasArgument {
-  ctx.ReportNode(returnStmt.Expression, buildUnexpectedReturnValueMessage(funcInfo.functionName))
-} else {
-  // Complex range calculation for return keyword
-  ctx.ReportRange(core.NewTextRange(nodeRange.Pos(), returnKeywordEnd), buildMissingReturnValueMessage(funcInfo.functionName))
-}
-```
-
-**Issue:** The TypeScript version delegates error reporting to the base ESLint rule, which likely has different reporting logic. The Go version implements custom range calculation that may not match the expected column positions in test cases.
-
-**Impact:** Error locations (line/column) in test output may not match expected values.
-
-**Test Coverage:** All invalid test cases specify exact column positions that may not align.
-
-### 3. Promise Union Type Detection
-
+#### 3. Promise Type Analysis Depth
 **TypeScript Implementation:**
 ```typescript
 function isPromiseVoid(node: ts.Node, type: ts.Type): boolean {
-  if (
-    tsutils.isThenableType(checker, node, type) &&
-    tsutils.isTypeReference(type)
-  ) {
+  if (tsutils.isThenableType(checker, node, type) && tsutils.isTypeReference(type)) {
     const awaitedType = type.typeArguments?.[0];
     if (awaitedType) {
       if (isTypeFlagSet(awaitedType, ts.TypeFlags.Void)) {
@@ -106,76 +102,86 @@ function isPromiseVoid(node: ts.Node, type: ts.Type): boolean {
 
 **Go Implementation:**
 ```go
-isPromiseUnionWithVoid := func(funcNode *ast.Node, t *checker.Type) bool {
-  // Complex nested logic for Promise<union> types
-  // Includes special handling for Promise<Promise<void | undefined>>
-  // May be over-engineered compared to TypeScript version
+var isPromiseVoid func(node *ast.Node, t *checker.Type) bool
+isPromiseVoid = func(node *ast.Node, t *checker.Type) bool {
+    if !utils.IsThenableType(ctx.TypeChecker, node, t) {
+        return false
+    }
+    if !utils.IsObjectType(t) {
+        return false
+    }
+    typeArgs := checker.Checker_getTypeArguments(ctx.TypeChecker, t)
+    // Similar recursive logic but different API calls
 }
 ```
 
-**Issue:** The Go version has more complex logic for handling Promise union types, including special cases that may not exist in the TypeScript version. This could lead to different behavior for edge cases.
+**Issue:** While both are recursive, they use different TypeScript compiler APIs and may handle edge cases differently.
 
-**Impact:** Complex Promise types with unions may behave differently between implementations.
+**Impact:** Complex nested Promise types like `Promise<Promise<void>>` may be handled inconsistently.
 
-**Test Coverage:** The test case `Promise<Promise<void | undefined>>` exercises this logic.
+**Test Coverage:** Tests with nested Promise types and complex async return types.
 
-### 4. Base Rule Integration Missing
-
+#### 4. Union Type with Void Handling
 **TypeScript Implementation:**
 ```typescript
-const baseRule = getESLintCoreRule('consistent-return');
-// ... 
-const rules = baseRule.create(context);
-// Delegates most logic to base ESLint rule
+// Simple binary check - either void or not
+if (node.async) {
+  return isPromiseVoid(tsNode, returnType);
+}
+return isTypeFlagSet(returnType, ts.TypeFlags.Void);
 ```
 
 **Go Implementation:**
 ```go
-// Implements entire rule logic from scratch
-// No integration with base ESLint rule behavior
+// Complex policy system with special union handling
+if utils.IsUnionType(returnType) {
+    for _, unionMember := range returnType.Types() {
+        if utils.IsTypeFlagSet(unionMember, checker.TypeFlagsVoid) {
+            return 2 // Mixed returns allowed
+        }
+    }
+}
 ```
 
-**Issue:** The TypeScript version extends the base ESLint `consistent-return` rule and only adds TypeScript-specific type checking. The Go version reimplements the entire rule, which may miss some edge cases or behaviors from the original ESLint rule.
+**Issue:** The Go version introduces a "mixed returns allowed" policy for union types containing void, while TypeScript treats them as non-void unless the entire return type is void.
 
-**Impact:** Subtle differences in rule behavior for edge cases not covered by TypeScript-specific logic.
+**Impact:** May allow inconsistent returns in union type scenarios where TypeScript version would enforce consistency.
 
-**Test Coverage:** Base JavaScript functionality that would normally be handled by the original ESLint rule.
+**Test Coverage:** Tests with union types like `number | void`, `Promise<string | void>`.
 
-### 5. Function Name Extraction Inconsistencies
-
+#### 5. Function Name Extraction Complexity
 **TypeScript Implementation:**
 ```typescript
-// Relies on base rule for function name extraction and formatting
+// Uses base rule's function name extraction
+// No explicit name extraction logic visible
 ```
 
 **Go Implementation:**
 ```go
 getFunctionName := func(node *ast.Node) string {
-  // Custom implementation with specific formatting
-  // Returns "Function 'name'", "Async function 'name'", etc.
+    switch node.Kind {
+    case ast.KindFunctionDeclaration:
+        // Complex name extraction with async detection
+    case ast.KindArrowFunction:
+        // Handles arrow functions specially
+    case ast.KindMethodDeclaration:
+        // Method-specific naming
+    // ... many more cases
 }
 ```
 
-**Issue:** The custom function name extraction in Go may not match the exact formatting used by the base ESLint rule, potentially causing test failures due to message differences.
+**Issue:** The Go version has much more complex function naming logic, which may not match the base rule's naming conventions.
 
-**Impact:** Error messages may have different formatting for function names.
+**Impact:** Error messages may have different function names than expected in test cases.
 
-**Test Coverage:** All error test cases specify exact function names in error messages.
+**Test Coverage:** All error message tests that check the `data.name` field.
 
-## Recommendations
-
-1. **Fix Union Type Handling**: Implement proper detection of sync functions with union return types that include void. The `getReturnPolicy` function should return policy 2 (mixed returns allowed) for cases like `string | void`.
-
-2. **Simplify Return Policy Logic**: Consider simplifying the 3-tier policy system to match the TypeScript implementation's simpler boolean approach for void detection.
-
-3. **Align Error Reporting**: Ensure error reporting locations match the expected test output by either adjusting the range calculation or updating test expectations.
-
-4. **Review Promise Type Detection**: Simplify the `isPromiseUnionWithVoid` logic to more closely match the TypeScript version's approach.
-
-5. **Add Missing Test Cases**: Consider adding test cases that specifically validate the edge cases in Promise union type handling.
-
-6. **Verify Function Name Formatting**: Ensure the custom function name extraction produces messages that match the expected test output format.
-
-7. **Document Behavioral Differences**: If the Go implementation intentionally differs from the TypeScript version (e.g., more sophisticated Promise handling), document these differences and update tests accordingly.
+### Recommendations
+- Consider integrating with a base consistent-return implementation instead of from-scratch approach
+- Simplify the return policy system to match TypeScript's binary void detection
+- Verify union type handling matches TypeScript-ESLint behavior exactly
+- Test complex nested Promise scenarios thoroughly
+- Ensure function naming matches expected test output formats
+- Add comprehensive test coverage for edge cases that base ESLint rule handles
 
 ---

@@ -139,8 +139,19 @@ func hasDirectConstAssertion(node *ast.Node) bool {
 
 // Check if function immediately returns another function expression
 func doesImmediatelyReturnFunctionExpression(info functionInfo) bool {
+	node := info.node
 	returns := info.returns
 	
+	// For arrow functions, check if body is directly a function
+	if node.Kind == ast.KindArrowFunction {
+		arrowFunc := node.AsArrowFunction()
+		if arrowFunc.Body != nil && arrowFunc.Body.Kind != ast.KindBlock {
+			// Direct expression body
+			return isFunction(arrowFunc.Body)
+		}
+	}
+	
+	// For regular functions or arrow functions with block bodies, check return statements
 	// Should have exactly one return statement
 	if len(returns) != 1 {
 		return false
@@ -384,30 +395,54 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 			AllowOverloadFunctions:                    false,
 		}
 		
+		// Parse options with dual-format support (handles both array and object formats)
 		if options != nil {
-			if optsMap, ok := options.(map[string]interface{}); ok {
-				if val, ok := optsMap["allowArgumentsExplicitlyTypedAsAny"].(bool); ok {
-					opts.AllowArgumentsExplicitlyTypedAsAny = val
+			var optsMap map[string]interface{}
+			var ok bool
+			
+			// Handle array format: [{ option: value }]
+			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
+				optsMap, ok = optArray[0].(map[string]interface{})
+			} else {
+				// Handle direct object format: { option: value }
+				optsMap, ok = options.(map[string]interface{})
+			}
+			
+			if ok {
+				if val, exists := optsMap["allowArgumentsExplicitlyTypedAsAny"]; exists {
+					if boolVal, ok := val.(bool); ok {
+						opts.AllowArgumentsExplicitlyTypedAsAny = boolVal
+					}
 				}
-				if val, ok := optsMap["allowDirectConstAssertionInArrowFunctions"].(bool); ok {
-					opts.AllowDirectConstAssertionInArrowFunctions = val
+				if val, exists := optsMap["allowDirectConstAssertionInArrowFunctions"]; exists {
+					if boolVal, ok := val.(bool); ok {
+						opts.AllowDirectConstAssertionInArrowFunctions = boolVal
+					}
 				}
-				if val, ok := optsMap["allowedNames"].([]interface{}); ok {
-					opts.AllowedNames = make([]string, 0, len(val))
-					for _, v := range val {
-						if s, ok := v.(string); ok {
-							opts.AllowedNames = append(opts.AllowedNames, s)
+				if val, exists := optsMap["allowedNames"]; exists {
+					if arrayVal, ok := val.([]interface{}); ok {
+						opts.AllowedNames = make([]string, 0, len(arrayVal))
+						for _, v := range arrayVal {
+							if s, ok := v.(string); ok {
+								opts.AllowedNames = append(opts.AllowedNames, s)
+							}
 						}
 					}
 				}
-				if val, ok := optsMap["allowHigherOrderFunctions"].(bool); ok {
-					opts.AllowHigherOrderFunctions = val
+				if val, exists := optsMap["allowHigherOrderFunctions"]; exists {
+					if boolVal, ok := val.(bool); ok {
+						opts.AllowHigherOrderFunctions = boolVal
+					}
 				}
-				if val, ok := optsMap["allowTypedFunctionExpressions"].(bool); ok {
-					opts.AllowTypedFunctionExpressions = val
+				if val, exists := optsMap["allowTypedFunctionExpressions"]; exists {
+					if boolVal, ok := val.(bool); ok {
+						opts.AllowTypedFunctionExpressions = boolVal
+					}
 				}
-				if val, ok := optsMap["allowOverloadFunctions"].(bool); ok {
-					opts.AllowOverloadFunctions = val
+				if val, exists := optsMap["allowOverloadFunctions"]; exists {
+					if boolVal, ok := val.(bool); ok {
+						opts.AllowOverloadFunctions = boolVal
+					}
 				}
 			}
 		}
@@ -432,34 +467,6 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 			return []*ast.Node{}
 		}
 		
-		// Helper to check if exported higher order function
-		isExportedHigherOrderFunction := func(info functionInfo) bool {
-			current := info.node.Parent
-			for current != nil {
-				if current.Kind == ast.KindReturnStatement {
-					// Skip block statement parent
-					current = current.Parent.Parent
-					continue
-				}
-				
-				if !isFunction(current) {
-					return false
-				}
-				
-				returns := getReturnsInFunction(current)
-				funcInfo := functionInfo{node: current, returns: returns}
-				if !doesImmediatelyReturnFunctionExpression(funcInfo) {
-					return false
-				}
-				
-				if checkedFunctions[current] {
-					return true
-				}
-				
-				current = current.Parent
-			}
-			return false
-		}
 		
 		// Check a single parameter
 		var checkParameter func(param *ast.Node)
@@ -575,6 +582,14 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 				return
 			}
 			
+			// Check if this is a higher-order function that should be allowed
+			if opts.AllowHigherOrderFunctions && doesImmediatelyReturnFunctionExpression(info) {
+				// Allow higher-order functions to omit return types entirely
+				// Only check parameters
+				checkParameters(node)
+				return
+			}
+			
 			// Check return type
 			if !hasReturnType(node) {
 				// Special handling for arrow functions with direct const assertion
@@ -623,6 +638,14 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 			}
 			
 			if opts.AllowOverloadFunctions && hasOverloadSignatures(node, ctx) {
+				return
+			}
+			
+			// Check if this is a higher-order function that should be allowed
+			if opts.AllowHigherOrderFunctions && doesImmediatelyReturnFunctionExpression(info) {
+				// Allow higher-order functions to omit return types entirely
+				// Only check parameters
+				checkParameters(node)
 				return
 			}
 			
@@ -742,6 +765,86 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 			}
 		}
 		
+		// Track all functions that are exported to check later
+		exportedFunctions := make(map[*ast.Node]bool)
+		
+		// Helper to mark exported nodes recursively
+		var markExportedNodes func(node *ast.Node, exported map[*ast.Node]bool)
+		markExportedNodes = func(node *ast.Node, exported map[*ast.Node]bool) {
+			if node == nil {
+				return
+			}
+			
+			// Mark functions as exported
+			if isFunction(node) {
+				exported[node] = true
+				return
+			}
+			
+			// Recursively check common patterns
+			switch node.Kind {
+			case ast.KindVariableDeclaration:
+				varDecl := node.AsVariableDeclaration()
+				if varDecl.Initializer != nil {
+					markExportedNodes(varDecl.Initializer, exported)
+				}
+			case ast.KindVariableDeclarationList:
+				for _, decl := range node.AsVariableDeclarationList().Declarations.Nodes {
+					markExportedNodes(decl, exported)
+				}
+			case ast.KindPropertyDeclaration:
+				prop := node.AsPropertyDeclaration()
+				if prop.Initializer != nil {
+					markExportedNodes(prop.Initializer, exported)
+				}
+			case ast.KindPropertyAssignment:
+				markExportedNodes(node.AsPropertyAssignment().Initializer, exported)
+			case ast.KindMethodDeclaration:
+				exported[node] = true
+			case ast.KindClassDeclaration, ast.KindClassExpression:
+				// Mark all public methods
+				for _, member := range node.Members() {
+					if member.Kind == ast.KindMethodDeclaration {
+						method := member.AsMethodDeclaration()
+						isPrivate := false
+						if method.Modifiers() != nil {
+							for _, mod := range method.Modifiers().Nodes {
+								if mod.Kind == ast.KindPrivateKeyword {
+									isPrivate = true
+									break
+								}
+							}
+						}
+						if !isPrivate {
+							exported[member] = true
+						}
+					} else if member.Kind == ast.KindPropertyDeclaration {
+						prop := member.AsPropertyDeclaration()
+						isPrivate := false
+						if prop.Modifiers() != nil {
+							for _, mod := range prop.Modifiers().Nodes {
+								if mod.Kind == ast.KindPrivateKeyword {
+									isPrivate = true
+									break
+								}
+							}
+						}
+						if !isPrivate && prop.Initializer != nil {
+							markExportedNodes(prop.Initializer, exported)
+						}
+					}
+				}
+			case ast.KindObjectLiteralExpression:
+				for _, prop := range node.AsObjectLiteralExpression().Properties.Nodes {
+					markExportedNodes(prop, exported)
+				}
+			case ast.KindArrayLiteralExpression:
+				for _, elem := range node.AsArrayLiteralExpression().Elements.Nodes {
+					markExportedNodes(elem, exported)
+				}
+			}
+		}
+		
 		return rule.RuleListeners{
 			// Track function enters/exits
 			ast.KindArrowFunction: func(node *ast.Node) {
@@ -751,6 +854,21 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
 				functionStack = append(functionStack, node)
 				functionReturnsMap[node] = []*ast.Node{}
+				
+				// Check if this is an exported function declaration
+				parent := node.Parent
+				if parent != nil && parent.Kind == ast.KindSourceFile {
+					// Check if this function declaration has export modifier
+					funcDecl := node.AsFunctionDeclaration()
+					if funcDecl.Modifiers() != nil {
+						for _, mod := range funcDecl.Modifiers().Nodes {
+							if mod.Kind == ast.KindExportKeyword {
+								exportedFunctions[node] = true
+								break
+							}
+						}
+					}
+				}
 			},
 			ast.KindFunctionExpression: func(node *ast.Node) {
 				functionStack = append(functionStack, node)
@@ -765,11 +883,11 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 				}
 			},
 			
-			// Handle export declarations
+			// Handle export declarations  
 			ast.KindExportAssignment: func(node *ast.Node) {
-				// Check the expression being exported
+				// Mark exported functions for later processing
 				exportDefault := node.AsExportAssignment()
-				checkNode(exportDefault.Expression)
+				markExportedNodes(exportDefault.Expression, exportedFunctions)
 			},
 			
 			ast.KindExportDeclaration: func(node *ast.Node) {
@@ -787,7 +905,8 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 							}
 						}
 					}
-					// Note: Declaration field handling removed as API changed
+					// Handle export declarations with direct declarations
+					// Note: We already handle export function declarations in the FunctionDeclaration listener
 				}
 			},
 			
@@ -808,14 +927,35 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 				}
 			},
 			
-			// Program exit - check for exported higher-order functions
+			// Program exit - check all functions now that return statements have been collected
 			rule.ListenerOnExit(ast.KindSourceFile): func(node *ast.Node) {
-				for funcNode, returns := range functionReturnsMap {
+				// Check all functions that were tracked, giving priority to exported ones
+				processedFunctions := make(map[*ast.Node]bool)
+				
+				// First process exported functions
+				for funcNode := range exportedFunctions {
+					if processedFunctions[funcNode] {
+						continue
+					}
+					processedFunctions[funcNode] = true
+					
+					returns := getReturnsInFunction(funcNode)
 					info := functionInfo{node: funcNode, returns: returns}
-					if isExportedHigherOrderFunction(info) {
-						checkNode(funcNode)
+					
+					if isFunction(funcNode) {
+						switch funcNode.Kind {
+						case ast.KindFunctionDeclaration:
+							checkFunction(info)
+						case ast.KindArrowFunction, ast.KindFunctionExpression:
+							checkFunctionExpression(info)
+						case ast.KindMethodDeclaration:
+							checkFunction(info)  
+						}
 					}
 				}
+				
+				// Skip processing non-exported functions as they are not module boundaries
+				// Only exported functions should be checked by this rule
 			},
 		}
 	},

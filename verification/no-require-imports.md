@@ -3,13 +3,13 @@
 ### Test File: no-require-imports.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: Basic require() call detection, external module reference handling, allow patterns with regex, allowAsImport option for import equals declarations, string and template literal argument handling
-- ⚠️ **POTENTIAL ISSUES**: Global require detection logic complexity, optional chaining handling approach, template literal with expressions edge case
-- ❌ **INCORRECT**: None identified that would cause test failures
+- ✅ **CORRECT**: Core rule logic structure, TSExternalModuleReference handling, configuration options parsing, basic string literal processing
+- ⚠️ **POTENTIAL ISSUES**: Optional chaining syntax handling, scope resolution complexity, template literal processing edge cases
+- ❌ **INCORRECT**: Global require detection logic has fundamental differences that could cause false positives/negatives
 
 ### Discrepancies Found
 
-#### 1. Global Require Detection Approach
+#### 1. Global Require Detection Logic Complexity
 **TypeScript Implementation:**
 ```typescript
 const variable = ASTUtils.findVariable(
@@ -30,7 +30,6 @@ if (!variable?.identifiers.length) {
 ```go
 // isGlobalRequire checks if the require is the global require function
 func isGlobalRequire(ctx rule.RuleContext, node *ast.Node) bool {
-	// Walk up to find the source file and traverse all variable declarations
 	sourceFile := ctx.SourceFile
 	if sourceFile == nil {
 		return true
@@ -39,34 +38,28 @@ func isGlobalRequire(ctx rule.RuleContext, node *ast.Node) bool {
 	// Check if 'require' is defined anywhere in the current scope context
 	return !isRequireLocallyDefined(sourceFile, node)
 }
+
+// Complex multi-function implementation with scope traversal
 ```
 
-**Issue:** The Go implementation uses a custom scope traversal algorithm that manually walks through AST nodes to find local require declarations, while TypeScript uses the ESLint scope analysis utilities. The Go approach may miss complex scoping scenarios or block-scoped declarations.
+**Issue:** The Go implementation uses a complex custom scope traversal mechanism instead of leveraging TypeScript's built-in scope analysis. The TypeScript version uses ESLint's `findVariable` utility which properly handles JavaScript/TypeScript scoping rules, while the Go version manually walks the AST which may miss edge cases.
 
-**Impact:** Could potentially miss cases where require is redefined in nested scopes or through more complex declaration patterns.
+**Impact:** This could lead to incorrect behavior in complex scoping scenarios, particularly with nested functions, closures, and different types of declarations.
 
-**Test Coverage:** Tests with local require redefinition should reveal any issues, particularly the cases with `let require = bazz;`.
+**Test Coverage:** Test cases like the one with `createRequire` from 'module' and local require reassignment scenarios rely heavily on this logic.
 
-#### 2. Optional Chaining Detection
+#### 2. Optional Chaining Implementation Inconsistency
 **TypeScript Implementation:**
 ```typescript
 'CallExpression[callee.name="require"]'(
   node: TSESTree.CallExpression,
 ): void {
-  // Handles both require() and require?.() through selector matching
+  // Automatically matches both require() and require?.() calls
 }
 ```
 
 **Go Implementation:**
 ```go
-// Check if this is a require call or require?.() call
-var isRequireCall bool
-
-if ast.IsIdentifier(callExpr.Expression) {
-	identifier := callExpr.Expression.AsIdentifier()
-	if identifier.Text == "require" {
-		isRequireCall = true
-	}
 } else if callExpr.QuestionDotToken != nil {
 	// Handle optional chaining: require?.()
 	// The expression should be require for require?.()
@@ -79,13 +72,13 @@ if ast.IsIdentifier(callExpr.Expression) {
 }
 ```
 
-**Issue:** The Go implementation explicitly checks for optional chaining tokens, which should work correctly but uses a different detection strategy than the TypeScript selector-based approach.
+**Issue:** The TypeScript selector pattern automatically handles both `require()` and `require?.()` calls, while the Go implementation has separate logic paths. The Go logic for optional chaining appears to check the same condition twice (identifier.Text == "require") which may be redundant.
 
-**Impact:** Should function equivalently for the test cases, but the logic is more explicit in Go.
+**Impact:** Potential for different handling of optional chaining edge cases.
 
-**Test Coverage:** Test cases with `require?.()` should validate this works correctly.
+**Test Coverage:** Tests with `require?.()` syntax rely on this logic.
 
-#### 3. Template Literal Handling
+#### 3. Template Literal Processing Differences
 **TypeScript Implementation:**
 ```typescript
 function isStringOrTemplateLiteral(node: TSESTree.Node): boolean {
@@ -106,38 +99,50 @@ func isStringOrTemplateLiteral(node *ast.Node) bool {
 }
 ```
 
-**Issue:** The Go implementation has more specific handling for template expressions, checking for empty TemplateSpans, while TypeScript accepts all template literals. However, the getStaticStringValue function in Go only extracts values from simple templates without expressions, which aligns with the intent.
+**Issue:** The TypeScript version accepts any `TemplateLiteral` node, while the Go version has additional conditions checking for `TemplateSpans == nil`. This could cause discrepancies in how complex template literals are handled.
 
-**Impact:** Go implementation may be more restrictive but correctly handles the test cases.
+**Impact:** May affect validation of require calls with template literal arguments.
 
-**Test Coverage:** Template literal test cases like `require(\`./package.json\`)` should validate this.
+**Test Coverage:** Tests with template literal syntax like `require(\`./package.json\`)` depend on this.
 
-#### 4. Message ID Consistency
+#### 4. Scope Resolution Accuracy
 **TypeScript Implementation:**
 ```typescript
-messages: {
-  noRequireImports: 'A `require()` style import is forbidden.',
-},
+// Uses ESLint's built-in scope analysis
+const variable = ASTUtils.findVariable(
+  context.sourceCode.getScope(node),
+  'require',
+);
 ```
 
 **Go Implementation:**
 ```go
-ctx.ReportNode(node, rule.RuleMessage{
-	Id:          "noRequireImports",
-	Description: "A `require()` style import is forbidden.",
-})
+// Custom implementation traversing parent nodes and checking statements
+func isRequireLocallyDefined(sourceFile *ast.SourceFile, callNode *ast.Node) bool {
+	currentNode := callNode
+	
+	for currentNode != nil {
+		if hasLocalRequireInContext(currentNode) {
+			return true
+		}
+		currentNode = currentNode.Parent
+	}
+	
+	return hasLocalRequireInStatements(sourceFile.Statements)
+}
 ```
 
-**Issue:** Both use the same message ID and description, ensuring consistency.
+**Issue:** The Go implementation may not correctly handle all JavaScript/TypeScript scoping rules, particularly for function scopes, block scopes, and complex nested structures. The manual traversal might miss declarations in sibling scopes or misunderstand scope boundaries.
 
-**Impact:** No impact - correctly implemented.
+**Impact:** Critical for test cases where `require` is locally defined but should not trigger the rule.
 
-**Test Coverage:** All test cases expecting `messageId: 'noRequireImports'` should pass.
+**Test Coverage:** Several test cases depend on this, especially those with local `require` declarations.
 
 ### Recommendations
-- **Verify scope detection**: The manual scope traversal in the Go implementation should be tested against complex scoping scenarios to ensure it matches ESLint's scope analysis behavior
-- **Validate optional chaining**: Ensure the explicit optional chaining detection works for all variations of `require?.()` calls
-- **Test template literal edge cases**: Verify that template literals with expressions are handled consistently between implementations
-- **Consider performance**: The Go implementation's scope traversal may be less efficient than using dedicated scope analysis utilities
+- **HIGH PRIORITY**: Review and test the global require detection logic extensively against the TypeScript test cases, particularly the ones involving local require declarations
+- **MEDIUM PRIORITY**: Simplify the optional chaining logic to match the TypeScript behavior more closely
+- **MEDIUM PRIORITY**: Verify template literal handling matches ESLint's `getStaticStringValue` utility behavior
+- **LOW PRIORITY**: Consider leveraging TypeScript-Go's scope analysis if available instead of manual traversal
+- **TEST ENHANCEMENT**: Add more edge case tests for complex scoping scenarios, nested functions, and different declaration types
 
 ---

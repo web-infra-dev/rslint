@@ -1,8 +1,129 @@
 exports[`no-unsafe-function-type > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "ruleName": "no-unsafe-function-type",
+      "messageId": "bannedFunctionType",
+      "message": "The \`Function\` type accepts any function-like value.\\nPrefer explicitly defining any function parameters and return type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 12
+        },
+        "end": {
+          "line": 1,
+          "column": 20
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 0
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unsafe-function-type > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unsafe-function-type",
+      "messageId": "bannedFunctionType",
+      "message": "The \`Function\` type accepts any function-like value.\\nPrefer explicitly defining any function parameters and return type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 12
+        },
+        "end": {
+          "line": 1,
+          "column": 20
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unsafe-function-type > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unsafe-function-type",
+      "messageId": "bannedFunctionType",
+      "message": "The \`Function\` type accepts any function-like value.\\nPrefer explicitly defining any function parameters and return type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 12
+        },
+        "end": {
+          "line": 1,
+          "column": 20
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unsafe-function-type > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unsafe-function-type",
+      "messageId": "bannedFunctionType",
+      "message": "The \`Function\` type accepts any function-like value.\\nPrefer explicitly defining any function parameters and return type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 32
+        },
+        "end": {
+          "line": 2,
+          "column": 40
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unsafe-function-type > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unsafe-function-type",
+      "messageId": "bannedFunctionType",
+      "message": "The \`Function\` type accepts any function-like value.\\nPrefer explicitly defining any function parameters and return type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 33
+        },
+        "end": {
+          "line": 2,
+          "column": 41
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
 }
 `;

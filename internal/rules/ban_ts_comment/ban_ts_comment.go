@@ -86,35 +86,49 @@ func parseDirectiveConfig(config DirectiveConfig) (bool, string, string) {
 }
 
 func getStringLength(s string) int {
-	// Count meaningful characters for description length
-	// Include basic characters and some emoji/unicode but be more restrictive
-	count := 0
-	runes := []rune(s)
+	// Count visual characters (grapheme clusters), not just runes
+	// This is important for handling complex Unicode sequences like emojis
+	trimmed := strings.TrimSpace(s)
+	if trimmed == "" {
+		return 0
+	}
 	
-	for i := 0; i < len(runes); i++ {
+	// Simple grapheme cluster counting for emoji sequences
+	// The family emoji 👨‍👩‍👧‍👦 should count as 1 character
+	runes := []rune(trimmed)
+	count := 0
+	i := 0
+	
+	for i < len(runes) {
+		count++
 		r := runes[i]
+		i++
 		
-		// Count ASCII letters, numbers, and meaningful punctuation
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') ||
-			r == ' ' || r == '.' || r == ',' || r == ':' || r == ';' || r == '!' || r == '?' ||
-			r == '-' || r == '_' || r == '(' || r == ')' || r == '[' || r == ']' ||
-			r == '{' || r == '}' || r == '\'' || r == '"' || r == '`' || r == '/' || r == '\\' ||
-			r == '+' || r == '=' || r == '@' || r == '#' || r == '$' || r == '%' || r == '&' ||
-			r == '*' || r == '<' || r == '>' || r == '|' {
-			count++
-		} else if r >= 0x1F000 {
-			// Count emoji and other high Unicode characters, but handle multi-codepoint sequences
-			// Family emoji like 👨‍👩‍👧‍👦 are composed of multiple codepoints joined by ZWJ (U+200D)
-			count++
-			// Skip over zero-width joiners and variation selectors that are part of emoji sequences
-			for i+1 < len(runes) && (runes[i+1] == 0x200D || (runes[i+1] >= 0xFE00 && runes[i+1] <= 0xFE0F)) {
-				i++
-				if i+1 < len(runes) && runes[i+1] >= 0x1F000 {
-					i++ // Skip the next emoji component
+		// Skip over zero-width joiners and the following character
+		// This handles complex emoji sequences like family emojis
+		for i < len(runes) && i-1 < len(runes) && runes[i] == 0x200D {
+			i++ // Skip the ZWJ
+			if i < len(runes) {
+				i++ // Skip the next character after ZWJ
+				
+				// Also skip any variation selectors after the joined character
+				for i < len(runes) && (runes[i] == 0xFE0E || runes[i] == 0xFE0F || (runes[i] >= 0x1F3FB && runes[i] <= 0x1F3FF)) {
+					i++
 				}
 			}
 		}
+		
+		// Skip over variation selectors and skin tone modifiers for the main character
+		for i < len(runes) && (runes[i] == 0xFE0E || runes[i] == 0xFE0F || (runes[i] >= 0x1F3FB && runes[i] <= 0x1F3FF)) {
+			i++
+		}
+		
+		// Skip regional indicator sequences (flags)
+		if r >= 0x1F1E6 && r <= 0x1F1FF && i < len(runes) && runes[i] >= 0x1F1E6 && runes[i] <= 0x1F1FF {
+			i++ // Skip the second part of the flag
+		}
 	}
+	
 	return count
 }
 
@@ -258,8 +272,20 @@ var BanTsCommentRule = rule.Rule{
 			TsNocheck:                true,
 		}
 
+		// Parse options with dual-format support (handles both array and object formats)
 		if options != nil {
-			if optMap, ok := options.(map[string]interface{}); ok {
+			var optMap map[string]interface{}
+			var ok bool
+			
+			// Handle array format: [{ option: value }]
+			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
+				optMap, ok = optArray[0].(map[string]interface{})
+			} else {
+				// Handle direct object format: { option: value }
+				optMap, ok = options.(map[string]interface{})
+			}
+			
+			if ok {
 				if minLen, exists := optMap["minimumDescriptionLength"]; exists {
 					if minLenInt, ok := minLen.(float64); ok {
 						opts.MinimumDescriptionLength = utils.Ref(int(minLenInt))
@@ -313,12 +339,49 @@ var BanTsCommentRule = rule.Rule{
 				commentText := sourceText[commentRange.Pos():commentRange.End()]
 				isBlockComment := strings.HasPrefix(commentText, "/*") || strings.HasPrefix(commentText, "/**")
 				
+				// Block comments with ts-nocheck are always allowed (regardless of configuration)
 				if isBlockComment {
-					// Block comments with ts-nocheck are always allowed
 					return
 				}
 				
-				// For line comments, allow if they appear before the first statement
+				// For line comments, check the configuration
+				directiveName := "ts-" + directive.Directive
+				config, exists := directiveConfigs[directiveName] 
+				if exists {
+					enabled, mode, descFormat := parseDirectiveConfig(config)
+					
+					// If ts-nocheck is banned (enabled=true, mode=""), then report error for line comments
+					if enabled && mode == "" {
+						ctx.ReportRange(commentRange.TextRange, buildTsDirectiveCommentMessage(directive.Directive))
+						return
+					}
+					
+					// If mode is "allow-with-description" or "description-format", validate the description
+					if enabled && (mode == "allow-with-description" || mode == "description-format") {
+						trimmedDescription := strings.TrimSpace(directive.Description)
+						descriptionLength := getStringLength(trimmedDescription)
+						
+						// Check minimum description length
+						if descriptionLength < *opts.MinimumDescriptionLength {
+							ctx.ReportRange(commentRange.TextRange, buildTsDirectiveCommentRequiresDescriptionMessage(directive.Directive, *opts.MinimumDescriptionLength))
+							return
+						}
+						
+						// Check description format if specified
+						if mode == "description-format" && descFormat != "" {
+							regex := descriptionFormats[directiveName]
+							if regex != nil && !regex.MatchString(directive.Description) {
+								ctx.ReportRange(commentRange.TextRange, buildTsDirectiveCommentDescriptionNotMatchPatternMessage(directive.Directive, descFormat))
+								return
+							}
+						}
+						
+						// Description is valid, allow the directive
+						return
+					}
+				}
+				
+				// For line comments when not banned, allow if they appear before the first statement
 				if firstStatement == nil {
 					// No statements in file, allow ts-nocheck
 					return

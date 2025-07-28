@@ -24,6 +24,7 @@ import (
 	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_void_expression"
 	"github.com/typescript-eslint/rslint/internal/rules/no_duplicate_type_constituents"
 	"github.com/typescript-eslint/rslint/internal/rules/no_duplicate_enum_values"
+	"github.com/typescript-eslint/rslint/internal/rules/no_dupe_class_members"
 	"github.com/typescript-eslint/rslint/internal/rules/no_dynamic_delete"
 	"github.com/typescript-eslint/rslint/internal/rules/no_empty_function"
 	"github.com/typescript-eslint/rslint/internal/rules/no_floating_promises"
@@ -269,6 +270,7 @@ func RegisterAllTypeSriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/class-literal-property-style", class_literal_property_style.ClassLiteralPropertyStyleRule)
 	GlobalRuleRegistry.Register("class-literal-property-style", class_literal_property_style.ClassLiteralPropertyStyleRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/class-methods-use-this", class_methods_use_this.ClassMethodsUseThisRule)
+	GlobalRuleRegistry.Register("class-methods-use-this", class_methods_use_this.ClassMethodsUseThisRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/consistent-generic-constructors", consistent_generic_constructors.ConsistentGenericConstructorsRule)
 	GlobalRuleRegistry.Register("consistent-generic-constructors", consistent_generic_constructors.ConsistentGenericConstructorsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/consistent-indexed-object-style", consistent_indexed_object_style.ConsistentIndexedObjectStyleRule)
@@ -301,6 +303,8 @@ func RegisterAllTypeSriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("no-duplicate-type-constituents", no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-duplicate-enum-values", no_duplicate_enum_values.NoDuplicateEnumValuesRule)
 	GlobalRuleRegistry.Register("no-duplicate-enum-values", no_duplicate_enum_values.NoDuplicateEnumValuesRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-dupe-class-members", no_dupe_class_members.NoDupeClassMembersRule)
+	GlobalRuleRegistry.Register("no-dupe-class-members", no_dupe_class_members.NoDupeClassMembersRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-dynamic-delete", no_dynamic_delete.NoDynamicDeleteRule)
 	GlobalRuleRegistry.Register("no-dynamic-delete", no_dynamic_delete.NoDynamicDeleteRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-empty-function", no_empty_function.NoEmptyFunctionRule)

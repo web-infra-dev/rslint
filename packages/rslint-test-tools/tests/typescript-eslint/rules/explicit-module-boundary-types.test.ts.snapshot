@@ -1,0 +1,25 @@
+exports[`explicit-module-boundary-types > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "explicit-module-boundary-types",
+      "messageId": "missingReturnType",
+      "message": "Missing return type on function.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 17
+        },
+        "end": {
+          "line": 2,
+          "column": 21
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

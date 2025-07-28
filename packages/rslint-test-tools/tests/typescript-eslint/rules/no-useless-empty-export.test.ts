@@ -18,7 +18,7 @@ const error = {
   messageId: 'uselessExport',
 } as const;
 
-ruleTester.run('no-useless-empty-export', 'no-useless-empty-export', {
+ruleTester.run('no-useless-empty-export', {
   valid: [
     "declare module '_'",
     "import {} from '_';",

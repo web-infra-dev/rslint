@@ -2,6 +2,7 @@ package no_empty_function
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/typescript-eslint/rslint/internal/rule"
 	"github.com/typescript-eslint/rslint/internal/utils"
 )
@@ -17,13 +18,20 @@ var NoEmptyFunctionRule = rule.Rule{
 			Allow: []string{},
 		}
 		if options != nil {
-			if optsSlice, ok := options.([]interface{}); ok && len(optsSlice) > 0 {
-				if optsMap, ok := optsSlice[0].(map[string]interface{}); ok {
-					if allow, ok := optsMap["allow"].([]interface{}); ok {
-						for _, a := range allow {
-							if str, ok := a.(string); ok {
-								opts.Allow = append(opts.Allow, str)
-							}
+			var optsMap map[string]interface{}
+			if optsArray, ok := options.([]interface{}); ok && len(optsArray) > 0 {
+				if opts, ok := optsArray[0].(map[string]interface{}); ok {
+					optsMap = opts
+				}
+			} else if opts, ok := options.(map[string]interface{}); ok {
+				optsMap = opts
+			}
+
+			if optsMap != nil {
+				if allow, ok := optsMap["allow"].([]interface{}); ok {
+					for _, a := range allow {
+						if str, ok := a.(string); ok {
+							opts.Allow = append(opts.Allow, str)
 						}
 					}
 				}
@@ -59,6 +67,18 @@ var NoEmptyFunctionRule = rule.Rule{
 				}
 				block := fn.Body.AsBlock()
 				return len(block.Statements.Nodes) == 0
+			} else if node.Kind == ast.KindConstructor {
+				constructor := node.AsConstructorDeclaration()
+				return constructor.Body != nil && len(constructor.Body.Statements()) == 0
+			} else if node.Kind == ast.KindMethodDeclaration {
+				method := node.AsMethodDeclaration()
+				return method.Body != nil && len(method.Body.Statements()) == 0
+			} else if node.Kind == ast.KindGetAccessor {
+				accessor := node.AsGetAccessorDeclaration()
+				return accessor.Body != nil && len(accessor.Body.Statements()) == 0
+			} else if node.Kind == ast.KindSetAccessor {
+				accessor := node.AsSetAccessorDeclaration()
+				return accessor.Body != nil && len(accessor.Body.Statements()) == 0
 			}
 			return false
 		}
@@ -78,6 +98,10 @@ var NoEmptyFunctionRule = rule.Rule{
 				if node.AsArrowFunction().Parameters != nil {
 					params = node.AsArrowFunction().Parameters.Nodes
 				}
+			} else if node.Kind == ast.KindConstructor {
+				if node.AsConstructorDeclaration().Parameters != nil {
+					params = node.AsConstructorDeclaration().Parameters.Nodes
+				}
 			}
 
 			for _, param := range params {
@@ -91,6 +115,48 @@ var NoEmptyFunctionRule = rule.Rule{
 			return false
 		}
 
+		// Get the opening brace position of a function body
+		getOpenBracePosition := func(node *ast.Node) (core.TextRange, bool) {
+			var body *ast.Node
+			if node.Kind == ast.KindFunctionDeclaration {
+				body = node.AsFunctionDeclaration().Body
+			} else if node.Kind == ast.KindFunctionExpression {
+				body = node.AsFunctionExpression().Body
+			} else if node.Kind == ast.KindArrowFunction {
+				fn := node.AsArrowFunction()
+				if fn.Body != nil && fn.Body.Kind == ast.KindBlock {
+					body = fn.Body
+				}
+			} else if node.Kind == ast.KindConstructor {
+				body = node.AsConstructorDeclaration().Body
+			} else if node.Kind == ast.KindMethodDeclaration {
+				body = node.AsMethodDeclaration().Body
+			} else if node.Kind == ast.KindGetAccessor {
+				body = node.AsGetAccessorDeclaration().Body
+			} else if node.Kind == ast.KindSetAccessor {
+				body = node.AsSetAccessorDeclaration().Body
+			}
+
+			if body == nil {
+				return core.TextRange{}, false
+			}
+
+			// Find the opening brace by searching for '{' character from node start to body end
+			sourceText := ctx.SourceFile.Text()
+			nodeStart := node.Pos()
+			bodyStart := body.Pos()
+			
+			// Search for the opening brace between node start and body start
+			for i := nodeStart; i <= bodyStart && i < len(sourceText); i++ {
+				if sourceText[i] == '{' {
+					return core.TextRange{}.WithPos(i).WithEnd(i + 1), true
+				}
+			}
+			
+			// Fallback: use the body's start position
+			return core.TextRange{}.WithPos(bodyStart).WithEnd(bodyStart + 1), true
+		}
+
 		// Get the function name for error message
 		getFunctionName := func(node *ast.Node) string {
 			if node.Kind == ast.KindFunctionDeclaration {
@@ -99,6 +165,29 @@ var NoEmptyFunctionRule = rule.Rule{
 					return "function '" + fn.Name().AsIdentifier().Text + "'"
 				}
 				return "function"
+			} else if node.Kind == ast.KindConstructor {
+				return "constructor"
+			} else if node.Kind == ast.KindMethodDeclaration {
+				method := node.AsMethodDeclaration()
+				if method.Name() != nil {
+					name, _ := utils.GetNameFromMember(ctx.SourceFile, method.Name())
+					return "method '" + name + "'"
+				}
+				return "method"
+			} else if node.Kind == ast.KindGetAccessor {
+				accessor := node.AsGetAccessorDeclaration()
+				if accessor.Name() != nil {
+					name, _ := utils.GetNameFromMember(ctx.SourceFile, accessor.Name())
+					return "getter '" + name + "'"
+				}
+				return "getter"
+			} else if node.Kind == ast.KindSetAccessor {
+				accessor := node.AsSetAccessorDeclaration()
+				if accessor.Name() != nil {
+					name, _ := utils.GetNameFromMember(ctx.SourceFile, accessor.Name())
+					return "setter '" + name + "'"
+				}
+				return "setter"
 			} else if node.Kind == ast.KindFunctionExpression {
 				parent := node.Parent
 				if parent != nil {
@@ -106,9 +195,6 @@ var NoEmptyFunctionRule = rule.Rule{
 						method := parent.AsMethodDeclaration()
 						if method.Name() != nil {
 							name, _ := utils.GetNameFromMember(ctx.SourceFile, method.Name())
-							if method.Kind == ast.KindConstructor {
-								return "constructor"
-							}
 							if method.Kind == ast.KindGetAccessor {
 								return "getter '" + name + "'"
 							}
@@ -176,34 +262,90 @@ var NoEmptyFunctionRule = rule.Rule{
 				isGenerator = fn.AsteriskToken != nil
 			} else if node.Kind == ast.KindArrowFunction {
 				isAsync = ast.HasSyntacticModifier(node, ast.ModifierFlagsAsync)
+			} else if node.Kind == ast.KindMethodDeclaration {
+				method := node.AsMethodDeclaration()
+				isAsync = ast.HasSyntacticModifier(node, ast.ModifierFlagsAsync)
+				isGenerator = method.AsteriskToken != nil
+			} else if node.Kind == ast.KindGetAccessor {
+				isAsync = ast.HasSyntacticModifier(node, ast.ModifierFlagsAsync)
+			} else if node.Kind == ast.KindSetAccessor {
+				isAsync = ast.HasSyntacticModifier(node, ast.ModifierFlagsAsync)
+			} else if node.Kind == ast.KindConstructor {
+				// Check accessibility modifiers for constructors
+				hasPrivate := ast.HasSyntacticModifier(node, ast.ModifierFlagsPrivate)
+				hasProtected := ast.HasSyntacticModifier(node, ast.ModifierFlagsProtected)
+
+				if isAllowed("constructors") {
+					return
+				}
+				if hasPrivate && isAllowed("private-constructors") {
+					return
+				}
+				if hasProtected && isAllowed("protected-constructors") {
+					return
+				}
+
+				// Constructors with parameter properties are allowed
+				if hasParameterProperties(node) {
+					return
+				}
 			}
 
-			// Check for various allowed types
+			// Check for arrow functions first (before parent checks)
+			if node.Kind == ast.KindArrowFunction && isAllowed("arrowFunctions") {
+				return
+			}
+			
+			// Check for async/generator functions early
+			if isAsync && isAllowed("asyncFunctions") {
+				return
+			}
+			if isGenerator && isAllowed("generatorFunctions") {
+				return
+			}
+			if node.Kind == ast.KindFunctionDeclaration || node.Kind == ast.KindFunctionExpression {
+				if isAllowed("functions") {
+					return
+				}
+			}
+
+			// Check for method declarations directly
+			if node.Kind == ast.KindMethodDeclaration {
+				// Decorated function check
+				if ast.GetCombinedModifierFlags(node)&ast.ModifierFlagsDecorator != 0 && isAllowed("decoratedFunctions") {
+					return
+				}
+
+				// Override method check
+				if ast.HasSyntacticModifier(node, ast.ModifierFlagsOverride) && isAllowed("overrideMethods") {
+					return
+				}
+
+				// Regular method checks
+				if isAsync && isAllowed("asyncMethods") {
+					return
+				}
+				if isGenerator && isAllowed("generatorMethods") {
+					return
+				}
+				if isAllowed("methods") {
+					return
+				}
+			}
+
+			// Check for accessor declarations directly
+			if node.Kind == ast.KindGetAccessor && isAllowed("getters") {
+				return
+			}
+			if node.Kind == ast.KindSetAccessor && isAllowed("setters") {
+				return
+			}
+
+			// Check for various allowed types (parent-based logic for function expressions)
 			if parent != nil && parent.Kind == ast.KindMethodDeclaration {
 				method := parent.AsMethodDeclaration()
 
-				// Constructor checks
-				if method.Kind == ast.KindConstructor {
-					if isAllowed("constructors") {
-						return
-					}
-
-					// Check accessibility modifiers
-					hasPrivate := ast.HasSyntacticModifier(parent, ast.ModifierFlagsPrivate)
-					hasProtected := ast.HasSyntacticModifier(parent, ast.ModifierFlagsProtected)
-
-					if hasPrivate && isAllowed("private-constructors") {
-						return
-					}
-					if hasProtected && isAllowed("protected-constructors") {
-						return
-					}
-
-					// Constructors with parameter properties are allowed
-					if hasParameterProperties(node) {
-						return
-					}
-				}
+				// Constructor checks - not needed here since we handle KindConstructor directly above
 
 				// Getter/Setter checks
 				if method.Kind == ast.KindGetAccessor && isAllowed("getters") {
@@ -251,18 +393,30 @@ var NoEmptyFunctionRule = rule.Rule{
 				}
 			}
 
-			// Report the error
+			// Report the error at the opening brace position
 			funcName := getFunctionName(node)
-			ctx.ReportNode(node, rule.RuleMessage{
-				Id:          "unexpected",
-				Description: "Unexpected empty " + funcName + ".",
-			})
+			if braceRange, found := getOpenBracePosition(node); found {
+				ctx.ReportRange(braceRange, rule.RuleMessage{
+					Id:          "unexpected",
+					Description: "Unexpected empty " + funcName + ".",
+				})
+			} else {
+				// Fallback to reporting on the entire node
+				ctx.ReportNode(node, rule.RuleMessage{
+					Id:          "unexpected",
+					Description: "Unexpected empty " + funcName + ".",
+				})
+			}
 		}
 
 		return rule.RuleListeners{
 			ast.KindFunctionDeclaration: checkFunction,
 			ast.KindFunctionExpression:  checkFunction,
 			ast.KindArrowFunction:       checkFunction,
+			ast.KindConstructor:         checkFunction,
+			ast.KindMethodDeclaration:   checkFunction,
+			ast.KindGetAccessor:         checkFunction,
+			ast.KindSetAccessor:         checkFunction,
 		}
 	},
 }

@@ -216,9 +216,9 @@ ruleTester.run('consistent-return', {
       `,
       errors: [
         {
-          column: 16,
+          column: 8,
           data: { name: "Function 'foo'" },
-          endColumn: 23,
+          endColumn: 15,
           endLine: 4,
           line: 4,
           messageId: 'missingReturnValue',
@@ -235,9 +235,9 @@ ruleTester.run('consistent-return', {
       `,
       errors: [
         {
-          column: 11,
+          column: 3,
           data: { name: "Function 'foo'" },
-          endColumn: 18,
+          endColumn: 10,
           endLine: 5,
           line: 5,
           messageId: 'missingReturnValue',
@@ -258,17 +258,17 @@ ruleTester.run('consistent-return', {
       `,
       errors: [
         {
-          column: 13,
+          column: 12,
           data: { name: "Function 'baz'" },
-          endColumn: 30,
+          endColumn: 21,
           endLine: 6,
           line: 6,
           messageId: 'unexpectedReturnValue',
         },
         {
-          column: 11,
+          column: 3,
           data: { name: "Function 'bar'" },
-          endColumn: 18,
+          endColumn: 10,
           endLine: 9,
           line: 9,
           messageId: 'missingReturnValue',
@@ -284,9 +284,9 @@ ruleTester.run('consistent-return', {
       `,
       errors: [
         {
-          column: 16,
+          column: 8,
           data: { name: "Function 'foo'" },
-          endColumn: 23,
+          endColumn: 15,
           endLine: 4,
           line: 4,
           messageId: 'missingReturnValue',
@@ -302,9 +302,9 @@ ruleTester.run('consistent-return', {
       `,
       errors: [
         {
-          column: 16,
+          column: 15,
           data: { name: "Async function 'foo'" },
-          endColumn: 31,
+          endColumn: 22,
           endLine: 4,
           line: 4,
           messageId: 'unexpectedReturnValue',
@@ -320,9 +320,9 @@ ruleTester.run('consistent-return', {
       `,
       errors: [
         {
-          column: 16,
+          column: 8,
           data: { name: "Async function 'foo'" },
-          endColumn: 23,
+          endColumn: 15,
           endLine: 4,
           line: 4,
           messageId: 'missingReturnValue',
@@ -338,9 +338,9 @@ ruleTester.run('consistent-return', {
       `,
       errors: [
         {
-          column: 11,
+          column: 10,
           data: { name: "Async function 'foo'" },
-          endColumn: 20,
+          endColumn: 11,
           endLine: 4,
           line: 4,
           messageId: 'unexpectedReturnValue',
@@ -356,9 +356,9 @@ ruleTester.run('consistent-return', {
       `,
       errors: [
         {
-          column: 16,
+          column: 15,
           data: { name: "Function 'foo'" },
-          endColumn: 31,
+          endColumn: 22,
           endLine: 4,
           line: 4,
           messageId: 'unexpectedReturnValue',
@@ -377,9 +377,9 @@ ruleTester.run('consistent-return', {
       `,
       errors: [
         {
-          column: 11,
+          column: 3,
           data: { name: "Function 'foo'" },
-          endColumn: 18,
+          endColumn: 10,
           endLine: 7,
           line: 7,
           messageId: 'missingReturnValue',
@@ -397,9 +397,9 @@ ruleTester.run('consistent-return', {
       `,
       errors: [
         {
-          column: 11,
+          column: 10,
           data: { name: "Function 'foo'" },
-          endColumn: 23,
+          endColumn: 14,
           endLine: 6,
           line: 6,
           messageId: 'unexpectedReturnValue',
@@ -423,9 +423,9 @@ ruleTester.run('consistent-return', {
       `,
       errors: [
         {
-          column: 11,
+          column: 10,
           data: { name: "Function 'foo'" },
-          endColumn: 29,
+          endColumn: 20,
           endLine: 7,
           line: 7,
           messageId: 'unexpectedReturnValue',

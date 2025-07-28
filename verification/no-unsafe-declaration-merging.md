@@ -3,13 +3,13 @@
 ### Test File: no-unsafe-declaration-merging.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: Rule structure, AST node listeners for classes and interfaces, error message format
-- ⚠️ **POTENTIAL ISSUES**: Scope handling differences, symbol resolution approach
-- ❌ **INCORRECT**: Core symbol checking logic is not implemented (always returns false)
+- ✅ **CORRECT**: Basic rule structure, listener setup for ClassDeclaration and InterfaceDeclaration, error message ID and description
+- ⚠️ **POTENTIAL ISSUES**: Incomplete symbol checking implementation, missing scope analysis
+- ❌ **INCORRECT**: Core detection logic not implemented, missing TypeScript symbol API usage
 
 ### Discrepancies Found
 
-#### 1. Missing Core Implementation
+#### 1. Incomplete Symbol Declaration Checking
 **TypeScript Implementation:**
 ```typescript
 function checkUnsafeDeclaration(
@@ -48,47 +48,58 @@ hasDeclarationOfKind := func(symbol any, kind ast.Kind) bool {
 }
 ```
 
-**Issue:** The Go implementation contains a placeholder that always returns false, making the rule non-functional.
+**Issue:** The Go implementation has a placeholder function that always returns false, completely disabling the rule's core functionality.
 
-**Impact:** Rule will never trigger on any unsafe declaration merging cases, causing all invalid test cases to fail.
+**Impact:** The rule will never detect unsafe declaration merging, causing all test cases to fail.
 
-**Test Coverage:** All invalid test cases will fail because the rule never reports violations.
+**Test Coverage:** All invalid test cases will fail since no errors will be reported.
 
-#### 2. Scope vs Symbol-based Approach
+#### 2. Missing Scope Analysis for Class Declarations
 **TypeScript Implementation:**
 ```typescript
-// by default eslint returns the inner class scope for the ClassDeclaration node
-// but we want the outer scope within which merged variables will sit
-const currentScope = context.sourceCode.getScope(node).upper;
-if (currentScope == null) {
-  return;
-}
+ClassDeclaration(node): void {
+  if (node.id) {
+    // by default eslint returns the inner class scope for the ClassDeclaration node
+    // but we want the outer scope within which merged variables will sit
+    const currentScope = context.sourceCode.getScope(node).upper;
+    if (currentScope == null) {
+      return;
+    }
 
-checkUnsafeDeclaration(
-  currentScope,
-  node.id,
-  AST_NODE_TYPES.TSInterfaceDeclaration,
-);
+    checkUnsafeDeclaration(
+      currentScope,
+      node.id,
+      AST_NODE_TYPES.TSInterfaceDeclaration,
+    );
+  }
+}
 ```
 
 **Go Implementation:**
 ```go
-// Get the symbol for this class name
-symbol := ctx.TypeChecker.GetSymbolAtLocation(className)
-if symbol == nil {
-  return
+ast.KindClassDeclaration: func(node *ast.Node) {
+  classDecl := node.AsClassDeclaration()
+  className := classDecl.Name()
+  if className == nil {
+    return
+  }
+
+  // Get the symbol for this class name
+  symbol := ctx.TypeChecker.GetSymbolAtLocation(className)
+  // ... rest of logic
 }
 ```
 
-**Issue:** The TypeScript version uses scope-based variable resolution while the Go version attempts to use TypeScript symbols. The scope management is crucial for handling nested scopes correctly.
+**Issue:** The Go implementation doesn't handle scope correctly. The TypeScript version explicitly uses the outer scope for class declarations, while the Go version doesn't consider scope at all.
 
-**Impact:** May miss cases where declarations exist in different scopes or handle scope boundaries incorrectly.
+**Impact:** May miss cases where class and interface declarations exist in nested scopes or incorrectly flag valid cases.
 
 **Test Coverage:** Test cases with nested scopes or global declarations may behave differently.
 
-#### 3. Symbol Declaration Analysis Missing
+#### 3. Missing Symbol Declaration Analysis
 **TypeScript Implementation:**
 ```typescript
+const variable = scope.set.get(node.name);
 const defs = variable.defs;
 if (defs.length <= 1) {
   return;
@@ -104,41 +115,59 @@ if (defs.some(def => def.node.type === unsafeKind)) {
 
 **Go Implementation:**
 ```go
+symbol := ctx.TypeChecker.GetSymbolAtLocation(className)
+if symbol == nil {
+  return
+}
+
 // Check if this symbol also has interface declarations
 if hasDeclarationOfKind(symbol, ast.KindInterfaceDeclaration) {
   reportUnsafeMerging(className)
 }
 ```
 
-**Issue:** The Go version needs to implement actual symbol declaration analysis. It should check if a symbol has multiple declarations and if any are of the conflicting kind.
+**Issue:** The Go implementation needs to access the symbol's declarations to check if it has multiple declaration types. The TypeScript API provides `variable.defs` while Go needs to use TypeScript's symbol API properly.
 
-**Impact:** Without proper declaration analysis, the rule cannot detect when classes and interfaces with the same name exist in the same scope.
+**Impact:** Cannot detect when the same identifier is used for both class and interface declarations.
 
-**Test Coverage:** All invalid test cases depend on this functionality.
+**Test Coverage:** All invalid test cases require this functionality to work.
 
-#### 4. Missing Scope Boundary Handling
-**TypeScript Implementation:**
-```typescript
-// Uses scope.upper to get the containing scope for class declarations
-const currentScope = context.sourceCode.getScope(node).upper;
-```
+#### 4. Missing Implementation of Symbol Declaration Inspection
+**Issue:** The Go version needs to implement proper access to TypeScript symbol declarations. The TypeScript compiler API in Go should provide access to symbol declarations similar to the TypeScript version's `variable.defs`.
 
-**Go Implementation:**
+**Expected Go Implementation Pattern:**
 ```go
-// No equivalent scope boundary handling
+// Pseudo-code for what should be implemented
+symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
+if symbol != nil {
+  declarations := symbol.GetDeclarations() // Need to access declarations
+  if len(declarations) > 1 {
+    // Check if declarations include both class and interface types
+    hasClass := false
+    hasInterface := false
+    for _, decl := range declarations {
+      if decl.Kind() == ast.KindClassDeclaration {
+        hasClass = true
+      } else if decl.Kind() == ast.KindInterfaceDeclaration {
+        hasInterface = true
+      }
+    }
+    if hasClass && hasInterface {
+      reportUnsafeMerging(node)
+    }
+  }
+}
 ```
-
-**Issue:** The TypeScript version carefully handles scope boundaries, especially for class declarations where it needs to check the outer scope. The Go version doesn't implement this logic.
-
-**Impact:** May incorrectly handle cases where classes and interfaces are declared in different nested scopes.
-
-**Test Coverage:** Cases with function-scoped classes or global declarations may behave incorrectly.
 
 ### Recommendations
-- **Implement hasDeclarationOfKind function**: Replace the placeholder with actual logic to check symbol declarations using the TypeScript checker API
-- **Add proper symbol declaration iteration**: Access symbol.valueDeclaration and symbol.declarations to check for multiple declarations of different kinds
-- **Consider scope handling**: Evaluate if the symbol-based approach adequately handles scope boundaries or if additional scope checks are needed
-- **Test the implementation**: Run the test suite to verify that all invalid cases are properly detected
-- **Add debug logging**: Temporarily add logging to understand how symbols and declarations are accessed in the Go TypeScript bindings
+- Implement proper symbol declaration analysis using TypeScript's symbol API in Go
+- Add correct scope handling for class declarations (use outer scope)
+- Replace the placeholder `hasDeclarationOfKind` function with actual symbol inspection
+- Verify that the TypeScript symbol API bindings in typescript-go support accessing symbol declarations
+- Add comprehensive tests to ensure scope-based detection works correctly
+- Consider edge cases like global declarations and nested scopes
+
+### Critical Implementation Gap
+The current Go implementation is essentially non-functional due to the placeholder logic. The core detection mechanism must be implemented using the TypeScript compiler's symbol table to properly identify declaration merging scenarios.
 
 ---

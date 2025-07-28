@@ -3,48 +3,95 @@
 ### Test File: default-param-last.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: 
-  - Core logic for detecting default/optional parameters before required parameters
-  - Support for function declarations, expressions, and arrow functions
-  - Support for class constructors and methods
-  - Error message consistency ("Default parameters should be last.")
-  - Proper iteration through parameters from right to left
-  - Basic parameter type detection (optional, default, rest)
-
-- ⚠️ **POTENTIAL ISSUES**: 
-  - TypeScript parameter property handling may differ from Go implementation
-  - Destructuring pattern handling needs verification
-  - Rest parameter detection logic differs between implementations
-
-- ❌ **INCORRECT**: 
-  - Missing support for TSParameterProperty unwrapping
-  - Destructuring patterns (ArrayPattern, ObjectPattern) not handled in Go
-  - AssignmentPattern detection logic is incomplete
+- ✅ **CORRECT**: Core rule logic matches, right-to-left parameter iteration, error message consistency, basic parameter classification
+- ⚠️ **POTENTIAL ISSUES**: TypeScript parameter property handling, destructuring parameter detection with defaults, expanded function type coverage
+- ❌ **INCORRECT**: Missing TSParameterProperty unwrapping, incomplete destructuring pattern support for default detection
 
 ### Discrepancies Found
 
-#### 1. TSParameterProperty Handling
+#### 1. Missing TSParameterProperty Unwrapping
 **TypeScript Implementation:**
 ```typescript
 const param =
   current.type === AST_NODE_TYPES.TSParameterProperty
     ? current.parameter
     : current;
+
+if (isPlainParam(param)) {
+  hasSeenPlainParam = true;
+  continue;
+}
+
+if (hasSeenPlainParam &&
+    (isOptionalParam(param) || param.type === AST_NODE_TYPES.AssignmentPattern)) {
+  context.report({ node: current, messageId: 'shouldBeLast' });
+}
 ```
 
 **Go Implementation:**
 ```go
-// No equivalent handling for TSParameterProperty
-// Go code directly processes parameters without unwrapping
+// No TSParameterProperty handling - processes parameters directly
+for i := len(params) - 1; i >= 0; i-- {
+    current := params[i]
+    if current == nil {
+        continue
+    }
+
+    if isPlainParam(current) {
+        hasSeenPlainParam = true
+        continue
+    }
+    
+    if hasSeenPlainParam && (isOptionalParam(current) || isDefaultParam(current)) {
+        violatingParams = append(violatingParams, current)
+    }
+}
 ```
 
-**Issue:** The TypeScript version unwraps TSParameterProperty nodes to get the actual parameter, but the Go version doesn't handle this case. TSParameterProperty represents constructor parameters with accessibility modifiers (public, private, protected).
+**Issue:** The TypeScript version handles constructor parameter properties (like `public a = 0, private b: number`) by unwrapping the inner parameter from the TSParameterProperty node before analysis. The Go version processes parameters directly without this unwrapping.
 
-**Impact:** Constructor parameters with accessibility modifiers may not be properly analyzed, leading to missed violations in class constructors.
+**Impact:** Constructor parameters with access modifiers will not be analyzed correctly, causing failures in test cases like the constructor tests with `public`, `private`, `protected` modifiers.
 
-**Test Coverage:** Constructor test cases with `public a = 0`, `protected b?: number`, etc. may fail.
+**Test Coverage:** Multiple constructor test cases will fail: `public a = 0, private b: number` scenarios.
 
-#### 2. Destructuring Pattern Support
+#### 2. Destructuring Parameter Default Detection
+**TypeScript Implementation:**
+```typescript
+// Detects AssignmentPattern directly as default parameter
+function isPlainParam(node: TSESTree.Parameter): boolean {
+  return !(
+    node.type === AST_NODE_TYPES.AssignmentPattern ||
+    node.type === AST_NODE_TYPES.RestElement ||
+    isOptionalParam(node)
+  );
+}
+
+// Also checks for AssignmentPattern in violation detection
+if (hasSeenPlainParam &&
+    (isOptionalParam(param) || param.type === AST_NODE_TYPES.AssignmentPattern)) {
+  context.report({ node: current, messageId: 'shouldBeLast' });
+}
+```
+
+**Go Implementation:**
+```go
+func isDefaultParam(node *ast.Node) bool {
+    if node == nil || !ast.IsParameter(node) {
+        return false
+    }
+    
+    param := node.AsParameterDeclaration()
+    return param.Initializer != nil
+}
+```
+
+**Issue:** The TypeScript version explicitly checks for `AssignmentPattern` nodes (which represent destructuring with defaults like `{ a } = {}`), while the Go version only checks `Initializer` on `ParameterDeclaration` nodes.
+
+**Impact:** Destructuring parameters with defaults like `function foo({ a } = {}, b) {}` and `function foo([a] = [], b) {}` may not be detected as default parameters.
+
+**Test Coverage:** Test cases with destructuring defaults will likely fail.
+
+#### 3. Optional Parameter Pattern Support
 **TypeScript Implementation:**
 ```typescript
 function isOptionalParam(node: TSESTree.Parameter): boolean {
@@ -62,59 +109,62 @@ function isOptionalParam(node: TSESTree.Parameter): boolean {
 **Go Implementation:**
 ```go
 func isOptionalParam(node *ast.Node) bool {
-	if node == nil || !ast.IsParameter(node) {
-		return false
-	}
-
-	param := node.AsParameterDeclaration()
-	return param.QuestionToken != nil
+    if node == nil || !ast.IsParameter(node) {
+        return false
+    }
+    
+    param := node.AsParameterDeclaration()
+    return param.QuestionToken != nil
 }
 ```
 
-**Issue:** The Go version only checks for QuestionToken on ParameterDeclaration, but doesn't handle destructuring patterns (ArrayPattern, ObjectPattern) that can also have optional markers.
+**Issue:** The TypeScript version checks for `optional` property on various parameter pattern types, while the Go version only checks `QuestionToken` on parameter declarations.
 
-**Impact:** Test cases with destructuring patterns like `function foo({ a } = {}, b) {}` or `function foo([a] = [], b) {}` may not be correctly identified as having default parameters.
+**Impact:** Optional destructuring parameters or other parameter patterns may not be detected correctly.
 
-**Test Coverage:** Tests with destructuring patterns will likely fail to report violations.
+**Test Coverage:** Edge cases with optional parameter patterns may fail.
 
-#### 3. AssignmentPattern Detection
+#### 4. Expanded Function Type Coverage
 **TypeScript Implementation:**
 ```typescript
-function isPlainParam(node: TSESTree.Parameter): boolean {
-  return !(
-    node.type === AST_NODE_TYPES.AssignmentPattern ||
-    node.type === AST_NODE_TYPES.RestElement ||
-    isOptionalParam(node)
-  );
+return {
+  ArrowFunctionExpression: checkDefaultParamLast,
+  FunctionDeclaration: checkDefaultParamLast,
+  FunctionExpression: checkDefaultParamLast,
+};
+```
+
+**Go Implementation:**
+```go
+return rule.RuleListeners{
+  ast.KindArrowFunction: func(node *ast.Node) { checkDefaultParamLast(ctx, node) },
+  ast.KindFunctionDeclaration: func(node *ast.Node) { checkDefaultParamLast(ctx, node) },
+  ast.KindFunctionExpression: func(node *ast.Node) { checkDefaultParamLast(ctx, node) },
+  ast.KindMethodDeclaration: func(node *ast.Node) { checkDefaultParamLast(ctx, node) },
+  ast.KindConstructor: func(node *ast.Node) { checkDefaultParamLast(ctx, node) },
+  ast.KindGetAccessor: func(node *ast.Node) { checkDefaultParamLast(ctx, node) },
+  ast.KindSetAccessor: func(node *ast.Node) { checkDefaultParamLast(ctx, node) },
+}
+```
+
+**Issue:** The Go implementation covers additional function types (methods, constructors, accessors) beyond the original TypeScript-ESLint rule scope.
+
+**Impact:** The rule will trigger on more function types than the original rule, which could be seen as enhanced coverage or unwanted deviation depending on intent.
+
+**Test Coverage:** Constructor test cases are included in the test suite, suggesting this expansion is intentional.
+
+#### 5. Parameter Extraction Complexity
+**TypeScript Implementation:**
+```typescript
+// Simple parameter access
+for (let i = node.params.length - 1; i >= 0; i--) {
+  const current = node.params[i];
 }
 ```
 
 **Go Implementation:**
 ```go
-func isPlainParam(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-
-	return !isOptionalParam(node) && !isDefaultParam(node) && !isRestParam(node)
-}
-```
-
-**Issue:** The TypeScript version explicitly checks for AssignmentPattern in isPlainParam, but the Go version relies on isDefaultParam which only checks for Initializer on ParameterDeclaration. This may not cover all cases where AssignmentPattern appears.
-
-**Impact:** Some destructuring with defaults may not be properly detected as non-plain parameters.
-
-**Test Coverage:** Complex destructuring cases may not trigger violations when they should.
-
-#### 4. Parameter Extraction Logic
-**TypeScript Implementation:**
-```typescript
-// Directly accesses node.params for all function types
-```
-
-**Go Implementation:**
-```go
-// Different parameter extraction for each function type
+// Complex parameter extraction with switch statement
 switch functionNode.Kind {
 case ast.KindArrowFunction:
     if functionNode.AsArrowFunction().Parameters != nil {
@@ -125,20 +175,21 @@ case ast.KindFunctionDeclaration:
         params = functionNode.AsFunctionDeclaration().Parameters.Nodes
     }
 // ... more cases
+}
 ```
 
-**Issue:** The Go implementation manually extracts parameters for each function type, while TypeScript has a unified approach. This is more verbose but functionally equivalent if all cases are covered.
+**Issue:** The Go version requires explicit parameter extraction for each function type, which is more complex but necessary due to the type system.
 
-**Impact:** Potential for missing function types if not all cases are handled in the switch statement.
+**Impact:** Risk of missing parameter extraction for new function types, but provides type safety.
 
-**Test Coverage:** Should verify all function types are properly supported.
+**Test Coverage:** All function types need verification that parameter extraction works correctly.
 
 ### Recommendations
-- Add TSParameterProperty unwrapping logic to handle constructor parameters with accessibility modifiers
-- Implement proper destructuring pattern detection for ArrayPattern and ObjectPattern
-- Enhance AssignmentPattern detection to cover destructuring with defaults
-- Verify that all function types are properly handled in the parameter extraction switch statement
-- Add specific test cases for TypeScript-specific constructs like parameter properties
-- Consider adding debug logging to verify parameter detection is working correctly for edge cases
+- **CRITICAL**: Implement TSParameterProperty unwrapping logic to handle constructor parameter properties correctly
+- **HIGH**: Add proper destructuring parameter detection for AssignmentPattern, ObjectPattern, and ArrayPattern nodes
+- **HIGH**: Verify that parameter extraction works correctly for all supported function types
+- **MEDIUM**: Consider whether expanded function type coverage (methods, accessors) is desired or should match original rule
+- **LOW**: Add comprehensive test coverage for edge cases with complex parameter patterns
+- **LOW**: Consider adding debug logging to verify parameter classification logic
 
 ---

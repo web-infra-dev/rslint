@@ -3,183 +3,200 @@
 ### Test File: no-empty-function.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: 
-  - Basic empty function detection logic
-  - Constructor parameter properties detection
-  - Private/protected constructor accessibility checks
-  - Override method detection
-  - Configuration option parsing structure
-  - Core AST pattern matching for function types
-
-- ⚠️ **POTENTIAL ISSUES**: 
-  - Method kind detection for constructors, getters, and setters
-  - Decorator detection mechanism
-  - Arrow function body type checking
-  - Function name extraction logic complexity
-
-- ❌ **INCORRECT**: 
-  - AST node kind comparisons for method types
-  - Decorator flag checking mechanism
-  - Generator function detection approach
+- ✅ **CORRECT**: Core empty function detection logic, basic configuration option parsing, main function types handled (functions, arrow functions, methods, constructors, getters, setters), parameter properties detection for constructors, basic async/generator function detection
+- ⚠️ **POTENTIAL ISSUES**: AST node type mapping differences, decorator detection implementation, override method detection, error positioning accuracy
+- ❌ **INCORRECT**: Constructor accessibility modifier detection logic, decorator detection method, some AST navigation patterns
 
 ### Discrepancies Found
 
-#### 1. Method Kind Detection for Constructors, Getters, and Setters
-
+#### 1. Constructor Accessibility Detection
 **TypeScript Implementation:**
 ```typescript
-parent.type === AST_NODE_TYPES.MethodDefinition &&
-parent.kind === 'constructor'
-
-// And for getters/setters:
-parent.kind === 'constructor'
-// method.Kind == ast.KindGetAccessor
-// method.Kind == ast.KindSetAccessor
-```
-
-**Go Implementation:**
-```go
-parent.Kind == ast.KindMethodDeclaration
-method := parent.AsMethodDeclaration()
-if method.Kind == ast.KindConstructor {
-    // ...
-}
-if method.Kind == ast.KindGetAccessor && isAllowed("getters") {
-    return
-}
-if method.Kind == ast.KindSetAccessor && isAllowed("setters") {
-    return
-}
-```
-
-**Issue:** The Go implementation is checking `method.Kind` against constructor/getter/setter AST kinds, but these should likely be string comparisons or different AST node properties. In TypeScript AST, `kind` is a string property, while the Go version seems to be treating it as an AST node kind enum.
-
-**Impact:** Constructor, getter, and setter detection may fail, causing the rule to incorrectly flag allowed empty functions.
-
-**Test Coverage:** Test cases for constructors, getters, setters, and private/protected constructors would reveal this issue.
-
-#### 2. Decorator Detection Mechanism
-
-**TypeScript Implementation:**
-```typescript
-const decorators =
-  node.parent.type === AST_NODE_TYPES.MethodDefinition
-    ? node.parent.decorators
-    : undefined;
-return !!decorators && !!decorators.length;
-```
-
-**Go Implementation:**
-```go
-if ast.GetCombinedModifierFlags(parent)&ast.ModifierFlagsDecorator != 0 && isAllowed("decoratedFunctions") {
-    return
-}
-```
-
-**Issue:** The Go implementation uses `ast.ModifierFlagsDecorator` to detect decorators, but this may not be the correct way to detect decorators in the typescript-go AST. The TypeScript version explicitly checks for a `decorators` array property.
-
-**Impact:** Decorated functions may not be properly detected as allowed empty functions.
-
-**Test Coverage:** The decorator test case `@decorator() foo() {}` would fail.
-
-#### 3. Generator Function Detection
-
-**TypeScript Implementation:**
-```typescript
-function hasParameterProperties(
+function isAllowedEmptyConstructor(
   node: TSESTree.FunctionDeclaration | TSESTree.FunctionExpression,
 ): boolean {
-  return node.params.some(
-    param => param.type === AST_NODE_TYPES.TSParameterProperty,
+  const parent = node.parent;
+  if (
+    isBodyEmpty(node) &&
+    parent.type === AST_NODE_TYPES.MethodDefinition &&
+    parent.kind === 'constructor'
+  ) {
+    const { accessibility } = parent;
+
+    return (
+      // allow protected constructors
+      (accessibility === 'protected' && isAllowedProtectedConstructors) ||
+      // allow private constructors
+      (accessibility === 'private' && isAllowedPrivateConstructors) ||
+      // allow constructors which have parameter properties
+      hasParameterProperties(node)
+    );
+  }
+
+  return false;
+}
+```
+
+**Go Implementation:**
+```go
+// In the constructor case within checkFunction:
+if node.Kind == ast.KindConstructor {
+    // Check accessibility modifiers for constructors
+    hasPrivate := ast.HasSyntacticModifier(node, ast.ModifierFlagsPrivate)
+    hasProtected := ast.HasSyntacticModifier(node, ast.ModifierFlagsProtected)
+
+    if isAllowed("constructors") {
+        return
+    }
+    if hasPrivate && isAllowed("private-constructors") {
+        return
+    }
+    if hasProtected && isAllowed("protected-constructors") {
+        return
+    }
+
+    // Constructors with parameter properties are allowed
+    if hasParameterProperties(node) {
+        return
+    }
+}
+```
+
+**Issue:** The TypeScript version checks accessibility on the parent MethodDefinition node, while the Go version checks modifiers directly on the constructor node. This may not correctly identify private/protected constructors.
+
+**Impact:** Private and protected constructors may not be properly detected, causing the rule to incorrectly report or allow empty constructors.
+
+**Test Coverage:** Test cases for private and protected constructors would reveal this issue.
+
+#### 2. Decorator Detection Method
+**TypeScript Implementation:**
+```typescript
+function isAllowedEmptyDecoratedFunctions(
+  node: TSESTree.FunctionDeclaration | TSESTree.FunctionExpression,
+): boolean {
+  if (isAllowedDecoratedFunctions && isBodyEmpty(node)) {
+    const decorators =
+      node.parent.type === AST_NODE_TYPES.MethodDefinition
+        ? node.parent.decorators
+        : undefined;
+    return !!decorators && !!decorators.length;
+  }
+
+  return false;
+}
+```
+
+**Go Implementation:**
+```go
+// Decorated function check
+if ast.GetCombinedModifierFlags(node)&ast.ModifierFlagsDecorator != 0 && isAllowed("decoratedFunctions") {
+    return
+}
+```
+
+**Issue:** The TypeScript version checks for decorators on the parent MethodDefinition, while the Go version checks modifier flags directly on the node. The decorator detection approach is fundamentally different.
+
+**Impact:** Decorated functions may not be properly identified, causing incorrect rule behavior for functions with decorators.
+
+**Test Coverage:** The decorator test case would likely fail with the current Go implementation.
+
+#### 3. Override Method Detection Inconsistency
+**TypeScript Implementation:**
+```typescript
+function isAllowedEmptyOverrideMethod(
+  node: TSESTree.FunctionExpression,
+): boolean {
+  return (
+    isAllowedOverrideMethods &&
+    isBodyEmpty(node) &&
+    node.parent.type === AST_NODE_TYPES.MethodDefinition &&
+    node.parent.override
   );
 }
 ```
 
 **Go Implementation:**
 ```go
-isGenerator = fn.AsteriskToken != nil
+// Override method check
+if ast.HasSyntacticModifier(node, ast.ModifierFlagsOverride) && isAllowed("overrideMethods") {
+    return
+}
 ```
 
-**Issue:** The Go implementation checks for `AsteriskToken` to detect generator functions, but this approach may not work correctly across all function types. The parameter properties detection also uses modifier flags instead of checking for `TSParameterProperty` node types.
+**Issue:** The TypeScript version checks the `override` property on the parent MethodDefinition, while the Go version checks the modifier flag directly on the node. This mirrors the decorator issue.
 
-**Impact:** Generator functions and parameter properties may not be detected correctly.
+**Impact:** Override methods may not be correctly identified, causing the rule to behave incorrectly for overridden methods.
 
-**Test Coverage:** Generator function tests and constructor parameter property tests would reveal this.
+**Test Coverage:** The override method test case would reveal this discrepancy.
 
-#### 4. Arrow Function Body Type Checking
-
+#### 4. AST Node Structure Differences
 **TypeScript Implementation:**
 ```typescript
-// Base rule handles arrow functions
-// No explicit arrow function body checking in the extended logic
+// Works with FunctionExpression nodes inside MethodDefinition parents
+FunctionExpression(node): void {
+  if (
+    isAllowedEmptyConstructor(node) ||
+    isAllowedEmptyDecoratedFunctions(node) ||
+    isAllowedEmptyOverrideMethod(node)
+  ) {
+    return;
+  }
+
+  rules.FunctionExpression(node);
+}
 ```
 
 **Go Implementation:**
 ```go
-if fn.Body == nil {
-    return false
+// Handles method declarations directly without parent-child relationship
+return rule.RuleListeners{
+    ast.KindFunctionDeclaration: checkFunction,
+    ast.KindFunctionExpression:  checkFunction,
+    ast.KindArrowFunction:       checkFunction,
+    ast.KindConstructor:         checkFunction,
+    ast.KindMethodDeclaration:   checkFunction,
+    ast.KindGetAccessor:         checkFunction,
+    ast.KindSetAccessor:         checkFunction,
 }
-if fn.Body.Kind != ast.KindBlock {
-    return false // Expression body, not empty
-}
-block := fn.Body.AsBlock()
-return len(block.Statements.Nodes) == 0
 ```
 
-**Issue:** The Go implementation has complex arrow function body checking that distinguishes between block and expression bodies, but this logic may be overly complex compared to the TypeScript version which relies on the base rule.
+**Issue:** The AST structure is different between TypeScript-ESLint and typescript-go. The TypeScript version primarily handles FunctionExpression nodes with parent context, while the Go version handles various node types directly.
 
-**Impact:** Arrow functions with expression bodies might be incorrectly handled.
+**Impact:** This fundamental difference could lead to missed or incorrectly handled cases, especially for method-related functionality.
 
-**Test Coverage:** Arrow function test cases would reveal discrepancies.
+**Test Coverage:** All method-related test cases could be affected.
 
-#### 5. Method Definition vs Method Declaration Confusion
-
+#### 5. Error Position Reporting
 **TypeScript Implementation:**
 ```typescript
-parent.type === AST_NODE_TYPES.MethodDefinition
+// Uses the base ESLint rule's error reporting which targets the opening brace
+rules.FunctionExpression(node);
 ```
 
 **Go Implementation:**
 ```go
-parent.Kind == ast.KindMethodDeclaration
-```
-
-**Issue:** The TypeScript uses `MethodDefinition` while Go uses `MethodDeclaration`. These may not be equivalent AST node types in the respective parsers.
-
-**Impact:** Method detection may fail entirely, causing all method-related logic to not work.
-
-**Test Coverage:** All method-related test cases would be affected.
-
-#### 6. Parameter Properties Detection Logic
-
-**TypeScript Implementation:**
-```typescript
-return node.params.some(
-  param => param.type === AST_NODE_TYPES.TSParameterProperty,
-);
-```
-
-**Go Implementation:**
-```go
-if ast.GetCombinedModifierFlags(param)&(ast.ModifierFlagsPublic|ast.ModifierFlagsPrivate|ast.ModifierFlagsProtected|ast.ModifierFlagsReadonly) != 0 {
-    return true
+// Custom brace position detection with fallback
+getOpenBracePosition := func(node *ast.Node) (core.TextRange, bool) {
+    // Complex logic to find opening brace position
+    // ...
+    // Fallback: use the body's start position
+    return core.TextRange{}.WithPos(bodyStart).WithEnd(bodyStart + 1), true
 }
 ```
 
-**Issue:** The TypeScript version checks for `TSParameterProperty` node type, while the Go version checks for modifier flags. These are different approaches that may not be equivalent.
+**Issue:** The Go implementation has custom logic for finding the opening brace position, which may not exactly match the TypeScript-ESLint behavior, especially in edge cases.
 
-**Impact:** Constructor parameter properties may not be detected correctly, causing valid empty constructors to be flagged.
+**Impact:** Error column positions may not match expected test results exactly.
 
-**Test Coverage:** The `constructor(private name: string) {}` test case would reveal this.
+**Test Coverage:** All invalid test cases check specific column positions which could reveal mismatches.
 
 ### Recommendations
-- Verify the correct AST node types and properties for method definitions in typescript-go
-- Implement proper decorator detection using the correct AST properties
-- Fix the method kind detection to use appropriate string or enum comparisons
-- Simplify arrow function body checking to match TypeScript behavior
-- Correct parameter properties detection to check for the right node types or properties
-- Add more comprehensive test cases to validate all allowed function types
-- Test edge cases around async/generator combinations with different method types
-- Verify that the base rule integration works correctly for the core empty function detection
+- Fix constructor accessibility detection by checking the correct AST node or parent node for modifiers
+- Implement proper decorator detection that matches the TypeScript-ESLint approach
+- Fix override method detection to check the appropriate node/parent for the override flag
+- Review and align the AST node type handling with the expected TypeScript-ESLint patterns
+- Verify error position reporting matches expected column numbers in tests
+- Add comprehensive test coverage for edge cases involving nested function contexts
+- Consider adding debug logging to verify which code paths are being taken during rule execution
 
 ---

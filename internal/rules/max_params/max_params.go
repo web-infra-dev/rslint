@@ -109,6 +109,8 @@ func getParameters(node *ast.Node) []*ast.Node {
 		return node.AsGetAccessorDeclaration().Parameters.Nodes
 	case ast.KindSetAccessor:
 		return node.AsSetAccessorDeclaration().Parameters.Nodes
+	case ast.KindFunctionType:
+		return node.AsFunctionTypeNode().Parameters.Nodes
 	default:
 		return nil
 	}
@@ -177,6 +179,7 @@ var MaxParamsRule = rule.Rule{
 			ast.KindConstructor:         checkFunction,
 			ast.KindGetAccessor:         checkFunction,
 			ast.KindSetAccessor:         checkFunction,
+			ast.KindFunctionType:        checkFunction,
 		}
 	},
 }

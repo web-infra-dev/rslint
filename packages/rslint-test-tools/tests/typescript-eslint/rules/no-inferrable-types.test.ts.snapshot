@@ -1,8 +1,112 @@
 exports[`no-inferrable-types > invalid 1`] = `
 {
+  "diagnostics": [
+    {
+      "ruleName": "no-inferrable-types",
+      "messageId": "noInferrableType",
+      "message": "Type bigint trivially inferred from a bigint literal, remove type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 7
+        },
+        "end": {
+          "line": 1,
+          "column": 8
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-inferrable-types > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-inferrable-types",
+      "messageId": "noInferrableType",
+      "message": "Type bigint trivially inferred from a bigint literal, remove type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 7
+        },
+        "end": {
+          "line": 1,
+          "column": 8
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-inferrable-types > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-inferrable-types",
+      "messageId": "noInferrableType",
+      "message": "Type bigint trivially inferred from a bigint literal, remove type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 7
+        },
+        "end": {
+          "line": 1,
+          "column": 8
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-inferrable-types > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-inferrable-types",
+      "messageId": "noInferrableType",
+      "message": "Type bigint trivially inferred from a bigint literal, remove type annotation.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 7
+        },
+        "end": {
+          "line": 1,
+          "column": 8
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-inferrable-types > invalid 5`] = `
+{
   "diagnostics": [],
   "errorCount": 0,
   "fileCount": 1,
-  "ruleCount": 0
+  "ruleCount": 1
 }
 `;

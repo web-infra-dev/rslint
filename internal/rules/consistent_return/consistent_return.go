@@ -44,12 +44,14 @@ var ConsistentReturnRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		treatUndefinedAsUnspecified := false
 		
-		// Parse options
+		// Parse options with dual-format support
 		if options != nil {
 			if optionsMap, ok := options.(map[string]interface{}); ok {
 				if val, exists := optionsMap["treatUndefinedAsUnspecified"]; exists {
 					if boolVal, ok := val.(bool); ok {
 						treatUndefinedAsUnspecified = boolVal
+					} else if floatVal, ok := val.(float64); ok {
+						treatUndefinedAsUnspecified = floatVal != 0
 					}
 				}
 			}
@@ -346,17 +348,15 @@ var ConsistentReturnRule = rule.Rule{
 				if hasArgument {
 					if funcInfo.hasNoReturnValue {
 						// This return has a value but previous returns didn't
-						// Report error on the return expression, not the entire statement
+						// Report error on the return expression (the value that shouldn't be there)
 						ctx.ReportNode(returnStmt.Expression, buildUnexpectedReturnValueMessage(funcInfo.functionName))
 					}
 					funcInfo.hasReturnValue = true
 				} else {
 					if funcInfo.hasReturnValue {
 						// This return has no value but previous returns did
-						// For missing return value, report on the return statement node
-						// Include the semicolon in the range to match expected behavior
-						nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
-						ctx.ReportRange(nodeRange, buildMissingReturnValueMessage(funcInfo.functionName))
+						// Report error on the return statement
+						ctx.ReportNode(node, buildMissingReturnValueMessage(funcInfo.functionName))
 					}
 					funcInfo.hasNoReturnValue = true
 				}

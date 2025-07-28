@@ -42,8 +42,20 @@ var ConsistentTypeExportsRule = rule.Rule{
 			FixMixedExportsWithInlineTypeSpecifier: false,
 		}
 
+		// Parse options with dual-format support (handles both array and object formats)
 		if options != nil {
-			if optsMap, ok := options.(map[string]interface{}); ok {
+			var optsMap map[string]interface{}
+			var ok bool
+			
+			// Handle array format: [{ option: value }]
+			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
+				optsMap, ok = optArray[0].(map[string]interface{})
+			} else {
+				// Handle direct object format: { option: value }
+				optsMap, ok = options.(map[string]interface{})
+			}
+			
+			if ok {
 				if val, ok := optsMap["fixMixedExportsWithInlineTypeSpecifier"].(bool); ok {
 					opts.FixMixedExportsWithInlineTypeSpecifier = val
 				}
@@ -57,26 +69,27 @@ var ConsistentTypeExportsRule = rule.Rule{
 				return false, false
 			}
 
-			// Add timeout protection for symbol resolution
-			// If we can't resolve quickly, assume it's a value to be safe
-			aliasedSymbol := symbol
-			if utils.IsSymbolFlagSet(symbol, ast.SymbolFlagsAlias) {
-				// GetAliasedSymbol can be expensive for complex module graphs
-				// Add a check to avoid following aliases for external modules
-				if symbol.Declarations != nil && len(symbol.Declarations) > 0 {
-					decl := symbol.Declarations[0]
-					if decl != nil {
-						sourceFile := ast.GetSourceFileOfNode(decl)
-						if sourceFile != nil {
-							// Check if this is an external module
-							fileName := sourceFile.FileName()
-							if strings.Contains(fileName, "node_modules") {
-								// Skip external modules to avoid timeout
-								return false, false
-							}
+			// Check if this symbol is from an external module first
+			if symbol.Declarations != nil && len(symbol.Declarations) > 0 {
+				decl := symbol.Declarations[0]
+				if decl != nil {
+					sourceFile := ast.GetSourceFileOfNode(decl)
+					if sourceFile != nil {
+						fileName := sourceFile.FileName()
+						// Skip external modules completely
+						if strings.Contains(fileName, "node_modules") ||
+						   strings.HasPrefix(fileName, "/usr/") ||
+						   strings.HasPrefix(fileName, "C:\\") ||
+						   !strings.HasSuffix(fileName, ".ts") && !strings.HasSuffix(fileName, ".tsx") && !strings.HasSuffix(fileName, ".js") && !strings.HasSuffix(fileName, ".jsx") {
+							return false, false
 						}
 					}
 				}
+			}
+
+			aliasedSymbol := symbol
+			if utils.IsSymbolFlagSet(symbol, ast.SymbolFlagsAlias) {
+				// Only resolve aliases for local symbols
 				aliasedSymbol = ctx.TypeChecker.GetAliasedSymbol(symbol)
 			}
 

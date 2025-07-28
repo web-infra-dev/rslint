@@ -179,7 +179,27 @@ func findPublicKeywordRange(ctx rule.RuleContext, node *ast.Node) (core.TextRang
 }
 
 func getMemberName(node *ast.Node, ctx rule.RuleContext) string {
-	name, _ := utils.GetNameFromMember(ctx.SourceFile, node)
+	var nameNode *ast.Node
+	switch node.Kind {
+	case ast.KindMethodDeclaration:
+		nameNode = node.AsMethodDeclaration().Name()
+	case ast.KindPropertyDeclaration:
+		nameNode = node.AsPropertyDeclaration().Name()
+	case ast.KindGetAccessor:
+		nameNode = node.AsGetAccessorDeclaration().Name()
+	case ast.KindSetAccessor:
+		nameNode = node.AsSetAccessorDeclaration().Name()
+	case ast.KindConstructor:
+		return "constructor"
+	default:
+		nameNode = node
+	}
+	
+	if nameNode == nil {
+		return ""
+	}
+	
+	name, _ := utils.GetNameFromMember(ctx.SourceFile, nameNode)
 	return name
 }
 

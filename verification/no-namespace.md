@@ -4,61 +4,93 @@
 
 ### Validation Summary
 - ✅ **CORRECT**: 
-  - Basic namespace and module detection
-  - Global scope augmentation filtering (`declare global {}`)
-  - String literal module filtering (`declare module 'foo' {}`)
-  - Nested namespace parent filtering
-  - Definition file suffix checking (`.d.ts`)
-  - Basic declare modifier detection
-  - Error message consistency
-  - Option structure and defaults
+  - Basic namespace/module detection and reporting
+  - Option parsing for `allowDeclarations` and `allowDefinitionFiles`
+  - Global scope augmentation exclusion (`declare global {}`)
+  - String literal module exclusion (`declare module 'foo' {}`)
+  - Nested namespace parent checking
+  - Definition file handling (`.d.ts` files)
+  - Declare modifier detection and ancestor traversal
+  - Core error message matching
 
 - ⚠️ **POTENTIAL ISSUES**: 
-  - AST node access pattern differences between TypeScript-ESLint and typescript-go
-  - Position reporting differences (0-based vs 1-based)
+  - AST node access pattern differences between typescript-go and TypeScript-ESLint
+  - Modifier detection approach may differ in edge cases
 
 - ❌ **INCORRECT**: None identified - implementations appear functionally equivalent
 
 ### Discrepancies Found
 
-#### 1. AST Access Pattern Differences
+No significant discrepancies were found between the TypeScript and Go implementations. Both versions correctly implement the same core logic:
+
+1. **Selector Pattern Match**: The TypeScript version uses the selector `"TSModuleDeclaration[global!=true][id.type!='Literal']"` while the Go version manually checks these conditions in the listener function. Both approaches achieve the same filtering.
+
+2. **Declaration Detection**: Both implementations use recursive ancestor traversal to detect declare modifiers, with equivalent logic.
+
+3. **Option Handling**: The Go version includes robust option parsing that handles both array format `[{option: value}]` and direct object format `{option: value}`, which provides better compatibility.
+
+4. **File Extension Checking**: Both versions correctly check for `.d.ts` files when `allowDefinitionFiles` is enabled.
+
+### Implementation Analysis
+
+#### Core Logic Comparison
 **TypeScript Implementation:**
 ```typescript
 "TSModuleDeclaration[global!=true][id.type!='Literal']"(
   node: TSESTree.TSModuleDeclaration,
 ): void {
-  // Uses selector-based filtering in the listener definition
+  if (
+    node.parent.type === AST_NODE_TYPES.TSModuleDeclaration ||
+    (allowDefinitionFiles && isDefinitionFile(context.filename)) ||
+    (allowDeclarations && isDeclaration(node))
+  ) {
+    return;
+  }
+  
+  context.report({
+    node,
+    messageId: 'moduleSyntaxIsPreferred',
+  });
 }
 ```
 
 **Go Implementation:**
 ```go
 ast.KindModuleDeclaration: func(node *ast.Node) {
-  // Manual filtering inside the handler
+  moduleDecl := node.AsModuleDeclaration()
+
+  // Skip global declarations
   if ast.IsGlobalScopeAugmentation(node) {
     return
   }
-  
+
+  // Skip module declarations with string literal names
   if moduleDecl.Name() != nil && ast.IsStringLiteral(moduleDecl.Name()) {
     return
   }
+
+  // Skip if parent is also a module declaration
+  if node.Parent != nil && node.Parent.Kind == ast.KindModuleDeclaration {
+    return
+  }
+
+  // Check options...
+  ctx.ReportNode(node, rule.RuleMessage{
+    Id:          "moduleSyntaxIsPreferred",
+    Description: "ES2015 module syntax is preferred over namespaces.",
+  })
 }
 ```
 
-**Issue:** Different filtering approaches but functionally equivalent - TypeScript uses selector-based pre-filtering while Go uses manual filtering.
+Both implementations follow the same logical flow and exclusion patterns.
 
-**Impact:** No functional impact - both achieve the same filtering results.
-
-**Test Coverage:** All test cases should pass as the filtering logic is equivalent.
-
-#### 2. Parent Chain Traversal
+#### Declaration Detection
 **TypeScript Implementation:**
 ```typescript
 function isDeclaration(node: TSESTree.Node): boolean {
   if (node.type === AST_NODE_TYPES.TSModuleDeclaration && node.declare) {
     return true;
   }
-
   return node.parent != null && isDeclaration(node.parent);
 }
 ```
@@ -76,72 +108,33 @@ func isDeclaration(node *ast.Node) bool {
       }
     }
   }
-
+  
   if node.Parent != nil {
     return isDeclaration(node.Parent)
   }
-
+  
   return false
 }
 ```
 
-**Issue:** Both implementations traverse the parent chain to find declare modifiers, but use different AST access patterns.
+Both use recursive ancestor traversal with equivalent logic for detecting declare modifiers.
 
-**Impact:** No functional impact - both correctly identify declarations through parent traversal.
+### Test Coverage Analysis
 
-**Test Coverage:** Complex nested declaration test cases validate this functionality.
+All test cases from the original TypeScript-ESLint test suite are included in the RSLint test file, indicating comprehensive coverage of:
 
-#### 3. Node Filtering Logic
-**TypeScript Implementation:**
-```typescript
-if (
-  node.parent.type === AST_NODE_TYPES.TSModuleDeclaration ||
-  (allowDefinitionFiles && isDefinitionFile(context.filename)) ||
-  (allowDeclarations && isDeclaration(node))
-) {
-  return;
-}
-```
-
-**Go Implementation:**
-```go
-// Skip if parent is also a module declaration (nested namespaces)
-if node.Parent != nil && node.Parent.Kind == ast.KindModuleDeclaration {
-  return
-}
-
-// Check if allowed by options
-if opts.AllowDefinitionFiles && strings.HasSuffix(ctx.SourceFile.FileName(), ".d.ts") {
-  return
-}
-
-if opts.AllowDeclarations && isDeclaration(node) {
-  return
-}
-```
-
-**Issue:** The logic order and structure are equivalent, just using different AST access patterns.
-
-**Impact:** No functional impact - both implementations apply the same filtering rules in the same order.
-
-**Test Coverage:** All test cases should pass as the filtering logic is functionally identical.
+- Basic namespace/module declarations
+- Global declarations (`declare global {}`)
+- String literal modules (`declare module 'foo' {}`)
+- Declaration allowance with `allowDeclarations: true`
+- Definition file allowance with `allowDefinitionFiles: true`
+- Nested namespace scenarios
+- Complex nested declaration scenarios with mixed declare/non-declare contexts
 
 ### Recommendations
-- ✅ **No fixes needed** - The Go implementation correctly captures all the logic from the TypeScript version
-- ✅ **Test coverage is comprehensive** - All original test cases are preserved and should pass
-- ✅ **Edge cases are handled** - Complex nested declaration scenarios are properly addressed
-- ✅ **Options handling is correct** - Both allowDeclarations and allowDefinitionFiles work as expected
-
-### Implementation Quality Assessment
-
-The Go port demonstrates excellent fidelity to the original TypeScript implementation:
-
-1. **Core Logic Preservation**: All filtering conditions are correctly translated
-2. **Edge Case Coverage**: Complex nested namespace scenarios are handled identically
-3. **Option Handling**: Configuration options work exactly as in the original
-4. **Error Reporting**: Messages and positioning are consistent
-5. **Performance**: Go implementation should be more performant while maintaining identical behavior
-
-The implementation appears to be a high-quality port that maintains full compatibility with the TypeScript-ESLint version.
+- No changes needed - the Go implementation correctly mirrors the TypeScript version
+- The implementation properly handles all edge cases covered by the test suite
+- Option parsing is robust and handles multiple input formats
+- Error reporting matches the expected format and message IDs
 
 ---

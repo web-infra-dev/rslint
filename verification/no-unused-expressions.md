@@ -3,65 +3,37 @@
 ### Test File: no-unused-expressions.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: Basic expression statement handling, TypeScript-specific node unwrapping (as expressions, type assertions, non-null expressions), configuration options parsing, directive prologue handling concept
-- ⚠️ **POTENTIAL ISSUES**: Chain expression logic implementation differs significantly, import expression detection may be incorrect, directive prologue implementation is complex and may not match ESLint behavior exactly
-- ❌ **INCORRECT**: Missing base rule delegation, incorrect AST node type mapping for several cases, logical expression handling logic differs from TypeScript implementation
+- ✅ **CORRECT**: Basic expression statement validation, TypeScript-specific node unwrapping (as expressions, type assertions, non-null expressions), configuration option support for allowShortCircuit/allowTernary/allowTaggedTemplates
+- ⚠️ **POTENTIAL ISSUES**: ImportExpression detection logic, directive prologue detection, optional chaining detection, binary expression handling for logical operators
+- ❌ **INCORRECT**: Missing base ESLint rule integration, incorrect AST node type mapping for import expressions, complex directive prologue logic that may not match ESLint behavior
 
 ### Discrepancies Found
 
-#### 1. Missing Base Rule Delegation
+#### 1. Base Rule Integration Missing
 **TypeScript Implementation:**
 ```typescript
 const baseRule = getESLintCoreRule('no-unused-expressions');
-const rules = baseRule.create(context);
-// Later calls rules.ExpressionStatement(node)
+// ... delegates to baseRule.create(context) and only adds TS-specific handling
+rules.ExpressionStatement(node);
 ```
 
 **Go Implementation:**
 ```go
-// Complete reimplementation without base rule
-var NoUnusedExpressionsRule = rule.Rule{
-    Name: "no-unused-expressions",
-    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-        // Custom logic only
+// Complete reimplementation without base rule delegation
+return rule.RuleListeners{
+    ast.KindExpressionStatement: func(node *ast.Node) {
+        // Custom logic for all cases
     },
 }
 ```
 
-**Issue:** The TypeScript implementation extends ESLint's base rule and only adds TypeScript-specific handling, while the Go version completely reimplements the rule logic. This means the Go version may miss edge cases and behaviors that the base ESLint rule handles.
+**Issue:** The TypeScript version extends the base ESLint rule and only adds TypeScript-specific handling, while the Go version is a complete rewrite. This could lead to missing edge cases that the base ESLint rule handles.
 
-**Impact:** Missing coverage for complex expressions that the base ESLint rule would catch, potentially leading to false negatives.
+**Impact:** May miss various expression types and edge cases that the original ESLint rule covers.
 
-**Test Coverage:** Many of the failing test cases likely stem from this fundamental difference.
+**Test Coverage:** All test cases could potentially be affected by missing base rule logic.
 
-#### 2. Incorrect Chain Expression Handling
-**TypeScript Implementation:**
-```typescript
-return (
-  (node.type === AST_NODE_TYPES.ChainExpression &&
-    node.expression.type === AST_NODE_TYPES.CallExpression) ||
-  node.type === AST_NODE_TYPES.ImportExpression
-);
-```
-
-**Go Implementation:**
-```go
-// ChainExpression with CallExpression (e.g., foo?.())
-if node.Kind == ast.KindCallExpression {
-    callExpr := node.AsCallExpression()
-    if callExpr.QuestionDotToken != nil {
-        return true
-    }
-}
-```
-
-**Issue:** The TypeScript version looks for ChainExpression nodes containing CallExpression, while the Go version checks for CallExpression with optional chaining tokens. The AST structure mapping is incorrect.
-
-**Impact:** Optional chaining expressions like `a?.b?.c?.()` may not be handled correctly.
-
-**Test Coverage:** Tests like `test.age?.toLocaleString();` and `one[2]?.[3][4]?.();` reveal this issue.
-
-#### 3. Import Expression Detection
+#### 2. ImportExpression Detection
 **TypeScript Implementation:**
 ```typescript
 node.type === AST_NODE_TYPES.ImportExpression
@@ -69,64 +41,18 @@ node.type === AST_NODE_TYPES.ImportExpression
 
 **Go Implementation:**
 ```go
-// ImportExpression (e.g., import('./foo'))
 if node.Kind == ast.KindImportKeyword {
     return true
 }
 ```
 
-**Issue:** The Go version checks for `ast.KindImportKeyword` instead of a proper import expression. Import keywords and import expressions are different AST nodes.
+**Issue:** The Go version checks for `KindImportKeyword` instead of import expressions/calls. Import expressions like `import('./foo')` are call-like expressions, not just keywords.
 
-**Impact:** Dynamic imports like `import('./foo')` may not be recognized as valid expressions.
+**Impact:** May incorrectly identify import keywords in other contexts as valid expressions.
 
-**Test Coverage:** Tests with `import('./foo');` may fail.
+**Test Coverage:** Test cases with `import('./foo')` may not work correctly.
 
-#### 4. Logical Expression Handling Logic Difference
-**TypeScript Implementation:**
-```typescript
-if (allowShortCircuit && node.type === AST_NODE_TYPES.LogicalExpression) {
-  return isValidExpression(node.right);
-}
-```
-
-**Go Implementation:**
-```go
-if binaryExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken || 
-   binaryExpr.OperatorToken.Kind == ast.KindBarBarToken {
-    // Allow if allowShortCircuit is true, or if right side has side effects
-    if opts.AllowShortCircuit {
-        return isValidExpression(binaryExpr.Right)
-    }
-    // Even without allowShortCircuit, allow if right side has side effects
-    return isValidExpression(binaryExpr.Right)
-}
-```
-
-**Issue:** The Go version always checks the right side for side effects even when `allowShortCircuit` is false, which differs from the TypeScript behavior. The TypeScript version only checks the right side when `allowShortCircuit` is true.
-
-**Impact:** Short-circuit expressions may be incorrectly allowed when they should be flagged.
-
-**Test Coverage:** Tests with `allowShortCircuit: true` options may behave differently.
-
-#### 5. Missing Satisfies Expression Handling
-**TypeScript Implementation:**
-```typescript
-// Handles TSInstantiationExpression, TSAsExpression, TSNonNullExpression, TSTypeAssertion
-```
-
-**Go Implementation:**
-```go
-case ast.KindSatisfiesExpression:
-    expression = expression.AsSatisfiesExpression().Expression
-```
-
-**Issue:** The Go version includes `SatisfiesExpression` handling, but the TypeScript version doesn't explicitly mention it. This might be correct for newer TypeScript versions, but could cause inconsistency.
-
-**Impact:** `satisfies` expressions may be handled differently between implementations.
-
-**Test Coverage:** No test cases cover `satisfies` expressions in the provided tests.
-
-#### 6. Directive Prologue Implementation Complexity
+#### 3. Directive Prologue Detection
 **TypeScript Implementation:**
 ```typescript
 if (node.directive || isValidExpression(node.expression)) {
@@ -136,49 +62,103 @@ if (node.directive || isValidExpression(node.expression)) {
 
 **Go Implementation:**
 ```go
-// Skip directive prologues (e.g., 'use strict')
 if ast.IsPrologueDirective(node) {
-    // Complex logic to check directive position and content
-    // Multiple conditions and parent traversal
+    // Complex custom logic to detect 'use strict' and other directives
+    // Checks literal text, parent context, and position in block
 }
 ```
 
-**Issue:** The Go implementation has a much more complex directive prologue detection than the TypeScript version, which simply checks `node.directive`. This complexity may introduce bugs or inconsistencies.
+**Issue:** The TypeScript version relies on a simple `directive` property, while the Go version has complex custom detection logic that may not match ESLint's behavior exactly.
 
-**Impact:** Directive statements like `'use strict'` may be handled inconsistently.
+**Impact:** May incorrectly allow or disallow directive statements in certain contexts.
 
-**Test Coverage:** Tests with `'use strict'` in various positions test this behavior.
+**Test Coverage:** Test cases with 'use strict' in modules, namespaces, and functions.
 
-#### 7. Missing Expression Types in Valid Expression Check
+#### 4. Optional Chaining Detection
 **TypeScript Implementation:**
 ```typescript
-// Base rule handles many expression types automatically
+(node.type === AST_NODE_TYPES.ChainExpression &&
+  node.expression.type === AST_NODE_TYPES.CallExpression)
 ```
 
 **Go Implementation:**
 ```go
-return node.Kind == ast.KindCallExpression || 
-       node.Kind == ast.KindNewExpression ||
-       node.Kind == ast.KindPostfixUnaryExpression ||
-       node.Kind == ast.KindDeleteExpression ||
-       node.Kind == ast.KindAwaitExpression ||
-       node.Kind == ast.KindYieldExpression
+if node.Kind == ast.KindCallExpression {
+    callExpr := node.AsCallExpression()
+    if callExpr.QuestionDotToken != nil {
+        return true
+    }
+}
+// Plus complex parent traversal logic for property/element access
 ```
 
-**Issue:** The Go version only explicitly handles a limited set of expression types as valid, while the base ESLint rule would handle many more cases automatically.
+**Issue:** The TypeScript version checks for `ChainExpression` wrapping `CallExpression`, while the Go version checks for `QuestionDotToken` and does parent traversal. These approaches may not be equivalent.
 
-**Impact:** Valid expressions may be incorrectly flagged as unused expressions.
+**Impact:** May incorrectly validate or invalidate optional chaining expressions.
 
-**Test Coverage:** Edge cases with assignment expressions, update expressions, etc. may fail.
+**Test Coverage:** Test cases with `foo?.()`, `a?.['b']?.c()`, etc.
+
+#### 5. Binary Expression Logic
+**TypeScript Implementation:**
+```typescript
+if (allowShortCircuit && node.type === AST_NODE_TYPES.LogicalExpression) {
+  return isValidExpression(node.right);
+}
+```
+
+**Go Implementation:**
+```go
+if node.Kind == ast.KindBinaryExpression {
+    binaryExpr := node.AsBinaryExpression()
+    if binaryExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken || 
+       binaryExpr.OperatorToken.Kind == ast.KindBarBarToken {
+        if opts.AllowShortCircuit {
+            return isValidExpression(binaryExpr.Right)
+        }
+        // Even without allowShortCircuit, allow if right side has side effects
+        return isValidExpression(binaryExpr.Right)
+    }
+}
+```
+
+**Issue:** The Go version allows logical expressions with side effects even when `allowShortCircuit` is false, while the TypeScript version only allows them when the option is enabled.
+
+**Impact:** May incorrectly allow short-circuit expressions when they should be flagged.
+
+**Test Coverage:** Test case `'foo && foo?.bar;'` with `allowShortCircuit: true` should flag this, but Go version might not.
+
+#### 6. TypeScript Node Type Mappings
+**TypeScript Implementation:**
+```typescript
+expressionType === TSTree.AST_NODE_TYPES.TSInstantiationExpression ||
+expressionType === TSTree.AST_NODE_TYPES.TSAsExpression ||
+expressionType === TSTree.AST_NODE_TYPES.TSNonNullExpression ||
+expressionType === TSTree.AST_NODE_TYPES.TSTypeAssertion
+```
+
+**Go Implementation:**
+```go
+case ast.KindAsExpression:
+case ast.KindTypeAssertionExpression:
+case ast.KindNonNullExpression:
+case ast.KindSatisfiesExpression:  // Extra node type
+// Missing: TSInstantiationExpression equivalent
+case ast.KindExpressionWithTypeArguments:  // Different mapping
+```
+
+**Issue:** The Go version maps to different AST node types and includes `SatisfiesExpression` not in TypeScript version, while missing proper handling for instantiation expressions.
+
+**Impact:** May not correctly handle all TypeScript-specific expression types.
+
+**Test Coverage:** Test cases with `Foo<string>;` and type assertions.
 
 ### Recommendations
-- **Implement base rule logic**: Either port the complete ESLint base rule logic or ensure all expression types are properly handled
-- **Fix chain expression detection**: Properly map TypeScript's ChainExpression AST nodes to Go's AST structure
-- **Correct import expression handling**: Use the proper AST node type for import expressions
-- **Align logical expression behavior**: Match the TypeScript implementation's short-circuit logic exactly
-- **Simplify directive prologue detection**: Use a simpler, more reliable method that matches the TypeScript behavior
-- **Add comprehensive expression type coverage**: Ensure all valid expression types are recognized
-- **Add missing test cases**: Include tests for satisfies expressions, complex chain expressions, and edge cases
-- **Consider AST structure differences**: Carefully map TypeScript AST node types to Go AST equivalents
+- Implement base ESLint rule logic or ensure all edge cases from base rule are covered
+- Fix ImportExpression detection to properly identify dynamic import calls
+- Simplify directive prologue detection to match ESLint behavior or verify current logic is equivalent
+- Review optional chaining detection logic and ensure it matches TypeScript-ESLint behavior
+- Fix binary expression logic to respect allowShortCircuit option correctly
+- Verify TypeScript node type mappings are correct and complete
+- Add comprehensive test coverage for edge cases identified in base ESLint rule
 
 ---

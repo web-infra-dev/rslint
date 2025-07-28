@@ -184,7 +184,7 @@ func TestNoUseBeforeDefineRule(t *testing.T) {
 				{
 					MessageId: "noUseBeforeDefine",
 					Line:      4,
-					Column:    11,
+					Column:    12,
 				},
 			},
 		},
@@ -213,7 +213,7 @@ func TestNoUseBeforeDefineRule(t *testing.T) {
 				{
 					MessageId: "noUseBeforeDefine",
 					Line:      3,
-					Column:    11,
+					Column:    12,
 				},
 			},
 		},
@@ -254,7 +254,7 @@ func TestNoUseBeforeDefineRule(t *testing.T) {
 				{
 					MessageId: "noUseBeforeDefine",
 					Line:      3,
-					Column:    9,
+					Column:    10,
 				},
 			},
 		},
@@ -271,7 +271,7 @@ func TestNoUseBeforeDefineRule(t *testing.T) {
 				{
 					MessageId: "noUseBeforeDefine",
 					Line:      3,
-					Column:    18,
+					Column:    19,
 				},
 			},
 		},
@@ -290,7 +290,7 @@ func TestNoUseBeforeDefineRule(t *testing.T) {
 				{
 					MessageId: "noUseBeforeDefine",
 					Line:      3,
-					Column:    12,
+					Column:    13,
 				},
 			},
 		},

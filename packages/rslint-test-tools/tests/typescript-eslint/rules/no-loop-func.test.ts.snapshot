@@ -1,8 +1,545 @@
 exports[`no-loop-func > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 4
+        },
+        "end": {
+          "line": 5,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 0
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 4
+        },
+        "end": {
+          "line": 6,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 4
+        },
+        "end": {
+          "line": 8,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 9,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 3
+        },
+        "end": {
+          "line": 8,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 27
+        },
+        "end": {
+          "line": 3,
+          "column": 38
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 6
+        },
+        "end": {
+          "line": 8,
+          "column": 6
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'x'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 6
+        },
+        "end": {
+          "line": 6,
+          "column": 6
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'x'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 4
+        },
+        "end": {
+          "line": 5,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 4
+        },
+        "end": {
+          "line": 7,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 4
+        },
+        "end": {
+          "line": 6,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i', 'j'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 6
+        },
+        "end": {
+          "line": 6,
+          "column": 6
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 4
+        },
+        "end": {
+          "line": 9,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 6
+        },
+        "end": {
+          "line": 8,
+          "column": 6
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 4
+        },
+        "end": {
+          "line": 5,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 4
+        },
+        "end": {
+          "line": 5,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 11
+        },
+        "end": {
+          "line": 5,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'i'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 4
+        },
+        "end": {
+          "line": 7,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loop-func > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loop-func",
+      "messageId": "unsafeRefs",
+      "message": "Function declared in a loop contains unsafe references to variable(s) 'a'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 4
+        },
+        "end": {
+          "line": 6,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
 }
 `;

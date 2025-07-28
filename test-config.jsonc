@@ -1,0 +1,1 @@
+[{"language": "typescript", "files": ["*.ts"], "rules": {"no-empty-function": "error"}}]

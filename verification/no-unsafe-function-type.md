@@ -3,24 +3,13 @@
 ### Test File: no-unsafe-function-type.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: 
-  - Core rule logic correctly identifies `Function` type references
-  - Error message content matches TypeScript implementation
-  - Handles type references (`let value: Function`)
-  - Handles class implements clauses (`class Foo implements Function`)
-  - Handles interface extends clauses (`interface Foo extends Function`)
-  - Correctly uses `isReferenceToGlobalFunction` utility for type checking
-  - Proper scope handling to distinguish global Function from local Function types
-
-- ⚠️ **POTENTIAL ISSUES**: 
-  - AST node traversal patterns differ but appear functionally equivalent
-  - Heritage clause handling is more complex in Go but covers same cases
-
-- ❌ **INCORRECT**: No definitive discrepancies found
+- ✅ **CORRECT**: Core message handling, global Function type detection logic, basic type reference checking
+- ⚠️ **POTENTIAL ISSUES**: Heritage clause handling is more complex than TypeScript version, AST node kind mappings may not be 1:1
+- ❌ **INCORRECT**: AST visitor pattern mismatch - Go listens to different node types than TypeScript
 
 ### Discrepancies Found
 
-#### 1. AST Node Pattern Differences
+#### 1. AST Visitor Pattern Mismatch
 **TypeScript Implementation:**
 ```typescript
 return {
@@ -39,21 +28,24 @@ return {
 **Go Implementation:**
 ```go
 return rule.RuleListeners{
+  // Check type references like: let value: Function;
   ast.KindTypeReference: func(node *ast.Node) {
-    typeRef := node.AsTypeReference()
+    typeRef := node.AsTypeReferenceNode()
     checkBannedTypes(typeRef.TypeName)
   },
+
+  // Check class implements clauses like: class Foo implements Function {}
   ast.KindHeritageClause: func(node *ast.Node) {
-    // Complex logic to handle both implements and extends
+    // Complex logic to filter heritage clauses...
   },
 }
 ```
 
-**Issue:** The Go implementation uses a single `KindHeritageClause` listener instead of separate `TSClassImplements` and `TSInterfaceHeritage` listeners, but this is acceptable as it achieves the same result through conditional logic.
+**Issue:** The TypeScript version has specific visitors for `TSClassImplements` and `TSInterfaceHeritage` nodes, while the Go version uses a single `KindHeritageClause` visitor with complex filtering logic. This creates a structural mismatch.
 
-**Impact:** No functional impact - both approaches correctly identify the target AST patterns.
+**Impact:** The Go implementation may miss some cases or incorrectly process heritage clauses that aren't related to class implements or interface extends.
 
-**Test Coverage:** All test cases should pass with both implementations.
+**Test Coverage:** Test cases for `class Weird implements Function` and `interface Weird extends Function` may not work correctly.
 
 #### 2. Heritage Clause Processing Complexity
 **TypeScript Implementation:**
@@ -98,17 +90,15 @@ ast.KindHeritageClause: func(node *ast.Node) {
 },
 ```
 
-**Issue:** The Go implementation is more verbose but functionally equivalent. It manually filters for the correct heritage clause types and parent contexts.
+**Issue:** The Go implementation has much more complex logic to determine if a heritage clause should be processed, while the TypeScript version relies on specific AST node types to filter appropriately.
 
-**Impact:** No functional impact - both approaches achieve the same filtering result.
+**Impact:** The additional complexity increases the chance of bugs and makes the code harder to maintain. The filtering logic may not perfectly match TypeScript's behavior.
 
-**Test Coverage:** The test cases `class Weird implements Function` and `interface Weird extends Function` validate this behavior.
+**Test Coverage:** Both class implements and interface extends test cases need careful verification.
 
-#### 3. Global Function Type Detection
+#### 3. Global Function Detection Implementation
 **TypeScript Implementation:**
 ```typescript
-node.type === AST_NODE_TYPES.Identifier &&
-node.name === 'Function' &&
 isReferenceToGlobalFunction('Function', node, context.sourceCode)
 ```
 
@@ -119,63 +109,45 @@ func isReferenceToGlobalFunction(ctx rule.RuleContext, node *ast.Node) bool {
     return false
   }
 
-  // Get the type at this location to check if it's the global Function
-  nodeType := ctx.TypeChecker.GetTypeAtLocation(node)
-  if nodeType == nil {
+  // Get the symbol for the identifier
+  symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
+  if symbol == nil {
     return false
   }
 
-  // Multiple approaches to detect built-in Function type
-  if utils.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, nodeType, "Function") {
-    return true
-  }
-  
-  if utils.IsBuiltinSymbolLike(ctx.Program, ctx.TypeChecker, nodeType, "FunctionConstructor") {
-    return true
-  }
-  
-  // Check symbol declarations to distinguish global vs local Function
-  symbol := checker.Type_symbol(nodeType)
-  if symbol != nil && symbol.Name == "Function" {
-    hasDefaultLibDeclaration := false
-    hasUserCodeDeclaration := false
-    
-    for _, declaration := range symbol.Declarations {
-      sourceFile := ast.GetSourceFileOfNode(declaration)
-      if sourceFile != nil {
-        if utils.IsSourceFileDefaultLibrary(ctx.Program, sourceFile) {
-          hasDefaultLibDeclaration = true
-        } else {
-          hasUserCodeDeclaration = true
-        }
-      }
+  // Check if this symbol is from the default library (lib.*.d.ts)
+  for _, declaration := range symbol.Declarations {
+    if declaration == nil {
+      continue
     }
     
-    if hasUserCodeDeclaration {
+    sourceFile := ast.GetSourceFileOfNode(declaration)
+    if sourceFile == nil {
+      continue
+    }
+    
+    // If any declaration is NOT from the default library, this is user-defined
+    if !utils.IsSourceFileDefaultLibrary(ctx.Program, sourceFile) {
       return false
     }
-    
-    if hasDefaultLibDeclaration {
-      return true
-    }
   }
   
-  return false
+  // If we have declarations and they're all from the default library, this is the global Function
+  return len(symbol.Declarations) > 0
 }
 ```
 
-**Issue:** The Go implementation is more comprehensive in detecting the global Function type, using multiple strategies including built-in symbol detection and source file analysis.
+**Issue:** While the Go implementation looks functionally correct, it doesn't use the same utility function as the TypeScript version. The logic for checking if a symbol is from the default library may have subtle differences.
 
-**Impact:** Positive impact - the Go implementation may be more robust at distinguishing global Function from local Function types.
+**Impact:** This could potentially cause differences in edge cases, particularly around shadowed `Function` identifiers.
 
-**Test Coverage:** The valid test case with local `type Function = () => void` specifically tests this distinction.
+**Test Coverage:** The test case with the locally scoped `Function` type alias should verify this works correctly.
 
 ### Recommendations
-- ✅ **No fixes needed** - The Go implementation appears functionally correct and equivalent to the TypeScript version
-- ✅ **Test coverage is adequate** - All original test cases are ported and should pass
-- ✅ **Enhanced type detection** - The Go implementation may actually be more robust in distinguishing global vs local Function types
-
-### Overall Assessment
-The Go port of `no-unsafe-function-type` is **functionally correct** and properly implements the same rule logic as the TypeScript version. The implementation differences are due to language-specific AST handling patterns but achieve equivalent results. The Go version may even be more robust in some edge cases related to global type detection.
+- **Fix AST visitor pattern**: Research the correct Go AST node kinds that correspond to TypeScript's `TSClassImplements` and `TSInterfaceHeritage` to simplify the heritage clause handling
+- **Simplify heritage clause logic**: If possible, find more direct AST node types to listen to rather than using complex filtering in `KindHeritageClause`
+- **Verify global Function detection**: Ensure the `IsSourceFileDefaultLibrary` utility correctly identifies default library files in all edge cases
+- **Add comprehensive testing**: Create additional test cases to verify the heritage clause processing works correctly in complex inheritance scenarios
+- **Review AST mapping**: Double-check that `ast.KindTypeReference` correctly corresponds to TypeScript's `TSTypeReference` nodes
 
 ---

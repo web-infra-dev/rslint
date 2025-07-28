@@ -60,6 +60,7 @@ export class RSLintService {
   private chunks: Buffer[];
   private chunkSize: number;
   private expectedSize: number | null;
+  private handshakeComplete: boolean;
 
   constructor(options: RSlintOptions = {}) {
     this.nextMessageId = 1;
@@ -68,7 +69,7 @@ export class RSLintService {
       options.rslintPath || path.join(import.meta.dirname, '../bin/rslint');
 
     this.process = spawn(this.rslintPath, ['--api'], {
-      stdio: ['pipe', 'pipe', 'inherit'],
+      stdio: ['pipe', 'pipe', 'pipe'], // Capture stderr as well
       cwd: options.workingDirectory || process.cwd(),
       env: {
         ...process.env,
@@ -78,9 +79,29 @@ export class RSLintService {
 
     // Set up binary message reading
     this.process.stdout!.on('data', data => this.handleChunk(data));
+    
+    // Capture stderr for debugging
+    this.process.stderr!.on('data', data => {
+      console.error('RSLint stderr:', data.toString());
+    });
+    
+    // Handle process errors
+    this.process.on('error', err => {
+      console.error('RSLint process error:', err);
+      this.rejectAllPending(err);
+    });
+    
+    this.process.on('exit', (code, signal) => {
+      if (code !== 0) {
+        const err = new Error(`RSLint process exited with code ${code} (signal: ${signal})`);
+        this.rejectAllPending(err);
+      }
+    });
+    
     this.chunks = [];
     this.chunkSize = 0;
     this.expectedSize = null;
+    this.handshakeComplete = false;
   }
 
   /**
@@ -91,18 +112,47 @@ export class RSLintService {
       const id = this.nextMessageId++;
       const message = { id, kind, data };
 
+      // Set a timeout for the message
+      const timeout = setTimeout(() => {
+        this.pendingMessages.delete(id);
+        reject(new Error(`Timeout waiting for response to message ${id} (${kind})`));
+      }, 60000); // 60 second timeout
+
       // Register promise callbacks
-      this.pendingMessages.set(id, { resolve, reject });
+      this.pendingMessages.set(id, { 
+        resolve: (data) => {
+          clearTimeout(timeout);
+          resolve(data);
+        }, 
+        reject: (err) => {
+          clearTimeout(timeout);
+          reject(err);
+        }
+      });
 
-      // Write message length as 4 bytes in little endian
-      const json = JSON.stringify(message);
-      const length = Buffer.alloc(4);
-      length.writeUInt32LE(json.length, 0);
+      try {
+        // Write message length as 4 bytes in little endian
+        const json = JSON.stringify(message);
+        const jsonBuffer = Buffer.from(json, 'utf8');
+        const length = Buffer.alloc(4);
+        length.writeUInt32LE(jsonBuffer.length, 0);
 
-      // Send message
-      this.process.stdin!.write(
-        Buffer.concat([length, Buffer.from(json, 'utf8')]),
-      );
+        // Send message
+        this.process.stdin!.write(
+          Buffer.concat([length, jsonBuffer]),
+          (err) => {
+            if (err) {
+              this.pendingMessages.delete(id);
+              clearTimeout(timeout);
+              reject(err);
+            }
+          }
+        );
+      } catch (err) {
+        this.pendingMessages.delete(id);
+        clearTimeout(timeout);
+        reject(err);
+      }
     });
   }
 
@@ -177,8 +227,12 @@ export class RSLintService {
   async lint(options: LintOptions = {}): Promise<LintResponse> {
     const { files, tsconfig, workingDirectory, ruleOptions, fileContents } =
       options;
-    // Send handshake
-    await this.sendMessage('handshake', { version: '1.0.0' });
+    
+    // Send handshake only once
+    if (!this.handshakeComplete) {
+      await this.sendMessage('handshake', { version: '1.0.0' });
+      this.handshakeComplete = true;
+    }
 
     // Send lint request
     const request = {
@@ -194,12 +248,23 @@ export class RSLintService {
   }
 
   /**
+   * Reject all pending messages
+   */
+  private rejectAllPending(err: Error): void {
+    for (const pending of this.pendingMessages.values()) {
+      pending.reject(err);
+    }
+    this.pendingMessages.clear();
+  }
+
+  /**
    * Close the rslint process
    */
   close(): Promise<void> {
     return new Promise(resolve => {
       this.sendMessage('exit', {}).finally(() => {
         this.process.stdin!.end();
+        this.process.kill();
         resolve();
       });
     });

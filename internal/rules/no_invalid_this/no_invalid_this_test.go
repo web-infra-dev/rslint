@@ -400,7 +400,7 @@ z(x => console.log(x, this));
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 2, Column: 13},
-				{MessageId: "unexpectedThis", Line: 3, Column: 22},
+				{MessageId: "unexpectedThis", Line: 3, Column: 23},
 			},
 		},
 
@@ -414,7 +414,7 @@ z(x => console.log(x, this));
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 
@@ -428,7 +428,7 @@ function foo() {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -441,7 +441,7 @@ function foo() {
 			Options: capIsConstructorFalse,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -454,7 +454,7 @@ function Foo() {
 			Options: capIsConstructorFalse,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -467,7 +467,7 @@ function foo() {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 4, Column: 15},
-				{MessageId: "unexpectedThis", Line: 5, Column: 24},
+				{MessageId: "unexpectedThis", Line: 5, Column: 25},
 			},
 		},
 		{
@@ -481,7 +481,7 @@ function Foo() {
 			Options: capIsConstructorFalse,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 4, Column: 15},
-				{MessageId: "unexpectedThis", Line: 5, Column: 24},
+				{MessageId: "unexpectedThis", Line: 5, Column: 25},
 			},
 		},
 		{
@@ -493,7 +493,7 @@ var foo = function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 
@@ -512,7 +512,7 @@ var obj = {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 5, Column: 19},
-				{MessageId: "unexpectedThis", Line: 6, Column: 28},
+				{MessageId: "unexpectedThis", Line: 6, Column: 29},
 			},
 		},
 		{
@@ -529,7 +529,7 @@ var obj = {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 5, Column: 19},
-				{MessageId: "unexpectedThis", Line: 6, Column: 28},
+				{MessageId: "unexpectedThis", Line: 6, Column: 29},
 			},
 		},
 		{
@@ -545,7 +545,7 @@ var obj = {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 5, Column: 19},
-				{MessageId: "unexpectedThis", Line: 6, Column: 28},
+				{MessageId: "unexpectedThis", Line: 6, Column: 29},
 			},
 		},
 		{
@@ -562,7 +562,7 @@ var obj = {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 6, Column: 19},
-				{MessageId: "unexpectedThis", Line: 7, Column: 28},
+				{MessageId: "unexpectedThis", Line: 7, Column: 29},
 			},
 		},
 		{
@@ -576,7 +576,7 @@ obj.foo = function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 4, Column: 17},
-				{MessageId: "unexpectedThis", Line: 5, Column: 26},
+				{MessageId: "unexpectedThis", Line: 5, Column: 27},
 			},
 		},
 		{
@@ -591,7 +591,7 @@ obj.foo = function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 5, Column: 17},
-				{MessageId: "unexpectedThis", Line: 6, Column: 26},
+				{MessageId: "unexpectedThis", Line: 6, Column: 27},
 			},
 		},
 
@@ -609,7 +609,7 @@ class A {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 5, Column: 19},
-				{MessageId: "unexpectedThis", Line: 6, Column: 28},
+				{MessageId: "unexpectedThis", Line: 6, Column: 29},
 			},
 		},
 
@@ -625,7 +625,7 @@ class A {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 4, Column: 17},
-				{MessageId: "unexpectedThis", Line: 5, Column: 26},
+				{MessageId: "unexpectedThis", Line: 5, Column: 27},
 			},
 		},
 		{
@@ -641,7 +641,7 @@ class A {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 5, Column: 19},
-				{MessageId: "unexpectedThis", Line: 6, Column: 28},
+				{MessageId: "unexpectedThis", Line: 6, Column: 29},
 			},
 		},
 
@@ -657,7 +657,7 @@ obj.foo = (function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 4, Column: 17},
-				{MessageId: "unexpectedThis", Line: 5, Column: 26},
+				{MessageId: "unexpectedThis", Line: 5, Column: 27},
 			},
 		},
 		{
@@ -669,7 +669,7 @@ obj.foo = (() => () => {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 
@@ -683,7 +683,7 @@ var foo = function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -695,7 +695,7 @@ var foo = function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -707,7 +707,7 @@ var foo = function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 
@@ -721,7 +721,7 @@ Array.from([], function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -733,7 +733,7 @@ foo.every(function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -745,7 +745,7 @@ foo.filter(function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -757,7 +757,7 @@ foo.find(function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -769,7 +769,7 @@ foo.findIndex(function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -781,7 +781,7 @@ foo.forEach(function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -793,7 +793,7 @@ foo.map(function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -805,7 +805,7 @@ foo.some(function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -817,7 +817,7 @@ foo.forEach(function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 
@@ -831,7 +831,7 @@ foo.forEach(function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -843,7 +843,7 @@ foo.forEach(function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 
@@ -858,7 +858,7 @@ var Ctor = function () {
 			Options: capIsConstructorFalse,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -870,7 +870,7 @@ var func = function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -883,7 +883,7 @@ var func = function () {
 			Options: capIsConstructorFalse,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -896,7 +896,7 @@ Ctor = function () {
 			Options: capIsConstructorFalse,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -908,7 +908,7 @@ func = function () {
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -921,7 +921,7 @@ func = function () {
 			Options: capIsConstructorFalse,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 3, Column: 15},
-				{MessageId: "unexpectedThis", Line: 4, Column: 24},
+				{MessageId: "unexpectedThis", Line: 4, Column: 25},
 			},
 		},
 		{
@@ -935,7 +935,7 @@ function foo(
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 4, Column: 17},
-				{MessageId: "unexpectedThis", Line: 5, Column: 26},
+				{MessageId: "unexpectedThis", Line: 5, Column: 27},
 			},
 		},
 		{
@@ -949,7 +949,7 @@ function foo(
 			`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "unexpectedThis", Line: 4, Column: 17},
-				{MessageId: "unexpectedThis", Line: 5, Column: 26},
+				{MessageId: "unexpectedThis", Line: 5, Column: 27},
 			},
 		},
 	})

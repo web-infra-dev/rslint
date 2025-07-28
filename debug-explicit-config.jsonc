@@ -1,0 +1,14 @@
+[
+  {
+    "language": "typescript",
+    "files": ["**/*.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "project": ["./tsconfig.json"]
+      }
+    },
+    "rules": {
+      "@typescript-eslint/consistent-indexed-object-style": "error"
+    }
+  }
+]

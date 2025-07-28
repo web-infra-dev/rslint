@@ -1,0 +1,14 @@
+[
+  {
+    "language": "typescript",
+    "files": ["*.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "project": ["./tsconfig.json"]
+      }
+    },
+    "rules": {
+      "consistent-indexed-object-style": ["error", "index-signature"]
+    }
+  }
+]

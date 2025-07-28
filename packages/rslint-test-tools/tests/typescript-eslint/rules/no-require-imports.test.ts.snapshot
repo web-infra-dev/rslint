@@ -1,8 +1,619 @@
 exports[`no-require-imports > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 25
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 0
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 13
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 40
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 14
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 17
+        },
+        "end": {
+          "line": 1,
+          "column": 33
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 7
+        },
+        "end": {
+          "line": 1,
+          "column": 21
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 13
+        },
+        "end": {
+          "line": 1,
+          "column": 34
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 18
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 18
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 12
+        },
+        "end": {
+          "line": 1,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 39
+        },
+        "end": {
+          "line": 2,
+          "column": 58
+        }
+      }
+    },
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 27
+        },
+        "end": {
+          "line": 3,
+          "column": 46
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 13
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 22`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 15
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 12
+        },
+        "end": {
+          "line": 2,
+          "column": 27
+        }
+      }
+    },
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 10
+        },
+        "end": {
+          "line": 3,
+          "column": 25
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 15
+        },
+        "end": {
+          "line": 1,
+          "column": 30
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 12
+        },
+        "end": {
+          "line": 1,
+          "column": 29
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 12
+        },
+        "end": {
+          "line": 2,
+          "column": 29
+        }
+      }
+    },
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 10
+        },
+        "end": {
+          "line": 3,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 13
+        },
+        "end": {
+          "line": 1,
+          "column": 38
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-require-imports > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-require-imports",
+      "messageId": "noRequireImports",
+      "message": "A \`require()\` style import is forbidden.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 13
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
 }
 `;

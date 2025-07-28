@@ -1,17 +1,15 @@
-# Rule Validation: no-redeclare
-
 ## Rule: no-redeclare
 
 ### Test File: no-redeclare.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: Basic redeclaration detection, TypeScript declaration merging logic, configuration options handling, message formatting
-- ⚠️ **POTENTIAL ISSUES**: ESLint directive comments handling, scope management complexity, builtin globals detection in different environments
-- ❌ **INCORRECT**: Missing ESLint directive comment support, incomplete scope traversal, missing function overload handling
+- ✅ **CORRECT**: Basic redeclaration detection, TypeScript declaration merging logic, configuration options handling, core error messages
+- ⚠️ **POTENTIAL ISSUES**: Global directive comment handling, ESLint scope manager integration, builtin globals detection in modules vs scripts
+- ❌ **INCORRECT**: Missing ESLint global directive support, incomplete builtin globals list, scope traversal differences
 
 ### Discrepancies Found
 
-#### 1. ESLint Directive Comments Not Supported
+#### 1. ESLint Global Directive Comments Not Supported
 **TypeScript Implementation:**
 ```typescript
 if (
@@ -34,16 +32,40 @@ if (
 
 **Go Implementation:**
 ```go
-// No equivalent handling for ESLint directive comments like /*global b:false*/
+// No equivalent implementation found
 ```
 
-**Issue:** The Go implementation completely lacks support for ESLint directive comments (e.g., `/*global b:false*/ var b = 1;`). The TypeScript version detects these and reports `redeclaredBySyntax` errors.
+**Issue:** The Go implementation completely lacks support for ESLint global directive comments like `/*global b:false*/`. These comments can declare global variables that should be checked for redeclaration.
 
-**Impact:** Test case `/*global b:false*/ var b = 1;` will not trigger the expected `redeclaredBySyntax` error in the Go version.
+**Impact:** Test case `/*global b:false*/ var b = 1;` should produce a `redeclaredBySyntax` error but won't be detected by the Go implementation.
 
 **Test Coverage:** The test case with `/*global b:false*/ var b = 1;` will fail.
 
-#### 2. Function Overload Handling Missing
+#### 2. ESLint Implicit Global Settings Missing
+**TypeScript Implementation:**
+```typescript
+if (
+  options.builtinGlobals &&
+  'eslintImplicitGlobalSetting' in variable &&
+  (variable.eslintImplicitGlobalSetting === 'readonly' ||
+    variable.eslintImplicitGlobalSetting === 'writable')
+) {
+  yield { type: 'builtin' };
+}
+```
+
+**Go Implementation:**
+```go
+// No equivalent - only handles hardcoded builtin globals
+```
+
+**Issue:** The Go implementation doesn't integrate with ESLint's scope manager to detect implicit global settings. It only uses a hardcoded list of builtin globals.
+
+**Impact:** Test case with `languageOptions: { globals: { top: 'readonly' } }` expects `redeclaredAsBuiltin` error but may not work correctly.
+
+**Test Coverage:** Test case `var top = 0;` with globals configuration will fail.
+
+#### 3. TSDeclareFunction Filtering Missing
 **TypeScript Implementation:**
 ```typescript
 const identifiers = variable.identifiers
@@ -59,29 +81,52 @@ const identifiers = variable.identifiers
 
 **Go Implementation:**
 ```go
-// No special handling for TSDeclareFunction or function overloads
+// No equivalent filtering for TSDeclareFunction
 ```
 
-**Issue:** The Go implementation doesn't filter out `TSDeclareFunction` nodes, which should be ignored as they represent TypeScript function overloads.
+**Issue:** The Go implementation doesn't filter out `TSDeclareFunction` nodes, which should be ignored as TypeScript treats them as overloads.
 
-**Impact:** Function overloads may incorrectly trigger redeclaration errors when they should be allowed.
+**Impact:** May incorrectly report redeclarations for TypeScript declare function overloads.
 
-**Test Coverage:** The test case with function overloads `function a(): string; function a(): number; function a() {}` might fail.
+**Test Coverage:** Test cases with function overloads `function a(): string; function a(): number; function a() {}` should pass but might fail.
 
-#### 3. Scope Management Complexity
+#### 4. Scope Detection Logic Differences
 **TypeScript Implementation:**
 ```typescript
 function checkForBlock(node: TSESTree.Node): void {
   const scope = context.sourceCode.getScope(node);
+  
   if (scope.block === node) {
     findVariablesInScope(scope);
   }
 }
+```
 
-// Handles Program scope specially
+**Go Implementation:**
+```go
+// Manual scope tracking without ESLint scope manager integration
+enterScope := func(node *ast.Node) {
+  if _, processed := processedScopes[node]; processed {
+    return
+  }
+  // ... manual scope creation
+}
+```
+
+**Issue:** The Go implementation uses manual scope tracking instead of integrating with a proper scope manager, which may miss subtle scoping rules.
+
+**Impact:** May incorrectly detect or miss redeclarations in complex scoping scenarios.
+
+**Test Coverage:** Complex scoping test cases may behave differently.
+
+#### 5. Module vs Script Context Detection
+**TypeScript Implementation:**
+```typescript
+// Node.js or ES modules has a special scope.
 if (
   scope.type === ScopeType.global &&
   scope.childScopes[0] &&
+  // The special scope's block is the Program node.
   scope.block === scope.childScopes[0].block
 ) {
   findVariablesInScope(scope.childScopes[0]);
@@ -90,32 +135,7 @@ if (
 
 **Go Implementation:**
 ```go
-// Manual scope tracking with enterScope/exitScope
-// May not handle all scope edge cases correctly
-```
-
-**Issue:** The Go implementation uses manual scope tracking rather than leveraging a proper scope analyzer. This may miss complex scoping scenarios and doesn't handle the special Node.js/ES module scope detection.
-
-**Impact:** Variables may be incorrectly scoped, leading to false positives or missed redeclarations.
-
-**Test Coverage:** Complex scoping scenarios may not work correctly.
-
-#### 4. Incomplete Builtin Globals Environment Detection
-**TypeScript Implementation:**
-```typescript
-if (
-  options.builtinGlobals &&
-  'eslintImplicitGlobalSetting' in variable &&
-  (variable.eslintImplicitGlobalSetting === 'readonly' ||
-    variable.eslintImplicitGlobalSetting === 'writable')
-) {
-  yield { type: 'builtin' };
-}
-```
-
-**Go Implementation:**
-```go
-// Only adds builtins to root scope if not a module
+// Check if this is a module by looking for exports or imports
 isModuleScope := false
 ctx.SourceFile.ForEachChild(func(node *ast.Node) bool {
   if ast.IsImportDeclaration(node) || ast.IsExportDeclaration(node) || ast.IsExportAssignment(node) {
@@ -126,65 +146,84 @@ ctx.SourceFile.ForEachChild(func(node *ast.Node) bool {
 })
 ```
 
-**Issue:** The Go implementation uses a simple import/export detection for module scope, but doesn't properly integrate with ESLint's global variable system or handle different environments (browser vs Node.js).
+**Issue:** The Go implementation has a simplified module detection that may not match ESLint's sophisticated scope analysis.
 
-**Impact:** Builtin global detection may not work correctly in all environments, leading to missed `redeclaredAsBuiltin` errors.
+**Impact:** Builtin global detection may work differently between module and script contexts.
 
-**Test Coverage:** Tests with `languageOptions.globals` may not work correctly.
+**Test Coverage:** Tests with `sourceType: 'module'` vs `sourceType: 'script'` may behave differently.
 
-#### 5. Declaration Merging Logic Timing
+#### 6. Declaration Merging Logic Edge Cases
 **TypeScript Implementation:**
 ```typescript
-// Processes all declarations first, then applies merging logic
-const [declaration, ...extraDeclarations] = iterateDeclarations(variable);
-if (extraDeclarations.length === 0) {
-  continue;
+// class + interface/namespace merging
+if (
+  identifiers.every(({ parent }) =>
+    CLASS_DECLARATION_MERGE_NODES.has(parent.type),
+  )
+) {
+  const classDecls = identifiers.filter(
+    ({ parent }) => parent.type === AST_NODE_TYPES.ClassDeclaration,
+  );
+  if (classDecls.length === 1) {
+    // safe declaration merging
+    return;
+  }
+  
+  // there's more than one class declaration, which needs to be reported
+  for (const { identifier } of classDecls) {
+    yield { loc: identifier.loc, node: identifier, type: 'syntax' };
+  }
+  return;
 }
 ```
 
 **Go Implementation:**
 ```go
-// Reports immediately when second declaration is encountered
-if len(varInfo.Declarations) > 1 {
-  // Check merging logic here
-}
+case ast.KindClassDeclaration:
+  // Report only when we encounter exactly the second class
+  shouldReport = classCounts == 2
 ```
 
-**Issue:** The Go implementation checks for redeclarations immediately upon encountering each declaration, rather than collecting all declarations first and then applying the merging logic. This may lead to incorrect reporting order or missed merging scenarios.
+**Issue:** The Go implementation reports on the second class declaration immediately, while the TypeScript version reports all duplicate class declarations at once after analysis.
 
-**Impact:** The timing of error reporting may be different, and complex merging scenarios might not be handled correctly.
+**Impact:** Error reporting timing and count may differ for multiple class declarations.
 
-**Test Coverage:** Tests with multiple declarations of the same name may show different behavior.
+**Test Coverage:** Test case `class A {} class A {} namespace A {}` expects only one error but Go might report differently.
 
-#### 6. Missing Destructuring Pattern Support
+#### 7. Missing Variable Declaration List Processing
 **TypeScript Implementation:**
 ```typescript
-// Automatically handled by scope manager's variable collection
+// Uses ESLint scope manager to automatically track variable declarations
 ```
 
 **Go Implementation:**
 ```go
-// Manual destructuring pattern handling
-if ast.IsObjectBindingPattern(varDecl.Name()) || ast.IsArrayBindingPattern(varDecl.Name()) {
-  // Handle destructuring patterns
-  var processBindingPattern func(*ast.Node)
-  // ... complex recursive logic
+ast.KindVariableStatement: func(node *ast.Node) {
+  varStmt := node.AsVariableStatement()
+  if varStmt.DeclarationList == nil {
+    return
+  }
+  declList := varStmt.DeclarationList.AsVariableDeclarationList()
+  for _, decl := range declList.Declarations.Nodes {
+    // Manual processing of each declaration
+  }
 }
 ```
 
-**Issue:** While the Go implementation attempts to handle destructuring, it may miss edge cases or nested patterns that the TypeScript scope manager handles automatically.
+**Issue:** The Go implementation manually processes variable declarations, which may miss edge cases that ESLint's scope manager handles automatically.
 
-**Impact:** Complex destructuring patterns might not be correctly analyzed for redeclarations.
+**Impact:** Complex variable declaration patterns may not be handled correctly.
 
-**Test Coverage:** Tests with complex destructuring like `var { a = 0, b: Object = 0 } = {};` need verification.
+**Test Coverage:** Destructuring and complex declaration patterns may behave differently.
 
 ### Recommendations
-- **Add ESLint directive comment parsing**: Implement support for `/*global*/` comments and report `redeclaredBySyntax` errors
-- **Implement function overload filtering**: Filter out `TSDeclareFunction` nodes from redeclaration checking
-- **Improve scope management**: Consider using a proper scope analyzer or more closely mirror ESLint's scope handling
-- **Enhance builtin globals detection**: Properly integrate with environment-specific globals and ESLint's global variable system
-- **Refactor declaration merging timing**: Collect all declarations first before applying merging logic
-- **Test destructuring patterns thoroughly**: Ensure all destructuring edge cases are handled correctly
-- **Add missing AST node types**: Ensure all declaration types (including export declarations) are properly handled
+- Implement ESLint global directive comment parsing and processing
+- Add integration with proper scope management system or enhance manual scope tracking
+- Add filtering for TSDeclareFunction nodes to match TypeScript behavior
+- Enhance module vs script context detection to match ESLint's behavior
+- Review and test declaration merging logic for edge cases with multiple declarations
+- Add comprehensive builtin globals list or integrate with ESLint's globals
+- Test extensively with complex scoping scenarios to ensure compatibility
+- Consider implementing iterator-based declaration processing to match TypeScript's approach
 
 ---

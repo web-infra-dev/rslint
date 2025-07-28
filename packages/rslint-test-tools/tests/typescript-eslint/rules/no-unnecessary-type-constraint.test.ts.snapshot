@@ -1,8 +1,587 @@
 exports[`no-unnecessary-type-constraint > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 15
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 0
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 15
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 15
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 15
+        },
+        "end": {
+          "line": 1,
+          "column": 38
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 15
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    },
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`U\` to \`any\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 30
+        },
+        "end": {
+          "line": 1,
+          "column": 43
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`unknown\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 15
+        },
+        "end": {
+          "line": 1,
+          "column": 32
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 15
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`unknown\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 15
+        },
+        "end": {
+          "line": 1,
+          "column": 32
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`unknown\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 12
+        },
+        "end": {
+          "line": 1,
+          "column": 29
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`unknown\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 20
+        },
+        "end": {
+          "line": 1,
+          "column": 37
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`unknown\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 10
+        },
+        "end": {
+          "line": 3,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 15
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`unknown\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 10
+        },
+        "end": {
+          "line": 3,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`unknown\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 16
+        },
+        "end": {
+          "line": 1,
+          "column": 33
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 22`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`unknown\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`U\` to \`any\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 18
+        },
+        "end": {
+          "line": 1,
+          "column": 31
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 15
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 15
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 15
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 15
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 15
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-constraint > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-constraint",
+      "messageId": "unnecessaryConstraint",
+      "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 15
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
 }
 `;

@@ -1,0 +1,15 @@
+[
+  {
+    "language": "typescript",
+    "files": ["test-consistent-return-specific.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "project": ["./tsconfig.json"],
+        "projectService": false
+      }
+    },
+    "rules": {
+      "consistent-return": "error"
+    }
+  }
+]

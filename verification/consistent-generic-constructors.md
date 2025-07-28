@@ -3,154 +3,38 @@
 ### Test File: consistent-generic-constructors.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: 
-  - Core rule logic for detecting type annotation vs constructor generic preferences
-  - Basic AST pattern matching for variable declarations, property declarations, and parameters
-  - Error message IDs and descriptions match exactly
-  - Options parsing supports both string and array formats
-  - Type reference matching logic with same constructor name validation
-  - Basic fix generation for moving generics between locations
-  - Support for accessor properties and binding elements
-
-- ⚠️ **POTENTIAL ISSUES**: 
-  - Comment preservation during fixes is simplified compared to TypeScript version
-  - Computed property handling may not match exact positioning for type annotation attachment
-  - Error reporting node selection differs for some cases (variable statements vs declarations)
-  - isolatedDeclarations option checking relies on Program.Options() which may not match parser options exactly
-
-- ❌ **INCORRECT**: 
-  - Missing proper handling of assignment patterns in destructuring contexts outside function parameters
-  - AST node kind mapping doesn't fully match TypeScript ESLint's selector pattern
-  - Binding element filtering logic is too restrictive and may miss valid cases
+- ✅ **CORRECT**: Core rule logic for detecting generic constructor patterns, basic AST pattern matching for variable declarations and property declarations, error message structure and IDs, basic option parsing for constructor vs type-annotation modes
+- ⚠️ **POTENTIAL ISSUES**: Comment preservation during fixes may not be as sophisticated as TypeScript version, handling of computed property names in type annotation attachment, binding element processing logic differs from TypeScript selector approach
+- ❌ **INCORRECT**: Missing support for AssignmentPattern nodes (destructuring with defaults in function parameters), AST node selector logic doesn't match TypeScript's sophisticated selector, isolatedDeclarations option access may not work correctly
 
 ### Discrepancies Found
 
-#### 1. AST Node Selector Mismatch
+#### 1. Missing AssignmentPattern Support
 **TypeScript Implementation:**
 ```typescript
-'VariableDeclarator,PropertyDefinition,AccessorProperty,:matches(FunctionDeclaration,FunctionExpression) > AssignmentPattern'
+'VariableDeclarator,PropertyDefinition,AccessorProperty,:matches(FunctionDeclaration,FunctionExpression) > AssignmentPattern'(
+  node: TSESTree.AccessorProperty | TSESTree.AssignmentPattern | TSESTree.PropertyDefinition | TSESTree.VariableDeclarator,
+): void {
+  // Handles AssignmentPattern nodes which are function parameter defaults with destructuring
 ```
 
 **Go Implementation:**
 ```go
 return rule.RuleListeners{
     ast.KindVariableDeclaration: handleNode,
-    ast.KindPropertyDeclaration: handleNode,
+    ast.KindPropertyDeclaration: handleNode, // Includes accessor properties
     ast.KindParameter:           handleNode,
-    ast.KindBindingElement:      handleNode,
+    ast.KindBindingElement:      handleNode, // Support for assignment patterns
 }
 ```
 
-**Issue:** The TypeScript version uses a complex CSS-like selector that includes `AssignmentPattern` specifically within function contexts, while the Go version uses `BindingElement` with custom filtering logic that may be too restrictive.
+**Issue:** The TypeScript version uses a sophisticated CSS-like selector that specifically targets AssignmentPattern nodes that are children of FunctionDeclaration or FunctionExpression. The Go version attempts to handle this with KindBindingElement but the logic is different.
 
-**Impact:** May miss assignment patterns in destructuring that should be checked, or may incorrectly process binding elements outside intended contexts.
+**Impact:** Test cases involving destructuring parameters with defaults (like `function foo({ a }: Foo<string> = new Foo()) {}`) may not be handled correctly.
 
-**Test Coverage:** Test cases with destructuring assignments like `const [a = new Foo<string>()] = [];` may not work correctly.
+**Test Coverage:** Tests with function parameter destructuring patterns will reveal this issue.
 
-#### 2. Comment Preservation in Fixes
-**TypeScript Implementation:**
-```typescript
-const extraComments = new Set(
-  context.sourceCode.getCommentsInside(lhs.parent),
-);
-context.sourceCode
-  .getCommentsInside(lhs.typeArguments)
-  .forEach(c => extraComments.delete(c));
-context.report({
-  *fix(fixer) {
-    for (const comment of extraComments) {
-      yield fixer.insertTextAfter(
-        rhs.callee,
-        context.sourceCode.getText(comment),
-      );
-    }
-  }
-});
-```
-
-**Go Implementation:**
-```go
-typeArgsText := getNodeListTextWithBrackets(ctx, lhsTypeArgs)
-// Basic comment preservation - the type args text already includes any comments
-```
-
-**Issue:** The Go version has simplified comment preservation that just includes comments within the type arguments, but doesn't handle the sophisticated comment redistribution logic of the TypeScript version.
-
-**Impact:** Comments may not be preserved correctly when moving generics between type annotation and constructor, leading to lost or misplaced comments.
-
-**Test Coverage:** Test cases with comments like `const a: /* comment */ Foo/* another */ <string> = new Foo();` may not produce identical output.
-
-#### 3. Computed Property Type Annotation Attachment
-**TypeScript Implementation:**
-```typescript
-function getIDToAttachAnnotation(): TSESTree.Node | TSESTree.Token {
-  if (node.computed) {
-    return nullThrows(
-      context.sourceCode.getTokenAfter(node.key),
-      NullThrowsReasons.MissingToken(']', 'key'),
-    );
-  }
-  return node.key;
-}
-```
-
-**Go Implementation:**
-```go
-if propDecl.Name().Kind == ast.KindComputedPropertyName {
-    // For computed properties, find the closing bracket token to match TypeScript behavior
-    computed := propDecl.Name().AsComputedPropertyName()
-    // Use scanner to find the closing bracket after the expression
-    // TODO: Better position handling for after closing bracket
-    return computed.AsNode() 
-}
-```
-
-**Issue:** The Go version has incomplete handling for computed properties and doesn't properly find the closing bracket token position for type annotation attachment.
-
-**Impact:** Type annotations may be attached at the wrong position for computed properties, leading to invalid syntax.
-
-**Test Coverage:** Test cases like `class Foo { [a]: Foo<string> = new Foo(); }` may produce incorrect fix output positioning.
-
-#### 4. Error Reporting Node Selection
-**TypeScript Implementation:**
-```typescript
-context.report({
-  node, // Reports on the original node (VariableDeclarator, PropertyDefinition, etc.)
-```
-
-**Go Implementation:**
-```go
-// Determine what node to report the error on
-reportNode := node
-if node.Kind == ast.KindVariableDeclaration && node.Parent != nil {
-    reportNode = node.Parent // For variable declarations, report on the statement
-}
-```
-
-**Issue:** The Go version changes the reporting node for variable declarations to the parent statement, while TypeScript reports on the declarator itself.
-
-**Impact:** Error positioning and highlighting may differ from TypeScript ESLint output.
-
-**Test Coverage:** Error location for variable declaration cases may not match expected positions.
-
-#### 5. isolatedDeclarations Option Handling
-**TypeScript Implementation:**
-```typescript
-const isolatedDeclarations = context.parserOptions.isolatedDeclarations;
-```
-
-**Go Implementation:**
-```go
-isolatedDeclarations := ctx.Program.Options().IsolatedDeclarations.IsTrue()
-```
-
-**Issue:** The Go version reads from Program options while TypeScript reads from parser options, which may not be the same value depending on how options are passed through.
-
-**Impact:** The isolatedDeclarations feature gate may not work correctly, causing the rule to flag cases it should ignore.
-
-**Test Coverage:** The commented-out test case for isolatedDeclarations cannot be validated.
-
-#### 6. Assignment Pattern Context Filtering
+#### 2. Selector Logic Mismatch
 **TypeScript Implementation:**
 ```typescript
 ':matches(FunctionDeclaration,FunctionExpression) > AssignmentPattern'
@@ -165,6 +49,7 @@ if node.Kind == ast.KindBindingElement {
         if current.Kind == ast.KindParameter {
             break
         }
+        // If we find a variable declaration or other non-parameter context, skip
         if current.Kind == ast.KindVariableDeclaration ||
             current.Kind == ast.KindVariableStatement ||
             current.Kind == ast.KindVariableDeclarationList {
@@ -172,26 +57,153 @@ if node.Kind == ast.KindBindingElement {
         }
         current = current.Parent
     }
+    // If we didn't find a parameter parent, skip this binding element
     if current == nil {
         return
     }
 }
 ```
 
-**Issue:** The Go version's filtering logic is more complex but may still miss valid assignment patterns or incorrectly filter out cases that should be processed.
+**Issue:** The Go version tries to mimic the selector behavior but may miss edge cases or have different traversal logic than the TypeScript selector engine.
 
-**Impact:** Some destructuring assignment patterns with defaults may not be processed correctly.
+**Impact:** Some valid cases might be skipped or invalid cases might be processed.
 
-**Test Coverage:** Complex destructuring scenarios may behave differently.
+**Test Coverage:** Function parameter destructuring tests may fail.
+
+#### 3. IsolatedDeclarations Option Access
+**TypeScript Implementation:**
+```typescript
+const isolatedDeclarations = context.parserOptions.isolatedDeclarations;
+```
+
+**Go Implementation:**
+```go
+isolatedDeclarations := ctx.Program.Options().IsolatedDeclarations.IsTrue()
+```
+
+**Issue:** The Go version accesses isolatedDeclarations through the Program options, but it's unclear if this correctly corresponds to the TypeScript parser options.
+
+**Impact:** The rule behavior when isolatedDeclarations is enabled may not match TypeScript ESLint.
+
+**Test Coverage:** The commented-out test case for isolatedDeclarations in the Go test file indicates this feature isn't fully working.
+
+#### 4. Comment Preservation Complexity
+**TypeScript Implementation:**
+```typescript
+const extraComments = new Set(
+  context.sourceCode.getCommentsInside(lhs.parent),
+);
+context.sourceCode
+  .getCommentsInside(lhs.typeArguments)
+  .forEach(c => extraComments.delete(c));
+```
+
+**Go Implementation:**
+```go
+// Basic comment preservation - get any comments within the type arguments
+// This is a simplified approach compared to the sophisticated TypeScript version
+typeAnnotation := calleeText + typeArgsText
+```
+
+**Issue:** The Go version has a much simpler comment preservation strategy and may not handle complex comment scenarios as well as the TypeScript version.
+
+**Impact:** Comments in type arguments may not be preserved correctly during fixes.
+
+**Test Coverage:** Tests with comments in type arguments may produce different output.
+
+#### 5. getLHSRHS Function Logic Differences
+**TypeScript Implementation:**
+```typescript
+function getLHSRHS(): [
+  (TSESTree.AccessorProperty | TSESTree.BindingName | TSESTree.PropertyDefinition),
+  TSESTree.Expression | null,
+] {
+  switch (node.type) {
+    case AST_NODE_TYPES.VariableDeclarator:
+      return [node.id, node.init];
+    case AST_NODE_TYPES.PropertyDefinition:
+    case AST_NODE_TYPES.AccessorProperty:
+      return [node, node.value];
+    case AST_NODE_TYPES.AssignmentPattern:
+      return [node.left, node.right];
+    default:
+      throw new Error(`Unhandled node type: ${(node as { type: string }).type}`);
+  }
+}
+```
+
+**Go Implementation:**
+```go
+func getLHSRHS(node *ast.Node) *lhsRhsPair {
+    switch node.Kind {
+    case ast.KindVariableDeclaration:
+        // Returns name and initializer
+    case ast.KindPropertyDeclaration:
+        // Returns node and initializer
+    case ast.KindParameter:
+        // Returns name and initializer
+    case ast.KindBindingElement:
+        // Returns name and initializer
+    default:
+        return &lhsRhsPair{lhs: nil, rhs: nil}
+    }
+}
+```
+
+**Issue:** The Go version handles different AST node types than TypeScript and doesn't have an exact equivalent for AssignmentPattern handling.
+
+**Impact:** The extraction of left-hand side and right-hand side values may be incorrect for some node types.
+
+**Test Coverage:** Various declaration patterns in tests will reveal mismatches.
+
+#### 6. getIDToAttachAnnotation Computed Property Handling
+**TypeScript Implementation:**
+```typescript
+if (!node.computed) {
+  return node.key;
+}
+// If the property's computed, we have to attach the
+// annotation after the square bracket, not the enclosed expression
+return nullThrows(
+  context.sourceCode.getTokenAfter(node.key),
+  NullThrowsReasons.MissingToken(']', 'key'),
+);
+```
+
+**Go Implementation:**
+```go
+if propDecl.Name().Kind == ast.KindComputedPropertyName {
+    // For computed properties, find the closing bracket token to match TypeScript behavior
+    computed := propDecl.Name().AsComputedPropertyName()
+    if computed.Expression != nil {
+        // Use scanner to find the closing bracket after the expression
+        s := scanner.GetScannerForSourceFile(ctx.SourceFile, computed.Expression.End())
+        for s.TokenStart() < ctx.SourceFile.End() {
+            if s.Token() == ast.KindCloseBracketToken {
+                // For now, use the computed property node
+                // TODO: Better position handling for after closing bracket
+                return computed.AsNode() 
+            }
+            // ... scanner logic
+        }
+    }
+    return propDecl.Name()
+}
+```
+
+**Issue:** The Go version has a TODO comment indicating incomplete handling of computed property annotation attachment.
+
+**Impact:** Type annotation attachment for computed properties like `[key]: Type = new Constructor()` may not work correctly.
+
+**Test Coverage:** Tests with computed properties will reveal this issue.
 
 ### Recommendations
-- Fix AST node selection to more accurately match TypeScript ESLint's selector behavior
-- Improve comment preservation logic to handle sophisticated comment redistribution
-- Complete the computed property type annotation attachment positioning
-- Align error reporting node selection with TypeScript behavior
-- Verify isolatedDeclarations option is correctly passed through from parser options
-- Simplify and correct binding element filtering to match intended selector semantics
-- Add more comprehensive test cases for edge cases like complex destructuring patterns
-- Consider implementing a more direct mapping from TypeScript ESLint's CSS selectors to Go AST listeners
+- Implement proper AssignmentPattern support to match TypeScript's selector behavior exactly
+- Fix the isolatedDeclarations option access to properly read from parser options
+- Complete the computed property name handling in getIDToAttachAnnotation
+- Enhance comment preservation logic to match TypeScript's sophisticated approach
+- Add comprehensive test coverage for edge cases like complex destructuring patterns
+- Verify that the binding element processing correctly handles all function parameter scenarios
+- Consider adding debug logging to compare AST traversal with TypeScript version
 
 ---

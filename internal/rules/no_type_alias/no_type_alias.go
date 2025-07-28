@@ -188,9 +188,20 @@ var NoTypeAliasRule = rule.Rule{
 			AllowTupleTypes:       ValueNever,
 		}
 
-		// Parse options if provided
+		// Parse options with dual-format support (handles both array and object formats)
 		if options != nil {
-			if optsMap, ok := options.(map[string]interface{}); ok {
+			var optsMap map[string]interface{}
+			var ok bool
+			
+			// Handle array format: [{ option: value }]
+			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
+				optsMap, ok = optArray[0].(map[string]interface{})
+			} else {
+				// Handle direct object format: { option: value }
+				optsMap, ok = options.(map[string]interface{})
+			}
+			
+			if ok {
 				if val, ok := optsMap["allowAliases"].(string); ok {
 					opts.AllowAliases = val
 				}

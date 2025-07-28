@@ -3,80 +3,131 @@
 ### Test File: no-restricted-types.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: Core banned type checking logic, keyword type listeners, option parsing structure, error message formatting, fix and suggestion handling
-- ⚠️ **POTENTIAL ISSUES**: Heritage clause handling implementation differs, AST navigation patterns may not be equivalent
-- ❌ **INCORRECT**: Missing union and intersection type checking, missing type assertion handling, incomplete heritage clause coverage
+- ✅ **CORRECT**: 
+  - Basic type keyword detection (string, number, boolean, etc.)
+  - Empty tuple `[]` detection
+  - Empty type literal `{}` detection
+  - Type reference checking with qualified names (NS.Banned)
+  - Space normalization in type names
+  - Basic fix and suggestion support
+  - Class implements clause checking
+  - Interface extends clause checking
+  - Configuration parsing for different ban config formats
+
+- ⚠️ **POTENTIAL ISSUES**:
+  - AST node listener registration pattern may miss dynamic cases
+  - Type argument checking logic might not match all cases
+
+- ❌ **INCORRECT**:
+  - Missing support for type assertions (`1 as Banned`)
+  - Missing support for union types (`Banned | {}`)
+  - Missing support for intersection types (`Banned & {}`)
+  - Missing support for array types (`Banned[]`)
+  - Missing support for tuple element types (`[Banned]`)
+  - Missing support for property types in type literals (`{ c: Banned }`)
 
 ### Discrepancies Found
 
-#### 1. Missing Union and Intersection Type Support
+#### 1. Type Assertion Support Missing
 **TypeScript Implementation:**
 ```typescript
-// No explicit union/intersection handlers, but the generic node checking
-// and TSTypeReference handler would catch these patterns
-checkBannedTypes(node.typeName); // Checks type references in unions/intersections
+return {
+  ...keywordSelectors,
+  // ... other listeners that catch all type nodes
+};
 ```
 
 **Go Implementation:**
 ```go
-// No listeners for union or intersection types
-// Missing: ast.KindUnionType and ast.KindIntersectionType listeners
+listeners := rule.RuleListeners{}
+// Only has specific listeners for certain node types
 ```
 
-**Issue:** The Go implementation lacks explicit handling for union types (`Banned | {}`) and intersection types (`Banned & {}`), which are covered by test cases.
+**Issue:** The Go implementation doesn't listen for type assertion nodes (`1 as Banned`), which means it won't catch banned types used in type assertions.
 
-**Impact:** Test cases like `'type Union = Banned | {};'` and `'type Intersection = Banned & {};'` may not trigger the rule properly.
+**Impact:** Test case `'1 as Banned;'` would not be caught by the Go implementation.
 
-**Test Coverage:** Tests for union and intersection types would fail.
+**Test Coverage:** Test case with `code: '1 as Banned;'` would fail.
 
-#### 2. Missing Type Assertion Support
+#### 2. Union and Intersection Type Support Missing
 **TypeScript Implementation:**
 ```typescript
-// Implicit coverage through generic AST traversal and TSTypeReference
-// Type assertions like "1 as Banned" are caught when visiting type nodes
+// The TypeScript implementation catches all type nodes through comprehensive listeners
 ```
 
 **Go Implementation:**
 ```go
-// No listener for ast.KindTypeAssertion or ast.KindAsExpression
-// Missing: type assertion handling
+// Missing listeners for:
+// - ast.KindUnionType
+// - ast.KindIntersectionType
 ```
 
-**Issue:** Type assertions like `1 as Banned;` are not explicitly handled in the Go implementation.
+**Issue:** The Go implementation doesn't check banned types within union (`Banned | {}`) or intersection (`Banned & {}`) types.
 
-**Impact:** The test case `'1 as Banned;'` may not be caught by the rule.
+**Impact:** Test cases like `'type Union = Banned | {};'` and `'type Intersection = Banned & {};'` would not be caught.
 
-**Test Coverage:** Type assertion test case would fail.
+**Test Coverage:** Multiple test cases with union and intersection types would fail.
 
-#### 3. Heritage Clause Implementation Differences
+#### 3. Array Type Support Missing
 **TypeScript Implementation:**
 ```typescript
-TSClassImplements(node): void {
-  checkBannedTypes(node);
-},
-TSInterfaceHeritage(node): void {
-  checkBannedTypes(node);
+// Catches all type references including array types
+TSTypeReference(node): void {
+  checkBannedTypes(node.typeName);
+  // ...
 }
 ```
 
 **Go Implementation:**
 ```go
-// Manual traversal of heritage clauses in class and interface declarations
-listeners[ast.KindClassDeclaration] = func(node *ast.Node) {
-  // Complex manual parsing of heritage clauses
-}
-listeners[ast.KindInterfaceDeclaration] = func(node *ast.Node) {
-  // Complex manual parsing of heritage clauses  
+// Missing listener for ast.KindArrayType
+```
+
+**Issue:** The Go implementation doesn't check for banned types used as array element types (`Banned[]`).
+
+**Impact:** Test case `'let value: Banned[];'` would not be caught.
+
+**Test Coverage:** Test case with `code: 'let value: Banned[];'` would fail.
+
+#### 4. Tuple Element Type Support Missing
+**TypeScript Implementation:**
+```typescript
+// The comprehensive listener approach catches tuple element types
+```
+
+**Go Implementation:**
+```go
+listeners[ast.KindTupleType] = func(node *ast.Node) {
+  // Only checks if tuple is empty, doesn't check element types
 }
 ```
 
-**Issue:** The TypeScript version uses specific AST node types for heritage clauses, while Go manually traverses class/interface declarations. This could miss edge cases or have different behavior.
+**Issue:** The Go implementation only checks for empty tuples but doesn't recursively check tuple element types for banned types.
 
-**Impact:** May affect reliability of catching banned types in implements/extends clauses.
+**Impact:** Test case `'let value: [Banned];'` would not be caught.
 
-**Test Coverage:** Heritage clause tests might pass but with different execution paths.
+**Test Coverage:** Test case with `code: 'let value: [Banned];'` would fail.
 
-#### 4. Dynamic Listener Registration Issue
+#### 5. Property Type Support Missing
+**TypeScript Implementation:**
+```typescript
+// Catches all type nodes including property types in type literals
+```
+
+**Go Implementation:**
+```go
+listeners[ast.KindTypeLiteral] = func(node *ast.Node) {
+  // Only checks if type literal is empty, doesn't check member types
+}
+```
+
+**Issue:** The Go implementation doesn't recursively check property types within type literals.
+
+**Impact:** Test case `'let b: { c: Banned };'` would not be caught.
+
+**Test Coverage:** Test case with `code: 'let b: { c: Banned };'` would fail.
+
+#### 6. Incomplete AST Coverage Strategy
 **TypeScript Implementation:**
 ```typescript
 const keywordSelectors = objectReduceKey(
@@ -90,94 +141,45 @@ const keywordSelectors = objectReduceKey(
   },
   {},
 );
+
+return {
+  ...keywordSelectors,
+  TSClassImplements(node): void { checkBannedTypes(node); },
+  TSInterfaceHeritage(node): void { checkBannedTypes(node); },
+  TSTupleType(node): void { /* ... */ },
+  TSTypeLiteral(node): void { /* ... */ },
+  TSTypeReference(node): void { /* ... */ },
+};
 ```
 
 **Go Implementation:**
 ```go
+listeners := rule.RuleListeners{}
+
+// Add listeners for keyword types
 for keyword, kind := range typeKeywords {
   if _, exists := opts.Types[keyword]; exists {
-    listeners[kind] = func(node *ast.Node) {
-      // Closure variable capture issue - all closures capture final keyword value
-      for k, v := range typeKeywords {
-        if v == node.Kind {
-          checkBannedTypes(node, k)
-          break
-        }
-      }
-    }
+    listeners[kind] = func(node *ast.Node) { /* ... */ }
   }
 }
 ```
 
-**Issue:** The Go implementation has a potential closure variable capture problem and uses inefficient reverse lookup instead of capturing the keyword directly.
+**Issue:** The Go implementation only adds keyword listeners if they exist in the banned types configuration, but the TypeScript version has a more comprehensive approach that catches type nodes in various contexts.
 
-**Impact:** May cause incorrect keyword identification or performance issues.
+**Impact:** Many test cases involving banned types in complex type expressions would not be caught.
 
-**Test Coverage:** Keyword type tests may behave unexpectedly.
-
-#### 5. String-based Configuration vs Structured Configuration
-**TypeScript Implementation:**
-```typescript
-// Handles both string and object configurations cleanly
-if (typeof bannedType === 'string') {
-  return ` ${bannedType}`;
-}
-if (bannedType.message) {
-  return ` ${bannedType.message}`;
-}
-```
-
-**Go Implementation:**
-```go
-// Complex type switching with potential edge cases
-switch v := bannedConfig.(type) {
-case bool:
-  if v { return "" }
-case string:
-  return " " + v
-case map[string]interface{}:
-  // Complex nested type assertions
-}
-```
-
-**Issue:** The Go implementation's type switching is more complex and may not handle all edge cases that the TypeScript version handles gracefully.
-
-**Impact:** Configuration parsing edge cases might behave differently.
-
-**Test Coverage:** Complex configuration test cases might fail.
-
-#### 6. Missing Support for Generic Type Parameters
-**TypeScript Implementation:**
-```typescript
-TSTypeReference(node): void {
-  checkBannedTypes(node.typeName);
-  if (node.typeArguments) {
-    checkBannedTypes(node); // Checks full generic type
-  }
-}
-```
-
-**Go Implementation:**
-```go
-listeners[ast.KindTypeReference] = func(node *ast.Node) {
-  // Checks type name and full type with arguments
-  // But may not handle complex nested generics properly
-}
-```
-
-**Issue:** The Go implementation may not properly handle complex generic type patterns like nested type arguments.
-
-**Impact:** Test cases with complex generics like `Banned<A,B>` might not work correctly.
-
-**Test Coverage:** Generic type parameter tests could fail.
+**Test Coverage:** Multiple test cases would fail due to incomplete AST coverage.
 
 ### Recommendations
-- Add explicit listeners for `ast.KindUnionType` and `ast.KindIntersectionType`
-- Add listener for `ast.KindTypeAssertion` to handle type assertions
-- Fix the closure variable capture issue in keyword listener registration
-- Simplify heritage clause handling to match TypeScript patterns more closely
-- Add comprehensive test coverage for edge cases in configuration parsing
-- Enhance generic type parameter handling for complex nested cases
-- Consider using dedicated AST node types for heritage clauses if available in the Go AST
+- Add listeners for missing AST node types:
+  - `ast.KindTypeAssertion` for type assertions
+  - `ast.KindUnionType` for union types  
+  - `ast.KindIntersectionType` for intersection types
+  - `ast.KindArrayType` for array types
+- Implement recursive type checking for complex type expressions
+- Add comprehensive traversal of tuple elements and type literal members
+- Consider a more general approach that visits all type nodes rather than specific node types
+- Add proper handling for all contexts where types can appear
+- Ensure the keyword listener registration works for all cases, not just when types are pre-configured
 
 ---

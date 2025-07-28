@@ -4,45 +4,91 @@
 
 ### Validation Summary
 - ✅ **CORRECT**: 
-  - Core array/tuple type detection logic matches
-  - Union and intersection type handling is equivalent
-  - Basic delete expression detection works
-  - Element access expression validation
-  - Error message IDs are consistent
-  - Suggestion mechanism is implemented
+  - Core rule logic correctly identifies delete expressions on array-typed values
+  - Type checking logic properly handles union types (all members must be arrays)
+  - Type checking logic properly handles intersection types (any member can be array)
+  - Basic AST pattern matching for DeleteExpression -> ElementAccessExpression
+  - Error message IDs and descriptions match exactly
+  - Suggestion message matches exactly
+  - Basic fix generation structure is present
+
 - ⚠️ **POTENTIAL ISSUES**: 
-  - Fix generation approach differs significantly (token-based vs text replacement)
-  - Comment preservation logic appears incomplete in Go version
+  - Comment handling approach differs significantly from TypeScript version
   - Parentheses handling for complex expressions may differ
+  - Token range calculation approach is different
+
 - ❌ **INCORRECT**: 
-  - Missing member expression detection (TypeScript checks `AST_NODE_TYPES.MemberExpression`, Go only checks element access)
-  - Go version doesn't handle property access syntax (`obj.prop`) deletion
-  - Sequence expression parentheses logic not implemented in Go
+  - Missing support for MemberExpression (property access) patterns
+  - Fix generation logic is fundamentally different and likely incorrect
+  - No handling of SequenceExpression parentheses requirement
+  - Missing comment preservation in fixes
 
 ### Discrepancies Found
 
-#### 1. Missing Member Expression Support
+#### 1. AST Pattern Matching Scope
 **TypeScript Implementation:**
 ```typescript
-if (argument.type !== AST_NODE_TYPES.MemberExpression) {
-  return;
+'UnaryExpression[operator="delete"]'(node: TSESTree.UnaryExpression): void {
+  const { argument } = node;
+  if (argument.type !== AST_NODE_TYPES.MemberExpression) {
+    return;
+  }
+  // ... continue processing
 }
 ```
 
 **Go Implementation:**
 ```go
-if !ast.IsElementAccessExpression(deleteExpression) {
-  return;
+ast.KindDeleteExpression: func(node *ast.Node) {
+  // ...
+  if !ast.IsElementAccessExpression(deleteExpression) {
+    return;
+  }
+  // ... continue processing
 }
 ```
 
-**Issue:** The TypeScript version checks for any `MemberExpression` (which includes both property access `obj.prop` and element access `obj[key]`), while the Go version only checks for `ElementAccessExpression` (bracket notation).
+**Issue:** The Go version only handles ElementAccessExpression (arr[index]) but the TypeScript version handles all MemberExpression types, which includes both ElementAccess and PropertyAccess patterns.
 
-**Impact:** The Go version would miss cases like `delete arr.length` or other property access patterns that should be caught.
+**Impact:** This is actually correct behavior - the rule should only trigger on bracket notation (arr[0]) not dot notation (obj.prop), as evidenced by the test cases.
 
-**Test Coverage:** This discrepancy would affect edge cases involving property access on arrays, though the current test suite focuses on element access patterns.
+**Test Coverage:** All test cases use bracket notation, confirming this is correct.
 
-#### 2. Sequence Expression Parentheses Handling
+#### 2. Fix Generation Strategy
+**TypeScript Implementation:**
+```typescript
+fix(fixer): TSESLint.RuleFix | null {
+  const { object, property } = argument;
+  const shouldHaveParentheses = property.type === AST_NODE_TYPES.SequenceExpression;
+  const nodeMap = services.esTreeNodeToTSNodeMap;
+  const target = nodeMap.get(object).getText();
+  const rawKey = nodeMap.get(property).getText();
+  const key = shouldHaveParentheses ? `(${rawKey})` : rawKey;
+  let suggestion = `${target}.splice(${key}, 1)`;
+  // ... comment handling
+  return fixer.replaceText(node, suggestion);
+}
+```
+
+**Go Implementation:**
+```go
+ctx.ReportNodeWithSuggestions(node, buildNoArrayDeleteMessage(), rule.RuleSuggestion{
+  Message: buildUseSpliceMessage(),
+  FixesArr: []rule.RuleFix{
+    rule.RuleFixRemoveRange(deleteTokenRange),
+    rule.RuleFixReplaceRange(leftBracketTokenRange, ".splice("),
+    rule.RuleFixReplaceRange(rightBracketTokenRange, ", 1)"),
+  },
+})
+```
+
+**Issue:** The Go version uses multiple targeted range replacements instead of replacing the entire expression. This approach is fundamentally different and may not handle complex expressions correctly.
+
+**Impact:** The piecemeal replacement approach may fail for complex expressions, nested parentheses, or expressions with comments.
+
+**Test Coverage:** Test cases with complex expressions like `delete a[(b + 1) * (b + 2)]` and `delete arr[(doWork(), 1)]` would reveal this issue.
+
+#### 3. SequenceExpression Parentheses Handling
 **TypeScript Implementation:**
 ```typescript
 const shouldHaveParentheses = property.type === AST_NODE_TYPES.SequenceExpression;
@@ -51,88 +97,67 @@ const key = shouldHaveParentheses ? `(${rawKey})` : rawKey;
 
 **Go Implementation:**
 ```go
-// No equivalent logic for sequence expression parentheses
+// No equivalent logic for SequenceExpression parentheses
 ```
 
-**Issue:** The Go version doesn't check if the argument expression is a sequence expression that needs parentheses in the fix suggestion.
+**Issue:** The Go version doesn't check if the array index is a SequenceExpression that needs parentheses preservation.
 
-**Impact:** For test cases like `delete arr[(doWork(), 1)]`, the Go version might generate incorrect fix suggestions without proper parentheses.
+**Impact:** For code like `delete arr[(doWork(), 1)]`, the fix would generate `arr.splice(doWork(), 1, 1)` instead of the correct `arr.splice((doWork(), 1), 1)`.
 
-**Test Coverage:** Test case with `delete arr[(doWork(), 1)]` expects output `arr.splice((doWork(), 1), 1)` - the parentheses must be preserved.
+**Test Coverage:** The test case with `delete arr[(doWork(), 1)]` expects the output `arr.splice((doWork(), 1), 1)` which the Go version cannot produce correctly.
 
-#### 3. Comment Preservation Logic Missing
+#### 4. Comment Preservation
 **TypeScript Implementation:**
 ```typescript
 const comments = context.sourceCode.getCommentsInside(node);
 if (comments.length > 0) {
   const indentationCount = node.loc.start.column;
   const indentation = ' '.repeat(indentationCount);
-  const commentsText = comments.map(comment => {
-    return comment.type === AST_TOKEN_TYPES.Line
-      ? `//${comment.value}`
-      : `/*${comment.value}*/`;
-  }).join(`\n${indentation}`);
+  const commentsText = comments
+    .map(comment => {
+      return comment.type === AST_TOKEN_TYPES.Line
+        ? `//${comment.value}`
+        : `/*${comment.value}*/`;
+    })
+    .join(`\n${indentation}`);
   suggestion = `${commentsText}\n${indentation}${suggestion}`;
 }
 ```
 
 **Go Implementation:**
 ```go
-// No comment preservation logic implemented
+// No comment preservation logic
 ```
 
-**Issue:** The Go version doesn't preserve comments when generating fix suggestions, while the TypeScript version has sophisticated comment handling.
+**Issue:** The Go version completely lacks comment preservation during fix generation.
 
-**Impact:** Complex test cases with embedded comments will fail, such as the test with `/* multi line */` and `// single-line` comments.
+**Impact:** Comments within delete expressions will be lost during fixes, violating the expected behavior shown in test cases.
 
-**Test Coverage:** The `noFormat` test case with extensive comments expects all comments to be preserved and properly formatted in the output.
+**Test Coverage:** The complex comment test case demonstrates this requirement clearly.
 
-#### 4. Token-Based vs Text-Based Fix Generation
+#### 5. Parentheses Stripping Logic
 **TypeScript Implementation:**
 ```typescript
-return fixer.replaceText(node, suggestion);
-```
-
-**Go Implementation:**
-```go
-FixesArr: []rule.RuleFix{
-  rule.RuleFixRemoveRange(deleteTokenRange),
-  rule.RuleFixReplaceRange(leftBracketTokenRange, ".splice("),
-  rule.RuleFixReplaceRange(rightBracketTokenRange, ", 1)"),
-}
-```
-
-**Issue:** The approaches differ fundamentally - TypeScript builds a complete replacement string, while Go uses multiple targeted token replacements.
-
-**Impact:** The Go approach may be more fragile with complex expressions, parentheses, and whitespace preservation.
-
-**Test Coverage:** Complex expressions with nested parentheses like `delete ((a[((b))]))` may not generate clean output.
-
-#### 5. AST Node Navigation Differences
-**TypeScript Implementation:**
-```typescript
+// Uses ESTree AST directly without explicit parentheses stripping
 const { object, property } = argument;
 ```
 
 **Go Implementation:**
 ```go
-expression := deleteExpression.AsElementAccessExpression()
-// Uses expression.Expression and expression.ArgumentExpression
+deleteExpression := ast.SkipParentheses(node.AsDeleteExpression().Expression)
 ```
 
-**Issue:** The property access patterns differ between the implementations, potentially affecting how complex member expressions are handled.
+**Issue:** The Go version strips parentheses from the entire expression, which may affect the fix generation for complex nested parentheses.
 
-**Impact:** Edge cases with deeply nested property access might behave differently.
+**Impact:** May not handle cases like `delete ((a[((b))]))` correctly in fix generation.
 
-**Test Coverage:** Test cases like `delete obj.a.b.c[0]` rely on proper AST navigation.
+**Test Coverage:** The test case `delete ((a[((b))]))` expects output `a.splice(b, 1)` which tests this behavior.
 
 ### Recommendations
-- Add support for `MemberExpression` detection in addition to `ElementAccessExpression`
-- Implement sequence expression parentheses logic for fix suggestions
-- Add comprehensive comment preservation during fix generation
-- Consider switching to text-based fix generation for better consistency with TypeScript-ESLint
-- Add test cases specifically for property access deletion patterns
-- Validate that all complex expression test cases generate correct fix suggestions
-- Ensure whitespace and formatting preservation matches TypeScript-ESLint output exactly
+- **Fix the fix generation strategy**: Replace the multi-range approach with a single text replacement that properly reconstructs the splice call
+- **Add SequenceExpression detection**: Implement logic to detect when parentheses are needed around the array index
+- **Implement comment preservation**: Add logic to extract and preserve comments within the delete expression
+- **Improve complex expression handling**: Ensure the fix generation works correctly for nested expressions and parentheses
+- **Add comprehensive fix testing**: The current test approach validates the core logic but may miss fix generation edge cases
 
 ---

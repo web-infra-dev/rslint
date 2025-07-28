@@ -68,7 +68,17 @@ exports[`consistent-indexed-object-style > invalid 11`] = `
           "column": 42
         }
       }
-    },
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 12`] = `
+{
+  "diagnostics": [
     {
       "ruleName": "consistent-indexed-object-style",
       "messageId": "preferRecord",
@@ -81,12 +91,125 @@ exports[`consistent-indexed-object-style > invalid 11`] = `
         },
         "end": {
           "line": 1,
-          "column": 42
+          "column": 51
         }
       }
     }
   ],
-  "errorCount": 2,
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-indexed-object-style",
+      "messageId": "preferRecord",
+      "message": "A record is preferred over an index signature.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 19
+        },
+        "end": {
+          "line": 1,
+          "column": 41
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-indexed-object-style",
+      "messageId": "preferRecord",
+      "message": "A record is preferred over an index signature.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 17
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-indexed-object-style",
+      "messageId": "preferRecord",
+      "message": "A record is preferred over an index signature.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 19
+        },
+        "end": {
+          "line": 1,
+          "column": 50
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-indexed-object-style",
+      "messageId": "preferRecord",
+      "message": "A record is preferred over an index signature.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 17
+        },
+        "end": {
+          "line": 1,
+          "column": 48
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-indexed-object-style > invalid 17`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
   "fileCount": 1,
   "ruleCount": 1
 }

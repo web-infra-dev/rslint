@@ -2,7 +2,7 @@ import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const ruleTester = new RuleTester();
 
-ruleTester.run('no-duplicate-enum-values', 'no-duplicate-enum-values', {
+ruleTester.run('no-duplicate-enum-values', {
   valid: [
     `
 enum E {

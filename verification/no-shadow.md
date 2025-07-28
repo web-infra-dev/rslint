@@ -3,189 +3,74 @@
 ### Test File: no-shadow.test.ts
 
 ### Validation Summary
-- ✅ **CORRECT**: Basic shadowing detection, scope tracking, option parsing, built-in globals handling, message formatting
-- ⚠️ **POTENTIAL ISSUES**: Function type parameter detection, type/value shadowing logic, complex AST pattern matching, temporal dead zone handling
-- ❌ **INCORRECT**: Missing several critical TypeScript-specific features, incomplete scope analysis, missing advanced edge case handling
+- ✅ **CORRECT**: Basic shadowing detection, scope management, hoisting behavior, type/value shadow ignoring, function type parameter handling, builtin globals support, class/enum duplicate name detection
+- ⚠️ **POTENTIAL ISSUES**: Complex AST navigation patterns, initialization pattern detection, temporal dead zone handling, external declaration merging
+- ❌ **INCORRECT**: Missing critical helper functions, incomplete scope analysis patterns, missing import type handling, static method generic shadowing logic
 
 ### Discrepancies Found
 
-#### 1. Missing Type Import Detection
+#### 1. Missing `isOnInitializer` Function
 **TypeScript Implementation:**
 ```typescript
-import { isTypeImport } from '../util/isTypeImport';
-
-function isTypeValueShadow(
+function isOnInitializer(
   variable: TSESLint.Scope.Variable,
-  shadowed: TSESLint.Scope.Variable,
+  scopeVar: TSESLint.Scope.Variable,
 ): boolean {
-  const firstDefinition = shadowed.defs.at(0);
-  const isShadowedValue =
-    !('isValueVariable' in shadowed) ||
-    !firstDefinition ||
-    (!isTypeImport(firstDefinition) && shadowed.isValueVariable);
-  return variable.isValueVariable !== isShadowedValue;
-}
-```
+  const outerScope = scopeVar.scope;
+  const outerDef = scopeVar.defs.at(0);
+  const outer = outerDef?.parent?.range;
+  const innerScope = variable.scope;
+  const innerDef = variable.defs.at(0);
+  const inner = innerDef?.name.range;
 
-**Go Implementation:**
-```go
-isTypeValueShadow := func(variable *Variable, shadowed *Variable) bool {
-  if !opts.IgnoreTypeValueShadow {
-    return false
-  }
-  return variable.IsValue != shadowed.IsValue
-}
-```
-
-**Issue:** The Go version oversimplifies type/value shadow detection and doesn't handle type imports properly.
-
-**Impact:** May incorrectly flag or miss shadowing cases involving TypeScript type imports.
-
-**Test Coverage:** Test case `import type { Foo } from "./foo"; function bar(Foo: string) {}` will fail.
-
-#### 2. Incomplete Function Type Parameter Detection
-**TypeScript Implementation:**
-```typescript
-const allowedFunctionVariableDefTypes = new Set([
-  AST_NODE_TYPES.TSCallSignatureDeclaration,
-  AST_NODE_TYPES.TSFunctionType,
-  AST_NODE_TYPES.TSMethodSignature,
-  AST_NODE_TYPES.TSEmptyBodyFunctionExpression,
-  AST_NODE_TYPES.TSDeclareFunction,
-  AST_NODE_TYPES.TSConstructSignatureDeclaration,
-  AST_NODE_TYPES.TSConstructorType,
-]);
-
-function isFunctionTypeParameterNameValueShadow(
-  variable: TSESLint.Scope.Variable,
-  shadowed: TSESLint.Scope.Variable,
-): boolean {
-  return variable.defs.every(def =>
-    allowedFunctionVariableDefTypes.has(def.node.type),
+  return !!(
+    outer &&
+    inner &&
+    outer[0] < inner[0] &&
+    inner[1] < outer[1] &&
+    ((innerDef.type === DefinitionType.FunctionName &&
+      innerDef.node.type === AST_NODE_TYPES.FunctionExpression) ||
+      innerDef.node.type === AST_NODE_TYPES.ClassExpression) &&
+    outerScope === innerScope.upper
   );
 }
 ```
 
 **Go Implementation:**
 ```go
-var allowedFunctionVariableDefTypes = map[ast.Kind]bool{
-  ast.KindCallSignature:       true,
-  ast.KindFunctionType:        true,
-  ast.KindMethodSignature:     true,
-  ast.KindEmptyStatement:      true, // TSEmptyBodyFunctionExpression
-  ast.KindFunctionDeclaration: true, // TSDeclareFunction
-  ast.KindConstructSignature:  true,
-  ast.KindConstructorType:     true,
-}
-
-isFunctionTypeParameterNameValueShadow := func(variable *Variable, shadowed *Variable) bool {
-  // Simplified check that excludes function declarations
-  return allowedFunctionVariableDefTypes[parent.Kind] && parent.Kind != ast.KindFunctionDeclaration
-}
+// Function is completely missing
 ```
 
-**Issue:** The Go version has incorrect AST kind mappings and doesn't properly check all definitions like the TypeScript version.
+**Issue:** The Go implementation lacks the critical `isOnInitializer` function that prevents reporting shadowing in cases like `var a = function a() {};`
 
-**Impact:** Will incorrectly handle function type parameter shadowing cases.
+**Impact:** Will incorrectly report shadowing for legitimate function/class expressions that reference their own names.
 
-**Test Coverage:** Test cases involving function type parameters will fail.
+**Test Coverage:** The valid test case `'var a = function a() { return a; };'` would fail.
 
-#### 3. Missing Complex Edge Case Handlers
-**TypeScript Implementation:**
-```typescript
-function isGenericOfStaticMethod(variable: TSESLint.Scope.Variable): boolean {
-  // Complex traversal logic for static method generics
-}
-
-function isGenericOfClass(variable: TSESLint.Scope.Variable): boolean {
-  // Complex traversal logic for class generics
-}
-
-function isGenericOfAStaticMethodShadow(
-  variable: TSESLint.Scope.Variable,
-  shadowed: TSESLint.Scope.Variable,
-): boolean {
-  return isGenericOfStaticMethod(variable) && isGenericOfClass(shadowed);
-}
-```
-
-**Go Implementation:**
-```go
-// These functions are completely missing
-```
-
-**Issue:** The Go version lacks handling for static method generic shadowing of class generics.
-
-**Impact:** Test case `class Foo<T> { static method<T>() {} }` will incorrectly report shadowing.
-
-**Test Coverage:** Static method generic test case will fail.
-
-#### 4. Missing External Declaration Merging
-**TypeScript Implementation:**
-```typescript
-function isExternalDeclarationMerging(
-  scope: TSESLint.Scope.Scope,
-  variable: TSESLint.Scope.Variable,
-  shadowed: TSESLint.Scope.Variable,
-): boolean {
-  const [firstDefinition] = shadowed.defs;
-  const [secondDefinition] = variable.defs;
-
-  return (
-    isTypeImport(firstDefinition) &&
-    isImportDeclaration(firstDefinition.parent) &&
-    isExternalModuleDeclarationWithName(
-      scope,
-      firstDefinition.parent.source.value,
-    ) &&
-    (secondDefinition.node.type === AST_NODE_TYPES.TSInterfaceDeclaration ||
-     secondDefinition.node.type === AST_NODE_TYPES.TSTypeAliasDeclaration)
-  );
-}
-```
-
-**Go Implementation:**
-```go
-// This function is completely missing
-```
-
-**Issue:** The Go version doesn't handle external module declaration merging.
-
-**Impact:** May incorrectly flag valid TypeScript declaration merging patterns as shadowing.
-
-**Test Coverage:** Module declaration merging test cases will fail.
-
-#### 5. Incomplete Initialization Pattern Detection
-**TypeScript Implementation:**
+#### 2. Missing `isInitPatternNode` Function
+**TypeScript Implementation:**  
 ```typescript
 function isInitPatternNode(
   variable: TSESLint.Scope.Variable,
   shadowedVariable: TSESLint.Scope.Variable,
 ): boolean {
   // Complex logic to detect initialization patterns
-  // Handles various assignment patterns and for-loop contexts
-}
-
-function isOnInitializer(
-  variable: TSESLint.Scope.Variable,
-  scopeVar: TSESLint.Scope.Variable,
-): boolean {
-  // Logic to detect if variable is in initializer of another variable
+  // involving arrow functions, call expressions, and variable declarators
 }
 ```
 
 **Go Implementation:**
 ```go
-// These functions are completely missing
+// Function is completely missing
 ```
 
-**Issue:** The Go version lacks the `ignoreOnInitialization` option implementation.
+**Issue:** Missing complex initialization pattern detection that works with the `ignoreOnInitialization` option.
 
-**Impact:** Won't properly handle cases where shadowing should be ignored during initialization.
+**Impact:** The `ignoreOnInitialization` option won't work correctly, potentially missing valid cases where shadowing should be ignored.
 
-**Test Coverage:** Initialization-related test cases will fail.
+**Test Coverage:** Any test cases using `ignoreOnInitialization: true` would not behave correctly.
 
-#### 6. Incomplete Temporal Dead Zone Handling
+#### 3. Missing `isInTdz` (Temporal Dead Zone) Function
 **TypeScript Implementation:**
 ```typescript
 function isInTdz(
@@ -199,63 +84,116 @@ function isInTdz(
   if (!inner || !outer || inner[1] >= outer[0]) {
     return false;
   }
-
-  if (options.hoist === 'functions') {
-    return !functionsHoistedNodes.has(outerDef.node.type);
-  }
-  // Additional hoist option handling
+  // Additional TDZ logic based on hoist options
 }
 ```
 
 **Go Implementation:**
 ```go
-// TDZ logic is partially implemented but incomplete
-if opts.Hoist == "never" {
-  if ast.IsFunctionDeclaration(shadowed.DeclaredAt) {
-    return
-  }
-  // Simplified TDZ check
-}
+// Partial implementation in checkVariable, but not as a separate function
+// TDZ logic is simplified and may not handle all cases correctly
 ```
 
-**Issue:** The Go version has incomplete temporal dead zone checking and doesn't handle all hoist options properly.
+**Issue:** The TDZ (Temporal Dead Zone) detection is incomplete and not properly separated into its own function.
 
-**Impact:** Will incorrectly report or miss shadowing in various hoisting scenarios.
+**Impact:** Hoisting behavior may not work correctly for all variable types and positions.
 
-**Test Coverage:** Hoisting-related test cases will have inconsistent behavior.
+**Test Coverage:** Complex hoisting test cases may fail.
 
-#### 7. Missing Global Augmentation Detection
+#### 4. Missing Import Type Handling
 **TypeScript Implementation:**
 ```typescript
-function isGlobalAugmentation(scope: TSESLint.Scope.Scope): boolean {
+import { isTypeImport } from '../util/isTypeImport';
+
+function isExternalDeclarationMerging(
+  scope: TSESLint.Scope.Scope,
+  variable: TSESLint.Scope.Variable,
+  shadowed: TSESLint.Scope.Variable,
+): boolean {
+  const [firstDefinition] = shadowed.defs;
   return (
-    (scope.type === ScopeType.tsModule && scope.block.kind === 'global') ||
-    (!!scope.upper && isGlobalAugmentation(scope.upper))
+    isTypeImport(firstDefinition) &&
+    isImportDeclaration(firstDefinition.parent) &&
+    // Additional external declaration merging logic
   );
 }
 ```
 
 **Go Implementation:**
 ```go
-isGlobalAugmentation = func(scope *Scope) bool {
-  if scope.Type == ScopeTypeTSModule && ast.IsModuleDeclaration(scope.Node) {
-    moduleDecl := scope.Node.AsModuleDeclaration()
-    nameNode := moduleDecl.Name()
-    if ast.IsStringLiteral(nameNode) && nameNode.AsStringLiteral().Text == "global" {
-      return true
-    }
-  }
-  return scope.Parent != nil && isGlobalAugmentation(scope.Parent)
+// No import type detection or external declaration merging logic
+```
+
+**Issue:** Missing import type detection and external declaration merging logic.
+
+**Impact:** Will incorrectly report shadowing for legitimate type imports and module declaration merging.
+
+**Test Coverage:** Test case `'import type { Foo } from "./foo"; function bar(Foo: string) {}'` may not work correctly.
+
+#### 5. Incomplete Static Method Generic Shadowing
+**TypeScript Implementation:**
+```typescript
+function isGenericOfStaticMethod(variable: TSESLint.Scope.Variable): boolean {
+  // Complex AST traversal to detect static method generics
+  const typeParameter = variable.identifiers[0].parent;
+  const typeParameterDecl = typeParameter.parent;
+  const functionExpr = typeParameterDecl.parent;
+  const methodDefinition = functionExpr.parent;
+  return methodDefinition.type === AST_NODE_TYPES.MethodDefinition &&
+         methodDefinition.static;
+}
+
+function isGenericOfAStaticMethodShadow(variable, shadowed): boolean {
+  return isGenericOfStaticMethod(variable) && isGenericOfClass(shadowed);
 }
 ```
 
-**Issue:** The Go version checks for string literal "global" but the TypeScript version checks for `kind === 'global'`, which may be different properties.
+**Go Implementation:**
+```go
+// Logic is completely missing
+```
 
-**Impact:** May not correctly identify global augmentation scopes.
+**Issue:** Missing complex logic to handle static method generic type parameter shadowing class generics.
 
-**Test Coverage:** Global augmentation test cases may fail.
+**Impact:** Will incorrectly report shadowing for legitimate static method generics that shadow class generics.
 
-#### 8. Missing Definition File (.d.ts) Handling
+**Test Coverage:** Test case `'class Foo<T> { static method<T>() {} }'` may fail.
+
+#### 6. Incomplete Function Type Parameter Detection
+**TypeScript Implementation:**
+```typescript
+const allowedFunctionVariableDefTypes = new Set([
+  AST_NODE_TYPES.TSCallSignatureDeclaration,
+  AST_NODE_TYPES.TSFunctionType,
+  AST_NODE_TYPES.TSMethodSignature,
+  AST_NODE_TYPES.TSEmptyBodyFunctionExpression,
+  AST_NODE_TYPES.TSDeclareFunction,
+  AST_NODE_TYPES.TSConstructSignatureDeclaration,
+  AST_NODE_TYPES.TSConstructorType,
+]);
+
+function isFunctionTypeParameterNameValueShadow(variable, shadowed): boolean {
+  return variable.defs.every(def =>
+    allowedFunctionVariableDefTypes.has(def.node.type),
+  );
+}
+```
+
+**Go Implementation:**
+```go
+isFunctionTypeParameterNameValueShadow := func(variable *Variable, shadowed *Variable) bool {
+  // Simplified logic that doesn't properly check parent context
+  return allowedFunctionVariableDefTypes[parent.Kind] && parent.Kind != ast.KindFunctionDeclaration
+}
+```
+
+**Issue:** The Go implementation doesn't properly traverse the AST to determine if a parameter is truly in a function type context vs. a regular function parameter.
+
+**Impact:** May not correctly distinguish between function type parameters and regular function parameters.
+
+**Test Coverage:** Function type parameter test cases may not work correctly.
+
+#### 7. Missing Definition File Detection
 **TypeScript Implementation:**
 ```typescript
 function isDeclareInDTSFile(variable: TSESLint.Scope.Variable): boolean {
@@ -267,8 +205,7 @@ function isDeclareInDTSFile(variable: TSESLint.Scope.Variable): boolean {
     return (
       (def.type === DefinitionType.Variable && def.parent.declare) ||
       (def.type === DefinitionType.ClassName && def.node.declare) ||
-      (def.type === DefinitionType.TSEnumName && def.node.declare) ||
-      (def.type === DefinitionType.TSModuleName && def.node.declare)
+      // Additional declare modifier checks
     );
   });
 }
@@ -276,70 +213,53 @@ function isDeclareInDTSFile(variable: TSESLint.Scope.Variable): boolean {
 
 **Go Implementation:**
 ```go
-// This function is completely missing
+// Logic is completely missing
 ```
 
-**Issue:** The Go version doesn't handle TypeScript declaration files (.d.ts) with declare modifiers.
+**Issue:** Missing detection of declare modifiers in .d.ts files.
 
-**Impact:** May incorrectly flag shadowing in declaration files where it should be ignored.
+**Impact:** Will incorrectly report shadowing for legitimate declare statements in TypeScript definition files.
 
-**Test Coverage:** Declaration file test cases will fail.
+**Test Coverage:** Any .d.ts file test cases would be affected.
 
-#### 9. Incorrect AST Kind Mappings
+#### 8. Simplified Same-Scope Redeclaration Logic
 **TypeScript Implementation:**
 ```typescript
-AST_NODE_TYPES.TSEmptyBodyFunctionExpression
+// Integrated into the main checkForShadows function with complex scope traversal
+function checkForShadows(scope: TSESLint.Scope.Scope): void {
+  const variables = scope.variables;
+  for (const variable of variables) {
+    // Complex logic considering all definition types and scopes
+  }
+}
 ```
 
 **Go Implementation:**
 ```go
-ast.KindEmptyStatement // Incorrect mapping
+// Simplified check in addVariable and checkVariable
+if v, exists := scope.Variables[name]; exists {
+  if v.IsValue && isValue {
+    // Simple same-scope check
+  }
+}
 ```
 
-**Issue:** The Go version maps `TSEmptyBodyFunctionExpression` to `KindEmptyStatement`, which is incorrect.
+**Issue:** The same-scope redeclaration detection is overly simplified and may not handle all TypeScript declaration merging cases correctly.
 
-**Impact:** Will not properly identify empty body function expressions.
+**Impact:** May report false positives for legitimate TypeScript declaration merging (interfaces, namespaces, etc.).
 
-**Test Coverage:** Function expression related test cases may fail.
-
-#### 10. Missing Scope Exit Processing
-**TypeScript Implementation:**
-```typescript
-return {
-  'Program:exit'(node): void {
-    const globalScope = context.sourceCode.getScope(node);
-    const stack = [...globalScope.childScopes];
-
-    while (stack.length) {
-      const scope = stack.pop()!;
-      stack.push(...scope.childScopes);
-      checkForShadows(scope);
-    }
-  },
-};
-```
-
-**Go Implementation:**
-```go
-// Uses individual node listeners but no comprehensive scope traversal
-```
-
-**Issue:** The Go version processes variables immediately upon declaration rather than doing a comprehensive scope analysis at the end.
-
-**Impact:** May miss some shadowing relationships or process them in the wrong order.
-
-**Test Coverage:** Complex nested shadowing cases may behave differently.
+**Test Coverage:** Complex declaration merging scenarios may fail.
 
 ### Recommendations
-- Implement missing TypeScript-specific edge case handlers (static method generics, external declaration merging)
-- Add proper type import detection and type/value shadowing logic
-- Implement complete temporal dead zone and hoisting behavior
-- Add support for .d.ts file handling with declare modifiers
-- Fix AST kind mappings to match TypeScript equivalents
-- Implement missing initialization pattern detection for `ignoreOnInitialization` option
-- Add comprehensive scope traversal similar to TypeScript implementation
-- Enhance function type parameter detection logic
-- Improve global augmentation detection to match TypeScript behavior
-- Add missing utility functions for complex AST pattern matching
+- Implement missing `isOnInitializer` function to handle function/class expression self-references
+- Add `isInitPatternNode` function to support `ignoreOnInitialization` option fully
+- Implement proper `isInTdz` function with complete temporal dead zone logic
+- Add import type detection and external declaration merging support
+- Implement static method generic shadowing detection logic
+- Improve function type parameter detection with proper AST traversal
+- Add declare modifier detection for .d.ts files
+- Enhance same-scope redeclaration logic to handle TypeScript declaration merging
+- Add comprehensive AST node type mappings between TypeScript and Go AST types
+- Implement proper scope analysis patterns that match TypeScript-ESLint's scope manager behavior
 
 ---

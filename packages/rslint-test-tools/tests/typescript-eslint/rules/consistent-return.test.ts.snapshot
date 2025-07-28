@@ -13,7 +13,7 @@ exports[`consistent-return > invalid 1`] = `
         },
         "end": {
           "line": 4,
-          "column": 22
+          "column": 23
         }
       }
     }

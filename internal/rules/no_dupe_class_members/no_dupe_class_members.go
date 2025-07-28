@@ -28,15 +28,7 @@ var NoDupeClassMembersRule = rule.Rule{
 		classMembersMap := make(map[*ast.Node]map[string]map[bool][]MemberInfo)
 
 		isMethod := func(node *ast.Node) bool {
-			if ast.IsMethodDeclaration(node) {
-				method := node.AsMethodDeclaration()
-				// Skip TypeScript empty body function expressions (method overloads)
-				if method.Body == nil {
-					return false
-				}
-				return true
-			}
-			return false
+			return ast.IsMethodDeclaration(node)
 		}
 
 		isProperty := func(node *ast.Node) bool {
@@ -47,6 +39,29 @@ var NoDupeClassMembersRule = rule.Rule{
 		}
 
 		getMemberName := func(node *ast.Node) string {
+			// First check if it's a numeric literal that needs evaluation
+			var nameNode *ast.Node
+			switch {
+			case ast.IsMethodDeclaration(node):
+				nameNode = node.AsMethodDeclaration().Name()
+			case ast.IsPropertyDeclaration(node):
+				nameNode = node.AsPropertyDeclaration().Name()
+			case ast.IsGetAccessorDeclaration(node):
+				nameNode = node.AsGetAccessorDeclaration().Name()
+			case ast.IsSetAccessorDeclaration(node):
+				nameNode = node.AsSetAccessorDeclaration().Name()
+			}
+			
+			// Check if it's a numeric literal and evaluate it
+			if nameNode != nil && nameNode.Kind == ast.KindNumericLiteral {
+				numLit := nameNode.AsNumericLiteral()
+				// Parse the numeric literal text to get its actual value
+				// This will convert both "10" and "1e1" to "10"
+				var val float64
+				fmt.Sscanf(numLit.Text, "%g", &val)
+				return fmt.Sprintf("%g", val)
+			}
+			
 			// Use the robust utility function for getting member names
 			memberName, _ := utils.GetNameFromMember(ctx.SourceFile, node)
 			if memberName != "" {
@@ -134,24 +149,20 @@ var NoDupeClassMembersRule = rule.Rule{
 		processMember := func(classNode *ast.Node, memberNode *ast.Node) {
 			// Skip computed properties
 			if isComputed(memberNode) {
+				fmt.Printf("DEBUG: Skipping computed property\n")
 				return
-			}
-
-			// Skip TypeScript empty body function expressions (method overloads)
-			if ast.IsMethodDeclaration(memberNode) {
-				method := memberNode.AsMethodDeclaration()
-				if method.Body == nil {
-					return
-				}
 			}
 
 			memberName := getMemberName(memberNode)
 			if memberName == "" {
+				fmt.Printf("DEBUG: Member name is empty for kind %v\n", memberNode.Kind)
 				return
 			}
-
+			
 			memberIsStatic := isStatic(memberNode)
 			memberKind := getMemberKind(memberNode)
+			
+			fmt.Printf("DEBUG: Processing member %s (kind: %s, static: %v)\n", memberName, memberKind, memberIsStatic)
 
 			// Initialize maps if needed
 			if classMembersMap[classNode] == nil {
@@ -164,24 +175,22 @@ var NoDupeClassMembersRule = rule.Rule{
 			// Check for duplicates in the same static/instance scope
 			existingMembers := classMembersMap[classNode][memberName][memberIsStatic]
 			
-			// Special handling for getter/setter pairs
-			if memberKind == "getter" || memberKind == "setter" {
-				// Check if there's already a non-accessor member with the same name
-				for _, existing := range existingMembers {
-					if existing.kind != "getter" && existing.kind != "setter" {
-						// Report duplicate for mixing accessor with non-accessor
-						ctx.ReportNode(memberNode, buildUnexpectedMessage(memberName))
-						return
-					}
-					// Check if we already have the same accessor type
+			// Handle duplicate detection based on member types
+			for _, existing := range existingMembers {
+				if memberKind == "getter" || memberKind == "setter" {
+					// For accessors (getters/setters)
 					if existing.kind == memberKind {
+						// Same accessor type is a duplicate (e.g., two getters or two setters)
+						ctx.ReportNode(memberNode, buildUnexpectedMessage(memberName))
+						return
+					} else if existing.kind == "method" || existing.kind == "property" {
+						// Accessor conflicts with method/property
 						ctx.ReportNode(memberNode, buildUnexpectedMessage(memberName))
 						return
 					}
-				}
-			} else {
-				// For non-accessor members, any existing member is a duplicate
-				if len(existingMembers) > 0 {
+					// Different accessor types (getter/setter) can coexist, so continue
+				} else if memberKind == "method" || memberKind == "property" {
+					// For methods and properties, they conflict with any existing member
 					ctx.ReportNode(memberNode, buildUnexpectedMessage(memberName))
 					return
 				}
@@ -205,8 +214,12 @@ var NoDupeClassMembersRule = rule.Rule{
 					return
 				}
 
+				// Debug: check if we get any class at all
+				fmt.Printf("DEBUG: Processing class with %d members\n", len(classDecl.Members.Nodes))
+
 				// Process all members of the class
 				for _, member := range classDecl.Members.Nodes {
+					fmt.Printf("DEBUG: Processing member of kind %v\n", member.Kind)
 					processMember(node, member)
 				}
 			},

@@ -1,8 +1,483 @@
 exports[`no-shadow > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadow",
+      "message": "'a' is already declared in the upper scope on line 1 column 4.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 31
+        },
+        "end": {
+          "line": 1,
+          "column": 37
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 0
+  "ruleCount": 1
+}
+`;
+
+exports[`no-shadow > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadow",
+      "message": "'a' is already declared in the upper scope on line 1 column 6.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 25
+        },
+        "end": {
+          "line": 1,
+          "column": 26
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-shadow > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadow",
+      "message": "'e' is already declared in the upper scope on line 1 column 6.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 28
+        },
+        "end": {
+          "line": 1,
+          "column": 29
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-shadow > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadow",
+      "message": "'Foo' is already declared in the upper scope on line 1 column 6.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 16
+        },
+        "end": {
+          "line": 1,
+          "column": 32
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-shadow > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadow",
+      "message": "'Foo' is already declared in the upper scope on line 1 column 6.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 16
+        },
+        "end": {
+          "line": 1,
+          "column": 32
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-shadow > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadow",
+      "message": "'a' is already declared in the upper scope on line 1 column 6.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 26
+        },
+        "end": {
+          "line": 1,
+          "column": 35
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-shadow > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadow",
+      "message": "'a' is already declared in the upper scope on line 1 column 6.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 31
+        },
+        "end": {
+          "line": 1,
+          "column": 40
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-shadow > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadow",
+      "message": "'a' is already declared in the upper scope on line 1 column 6.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 36
+        },
+        "end": {
+          "line": 1,
+          "column": 45
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-shadow > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadow",
+      "message": "'a' is already declared in the upper scope on line 1 column 6.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 33
+        },
+        "end": {
+          "line": 1,
+          "column": 42
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-shadow > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadow",
+      "message": "'x' is already declared in the upper scope on line 1 column 4.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 31
+        },
+        "end": {
+          "line": 1,
+          "column": 36
+        }
+      }
+    },
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadow",
+      "message": "'x' is already declared in the upper scope on line 1 column 30.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 57
+        },
+        "end": {
+          "line": 1,
+          "column": 62
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-shadow > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadowGlobal",
+      "message": "'Object' is already a global variable.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 22
+        },
+        "end": {
+          "line": 1,
+          "column": 32
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-shadow > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadow",
+      "message": "'a' is already declared in the upper scope on line 1 column 4.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 16
+        },
+        "end": {
+          "line": 1,
+          "column": 22
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-shadow > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadow",
+      "message": "'a' is already declared in the upper scope on line 1 column 4.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 27
+        },
+        "end": {
+          "line": 1,
+          "column": 42
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-shadow > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadow",
+      "message": "'Foo' is already declared in the upper scope on line 1 column 1.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 44
+        },
+        "end": {
+          "line": 1,
+          "column": 51
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-shadow > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadow",
+      "message": "'test' is already declared in the upper scope on line 1 column 4.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 28
+        },
+        "end": {
+          "line": 1,
+          "column": 40
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-shadow > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadow",
+      "message": "'a' is already declared in the upper scope on line 1 column 14.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 57
+        },
+        "end": {
+          "line": 1,
+          "column": 66
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-shadow > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadow",
+      "message": "'A' is already declared in the upper scope on line 1 column 1.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 22
+        },
+        "end": {
+          "line": 1,
+          "column": 32
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-shadow > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-shadow",
+      "messageId": "noShadow",
+      "message": "'x' is already declared in the upper scope on line 1 column 4.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 18
+        },
+        "end": {
+          "line": 1,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
 }
 `;
