@@ -1994,5 +1994,3 @@ interface FooInterface {
     },
   ],
 });
-
-// Note: Additional ESLint-specific tests have been removed as they are not compatible with Node.js test runner
