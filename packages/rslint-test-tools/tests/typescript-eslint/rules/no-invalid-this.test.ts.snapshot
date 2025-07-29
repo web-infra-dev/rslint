@@ -8,18 +8,18 @@ exports[`no-invalid-this > invalid 1`] = `
       "filePath": "src/virtual.ts",
       "range": {
         "start": {
-          "line": 5,
-          "column": 17
+          "line": 6,
+          "column": 3
         },
         "end": {
           "line": 6,
-          "column": 4
+          "column": 7
         }
       }
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -51,17 +51,17 @@ exports[`no-invalid-this > invalid 10`] = `
       "range": {
         "start": {
           "line": 4,
-          "column": 24
+          "column": 25
         },
         "end": {
           "line": 4,
-          "column": 28
+          "column": 29
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -93,17 +93,17 @@ exports[`no-invalid-this > invalid 11`] = `
       "range": {
         "start": {
           "line": 4,
-          "column": 24
+          "column": 25
         },
         "end": {
           "line": 4,
-          "column": 28
+          "column": 29
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -135,17 +135,17 @@ exports[`no-invalid-this > invalid 12`] = `
       "range": {
         "start": {
           "line": 6,
-          "column": 28
+          "column": 29
         },
         "end": {
           "line": 6,
-          "column": 32
+          "column": 33
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -177,17 +177,17 @@ exports[`no-invalid-this > invalid 13`] = `
       "range": {
         "start": {
           "line": 6,
-          "column": 28
+          "column": 29
         },
         "end": {
           "line": 6,
-          "column": 32
+          "column": 33
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -219,17 +219,17 @@ exports[`no-invalid-this > invalid 14`] = `
       "range": {
         "start": {
           "line": 6,
-          "column": 28
+          "column": 29
         },
         "end": {
           "line": 6,
-          "column": 32
+          "column": 33
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -261,17 +261,17 @@ exports[`no-invalid-this > invalid 15`] = `
       "range": {
         "start": {
           "line": 7,
-          "column": 28
+          "column": 29
         },
         "end": {
           "line": 7,
-          "column": 32
+          "column": 33
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -303,17 +303,17 @@ exports[`no-invalid-this > invalid 16`] = `
       "range": {
         "start": {
           "line": 5,
-          "column": 26
+          "column": 27
         },
         "end": {
           "line": 5,
-          "column": 30
+          "column": 31
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -345,17 +345,17 @@ exports[`no-invalid-this > invalid 17`] = `
       "range": {
         "start": {
           "line": 6,
-          "column": 26
+          "column": 27
         },
         "end": {
           "line": 6,
-          "column": 30
+          "column": 31
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -387,17 +387,17 @@ exports[`no-invalid-this > invalid 18`] = `
       "range": {
         "start": {
           "line": 6,
-          "column": 28
+          "column": 29
         },
         "end": {
           "line": 6,
-          "column": 32
+          "column": 33
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -429,17 +429,17 @@ exports[`no-invalid-this > invalid 19`] = `
       "range": {
         "start": {
           "line": 5,
-          "column": 26
+          "column": 27
         },
         "end": {
           "line": 5,
-          "column": 30
+          "column": 31
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -471,17 +471,17 @@ exports[`no-invalid-this > invalid 2`] = `
       "range": {
         "start": {
           "line": 3,
-          "column": 22
+          "column": 23
         },
         "end": {
           "line": 3,
-          "column": 26
+          "column": 27
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -513,17 +513,17 @@ exports[`no-invalid-this > invalid 20`] = `
       "range": {
         "start": {
           "line": 6,
-          "column": 28
+          "column": 29
         },
         "end": {
           "line": 6,
-          "column": 32
+          "column": 33
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -555,17 +555,17 @@ exports[`no-invalid-this > invalid 21`] = `
       "range": {
         "start": {
           "line": 5,
-          "column": 26
+          "column": 27
         },
         "end": {
           "line": 5,
-          "column": 30
+          "column": 31
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -597,17 +597,17 @@ exports[`no-invalid-this > invalid 22`] = `
       "range": {
         "start": {
           "line": 4,
-          "column": 24
+          "column": 25
         },
         "end": {
           "line": 4,
-          "column": 28
+          "column": 29
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -639,17 +639,17 @@ exports[`no-invalid-this > invalid 23`] = `
       "range": {
         "start": {
           "line": 4,
-          "column": 24
+          "column": 25
         },
         "end": {
           "line": 4,
-          "column": 28
+          "column": 29
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -681,17 +681,17 @@ exports[`no-invalid-this > invalid 24`] = `
       "range": {
         "start": {
           "line": 4,
-          "column": 24
+          "column": 25
         },
         "end": {
           "line": 4,
-          "column": 28
+          "column": 29
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -723,17 +723,17 @@ exports[`no-invalid-this > invalid 25`] = `
       "range": {
         "start": {
           "line": 4,
-          "column": 24
+          "column": 25
         },
         "end": {
           "line": 4,
-          "column": 28
+          "column": 29
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -765,17 +765,17 @@ exports[`no-invalid-this > invalid 26`] = `
       "range": {
         "start": {
           "line": 4,
-          "column": 24
+          "column": 25
         },
         "end": {
           "line": 4,
-          "column": 28
+          "column": 29
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -807,17 +807,17 @@ exports[`no-invalid-this > invalid 27`] = `
       "range": {
         "start": {
           "line": 4,
-          "column": 24
+          "column": 25
         },
         "end": {
           "line": 4,
-          "column": 28
+          "column": 29
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -849,59 +849,17 @@ exports[`no-invalid-this > invalid 28`] = `
       "range": {
         "start": {
           "line": 4,
-          "column": 24
+          "column": 25
         },
         "end": {
           "line": 4,
-          "column": 28
+          "column": 29
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`no-invalid-this > invalid 29`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "no-invalid-this",
-      "messageId": "unexpectedThis",
-      "message": "Unexpected 'this'.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 3,
-          "column": 15
-        },
-        "end": {
-          "line": 3,
-          "column": 19
-        }
-      }
-    },
-    {
-      "ruleName": "no-invalid-this",
-      "messageId": "unexpectedThis",
-      "message": "Unexpected 'this'.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 4,
-          "column": 24
-        },
-        "end": {
-          "line": 4,
-          "column": 28
-        }
-      }
-    }
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -933,278 +891,17 @@ exports[`no-invalid-this > invalid 3`] = `
       "range": {
         "start": {
           "line": 3,
-          "column": 22
+          "column": 23
         },
         "end": {
           "line": 3,
-          "column": 26
+          "column": 27
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`no-invalid-this > invalid 30`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "no-invalid-this",
-      "messageId": "unexpectedThis",
-      "message": "Unexpected 'this'.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 3,
-          "column": 15
-        },
-        "end": {
-          "line": 3,
-          "column": 19
-        }
-      }
-    },
-    {
-      "ruleName": "no-invalid-this",
-      "messageId": "unexpectedThis",
-      "message": "Unexpected 'this'.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 4,
-          "column": 24
-        },
-        "end": {
-          "line": 4,
-          "column": 28
-        }
-      }
-    }
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`no-invalid-this > invalid 31`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "no-invalid-this",
-      "messageId": "unexpectedThis",
-      "message": "Unexpected 'this'.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 3,
-          "column": 15
-        },
-        "end": {
-          "line": 3,
-          "column": 19
-        }
-      }
-    },
-    {
-      "ruleName": "no-invalid-this",
-      "messageId": "unexpectedThis",
-      "message": "Unexpected 'this'.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 4,
-          "column": 24
-        },
-        "end": {
-          "line": 4,
-          "column": 28
-        }
-      }
-    }
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`no-invalid-this > invalid 32`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "no-invalid-this",
-      "messageId": "unexpectedThis",
-      "message": "Unexpected 'this'.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 3,
-          "column": 15
-        },
-        "end": {
-          "line": 3,
-          "column": 19
-        }
-      }
-    },
-    {
-      "ruleName": "no-invalid-this",
-      "messageId": "unexpectedThis",
-      "message": "Unexpected 'this'.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 4,
-          "column": 24
-        },
-        "end": {
-          "line": 4,
-          "column": 28
-        }
-      }
-    }
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`no-invalid-this > invalid 33`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "no-invalid-this",
-      "messageId": "unexpectedThis",
-      "message": "Unexpected 'this'.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 3,
-          "column": 15
-        },
-        "end": {
-          "line": 3,
-          "column": 19
-        }
-      }
-    },
-    {
-      "ruleName": "no-invalid-this",
-      "messageId": "unexpectedThis",
-      "message": "Unexpected 'this'.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 4,
-          "column": 24
-        },
-        "end": {
-          "line": 4,
-          "column": 28
-        }
-      }
-    }
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`no-invalid-this > invalid 34`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "no-invalid-this",
-      "messageId": "unexpectedThis",
-      "message": "Unexpected 'this'.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 3,
-          "column": 15
-        },
-        "end": {
-          "line": 3,
-          "column": 19
-        }
-      }
-    },
-    {
-      "ruleName": "no-invalid-this",
-      "messageId": "unexpectedThis",
-      "message": "Unexpected 'this'.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 4,
-          "column": 24
-        },
-        "end": {
-          "line": 4,
-          "column": 28
-        }
-      }
-    }
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`no-invalid-this > invalid 35`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "no-invalid-this",
-      "messageId": "unexpectedThis",
-      "message": "Unexpected 'this'.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 3,
-          "column": 15
-        },
-        "end": {
-          "line": 3,
-          "column": 19
-        }
-      }
-    },
-    {
-      "ruleName": "no-invalid-this",
-      "messageId": "unexpectedThis",
-      "message": "Unexpected 'this'.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 4,
-          "column": 24
-        },
-        "end": {
-          "line": 4,
-          "column": 28
-        }
-      }
-    }
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`no-invalid-this > invalid 36`] = `
-{
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -1236,17 +933,17 @@ exports[`no-invalid-this > invalid 4`] = `
       "range": {
         "start": {
           "line": 4,
-          "column": 24
+          "column": 25
         },
         "end": {
           "line": 4,
-          "column": 28
+          "column": 29
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -1278,17 +975,17 @@ exports[`no-invalid-this > invalid 5`] = `
       "range": {
         "start": {
           "line": 4,
-          "column": 24
+          "column": 25
         },
         "end": {
           "line": 4,
-          "column": 28
+          "column": 29
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -1320,17 +1017,17 @@ exports[`no-invalid-this > invalid 6`] = `
       "range": {
         "start": {
           "line": 4,
-          "column": 24
+          "column": 25
         },
         "end": {
           "line": 4,
-          "column": 28
+          "column": 29
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -1362,17 +1059,17 @@ exports[`no-invalid-this > invalid 7`] = `
       "range": {
         "start": {
           "line": 4,
-          "column": 24
+          "column": 25
         },
         "end": {
           "line": 4,
-          "column": 28
+          "column": 29
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -1404,17 +1101,17 @@ exports[`no-invalid-this > invalid 8`] = `
       "range": {
         "start": {
           "line": 5,
-          "column": 24
+          "column": 25
         },
         "end": {
           "line": 5,
-          "column": 28
+          "column": 29
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -1446,17 +1143,17 @@ exports[`no-invalid-this > invalid 9`] = `
       "range": {
         "start": {
           "line": 5,
-          "column": 24
+          "column": 25
         },
         "end": {
           "line": 5,
-          "column": 28
+          "column": 29
         }
       }
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;

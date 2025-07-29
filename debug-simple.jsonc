@@ -1,1 +1,0 @@
-[{"language": "typescript", "files": ["debug-no-unnecessary-constraint.ts"], "languageOptions": {"parserOptions": {"project": ["debug-tsconfig.json"]}}, "rules": {"no-unnecessary-type-constraint": "error"}}]

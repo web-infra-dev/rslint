@@ -52,7 +52,14 @@ var NoInferrableTypesRule = rule.Rule{
 		}
 
 		skipChainExpression := func(node *ast.Node) *ast.Node {
+			visited := make(map[*ast.Node]bool)
 			for node != nil {
+				// Prevent infinite loops by tracking visited nodes
+				if visited[node] {
+					return node
+				}
+				visited[node] = true
+				
 				switch node.Kind {
 				case ast.KindParenthesizedExpression:
 					node = node.AsParenthesizedExpression().Expression

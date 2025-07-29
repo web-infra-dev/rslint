@@ -19,7 +19,7 @@ exports[`no-loop-func > invalid 1`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -45,7 +45,7 @@ exports[`no-loop-func > invalid 10`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -71,7 +71,7 @@ exports[`no-loop-func > invalid 11`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -97,7 +97,7 @@ exports[`no-loop-func > invalid 12`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -123,7 +123,7 @@ exports[`no-loop-func > invalid 13`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -149,7 +149,7 @@ exports[`no-loop-func > invalid 14`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -175,7 +175,7 @@ exports[`no-loop-func > invalid 15`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -201,7 +201,7 @@ exports[`no-loop-func > invalid 16`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -227,7 +227,7 @@ exports[`no-loop-func > invalid 17`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -253,7 +253,7 @@ exports[`no-loop-func > invalid 18`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -279,7 +279,7 @@ exports[`no-loop-func > invalid 19`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -305,7 +305,7 @@ exports[`no-loop-func > invalid 2`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -331,7 +331,7 @@ exports[`no-loop-func > invalid 20`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -357,7 +357,7 @@ exports[`no-loop-func > invalid 21`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -383,7 +383,7 @@ exports[`no-loop-func > invalid 3`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -409,7 +409,7 @@ exports[`no-loop-func > invalid 4`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -435,7 +435,7 @@ exports[`no-loop-func > invalid 5`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -461,7 +461,7 @@ exports[`no-loop-func > invalid 6`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -487,7 +487,7 @@ exports[`no-loop-func > invalid 7`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -513,7 +513,7 @@ exports[`no-loop-func > invalid 8`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -539,7 +539,7 @@ exports[`no-loop-func > invalid 9`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;

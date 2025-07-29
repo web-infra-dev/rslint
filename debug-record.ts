@@ -1,1 +1,0 @@
-type Foo = Record<string, any>;

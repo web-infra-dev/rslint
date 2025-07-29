@@ -19,7 +19,33 @@ exports[`no-dupe-class-members > invalid 1`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-dupe-class-members > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-dupe-class-members",
+      "messageId": "unexpected",
+      "message": "Duplicate name 'foo() {}'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 3
+        },
+        "end": {
+          "line": 4,
+          "column": 11
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -45,7 +71,7 @@ exports[`no-dupe-class-members > invalid 2`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -56,7 +82,7 @@ exports[`no-dupe-class-members > invalid 3`] = `
     {
       "ruleName": "no-dupe-class-members",
       "messageId": "unexpected",
-      "message": "Duplicate name ''foo'() {}'.",
+      "message": "Duplicate name 'foo() {}'.",
       "filePath": "src/virtual.ts",
       "range": {
         "start": {
@@ -71,7 +97,7 @@ exports[`no-dupe-class-members > invalid 3`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -97,7 +123,7 @@ exports[`no-dupe-class-members > invalid 4`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -139,7 +165,7 @@ exports[`no-dupe-class-members > invalid 5`] = `
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -165,16 +191,85 @@ exports[`no-dupe-class-members > invalid 6`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
 
 exports[`no-dupe-class-members > invalid 7`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 1,
+  "diagnostics": [
+    {
+      "ruleName": "no-dupe-class-members",
+      "messageId": "unexpected",
+      "message": "Duplicate name 'foo() {}'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 3
+        },
+        "end": {
+          "line": 4,
+          "column": 15
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 7,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-dupe-class-members > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-dupe-class-members",
+      "messageId": "unexpected",
+      "message": "Duplicate name 'foo() {}'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 3
+        },
+        "end": {
+          "line": 4,
+          "column": 11
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 7,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-dupe-class-members > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-dupe-class-members",
+      "messageId": "unexpected",
+      "message": "Duplicate name 'foo'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 3
+        },
+        "end": {
+          "line": 4,
+          "column": 12
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;

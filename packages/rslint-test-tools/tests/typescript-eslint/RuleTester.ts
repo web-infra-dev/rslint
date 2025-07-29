@@ -108,7 +108,7 @@ export class RuleTester {
               },
             }),
             new Promise((_, reject) => 
-              setTimeout(() => reject(new Error(`Timeout after 30s for rule ${ruleName} valid case`)), 60000)
+              setTimeout(() => reject(new Error(`Timeout after 30s for rule ${ruleName} valid case`)), 30000)
             )
           ]);
           if (diags.diagnostics?.length > 0) {
@@ -141,7 +141,7 @@ export class RuleTester {
               },
             }),
             new Promise((_, reject) => 
-              setTimeout(() => reject(new Error(`Timeout after 30s for rule ${ruleName} valid case`)), 60000)
+              setTimeout(() => reject(new Error(`Timeout after 30s for rule ${ruleName} invalid case`)), 30000)
             )
           ]);
           t.assert.snapshot(diags);

@@ -1,4 +1,4 @@
-exports[`@typescript-eslint/explicit-member-accessibility > invalid 1`] = `
+exports[`explicit-member-accessibility > invalid 1`] = `
 {
   "diagnostics": [
     {
@@ -19,7 +19,33 @@ exports[`@typescript-eslint/explicit-member-accessibility > invalid 1`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
+  "ruleCount": 1
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "explicit-member-accessibility",
+      "messageId": "missingAccessibility",
+      "message": "Missing accessibility modifier on parameter property value.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 22
+        },
+        "end": {
+          "line": 3,
+          "column": 44
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;

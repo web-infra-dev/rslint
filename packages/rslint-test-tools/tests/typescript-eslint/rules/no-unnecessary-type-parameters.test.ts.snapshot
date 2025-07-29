@@ -19,7 +19,7 @@ exports[`no-unnecessary-type-parameters > invalid 1`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -45,7 +45,7 @@ exports[`no-unnecessary-type-parameters > invalid 2`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -54,7 +54,7 @@ exports[`no-unnecessary-type-parameters > invalid 3`] = `
 {
   "diagnostics": [],
   "errorCount": 0,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;

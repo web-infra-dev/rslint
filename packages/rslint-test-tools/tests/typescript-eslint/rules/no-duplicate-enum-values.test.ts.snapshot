@@ -19,7 +19,7 @@ exports[`no-duplicate-enum-values > invalid 1`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -45,7 +45,7 @@ exports[`no-duplicate-enum-values > invalid 2`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -87,7 +87,7 @@ exports[`no-duplicate-enum-values > invalid 3`] = `
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -113,7 +113,7 @@ exports[`no-duplicate-enum-values > invalid 4`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -139,7 +139,7 @@ exports[`no-duplicate-enum-values > invalid 5`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;

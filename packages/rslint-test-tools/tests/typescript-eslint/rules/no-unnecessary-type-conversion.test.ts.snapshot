@@ -19,16 +19,59 @@ exports[`no-unnecessary-type-conversion > invalid 1`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
 
 exports[`no-unnecessary-type-conversion > invalid 2`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 1,
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-conversion",
+      "messageId": "unnecessaryTypeConversion",
+      "message": "Calling a string's .toString() method does not change the type or value of the string.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 8
+        },
+        "end": {
+          "line": 1,
+          "column": 18
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 7,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-unnecessary-type-conversion > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unnecessary-type-conversion",
+      "messageId": "unnecessaryTypeConversion",
+      "message": "Concatenating '' with a string does not change the type or value of the string.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 5
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;

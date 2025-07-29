@@ -1,3 +1,0 @@
-function foo() {
-  this.prop;
-}

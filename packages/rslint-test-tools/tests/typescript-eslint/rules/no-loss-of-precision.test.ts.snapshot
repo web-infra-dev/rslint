@@ -19,7 +19,7 @@ exports[`no-loss-of-precision > invalid 1`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -45,7 +45,7 @@ exports[`no-loss-of-precision > invalid 10`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -71,7 +71,7 @@ exports[`no-loss-of-precision > invalid 2`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -97,7 +97,7 @@ exports[`no-loss-of-precision > invalid 3`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -123,7 +123,7 @@ exports[`no-loss-of-precision > invalid 4`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -149,7 +149,7 @@ exports[`no-loss-of-precision > invalid 5`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -175,7 +175,7 @@ exports[`no-loss-of-precision > invalid 6`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -201,7 +201,7 @@ exports[`no-loss-of-precision > invalid 7`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -227,7 +227,7 @@ exports[`no-loss-of-precision > invalid 8`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -253,7 +253,7 @@ exports[`no-loss-of-precision > invalid 9`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;

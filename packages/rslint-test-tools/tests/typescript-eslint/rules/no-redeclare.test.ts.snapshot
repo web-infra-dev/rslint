@@ -19,7 +19,7 @@ exports[`no-redeclare > invalid 1`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -45,7 +45,7 @@ exports[`no-redeclare > invalid 10`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -71,7 +71,7 @@ exports[`no-redeclare > invalid 11`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -97,16 +97,117 @@ exports[`no-redeclare > invalid 12`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
 
 exports[`no-redeclare > invalid 13`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 1,
+  "diagnostics": [
+    {
+      "ruleName": "no-redeclare",
+      "messageId": "redeclaredAsBuiltin",
+      "message": "'top' is already defined as a built-in global variable.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 5
+        },
+        "end": {
+          "line": 1,
+          "column": 8
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 7,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-redeclare > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-redeclare",
+      "messageId": "redeclared",
+      "message": "'a' is already defined.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 7
+        },
+        "end": {
+          "line": 3,
+          "column": 8
+        }
+      }
+    },
+    {
+      "ruleName": "no-redeclare",
+      "messageId": "redeclaredAsBuiltin",
+      "message": "'Object' is already defined as a built-in global variable.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 17
+        },
+        "end": {
+          "line": 3,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 7,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-redeclare > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-redeclare",
+      "messageId": "redeclared",
+      "message": "'a' is already defined.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 7
+        },
+        "end": {
+          "line": 3,
+          "column": 8
+        }
+      }
+    },
+    {
+      "ruleName": "no-redeclare",
+      "messageId": "redeclaredAsBuiltin",
+      "message": "'Object' is already defined as a built-in global variable.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 17
+        },
+        "end": {
+          "line": 3,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -132,7 +233,7 @@ exports[`no-redeclare > invalid 2`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -158,7 +259,7 @@ exports[`no-redeclare > invalid 3`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -184,7 +285,7 @@ exports[`no-redeclare > invalid 4`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -210,7 +311,7 @@ exports[`no-redeclare > invalid 5`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -236,7 +337,7 @@ exports[`no-redeclare > invalid 6`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -262,7 +363,7 @@ exports[`no-redeclare > invalid 7`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -288,7 +389,7 @@ exports[`no-redeclare > invalid 8`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -330,7 +431,7 @@ exports[`no-redeclare > invalid 9`] = `
     }
   ],
   "errorCount": 2,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;

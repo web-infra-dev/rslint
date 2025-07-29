@@ -1,8 +1,25 @@
 exports[`no-misused-new > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 1,
+  "diagnostics": [
+    {
+      "ruleName": "no-misused-new",
+      "messageId": "errorMessageInterface",
+      "message": "Interfaces cannot be constructed, only classes.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 13
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;

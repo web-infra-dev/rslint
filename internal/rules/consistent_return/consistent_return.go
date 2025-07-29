@@ -319,6 +319,7 @@ var ConsistentReturnRule = rule.Rule{
 				if funcInfo == nil {
 					return
 				}
+				
 
 				returnStmt := node.AsReturnStatement()
 				hasArgument := returnStmt.Expression != nil

@@ -1,1 +1,0 @@
-[{"language": "typescript", "files": ["debug-array-delete.ts"], "languageOptions": {"parserOptions": {"project": ["debug-tsconfig.json"]}}, "rules": {"no-array-delete": "error"}}]

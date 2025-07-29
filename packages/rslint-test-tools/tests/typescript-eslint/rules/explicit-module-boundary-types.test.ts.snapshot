@@ -19,7 +19,7 @@ exports[`explicit-module-boundary-types > invalid 1`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;

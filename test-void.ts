@@ -1,1 +1,0 @@
-type GenericVoid = Generic<void>;

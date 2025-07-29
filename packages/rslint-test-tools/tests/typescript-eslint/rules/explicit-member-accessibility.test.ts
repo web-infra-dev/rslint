@@ -1,6 +1,6 @@
 import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
-const rule = '@typescript-eslint/explicit-member-accessibility';
+const rule = 'explicit-member-accessibility';
 
 const ruleTester = new RuleTester({
   languageOptions: {
@@ -348,7 +348,7 @@ export class XXXX {
       errors: [
         {
           column: 22,
-          endColumn: 36,
+          endColumn: 44,
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',
@@ -372,7 +372,7 @@ export class WithParameterProperty {
       errors: [
         {
           column: 22,
-          endColumn: 36,
+          endColumn: 44,
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',

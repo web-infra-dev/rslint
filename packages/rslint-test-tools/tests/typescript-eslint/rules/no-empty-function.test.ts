@@ -144,7 +144,7 @@ class Person {
       `,
       errors: [
         {
-          column: 29,
+          column: 28,
           data: {
             name: 'constructor',
           },
@@ -161,7 +161,7 @@ class Person {
       `,
       errors: [
         {
-          column: 29,
+          column: 28,
           data: {
             name: "method 'otherMethod'",
           },

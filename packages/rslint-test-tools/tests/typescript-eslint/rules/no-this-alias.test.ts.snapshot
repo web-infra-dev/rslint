@@ -19,7 +19,7 @@ exports[`no-this-alias > invalid 1`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -45,7 +45,7 @@ exports[`no-this-alias > invalid 2`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -71,7 +71,7 @@ exports[`no-this-alias > invalid 3`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -97,7 +97,7 @@ exports[`no-this-alias > invalid 4`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -155,7 +155,7 @@ exports[`no-this-alias > invalid 5`] = `
     }
   ],
   "errorCount": 3,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -277,7 +277,7 @@ exports[`no-this-alias > invalid 6`] = `
     }
   ],
   "errorCount": 7,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;

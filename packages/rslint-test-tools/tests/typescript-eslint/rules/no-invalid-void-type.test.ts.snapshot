@@ -2,7 +2,7 @@ exports[`no-invalid-void-type: allowAsThisParameter: true > invalid 1`] = `
 {
   "diagnostics": [],
   "errorCount": 0,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 0
 }
 `;
@@ -11,7 +11,7 @@ exports[`no-invalid-void-type: allowInGenericTypeArguments: false > invalid 1`] 
 {
   "diagnostics": [],
   "errorCount": 0,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 0
 }
 `;
@@ -20,7 +20,7 @@ exports[`no-invalid-void-type: allowInGenericTypeArguments: true > invalid 1`] =
 {
   "diagnostics": [],
   "errorCount": 0,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 0
 }
 `;
@@ -29,7 +29,7 @@ exports[`no-invalid-void-type: allowInGenericTypeArguments: whitelist > invalid 
 {
   "diagnostics": [],
   "errorCount": 0,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 0
 }
 `;

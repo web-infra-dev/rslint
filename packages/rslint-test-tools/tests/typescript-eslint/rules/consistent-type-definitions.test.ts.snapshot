@@ -19,267 +19,7 @@ exports[`consistent-type-definitions > invalid 1`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`consistent-type-definitions > invalid 10`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "consistent-type-definitions",
-      "messageId": "typeOverInterface",
-      "message": "Use a \`type\` instead of an \`interface\`.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 11
-        },
-        "end": {
-          "line": 1,
-          "column": 12
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`consistent-type-definitions > invalid 11`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "consistent-type-definitions",
-      "messageId": "typeOverInterface",
-      "message": "Use a \`type\` instead of an \`interface\`.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 2,
-          "column": 18
-        },
-        "end": {
-          "line": 2,
-          "column": 19
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`consistent-type-definitions > invalid 12`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "consistent-type-definitions",
-      "messageId": "typeOverInterface",
-      "message": "Use a \`type\` instead of an \`interface\`.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 3,
-          "column": 13
-        },
-        "end": {
-          "line": 3,
-          "column": 18
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`consistent-type-definitions > invalid 13`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "consistent-type-definitions",
-      "messageId": "typeOverInterface",
-      "message": "Use a \`type\` instead of an \`interface\`.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 3,
-          "column": 13
-        },
-        "end": {
-          "line": 3,
-          "column": 18
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`consistent-type-definitions > invalid 14`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "consistent-type-definitions",
-      "messageId": "typeOverInterface",
-      "message": "Use a \`type\` instead of an \`interface\`.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 3,
-          "column": 13
-        },
-        "end": {
-          "line": 3,
-          "column": 18
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`consistent-type-definitions > invalid 15`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "consistent-type-definitions",
-      "messageId": "typeOverInterface",
-      "message": "Use a \`type\` instead of an \`interface\`.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 4,
-          "column": 15
-        },
-        "end": {
-          "line": 4,
-          "column": 18
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`consistent-type-definitions > invalid 16`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "consistent-type-definitions",
-      "messageId": "typeOverInterface",
-      "message": "Use a \`type\` instead of an \`interface\`.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 2,
-          "column": 26
-        },
-        "end": {
-          "line": 2,
-          "column": 30
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`consistent-type-definitions > invalid 17`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "consistent-type-definitions",
-      "messageId": "interfaceOverType",
-      "message": "Use an \`interface\` instead of a \`type\`.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 2,
-          "column": 21
-        },
-        "end": {
-          "line": 2,
-          "column": 25
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`consistent-type-definitions > invalid 18`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "consistent-type-definitions",
-      "messageId": "typeOverInterface",
-      "message": "Use a \`type\` instead of an \`interface\`.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 2,
-          "column": 26
-        },
-        "end": {
-          "line": 2,
-          "column": 30
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`consistent-type-definitions > invalid 19`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "consistent-type-definitions",
-      "messageId": "interfaceOverType",
-      "message": "Use an \`interface\` instead of a \`type\`.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 2,
-          "column": 6
-        },
-        "end": {
-          "line": 2,
-          "column": 9
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -305,111 +45,7 @@ exports[`consistent-type-definitions > invalid 2`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`consistent-type-definitions > invalid 20`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "consistent-type-definitions",
-      "messageId": "interfaceOverType",
-      "message": "Use an \`interface\` instead of a \`type\`.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 2,
-          "column": 6
-        },
-        "end": {
-          "line": 2,
-          "column": 9
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`consistent-type-definitions > invalid 21`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "consistent-type-definitions",
-      "messageId": "interfaceOverType",
-      "message": "Use an \`interface\` instead of a \`type\`.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 2,
-          "column": 6
-        },
-        "end": {
-          "line": 2,
-          "column": 9
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`consistent-type-definitions > invalid 22`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "consistent-type-definitions",
-      "messageId": "interfaceOverType",
-      "message": "Use an \`interface\` instead of a \`type\`.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 2,
-          "column": 6
-        },
-        "end": {
-          "line": 2,
-          "column": 9
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`consistent-type-definitions > invalid 23`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "consistent-type-definitions",
-      "messageId": "interfaceOverType",
-      "message": "Use an \`interface\` instead of a \`type\`.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 2,
-          "column": 6
-        },
-        "end": {
-          "line": 2,
-          "column": 9
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -435,7 +71,7 @@ exports[`consistent-type-definitions > invalid 3`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -461,7 +97,7 @@ exports[`consistent-type-definitions > invalid 4`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -487,7 +123,7 @@ exports[`consistent-type-definitions > invalid 5`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 1,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;
@@ -499,7 +135,55 @@ exports[`consistent-type-definitions > invalid 6`] = `
       "ruleName": "consistent-type-definitions",
       "messageId": "typeOverInterface",
       "message": "Use a \`type\` instead of an \`interface\`.",
-      "filePath": "src/virtual.ts",
+      "filePath": "src/consistent-type-exports.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 18
+        },
+        "end": {
+          "line": 3,
+          "column": 23
+        }
+      }
+    },
+    {
+      "ruleName": "consistent-type-definitions",
+      "messageId": "typeOverInterface",
+      "message": "Use a \`type\` instead of an \`interface\`.",
+      "filePath": "src/consistent-type-exports/type-only-exports.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 18
+        },
+        "end": {
+          "line": 3,
+          "column": 23
+        }
+      }
+    },
+    {
+      "ruleName": "consistent-type-definitions",
+      "messageId": "typeOverInterface",
+      "message": "Use a \`type\` instead of an \`interface\`.",
+      "filePath": "src/consistent-type-exports/type-only-exports.ts",
+      "range": {
+        "start": {
+          "line": 11,
+          "column": 20
+        },
+        "end": {
+          "line": 11,
+          "column": 21
+        }
+      }
+    },
+    {
+      "ruleName": "consistent-type-definitions",
+      "messageId": "typeOverInterface",
+      "message": "Use a \`type\` instead of an \`interface\`.",
+      "filePath": "src/debug-circular.ts",
       "range": {
         "start": {
           "line": 1,
@@ -507,20 +191,10 @@ exports[`consistent-type-definitions > invalid 6`] = `
         },
         "end": {
           "line": 1,
-          "column": 12
+          "column": 14
         }
       }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`consistent-type-definitions > invalid 7`] = `
-{
-  "diagnostics": [
+    },
     {
       "ruleName": "consistent-type-definitions",
       "messageId": "typeOverInterface",
@@ -538,60 +212,8 @@ exports[`consistent-type-definitions > invalid 7`] = `
       }
     }
   ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`consistent-type-definitions > invalid 8`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "consistent-type-definitions",
-      "messageId": "typeOverInterface",
-      "message": "Use a \`type\` instead of an \`interface\`.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 11
-        },
-        "end": {
-          "line": 1,
-          "column": 12
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-
-exports[`consistent-type-definitions > invalid 9`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "consistent-type-definitions",
-      "messageId": "typeOverInterface",
-      "message": "Use a \`type\` instead of an \`interface\`.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 11
-        },
-        "end": {
-          "line": 1,
-          "column": 12
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "errorCount": 5,
+  "fileCount": 7,
   "ruleCount": 1
 }
 `;

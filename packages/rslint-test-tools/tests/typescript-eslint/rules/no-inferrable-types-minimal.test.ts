@@ -1,0 +1,33 @@
+import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+
+const ruleTester = new RuleTester({
+  languageOptions: {
+    parserOptions: {
+      project: './tsconfig.json',
+      tsconfigRootDir: getFixturesRootDir(),
+    },
+  },
+});
+
+ruleTester.run('no-inferrable-types', {
+  valid: [
+    'const a = 10;',
+    'const b = true;',
+  ],
+  invalid: [
+    {
+      code: 'const a: number = 10;',
+      errors: [
+        {
+          column: 7,
+          data: {
+            type: 'number',
+          },
+          line: 1,
+          messageId: 'noInferrableType',
+        },
+      ],
+      output: 'const a = 10;',
+    },
+  ],
+});
