@@ -68,14 +68,10 @@ function checkDiagnosticEqual(
 
 export class RuleTester {
   constructor(options: any) {}
-  public run(
-    ruleName: string,
-    ruleOrCases: any,
-    optionalCases?: any,
-  ) {
+  public run(ruleName: string, ruleOrCases: any, optionalCases?: any) {
     // Handle both TypeScript ESLint format: run(name, rule, cases) and RSLint format: run(name, cases)
     const cases = optionalCases || ruleOrCases;
-    
+
     test(ruleName, async () => {
       let cwd = path.resolve(import.meta.dirname, './fixtures');
       const config = path.resolve(
@@ -86,11 +82,14 @@ export class RuleTester {
       await test('valid', async () => {
         for (const testCase of cases.valid) {
           const code = typeof testCase === 'string' ? testCase : testCase.code;
-          const options = typeof testCase === 'string' ? undefined : testCase.options;
+          const options =
+            typeof testCase === 'string' ? undefined : testCase.options;
 
           // Skip test cases that have specific options for now to avoid false positives
           if (options !== undefined) {
-            console.log(`Skipping valid test case with options: ${JSON.stringify(options)}`);
+            console.log(
+              `Skipping valid test case with options: ${JSON.stringify(options)}`,
+            );
             continue;
           }
           const diags = await lint({
@@ -110,16 +109,20 @@ export class RuleTester {
         }
       });
       await test('invalid', async t => {
-        const validTestCases = cases.invalid.filter((testCase: any) => testCase.options === undefined);
-        
+        const validTestCases = cases.invalid.filter(
+          (testCase: any) => testCase.options === undefined,
+        );
+
         if (validTestCases.length === 0) {
-          console.log('Skipping all invalid test cases - they all have options');
+          console.log(
+            'Skipping all invalid test cases - they all have options',
+          );
           return;
         }
-        
+
         for (const testCase of validTestCases) {
           const { errors, code } = testCase;
-          
+
           const diags = await lint({
             config,
             workingDirectory: cwd,
