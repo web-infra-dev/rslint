@@ -148,7 +148,8 @@ func checkBodyForOverloadMethods(ctx rule.RuleContext, node *ast.Node) {
 	// Keep track of the last method we saw for each name
 	// When we see a method again, check if it was the immediately previous member
 	methodLastSeenIndex := make(map[string]int)
-	lastMethodIndex := -1
+	var lastMethodKey string
+	lastMethodIdx := -1
 
 	for memberIdx, member := range members {
 		method := getMemberMethod(ctx, member)
@@ -160,10 +161,10 @@ func checkBodyForOverloadMethods(ctx rule.RuleContext, node *ast.Node) {
 		// Create a key for this method (includes name, static, callSignature, nameType)
 		key := fmt.Sprintf("%s:%t:%t:%d", method.Name, method.Static, method.CallSignature, method.NameType)
 
-		if prevIndex, seen := methodLastSeenIndex[key]; seen {
+		if _, seen := methodLastSeenIndex[key]; seen {
 			// We've seen this method before
-			// Check if it was the immediately previous method
-			if lastMethodIndex != memberIdx-1 || prevIndex != lastMethodIndex {
+			// Check if the previous occurrence was the last method we saw
+			if lastMethodKey != key || lastMethodIdx != memberIdx-1 {
 				// There was something between the last occurrence and this one
 				staticPrefix := ""
 				if method.Static {
@@ -178,7 +179,8 @@ func checkBodyForOverloadMethods(ctx rule.RuleContext, node *ast.Node) {
 
 		// Update the last seen index for this method
 		methodLastSeenIndex[key] = memberIdx
-		lastMethodIndex = memberIdx
+		lastMethodKey = key
+		lastMethodIdx = memberIdx
 	}
 }
 
