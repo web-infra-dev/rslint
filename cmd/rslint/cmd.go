@@ -319,7 +319,7 @@ Options:
     --config PATH     Which rslint config file to use. Defaults to rslint.json.
 	--list-files      List matched files
 	--format FORMAT   Output format: default | jsonline
-	--api, --ipc      Run in API/IPC mode (for JS integration)
+	--ipc             Run in IPC mode (for JS integration)
 	--no-color        Disable colored output
 	--force-color     Force colored output
 	-h, --help        Show help
@@ -347,7 +347,6 @@ func runCMD() int {
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&help, "h", false, "show help")
 	flag.BoolVar(&ipcMode, "ipc", false, "run in IPC mode (for JS integration)")
-	flag.BoolVar(&ipcMode, "api", false, "run in API mode (for JS integration)")
 	flag.BoolVar(&noColor, "no-color", false, "disable colored output")
 	flag.BoolVar(&forceColor, "force-color", false, "force colored output")
 
