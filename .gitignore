@@ -143,13 +143,10 @@ vite.config.ts.timestamp-*
 .DS_Store
 **/.DS_Store
 
-<<<<<<< HEAD
-rslint
-# IntelliJ IDEA
-.idea/
-=======
 ## ignore ai build result
 /rslint
 /bin/rslint
 npm/*/rslint
->>>>>>> origin/main
+
+# IntelliJ IDEA
+.idea/

@@ -347,17 +347,13 @@ var BanTsCommentRule = rule.Rule{
 				}
 				
 				// Check if this @ts-nocheck comment appears after the first statement
-				// If so, it's ineffective and should be allowed regardless of configuration
+				// If so, it's ineffective and should be treated according to configuration
 				if firstStatement != nil {
 					firstStatementStart := firstStatement.Pos()
 					commentStart := commentRange.Pos()
-					fmt.Printf("DEBUG: firstStatementStart=%d, commentStart=%d, diff=%d\n", 
-						firstStatementStart, commentStart, commentStart-firstStatementStart)
 					if commentStart > firstStatementStart {
 						// Comment appears after first statement, so it's ineffective
-						// Allow it regardless of configuration
-						fmt.Printf("DEBUG: Allowing ts-nocheck after first statement\n")
-						return
+						// Don't allow it - treat according to configuration like any other ts-nocheck
 					}
 				}
 				

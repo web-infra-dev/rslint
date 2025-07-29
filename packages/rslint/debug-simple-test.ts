@@ -1,0 +1,1 @@
+var Object = 0;

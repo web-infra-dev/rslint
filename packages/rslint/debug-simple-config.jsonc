@@ -1,0 +1,10 @@
+[
+  {
+    "language": "typescript",
+    "files": ["*.ts"],
+    "rules": {
+      "no-redeclare": ["error", {"builtinGlobals": true}]
+    }
+  }
+]
+EOF < /dev/null
