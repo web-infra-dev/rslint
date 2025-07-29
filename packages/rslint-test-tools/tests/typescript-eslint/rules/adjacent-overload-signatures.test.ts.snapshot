@@ -1,0 +1,879 @@
+exports[`adjacent-overload-signatures > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 6,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 1
+        },
+        "end": {
+          "line": 6,
+          "column": 43
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 1
+        },
+        "end": {
+          "line": 6,
+          "column": 43
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 50
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All baz signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 8,
+          "column": 3
+        },
+        "end": {
+          "line": 8,
+          "column": 33
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 50
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All baz signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 8,
+          "column": 3
+        },
+        "end": {
+          "line": 8,
+          "column": 33
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 34
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 34
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 24
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All call signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 21
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 6,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 34
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 34
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 22`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 34
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 23`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 24
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 24`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All baz signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 8,
+          "column": 5
+        },
+        "end": {
+          "line": 8,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 25`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All new signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 29
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 26`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All new signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 19
+        }
+      }
+    },
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All new signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 29
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 27`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All constructor signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 38
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 28`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 29`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 1
+        },
+        "end": {
+          "line": 6,
+          "column": 44
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 30`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 8,
+          "column": 3
+        },
+        "end": {
+          "line": 8,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 31`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All constructor signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 26
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 32`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 24
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 33`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All static foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 31
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 34`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All #private signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 33
+        }
+      }
+    },
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All '#private' signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 6,
+          "column": 35
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 1
+        },
+        "end": {
+          "line": 6,
+          "column": 44
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 1
+        },
+        "end": {
+          "line": 6,
+          "column": 37
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 1
+        },
+        "end": {
+          "line": 6,
+          "column": 37
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 1
+        },
+        "end": {
+          "line": 6,
+          "column": 37
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 1
+        },
+        "end": {
+          "line": 5,
+          "column": 37
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`adjacent-overload-signatures > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "adjacent-overload-signatures",
+      "message": "All foo signatures should be adjacent.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 9,
+          "column": 3
+        },
+        "end": {
+          "line": 9,
+          "column": 30
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
