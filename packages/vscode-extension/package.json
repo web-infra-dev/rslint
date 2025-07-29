@@ -59,8 +59,7 @@
   "scripts": {
     "build": "node scripts/build.js",
     "watch": "node scripts/build.js --watch",
-    "test": "tsc -p tsconfig.spec.json && node .vscode-test-out/runTest.js",
-    "lint": "rslint --tsconfig tsconfig.build.json"
+    "test": "tsc -p tsconfig.spec.json && node .vscode-test-out/runTest.js"
   },
   "devDependencies": {
     "@rslint/core": "workspace:*",

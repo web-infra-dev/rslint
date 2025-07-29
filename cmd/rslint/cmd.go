@@ -64,7 +64,7 @@ func setupColors() *ColorScheme {
 	// Create color functions
 	ruleNameColor := color.New(color.FgHiGreen).SprintfFunc()
 	fileNameColor := color.New(color.FgCyan, color.Italic).SprintfFunc()
-	errorTextColor := color.New(color.FgRed, color.Underline).SprintfFunc()
+	errorTextColor := color.New(color.FgRed, color.Bold).SprintfFunc()
 	successColor := color.New(color.FgGreen, color.Bold).SprintfFunc()
 	dimColor := color.New(color.Faint).SprintfFunc()
 	boldColor := color.New(color.Bold).SprintfFunc()
@@ -261,17 +261,18 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 
 	diagnosticHighlightActive := false
 	lastLineNumber := strconv.Itoa(codeboxEndLine + 1)
+
 	for line := codeboxStartLine; line <= codeboxEndLine; line++ {
 		w.WriteString("  ")
 		w.WriteString(colors.BorderText("│ "))
 		if line == codeboxEndLine {
-			w.WriteString(lastLineNumber)
+			w.WriteString(colors.DimText("%s", lastLineNumber))
 		} else {
 			number := strconv.Itoa(line + 1)
 			if len(number) < len(lastLineNumber) {
 				w.WriteByte(' ')
 			}
-			w.WriteString(number)
+			w.WriteString(colors.DimText("%s", number))
 		}
 		w.WriteString(colors.BorderText(" │"))
 		w.WriteString("  ")
@@ -295,7 +296,7 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 
 		if underlineStart != underlineEnd {
 			w.WriteString(text[lineTextStart:underlineStart])
-			w.WriteString(colors.ErrorText("%s", text[underlineStart:underlineEnd]))
+			w.WriteString(severityColor("%s", text[underlineStart:underlineEnd]))
 			w.WriteString(text[underlineEnd:lineTextEnd])
 		} else if lineTextStart != lineTextEnd {
 			w.WriteString(text[lineTextStart:lineTextEnd])
