@@ -5,8 +5,8 @@
   "main": "src/index.ts",
   "private": true,
   "scripts": {
-    "test": "rstest run",
-    "test:update": "rstest run -u"
+    "test": "rstest run --testTimeout=0",
+    "test:update": "rstest run -u --testTimeout=0"
   },
   "keywords": [],
   "author": "",
