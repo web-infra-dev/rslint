@@ -1,15 +1,6 @@
-import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { RuleTester } from '../../../rule-tester';
 
-const rootPath = getFixturesRootDir();
-
-const ruleTester = new RuleTester({
-  languageOptions: {
-    parserOptions: {
-      project: './tsconfig.json',
-      tsconfigRootDir: rootPath,
-    },
-  },
-});
+const ruleTester = new RuleTester();
 
 ruleTester.run('array-type', {
   valid: [
@@ -1997,12 +1988,10 @@ interface FooInterface {
 
 // -- eslint rule tester is not working with multi-pass
 // https://github.com/eslint/eslint/issues/11187
-// NOTE: Commented out as this section uses ESLint-specific APIs not available in RSLint
-/*
 describe('array-type (nested)', () => {
   const linter = new TSESLint.Linter({ configType: 'eslintrc' });
   linter.defineRule('array-type', rule);
-  linter.defineParser('@typescript-eslint/parser', parser);*/
+  linter.defineParser('@typescript-eslint/parser', parser);
 
   describe('should deeply fix correctly', () => {
     function testOutput(
@@ -2233,10 +2222,7 @@ type BrokenArray = {
     );
   });
 });
-*/
 
-// NOTE: Schema validation tests commented out as they use ESLint-specific test utilities
-/*
 describe('schema validation', () => {
   // https://github.com/typescript-eslint/typescript-eslint/issues/6852
   test("array-type does not accept 'simple-array' option", () => {
@@ -2248,4 +2234,3 @@ describe('schema validation', () => {
     expect(areOptionsValid(rule, ['array'])).toBe(false);
   });
 });
-*/
