@@ -95,10 +95,12 @@ export class RuleTester {
 
           // For now, run all tests with default rule behavior (ignoring specific options)
           // TODO: Implement proper rule option passing
-          
+
           // Skip test cases that have specific options for now to avoid false positives
           if (options !== undefined) {
-            console.log(`Skipping valid test case with options: ${JSON.stringify(options)}`);
+            console.log(
+              `Skipping valid test case with options: ${JSON.stringify(options)}`,
+            );
             continue;
           }
 
@@ -124,10 +126,12 @@ export class RuleTester {
         for (const { errors, code, options } of cases.invalid) {
           // For now, run all tests with default rule behavior (ignoring specific options)
           // TODO: Implement proper rule option passing
-          
+
           // Skip test cases that have specific options for now
           if (options !== undefined) {
-            console.log(`Skipping invalid test case with options: ${JSON.stringify(options)}`);
+            console.log(
+              `Skipping invalid test case with options: ${JSON.stringify(options)}`,
+            );
             continue;
           }
 
