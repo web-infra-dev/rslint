@@ -3,6 +3,7 @@
 import path from 'node:path';
 import test from 'node:test';
 import util from 'node:util';
+import fs from 'node:fs';
 import { lint, type Diagnostic } from '@rslint/core';
 
 import assert from 'node:assert';
@@ -91,6 +92,9 @@ export class RuleTester {
           const code = typeof testCase === 'string' ? testCase : testCase.code;
           const options = typeof testCase === 'string' ? undefined : testCase.options;
           
+          // For now, run all tests with default rule behavior (ignoring specific options)
+          // TODO: Implement proper rule option passing
+          
           const ruleOptions: Record<string, string> = {};
           ruleOptions[ruleName] = 'error';
           
@@ -102,6 +106,7 @@ export class RuleTester {
             },
             ruleOptions,
           });
+          
           assert(
             diags.diagnostics?.length === 0,
             `Expected no diagnostics for valid case, but got: ${JSON.stringify(diags)}`,
@@ -110,6 +115,9 @@ export class RuleTester {
       });
       await test('invalid', async t => {
         for (const { errors, code, options } of cases.invalid) {
+          // For now, run all tests with default rule behavior (ignoring specific options)
+          // TODO: Implement proper rule option passing
+          
           const ruleOptions: Record<string, string> = {};
           ruleOptions[ruleName] = 'error';
           
@@ -121,6 +129,7 @@ export class RuleTester {
             },
             ruleOptions,
           });
+          
           t.assert.snapshot(diags);
           assert(
             diags.diagnostics?.length > 0,
