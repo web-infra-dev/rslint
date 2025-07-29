@@ -13,17 +13,13 @@ const ruleTester = new RuleTester({
 
 ruleTester.run('adjacent-overload-signatures', {
   valid: [
-    {
-      code: `
+    `
 function error(a: string);
 function error(b: number);
 function error(ab: string | number) {}
 export { error };
-      `,
-      languageOptions: { parserOptions: { sourceType: 'module' } },
-    },
-    {
-      code: `
+    `,
+    `
 import { connect } from 'react-redux';
 export interface ErrorMessageModel {
   message: string;
@@ -31,9 +27,7 @@ export interface ErrorMessageModel {
 function mapStateToProps() {}
 function mapDispatchToProps() {}
 export default connect(mapStateToProps, mapDispatchToProps)(ErrorMessage);
-      `,
-      languageOptions: { parserOptions: { sourceType: 'module' } },
-    },
+    `,
     `
 export const foo = 'a',
   bar = 'b';
