@@ -309,19 +309,19 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	w.WriteString("\n\n")
 }
 
-const usage = `✨ Rslint - Rocket Speed Linter
+const usage = `🚀 Rslint - Rocket Speed Linter
 
 Usage:
-    rslint [OPTIONS]
+  rslint [OPTIONS]
 
 Options:
-    --config PATH     Which rslint config file to use. Defaults to rslint.json.
-	--list-files      List matched files
-	--format FORMAT   Output format: default | jsonline
-	--ipc             Run in IPC mode (for JS integration)
-	--no-color        Disable colored output
-	--force-color     Force colored output
-	-h, --help        Show help
+  --config PATH     Which rslint config file to use. Defaults to rslint.json.
+  --list-files      List matched files
+  --format FORMAT   Output format: default | jsonline
+  --ipc             Run in IPC mode (for JS integration)
+  --no-color        Disable colored output
+  --force-color     Force colored output
+  -h, --help        Show help
 `
 
 func runCMD() int {
