@@ -18,6 +18,7 @@ import (
 	rslintconfig "github.com/typescript-eslint/rslint/internal/config"
 	"github.com/typescript-eslint/rslint/internal/linter"
 	"github.com/typescript-eslint/rslint/internal/rule"
+	"github.com/typescript-eslint/rslint/internal/rules/array_type"
 	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
 	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
 	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
@@ -98,6 +99,7 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 
 	// Create rules
 	var rules = []rule.Rule{
+		array_type.ArrayTypeRule,
 		await_thenable.AwaitThenableRule,
 		no_array_delete.NoArrayDeleteRule,
 		no_base_to_string.NoBaseToStringRule,
