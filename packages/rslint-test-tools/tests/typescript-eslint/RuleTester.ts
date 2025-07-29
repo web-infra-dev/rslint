@@ -133,8 +133,7 @@ export class RuleTester {
               [ruleName]: 'error',
             },
           });
-          // TODO: Fix snapshot generation for class-literal-property-style
-          // t.assert.snapshot(diags);
+          t.assert.snapshot(diags);
           assert(
             diags.diagnostics?.length > 0,
             `Expected diagnostics for invalid case`,
