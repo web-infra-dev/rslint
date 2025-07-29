@@ -2,6 +2,7 @@ package config
 
 import (
 	"github.com/typescript-eslint/rslint/internal/rule"
+	"github.com/typescript-eslint/rslint/internal/rules/adjacent_overload_signatures"
 	"github.com/typescript-eslint/rslint/internal/rules/array_type"
 	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
 	"github.com/typescript-eslint/rslint/internal/rules/ban_ts_comment"
@@ -268,6 +269,8 @@ func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConf
 
 // RegisterAllTypeSriptEslintPluginRules registers all available rules in the global registry
 func RegisterAllTypeSriptEslintPluginRules() {
+	GlobalRuleRegistry.Register("@typescript-eslint/adjacent-overload-signatures", adjacent_overload_signatures.AdjacentOverloadSignaturesRule)
+	GlobalRuleRegistry.Register("adjacent-overload-signatures", adjacent_overload_signatures.AdjacentOverloadSignaturesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/array-type", array_type.ArrayTypeRule)
 	GlobalRuleRegistry.Register("array-type", array_type.ArrayTypeRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/await-thenable", await_thenable.AwaitThenableRule)
