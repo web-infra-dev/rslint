@@ -19,6 +19,7 @@ import (
 	"github.com/typescript-eslint/rslint/internal/linter"
 	"github.com/typescript-eslint/rslint/internal/rule"
 	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
+	"github.com/typescript-eslint/rslint/internal/rules/class_literal_property_style"
 	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
 	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
 	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_void_expression"
@@ -99,6 +100,7 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 	// Create rules
 	var rules = []rule.Rule{
 		await_thenable.AwaitThenableRule,
+		class_literal_property_style.ClassLiteralPropertyStyleRule,
 		no_array_delete.NoArrayDeleteRule,
 		no_base_to_string.NoBaseToStringRule,
 		no_confusing_void_expression.NoConfusingVoidExpressionRule,
