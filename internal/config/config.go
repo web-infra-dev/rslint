@@ -21,12 +21,15 @@ import (
 	"github.com/typescript-eslint/rslint/internal/rules/init_declarations"
 	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
 	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
+	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_non_null_assertion"
 	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_void_expression"
 	"github.com/typescript-eslint/rslint/internal/rules/no_duplicate_type_constituents"
 	"github.com/typescript-eslint/rslint/internal/rules/no_duplicate_enum_values"
 	"github.com/typescript-eslint/rslint/internal/rules/no_dupe_class_members"
 	"github.com/typescript-eslint/rslint/internal/rules/no_dynamic_delete"
 	"github.com/typescript-eslint/rslint/internal/rules/no_empty_function"
+	"github.com/typescript-eslint/rslint/internal/rules/no_empty_interface"
+	"github.com/typescript-eslint/rslint/internal/rules/no_empty_object_type"
 	"github.com/typescript-eslint/rslint/internal/rules/no_floating_promises"
 	"github.com/typescript-eslint/rslint/internal/rules/no_import_type_side_effects"
 	"github.com/typescript-eslint/rslint/internal/rules/no_for_in_array"
@@ -305,6 +308,8 @@ func RegisterAllTypeSriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("no-array-delete", no_array_delete.NoArrayDeleteRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-base-to-string", no_base_to_string.NoBaseToStringRule)
 	GlobalRuleRegistry.Register("no-base-to-string", no_base_to_string.NoBaseToStringRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-confusing-non-null-assertion", no_confusing_non_null_assertion.NoConfusingNonNullAssertionRule)
+	GlobalRuleRegistry.Register("no-confusing-non-null-assertion", no_confusing_non_null_assertion.NoConfusingNonNullAssertionRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-confusing-void-expression", no_confusing_void_expression.NoConfusingVoidExpressionRule)
 	GlobalRuleRegistry.Register("no-confusing-void-expression", no_confusing_void_expression.NoConfusingVoidExpressionRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-duplicate-type-constituents", no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule)
@@ -317,6 +322,10 @@ func RegisterAllTypeSriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("no-dynamic-delete", no_dynamic_delete.NoDynamicDeleteRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-empty-function", no_empty_function.NoEmptyFunctionRule)
 	GlobalRuleRegistry.Register("no-empty-function", no_empty_function.NoEmptyFunctionRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-empty-interface", no_empty_interface.NoEmptyInterfaceRule)
+	GlobalRuleRegistry.Register("no-empty-interface", no_empty_interface.NoEmptyInterfaceRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-empty-object-type", no_empty_object_type.NoEmptyObjectTypeRule)
+	GlobalRuleRegistry.Register("no-empty-object-type", no_empty_object_type.NoEmptyObjectTypeRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-floating-promises", no_floating_promises.NoFloatingPromisesRule)
 	GlobalRuleRegistry.Register("no-floating-promises", no_floating_promises.NoFloatingPromisesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-for-in-array", no_for_in_array.NoForInArrayRule)

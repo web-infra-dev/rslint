@@ -14,14 +14,10 @@
   "description": "",
   "devDependencies": {
     "@types/node": "24.0.14",
-<<<<<<< HEAD
     "@rslint/core": "workspace:*",
     "tsx": "^4.6.0"
-=======
-    "@rslint/core": "workspace:*"
   },
   "publishConfig": {
     "access": "public"
->>>>>>> origin/main
   }
 }

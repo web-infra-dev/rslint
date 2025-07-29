@@ -272,6 +272,8 @@ var BanTsCommentRule = rule.Rule{
 			TsNocheck:                true,
 		}
 
+		// Parse options
+		
 		// Parse options with dual-format support (handles both array and object formats)
 		if options != nil {
 			var optMap map[string]interface{}
@@ -344,11 +346,18 @@ var BanTsCommentRule = rule.Rule{
 					return
 				}
 				
+				// Apply the configured rules regardless of whether options were explicit or default
+				
 				// For line comments, check the configuration
 				directiveName := "ts-" + directive.Directive
 				config, exists := directiveConfigs[directiveName] 
 				if exists {
 					enabled, mode, descFormat := parseDirectiveConfig(config)
+					
+					// If ts-nocheck is not enabled (disabled), always allow it
+					if !enabled {
+						return
+					}
 					
 					// If ts-nocheck is banned (enabled=true, mode=""), then report error for line comments
 					if enabled && mode == "" {
@@ -381,15 +390,8 @@ var BanTsCommentRule = rule.Rule{
 					}
 				}
 				
-				// For line comments when not banned, allow if they appear before the first statement
-				if firstStatement == nil {
-					// No statements in file, allow ts-nocheck
-					return
-				}
-				// Allow ts-nocheck at the top of the file (before any statements)
-				if commentRange.Pos() < firstStatement.Pos() {
-					return
-				}
+				// If config doesn't exist or other cases, allow by default
+				return
 			}
 
 			directiveName := "ts-" + directive.Directive

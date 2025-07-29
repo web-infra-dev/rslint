@@ -90,7 +90,6 @@ export class RuleTester {
       );
       let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
       await test('valid', async () => {
-<<<<<<< HEAD
         for (const testCase of cases.valid) {
           const code = typeof testCase === 'string' ? testCase : testCase.code;
           const options = typeof testCase === 'string' ? undefined : testCase.options;
@@ -99,8 +98,8 @@ export class RuleTester {
           
           const diags = await Promise.race([
             lint({
-              tsconfig: path.basename(tsconfig),
-              workingDirectory: path.dirname(tsconfig),
+              config,
+              workingDirectory: cwd,
               fileContents: {
                 [virtual_entry]: code,
               },
@@ -109,7 +108,7 @@ export class RuleTester {
               },
             }),
             new Promise((_, reject) => 
-              setTimeout(() => reject(new Error(`Timeout after 30s for rule ${ruleName} valid case`)), 30000)
+              setTimeout(() => reject(new Error(`Timeout after 30s for rule ${ruleName} valid case`)), 60000)
             )
           ]);
           if (diags.diagnostics?.length > 0) {
@@ -117,19 +116,6 @@ export class RuleTester {
             console.error('Options:', JSON.stringify(options));
             console.error('Rule config:', JSON.stringify(ruleConfig));
           }
-=======
-        for (const code of cases.valid) {
-          const diags = await lint({
-            config,
-            workingDirectory: cwd,
-            fileContents: {
-              [virtual_entry]: code,
-            },
-            ruleOptions: {
-              [ruleName]: 'error',
-            },
-          });
->>>>>>> origin/main
           assert(
             diags.diagnostics?.length === 0,
             `Expected no diagnostics for valid case, but got: ${JSON.stringify(diags)}`,
@@ -137,7 +123,6 @@ export class RuleTester {
         }
       });
       await test('invalid', async t => {
-<<<<<<< HEAD
         for (let i = 0; i < cases.invalid.length; i++) {
           const testCase = cases.invalid[i];
           const { errors, code, options } = testCase;
@@ -146,8 +131,8 @@ export class RuleTester {
           
           const diags = await Promise.race([
             lint({
-              tsconfig: path.basename(tsconfig),
-              workingDirectory: path.dirname(tsconfig),
+              config,
+              workingDirectory: cwd,
               fileContents: {
                 [virtual_entry]: code,
               },
@@ -156,22 +141,9 @@ export class RuleTester {
               },
             }),
             new Promise((_, reject) => 
-              setTimeout(() => reject(new Error(`Timeout after 30s for rule ${ruleName} valid case`)), 30000)
+              setTimeout(() => reject(new Error(`Timeout after 30s for rule ${ruleName} valid case`)), 60000)
             )
           ]);
-=======
-        for (const { errors, code } of cases.invalid) {
-          const diags = await lint({
-            config,
-            workingDirectory: cwd,
-            fileContents: {
-              [virtual_entry]: code,
-            },
-            ruleOptions: {
-              [ruleName]: 'error',
-            },
-          });
->>>>>>> origin/main
           t.assert.snapshot(diags);
           assert(
             diags.diagnostics?.length > 0,

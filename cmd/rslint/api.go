@@ -466,6 +466,10 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 	if diagnostics == nil {
 		diagnostics = []ipc.Diagnostic{}
 	}
+	for _, file := range files {
+		fmt.Fprintf(os.Stderr, "linting file: %s\n", file.FileName())
+	}
+
 	// Create response
 	return &ipc.LintResponse{
 		Diagnostics: diagnostics,

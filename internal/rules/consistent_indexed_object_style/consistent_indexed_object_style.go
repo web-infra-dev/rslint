@@ -145,6 +145,10 @@ func checkInterfaceDeclaration(ctx rule.RuleContext, node *ast.Node) {
 			return // Direct circular reference like Foo -> Foo
 		}
 		
+		// Only block conversion for direct circular references
+		// Arrays, functions, tuples, etc. containing the type are allowed
+		// These don't create problematic circular references in practice
+		
 		// For indirect references through other interfaces, check for mutual references
 		if valueType.Kind == ast.KindTypeReference {
 			typeRef := valueType.AsTypeReferenceNode()
@@ -349,6 +353,15 @@ func containsTypeReference(typeNode *ast.Node, typeName string) bool {
 					return true
 				}
 			}
+		}
+	case ast.KindIndexedAccessType:
+		// Handle Foo[number], Foo["key"], etc.
+		indexedAccess := typeNode.AsIndexedAccessTypeNode()
+		if indexedAccess.ObjectType != nil && containsTypeReference(indexedAccess.ObjectType, typeName) {
+			return true
+		}
+		if indexedAccess.IndexType != nil && containsTypeReference(indexedAccess.IndexType, typeName) {
+			return true
 		}
 	case ast.KindUnionType:
 		unionType := typeNode.AsUnionTypeNode()
