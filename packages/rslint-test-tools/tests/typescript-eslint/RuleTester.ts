@@ -3,7 +3,6 @@
 import path from 'node:path';
 import { test, describe, expect } from '@rstest/core';
 import { lint, type Diagnostic } from '@rslint/core';
-
 import assert from 'node:assert';
 
 interface TsDiagnostic {
@@ -76,7 +75,7 @@ export class RuleTester {
       }[];
     },
   ) {
-    describe(ruleName, async () => {
+    describe(ruleName, () => {
       let cwd = path.resolve(import.meta.dirname, './fixtures');
       const config = path.resolve(
         import.meta.dirname,
