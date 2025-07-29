@@ -25,6 +25,11 @@ async function publish_all() {
     const os = platform['node-os'] || platform.os;
     const arch = platform['node-arch'] || platform.arch;
     await $`cd packages/vscode-extension && pnpm ${marketplace} package --target ${os}-${arch}`;
+    // supports dry-run
+    if (process.argv.includes('--dry-run')) {
+      console.log(`Dry run: Skipping actual publish for ${os}-${arch}`);
+      continue;
+    }
     await $`cd packages/vscode-extension && pnpm ${marketplace} publish --packagePath ./rslint-${os}-${arch}-${version}.vsix `;
     console.log(`Finish Publishing v${version} for ${os}-${arch}.`);
   }
