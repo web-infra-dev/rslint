@@ -11,8 +11,8 @@
     "build:js": "tsc -b tsconfig.build.json --force",
     "dev": "tsc -b tsconfig.build.json --force --watch",
     "build": "pnpm build:bin && pnpm build:js",
-    "test": "node --test 'tests/**.test.mjs'",
-    "test:update": "node --test --test-update-snapshots 'tests/**.test.mjs'"
+    "test": "rstest run",
+    "test:update": "rstest run -u"
   },
   "files": [
     "bin/rslint.cjs"

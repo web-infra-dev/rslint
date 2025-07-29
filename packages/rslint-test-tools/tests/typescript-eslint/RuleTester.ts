@@ -1,8 +1,7 @@
 // Forked and modified from https://github.com/typescript-eslint/typescript-eslint/blob/16c344ec7d274ea542157e0f19682dd1930ab838/packages/rule-tester/src/RuleTester.ts#L4
 
 import path from 'node:path';
-import test from 'node:test';
-import util from 'node:util';
+import { test, describe, expect } from '@rstest/core';
 import { lint, type Diagnostic } from '@rslint/core';
 
 import assert from 'node:assert';
@@ -77,14 +76,14 @@ export class RuleTester {
       }[];
     },
   ) {
-    test(ruleName, async () => {
+    describe(ruleName, async () => {
       let cwd = path.resolve(import.meta.dirname, './fixtures');
       const config = path.resolve(
         import.meta.dirname,
         './fixtures/rslint.json',
       );
       let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
-      await test('valid', async () => {
+      test('valid', async () => {
         for (const code of cases.valid) {
           const diags = await lint({
             config,
@@ -102,7 +101,7 @@ export class RuleTester {
           );
         }
       });
-      await test('invalid', async t => {
+      test('invalid', async t => {
         for (const { errors, code } of cases.invalid) {
           const diags = await lint({
             config,
@@ -114,7 +113,7 @@ export class RuleTester {
               [ruleName]: 'error',
             },
           });
-          t.assert.snapshot(diags);
+          expect(diags).toMatchSnapshot();
           assert(
             diags.diagnostics?.length > 0,
             `Expected diagnostics for invalid case`,

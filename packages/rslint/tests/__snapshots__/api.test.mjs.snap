@@ -1,0 +1,66 @@
+// Rstest Snapshot v1
+
+exports[`lint api > diag snapshot 1`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/index.ts",
+      "message": "Unsafe member access .b on an \`any\` value.",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 2,
+        },
+        "start": {
+          "column": 3,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-unsafe-member-access",
+    },
+    {
+      "filePath": "src/index.ts",
+      "message": "Unsafe member access .c on an \`any\` value.",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-unsafe-member-access",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 40,
+}
+`;
+
+exports[`lint api > virtual file support 1`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unsafe member access .b on an \`any\` value.",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 23,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-unsafe-member-access",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 40,
+}
+`;

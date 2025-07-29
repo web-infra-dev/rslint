@@ -30,7 +30,8 @@
     "prettier": "3.5.0",
     "typescript": "5.8.3",
     "@rslint/core": "workspace:*",
-    "zx": "8.7.1"
+    "zx": "8.7.1",
+    "@rstest/core": "^0.0.10"
   },
   "packageManager": "pnpm@10.13.1",
   "engines": {
