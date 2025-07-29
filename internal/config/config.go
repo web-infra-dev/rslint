@@ -1,6 +1,11 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/typescript-eslint/rslint/internal/rule"
 	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
 	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
@@ -51,6 +56,7 @@ type RslintConfig []ConfigEntry
 type ConfigEntry struct {
 	Language        string           `json:"language"`
 	Files           []string         `json:"files"`
+	Ignores         []string         `json:"ignores,omitempty"` // List of file patterns to ignore
 	LanguageOptions *LanguageOptions `json:"languageOptions,omitempty"`
 	Rules           Rules            `json:"rules"`
 	Plugins         []string         `json:"plugins,omitempty"` // List of plugin names
@@ -144,25 +150,13 @@ func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConf
 	enabledRules := make(map[string]*RuleConfig)
 
 	for _, entry := range config {
-		// Check if the file matches the files pattern
-		matches := false
-		if len(entry.Files) == 0 {
-			// If no files pattern specified, match all files
-			matches = true
-		} else {
-			for _, pattern := range entry.Files {
-				// Simple pattern matching - for now just match all TypeScript files
-				if pattern == "**/*.ts" || pattern == "**/*.tsx" {
-					matches = true
-					break
-				}
-				if pattern == "*" || pattern == "**/*" {
-					matches = true
-					break
-				}
-				// Add more sophisticated pattern matching here if needed
-			}
+		// First check if the file should be ignored
+		if isFileIgnored(filePath, entry.Ignores) {
+			continue // Skip this config entry for ignored files
 		}
+
+		// Check if the file matches the files pattern
+		matches := true
 
 		if matches {
 
@@ -265,4 +259,67 @@ func getAllTypeScriptEslintPluginRules() []rule.Rule {
 		rules = append(rules, rule)
 	}
 	return rules
+}
+
+// isFileIgnored checks if a file should be ignored based on ignore patterns
+func isFileIgnored(filePath string, ignorePatterns []string) bool {
+	// Get current working directory for relative path resolution
+	cwd, err := os.Getwd()
+	if err != nil {
+		// If we can't get cwd, fall back to simple matching
+		return isFileIgnoredSimple(filePath, ignorePatterns)
+	}
+
+	// Normalize the file path relative to cwd
+	normalizedPath := normalizePath(filePath, cwd)
+
+	for _, pattern := range ignorePatterns {
+		// Try matching against normalized path
+		if matched, err := doublestar.PathMatch(pattern, normalizedPath); err == nil && matched {
+			return true
+		}
+
+		// Also try matching against original path for absolute patterns
+		if normalizedPath != filePath {
+			if matched, err := doublestar.PathMatch(pattern, filePath); err == nil && matched {
+				return true
+			}
+		}
+
+		// Try Unix-style path for cross-platform compatibility
+		unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
+		if unixPath != normalizedPath {
+			if matched, err := doublestar.PathMatch(pattern, unixPath); err == nil && matched {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// normalizePath converts file path to be relative to cwd for consistent matching
+func normalizePath(filePath, cwd string) string {
+	cleanPath := filepath.Clean(filePath)
+
+	// If absolute path, try to make it relative to working directory
+	if filepath.IsAbs(cleanPath) {
+		if relPath, err := filepath.Rel(cwd, cleanPath); err == nil {
+			// Only use relative path if it doesn't go outside the working directory
+			if !strings.HasPrefix(relPath, "..") {
+				return relPath
+			}
+		}
+	}
+
+	return cleanPath
+}
+
+// isFileIgnoredSimple provides fallback matching when cwd is unavailable
+func isFileIgnoredSimple(filePath string, ignorePatterns []string) bool {
+	for _, pattern := range ignorePatterns {
+		if matched, err := doublestar.PathMatch(pattern, filePath); err == nil && matched {
+			return true
+		}
+	}
+	return false
 }
