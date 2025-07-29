@@ -999,16 +999,9 @@ func mergeIntoExistingTypeImport(sourceFile *ast.SourceFile, existingImport *ast
 // isIdentifierShadowedByTypeParameter checks if an identifier is shadowed by a type parameter
 // in any enclosing scope (type alias, interface, class, function, etc.)
 func isIdentifierShadowedByTypeParameter(node *ast.Node, identifierName string) bool {
-	// Skip this expensive check for performance - this is a conservative approach
-	// that may miss some edge cases but prevents timeouts
-	// In practice, type parameter shadowing is relatively rare
-	return false
-	
-	// Original logic commented out to prevent performance issues:
-	/*
 	current := node.Parent
 	// Add a safety limit to prevent infinite loops
-	maxDepth := 5 // Further reduced
+	maxDepth := 5
 	depth := 0
 	
 	for current != nil && depth < maxDepth {
@@ -1020,7 +1013,7 @@ func isIdentifierShadowedByTypeParameter(node *ast.Node, identifierName string) 
 			return false
 		}
 		
-		// Only check immediate parent contexts to avoid deep traversal
+		// Check for type parameters in different contexts
 		var typeParameters *ast.TypeParameterList
 
 		switch current.Kind {
@@ -1029,28 +1022,27 @@ func isIdentifierShadowedByTypeParameter(node *ast.Node, identifierName string) 
 			typeParameters = typeAlias.TypeParameters
 		case ast.KindInterfaceDeclaration:
 			typeParameters = current.AsInterfaceDeclaration().TypeParameters
-		case ast.KindClassDeclaration, ast.KindClassExpression:
+		case ast.KindClassDeclaration:
 			typeParameters = current.ClassLikeData().TypeParameters
-		case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction, ast.KindMethodDeclaration:
+		case ast.KindFunctionDeclaration, ast.KindMethodDeclaration, ast.KindConstructor:
 			typeParameters = current.FunctionLikeData().TypeParameters
 		}
 
-		if typeParameters != nil && len(typeParameters.Nodes) > 0 {
-			// Limit the number of type parameters we check
-			maxParams := 3
+		// Check if the identifier is shadowed by any type parameter
+		if typeParameters != nil && typeParameters.Nodes != nil {
+			// Limit type parameter checks for performance
+			maxTypeParams := 10
 			checked := 0
 			for _, typeParam := range typeParameters.Nodes {
-				if checked >= maxParams {
+				if checked >= maxTypeParams {
 					break
 				}
 				checked++
 				
 				if ast.IsTypeParameterDeclaration(typeParam) {
 					typeParamDecl := typeParam.AsTypeParameter()
-					if typeParamDecl.Name() != nil {
-						paramName := typeParamDecl.Name().AsIdentifier().Text
-						if paramName == identifierName {
-							// This identifier is shadowed by a type parameter
+					if typeParamDecl.Name() != nil && ast.IsIdentifier(typeParamDecl.Name()) {
+						if typeParamDecl.Name().AsIdentifier().Text == identifierName {
 							return true
 						}
 					}
@@ -1060,9 +1052,8 @@ func isIdentifierShadowedByTypeParameter(node *ast.Node, identifierName string) 
 
 		current = current.Parent
 	}
-
+	
 	return false
-	*/
 }
 
 // analyzeShadowing analyzes which imports are shadowed by local declarations
