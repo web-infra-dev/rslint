@@ -110,7 +110,7 @@ export class RuleTester {
         }
       });
       await test('invalid', async t => {
-        const validTestCases = cases.invalid.filter(testCase => testCase.options === undefined);
+        const validTestCases = cases.invalid.filter((testCase: any) => testCase.options === undefined);
         
         if (validTestCases.length === 0) {
           console.log('Skipping all invalid test cases - they all have options');
