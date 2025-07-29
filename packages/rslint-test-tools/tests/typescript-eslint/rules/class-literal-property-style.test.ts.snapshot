@@ -33,11 +33,11 @@ exports[`class-literal-property-style > invalid 2`] = `
       "range": {
         "start": {
           "line": 3,
-          "column": 7
+          "column": 14
         },
         "end": {
           "line": 3,
-          "column": 9
+          "column": 16
         }
       }
     }
