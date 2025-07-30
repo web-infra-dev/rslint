@@ -15,14 +15,13 @@ const PARSER_OPTION_COMBOS = [
   },
 ] as const;
 
-describe.for(PARSER_OPTION_COMBOS)(
-  'experimentalDecorators: $experimentalDecorators + emitDecoratorMetadata: $emitDecoratorMetadata',
-  parserOptions => {
-    const ruleTester = new RuleTester({
-      languageOptions: { parserOptions },
-    });
+// Convert describe.for to regular describe blocks since Node.js test runner doesn't support it
+PARSER_OPTION_COMBOS.forEach(parserOptions => {
+  const ruleTester = new RuleTester({
+    languageOptions: { parserOptions },
+  });
 
-    ruleTester.run('consistent-type-imports', {
+  ruleTester.run('consistent-type-imports', {
       valid: [
         `
           import Foo from 'foo';
@@ -1949,17 +1948,16 @@ function test(foo: Foo) {}
 );
 
 // the special ignored config case
-describe('experimentalDecorators: true + emitDecoratorMetadata: true', () => {
-  const ruleTester = new RuleTester({
-    languageOptions: {
-      parserOptions: {
-        emitDecoratorMetadata: true,
-        experimentalDecorators: true,
-      },
+const ruleTesterSpecial = new RuleTester({
+  languageOptions: {
+    parserOptions: {
+      emitDecoratorMetadata: true,
+      experimentalDecorators: true,
     },
-  });
+  },
+});
 
-  ruleTester.run('consistent-type-imports', rule, {
+ruleTesterSpecial.run('consistent-type-imports', {
     valid: [
       `
         import Foo from 'foo';
@@ -2123,4 +2121,3 @@ describe('experimentalDecorators: true + emitDecoratorMetadata: true', () => {
       },
     ],
   });
-});
