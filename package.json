@@ -24,14 +24,25 @@
     "test": "pnpm -r test",
     "test:go": "go test ./internal/...",
     "typecheck": "pnpm tsc -b tsconfig.json",
-    "lint": "rslint"
+    "lint": "rslint",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "@rslint/core": "workspace:*",
+    "@rstest/core": "^0.0.10",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.2",
     "prettier": "3.5.0",
     "typescript": "5.8.3",
-    "@rslint/core": "workspace:*",
-    "zx": "8.7.1",
-    "@rstest/core": "^0.0.10"
+    "zx": "8.7.1"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "prettier --write"
+    ],
+    "*.{json,css,scss,md,yaml,yml}": [
+      "prettier --write"
+    ]
   },
   "packageManager": "pnpm@10.13.1",
   "engines": {
