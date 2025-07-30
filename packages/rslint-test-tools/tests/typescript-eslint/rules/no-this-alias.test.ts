@@ -2,7 +2,6 @@ import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
 
-
 const idError = {
   messageId: 'thisAssignment' as const,
   type: AST_NODE_TYPES.Identifier,

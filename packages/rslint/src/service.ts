@@ -81,16 +81,18 @@ export class RSLintService {
     this.chunks = [];
     this.chunkSize = 0;
     this.expectedSize = null;
-    
+
     // Handle process errors
     this.process.on('error', err => {
       console.error('RSLint process error:', err);
       this.rejectAllPending(err);
     });
-    
+
     this.process.on('exit', (code, signal) => {
       if (code !== 0) {
-        const err = new Error(`RSLint process exited with code ${code}, signal ${signal}`);
+        const err = new Error(
+          `RSLint process exited with code ${code}, signal ${signal}`,
+        );
         console.error(err.message);
         this.rejectAllPending(err);
       }
@@ -184,7 +186,7 @@ export class RSLintService {
       pending.resolve(data);
     }
   }
-  
+
   /**
    * Reject all pending messages
    */

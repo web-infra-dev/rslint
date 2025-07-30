@@ -31,8 +31,8 @@ globalThis.describe = Object.assign(
       for (const item of array) {
         callback(item);
       }
-    }
-  }
+    },
+  },
 );
 
 interface TsDiagnostic {
