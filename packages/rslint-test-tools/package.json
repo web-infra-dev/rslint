@@ -14,7 +14,8 @@
   "description": "",
   "devDependencies": {
     "@types/node": "24.0.14",
-    "@rslint/core": "workspace:*"
+    "@rslint/core": "workspace:*",
+    "@typescript-eslint/rule-tester": "workspace:*"
   },
   "publishConfig": {
     "access": "public"

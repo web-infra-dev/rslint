@@ -63,8 +63,19 @@ function checkDiagnosticEqual(
   }
 }
 
+interface RuleTesterOptions {
+  languageOptions?: {
+    parserOptions?: {
+      project?: string;
+      tsconfigRootDir?: string;
+    };
+  };
+}
 export class RuleTester {
-  constructor(options: any) {}
+  options: RuleTesterOptions;
+  constructor(options: RuleTesterOptions) {
+    this.options = options;
+  }
   public run(
     ruleName: string,
     cases: {
@@ -82,11 +93,10 @@ export class RuleTester {
     },
   ) {
     describe(ruleName, () => {
-      let cwd = path.resolve(import.meta.dirname, './fixtures');
-      const config = path.resolve(
-        import.meta.dirname,
-        './fixtures/rslint.json',
-      );
+      let cwd =
+        this.options.languageOptions?.parserOptions?.tsconfigRootDir ||
+        process.cwd();
+      const config = path.resolve(cwd, './rslint.json');
       let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
       // test whether case has only
       let hasOnly =
@@ -181,10 +191,6 @@ export class RuleTester {
       });
     });
   }
-}
-
-export function getFixturesRootDir(): string {
-  return path.join(import.meta.dirname, 'fixtures');
 }
 
 /**

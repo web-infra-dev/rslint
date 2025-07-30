@@ -13,4 +13,8 @@ export async function lint(options: LintOptions): Promise<LintResponse> {
   return result;
 }
 
-export { type Diagnostic } from './service.ts';
+export {
+  type Diagnostic,
+  type LintOptions,
+  type LintResponse,
+} from './service.ts';
