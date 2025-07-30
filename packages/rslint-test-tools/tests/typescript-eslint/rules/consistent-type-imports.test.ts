@@ -1,34 +1,29 @@
-import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester } from '../RuleTester.ts';
 
-const rootPath = getFixturesRootDir();
-const ruleTester = new RuleTester({
-  languageOptions: {
-    parserOptions: {
-      project: './tsconfig.json',
-      tsconfigRootDir: rootPath,
-    },
+// Rule would normally be imported but we're testing rslint's implementation
+// import rule from '../../src/rules/consistent-type-imports';
+
+const PARSER_OPTION_COMBOS = [
+  {
+    emitDecoratorMetadata: false,
+    experimentalDecorators: false,
   },
-});
+  {
+    emitDecoratorMetadata: true,
+    experimentalDecorators: false,
+  },
+  {
+    emitDecoratorMetadata: false,
+    experimentalDecorators: true,
+  },
+] as const;
 
-// Module declarations for test cases
-// TypeScript complains about these not being real modules, but they're just for testing
-// declare module 'foo' {
-//   export default class Foo {
-//     constructor();
-//   }
-//   export interface A {}
-//   export interface B {}
-//   export interface C {}
-//   export type Type = any;
-// }
-
-// declare module 'bar' {
-//   export default class Bar {
-//     constructor();
-//   }
-//   export interface A {}
-//   export interface B {}
-// }
+describe.for(PARSER_OPTION_COMBOS)(
+  'experimentalDecorators: $experimentalDecorators + emitDecoratorMetadata: $emitDecoratorMetadata',
+  parserOptions => {
+    const ruleTester = new RuleTester({
+      languageOptions: { parserOptions },
+    });
 
     ruleTester.run('consistent-type-imports', {
       valid: [
@@ -1926,7 +1921,7 @@ import { Foo, Bar } from 'foo';
 function test(foo: Foo) {}
           `,
           errors: [
-            { column: 1, line: 5, messageId: 'typeOverValue' },
+            { column: 1, line: 3, messageId: 'someImportsAreOnlyTypes' },
           ],
           output: `
 import 'foo';
@@ -1942,7 +1937,7 @@ import { Foo, Bar } from 'foo';
 function test(foo: Foo) {}
           `,
           errors: [
-            { column: 1, line: 5, messageId: 'typeOverValue' },
+            { column: 1, line: 3, messageId: 'someImportsAreOnlyTypes' },
           ],
           output: `
 import {} from 'foo';
@@ -1953,4 +1948,182 @@ function test(foo: Foo) {}
         },
       ],
     });
+  },
+);
 
+// the special ignored config case
+describe('experimentalDecorators: true + emitDecoratorMetadata: true', () => {
+  const ruleTester = new RuleTester({
+    languageOptions: {
+      parserOptions: {
+        emitDecoratorMetadata: true,
+        experimentalDecorators: true,
+      },
+    },
+  });
+
+  ruleTester.run('consistent-type-imports', rule, {
+    valid: [
+      `
+        import Foo from 'foo';
+        @deco
+        class A {
+          constructor(foo: Foo) {}
+        }
+      `,
+
+      `
+        import Foo from 'foo';
+        class A {
+          @deco
+          foo: Foo;
+        }
+      `,
+
+      `
+        import Foo from 'foo';
+        class A {
+          @deco
+          foo(foo: Foo) {}
+        }
+      `,
+
+      `
+        import Foo from 'foo';
+        class A {
+          @deco
+          foo(): Foo {}
+        }
+      `,
+
+      `
+        import Foo from 'foo';
+        class A {
+          foo(@deco foo: Foo) {}
+        }
+      `,
+
+      `
+        import Foo from 'foo';
+        class A {
+          @deco
+          set foo(value: Foo) {}
+        }
+      `,
+
+      `
+        import Foo from 'foo';
+        class A {
+          @deco
+          get foo() {}
+
+          set foo(value: Foo) {}
+        }
+      `,
+
+      `
+        import Foo from 'foo';
+        class A {
+          @deco
+          get foo() {}
+
+          set ['foo'](value: Foo) {}
+        }
+      `,
+
+      `
+        import type { Foo } from 'foo';
+        const key = 'k';
+        class A {
+          @deco
+          get [key]() {}
+
+          set [key](value: Foo) {}
+        }
+      `,
+
+      `
+        import * as foo from 'foo';
+        @deco
+        class A {
+          constructor(foo: foo.Foo) {}
+        }
+      `,
+
+      // https://github.com/typescript-eslint/typescript-eslint/issues/7327
+      `
+        import type { ClassA } from './classA';
+
+        export class ClassB {
+          public constructor(node: ClassA) {}
+        }
+      `,
+
+      `
+        import type Foo from 'foo';
+        @deco
+        class A {
+          constructor(foo: Foo) {}
+        }
+      `,
+      `
+        import type { Foo } from 'foo';
+        @deco
+        class A {
+          constructor(foo: Foo) {}
+        }
+      `,
+      `
+        import type { Type } from 'foo';
+        import { Foo, Bar } from 'foo';
+        @deco
+        class A {
+          constructor(foo: Foo) {}
+        }
+        type T = Bar;
+      `,
+      `
+        import { V } from 'foo';
+        import type { Foo, Bar, T } from 'foo';
+        @deco
+        class A {
+          constructor(foo: Foo) {}
+          foo(@deco bar: Bar) {}
+        }
+      `,
+      `
+        import type { Foo, T } from 'foo';
+        import { V } from 'foo';
+        @deco
+        class A {
+          constructor(foo: Foo) {}
+        }
+      `,
+      `
+        import type * as Type from 'foo';
+        @deco
+        class A {
+          constructor(foo: Type.Foo) {}
+        }
+      `,
+    ],
+    invalid: [
+      {
+        code: `
+          import Foo from 'foo';
+          export type T = Foo;
+        `,
+        errors: [
+          {
+            line: 2,
+            messageId: 'typeOverValue',
+          },
+        ],
+        output: `
+          import type Foo from 'foo';
+          export type T = Foo;
+        `,
+      },
+    ],
+  });
+});
