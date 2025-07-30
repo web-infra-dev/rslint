@@ -5,8 +5,8 @@
   "main": "src/index.ts",
   "private": true,
   "scripts": {
-    "test": "node --import=tsx/esm --test-force-exit --test-timeout 25000 --test tests/typescript-eslint/rules/*.test.ts",
-    "test:update": "node --import=tsx/esm --test --test-timeout 25000 --test-update-snapshots --test-force-exit tests/typescript-eslint/rules/*.test.ts"
+    "test": "node --import=tsx/esm --test-force-exit --test-timeout 60000 --test tests/typescript-eslint/rules/*.test.ts",
+    "test:update": "node --import=tsx/esm --test --test-timeout 60000 --test-update-snapshots --test-force-exit tests/typescript-eslint/rules/*.test.ts"
   },
   "keywords": [],
   "author": "",

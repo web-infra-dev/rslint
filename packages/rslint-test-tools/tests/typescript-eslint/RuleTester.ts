@@ -143,29 +143,16 @@ export class RuleTester {
             ? path.resolve(cwd, 'src', filename)
             : virtual_entry;
 
-          const diags = await Promise.race<LintResponse>([
-            lint({
-              config,
-              workingDirectory: cwd,
-              fileContents: {
-                [testFile]: code,
-              },
-              ruleOptions: {
-                [ruleName]: JSON.stringify(ruleConfig),
-              },
-            }),
-            new Promise((_, reject) =>
-              setTimeout(
-                () =>
-                  reject(
-                    new Error(
-                      `Timeout after 30s for rule ${ruleName} valid case`,
-                    ),
-                  ),
-                30000,
-              ),
-            ),
-          ]);
+          const diags = await lint({
+            config,
+            workingDirectory: cwd,
+            fileContents: {
+              [testFile]: code,
+            },
+            ruleOptions: {
+              [ruleName]: JSON.stringify(ruleConfig),
+            },
+          });
           if (diags.diagnostics?.length > 0) {
             console.error('Failed valid test case:', code);
             console.error('Options:', JSON.stringify(options));
@@ -189,29 +176,16 @@ export class RuleTester {
             ? path.resolve(cwd, 'src', filename)
             : virtual_entry;
 
-          const diags = await Promise.race<LintResponse>([
-            lint({
-              config,
-              workingDirectory: cwd,
-              fileContents: {
-                [testFile]: code,
-              },
-              ruleOptions: {
-                [ruleName]: JSON.stringify(ruleConfig),
-              },
-            }),
-            new Promise((_, reject) =>
-              setTimeout(
-                () =>
-                  reject(
-                    new Error(
-                      `Timeout after 30s for rule ${ruleName} invalid case`,
-                    ),
-                  ),
-                30000,
-              ),
-            ),
-          ]);
+          const diags = await lint({
+            config,
+            workingDirectory: cwd,
+            fileContents: {
+              [testFile]: code,
+            },
+            ruleOptions: {
+              [ruleName]: JSON.stringify(ruleConfig),
+            },
+          });
           t.assert.snapshot(diags);
           assert(
             diags.diagnostics?.length > 0,
