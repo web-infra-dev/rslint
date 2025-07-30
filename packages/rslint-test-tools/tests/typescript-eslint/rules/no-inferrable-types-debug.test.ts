@@ -11,8 +11,6 @@ const ruleTester = new RuleTester({
 
 // Test just the first few valid cases to see where it hangs
 ruleTester.run('no-inferrable-types', {
-  valid: [
-    'const a = 10n;',
-  ],
+  valid: ['const a = 10n;'],
   invalid: [],
 });

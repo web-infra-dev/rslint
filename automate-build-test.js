@@ -1,7 +1,16 @@
 #!/usr/bin/env node
 
 const { spawn } = require('child_process');
-const { readdir, readFile, writeFile, mkdir, unlink, access, rm, chmod } = require('fs/promises');
+const {
+  readdir,
+  readFile,
+  writeFile,
+  mkdir,
+  unlink,
+  access,
+  rm,
+  chmod,
+} = require('fs/promises');
 const { join, basename, dirname } = require('path');
 const https = require('https');
 const { randomBytes } = require('crypto');
@@ -14,7 +23,8 @@ const BUILD_COMMAND = 'pnpm';
 const BUILD_ARGS = ['-r', 'build'];
 const TEST_TIMEOUT = 120000; // 120 seconds (2 minutes)
 const TEST_DIR = 'packages/rslint-test-tools/tests/typescript-eslint/rules';
-const TSLINT_BASE_URL = 'https://raw.githubusercontent.com/typescript-eslint/typescript-eslint/main';
+const TSLINT_BASE_URL =
+  'https://raw.githubusercontent.com/typescript-eslint/typescript-eslint/main';
 const MAX_FIX_ATTEMPTS = 500; // Maximum attempts to fix a single test
 
 // Concurrent execution configuration
@@ -43,18 +53,23 @@ class WorkQueue {
   async addWork(items) {
     for (let i = 0; i < items.length; i++) {
       const workFile = join(this.workDir, `work_${i}.json`);
-      await writeFile(workFile, JSON.stringify({
-        id: i,
-        test: items[i],
-        status: 'pending',
-        createdAt: Date.now()
-      }));
+      await writeFile(
+        workFile,
+        JSON.stringify({
+          id: i,
+          test: items[i],
+          status: 'pending',
+          createdAt: Date.now(),
+        }),
+      );
     }
   }
 
   async claimWork(workerId) {
     const files = await readdir(this.workDir);
-    const workFiles = files.filter(f => f.startsWith('work_') && f.endsWith('.json'));
+    const workFiles = files.filter(
+      f => f.startsWith('work_') && f.endsWith('.json'),
+    );
 
     for (const file of workFiles) {
       const lockFile = join(this.lockDir, `${file}.lock`);
@@ -109,17 +124,30 @@ class WorkQueue {
 
   async getProgress() {
     const files = await readdir(this.workDir);
-    const workFiles = files.filter(f => f.startsWith('work_') && f.endsWith('.json'));
+    const workFiles = files.filter(
+      f => f.startsWith('work_') && f.endsWith('.json'),
+    );
 
-    let pending = 0, claimed = 0, completed = 0, failed = 0;
+    let pending = 0,
+      claimed = 0,
+      completed = 0,
+      failed = 0;
 
     for (const file of workFiles) {
       const work = JSON.parse(await readFile(join(this.workDir, file), 'utf8'));
       switch (work.status) {
-        case 'pending': pending++; break;
-        case 'claimed': claimed++; break;
-        case 'completed': completed++; break;
-        case 'failed': failed++; break;
+        case 'pending':
+          pending++;
+          break;
+        case 'claimed':
+          claimed++;
+          break;
+        case 'completed':
+          completed++;
+          break;
+        case 'failed':
+          failed++;
+          break;
       }
     }
 
@@ -146,7 +174,7 @@ const colors = {
   blue: '\x1b[34m',
   magenta: '\x1b[35m',
   cyan: '\x1b[36m',
-  white: '\x1b[37m'
+  white: '\x1b[37m',
 };
 
 function formatTime() {
@@ -185,7 +213,9 @@ function log(message, type = 'info') {
       break;
   }
 
-  console.log(`${colors.dim}${timestamp}${colors.reset} ${color}${prefix} ${message}${colors.reset}`);
+  console.log(
+    `${colors.dim}${timestamp}${colors.reset} ${color}${prefix} ${message}${colors.reset}`,
+  );
 }
 
 function logProgress(message, data = {}) {
@@ -194,7 +224,10 @@ function logProgress(message, data = {}) {
     if (data.phase === 'claude-text' || data.phase === 'claude-text-final') {
       log(`Claude: ${data.content}`, 'claude');
       return;
-    } else if (data.phase === 'claude-code' || data.phase === 'claude-code-final') {
+    } else if (
+      data.phase === 'claude-code' ||
+      data.phase === 'claude-code-final'
+    ) {
       console.log(`${colors.dim}--- Claude Code Block ---${colors.reset}`);
       console.log(data.content);
       console.log(`${colors.dim}--- End Code Block ---${colors.reset}`);
@@ -211,14 +244,26 @@ function logProgress(message, data = {}) {
   // Regular progress messages
   if (data.phase === 'go-test-start') {
     console.log('');
-    log(`Testing Go package ${data.packageName} (attempt ${data.attempt}/${data.maxAttempts})`, 'progress');
+    log(
+      `Testing Go package ${data.packageName} (attempt ${data.attempt}/${data.maxAttempts})`,
+      'progress',
+    );
   } else if (data.phase === 'go-test-pass') {
-    log(`✓ Go package ${data.packageName} passed in ${data.durationMs}ms`, 'success');
+    log(
+      `✓ Go package ${data.packageName} passed in ${data.durationMs}ms`,
+      'success',
+    );
   } else if (data.phase === 'go-test-fail') {
-    log(`✗ Go package ${data.packageName} failed with exit code ${data.exitCode}`, 'error');
+    log(
+      `✗ Go package ${data.packageName} failed with exit code ${data.exitCode}`,
+      'error',
+    );
   } else if (data.phase === 'test-start') {
     console.log('');
-    log(`Testing ${data.testName} (attempt ${data.attempt}/${data.maxAttempts})`, 'progress');
+    log(
+      `Testing ${data.testName} (attempt ${data.attempt}/${data.maxAttempts})`,
+      'progress',
+    );
   } else if (data.phase === 'test-pass') {
     log(`✓ ${data.testName} passed in ${data.durationMs}ms`, 'success');
   } else if (data.phase === 'test-fail') {
@@ -228,14 +273,19 @@ function logProgress(message, data = {}) {
       let failureDetails = [];
       if (data.goFailed) failureDetails.push('Go test');
       if (data.tsFailed) failureDetails.push('TypeScript test');
-      log(`✗ ${data.testName} failed (${failureDetails.join(' and ')})`, 'error');
+      log(
+        `✗ ${data.testName} failed (${failureDetails.join(' and ')})`,
+        'error',
+      );
     }
   } else if (data.phase === 'script-complete') {
     console.log('\n' + '='.repeat(60));
     log('Automation Complete', 'info');
     log(`Total Duration: ${data.totalDurationMinutes} minutes`, 'info');
-    log(`Tests: ${data.testResults.passed}/${data.testResults.total} passed (${data.testResults.successRate}%)`,
-        data.testResults.failed > 0 ? 'warning' : 'success');
+    log(
+      `Tests: ${data.testResults.passed}/${data.testResults.total} passed (${data.testResults.successRate}%)`,
+      data.testResults.failed > 0 ? 'warning' : 'success',
+    );
     console.log('='.repeat(60));
   } else {
     log(message, 'info');
@@ -244,20 +294,24 @@ function logProgress(message, data = {}) {
 
 async function fetchFromGitHub(url) {
   return new Promise((resolve, reject) => {
-    https.get(url, (res) => {
-      let data = '';
-      res.on('data', (chunk) => { data += chunk; });
-      res.on('end', () => {
-        if (res.statusCode === 200) {
-          resolve(data);
-        } else {
-          resolve(null); // Return null if not found
-        }
+    https
+      .get(url, res => {
+        let data = '';
+        res.on('data', chunk => {
+          data += chunk;
+        });
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            resolve(data);
+          } else {
+            resolve(null); // Return null if not found
+          }
+        });
+      })
+      .on('error', err => {
+        log(`GitHub fetch error: ${err.message}`, 'error');
+        resolve(null);
       });
-    }).on('error', (err) => {
-      log(`GitHub fetch error: ${err.message}`, 'error');
-      resolve(null);
-    });
   });
 }
 
@@ -276,7 +330,7 @@ async function fetchOriginalRule(ruleName) {
   return {
     ruleName: cleanRuleName,
     ruleContent,
-    testContent
+    testContent,
   };
 }
 
@@ -285,31 +339,33 @@ async function runCommand(command, args, options = {}) {
     const child = spawn(command, args, {
       stdio: 'pipe',
       cwd: __dirname,
-      ...options
+      ...options,
     });
 
     let stdout = '';
     let stderr = '';
 
-    child.stdout?.on('data', (data) => {
+    child.stdout?.on('data', data => {
       stdout += data.toString();
     });
 
-    child.stderr?.on('data', (data) => {
+    child.stderr?.on('data', data => {
       stderr += data.toString();
     });
 
-    const timeout = options.timeout ? setTimeout(() => {
-      child.kill('SIGKILL');
-      reject(new Error(`Command timed out after ${options.timeout}ms`));
-    }, options.timeout) : null;
+    const timeout = options.timeout
+      ? setTimeout(() => {
+          child.kill('SIGKILL');
+          reject(new Error(`Command timed out after ${options.timeout}ms`));
+        }, options.timeout)
+      : null;
 
-    child.on('close', (code) => {
+    child.on('close', code => {
       if (timeout) clearTimeout(timeout);
       resolve({ code, stdout, stderr });
     });
 
-    child.on('error', (error) => {
+    child.on('error', error => {
       if (timeout) clearTimeout(timeout);
       reject(error);
     });
@@ -317,22 +373,25 @@ async function runCommand(command, args, options = {}) {
 }
 
 async function runClaudeWithStreaming(prompt) {
-  return new Promise((resolve) => {
+  return new Promise(resolve => {
     // Use same flags as porter: -p, --verbose, --output-format stream-json
     const settingsFile = join(__dirname, '.claude', 'settings.local.json');
- const args = [
+    const args = [
       '-p',
       '--verbose',
-      '--output-format', 'stream-json',
-      '--model', 'claude-sonnet-4-20250514',
-      '--max-turns', '500',
+      '--output-format',
+      'stream-json',
+      '--model',
+      'claude-sonnet-4-20250514',
+      '--max-turns',
+      '500',
       // '--settings', settingsFile,
-      '--dangerously-skip-permissions'
+      '--dangerously-skip-permissions',
     ];
 
     const child = spawn('claude', args, {
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env }
+      env: { ...process.env },
     });
 
     let fullOutput = '';
@@ -340,7 +399,7 @@ async function runClaudeWithStreaming(prompt) {
     let jsonBuffer = '';
 
     // Process stdout stream for JSON
-    child.stdout.on('data', (data) => {
+    child.stdout.on('data', data => {
       const chunk = data.toString();
       fullOutput += chunk;
       jsonBuffer += chunk;
@@ -367,7 +426,9 @@ async function runClaudeWithStreaming(prompt) {
                 const lines = content.text.split('\n');
                 for (const line of lines) {
                   if (line.trim()) {
-                    process.stdout.write(`${colors.magenta}🤖 Claude: ${line}${colors.reset}\n`);
+                    process.stdout.write(
+                      `${colors.magenta}🤖 Claude: ${line}${colors.reset}\n`,
+                    );
                   }
                 }
               } else if (content.type === 'tool_use') {
@@ -387,17 +448,27 @@ async function runClaudeWithStreaming(prompt) {
             for (const content of json.message.content) {
               if (content.type === 'tool_result') {
                 const resultContent = content.content || '';
-                const resultStr = typeof resultContent === 'string' ? resultContent : JSON.stringify(resultContent);
+                const resultStr =
+                  typeof resultContent === 'string'
+                    ? resultContent
+                    : JSON.stringify(resultContent);
                 const lines = resultStr.split('\n');
                 const maxLines = 10;
                 const displayLines = lines.slice(0, maxLines);
 
-                log(`Tool result${lines.length > maxLines ? ` (showing first ${maxLines} lines)` : ''}:`, 'success');
+                log(
+                  `Tool result${lines.length > maxLines ? ` (showing first ${maxLines} lines)` : ''}:`,
+                  'success',
+                );
                 for (const line of displayLines) {
                   console.log(colors.dim + '   ' + line + colors.reset);
                 }
                 if (lines.length > maxLines) {
-                  console.log(colors.dim + `   ... (${lines.length - maxLines} more lines)` + colors.reset);
+                  console.log(
+                    colors.dim +
+                      `   ... (${lines.length - maxLines} more lines)` +
+                      colors.reset,
+                  );
                 }
               }
             }
@@ -406,7 +477,10 @@ async function runClaudeWithStreaming(prompt) {
             if (json.subtype === 'success') {
               log('Claude completed successfully', 'success');
             } else if (json.subtype === 'error_max_turns') {
-              log(`Claude reached max turns (${json.num_turns} turns)`, 'warning');
+              log(
+                `Claude reached max turns (${json.num_turns} turns)`,
+                'warning',
+              );
             } else if (json.subtype?.includes('error')) {
               log(`Claude error (${json.subtype})`, 'error');
               if (json.result?.message) {
@@ -415,10 +489,12 @@ async function runClaudeWithStreaming(prompt) {
             }
 
             if (json.usage) {
-              log(`Tokens used: ${json.usage.input_tokens} in, ${json.usage.output_tokens} out`, 'info');
+              log(
+                `Tokens used: ${json.usage.input_tokens} in, ${json.usage.output_tokens} out`,
+                'info',
+              );
             }
           }
-
         } catch (e) {
           // Not valid JSON, might be partial data
           if (line.length > 0 && !line.startsWith('{')) {
@@ -429,7 +505,7 @@ async function runClaudeWithStreaming(prompt) {
       }
     });
 
-    child.stderr.on('data', (data) => {
+    child.stderr.on('data', data => {
       const error = data.toString();
       fullError += error;
       if (error.trim()) {
@@ -437,13 +513,15 @@ async function runClaudeWithStreaming(prompt) {
       }
     });
 
-    child.on('close', (code) => {
+    child.on('close', code => {
       // Process any remaining JSON buffer
       if (jsonBuffer.trim()) {
         try {
           const json = JSON.parse(jsonBuffer);
           if (json.delta?.text) {
-            process.stdout.write(`${colors.magenta}${json.delta.text}${colors.reset}\n`);
+            process.stdout.write(
+              `${colors.magenta}${json.delta.text}${colors.reset}\n`,
+            );
           }
         } catch (e) {
           // Not JSON, just log it
@@ -456,7 +534,7 @@ async function runClaudeWithStreaming(prompt) {
       resolve({
         code,
         stdout: fullOutput,
-        stderr: fullError
+        stderr: fullError,
       });
     });
 
@@ -467,7 +545,7 @@ async function runClaudeWithStreaming(prompt) {
       resolve({
         code: -1,
         stdout: fullOutput,
-        stderr: 'Process timed out after 5 minutes'
+        stderr: 'Process timed out after 5 minutes',
       });
     }, 900000); // 5 minutes
 
@@ -480,7 +558,13 @@ async function runClaudeWithStreaming(prompt) {
   });
 }
 
-async function fixRuleTestsWithClaude(ruleName, goTestResult, tsTestResult, originalSources = null, currentTestContent = null) {
+async function fixRuleTestsWithClaude(
+  ruleName,
+  goTestResult,
+  tsTestResult,
+  originalSources = null,
+  currentTestContent = null,
+) {
   let prompt = `Go into plan mode first to analyze these test failures and plan the fix, performing deep research into the problem and paying attention to the TypeScript versions as a reference but also carefully considering the Go environment.\n\n`;
 
   prompt += `Rule: ${ruleName}\n\n`;
@@ -548,7 +632,10 @@ IMPORTANT:
 - This script will handle re-running the tests after your fixes
 `;
 
-  log(`Sending rule test failures to Claude CLI for fixing: ${ruleName}`, 'info');
+  log(
+    `Sending rule test failures to Claude CLI for fixing: ${ruleName}`,
+    'info',
+  );
 
   try {
     const result = await runClaudeWithStreaming(prompt);
@@ -566,7 +653,12 @@ IMPORTANT:
   }
 }
 
-async function fixErrorWithClaudeCLI(errorOutput, command, originalSources = null, currentTestContent = null) {
+async function fixErrorWithClaudeCLI(
+  errorOutput,
+  command,
+  originalSources = null,
+  currentTestContent = null,
+) {
   let prompt = `Go into plan mode first to analyze this error and plan the fix, performing deep research into the problem and paying attention to the ts versions as a refernce but also carefully considering the go environment.\n\n`;
 
   prompt += `Error occurred:\n\n${errorOutput}\n\n`;
@@ -623,14 +715,14 @@ IMPORTANT:
 function chunkErrorOutput(errorOutput, numChunks) {
   const lines = errorOutput.split('\n');
   const chunks = [];
-  
+
   // Calculate lines per chunk
   const linesPerChunk = Math.ceil(lines.length / numChunks);
-  
+
   for (let i = 0; i < numChunks; i++) {
     const start = i * linesPerChunk;
     const end = Math.min(start + linesPerChunk, lines.length);
-    
+
     if (start < lines.length) {
       const chunkLines = lines.slice(start, end);
       if (chunkLines.length > 0) {
@@ -638,7 +730,7 @@ function chunkErrorOutput(errorOutput, numChunks) {
       }
     }
   }
-  
+
   return chunks;
 }
 
@@ -646,7 +738,9 @@ async function runBuild(concurrentMode = false, workerCount = DEFAULT_WORKERS) {
   log('Starting build process...', 'info');
 
   try {
-    const result = await runCommand(BUILD_COMMAND, BUILD_ARGS, { timeout: 120000 });
+    const result = await runCommand(BUILD_COMMAND, BUILD_ARGS, {
+      timeout: 120000,
+    });
 
     if (result.code === 0) {
       log('Build successful', 'success');
@@ -670,16 +764,25 @@ async function runBuild(concurrentMode = false, workerCount = DEFAULT_WORKERS) {
       const shouldChunk = errorLines > 100 && concurrentMode && workerCount > 1;
 
       if (shouldChunk) {
-        log(`Build error is large (${errorLines} lines), splitting into ${workerCount} chunks for parallel fixing...`, 'info');
-        
+        log(
+          `Build error is large (${errorLines} lines), splitting into ${workerCount} chunks for parallel fixing...`,
+          'info',
+        );
+
         // Chunk the error output based on worker count
         const errorChunks = chunkErrorOutput(errorOutput, workerCount);
-        log(`Split into ${errorChunks.length} chunks for parallel processing`, 'info');
-        
+        log(
+          `Split into ${errorChunks.length} chunks for parallel processing`,
+          'info',
+        );
+
         // Process chunks in parallel using Promise.all
         const fixPromises = errorChunks.map(async (chunk, index) => {
-          log(`Processing error chunk ${index + 1}/${errorChunks.length}...`, 'info');
-          
+          log(
+            `Processing error chunk ${index + 1}/${errorChunks.length}...`,
+            'info',
+          );
+
           // Create a more focused prompt for each chunk
           const chunkPrompt = `This is error chunk ${index + 1} of ${errorChunks.length} from a build failure.
 Focus on fixing ONLY the errors in this specific chunk:
@@ -687,13 +790,13 @@ Focus on fixing ONLY the errors in this specific chunk:
 ${chunk}
 
 Build command: ${buildCommand}`;
-          
+
           return await fixErrorWithClaudeCLI(chunkPrompt, buildCommand);
         });
-        
+
         // Wait for all chunks to be processed
         const results = await Promise.all(fixPromises);
-        
+
         // If any chunk was fixed, retry the build
         if (results.some(fixed => fixed)) {
           log('At least one error chunk was fixed, retrying build...', 'info');
@@ -726,14 +829,17 @@ async function getGoTestPackages() {
   try {
     // Get list of all Go packages with tests
     const result = await runCommand('go', ['list', './internal/...'], {
-      cwd: __dirname
+      cwd: __dirname,
     });
-    
+
     if (result.code === 0) {
-      const packages = result.stdout.trim().split('\n').filter(pkg => pkg.length > 0);
+      const packages = result.stdout
+        .trim()
+        .split('\n')
+        .filter(pkg => pkg.length > 0);
       return packages;
     }
-    
+
     return [];
   } catch (error) {
     log(`Error listing Go packages: ${error.message}`, 'error');
@@ -751,57 +857,65 @@ async function getRuleTestPairs() {
       .map(file => ({
         tsTestFile: join(testPath, file),
         ruleName: file.replace('.test.ts', ''),
-        goRuleName: file.replace('.test.ts', '').replace(/-/g, '_')
+        goRuleName: file.replace('.test.ts', '').replace(/-/g, '_'),
       }));
 
     // Get Go packages with tests
     const goPackages = await getGoTestPackages();
-    
+
     // Create rule test pairs by matching rule names
     const ruleTestPairs = [];
-    
+
     for (const tsTest of tsTests) {
       // Find corresponding Go package
-      const goPackage = goPackages.find(pkg => 
-        pkg.includes(`/internal/rules/${tsTest.goRuleName}`)
+      const goPackage = goPackages.find(pkg =>
+        pkg.includes(`/internal/rules/${tsTest.goRuleName}`),
       );
-      
+
       if (goPackage) {
         ruleTestPairs.push({
           ruleName: tsTest.ruleName,
           goRuleName: tsTest.goRuleName,
           goPackage: goPackage,
-          tsTestFile: tsTest.tsTestFile
+          tsTestFile: tsTest.tsTestFile,
         });
       } else {
         // TypeScript test without corresponding Go test
-        log(`Warning: TypeScript test ${tsTest.ruleName} has no corresponding Go test`, 'warning');
+        log(
+          `Warning: TypeScript test ${tsTest.ruleName} has no corresponding Go test`,
+          'warning',
+        );
         ruleTestPairs.push({
           ruleName: tsTest.ruleName,
           goRuleName: tsTest.goRuleName,
           goPackage: null,
-          tsTestFile: tsTest.tsTestFile
+          tsTestFile: tsTest.tsTestFile,
         });
       }
     }
-    
+
     // Add Go-only packages (those without TypeScript tests)
     for (const goPackage of goPackages) {
       const goRuleName = goPackage.split('/').pop();
       const tsRuleName = goRuleName.replace(/_/g, '-');
-      
-      const alreadyIncluded = ruleTestPairs.find(pair => pair.goPackage === goPackage);
+
+      const alreadyIncluded = ruleTestPairs.find(
+        pair => pair.goPackage === goPackage,
+      );
       if (!alreadyIncluded) {
-        log(`Warning: Go package ${goRuleName} has no corresponding TypeScript test`, 'warning');
+        log(
+          `Warning: Go package ${goRuleName} has no corresponding TypeScript test`,
+          'warning',
+        );
         ruleTestPairs.push({
           ruleName: tsRuleName,
           goRuleName: goRuleName,
           goPackage: goPackage,
-          tsTestFile: null
+          tsTestFile: null,
         });
       }
     }
-    
+
     return ruleTestPairs;
   } catch (error) {
     log(`Error getting rule test pairs: ${error.message}`, 'error');
@@ -811,60 +925,60 @@ async function getRuleTestPairs() {
 
 async function runGoTestForRule(packagePath) {
   const packageName = packagePath.split('/').pop();
-  
+
   try {
     const result = await runCommand('go', ['test', packagePath, '-v'], {
       timeout: 120000, // 2 minutes per package
-      cwd: __dirname
+      cwd: __dirname,
     });
 
     if (result.code === 0) {
       return { success: true, output: result.stdout };
     } else {
-      return { 
-        success: false, 
-        output: result.stdout, 
+      return {
+        success: false,
+        output: result.stdout,
         error: result.stderr,
-        command: `go test ${packagePath} -v`
+        command: `go test ${packagePath} -v`,
       };
     }
   } catch (error) {
     return {
       success: false,
       error: error.message,
-      command: `go test ${packagePath} -v`
+      command: `go test ${packagePath} -v`,
     };
   }
 }
 
 async function runTsTestForRule(testFile) {
   const testName = basename(testFile);
-  
+
   try {
-    const result = await runCommand('node', [
-      '--import=tsx/esm',
-      '--test',
-      testFile
-    ], {
-      timeout: TEST_TIMEOUT,
-      cwd: join(__dirname, 'packages/rslint-test-tools')
-    });
+    const result = await runCommand(
+      'node',
+      ['--import=tsx/esm', '--test', testFile],
+      {
+        timeout: TEST_TIMEOUT,
+        cwd: join(__dirname, 'packages/rslint-test-tools'),
+      },
+    );
 
     if (result.code === 0) {
       return { success: true, output: result.stdout };
     } else {
-      return { 
-        success: false, 
-        output: result.stdout, 
+      return {
+        success: false,
+        output: result.stdout,
         error: result.stderr,
-        command: `node --import=tsx/esm --test ${testFile}`
+        command: `node --import=tsx/esm --test ${testFile}`,
       };
     }
   } catch (error) {
     return {
       success: false,
       error: error.message,
-      command: `node --import=tsx/esm --test ${testFile}`
+      command: `node --import=tsx/esm --test ${testFile}`,
     };
   }
 }
@@ -877,7 +991,7 @@ async function runSingleRuleTest(ruleTestPair, attemptNumber = 1) {
     phase: 'test-start',
     testName: ruleName,
     attempt: attemptNumber,
-    maxAttempts: MAX_FIX_ATTEMPTS
+    maxAttempts: MAX_FIX_ATTEMPTS,
   });
 
   // Fetch original TypeScript ESLint sources (only on first attempt)
@@ -889,7 +1003,10 @@ async function runSingleRuleTest(ruleTestPair, attemptNumber = 1) {
 
     originalSources = await fetchOriginalRule(ruleName);
     if (originalSources.ruleContent || originalSources.testContent) {
-      log(`✓ Original sources fetched (rule: ${originalSources.ruleContent ? 'yes' : 'no'}, test: ${originalSources.testContent ? 'yes' : 'no'})`, 'success');
+      log(
+        `✓ Original sources fetched (rule: ${originalSources.ruleContent ? 'yes' : 'no'}, test: ${originalSources.testContent ? 'yes' : 'no'})`,
+        'success',
+      );
     }
   } else {
     // Re-fetch on subsequent attempts as it might have been fixed
@@ -900,7 +1017,10 @@ async function runSingleRuleTest(ruleTestPair, attemptNumber = 1) {
   if (tsTestFile) {
     try {
       currentTestContent = await readFile(tsTestFile, 'utf8');
-      log(`✓ Current test file read (${currentTestContent.length} bytes)`, 'success');
+      log(
+        `✓ Current test file read (${currentTestContent.length} bytes)`,
+        'success',
+      );
     } catch (err) {
       log(`Failed to read current test file: ${err.message}`, 'error');
     }
@@ -914,7 +1034,7 @@ async function runSingleRuleTest(ruleTestPair, attemptNumber = 1) {
   if (goPackage) {
     log(`Running Go test for ${goRuleName}...`, 'info');
     goTestResult = await runGoTestForRule(goPackage);
-    
+
     if (goTestResult.success) {
       log(`✓ Go test passed for ${goRuleName}`, 'success');
     } else {
@@ -926,7 +1046,7 @@ async function runSingleRuleTest(ruleTestPair, attemptNumber = 1) {
   if (tsTestFile) {
     log(`Running TypeScript test for ${ruleName}...`, 'info');
     tsTestResult = await runTsTestForRule(tsTestFile);
-    
+
     if (tsTestResult.success) {
       log(`✓ TypeScript test passed for ${ruleName}`, 'success');
     } else {
@@ -943,7 +1063,7 @@ async function runSingleRuleTest(ruleTestPair, attemptNumber = 1) {
     logProgress('Test passed', {
       phase: 'test-pass',
       testName: ruleName,
-      durationMs: duration
+      durationMs: duration,
     });
     completedTests++;
     return true;
@@ -954,14 +1074,23 @@ async function runSingleRuleTest(ruleTestPair, attemptNumber = 1) {
     phase: 'test-fail',
     testName: ruleName,
     goFailed: !goSuccess,
-    tsFailed: !tsSuccess
+    tsFailed: !tsSuccess,
   });
 
   if (attemptNumber < MAX_FIX_ATTEMPTS) {
     // Try to fix with Claude CLI, passing both Go and TypeScript test results
-    log(`Attempting to fix rule test failures (attempt ${attemptNumber}/${MAX_FIX_ATTEMPTS})...`, 'warning');
+    log(
+      `Attempting to fix rule test failures (attempt ${attemptNumber}/${MAX_FIX_ATTEMPTS})...`,
+      'warning',
+    );
 
-    const fixed = await fixRuleTestsWithClaude(ruleName, goTestResult, tsTestResult, originalSources, currentTestContent);
+    const fixed = await fixRuleTestsWithClaude(
+      ruleName,
+      goTestResult,
+      tsTestResult,
+      originalSources,
+      currentTestContent,
+    );
 
     if (fixed) {
       // Claude thinks it fixed the issues, let's rebuild and retry
@@ -990,7 +1119,10 @@ async function runSingleRuleTest(ruleTestPair, attemptNumber = 1) {
   return false;
 }
 
-async function runAllRuleTests(concurrentMode = false, workerCount = DEFAULT_WORKERS) {
+async function runAllRuleTests(
+  concurrentMode = false,
+  workerCount = DEFAULT_WORKERS,
+) {
   const ruleTestPairs = await getRuleTestPairs();
   totalTests = ruleTestPairs.length;
 
@@ -1012,13 +1144,17 @@ async function runAllRuleTests(concurrentMode = false, workerCount = DEFAULT_WOR
       const ruleTestPair = ruleTestPairs[i];
       const ruleName = ruleTestPair.ruleName;
 
-      console.log(`\n${colors.bright}[${i + 1}/${totalTests}] ${ruleName}${colors.reset}`);
+      console.log(
+        `\n${colors.bright}[${i + 1}/${totalTests}] ${ruleName}${colors.reset}`,
+      );
       console.log('-'.repeat(40));
 
       await runSingleRuleTest(ruleTestPair);
 
       // Show running totals
-      console.log(`\n${colors.dim}Progress: ${completedTests} passed, ${failedTests} failed, ${totalTests - completedTests - failedTests} remaining${colors.reset}`);
+      console.log(
+        `\n${colors.dim}Progress: ${completedTests} passed, ${failedTests} failed, ${totalTests - completedTests - failedTests} remaining${colors.reset}`,
+      );
     }
 
     logProgress('Rule test suite completed', {
@@ -1026,13 +1162,15 @@ async function runAllRuleTests(concurrentMode = false, workerCount = DEFAULT_WOR
       totalTests,
       completedTests,
       failedTests,
-      successRate: totalTests > 0 ? Math.round((completedTests / totalTests) * 100) : 0,
+      successRate:
+        totalTests > 0 ? Math.round((completedTests / totalTests) * 100) : 0,
       testResults: {
         passed: completedTests,
         failed: failedTests,
         total: totalTests,
-        successRate: totalTests > 0 ? Math.round((completedTests / totalTests) * 100) : 0
-      }
+        successRate:
+          totalTests > 0 ? Math.round((completedTests / totalTests) * 100) : 0,
+      },
     });
   }
 }
@@ -1048,28 +1186,41 @@ async function runConcurrentRuleTests(ruleTestPairs, workerCount) {
   // Create hook configuration
   const hookConfig = {
     hooks: {
-      PreToolUse: [{
-        matcher: "Write|Edit|MultiEdit",
-        hooks: [{
-          type: "command",
-          command: join(__dirname, 'hooks', 'pre-tool-use.js')
-        }]
-      }],
-      PostToolUse: [{
-        matcher: "Write|Edit|MultiEdit",
-        hooks: [{
-          type: "command",
-          command: join(__dirname, 'hooks', 'post-tool-use.js')
-        }]
-      }]
-    }
+      PreToolUse: [
+        {
+          matcher: 'Write|Edit|MultiEdit',
+          hooks: [
+            {
+              type: 'command',
+              command: join(__dirname, 'hooks', 'pre-tool-use.js'),
+            },
+          ],
+        },
+      ],
+      PostToolUse: [
+        {
+          matcher: 'Write|Edit|MultiEdit',
+          hooks: [
+            {
+              type: 'command',
+              command: join(__dirname, 'hooks', 'post-tool-use.js'),
+            },
+          ],
+        },
+      ],
+    },
   };
 
   // Create hooks directory and files
   await createHooks();
 
   // Write hook configuration
-  const configPath = join(os.homedir(), '.config', 'claude-code', 'settings.json');
+  const configPath = join(
+    os.homedir(),
+    '.config',
+    'claude-code',
+    'settings.json',
+  );
   await mkdir(dirname(configPath), { recursive: true });
   await writeFile(configPath, JSON.stringify(hookConfig, null, 2));
 
@@ -1083,9 +1234,9 @@ async function runConcurrentRuleTests(ruleTestPairs, workerCount) {
       env: {
         ...process.env,
         RSLINT_WORKER_ID: workerId,
-        RSLINT_WORK_QUEUE_DIR: WORK_QUEUE_DIR
+        RSLINT_WORK_QUEUE_DIR: WORK_QUEUE_DIR,
       },
-      stdio: 'inherit'
+      stdio: 'inherit',
     });
 
     workers.push({ id: workerId, process: worker });
@@ -1094,17 +1245,31 @@ async function runConcurrentRuleTests(ruleTestPairs, workerCount) {
   // Monitor progress
   const progressInterval = setInterval(async () => {
     const progress = await workQueue.getProgress();
-    const successRate = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
-    log(`Progress: ${progress.completed + progress.failed}/${progress.total} (${successRate}% success) - ${progress.completed} passed, ${progress.failed} failed, ${progress.claimed} in progress`, 'progress');
+    const successRate =
+      progress.total > 0
+        ? Math.round((progress.completed / progress.total) * 100)
+        : 0;
+    log(
+      `Progress: ${progress.completed + progress.failed}/${progress.total} (${successRate}% success) - ${progress.completed} passed, ${progress.failed} failed, ${progress.claimed} in progress`,
+      'progress',
+    );
   }, 10000); // Every 10 seconds
 
   // Wait for all workers to complete
-  await Promise.all(workers.map(w => new Promise((resolve) => {
-    w.process.on('exit', (code) => {
-      log(`Worker ${w.id} exited with code ${code}`, code === 0 ? 'success' : 'error');
-      resolve();
-    });
-  })));
+  await Promise.all(
+    workers.map(
+      w =>
+        new Promise(resolve => {
+          w.process.on('exit', code => {
+            log(
+              `Worker ${w.id} exited with code ${code}`,
+              code === 0 ? 'success' : 'error',
+            );
+            resolve();
+          });
+        }),
+    ),
+  );
 
   clearInterval(progressInterval);
 
@@ -1118,13 +1283,15 @@ async function runConcurrentRuleTests(ruleTestPairs, workerCount) {
     totalTests,
     completedTests,
     failedTests,
-    successRate: totalTests > 0 ? Math.round((completedTests / totalTests) * 100) : 0,
+    successRate:
+      totalTests > 0 ? Math.round((completedTests / totalTests) * 100) : 0,
     testResults: {
       passed: completedTests,
       failed: failedTests,
       total: totalTests,
-      successRate: totalTests > 0 ? Math.round((completedTests / totalTests) * 100) : 0
-    }
+      successRate:
+        totalTests > 0 ? Math.round((completedTests / totalTests) * 100) : 0,
+    },
   });
 
   // Cleanup
@@ -1150,12 +1317,18 @@ async function runWorker() {
       await workQueue.completeWork(work.id, success);
 
       if (success) {
-        log(`Worker ${WORKER_ID}: Completed ${work.test.ruleName} successfully`, 'success');
+        log(
+          `Worker ${WORKER_ID}: Completed ${work.test.ruleName} successfully`,
+          'success',
+        );
       } else {
         log(`Worker ${WORKER_ID}: Failed ${work.test.ruleName}`, 'error');
       }
     } catch (err) {
-      log(`Worker ${WORKER_ID}: Error processing ${work.test.ruleName}: ${err.message}`, 'error');
+      log(
+        `Worker ${WORKER_ID}: Error processing ${work.test.ruleName}: ${err.message}`,
+        'error',
+      );
       await workQueue.completeWork(work.id, false);
     }
   }
@@ -1288,20 +1461,33 @@ async function runCompleteProcess() {
   const showHelp = args.includes('--help') || args.includes('-h');
   const concurrentMode = args.includes('--concurrent');
   const workerCountArg = args.find(arg => arg.startsWith('--workers='));
-  const workerCount = workerCountArg ? parseInt(workerCountArg.split('=')[1]) : DEFAULT_WORKERS;
+  const workerCount = workerCountArg
+    ? parseInt(workerCountArg.split('=')[1])
+    : DEFAULT_WORKERS;
 
   if (showHelp && !IS_WORKER) {
-    console.log(`\nRSLint Automated Build & Test Runner\n\nUsage: node automate-build-test.js [options]\n\nOptions:\n  --concurrent      Run tests in parallel using multiple Claude instances\n  --workers=N       Number of parallel workers (default: ${DEFAULT_WORKERS})\n  --help, -h        Show this help message\n\nExamples:\n  node automate-build-test.js                    # Sequential execution\n  node automate-build-test.js --concurrent       # Parallel with ${DEFAULT_WORKERS} workers\n  node automate-build-test.js --concurrent --workers=8  # Parallel with 8 workers\n`);
+    console.log(
+      `\nRSLint Automated Build & Test Runner\n\nUsage: node automate-build-test.js [options]\n\nOptions:\n  --concurrent      Run tests in parallel using multiple Claude instances\n  --workers=N       Number of parallel workers (default: ${DEFAULT_WORKERS})\n  --help, -h        Show this help message\n\nExamples:\n  node automate-build-test.js                    # Sequential execution\n  node automate-build-test.js --concurrent       # Parallel with ${DEFAULT_WORKERS} workers\n  node automate-build-test.js --concurrent --workers=8  # Parallel with 8 workers\n`,
+    );
     process.exit(0);
   }
 
   if (!IS_WORKER) {
     console.clear();
-    console.log(`${colors.bright}${colors.cyan}╔═══════════════════════════════════════════════════════════╗${colors.reset}`);
-    console.log(`${colors.bright}${colors.cyan}║          RSLint Automated Build & Test Runner             ║${colors.reset}`);
-    console.log(`${colors.bright}${colors.cyan}╚═══════════════════════════════════════════════════════════╝${colors.reset}\n`);
+    console.log(
+      `${colors.bright}${colors.cyan}╔═══════════════════════════════════════════════════════════╗${colors.reset}`,
+    );
+    console.log(
+      `${colors.bright}${colors.cyan}║          RSLint Automated Build & Test Runner             ║${colors.reset}`,
+    );
+    console.log(
+      `${colors.bright}${colors.cyan}╚═══════════════════════════════════════════════════════════╝${colors.reset}\n`,
+    );
 
-    log(`Script started (PID: ${process.pid}, Node: ${process.version})`, 'info');
+    log(
+      `Script started (PID: ${process.pid}, Node: ${process.version})`,
+      'info',
+    );
     log(`Max fix attempts per test: ${MAX_FIX_ATTEMPTS}`, 'info');
 
     if (concurrentMode) {
@@ -1324,7 +1510,9 @@ async function runCompleteProcess() {
 
   // Step 2: Run combined rule tests (Go + TypeScript together)
   if (!IS_WORKER) {
-    console.log(`\n${colors.bright}=== COMBINED RULE TEST PHASE ===${colors.reset}`);
+    console.log(
+      `\n${colors.bright}=== COMBINED RULE TEST PHASE ===${colors.reset}`,
+    );
   }
   await runAllRuleTests(concurrentMode, workerCount);
 
@@ -1339,8 +1527,9 @@ async function runCompleteProcess() {
         total: totalTests,
         passed: completedTests,
         failed: failedTests,
-        successRate: totalTests > 0 ? Math.round((completedTests / totalTests) * 100) : 0
-      }
+        successRate:
+          totalTests > 0 ? Math.round((completedTests / totalTests) * 100) : 0,
+      },
     });
 
     return {
@@ -1348,7 +1537,7 @@ async function runCompleteProcess() {
       totalTests,
       completedTests,
       failedTests,
-      totalDuration
+      totalDuration,
     };
   }
 }
@@ -1358,9 +1547,15 @@ async function main() {
 
   if (!IS_WORKER) {
     console.clear();
-    console.log(`${colors.bright}${colors.magenta}╔═══════════════════════════════════════════════════════════╗${colors.reset}`);
-    console.log(`${colors.bright}${colors.magenta}║          RSLint 10x Automated Build & Test Runner         ║${colors.reset}`);
-    console.log(`${colors.bright}${colors.magenta}╚═══════════════════════════════════════════════════════════╝${colors.reset}\n`);
+    console.log(
+      `${colors.bright}${colors.magenta}╔═══════════════════════════════════════════════════════════╗${colors.reset}`,
+    );
+    console.log(
+      `${colors.bright}${colors.magenta}║          RSLint 10x Automated Build & Test Runner         ║${colors.reset}`,
+    );
+    console.log(
+      `${colors.bright}${colors.magenta}╚═══════════════════════════════════════════════════════════╝${colors.reset}\n`,
+    );
 
     log(`Starting ${TOTAL_RUNS} consecutive automation runs`, 'info');
     console.log('='.repeat(80));
@@ -1370,9 +1565,15 @@ async function main() {
 
   for (let runNumber = 1; runNumber <= TOTAL_RUNS; runNumber++) {
     if (!IS_WORKER) {
-      console.log(`\n${colors.bright}${colors.yellow}╔═════════════════════════════════════════════════════════════════════════════╗${colors.reset}`);
-      console.log(`${colors.bright}${colors.yellow}║                              RUN ${runNumber.toString().padStart(2)} OF ${TOTAL_RUNS}                                ║${colors.reset}`);
-      console.log(`${colors.bright}${colors.yellow}╚═════════════════════════════════════════════════════════════════════════════╝${colors.reset}\n`);
+      console.log(
+        `\n${colors.bright}${colors.yellow}╔═════════════════════════════════════════════════════════════════════════════╗${colors.reset}`,
+      );
+      console.log(
+        `${colors.bright}${colors.yellow}║                              RUN ${runNumber.toString().padStart(2)} OF ${TOTAL_RUNS}                                ║${colors.reset}`,
+      );
+      console.log(
+        `${colors.bright}${colors.yellow}╚═════════════════════════════════════════════════════════════════════════════╝${colors.reset}\n`,
+      );
 
       // Reset counters for each run
       totalTests = 0;
@@ -1385,13 +1586,21 @@ async function main() {
     if (!IS_WORKER) {
       allRunsResults.push({
         runNumber,
-        ...runResult
+        ...runResult,
       });
 
-      console.log(`\n${colors.bright}${colors.cyan}RUN ${runNumber} COMPLETE:${colors.reset}`);
-      console.log(`  • Tests: ${runResult.completedTests}/${runResult.totalTests} passed`);
-      console.log(`  • Duration: ${Math.round(runResult.totalDuration / 60000)} minutes`);
-      console.log(`  • Status: ${runResult.success ? colors.green + 'SUCCESS' + colors.reset : colors.red + 'FAILED' + colors.reset}`);
+      console.log(
+        `\n${colors.bright}${colors.cyan}RUN ${runNumber} COMPLETE:${colors.reset}`,
+      );
+      console.log(
+        `  • Tests: ${runResult.completedTests}/${runResult.totalTests} passed`,
+      );
+      console.log(
+        `  • Duration: ${Math.round(runResult.totalDuration / 60000)} minutes`,
+      );
+      console.log(
+        `  • Status: ${runResult.success ? colors.green + 'SUCCESS' + colors.reset : colors.red + 'FAILED' + colors.reset}`,
+      );
 
       // Brief pause between runs
       if (runNumber < TOTAL_RUNS) {
@@ -1403,29 +1612,50 @@ async function main() {
 
   if (!IS_WORKER) {
     // Final summary
-    console.log(`\n\n${colors.bright}${colors.magenta}╔═════════════════════════════════════════════════════════════════════════════╗${colors.reset}`);
-    console.log(`${colors.bright}${colors.magenta}║                            FINAL SUMMARY (${TOTAL_RUNS} RUNS)                             ║${colors.reset}`);
-    console.log(`${colors.bright}${colors.magenta}╚═════════════════════════════════════════════════════════════════════════════╝${colors.reset}\n`);
+    console.log(
+      `\n\n${colors.bright}${colors.magenta}╔═════════════════════════════════════════════════════════════════════════════╗${colors.reset}`,
+    );
+    console.log(
+      `${colors.bright}${colors.magenta}║                            FINAL SUMMARY (${TOTAL_RUNS} RUNS)                             ║${colors.reset}`,
+    );
+    console.log(
+      `${colors.bright}${colors.magenta}╚═════════════════════════════════════════════════════════════════════════════╝${colors.reset}\n`,
+    );
 
     const totalSuccessfulRuns = allRunsResults.filter(r => r.success).length;
     const totalFailedRuns = TOTAL_RUNS - totalSuccessfulRuns;
-    const averageDuration = allRunsResults.reduce((sum, r) => sum + r.totalDuration, 0) / TOTAL_RUNS;
+    const averageDuration =
+      allRunsResults.reduce((sum, r) => sum + r.totalDuration, 0) / TOTAL_RUNS;
 
     console.log(`${colors.bright}OVERALL RESULTS:${colors.reset}`);
-    console.log(`  • Successful runs: ${colors.green}${totalSuccessfulRuns}/${TOTAL_RUNS}${colors.reset}`);
-    console.log(`  • Failed runs: ${colors.red}${totalFailedRuns}/${TOTAL_RUNS}${colors.reset}`);
-    console.log(`  • Success rate: ${totalSuccessfulRuns === TOTAL_RUNS ? colors.green : colors.yellow}${Math.round((totalSuccessfulRuns / TOTAL_RUNS) * 100)}%${colors.reset}`);
-    console.log(`  • Average duration: ${Math.round(averageDuration / 60000)} minutes`);
+    console.log(
+      `  • Successful runs: ${colors.green}${totalSuccessfulRuns}/${TOTAL_RUNS}${colors.reset}`,
+    );
+    console.log(
+      `  • Failed runs: ${colors.red}${totalFailedRuns}/${TOTAL_RUNS}${colors.reset}`,
+    );
+    console.log(
+      `  • Success rate: ${totalSuccessfulRuns === TOTAL_RUNS ? colors.green : colors.yellow}${Math.round((totalSuccessfulRuns / TOTAL_RUNS) * 100)}%${colors.reset}`,
+    );
+    console.log(
+      `  • Average duration: ${Math.round(averageDuration / 60000)} minutes`,
+    );
 
     console.log(`\n${colors.bright}DETAILED RESULTS:${colors.reset}`);
     allRunsResults.forEach(result => {
-      const status = result.success ? colors.green + '✓' + colors.reset : colors.red + '✗' + colors.reset;
+      const status = result.success
+        ? colors.green + '✓' + colors.reset
+        : colors.red + '✗' + colors.reset;
       const duration = Math.round(result.totalDuration / 60000);
       const testSummary = `${result.completedTests}/${result.totalTests}`;
-      console.log(`  Run ${result.runNumber.toString().padStart(2)}: ${status} ${testSummary.padEnd(8)} (${duration}m)`);
+      console.log(
+        `  Run ${result.runNumber.toString().padStart(2)}: ${status} ${testSummary.padEnd(8)} (${duration}m)`,
+      );
     });
 
-    console.log(`\n${colors.bright}${colors.magenta}10x automation run completed!${colors.reset}`);
+    console.log(
+      `\n${colors.bright}${colors.magenta}10x automation run completed!${colors.reset}`,
+    );
     console.log('='.repeat(80));
 
     process.exit(totalFailedRuns > 0 ? 1 : 0);

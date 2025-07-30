@@ -10,10 +10,7 @@ const ruleTester = new RuleTester({
 });
 
 ruleTester.run('no-inferrable-types', {
-  valid: [
-    'const a = 10;',
-    'const b = true;',
-  ],
+  valid: ['const a = 10;', 'const b = true;'],
   invalid: [
     {
       code: 'const a: number = 10;',

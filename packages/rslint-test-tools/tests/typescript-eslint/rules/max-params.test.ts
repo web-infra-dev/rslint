@@ -85,9 +85,9 @@ type sum = (a: number, b: number) => number;
     },
   ],
   invalid: [
-    { 
-      code: 'function foo(a, b, c, d) {}', 
-      errors: [{ messageId: 'exceed' }] 
+    {
+      code: 'function foo(a, b, c, d) {}',
+      errors: [{ messageId: 'exceed' }],
     },
     {
       code: 'const foo = function (a, b, c, d) {};',

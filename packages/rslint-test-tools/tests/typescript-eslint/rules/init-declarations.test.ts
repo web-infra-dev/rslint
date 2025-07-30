@@ -302,7 +302,7 @@ interface IEmployee {
       options: ['never'],
     },
     {
-      code: "const foo: number = 123;",
+      code: 'const foo: number = 123;',
       options: ['always'],
     },
     {

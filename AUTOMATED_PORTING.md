@@ -45,13 +45,13 @@ node automated-port.js --concurrent --workers=3
 
 ### Command Line Options
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--list` | List missing rules only (no porting) | - |
-| `--status` | Show porting status and progress | - |
-| `--concurrent` | Enable parallel processing | Sequential |
-| `--workers=N` | Number of concurrent workers | 3 |
-| `--help, -h` | Show help message | - |
+| Option         | Description                          | Default    |
+| -------------- | ------------------------------------ | ---------- |
+| `--list`       | List missing rules only (no porting) | -          |
+| `--status`     | Show porting status and progress     | -          |
+| `--concurrent` | Enable parallel processing           | Sequential |
+| `--workers=N`  | Number of concurrent workers         | 3          |
+| `--help, -h`   | Show help message                    | -          |
 
 ### Examples
 
@@ -74,6 +74,7 @@ node automated-port.js --concurrent --workers=5
 ### 1. Rule Discovery Process
 
 The script automatically:
+
 1. Fetches the complete list of TypeScript-ESLint rules from GitHub
 2. Scans existing RSLint rules in `internal/rules/`
 3. Identifies missing rules that need to be ported
@@ -108,6 +109,7 @@ The script creates files in these locations:
 ## Progress Monitoring
 
 ### Sequential Mode
+
 ```
 [14:30:15] → Starting rule porting with 42 missing rules
 [14:30:16] 🔄 Porting adjacent-overload-signatures (attempt 1/3)
@@ -118,6 +120,7 @@ The script creates files in these locations:
 ```
 
 ### Concurrent Mode
+
 ```
 [14:30:15] → Starting rule porting with 42 missing rules
 [14:30:15] → Starting worker 1: porter_0_a1b2c3d4
@@ -129,12 +132,15 @@ The script creates files in these locations:
 ## Configuration
 
 ### Claude Settings
+
 The script uses the existing `.claude/settings.local.json` configuration:
+
 - Same permissions as `automate-build-test.js`
 - File locking hooks for concurrent safety
 - Streaming JSON output format
 
 ### Timeout Settings
+
 - **Per Rule**: 10 minutes maximum
 - **Retry Attempts**: 3 attempts per rule
 - **Retry Delay**: 10 seconds between attempts
@@ -145,30 +151,39 @@ The script uses the existing `.claude/settings.local.json` configuration:
 ### Common Issues and Solutions
 
 #### 1. Network Errors
+
 ```
 ✗ Failed to fetch rule sources from GitHub
 ```
+
 **Solution**: Check internet connection and GitHub availability
 
 #### 2. Claude CLI Errors
+
 ```
 ✗ Claude CLI failed (exit code 1)
 ```
+
 **Solution**: Verify Claude CLI is installed and configured properly
 
 #### 3. Permission Errors
+
 ```
 ✗ Could not acquire file lock
 ```
+
 **Solution**: Ensure no other instances are running, or reduce worker count
 
 #### 4. Timeout Errors
+
 ```
 ✗ Rule timed out after 10 minutes
 ```
+
 **Solution**: Rule may be complex; will retry automatically
 
 ### Retry Logic
+
 - Rules are retried up to 3 times on failure
 - Each retry includes fresh source fetching
 - Exponential backoff prevents API rate limiting
@@ -177,6 +192,7 @@ The script uses the existing `.claude/settings.local.json` configuration:
 ## Output and Results
 
 ### Success Indicators
+
 - ✅ New Go rule files created in `internal/rules/`
 - ✅ Test files created in `packages/rslint-test-tools/tests/`
 - ✅ Rules registered in configuration files
@@ -185,6 +201,7 @@ The script uses the existing `.claude/settings.local.json` configuration:
 **Note**: Build and test success must be verified separately using `automate-build-test.js`
 
 ### Final Summary
+
 ```
 === Porting Summary ===
 
@@ -203,18 +220,21 @@ The script uses the existing `.claude/settings.local.json` configuration:
 ## Best Practices
 
 ### When to Use Sequential Mode
+
 - **First time** running the script
 - **Debugging** specific rule issues
 - **Limited resources** or slow network
 - **Learning** how the porting process works
 
 ### When to Use Concurrent Mode
+
 - **Large batches** of rules to port
 - **Fast network** and powerful machine
 - **Experienced** with the porting process
 - **Time-sensitive** porting needs
 
 ### Recommended Workflow
+
 1. Start with `--status` to see scope
 2. Use `--list` to review missing rules
 3. Run sequentially first time: `node automated-port.js`
@@ -225,23 +245,27 @@ The script uses the existing `.claude/settings.local.json` configuration:
 ## Troubleshooting
 
 ### Script Won't Start
+
 1. Check Node.js is installed: `node --version`
 2. Verify Claude CLI: `claude --version`
 3. Check settings file exists: `.claude/settings.local.json`
 
 ### Rules Failing to Port
+
 1. Check GitHub connectivity
 2. Verify Claude CLI authentication
 3. Review error messages in output
 4. Try single rule porting first
 
 ### Concurrent Issues
+
 1. Reduce worker count: `--workers=1`
 2. Check file system permissions
 3. Ensure no other automation running
 4. Clear tmp directory if needed
 
 ### Performance Issues
+
 1. Use `--concurrent` for speed
 2. Increase worker count: `--workers=5`
 3. Check network bandwidth
@@ -261,6 +285,7 @@ This script complements the existing `automate-build-test.js`:
 ## Contributing
 
 When modifying the script:
+
 1. Follow same patterns as `automate-build-test.js`
 2. Test with both sequential and concurrent modes
 3. Verify error handling works correctly
@@ -269,6 +294,7 @@ When modifying the script:
 ## Support
 
 For issues or questions:
+
 1. Check existing RSLint documentation
 2. Review Claude CLI documentation
 3. Examine `automate-build-test.js` for patterns
@@ -277,6 +303,7 @@ For issues or questions:
 ---
 
 **Related Files:**
+
 - `automate-build-test.js` - Test automation script
 - `.claude/settings.local.json` - Claude CLI configuration
 - `eslint-to-go-porter/` - Alternative porting tool

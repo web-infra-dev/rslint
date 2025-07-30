@@ -7,11 +7,13 @@ The `automate-build-test.js` script now supports concurrent execution, allowing 
 ## Usage
 
 ### Sequential Mode (Default)
+
 ```bash
 node automate-build-test.js
 ```
 
 ### Concurrent Mode
+
 ```bash
 # Use default 4 workers
 node automate-build-test.js --concurrent
@@ -21,6 +23,7 @@ node automate-build-test.js --concurrent --workers=8
 ```
 
 ### Help
+
 ```bash
 node automate-build-test.js --help
 ```
@@ -28,22 +31,26 @@ node automate-build-test.js --help
 ## How It Works
 
 ### Work Queue System
+
 - Creates a temporary work queue in the system temp directory
 - Each test is added as a work item with atomic claiming mechanism
 - Workers claim work items one at a time to avoid conflicts
 
 ### File Locking via Hooks
+
 - Uses Claude Code hooks (PreToolUse/PostToolUse) to prevent file conflicts
 - When a worker edits a file, it acquires a lock
 - Other workers wait if they need to edit the same file
 - Locks are automatically released after edits complete
 
 ### Progress Tracking
+
 - Main process monitors overall progress every 10 seconds
 - Shows completed, failed, and in-progress counts
 - Workers log their individual progress
 
 ### Architecture
+
 ```
 Main Process
 ├── Builds the project

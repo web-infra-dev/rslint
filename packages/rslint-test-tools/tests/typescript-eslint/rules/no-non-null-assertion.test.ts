@@ -3,14 +3,7 @@ import { RuleTester } from '../RuleTester.ts';
 const ruleTester = new RuleTester({});
 
 ruleTester.run('@typescript-eslint/no-non-null-assertion', {
-  valid: [
-    'x;',
-    'x.y;',
-    'x.y.z;',
-    'x?.y.z;',
-    'x?.y?.z;',
-    '!x;',
-  ],
+  valid: ['x;', 'x.y;', 'x.y.z;', 'x?.y.z;', 'x?.y?.z;', '!x;'],
   invalid: [
     {
       code: 'x!;',

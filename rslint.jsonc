@@ -1,1 +1,7 @@
-[{"language": "typescript", "files": ["*.ts"], "rules": {"consistent-indexed-object-style": "error"}}]
+[
+  {
+    "language": "typescript",
+    "files": ["*.ts"],
+    "rules": { "consistent-indexed-object-style": "error" },
+  },
+]

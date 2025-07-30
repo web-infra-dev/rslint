@@ -9,6 +9,7 @@ RSLint is a drop-in replacement for ESLint and TypeScript-ESLint, built on top o
 ## Architecture
 
 ### Project Structure
+
 ```
 /cmd/rslint/              # Main Go CLI binary
 /internal/                # Core Go packages
@@ -29,42 +30,46 @@ RSLint is a drop-in replacement for ESLint and TypeScript-ESLint, built on top o
 ## Command-Line Interface
 
 ### Basic Usage
+
 ```bash
 rslint [OPTIONS] [FILES...]
 ```
 
 ### Available Options
 
-| Flag | Description | Default |
-|------|-------------|---------|
-| `--tsconfig PATH` | TypeScript configuration file | `tsconfig.json` |
-| `--config PATH` | RSLint configuration file | `rslint.jsonc` |
-| `--list-files` | List matched files | |
-| `--format FORMAT` | Output format: `default` \| `jsonline` | `default` |
-| `--lsp` | Run in Language Server Protocol mode | |
-| `--api` | Run in IPC mode for JavaScript integration | |
-| `--no-color` | Disable colored output | |
-| `--force-color` | Force colored output | |
-| `--trace FILE` | File for trace output | |
-| `--cpuprof FILE` | File for CPU profiling | |
-| `--singleThreaded` | Run in single-threaded mode | |
-| `-h, --help` | Show help | |
+| Flag               | Description                                | Default         |
+| ------------------ | ------------------------------------------ | --------------- |
+| `--tsconfig PATH`  | TypeScript configuration file              | `tsconfig.json` |
+| `--config PATH`    | RSLint configuration file                  | `rslint.jsonc`  |
+| `--list-files`     | List matched files                         |                 |
+| `--format FORMAT`  | Output format: `default` \| `jsonline`     | `default`       |
+| `--lsp`            | Run in Language Server Protocol mode       |                 |
+| `--api`            | Run in IPC mode for JavaScript integration |                 |
+| `--no-color`       | Disable colored output                     |                 |
+| `--force-color`    | Force colored output                       |                 |
+| `--trace FILE`     | File for trace output                      |                 |
+| `--cpuprof FILE`   | File for CPU profiling                     |                 |
+| `--singleThreaded` | Run in single-threaded mode                |                 |
+| `-h, --help`       | Show help                                  |                 |
 
 ### Output Formats
 
 #### Default Format
+
 Rich, colored terminal output with code context and error highlighting.
 
 #### JSON Line Format
+
 Machine-readable JSON output for CI/CD integration:
+
 ```json
 {
   "ruleName": "no-array-delete",
   "message": "Using the `delete` operator with an array expression is unsafe.",
   "filePath": "src/example.ts",
   "range": {
-    "start": {"line": 5, "column": 1},
-    "end": {"line": 5, "column": 15}
+    "start": { "line": 5, "column": 1 },
+    "end": { "line": 5, "column": 15 }
   },
   "severity": "error"
 }
@@ -73,11 +78,13 @@ Machine-readable JSON output for CI/CD integration:
 ## IPC (Inter-Process Communication) API
 
 ### Protocol Overview
+
 - **Transport**: Binary message format over stdio
 - **Encoding**: 4-byte length prefix (uint32 little endian) + JSON content
 - **Communication**: Request/response pattern with async support
 
 ### Message Types
+
 ```go
 type MessageKind string
 
@@ -91,6 +98,7 @@ const (
 ```
 
 ### Request Structure
+
 ```go
 type LintRequest struct {
     Files            []string          `json:"files,omitempty"`
@@ -103,6 +111,7 @@ type LintRequest struct {
 ```
 
 ### Response Structure
+
 ```go
 type LintResponse struct {
     Diagnostics []Diagnostic `json:"diagnostics"`
@@ -131,6 +140,7 @@ type Position struct {
 ```
 
 ### Error Handling
+
 ```go
 type ErrorResponse struct {
     Message string `json:"message"`
@@ -140,6 +150,7 @@ type ErrorResponse struct {
 ## Language Server Protocol (LSP)
 
 ### Server Capabilities
+
 ```go
 type ServerCapabilities struct {
     TextDocumentSync   int  `json:"textDocumentSync"`    // 1 = Full document sync
@@ -149,20 +160,21 @@ type ServerCapabilities struct {
 
 ### Supported Methods
 
-| Method | Description | Request Type | Response Type |
-|--------|-------------|--------------|---------------|
-| `initialize` | Server initialization | `InitializeParams` | `InitializeResult` |
-| `initialized` | Post-initialization notification | - | - |
-| `textDocument/didOpen` | Document opened | `DidOpenTextDocumentParams` | - |
-| `textDocument/didChange` | Document changed | `DidChangeTextDocumentParams` | - |
-| `textDocument/didSave` | Document saved | - | - |
-| `textDocument/diagnostic` | Diagnostic request | - | - |
-| `shutdown` | Server shutdown | - | - |
-| `exit` | Server termination | - | - |
+| Method                    | Description                      | Request Type                  | Response Type      |
+| ------------------------- | -------------------------------- | ----------------------------- | ------------------ |
+| `initialize`              | Server initialization            | `InitializeParams`            | `InitializeResult` |
+| `initialized`             | Post-initialization notification | -                             | -                  |
+| `textDocument/didOpen`    | Document opened                  | `DidOpenTextDocumentParams`   | -                  |
+| `textDocument/didChange`  | Document changed                 | `DidChangeTextDocumentParams` | -                  |
+| `textDocument/didSave`    | Document saved                   | -                             | -                  |
+| `textDocument/diagnostic` | Diagnostic request               | -                             | -                  |
+| `shutdown`                | Server shutdown                  | -                             | -                  |
+| `exit`                    | Server termination               | -                             | -                  |
 
 ### LSP Data Structures
 
 #### Initialize Parameters
+
 ```go
 type InitializeParams struct {
     ProcessID    *int    `json:"processId"`
@@ -173,6 +185,7 @@ type InitializeParams struct {
 ```
 
 #### Text Document Synchronization
+
 ```go
 type DidOpenTextDocumentParams struct {
     TextDocument TextDocumentItem `json:"textDocument"`
@@ -187,6 +200,7 @@ type TextDocumentItem struct {
 ```
 
 #### Diagnostics
+
 ```go
 type LspDiagnostic struct {
     Range    Range  `json:"range"`
@@ -204,6 +218,7 @@ type PublishDiagnosticsParams struct {
 ## JavaScript/Node.js API
 
 ### Installation
+
 ```bash
 npm install @rslint/core
 ```
@@ -211,18 +226,20 @@ npm install @rslint/core
 ### Core Service Class
 
 #### Constructor
+
 ```typescript
 export class RSLintService {
-  constructor(options: RSlintOptions = {})
+  constructor(options: RSlintOptions = {});
 }
 
 interface RSlintOptions {
-  rslintPath?: string;                       // Path to rslint binary
-  workingDirectory?: string;                 // Working directory
+  rslintPath?: string; // Path to rslint binary
+  workingDirectory?: string; // Working directory
 }
 ```
 
 #### Lint Method
+
 ```typescript
 async lint(options: LintOptions): Promise<LintResponse>
 
@@ -236,16 +253,19 @@ interface LintOptions {
 ```
 
 #### Cleanup
+
 ```typescript
 close(): Promise<void>
 ```
 
 ### Convenience Function
+
 ```typescript
-export async function lint(options: LintOptions): Promise<LintResponse>
+export async function lint(options: LintOptions): Promise<LintResponse>;
 ```
 
 ### Response Types
+
 ```typescript
 export interface LintResponse {
   diagnostics: Diagnostic[];
@@ -269,7 +289,7 @@ export interface Range {
 }
 
 export interface Position {
-  line: number;      // 0-based
+  line: number; // 0-based
   character: number; // 0-based
 }
 ```
@@ -277,40 +297,44 @@ export interface Position {
 ### Usage Examples
 
 #### One-shot Linting
+
 ```javascript
 import { lint } from '@rslint/core';
 
 const result = await lint({
   tsconfig: './tsconfig.json',
-  files: ['src/**/*.ts']
+  files: ['src/**/*.ts'],
 });
 
 console.log(`Found ${result.errorCount} errors`);
 ```
 
 #### Service-based Usage
+
 ```javascript
 import { RSLintService } from '@rslint/core';
 
 const service = new RSLintService();
-const result = await service.lint({ 
-  files: ['src/index.ts'] 
+const result = await service.lint({
+  files: ['src/index.ts'],
 });
 await service.close();
 ```
 
 #### Virtual File System
+
 ```javascript
 const result = await lint({
   fileContents: {
-    '/path/to/file.ts': 'let x: any = 10; x.foo = 5;'
-  }
+    '/path/to/file.ts': 'let x: any = 10; x.foo = 5;',
+  },
 });
 ```
 
 ## Configuration
 
 ### Configuration File Format
+
 RSLint uses an array-based configuration format (JSON/JSONC):
 
 ```jsonc
@@ -321,19 +345,20 @@ RSLint uses an array-based configuration format (JSON/JSONC):
     "languageOptions": {
       "parserOptions": {
         "project": ["./tsconfig.json"],
-        "projectService": false
-      }
+        "projectService": false,
+      },
     },
     "rules": {
       "no-array-delete": "error",
       "no-unsafe-assignment": "warn",
-      "prefer-as-const": "error"
-    }
-  }
+      "prefer-as-const": "error",
+    },
+  },
 ]
 ```
 
 ### Configuration Schema
+
 ```go
 type RslintConfig []ConfigEntry
 
@@ -355,7 +380,9 @@ type ParserOptions struct {
 ```
 
 ### Rule Configuration
+
 Rules can be configured with the following severity levels:
+
 - `"off"` or `0` - Rule is disabled
 - `"warn"` or `1` - Rule produces warnings
 - `"error"` or `2` - Rule produces errors
@@ -363,6 +390,7 @@ Rules can be configured with the following severity levels:
 ## Rule Development API
 
 ### Rule Structure
+
 ```go
 type Rule struct {
     Name string
@@ -373,6 +401,7 @@ type RuleListeners map[ast.Kind](func(node *ast.Node))
 ```
 
 ### Rule Context
+
 ```go
 type RuleContext struct {
     SourceFile                 *ast.SourceFile
@@ -389,6 +418,7 @@ type RuleContext struct {
 ### Reporting Functions
 
 #### Basic Reporting
+
 ```go
 // Report diagnostic at specific text range
 ctx.ReportRange(textRange, RuleMessage{Description: "Error message"})
@@ -398,9 +428,10 @@ ctx.ReportNode(node, RuleMessage{Description: "Error message"})
 ```
 
 #### Advanced Reporting
+
 ```go
 // Report with automatic fixes
-ctx.ReportNodeWithFixes(node, message, 
+ctx.ReportNodeWithFixes(node, message,
     RuleFix{Text: "replacement", Range: range})
 
 // Report with suggestions
@@ -412,6 +443,7 @@ ctx.ReportNodeWithSuggestions(node, message,
 ```
 
 ### Rule Development Pattern
+
 ```go
 var MyRule = rule.Rule{
     Name: "my-rule",
@@ -431,7 +463,9 @@ var MyRule = rule.Rule{
 ```
 
 ### AST Node Kinds
+
 Rules can listen to specific AST node types:
+
 - `ast.KindBinaryExpression`
 - `ast.KindCallExpression`
 - `ast.KindVariableDeclaration`
@@ -442,6 +476,7 @@ Rules can listen to specific AST node types:
 ## Built-in Rules (48 total)
 
 ### Type Safety Rules
+
 - `await-thenable` - Disallows awaiting non-thenable values
 - `no-unsafe-argument` - Disallows calling with unsafe arguments
 - `no-unsafe-assignment` - Disallows unsafe value assignments
@@ -453,6 +488,7 @@ Rules can listen to specific AST node types:
 - `no-unsafe-unary-minus` - Disallows unsafe unary minus operations
 
 ### Promise Handling Rules
+
 - `no-floating-promises` - Requires proper handling of promises
 - `no-misused-promises` - Prevents misuse of promises
 - `prefer-promise-reject-errors` - Requires rejecting with Error objects
@@ -460,6 +496,7 @@ Rules can listen to specific AST node types:
 - `return-await` - Enforces consistent await usage in return statements
 
 ### Code Quality Rules
+
 - `no-array-delete` - Disallows delete operator on arrays
 - `no-base-to-string` - Disallows toString() on non-string types
 - `no-for-in-array` - Disallows for-in loops over arrays
@@ -483,6 +520,7 @@ Rules can listen to specific AST node types:
 ## Integration Examples
 
 ### Command Line
+
 ```bash
 # Basic linting
 rslint
@@ -501,9 +539,11 @@ rslint --api
 ```
 
 ### VS Code Integration
+
 The VS Code extension automatically uses the LSP server for real-time linting.
 
 ### Build System Integration
+
 ```javascript
 // webpack.config.js
 const { lint } = require('@rslint/core');
@@ -513,22 +553,23 @@ const rslintPlugin = {
     compiler.hooks.compilation.tap('RSLintPlugin', async () => {
       const result = await lint({
         files: ['src/**/*.ts'],
-        tsconfig: './tsconfig.json'
+        tsconfig: './tsconfig.json',
       });
-      
+
       if (result.errorCount > 0) {
         console.error(`RSLint found ${result.errorCount} errors`);
       }
     });
-  }
+  },
 };
 
 module.exports = {
-  plugins: [rslintPlugin]
+  plugins: [rslintPlugin],
 };
 ```
 
 ### CI/CD Integration
+
 ```yaml
 # .github/workflows/lint.yml
 name: Lint
@@ -567,6 +608,7 @@ jobs:
 ## Common Debugging Patterns & Gotchas
 
 ### Rule Registration
+
 - Rules must be registered with BOTH namespaced and non-namespaced names:
   ```go
   GlobalRuleRegistry.Register("@typescript-eslint/array-type", array_type.ArrayTypeRule)
@@ -575,22 +617,26 @@ jobs:
 - Tests often use the non-namespaced version (e.g., "array-type" not "@typescript-eslint/array-type")
 
 ### AST Navigation
+
 - Use `utils.GetNameFromMember()` for robust property name extraction instead of custom implementations
 - Class members are accessed via `node.Members()` which returns `[]*ast.Node` directly (not a NodeList)
 - Accessor properties (`accessor a = ...`) are `PropertyDeclaration` nodes with the accessor modifier
 
 ### Position/Range Reporting
+
 - RSLint uses 1-based line and column numbers for compatibility with TypeScript-ESLint
 - The IPC API uses 0-based positions internally but converts to 1-based for display
 - When reporting on nodes, consider which part should be highlighted (e.g., identifier vs entire declaration)
 
 ### Common Issues & Solutions
+
 1. **Infinite loops/timeouts**: Check for recursive function calls without proper base cases
 2. **Rule not executing**: Verify rule is registered in `config.go` with both naming variants
 3. **Message ID mismatches**: Use camelCase message IDs or ensure `messageId` field is populated
 4. **Test snapshot mismatches**: Update snapshots when rule count changes
 
 ### Testing Best Practices
+
 - Run specific tests with: `node --import=tsx/esm --test tests/typescript-eslint/rules/RULE_NAME.test.ts`
 - Update API test snapshots after rule changes: `cd packages/rslint && npm test -- --update-snapshots`
 - Debug output can be added with `fmt.Printf()` but remember to remove it before committing
@@ -604,6 +650,7 @@ Rslint is a high-performance TypeScript/JavaScript linter written in Go, designe
 ## Project Structure
 
 ### Core Components
+
 - **Go Backend** (`cmd/`, `internal/`): Core linter engine written in Go
 - **Node.js Package** (`packages/rslint/`): JavaScript API and CLI wrapper
 - **VS Code Extension** (`packages/vscode-extension/`): Editor integration
@@ -611,6 +658,7 @@ Rslint is a high-performance TypeScript/JavaScript linter written in Go, designe
 - **TypeScript Shims** (`shim/`): Go bindings for TypeScript compiler
 
 ### Key Directories
+
 ```
 cmd/rslint/          # Main Go binary entry point
 internal/
@@ -630,11 +678,13 @@ typescript-go/         # TypeScript compiler Go port
 ## Technologies & Languages
 
 ### Primary Stack
+
 - **Go 1.24+**: Core linter implementation
 - **TypeScript/JavaScript**: Node.js API, tooling, and VS Code extension
 - **typescript-go**: TypeScript compiler bindings for Go
 
 ### Build Tools
+
 - **pnpm**: Package management (workspace setup)
 - **Go modules**: Go dependency management
 - **TypeScript**: Compilation and type checking
@@ -644,6 +694,7 @@ typescript-go/         # TypeScript compiler Go port
 ### Code Style & Patterns
 
 #### Go Code
+
 - Follow standard Go conventions and `gofmt` formatting
 - Use structured error handling with context
 - Implement rules as separate packages in `internal/rules/`
@@ -651,12 +702,14 @@ typescript-go/         # TypeScript compiler Go port
 - Use the rule framework defined in `internal/rule/rule.go`
 
 #### TypeScript/JavaScript Code
+
 - Use TypeScript for all new code
 - Follow the existing ESM module structure
 - Maintain compatibility with Node.js APIs
 - Use proper type definitions for Go binary interactions
 
 ### Rule Implementation
+
 When implementing new lint rules:
 
 1. **Create rule directory**: `internal/rules/rule_name/`
@@ -666,12 +719,14 @@ When implementing new lint rules:
 5. **Update documentation**: Include rule description and examples
 
 ### Testing Strategy
+
 - **Go tests**: Use Go's built-in testing framework
 - **Rule tests**: Utilize the `rule_tester` package
 - **Node.js tests**: Use Node.js test runner for JavaScript API
 - **Integration tests**: Test the complete CLI workflow
 
 ### Build Process
+
 ```bash
 # Run Install
 pnpm install
@@ -679,10 +734,10 @@ pnpm install
 # Run build
 pnpm build
 
-# Run format  
+# Run format
 pnpm format:check
 
-# Run lint  
+# Run lint
 pnpm lint
 
 # Run tests
@@ -693,12 +748,14 @@ pnpm test
 ## API Guidelines
 
 ### Go API
+
 - Rules implement the `Rule` interface with `Check()` method
 - Use `Diagnostic` structs for reporting issues
 - Leverage `SourceCodeFixer` for auto-fixes
 - Access TypeScript type information through the checker
 
 ### JavaScript API
+
 - Provide ESLint-compatible configuration format
 - Support async operations for file processing
 - Maintain compatibility with existing ESLint tooling
@@ -707,12 +764,14 @@ pnpm test
 ## Performance Considerations
 
 ### Optimization Principles
+
 - **Parallel processing**: Utilize all CPU cores for file processing
 - **Memory efficiency**: Minimize allocations in hot paths
 - **Caching**: Cache TypeScript compiler results when possible
 - **Direct AST usage**: Avoid AST transformations/conversions
 
 ### Profiling & Benchmarks
+
 - Use Go's built-in profiling tools (`go tool pprof`)
 - Maintain benchmarks in `benchmarks/` directory
 - Compare performance against ESLint baselines
@@ -721,11 +780,13 @@ pnpm test
 ## Integration Points
 
 ### VS Code Extension
+
 - Language Server Protocol (LSP) support via `--lsp` flag
 - Real-time diagnostics and quick fixes
 - Configuration integration with workspace settings
 
 ### Node.js Ecosystem
+
 - ESLint configuration compatibility
 - npm package distribution
 - CI/CD integration support
@@ -733,6 +794,7 @@ pnpm test
 ## Common Patterns
 
 ### Adding a New Rule
+
 ```go
 // internal/rules/my_rule/my_rule.go
 package my_rule
@@ -754,28 +816,33 @@ func NewRule() rule.Rule {
 ```
 
 ### TypeScript Integration
+
 - Use `checker` package for type information
 - Access AST nodes through `ast` package
 - Utilize `scanner` for source location details
 
 ### Error Handling
+
 - Return structured diagnostics with precise locations
 - Include fix suggestions when possible
 - Provide clear, actionable error messages
 
 ## File Naming Conventions
+
 - Go files: `snake_case.go`
 - TypeScript files: `kebab-case.ts` or `camelCase.ts`
 - Test files: `*_test.go` for Go, `*.test.ts` for TypeScript
 - Rule directories: `rule_name/` (snake_case)
 
 ## Documentation Requirements
+
 - Document all public APIs
 - Include usage examples for rules
 - Maintain README files for major components
 - Update benchmarks when adding performance-critical features
 
 ## Compatibility & Migration
+
 - Maintain ESLint rule compatibility where possible
 - Provide migration guides for ESLint users
 - Support TypeScript-ESLint configuration formats

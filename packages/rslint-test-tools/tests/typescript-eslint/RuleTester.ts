@@ -73,7 +73,15 @@ export class RuleTester {
   public run(
     ruleName: string,
     cases: {
-      valid: (string | { code: string; options?: any[]; languageOptions?: any; filename?: string })[];
+      valid: (
+        | string
+        | {
+            code: string;
+            options?: any[];
+            languageOptions?: any;
+            filename?: string;
+          }
+      )[];
       invalid: {
         code: string;
         errors: any[];
@@ -94,10 +102,11 @@ export class RuleTester {
       await test('valid', async () => {
         for (const testCase of cases.valid) {
           const code = typeof testCase === 'string' ? testCase : testCase.code;
-          const options = typeof testCase === 'string' ? undefined : testCase.options;
-          
+          const options =
+            typeof testCase === 'string' ? undefined : testCase.options;
+
           const ruleConfig = options ? ['error', ...options] : 'error';
-          
+
           const diags = await Promise.race<LintResponse>([
             lint({
               config,
@@ -109,9 +118,17 @@ export class RuleTester {
                 [ruleName]: JSON.stringify(ruleConfig),
               },
             }),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error(`Timeout after 30s for rule ${ruleName} valid case`)), 30000)
-            )
+            new Promise((_, reject) =>
+              setTimeout(
+                () =>
+                  reject(
+                    new Error(
+                      `Timeout after 30s for rule ${ruleName} valid case`,
+                    ),
+                  ),
+                30000,
+              ),
+            ),
           ]);
           if (diags.diagnostics?.length > 0) {
             console.error('Failed valid test case:', code);
@@ -128,9 +145,9 @@ export class RuleTester {
         for (let i = 0; i < cases.invalid.length; i++) {
           const testCase = cases.invalid[i];
           const { errors, code, options } = testCase;
-          
+
           const ruleConfig = options ? ['error', ...options] : 'error';
-          
+
           const diags = await Promise.race<LintResponse>([
             lint({
               config,
@@ -142,14 +159,22 @@ export class RuleTester {
                 [ruleName]: JSON.stringify(ruleConfig),
               },
             }),
-            new Promise((_, reject) => 
-              setTimeout(() => reject(new Error(`Timeout after 30s for rule ${ruleName} invalid case`)), 30000)
-            )
+            new Promise((_, reject) =>
+              setTimeout(
+                () =>
+                  reject(
+                    new Error(
+                      `Timeout after 30s for rule ${ruleName} invalid case`,
+                    ),
+                  ),
+                30000,
+              ),
+            ),
           ]);
           t.assert.snapshot(diags);
           assert(
             diags.diagnostics?.length > 0,
-            `Expected diagnostics for invalid case: ${JSON.stringify({code, options, diags})}`,
+            `Expected diagnostics for invalid case: ${JSON.stringify({ code, options, diags })}`,
           );
           checkDiagnosticEqual(diags.diagnostics, errors);
         }
