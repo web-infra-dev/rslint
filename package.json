@@ -14,7 +14,6 @@
   "license": "MIT",
   "scripts": {
     "build": "pnpm -r build",
-    "build:go": "go build -o rslint ./cmd/rslint",
     "build:npm": "zx scripts/build-npm.mjs",
     "version": "zx scripts/version.mjs",
     "release": "pnpm publish -r --no-git-checks ",

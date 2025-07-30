@@ -113,22 +113,20 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 	}
 
 	type Diagnostic struct {
-		RuleName  string `json:"ruleName"`
-		MessageID string `json:"messageId,omitempty"`
-		Message   string `json:"message"`
-		FilePath  string `json:"filePath"`
-		Range     Range  `json:"range"`
-		Severity  string `json:"severity"`
+		RuleName string `json:"ruleName"`
+		Message  string `json:"message"`
+		FilePath string `json:"filePath"`
+		Range    Range  `json:"range"`
+		Severity string `json:"severity"`
 	}
 
 	diagnostic := Diagnostic{
-		RuleName:  d.RuleName,
-		MessageID: d.Message.Id,
-		Message:   d.Message.Description,
-		FilePath:  tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions),
+		RuleName: d.RuleName,
+		Message:  d.Message.Description,
+		FilePath: tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions),
 		Range: Range{
 			Start: Location{
-				Line:   startLine + 1,
+				Line:   startLine + 1, // Convert to 1-based indexing
 				Column: startColumn + 1,
 			},
 			End: Location{

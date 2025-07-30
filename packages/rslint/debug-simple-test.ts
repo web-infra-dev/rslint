@@ -1,1 +1,0 @@
-var Object = 0;
