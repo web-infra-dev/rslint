@@ -1,10 +1,8 @@
 // Forked and modified from https://github.com/typescript-eslint/typescript-eslint/blob/16c344ec7d274ea542157e0f19682dd1930ab838/packages/rule-tester/src/RuleTester.ts#L4
 
 import path from 'node:path';
-import test from 'node:test';
-import util from 'node:util';
+import { test, describe, expect } from '@rstest/core';
 import { lint, type Diagnostic } from '@rslint/core';
-
 import assert from 'node:assert';
 
 interface TsDiagnostic {
@@ -83,7 +81,7 @@ export class RuleTester {
       }[];
     },
   ) {
-    test(ruleName, async () => {
+    describe(ruleName, () => {
       let cwd = path.resolve(import.meta.dirname, './fixtures');
       const config = path.resolve(
         import.meta.dirname,
@@ -99,7 +97,7 @@ export class RuleTester {
             return false;
           }
         }) || cases.invalid.some(x => x.only);
-      await test('valid', async () => {
+      test('valid', async () => {
         for (const validCase of cases.valid) {
           if (typeof validCase === 'object' && validCase.skip) {
             continue;
@@ -147,7 +145,7 @@ export class RuleTester {
           );
         }
       });
-      await test('invalid', async t => {
+      test('invalid', async t => {
         for (const item of cases.invalid) {
           const {
             code,
@@ -172,7 +170,7 @@ export class RuleTester {
               [ruleName]: options,
             },
           });
-          t.assert.snapshot(diags);
+          expect(diags).toMatchSnapshot();
 
           assert(
             diags.diagnostics?.length > 0,

@@ -5,8 +5,8 @@
   "main": "src/index.ts",
   "private": true,
   "scripts": {
-    "test": "node --test ",
-    "test:update": "node --test --test-update-snapshots "
+    "test": "rstest run --testTimeout=0",
+    "test:update": "rstest run -u --testTimeout=0"
   },
   "keywords": [],
   "author": "",
