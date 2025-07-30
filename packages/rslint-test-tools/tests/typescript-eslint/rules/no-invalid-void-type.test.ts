@@ -1,6 +1,8 @@
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
+
+
 const ruleTester = new RuleTester({
   languageOptions: {
     parserOptions: {
@@ -10,12 +12,7 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('no-invalid-void-type', {
-  valid: [],
-  invalid: [],
-});
-
-ruleTester.run('no-invalid-void-type: allowInGenericTypeArguments: false', {
+ruleTester.run('allowInGenericTypeArguments: false', {
   valid: [
     {
       code: 'type Generic<T> = [T];',
@@ -108,7 +105,7 @@ function foo(): void | never {
   ],
 });
 
-ruleTester.run('no-invalid-void-type: allowInGenericTypeArguments: true', {
+ruleTester.run('allowInGenericTypeArguments: true', {
   valid: [
     'function func(): void {}',
     'type NormalType = () => void;',
@@ -178,7 +175,7 @@ class SomeClass {
   }
 }
     `,
-    `
+    noFormat`
 class SomeClass {
   'f'(): void;
   'f'(x: string): string;
@@ -698,7 +695,7 @@ class SomeClass {
   ],
 });
 
-ruleTester.run('no-invalid-void-type: allowInGenericTypeArguments: whitelist', {
+ruleTester.run('allowInGenericTypeArguments: whitelist', {
   valid: [
     'type Allowed<T> = [T];',
     'type Banned<T> = [T];',
@@ -711,10 +708,12 @@ ruleTester.run('no-invalid-void-type: allowInGenericTypeArguments: whitelist', {
       options: [{ allowInGenericTypeArguments: ['Ex.Mx.Tx'] }],
     },
     {
+      // eslint-disable-next-line @typescript-eslint/internal/plugin-test-formatting
       code: 'type AllowedVoid = Ex . Mx . Tx<void>;',
       options: [{ allowInGenericTypeArguments: ['Ex.Mx.Tx'] }],
     },
     {
+      // eslint-disable-next-line @typescript-eslint/internal/plugin-test-formatting
       code: 'type AllowedVoid = Ex . Mx . Tx<void>;',
       options: [{ allowInGenericTypeArguments: ['Ex.Mx . Tx'] }],
     },
@@ -787,7 +786,7 @@ async function foo(bar: () => void | Promise<void>) {
   ],
 });
 
-ruleTester.run('no-invalid-void-type: allowAsThisParameter: true', {
+ruleTester.run('allowAsThisParameter: true', {
   valid: [
     {
       code: 'function f(this: void) {}',

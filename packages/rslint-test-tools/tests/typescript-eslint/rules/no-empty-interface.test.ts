@@ -1,14 +1,14 @@
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
-import { noFormat } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
 
+
 const ruleTester = new RuleTester({
-  parser: '@typescript-eslint/parser',
-  parserOptions: {
-    ecmaVersion: 2018,
-    tsconfigRootDir: rootPath,
-    project: './tsconfig.json',
+  languageOptions: {
+    parserOptions: {
+      project: './tsconfig.json',
+      tsconfigRootDir: rootPath,
+    },
   },
 });
 
@@ -59,9 +59,9 @@ class Bar {}
       code: 'interface Foo {}',
       errors: [
         {
-          messageId: 'noEmpty',
-          line: 1,
           column: 11,
+          line: 1,
+          messageId: 'noEmpty',
         },
       ],
       output: null,
@@ -70,9 +70,9 @@ class Bar {}
       code: noFormat`interface Foo extends {}`,
       errors: [
         {
-          messageId: 'noEmpty',
-          line: 1,
           column: 11,
+          line: 1,
+          messageId: 'noEmpty',
         },
       ],
       output: null,
@@ -89,9 +89,9 @@ class Baz {}
       `,
       errors: [
         {
-          messageId: 'noEmptyWithSuper',
-          line: 6,
           column: 11,
+          line: 6,
+          messageId: 'noEmptyWithSuper',
         },
       ],
       options: [{ allowSingleExtends: false }],
@@ -117,9 +117,9 @@ class Bar {}
       `,
       errors: [
         {
-          messageId: 'noEmptyWithSuper',
-          line: 6,
           column: 11,
+          line: 6,
+          messageId: 'noEmptyWithSuper',
         },
       ],
       options: [{ allowSingleExtends: false }],
@@ -137,9 +137,9 @@ const bar = class Bar {};
       `,
       errors: [
         {
-          messageId: 'noEmptyWithSuper',
-          line: 6,
           column: 11,
+          line: 6,
+          messageId: 'noEmptyWithSuper',
         },
       ],
       options: [{ allowSingleExtends: false }],
@@ -163,9 +163,9 @@ interface Bar extends Foo {}
       `,
       errors: [
         {
-          messageId: 'noEmptyWithSuper',
-          line: 6,
           column: 11,
+          line: 6,
+          messageId: 'noEmptyWithSuper',
         },
       ],
       options: [{ allowSingleExtends: false }],
@@ -181,9 +181,9 @@ type Bar = Foo
       code: 'interface Foo extends Array<number> {}',
       errors: [
         {
-          messageId: 'noEmptyWithSuper',
-          line: 1,
           column: 11,
+          line: 1,
+          messageId: 'noEmptyWithSuper',
         },
       ],
       output: `type Foo = Array<number>`,
@@ -192,9 +192,9 @@ type Bar = Foo
       code: 'interface Foo extends Array<number | {}> {}',
       errors: [
         {
-          messageId: 'noEmptyWithSuper',
-          line: 1,
           column: 11,
+          line: 1,
+          messageId: 'noEmptyWithSuper',
         },
       ],
       output: `type Foo = Array<number | {}>`,
@@ -208,9 +208,9 @@ interface Foo extends Array<Bar> {}
       `,
       errors: [
         {
-          messageId: 'noEmptyWithSuper',
-          line: 5,
           column: 11,
+          line: 5,
+          messageId: 'noEmptyWithSuper',
         },
       ],
       output: `
@@ -227,9 +227,9 @@ interface Foo extends R {}
       `,
       errors: [
         {
-          messageId: 'noEmptyWithSuper',
-          line: 3,
           column: 11,
+          line: 3,
+          messageId: 'noEmptyWithSuper',
         },
       ],
       output: `
@@ -243,9 +243,9 @@ interface Foo<T> extends Bar<T> {}
       `,
       errors: [
         {
-          messageId: 'noEmptyWithSuper',
-          line: 2,
           column: 11,
+          line: 2,
+          messageId: 'noEmptyWithSuper',
         },
       ],
       output: `
@@ -261,11 +261,11 @@ declare module FooBar {
       `,
       errors: [
         {
-          messageId: 'noEmptyWithSuper',
-          line: 4,
           column: 20,
           endColumn: 23,
           endLine: 4,
+          line: 4,
+          messageId: 'noEmptyWithSuper',
           suggestions: [
             {
               messageId: 'noEmptyWithSuper',

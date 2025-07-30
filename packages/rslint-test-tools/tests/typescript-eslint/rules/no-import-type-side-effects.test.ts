@@ -1,16 +1,18 @@
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
-const rule = '@typescript-eslint/no-import-type-side-effects';
+const rootPath = getFixturesRootDir();
+
 
 const ruleTester = new RuleTester({
-  parser: '@typescript-eslint/parser',
-  defaultFilenames: {
-    ts: 'foo.ts',
-    tsx: 'foo.tsx',
+  languageOptions: {
+    parserOptions: {
+      project: './tsconfig.json',
+      tsconfigRootDir: rootPath,
+    },
   },
 });
 
-ruleTester.run(rule, {
+ruleTester.run('no-import-type-side-effects', {
   valid: [
     "import T from 'mod';",
     "import * as T from 'mod';",

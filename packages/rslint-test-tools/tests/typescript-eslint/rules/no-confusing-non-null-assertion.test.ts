@@ -1,17 +1,23 @@
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
+// this rule enforces adding parens, which prettier will want to fix and break the tests
+/* eslint "@typescript-eslint/internal/plugin-test-formatting": ["error", { formatWithPrettier: false }] */
+
+
 
 const ruleTester = new RuleTester({
-  parser: '@rslint/parser',
-  parserOptions: {
-    tsconfigRootDir: rootPath,
-    project: './tsconfig.json',
+  languageOptions: {
+    parserOptions: {
+      project: './tsconfig.json',
+      tsconfigRootDir: rootPath,
+    },
   },
 });
 
 ruleTester.run('no-confusing-non-null-assertion', {
   valid: [
+    //
     'a == b!;',
     'a = b!;',
     'a !== b;',
@@ -172,7 +178,7 @@ ruleTester.run('no-confusing-non-null-assertion', {
       ],
     },
     {
-      code: `
+      code: noFormat`
 a !in b;
       `,
       errors: [

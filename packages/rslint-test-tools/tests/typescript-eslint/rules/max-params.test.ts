@@ -1,12 +1,12 @@
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
+
 
 const ruleTester = new RuleTester({
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
-      projectService: false,
       tsconfigRootDir: rootPath,
     },
   },
@@ -14,31 +14,25 @@ const ruleTester = new RuleTester({
 
 ruleTester.run('max-params', {
   valid: [
-    { code: 'function foo() {}' },
-    { code: 'const foo = function () {};' },
-    { code: 'const foo = () => {};' },
-    { code: 'function foo(a) {}' },
-    {
-      code: `
+    'function foo() {}',
+    'const foo = function () {};',
+    'const foo = () => {};',
+    'function foo(a) {}',
+    `
 class Foo {
   constructor(a) {}
 }
     `,
-    },
-    {
-      code: `
+    `
 class Foo {
   method(this: void, a, b, c) {}
 }
     `,
-    },
-    {
-      code: `
+    `
 class Foo {
   method(this: Foo, a, b) {}
 }
     `,
-    },
     {
       code: 'function foo(a, b, c, d) {}',
       options: [{ max: 4 }],
@@ -85,10 +79,7 @@ type sum = (a: number, b: number) => number;
     },
   ],
   invalid: [
-    {
-      code: 'function foo(a, b, c, d) {}',
-      errors: [{ messageId: 'exceed' }],
-    },
+    { code: 'function foo(a, b, c, d) {}', errors: [{ messageId: 'exceed' }] },
     {
       code: 'const foo = function (a, b, c, d) {};',
       errors: [{ messageId: 'exceed' }],

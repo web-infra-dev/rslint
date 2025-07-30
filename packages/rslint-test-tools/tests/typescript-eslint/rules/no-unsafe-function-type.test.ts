@@ -1,6 +1,7 @@
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
+
 
 const ruleTester = new RuleTester({
   languageOptions: {
@@ -34,6 +35,7 @@ ruleTester.run('no-unsafe-function-type', {
           messageId: 'bannedFunctionType',
         },
       ],
+      output: null,
     },
     {
       code: 'let value: Function[];',
@@ -44,6 +46,7 @@ ruleTester.run('no-unsafe-function-type', {
           messageId: 'bannedFunctionType',
         },
       ],
+      output: null,
     },
     {
       code: 'let value: Function | number;',
@@ -54,6 +57,7 @@ ruleTester.run('no-unsafe-function-type', {
           messageId: 'bannedFunctionType',
         },
       ],
+      output: null,
     },
     {
       code: `
@@ -68,6 +72,7 @@ ruleTester.run('no-unsafe-function-type', {
           messageId: 'bannedFunctionType',
         },
       ],
+      output: null,
     },
     {
       code: `
@@ -82,6 +87,7 @@ ruleTester.run('no-unsafe-function-type', {
           messageId: 'bannedFunctionType',
         },
       ],
+      output: null,
     },
   ],
 });

@@ -1,6 +1,8 @@
 import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
+
+
 const ruleTester = new RuleTester({
   languageOptions: {
     parserOptions: {

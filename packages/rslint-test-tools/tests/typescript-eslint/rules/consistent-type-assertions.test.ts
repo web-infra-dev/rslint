@@ -1,6 +1,9 @@
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
+
+
+
 const ruleTester = new RuleTester({
   languageOptions: {
     parserOptions: {
@@ -10,17 +13,10 @@ const ruleTester = new RuleTester({
   },
 });
 
-// Type declarations for test cases
-declare class Generic<T> {
-  constructor();
-}
-declare type Foo = any;
-declare type A = any;
-
 ruleTester.run('consistent-type-assertions', {
   valid: [
     {
-      code: 'const x = new Generic<number>() as Foo;',
+      code: 'const x = new Generic<int>() as Foo;',
       options: [
         {
           assertionStyle: 'as',
@@ -47,7 +43,7 @@ ruleTester.run('consistent-type-assertions', {
       ],
     },
     {
-      code: "const x = 'string' as string | number;",
+      code: "const x = 'string' as a | b;",
       options: [
         {
           assertionStyle: 'as',
@@ -137,7 +133,7 @@ ruleTester.run('consistent-type-assertions', {
       ],
     },
     {
-      code: 'const x = <Foo>new Generic<number>();',
+      code: 'const x = <Foo>new Generic<int>();',
       options: [
         {
           assertionStyle: 'angle-bracket',
@@ -164,7 +160,7 @@ ruleTester.run('consistent-type-assertions', {
       ],
     },
     {
-      code: "const x = <string | number>'string';",
+      code: "const x = <a | b>'string';",
       options: [
         {
           assertionStyle: 'angle-bracket',
@@ -254,11 +250,11 @@ ruleTester.run('consistent-type-assertions', {
       ],
     },
     {
-      code: 'const x = {} as Foo<number>;',
+      code: 'const x = {} as Foo<int>;',
       options: [{ assertionStyle: 'as', objectLiteralTypeAssertions: 'allow' }],
     },
     {
-      code: 'const x = {} as string | number;',
+      code: 'const x = {} as a | b;',
       options: [{ assertionStyle: 'as', objectLiteralTypeAssertions: 'allow' }],
     },
     {
@@ -302,7 +298,7 @@ function foo() {
       options: [{ assertionStyle: 'as', objectLiteralTypeAssertions: 'allow' }],
     },
     {
-      code: 'const x = <Foo<number>>{};',
+      code: 'const x = <Foo<int>>{};',
       options: [
         {
           assertionStyle: 'angle-bracket',
@@ -311,7 +307,7 @@ function foo() {
       ],
     },
     {
-      code: 'const x = <string | number>{};',
+      code: 'const x = <a | b>{};',
       options: [
         {
           assertionStyle: 'angle-bracket',
@@ -709,16 +705,15 @@ function foo() {
         },
       ],
     },
-    // Commented out - uses custom parser not supported in RSLint
-    // {
-    //   code: '123;',
-    //   languageOptions: {
-    //     // simulate a 3rd party parser that doesn't provide parser services
-    //     parser: {
-    //       parse: (): TSESTree.Program => parser.parse('123;'),
-    //     },
-    //   },
-    // },
+    {
+      code: '123;',
+      languageOptions: {
+        // simulate a 3rd party parser that doesn't provide parser services
+        parser: {
+          parse: (): TSESTree.Program => parser.parse('123;'),
+        },
+      },
+    },
     {
       code: `
 const x = { key: 'value' } as any;
@@ -734,7 +729,7 @@ const x = { key: 'value' } as unknown;
   ],
   invalid: [
     {
-      code: 'const x = new Generic<number>() as Foo;',
+      code: 'const x = new Generic<int>() as Foo;',
       errors: [
         {
           line: 1,
@@ -764,7 +759,7 @@ const x = { key: 'value' } as unknown;
       options: [{ assertionStyle: 'angle-bracket' }],
     },
     {
-      code: "const x = 'string' as string | number;",
+      code: "const x = 'string' as a | b;",
       errors: [
         {
           line: 1,
@@ -864,7 +859,7 @@ const x = { key: 'value' } as unknown;
       options: [{ assertionStyle: 'angle-bracket' }],
     },
     {
-      code: 'const x = <Foo>new Generic<number>();',
+      code: 'const x = <Foo>new Generic<int>();',
       errors: [
         {
           line: 1,
@@ -872,7 +867,7 @@ const x = { key: 'value' } as unknown;
         },
       ],
       options: [{ assertionStyle: 'as' }],
-      output: 'const x = new Generic<number>() as Foo;',
+      output: 'const x = new Generic<int>() as Foo;',
     },
     {
       code: 'const x = <A>b;',
@@ -897,7 +892,7 @@ const x = { key: 'value' } as unknown;
       output: 'const x = [1] as readonly number[];',
     },
     {
-      code: "const x = <string | number>'string';",
+      code: "const x = <a | b>'string';",
       errors: [
         {
           line: 1,
@@ -905,7 +900,7 @@ const x = { key: 'value' } as unknown;
         },
       ],
       options: [{ assertionStyle: 'as' }],
-      output: "const x = 'string' as string | number;",
+      output: "const x = 'string' as a | b;",
     },
     {
       code: "const x = <A>!'string';",
@@ -1007,7 +1002,7 @@ const x = { key: 'value' } as unknown;
       output: "const x = { key: 'value' } as const;",
     },
     {
-      code: 'const x = new Generic<number>() as Foo;',
+      code: 'const x = new Generic<int>() as Foo;',
       errors: [
         {
           line: 1,
@@ -1037,7 +1032,7 @@ const x = { key: 'value' } as unknown;
       options: [{ assertionStyle: 'never' }],
     },
     {
-      code: "const x = 'string' as string | number;",
+      code: "const x = 'string' as a | b;",
       errors: [
         {
           line: 1,
@@ -1127,7 +1122,7 @@ const x = { key: 'value' } as unknown;
       options: [{ assertionStyle: 'never' }],
     },
     {
-      code: 'const x = <Foo>new Generic<number>();',
+      code: 'const x = <Foo>new Generic<int>();',
       errors: [
         {
           line: 1,
@@ -1157,7 +1152,7 @@ const x = { key: 'value' } as unknown;
       options: [{ assertionStyle: 'never' }],
     },
     {
-      code: "const x = <string | number>'string';",
+      code: "const x = <a | b>'string';",
       errors: [
         {
           line: 1,
@@ -1247,21 +1242,21 @@ const x = { key: 'value' } as unknown;
       options: [{ assertionStyle: 'never' }],
     },
     {
-      code: 'const x = {} as Foo<number>;',
+      code: 'const x = {} as Foo<int>;',
       errors: [
         {
           line: 1,
           messageId: 'unexpectedObjectTypeAssertion',
           suggestions: [
             {
-              data: { cast: 'Foo<number>' },
+              data: { cast: 'Foo<int>' },
               messageId: 'replaceObjectTypeAssertionWithAnnotation',
-              output: 'const x: Foo<number> = {};',
+              output: 'const x: Foo<int> = {};',
             },
             {
-              data: { cast: 'Foo<number>' },
+              data: { cast: 'Foo<int>' },
               messageId: 'replaceObjectTypeAssertionWithSatisfies',
-              output: 'const x = {} satisfies Foo<number>;',
+              output: 'const x = {} satisfies Foo<int>;',
             },
           ],
         },
@@ -1274,21 +1269,21 @@ const x = { key: 'value' } as unknown;
       ],
     },
     {
-      code: 'const x = {} as string | number;',
+      code: 'const x = {} as a | b;',
       errors: [
         {
           line: 1,
           messageId: 'unexpectedObjectTypeAssertion',
           suggestions: [
             {
-              data: { cast: 'string | number' },
+              data: { cast: 'a | b' },
               messageId: 'replaceObjectTypeAssertionWithAnnotation',
-              output: 'const x: string | number = {};',
+              output: 'const x: a | b = {};',
             },
             {
-              data: { cast: 'string | number' },
+              data: { cast: 'a | b' },
               messageId: 'replaceObjectTypeAssertionWithSatisfies',
-              output: 'const x = {} satisfies string | number;',
+              output: 'const x = {} satisfies a | b;',
             },
           ],
         },
@@ -1323,21 +1318,21 @@ const x = { key: 'value' } as unknown;
       ],
     },
     {
-      code: 'const x = <Foo<number>>{};',
+      code: 'const x = <Foo<int>>{};',
       errors: [
         {
           line: 1,
           messageId: 'unexpectedObjectTypeAssertion',
           suggestions: [
             {
-              data: { cast: 'Foo<number>' },
+              data: { cast: 'Foo<int>' },
               messageId: 'replaceObjectTypeAssertionWithAnnotation',
-              output: 'const x: Foo<number> = {};',
+              output: 'const x: Foo<int> = {};',
             },
             {
-              data: { cast: 'Foo<number>' },
+              data: { cast: 'Foo<int>' },
               messageId: 'replaceObjectTypeAssertionWithSatisfies',
-              output: 'const x = {} satisfies Foo<number>;',
+              output: 'const x = {} satisfies Foo<int>;',
             },
           ],
         },
@@ -1350,21 +1345,21 @@ const x = { key: 'value' } as unknown;
       ],
     },
     {
-      code: 'const x = <string | number>{};',
+      code: 'const x = <a | b>{};',
       errors: [
         {
           line: 1,
           messageId: 'unexpectedObjectTypeAssertion',
           suggestions: [
             {
-              data: { cast: 'string | number' },
+              data: { cast: 'a | b' },
               messageId: 'replaceObjectTypeAssertionWithAnnotation',
-              output: 'const x: string | number = {};',
+              output: 'const x: a | b = {};',
             },
             {
-              data: { cast: 'string | number' },
+              data: { cast: 'a | b' },
               messageId: 'replaceObjectTypeAssertionWithSatisfies',
-              output: 'const x = {} satisfies string | number;',
+              output: 'const x = {} satisfies a | b;',
             },
           ],
         },
@@ -1399,21 +1394,21 @@ const x = { key: 'value' } as unknown;
       ],
     },
     {
-      code: 'const x = {} as Foo<number>;',
+      code: 'const x = {} as Foo<int>;',
       errors: [
         {
           line: 1,
           messageId: 'unexpectedObjectTypeAssertion',
           suggestions: [
             {
-              data: { cast: 'Foo<number>' },
+              data: { cast: 'Foo<int>' },
               messageId: 'replaceObjectTypeAssertionWithAnnotation',
-              output: 'const x: Foo<number> = {};',
+              output: 'const x: Foo<int> = {};',
             },
             {
-              data: { cast: 'Foo<number>' },
+              data: { cast: 'Foo<int>' },
               messageId: 'replaceObjectTypeAssertionWithSatisfies',
-              output: 'const x = {} satisfies Foo<number>;',
+              output: 'const x = {} satisfies Foo<int>;',
             },
           ],
         },
@@ -1421,21 +1416,21 @@ const x = { key: 'value' } as unknown;
       options: [{ assertionStyle: 'as', objectLiteralTypeAssertions: 'never' }],
     },
     {
-      code: 'const x = {} as string | number;',
+      code: 'const x = {} as a | b;',
       errors: [
         {
           line: 1,
           messageId: 'unexpectedObjectTypeAssertion',
           suggestions: [
             {
-              data: { cast: 'string | number' },
+              data: { cast: 'a | b' },
               messageId: 'replaceObjectTypeAssertionWithAnnotation',
-              output: 'const x: string | number = {};',
+              output: 'const x: a | b = {};',
             },
             {
-              data: { cast: 'string | number' },
+              data: { cast: 'a | b' },
               messageId: 'replaceObjectTypeAssertionWithSatisfies',
-              output: 'const x = {} satisfies string | number;',
+              output: 'const x = {} satisfies a | b;',
             },
           ],
         },
@@ -1604,21 +1599,21 @@ function foo() {
       options: [{ assertionStyle: 'as', objectLiteralTypeAssertions: 'never' }],
     },
     {
-      code: 'const x = <Foo<number>>{};',
+      code: 'const x = <Foo<int>>{};',
       errors: [
         {
           line: 1,
           messageId: 'unexpectedObjectTypeAssertion',
           suggestions: [
             {
-              data: { cast: 'Foo<number>' },
+              data: { cast: 'Foo<int>' },
               messageId: 'replaceObjectTypeAssertionWithAnnotation',
-              output: 'const x: Foo<number> = {};',
+              output: 'const x: Foo<int> = {};',
             },
             {
-              data: { cast: 'Foo<number>' },
+              data: { cast: 'Foo<int>' },
               messageId: 'replaceObjectTypeAssertionWithSatisfies',
-              output: 'const x = {} satisfies Foo<number>;',
+              output: 'const x = {} satisfies Foo<int>;',
             },
           ],
         },
@@ -1631,21 +1626,21 @@ function foo() {
       ],
     },
     {
-      code: 'const x = <string | number>{};',
+      code: 'const x = <a | b>{};',
       errors: [
         {
           line: 1,
           messageId: 'unexpectedObjectTypeAssertion',
           suggestions: [
             {
-              data: { cast: 'string | number' },
+              data: { cast: 'a | b' },
               messageId: 'replaceObjectTypeAssertionWithAnnotation',
-              output: 'const x: string | number = {};',
+              output: 'const x: a | b = {};',
             },
             {
-              data: { cast: 'string | number' },
+              data: { cast: 'a | b' },
               messageId: 'replaceObjectTypeAssertionWithSatisfies',
-              output: 'const x = {} satisfies string | number;',
+              output: 'const x = {} satisfies a | b;',
             },
           ],
         },
@@ -1819,14 +1814,13 @@ function foo() {
         },
       ],
     },
-    // Commented out - uses languageOptions not supported in RSLint
-    // {
-    //   code: 'const foo = <Foo style={{ bar: 5 } as Bar} />;',
-    //   errors: [{ line: 1, messageId: 'never' }],
-    //   languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
-    //   options: [{ assertionStyle: 'never' }],
-    //   output: null,
-    // },
+    {
+      code: 'const foo = <Foo style={{ bar: 5 } as Bar} />;',
+      errors: [{ line: 1, messageId: 'never' }],
+      languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
+      options: [{ assertionStyle: 'never' }],
+      output: null,
+    },
     {
       code: 'const a = <any>(b, c);',
       errors: [

@@ -1,6 +1,16 @@
-import { RuleTester } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
-const ruleTester = new RuleTester({});
+const rootPath = getFixturesRootDir();
+
+
+const ruleTester = new RuleTester({
+  languageOptions: {
+    parserOptions: {
+      project: './tsconfig.json',
+      tsconfigRootDir: rootPath,
+    },
+  },
+});
 
 ruleTester.run('no-useless-constructor', {
   valid: [
@@ -225,7 +235,7 @@ ${'  '}
       `,
             },
           ],
-          type: 'MethodDefinition',
+          type: AST_NODE_TYPES.MethodDefinition,
         },
       ],
     },
@@ -250,7 +260,7 @@ ${'  '}
       `,
             },
           ],
-          type: 'MethodDefinition',
+          type: AST_NODE_TYPES.MethodDefinition,
         },
       ],
     },
@@ -275,7 +285,7 @@ ${'  '}
       `,
             },
           ],
-          type: 'MethodDefinition',
+          type: AST_NODE_TYPES.MethodDefinition,
         },
       ],
     },
@@ -300,7 +310,7 @@ ${'  '}
       `,
             },
           ],
-          type: 'MethodDefinition',
+          type: AST_NODE_TYPES.MethodDefinition,
         },
       ],
     },
@@ -325,7 +335,7 @@ ${'  '}
       `,
             },
           ],
-          type: 'MethodDefinition',
+          type: AST_NODE_TYPES.MethodDefinition,
         },
       ],
     },
@@ -350,7 +360,7 @@ ${'  '}
       `,
             },
           ],
-          type: 'MethodDefinition',
+          type: AST_NODE_TYPES.MethodDefinition,
         },
       ],
     },
@@ -375,7 +385,7 @@ ${'  '}
       `,
             },
           ],
-          type: 'MethodDefinition',
+          type: AST_NODE_TYPES.MethodDefinition,
         },
       ],
     },
@@ -400,7 +410,7 @@ ${'  '}
       `,
             },
           ],
-          type: 'MethodDefinition',
+          type: AST_NODE_TYPES.MethodDefinition,
         },
       ],
     },
@@ -423,7 +433,7 @@ ${'  '}
       `,
             },
           ],
-          type: 'MethodDefinition',
+          type: AST_NODE_TYPES.MethodDefinition,
         },
       ],
     },

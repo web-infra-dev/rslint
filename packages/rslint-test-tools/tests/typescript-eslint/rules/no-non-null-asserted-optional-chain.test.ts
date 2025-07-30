@@ -1,11 +1,12 @@
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
+
 
 const ruleTester = new RuleTester({
   languageOptions: {
     parserOptions: {
-      project: ['./tsconfig.json'],
+      project: './tsconfig.json',
       tsconfigRootDir: rootPath,
     },
   },
@@ -85,84 +86,84 @@ ruleTester.run('no-non-null-asserted-optional-chain', {
       ],
     },
     {
-      code: '(foo?.bar)!.baz',
+      code: noFormat`(foo?.bar)!.baz`,
       errors: [
         {
           messageId: 'noNonNullOptionalChain',
           suggestions: [
             {
               messageId: 'suggestRemovingNonNull',
-              output: '(foo?.bar).baz',
+              output: `(foo?.bar).baz`,
             },
           ],
         },
       ],
     },
     {
-      code: '(foo?.bar)!().baz',
+      code: noFormat`(foo?.bar)!().baz`,
       errors: [
         {
           messageId: 'noNonNullOptionalChain',
           suggestions: [
             {
               messageId: 'suggestRemovingNonNull',
-              output: '(foo?.bar)().baz',
+              output: `(foo?.bar)().baz`,
             },
           ],
         },
       ],
     },
     {
-      code: '(foo?.bar)!',
+      code: noFormat`(foo?.bar)!`,
       errors: [
         {
           messageId: 'noNonNullOptionalChain',
           suggestions: [
             {
               messageId: 'suggestRemovingNonNull',
-              output: '(foo?.bar)',
+              output: `(foo?.bar)`,
             },
           ],
         },
       ],
     },
     {
-      code: '(foo?.bar)!()',
+      code: noFormat`(foo?.bar)!()`,
       errors: [
         {
           messageId: 'noNonNullOptionalChain',
           suggestions: [
             {
               messageId: 'suggestRemovingNonNull',
-              output: '(foo?.bar)()',
+              output: `(foo?.bar)()`,
             },
           ],
         },
       ],
     },
     {
-      code: '(foo?.bar!)',
+      code: noFormat`(foo?.bar!)`,
       errors: [
         {
           messageId: 'noNonNullOptionalChain',
           suggestions: [
             {
               messageId: 'suggestRemovingNonNull',
-              output: '(foo?.bar)',
+              output: `(foo?.bar)`,
             },
           ],
         },
       ],
     },
     {
-      code: '(foo?.bar!)()',
+      code: noFormat`(foo?.bar!)()`,
       errors: [
         {
           messageId: 'noNonNullOptionalChain',
           suggestions: [
             {
               messageId: 'suggestRemovingNonNull',
-              output: '(foo?.bar)()',
+              output: `(foo?.bar)()`,
             },
           ],
         },

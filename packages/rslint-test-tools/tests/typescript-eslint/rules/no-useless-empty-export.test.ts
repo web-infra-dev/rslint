@@ -1,16 +1,16 @@
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+
+const rootPath = getFixturesRootDir();
 // this rule tests the spacing, which prettier will want to fix and break the tests
 /* eslint "@typescript-eslint/internal/plugin-test-formatting": ["error", { formatWithPrettier: false }] */
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
-const rootDir = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
-  parser: '@typescript-eslint/parser',
-  parserOptions: {
-    ecmaVersion: 2020,
-    sourceType: 'module',
-    tsconfigRootDir: rootDir,
-    project: './tsconfig.json',
+  languageOptions: {
+    parserOptions: {
+      ecmaVersion: 2020,
+      sourceType: 'module',
+    },
   },
 });
 

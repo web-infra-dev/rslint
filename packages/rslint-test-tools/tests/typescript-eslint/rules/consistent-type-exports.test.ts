@@ -1,13 +1,16 @@
-/* eslint-disable @typescript-eslint/internal/plugin-test-formatting -- Prettier doesn't yet support TS 5.6 string literal module identifiers */
 import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
+/* eslint-disable @typescript-eslint/internal/plugin-test-formatting -- Prettier doesn't yet support TS 5.6 string literal module identifiers */
+
+
+const rootDir = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
-      tsconfigRootDir: rootPath,
+      tsconfigRootDir: rootDir,
     },
   },
 });
@@ -406,83 +409,79 @@ export {
 } from './consistent-type-exports';
       `,
     },
-    // TODO: Enable this test once export * handling is implemented without timeout issues
-    // {
-    //   code: `
-    //     export * from './consistent-type-exports/type-only-exports';
-    //   `,
-    //   errors: [
-    //     {
-    //       column: 9,
-    //       endColumn: 69,
-    //       endLine: 2,
-    //       line: 2,
-    //       messageId: 'typeOverValue',
-    //     },
-    //   ],
-    //   output: `
-    //     export type * from './consistent-type-exports/type-only-exports';
-    //   `,
-    // },
-    // TODO: Enable this test once export * handling is implemented without timeout issues
-    // {
-    //   code: noFormat`
-    //     /* comment 1 */ export
-    //       /* comment 2 */ *
-    //         // comment 3
-    //         from './consistent-type-exports/type-only-exports';
-    //   `,
-    //   errors: [
-    //     {
-    //       column: 25,
-    //       endColumn: 64,
-    //       endLine: 5,
-    //       line: 2,
-    //       messageId: 'typeOverValue',
-    //     },
-    //   ],
-    //   output: `
-    //     /* comment 1 */ export
-    //       /* comment 2 */ type *
-    //         // comment 3
-    //         from './consistent-type-exports/type-only-exports';
-    //   `,
-    // },
-    // TODO: Enable this test once export * handling is implemented without timeout issues
-    // {
-    //   code: `
-    //     export * from './consistent-type-exports/type-only-reexport';
-    //   `,
-    //   errors: [
-    //     {
-    //       column: 9,
-    //       endColumn: 70,
-    //       endLine: 2,
-    //       line: 2,
-    //       messageId: 'typeOverValue',
-    //     },
-    //   ],
-    //   output: `
-    //     export type * from './consistent-type-exports/type-only-reexport';
-    //   `,
-    // },
-    // TODO: Enable this test once export * handling is implemented without timeout issues
-    // {
-    //   code: `
-    //     export * as foo from './consistent-type-exports/type-only-reexport';
-    //   `,
-    //   errors: [
-    //     {
-    //       column: 9,
-    //       endColumn: 77,
-    //       endLine: 2,
-    //       line: 2,
-    //       messageId: 'typeOverValue',
-    //     },
-    //   ],
-    //   output: `
-    //     export type * as foo from './consistent-type-exports/type-only-reexport';
-    //   `,
-    // },
+    {
+      code: `
+        export * from './consistent-type-exports/type-only-exports';
+      `,
+      errors: [
+        {
+          column: 9,
+          endColumn: 69,
+          endLine: 2,
+          line: 2,
+          messageId: 'typeOverValue',
+        },
+      ],
+      output: `
+        export type * from './consistent-type-exports/type-only-exports';
+      `,
+    },
+    {
+      code: noFormat`
+        /* comment 1 */ export
+          /* comment 2 */ *
+            // comment 3
+            from './consistent-type-exports/type-only-exports';
+      `,
+      errors: [
+        {
+          column: 25,
+          endColumn: 64,
+          endLine: 5,
+          line: 2,
+          messageId: 'typeOverValue',
+        },
+      ],
+      output: `
+        /* comment 1 */ export
+          /* comment 2 */ type *
+            // comment 3
+            from './consistent-type-exports/type-only-exports';
+      `,
+    },
+    {
+      code: `
+        export * from './consistent-type-exports/type-only-reexport';
+      `,
+      errors: [
+        {
+          column: 9,
+          endColumn: 70,
+          endLine: 2,
+          line: 2,
+          messageId: 'typeOverValue',
+        },
+      ],
+      output: `
+        export type * from './consistent-type-exports/type-only-reexport';
+      `,
+    },
+    {
+      code: `
+        export * as foo from './consistent-type-exports/type-only-reexport';
+      `,
+      errors: [
+        {
+          column: 9,
+          endColumn: 77,
+          endLine: 2,
+          line: 2,
+          messageId: 'typeOverValue',
+        },
+      ],
+      output: `
+        export type * as foo from './consistent-type-exports/type-only-reexport';
+      `,
+    },
   ],
 });

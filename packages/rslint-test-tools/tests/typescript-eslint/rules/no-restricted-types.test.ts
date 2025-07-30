@@ -1,6 +1,16 @@
-import { RuleTester } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
-const ruleTester = new RuleTester({});
+const rootPath = getFixturesRootDir();
+
+
+const ruleTester = new RuleTester({
+  languageOptions: {
+    parserOptions: {
+      project: './tsconfig.json',
+      tsconfigRootDir: rootPath,
+    },
+  },
+});
 
 ruleTester.run('no-restricted-types', {
   valid: [
@@ -225,7 +235,7 @@ ruleTester.run('no-restricted-types', {
       output: null,
     },
     {
-      code: 'let value: [  ];',
+      code: noFormat`let value: [  ];`,
       errors: [
         {
           column: 12,
@@ -552,7 +562,7 @@ ruleTester.run('no-restricted-types', {
       output: 'let value: NS.Ok;',
     },
     {
-      code: 'let value: Type<   Banned   >;',
+      code: noFormat`let value: Type<   Banned   >;`,
       errors: [
         {
           column: 20,
@@ -574,7 +584,7 @@ ruleTester.run('no-restricted-types', {
           },
         },
       ],
-      output: 'let value: Type<   Ok   >;',
+      output: `let value: Type<   Ok   >;`,
     },
     {
       code: 'type Intersection = Banned<any>;',
@@ -599,7 +609,7 @@ ruleTester.run('no-restricted-types', {
       output: null,
     },
     {
-      code: 'type Intersection = Banned<A,B>;',
+      code: noFormat`type Intersection = Banned<A,B>;`,
       errors: [
         {
           column: 21,

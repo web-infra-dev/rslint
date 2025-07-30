@@ -1,8 +1,29 @@
-import { RuleTester } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
 
-const ruleTester = new RuleTester();
+
+const idError = {
+  messageId: 'thisAssignment' as const,
+  type: AST_NODE_TYPES.Identifier,
+};
+const destructureError = {
+  messageId: 'thisDestructure' as const,
+  type: AST_NODE_TYPES.ObjectPattern,
+};
+const arrayDestructureError = {
+  messageId: 'thisDestructure' as const,
+  type: AST_NODE_TYPES.ArrayPattern,
+};
+
+const ruleTester = new RuleTester({
+  languageOptions: {
+    parserOptions: {
+      project: './tsconfig.json',
+      tsconfigRootDir: rootPath,
+    },
+  },
+});
 
 ruleTester.run('no-this-alias', {
   valid: [
@@ -40,13 +61,7 @@ declare module 'foo' {
   invalid: [
     {
       code: 'const self = this;',
-      errors: [
-        {
-          messageId: 'thisAssignment',
-          line: 1,
-          column: 7,
-        },
-      ],
+      errors: [idError],
       options: [
         {
           allowDestructuring: true,
@@ -55,36 +70,18 @@ declare module 'foo' {
     },
     {
       code: 'const self = this;',
-      errors: [
-        {
-          messageId: 'thisAssignment',
-          line: 1,
-          column: 7,
-        },
-      ],
+      errors: [idError],
     },
     {
       code: `
 let that;
 that = this;
       `,
-      errors: [
-        {
-          messageId: 'thisAssignment',
-          line: 3,
-          column: 1,
-        },
-      ],
+      errors: [idError],
     },
     {
       code: 'const { props, state } = this;',
-      errors: [
-        {
-          messageId: 'thisDestructure',
-          line: 1,
-          column: 7,
-        },
-      ],
+      errors: [destructureError],
       options: [
         {
           allowDestructuring: false,
@@ -102,23 +99,7 @@ const testLambda = () => {
   const inLambda = this;
 };
       `,
-      errors: [
-        {
-          messageId: 'thisAssignment',
-          line: 2,
-          column: 5,
-        },
-        {
-          messageId: 'thisAssignment',
-          line: 5,
-          column: 7,
-        },
-        {
-          messageId: 'thisAssignment',
-          line: 8,
-          column: 9,
-        },
-      ],
+      errors: [idError, idError, idError],
     },
     {
       code: `
@@ -142,41 +123,13 @@ class TestClass {
 }
       `,
       errors: [
-        {
-          messageId: 'thisAssignment',
-          line: 4,
-          column: 11,
-        },
-        {
-          messageId: 'thisAssignment',
-          line: 5,
-          column: 11,
-        },
-        {
-          messageId: 'thisAssignment',
-          line: 13,
-          column: 11,
-        },
-        {
-          messageId: 'thisDestructure',
-          line: 14,
-          column: 11,
-        },
-        {
-          messageId: 'thisDestructure',
-          line: 15,
-          column: 11,
-        },
-        {
-          messageId: 'thisDestructure',
-          line: 16,
-          column: 11,
-        },
-        {
-          messageId: 'thisDestructure',
-          line: 17,
-          column: 11,
-        },
+        idError,
+        idError,
+        idError,
+        destructureError,
+        destructureError,
+        arrayDestructureError,
+        arrayDestructureError,
       ],
       options: [
         {

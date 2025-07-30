@@ -1,4 +1,7 @@
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+
+const rootPath = getFixturesRootDir();
+
 
 const ruleTester = new RuleTester({
   languageOptions: {
@@ -152,6 +155,7 @@ var a = 10;
             id: 'a',
           },
           messageId: 'redeclared',
+          type: AST_NODE_TYPES.Identifier,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
@@ -171,6 +175,7 @@ switch (foo) {
             id: 'b',
           },
           messageId: 'redeclared',
+          type: AST_NODE_TYPES.Identifier,
         },
       ],
     },
@@ -185,6 +190,7 @@ var a = 10;
             id: 'a',
           },
           messageId: 'redeclared',
+          type: AST_NODE_TYPES.Identifier,
         },
       ],
     },
@@ -199,6 +205,7 @@ var a = [];
             id: 'a',
           },
           messageId: 'redeclared',
+          type: AST_NODE_TYPES.Identifier,
         },
       ],
     },
@@ -213,6 +220,7 @@ function a() {}
             id: 'a',
           },
           messageId: 'redeclared',
+          type: AST_NODE_TYPES.Identifier,
         },
       ],
     },
@@ -227,6 +235,7 @@ function a() {}
             id: 'a',
           },
           messageId: 'redeclared',
+          type: AST_NODE_TYPES.Identifier,
         },
       ],
     },
@@ -241,6 +250,7 @@ var a = function () {};
             id: 'a',
           },
           messageId: 'redeclared',
+          type: AST_NODE_TYPES.Identifier,
         },
       ],
     },
@@ -255,6 +265,7 @@ var a = new Date();
             id: 'a',
           },
           messageId: 'redeclared',
+          type: AST_NODE_TYPES.Identifier,
         },
       ],
     },
@@ -270,12 +281,14 @@ var a = 15;
             id: 'a',
           },
           messageId: 'redeclared',
+          type: AST_NODE_TYPES.Identifier,
         },
         {
           data: {
             id: 'a',
           },
           messageId: 'redeclared',
+          type: AST_NODE_TYPES.Identifier,
         },
       ],
     },
@@ -290,6 +303,7 @@ var a;
             id: 'a',
           },
           messageId: 'redeclared',
+          type: AST_NODE_TYPES.Identifier,
         },
       ],
       languageOptions: { parserOptions: { sourceType: 'module' } },
@@ -305,6 +319,7 @@ var a;
             id: 'a',
           },
           messageId: 'redeclared',
+          type: AST_NODE_TYPES.Identifier,
         },
       ],
       languageOptions: { parserOptions: { sourceType: 'module' } },
@@ -317,6 +332,7 @@ var a;
             id: 'Object',
           },
           messageId: 'redeclaredAsBuiltin',
+          type: AST_NODE_TYPES.Identifier,
         },
       ],
       options: [{ builtinGlobals: true }],
@@ -329,6 +345,7 @@ var a;
             id: 'top',
           },
           messageId: 'redeclaredAsBuiltin',
+          type: AST_NODE_TYPES.Identifier,
         },
       ],
       languageOptions: {
@@ -347,12 +364,14 @@ var { a = 0, b: Object = 0 } = {};
             id: 'a',
           },
           messageId: 'redeclared',
+          type: AST_NODE_TYPES.Identifier,
         },
         {
           data: {
             id: 'Object',
           },
           messageId: 'redeclaredAsBuiltin',
+          type: AST_NODE_TYPES.Identifier,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
@@ -369,6 +388,7 @@ var { a = 0, b: Object = 0 } = {};
             id: 'a',
           },
           messageId: 'redeclared',
+          type: AST_NODE_TYPES.Identifier,
         },
       ],
       languageOptions: {
@@ -387,6 +407,7 @@ var { a = 0, b: Object = 0 } = {};
             id: 'a',
           },
           messageId: 'redeclared',
+          type: AST_NODE_TYPES.Identifier,
         },
       ],
       languageOptions: {
@@ -405,6 +426,7 @@ var { a = 0, b: Object = 0 } = {};
             id: 'a',
           },
           messageId: 'redeclared',
+          type: AST_NODE_TYPES.Identifier,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
@@ -420,6 +442,7 @@ var { a = 0, b: Object = 0 } = {};
             id: 'b',
           },
           messageId: 'redeclaredBySyntax',
+          type: AST_TOKEN_TYPES.Identifier,
         },
       ],
       options: [{ builtinGlobals: true }],

@@ -1,6 +1,8 @@
-import { RuleTester, getFixturesRootDir, noFormat } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
+
+
 const ruleTester = new RuleTester({
   languageOptions: {
     parserOptions: {
@@ -12,7 +14,6 @@ const ruleTester = new RuleTester({
 
 ruleTester.run('ban-ts-comment', {
   valid: [
-    // ts-expect-error tests
     '// just a comment containing @ts-expect-error somewhere',
     `
 /*
@@ -114,247 +115,8 @@ ruleTester.run('ban-ts-comment', {
         },
       ],
     },
-    // ts-ignore tests
-    '// just a comment containing @ts-ignore somewhere',
-    {
-      code: '// @ts-ignore',
-      options: [{ 'ts-ignore': false }],
-    },
-    {
-      code: '// @ts-ignore I think that I am exempted from any need to follow the rules!',
-      options: [{ 'ts-ignore': 'allow-with-description' }],
-    },
-    {
-      code: `
-/*
- @ts-ignore running with long description in a block
-*/
-      `,
-      options: [
-        {
-          minimumDescriptionLength: 21,
-          'ts-ignore': 'allow-with-description',
-        },
-      ],
-    },
-    `
-/*
- @ts-ignore
-*/
-    `,
-    `
-/* @ts-ignore not on the last line
- */
-    `,
-    `
-/**
- * @ts-ignore not on the last line
- */
-    `,
-    `
-/* not on the last line
- * @ts-expect-error
- */
-    `,
-    `
-/* @ts-ignore
- * not on the last line */
-    `,
-    {
-      code: '// @ts-ignore: TS1234 because xyz',
-      options: [
-        {
-          minimumDescriptionLength: 10,
-          'ts-ignore': {
-            descriptionFormat: '^: TS\\d+ because .+$',
-          },
-        },
-      ],
-    },
-    {
-      code: '// @ts-ignore 👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦',
-      options: [
-        {
-          'ts-ignore': 'allow-with-description',
-        },
-      ],
-    },
-    {
-      code: `
-/*
- * @ts-ignore here is why the error is expected */
-      `,
-      options: [
-        {
-          'ts-ignore': 'allow-with-description',
-        },
-      ],
-    },
-    {
-      code: '// @ts-ignore exactly 21 characters',
-      options: [
-        {
-          minimumDescriptionLength: 21,
-          'ts-ignore': 'allow-with-description',
-        },
-      ],
-    },
-    {
-      code: `
-/*
- * @ts-ignore exactly 21 characters*/
-      `,
-      options: [
-        {
-          minimumDescriptionLength: 21,
-          'ts-ignore': 'allow-with-description',
-        },
-      ],
-    },
-    {
-      code: `
-/*
- * @ts-ignore: TS1234 because xyz */
-      `,
-      options: [
-        {
-          minimumDescriptionLength: 10,
-          'ts-ignore': {
-            descriptionFormat: '^: TS\\d+ because .+$',
-          },
-        },
-      ],
-    },
-    // ts-nocheck tests
-    '// just a comment containing @ts-nocheck somewhere',
-    {
-      code: '// @ts-nocheck',
-      options: [{ 'ts-nocheck': false }],
-    },
-    {
-      code: '// @ts-nocheck no doubt, people will put nonsense here from time to time just to get the rule to stop reporting, perhaps even long messages with other nonsense in them like other // @ts-nocheck or // @ts-ignore things',
-      options: [{ 'ts-nocheck': 'allow-with-description' }],
-    },
-    {
-      code: `
-/*
- @ts-nocheck running with long description in a block
-*/
-      `,
-      options: [
-        {
-          minimumDescriptionLength: 21,
-          'ts-nocheck': 'allow-with-description',
-        },
-      ],
-    },
-    {
-      code: '// @ts-nocheck: TS1234 because xyz',
-      options: [
-        {
-          minimumDescriptionLength: 10,
-          'ts-nocheck': {
-            descriptionFormat: '^: TS\\d+ because .+$',
-          },
-        },
-      ],
-    },
-    {
-      code: '// @ts-nocheck 👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦',
-      options: [
-        {
-          'ts-nocheck': 'allow-with-description',
-        },
-      ],
-    },
-    '//// @ts-nocheck - pragma comments may contain 2 or 3 leading slashes',
-    `
-/**
- @ts-nocheck
-*/
-    `,
-    `
-/*
- @ts-nocheck
-*/
-    `,
-    '/** @ts-nocheck */',
-    '/* @ts-nocheck */',
-    `
-const a = 1;
-
-// @ts-nocheck - should not be reported
-
-// TS error is not actually suppressed
-const b: string = a;
-    `,
-    // ts-check tests
-    '// just a comment containing @ts-check somewhere',
-    `
-/*
- @ts-check running with long description in a block
-*/
-    `,
-    {
-      code: '// @ts-check',
-      options: [{ 'ts-check': false }],
-    },
-    {
-      code: '// @ts-check with a description and also with a no-op // @ts-ignore',
-      options: [
-        { minimumDescriptionLength: 3, 'ts-check': 'allow-with-description' },
-      ],
-    },
-    {
-      code: '// @ts-check: TS1234 because xyz',
-      options: [
-        {
-          minimumDescriptionLength: 10,
-          'ts-check': {
-            descriptionFormat: '^: TS\\d+ because .+$',
-          },
-        },
-      ],
-    },
-    {
-      code: '// @ts-check 👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦',
-      options: [
-        {
-          'ts-check': 'allow-with-description',
-        },
-      ],
-    },
-    {
-      code: '//// @ts-check - pragma comments may contain 2 or 3 leading slashes',
-      options: [{ 'ts-check': true }],
-    },
-    {
-      code: `
-/**
- @ts-check
-*/
-      `,
-      options: [{ 'ts-check': true }],
-    },
-    {
-      code: `
-/*
- @ts-check
-*/
-      `,
-      options: [{ 'ts-check': true }],
-    },
-    {
-      code: '/** @ts-check */',
-      options: [{ 'ts-check': true }],
-    },
-    {
-      code: '/* @ts-check */',
-      options: [{ 'ts-check': true }],
-    },
   ],
   invalid: [
-    // ts-expect-error tests
     {
       code: '// @ts-expect-error',
       errors: [
@@ -684,7 +446,123 @@ if (false) {
         },
       ],
     },
-    // ts-ignore tests
+  ],
+});
+
+ruleTester.run('ban-ts-comment', {
+  valid: [
+    '// just a comment containing @ts-ignore somewhere',
+    {
+      code: '// @ts-ignore',
+      options: [{ 'ts-ignore': false }],
+    },
+    {
+      code: '// @ts-ignore I think that I am exempted from any need to follow the rules!',
+      options: [{ 'ts-ignore': 'allow-with-description' }],
+    },
+    {
+      code: `
+/*
+ @ts-ignore running with long description in a block
+*/
+      `,
+      options: [
+        {
+          minimumDescriptionLength: 21,
+          'ts-ignore': 'allow-with-description',
+        },
+      ],
+    },
+    `
+/*
+ @ts-ignore
+*/
+    `,
+    `
+/* @ts-ignore not on the last line
+ */
+    `,
+    `
+/**
+ * @ts-ignore not on the last line
+ */
+    `,
+    `
+/* not on the last line
+ * @ts-expect-error
+ */
+    `,
+    `
+/* @ts-ignore
+ * not on the last line */
+    `,
+    {
+      code: '// @ts-ignore: TS1234 because xyz',
+      options: [
+        {
+          minimumDescriptionLength: 10,
+          'ts-ignore': {
+            descriptionFormat: '^: TS\\d+ because .+$',
+          },
+        },
+      ],
+    },
+    {
+      code: '// @ts-ignore 👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦',
+      options: [
+        {
+          'ts-ignore': 'allow-with-description',
+        },
+      ],
+    },
+    {
+      code: `
+/*
+ * @ts-ignore here is why the error is expected */
+      `,
+      options: [
+        {
+          'ts-ignore': 'allow-with-description',
+        },
+      ],
+    },
+    {
+      code: '// @ts-ignore exactly 21 characters',
+      options: [
+        {
+          minimumDescriptionLength: 21,
+          'ts-ignore': 'allow-with-description',
+        },
+      ],
+    },
+    {
+      code: `
+/*
+ * @ts-ignore exactly 21 characters*/
+      `,
+      options: [
+        {
+          minimumDescriptionLength: 21,
+          'ts-ignore': 'allow-with-description',
+        },
+      ],
+    },
+    {
+      code: `
+/*
+ * @ts-ignore: TS1234 because xyz */
+      `,
+      options: [
+        {
+          minimumDescriptionLength: 10,
+          'ts-ignore': {
+            descriptionFormat: '^: TS\\d+ because .+$',
+          },
+        },
+      ],
+    },
+  ],
+  invalid: [
     {
       code: '// @ts-ignore',
       errors: [
@@ -1063,7 +941,75 @@ if (false) {
         },
       ],
     },
-    // ts-nocheck tests
+  ],
+});
+
+ruleTester.run('ban-ts-comment', {
+  valid: [
+    '// just a comment containing @ts-nocheck somewhere',
+    {
+      code: '// @ts-nocheck',
+      options: [{ 'ts-nocheck': false }],
+    },
+    {
+      code: '// @ts-nocheck no doubt, people will put nonsense here from time to time just to get the rule to stop reporting, perhaps even long messages with other nonsense in them like other // @ts-nocheck or // @ts-ignore things',
+      options: [{ 'ts-nocheck': 'allow-with-description' }],
+    },
+    {
+      code: `
+/*
+ @ts-nocheck running with long description in a block
+*/
+      `,
+      options: [
+        {
+          minimumDescriptionLength: 21,
+          'ts-nocheck': 'allow-with-description',
+        },
+      ],
+    },
+    {
+      code: '// @ts-nocheck: TS1234 because xyz',
+      options: [
+        {
+          minimumDescriptionLength: 10,
+          'ts-nocheck': {
+            descriptionFormat: '^: TS\\d+ because .+$',
+          },
+        },
+      ],
+    },
+    {
+      code: '// @ts-nocheck 👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦',
+      options: [
+        {
+          'ts-nocheck': 'allow-with-description',
+        },
+      ],
+    },
+    '//// @ts-nocheck - pragma comments may contain 2 or 3 leading slashes',
+    `
+/**
+ @ts-nocheck
+*/
+    `,
+    `
+/*
+ @ts-nocheck
+*/
+    `,
+    '/** @ts-nocheck */',
+    '/* @ts-nocheck */',
+    `
+const a = 1;
+
+// @ts-nocheck - should not be reported
+
+// TS error is not actually suppressed
+const b: string = a;
+    `,
+  ],
+  invalid: [
     {
       code: '// @ts-nocheck',
       errors: [
@@ -1197,7 +1143,76 @@ const a: true = false;
         },
       ],
     },
-    // ts-check tests
+  ],
+});
+
+ruleTester.run('ban-ts-comment', {
+  valid: [
+    '// just a comment containing @ts-check somewhere',
+    `
+/*
+ @ts-check running with long description in a block
+*/
+    `,
+    {
+      code: '// @ts-check',
+      options: [{ 'ts-check': false }],
+    },
+    {
+      code: '// @ts-check with a description and also with a no-op // @ts-ignore',
+      options: [
+        { minimumDescriptionLength: 3, 'ts-check': 'allow-with-description' },
+      ],
+    },
+    {
+      code: '// @ts-check: TS1234 because xyz',
+      options: [
+        {
+          minimumDescriptionLength: 10,
+          'ts-check': {
+            descriptionFormat: '^: TS\\d+ because .+$',
+          },
+        },
+      ],
+    },
+    {
+      code: '// @ts-check 👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦',
+      options: [
+        {
+          'ts-check': 'allow-with-description',
+        },
+      ],
+    },
+    {
+      code: '//// @ts-check - pragma comments may contain 2 or 3 leading slashes',
+      options: [{ 'ts-check': true }],
+    },
+    {
+      code: `
+/**
+ @ts-check
+*/
+      `,
+      options: [{ 'ts-check': true }],
+    },
+    {
+      code: `
+/*
+ @ts-check
+*/
+      `,
+      options: [{ 'ts-check': true }],
+    },
+    {
+      code: '/** @ts-check */',
+      options: [{ 'ts-check': true }],
+    },
+    {
+      code: '/* @ts-check */',
+      options: [{ 'ts-check': true }],
+    },
+  ],
+  invalid: [
     {
       code: '// @ts-check',
       errors: [

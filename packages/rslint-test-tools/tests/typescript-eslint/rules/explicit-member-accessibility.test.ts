@@ -1,16 +1,18 @@
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
-const rule = 'explicit-member-accessibility';
+const rootPath = getFixturesRootDir();
+
 
 const ruleTester = new RuleTester({
   languageOptions: {
     parserOptions: {
-      project: false,
+      project: './tsconfig.json',
+      tsconfigRootDir: rootPath,
     },
   },
 });
 
-ruleTester.run(rule, {
+ruleTester.run('explicit-member-accessibility', {
   valid: [
     {
       code: `
@@ -348,10 +350,39 @@ export class XXXX {
       errors: [
         {
           column: 22,
-          endColumn: 44,
+          endColumn: 36,
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+export class XXXX {
+  public constructor(public readonly value: string) {}
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+export class XXXX {
+  public constructor(private readonly value: string) {}
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+export class XXXX {
+  public constructor(protected readonly value: string) {}
+}
+      `,
+            },
+          ],
         },
       ],
       options: [
@@ -362,6 +393,7 @@ export class XXXX {
           },
         },
       ],
+      output: null,
     },
     {
       code: `
@@ -372,13 +404,43 @@ export class WithParameterProperty {
       errors: [
         {
           column: 22,
-          endColumn: 44,
+          endColumn: 36,
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+export class WithParameterProperty {
+  public constructor(public readonly value: string) {}
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+export class WithParameterProperty {
+  public constructor(private readonly value: string) {}
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+export class WithParameterProperty {
+  public constructor(protected readonly value: string) {}
+}
+      `,
+            },
+          ],
         },
       ],
       options: [{ accessibility: 'explicit' }],
+      output: null,
     },
     {
       code: `
@@ -393,6 +455,35 @@ export class XXXX {
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+export class XXXX {
+  public constructor(public readonly samosa: string) {}
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+export class XXXX {
+  public constructor(private readonly samosa: string) {}
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+export class XXXX {
+  public constructor(protected readonly samosa: string) {}
+}
+      `,
+            },
+          ],
         },
       ],
       options: [
@@ -404,6 +495,7 @@ export class XXXX {
           },
         },
       ],
+      output: null,
     },
     {
       code: `
@@ -418,6 +510,35 @@ class Test {
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  public constructor(public readonly foo: string) {}
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  public constructor(private readonly foo: string) {}
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  public constructor(protected readonly foo: string) {}
+}
+      `,
+            },
+          ],
         },
       ],
       options: [
@@ -426,6 +547,7 @@ class Test {
           overrides: { parameterProperties: 'explicit' },
         },
       ],
+      output: null,
     },
     {
       code: `
@@ -439,12 +561,58 @@ class Test {
       errors: [
         {
           column: 3,
+          data: {
+            name: 'x',
+            type: 'class property',
+          },
           endColumn: 4,
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+
+              output: `
+class Test {
+  public x: number;
+  public getX() {
+    return this.x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+
+              output: `
+class Test {
+  private x: number;
+  public getX() {
+    return this.x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+
+              output: `
+class Test {
+  protected x: number;
+  public getX() {
+    return this.x;
+  }
+}
+      `,
+            },
+          ],
         },
       ],
+      output: null,
     },
     {
       code: `
@@ -458,12 +626,55 @@ class Test {
       errors: [
         {
           column: 3,
+          data: {
+            name: 'getX',
+            type: 'method definition',
+          },
           endColumn: 7,
           endLine: 4,
           line: 4,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x: number;
+  public getX() {
+    return this.x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x: number;
+  private getX() {
+    return this.x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x: number;
+  protected getX() {
+    return this.x;
+  }
+}
+      `,
+            },
+          ],
         },
       ],
+      output: null,
     },
     {
       code: `
@@ -477,19 +688,104 @@ class Test {
       errors: [
         {
           column: 3,
+          data: {
+            name: 'x',
+            type: 'class property',
+          },
           endColumn: 4,
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  public x?: number;
+  getX?() {
+    return this.x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x?: number;
+  getX?() {
+    return this.x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  protected x?: number;
+  getX?() {
+    return this.x;
+  }
+}
+      `,
+            },
+          ],
         },
         {
           column: 3,
+          data: {
+            name: 'getX',
+            type: 'method definition',
+          },
           endColumn: 7,
           endLine: 4,
           line: 4,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  x?: number;
+  public getX?() {
+    return this.x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  x?: number;
+  private getX?() {
+    return this.x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  x?: number;
+  protected getX?() {
+    return this.x;
+  }
+}
+      `,
+            },
+          ],
         },
       ],
+      output: null,
     },
     {
       code: `
@@ -504,6 +800,10 @@ class Test {
       errors: [
         {
           column: 3,
+          data: {
+            name: 'getX',
+            type: 'method definition',
+          },
           endColumn: 9,
           endLine: 5,
           line: 5,
@@ -534,6 +834,10 @@ class Test {
       errors: [
         {
           column: 3,
+          data: {
+            name: 'foo',
+            type: 'class property',
+          },
           endColumn: 9,
           endLine: 4,
           line: 4,
@@ -608,6 +912,62 @@ class Test {
           endLine: 7,
           line: 7,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x: number;
+  constructor(x: number) {
+    this.x = x;
+  }
+  public get internalValue() {
+    return this.x;
+  }
+  set internalValue(value: number) {
+    this.x = value;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x: number;
+  constructor(x: number) {
+    this.x = x;
+  }
+  private get internalValue() {
+    return this.x;
+  }
+  set internalValue(value: number) {
+    this.x = value;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x: number;
+  constructor(x: number) {
+    this.x = x;
+  }
+  protected get internalValue() {
+    return this.x;
+  }
+  set internalValue(value: number) {
+    this.x = value;
+  }
+}
+      `,
+            },
+          ],
         },
         {
           column: 3,
@@ -615,9 +975,66 @@ class Test {
           endLine: 10,
           line: 10,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x: number;
+  constructor(x: number) {
+    this.x = x;
+  }
+  get internalValue() {
+    return this.x;
+  }
+  public set internalValue(value: number) {
+    this.x = value;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x: number;
+  constructor(x: number) {
+    this.x = x;
+  }
+  get internalValue() {
+    return this.x;
+  }
+  private set internalValue(value: number) {
+    this.x = value;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x: number;
+  constructor(x: number) {
+    this.x = x;
+  }
+  get internalValue() {
+    return this.x;
+  }
+  protected set internalValue(value: number) {
+    this.x = value;
+  }
+}
+      `,
+            },
+          ],
         },
       ],
       options: [{ overrides: { constructors: 'no-public' } }],
+      output: null,
     },
     {
       code: `
@@ -641,6 +1058,62 @@ class Test {
           endLine: 4,
           line: 4,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x: number;
+  public constructor(x: number) {
+    this.x = x;
+  }
+  get internalValue() {
+    return this.x;
+  }
+  set internalValue(value: number) {
+    this.x = value;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x: number;
+  private constructor(x: number) {
+    this.x = x;
+  }
+  get internalValue() {
+    return this.x;
+  }
+  set internalValue(value: number) {
+    this.x = value;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x: number;
+  protected constructor(x: number) {
+    this.x = x;
+  }
+  get internalValue() {
+    return this.x;
+  }
+  set internalValue(value: number) {
+    this.x = value;
+  }
+}
+      `,
+            },
+          ],
         },
         {
           column: 3,
@@ -648,6 +1121,62 @@ class Test {
           endLine: 7,
           line: 7,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x: number;
+  constructor(x: number) {
+    this.x = x;
+  }
+  public get internalValue() {
+    return this.x;
+  }
+  set internalValue(value: number) {
+    this.x = value;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x: number;
+  constructor(x: number) {
+    this.x = x;
+  }
+  private get internalValue() {
+    return this.x;
+  }
+  set internalValue(value: number) {
+    this.x = value;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x: number;
+  constructor(x: number) {
+    this.x = x;
+  }
+  protected get internalValue() {
+    return this.x;
+  }
+  set internalValue(value: number) {
+    this.x = value;
+  }
+}
+      `,
+            },
+          ],
         },
         {
           column: 3,
@@ -655,8 +1184,65 @@ class Test {
           endLine: 10,
           line: 10,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x: number;
+  constructor(x: number) {
+    this.x = x;
+  }
+  get internalValue() {
+    return this.x;
+  }
+  public set internalValue(value: number) {
+    this.x = value;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x: number;
+  constructor(x: number) {
+    this.x = x;
+  }
+  get internalValue() {
+    return this.x;
+  }
+  private set internalValue(value: number) {
+    this.x = value;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x: number;
+  constructor(x: number) {
+    this.x = x;
+  }
+  get internalValue() {
+    return this.x;
+  }
+  protected set internalValue(value: number) {
+    this.x = value;
+  }
+}
+      `,
+            },
+          ],
         },
       ],
+      output: null,
     },
     {
       code: `
@@ -674,6 +1260,44 @@ class Test {
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  public constructor(public x: number) {}
+  public foo(): string {
+    return 'foo';
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private constructor(public x: number) {}
+  public foo(): string {
+    return 'foo';
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  protected constructor(public x: number) {}
+  public foo(): string {
+    return 'foo';
+  }
+}
+      `,
+            },
+          ],
         },
       ],
       options: [
@@ -681,6 +1305,7 @@ class Test {
           overrides: { parameterProperties: 'no-public' },
         },
       ],
+      output: null,
     },
     {
       code: `
@@ -695,8 +1320,38 @@ class Test {
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  public constructor(public x: number) {}
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private constructor(public x: number) {}
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  protected constructor(public x: number) {}
+}
+      `,
+            },
+          ],
         },
       ],
+      output: null,
     },
     {
       code: `
@@ -738,6 +1393,35 @@ class Test {
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  public x = 2;
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private x = 2;
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  protected x = 2;
+}
+      `,
+            },
+          ],
         },
       ],
       options: [
@@ -746,6 +1430,7 @@ class Test {
           overrides: { properties: 'explicit' },
         },
       ],
+      output: null,
     },
     {
       code: `
@@ -789,12 +1474,42 @@ class Test {
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  public constructor(public x: any[]) {}
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  private constructor(public x: any[]) {}
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class Test {
+  protected constructor(public x: any[]) {}
+}
+      `,
+            },
+          ],
         },
       ],
       options: [{ accessibility: 'explicit' }],
+      output: null,
     },
     {
-      code: `
+      code: noFormat`
 class Test {
   public /*public*/constructor(private foo: string) {}
 }
@@ -902,7 +1617,7 @@ class Test {
       `,
     },
     {
-      code: `
+      code: noFormat`
 class Test {
   constructor(public/* Hi there */ readonly foo) {}
 }
@@ -1010,7 +1725,7 @@ class EnsureWhiteSPaceSpan {
     },
     // quoted names
     {
-      code: `
+      code: noFormat`
 class Test {
   public 'foo' = 1;
   public 'foo foo' = 2;
@@ -1021,6 +1736,10 @@ class Test {
       errors: [
         {
           column: 3,
+          data: {
+            name: 'foo',
+            type: 'class property',
+          },
           endColumn: 9,
           endLine: 3,
           line: 3,
@@ -1028,6 +1747,10 @@ class Test {
         },
         {
           column: 3,
+          data: {
+            name: '"foo foo"',
+            type: 'class property',
+          },
           endColumn: 9,
           endLine: 4,
           line: 4,
@@ -1035,6 +1758,10 @@ class Test {
         },
         {
           column: 3,
+          data: {
+            name: 'bar',
+            type: 'method definition',
+          },
           endColumn: 9,
           endLine: 5,
           line: 5,
@@ -1042,6 +1769,10 @@ class Test {
         },
         {
           column: 3,
+          data: {
+            name: '"bar bar"',
+            type: 'method definition',
+          },
           endColumn: 9,
           endLine: 6,
           line: 6,
@@ -1071,9 +1802,39 @@ abstract class SomeClass {
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+abstract class SomeClass {
+  public abstract method(): string;
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+abstract class SomeClass {
+  private abstract method(): string;
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+abstract class SomeClass {
+  protected abstract method(): string;
+}
+      `,
+            },
+          ],
         },
       ],
       options: [{ accessibility: 'explicit' }],
+      output: null,
     },
     {
       code: `
@@ -1116,9 +1877,39 @@ abstract class SomeClass {
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+abstract class SomeClass {
+  public abstract x: string;
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+abstract class SomeClass {
+  private abstract x: string;
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+abstract class SomeClass {
+  protected abstract x: string;
+}
+      `,
+            },
+          ],
         },
       ],
       options: [{ accessibility: 'explicit' }],
+      output: null,
     },
     {
       code: `
@@ -1160,6 +1951,35 @@ class SomeClass {
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class SomeClass {
+  public accessor foo = 1;
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class SomeClass {
+  private accessor foo = 1;
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class SomeClass {
+  protected accessor foo = 1;
+}
+      `,
+            },
+          ],
         },
       ],
       options: [{ accessibility: 'explicit' }],
@@ -1177,6 +1997,35 @@ abstract class SomeClass {
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+abstract class SomeClass {
+  public abstract accessor foo: string;
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+abstract class SomeClass {
+  private abstract accessor foo: string;
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+abstract class SomeClass {
+  protected abstract accessor foo: string;
+}
+      `,
+            },
+          ],
         },
       ],
       options: [{ accessibility: 'explicit' }],
@@ -1206,6 +2055,71 @@ class DecoratedClass {
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class DecoratedClass {
+  public constructor(@foo @bar() readonly arg: string) {}
+  @foo @bar() x: string;
+  @foo @bar() getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  get y() {
+    return this.x;
+  }
+  @foo @bar() set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class DecoratedClass {
+  private constructor(@foo @bar() readonly arg: string) {}
+  @foo @bar() x: string;
+  @foo @bar() getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  get y() {
+    return this.x;
+  }
+  @foo @bar() set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class DecoratedClass {
+  protected constructor(@foo @bar() readonly arg: string) {}
+  @foo @bar() x: string;
+  @foo @bar() getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  get y() {
+    return this.x;
+  }
+  @foo @bar() set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      `,
+            },
+          ],
         },
         {
           column: 27,
@@ -1213,6 +2127,71 @@ class DecoratedClass {
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class DecoratedClass {
+  constructor(@foo @bar() public readonly arg: string) {}
+  @foo @bar() x: string;
+  @foo @bar() getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  get y() {
+    return this.x;
+  }
+  @foo @bar() set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class DecoratedClass {
+  constructor(@foo @bar() private readonly arg: string) {}
+  @foo @bar() x: string;
+  @foo @bar() getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  get y() {
+    return this.x;
+  }
+  @foo @bar() set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class DecoratedClass {
+  constructor(@foo @bar() protected readonly arg: string) {}
+  @foo @bar() x: string;
+  @foo @bar() getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  get y() {
+    return this.x;
+  }
+  @foo @bar() set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      `,
+            },
+          ],
         },
         {
           column: 15,
@@ -1220,6 +2199,71 @@ class DecoratedClass {
           endLine: 4,
           line: 4,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class DecoratedClass {
+  constructor(@foo @bar() readonly arg: string) {}
+  @foo @bar() public x: string;
+  @foo @bar() getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  get y() {
+    return this.x;
+  }
+  @foo @bar() set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class DecoratedClass {
+  constructor(@foo @bar() readonly arg: string) {}
+  @foo @bar() private x: string;
+  @foo @bar() getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  get y() {
+    return this.x;
+  }
+  @foo @bar() set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class DecoratedClass {
+  constructor(@foo @bar() readonly arg: string) {}
+  @foo @bar() protected x: string;
+  @foo @bar() getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  get y() {
+    return this.x;
+  }
+  @foo @bar() set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      `,
+            },
+          ],
         },
         {
           column: 15,
@@ -1227,6 +2271,71 @@ class DecoratedClass {
           endLine: 5,
           line: 5,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class DecoratedClass {
+  constructor(@foo @bar() readonly arg: string) {}
+  @foo @bar() x: string;
+  @foo @bar() public getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  get y() {
+    return this.x;
+  }
+  @foo @bar() set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class DecoratedClass {
+  constructor(@foo @bar() readonly arg: string) {}
+  @foo @bar() x: string;
+  @foo @bar() private getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  get y() {
+    return this.x;
+  }
+  @foo @bar() set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class DecoratedClass {
+  constructor(@foo @bar() readonly arg: string) {}
+  @foo @bar() x: string;
+  @foo @bar() protected getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  get y() {
+    return this.x;
+  }
+  @foo @bar() set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      `,
+            },
+          ],
         },
         {
           column: 3,
@@ -1234,6 +2343,71 @@ class DecoratedClass {
           endLine: 10,
           line: 10,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class DecoratedClass {
+  constructor(@foo @bar() readonly arg: string) {}
+  @foo @bar() x: string;
+  @foo @bar() getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  public get y() {
+    return this.x;
+  }
+  @foo @bar() set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class DecoratedClass {
+  constructor(@foo @bar() readonly arg: string) {}
+  @foo @bar() x: string;
+  @foo @bar() getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  private get y() {
+    return this.x;
+  }
+  @foo @bar() set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class DecoratedClass {
+  constructor(@foo @bar() readonly arg: string) {}
+  @foo @bar() x: string;
+  @foo @bar() getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  protected get y() {
+    return this.x;
+  }
+  @foo @bar() set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      `,
+            },
+          ],
         },
         {
           column: 15,
@@ -1241,8 +2415,74 @@ class DecoratedClass {
           endLine: 13,
           line: 13,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class DecoratedClass {
+  constructor(@foo @bar() readonly arg: string) {}
+  @foo @bar() x: string;
+  @foo @bar() getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  get y() {
+    return this.x;
+  }
+  @foo @bar() public set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class DecoratedClass {
+  constructor(@foo @bar() readonly arg: string) {}
+  @foo @bar() x: string;
+  @foo @bar() getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  get y() {
+    return this.x;
+  }
+  @foo @bar() private set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+class DecoratedClass {
+  constructor(@foo @bar() readonly arg: string) {}
+  @foo @bar() x: string;
+  @foo @bar() getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  get y() {
+    return this.x;
+  }
+  @foo @bar() protected set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      `,
+            },
+          ],
         },
       ],
+      output: null,
     },
     {
       code: `
@@ -1257,9 +2497,39 @@ abstract class SomeClass {
           endLine: 3,
           line: 3,
           messageId: 'missingAccessibility',
+          suggestions: [
+            {
+              data: { type: 'public' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+abstract class SomeClass {
+  public abstract ['computed-method-name'](): string;
+}
+      `,
+            },
+            {
+              data: { type: 'private' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+abstract class SomeClass {
+  private abstract ['computed-method-name'](): string;
+}
+      `,
+            },
+            {
+              data: { type: 'protected' },
+              messageId: 'addExplicitAccessibility',
+              output: `
+abstract class SomeClass {
+  protected abstract ['computed-method-name'](): string;
+}
+      `,
+            },
+          ],
         },
       ],
       options: [{ accessibility: 'explicit' }],
+      output: null,
     },
   ],
 });

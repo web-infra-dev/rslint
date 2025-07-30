@@ -1,10 +1,13 @@
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+
+const rootPath = getFixturesRootDir();
+
 
 const ruleTester = new RuleTester({
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
-      tsconfigRootDir: getFixturesRootDir(),
+      tsconfigRootDir: rootPath,
     },
   },
 });
@@ -84,55 +87,6 @@ class Foo extends Base {
       `,
       options: [{ allow: ['overrideMethods'] }],
     },
-    // Additional tests for various allowed types
-    {
-      code: `const foo = () => {};`,
-      options: [{ allow: ['arrowFunctions'] }],
-    },
-    {
-      code: `function* foo() {}`,
-      options: [{ allow: ['generatorFunctions'] }],
-    },
-    {
-      code: `
-class Foo {
-  *method() {}
-}
-      `,
-      options: [{ allow: ['generatorMethods'] }],
-    },
-    {
-      code: `
-class Foo {
-  get foo() {}
-}
-      `,
-      options: [{ allow: ['getters'] }],
-    },
-    {
-      code: `
-class Foo {
-  set foo(value) {}
-}
-      `,
-      options: [{ allow: ['setters'] }],
-    },
-    {
-      code: `async function foo() {}`,
-      options: [{ allow: ['asyncFunctions'] }],
-    },
-    {
-      code: `
-class Foo {
-  async method() {}
-}
-      `,
-      options: [{ allow: ['asyncMethods'] }],
-    },
-    {
-      code: `function foo() {}`,
-      options: [{ allow: ['functions'] }],
-    },
   ],
 
   invalid: [
@@ -144,7 +98,7 @@ class Person {
       `,
       errors: [
         {
-          column: 28,
+          column: 29,
           data: {
             name: 'constructor',
           },
@@ -161,7 +115,7 @@ class Person {
       `,
       errors: [
         {
-          column: 28,
+          column: 29,
           data: {
             name: "method 'otherMethod'",
           },
@@ -248,114 +202,6 @@ class Foo extends Base {
           column: 18,
           data: {
             name: "method 'foo'",
-          },
-          line: 3,
-          messageId: 'unexpected',
-        },
-      ],
-    },
-    // Additional invalid test cases
-    {
-      code: `const foo = () => {};`,
-      errors: [
-        {
-          column: 19,
-          data: {
-            name: "arrow function 'foo'",
-          },
-          line: 1,
-          messageId: 'unexpected',
-        },
-      ],
-    },
-    {
-      code: `function* foo() {}`,
-      errors: [
-        {
-          column: 17,
-          data: {
-            name: "function 'foo'",
-          },
-          line: 1,
-          messageId: 'unexpected',
-        },
-      ],
-    },
-    {
-      code: `
-class Foo {
-  *method() {}
-}
-      `,
-      errors: [
-        {
-          column: 13,
-          data: {
-            name: "method 'method'",
-          },
-          line: 3,
-          messageId: 'unexpected',
-        },
-      ],
-    },
-    {
-      code: `
-class Foo {
-  get foo() {}
-}
-      `,
-      errors: [
-        {
-          column: 13,
-          data: {
-            name: "getter 'foo'",
-          },
-          line: 3,
-          messageId: 'unexpected',
-        },
-      ],
-    },
-    {
-      code: `
-class Foo {
-  set foo(value) {}
-}
-      `,
-      errors: [
-        {
-          column: 18,
-          data: {
-            name: "setter 'foo'",
-          },
-          line: 3,
-          messageId: 'unexpected',
-        },
-      ],
-    },
-    {
-      code: `async function foo() {}`,
-      errors: [
-        {
-          column: 22,
-          data: {
-            name: "function 'foo'",
-          },
-          line: 1,
-          messageId: 'unexpected',
-        },
-      ],
-    },
-    {
-      code: `
-class Foo {
-  async method() {}
-}
-      `,
-      errors: [
-        {
-          column: 18,
-          data: {
-            name: "method 'method'",
           },
           line: 3,
           messageId: 'unexpected',

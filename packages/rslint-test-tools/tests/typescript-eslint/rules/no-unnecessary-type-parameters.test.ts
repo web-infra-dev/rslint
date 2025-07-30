@@ -1,4 +1,4 @@
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
 
@@ -1251,7 +1251,6 @@ function foo(_: unknown): <T>(input: T) => T {
           column: 33,
           data: { descriptor: 'function', name: 'T', uses: 'used only once' },
           endColumn: 34,
-          line: 1,
           messageId: 'sole',
           suggestions: [
             {
@@ -1265,7 +1264,6 @@ function foo(_: unknown): <T>(input: T) => T {
           column: 36,
           data: { descriptor: 'function', name: 'U', uses: 'used only once' },
           endColumn: 37,
-          line: 1,
           messageId: 'sole',
           suggestions: [
             {
@@ -1640,7 +1638,13 @@ interface StorageService {
       ],
     },
     {
-      code: `
+      // This isn't actually an important test case.
+      // However, we use it as an example in the docs of code that is flagged,
+      // but shouldn't necessarily be. So, if you make a change to the rule logic
+      // that resolves this sort-of-false-positive, please update the docs
+      // accordingly.
+      // Original discussion in https://github.com/typescript-eslint/typescript-eslint/issues/9709
+      code: noFormat`
 type Compute<A> = A extends Function ? A : { [K in keyof A]: Compute<A[K]> };
 type Equal<X, Y> =
   (<T1>() => T1 extends Compute<X> ? 1 : 2) extends
@@ -1807,7 +1811,7 @@ function join(els: ((string & number) | boolean)[]) {
       ],
     },
     {
-      code: `
+      code: noFormat`
 function join<T extends (string | number)>(els: T[]) {
   return els.map(el => '' + el).join(',');
 }

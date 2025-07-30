@@ -1,6 +1,8 @@
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
+
+
 const ruleTester = new RuleTester({
   languageOptions: {
     parserOptions: {
@@ -58,6 +60,13 @@ for (let i = 0; i < 10; i += 1) {
   someArray = someArray.filter((item: MyType) => !!item);
 }
     `,
+  ],
+  invalid: [],
+});
+
+// Forked from https://github.com/eslint/eslint/blob/89a4a0a260b8eb11487fe3d5d4d80f4630933eb3/tests/lib/rules/no-loop-func.js
+ruleTester.run('no-loop-func ESLint tests', {
+  valid: [
     "string = 'function a() {}';",
     `
 for (var i = 0; i < l; i++) {}
@@ -477,7 +486,7 @@ for (var i = 0; i < l; i++) {
         {
           data: { varNames: "'i'" },
           messageId: 'unsafeRefs',
-          type: 'FunctionExpression',
+          type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
     },
@@ -495,7 +504,7 @@ for (var i = 0; i < l; i++) {
         {
           data: { varNames: "'i', 'j'" },
           messageId: 'unsafeRefs',
-          type: 'FunctionExpression',
+          type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
     },
@@ -511,7 +520,7 @@ for (var i in {}) {
         {
           data: { varNames: "'i'" },
           messageId: 'unsafeRefs',
-          type: 'FunctionExpression',
+          type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
     },
@@ -527,7 +536,7 @@ for (var i of {}) {
         {
           data: { varNames: "'i'" },
           messageId: 'unsafeRefs',
-          type: 'FunctionExpression',
+          type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
@@ -544,7 +553,7 @@ for (var i = 0; i < l; i++) {
         {
           data: { varNames: "'i'" },
           messageId: 'unsafeRefs',
-          type: 'ArrowFunctionExpression',
+          type: AST_NODE_TYPES.ArrowFunctionExpression,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
@@ -561,7 +570,7 @@ for (var i = 0; i < l; i++) {
         {
           data: { varNames: "'i'" },
           messageId: 'unsafeRefs',
-          type: 'FunctionExpression',
+          type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
     },
@@ -578,7 +587,7 @@ for (var i = 0; i < l; i++) {
         {
           data: { varNames: "'i'" },
           messageId: 'unsafeRefs',
-          type: 'FunctionDeclaration',
+          type: AST_NODE_TYPES.FunctionDeclaration,
         },
       ],
     },
@@ -598,7 +607,7 @@ for (let i = 0; i < l; i++) {
         {
           data: { varNames: "'a'" },
           messageId: 'unsafeRefs',
-          type: 'FunctionExpression',
+          type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
@@ -617,7 +626,7 @@ for (let i in {}) {
         {
           data: { varNames: "'a'" },
           messageId: 'unsafeRefs',
-          type: 'FunctionExpression',
+          type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
@@ -636,7 +645,7 @@ a = 1;
         {
           data: { varNames: "'a'" },
           messageId: 'unsafeRefs',
-          type: 'FunctionExpression',
+          type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
@@ -657,7 +666,7 @@ for (let i = 0; i < l; i++) {
         {
           data: { varNames: "'a'" },
           messageId: 'unsafeRefs',
-          type: 'FunctionExpression',
+          type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
@@ -678,7 +687,7 @@ for (let i in {}) {
         {
           data: { varNames: "'a'" },
           messageId: 'unsafeRefs',
-          type: 'FunctionDeclaration',
+          type: AST_NODE_TYPES.FunctionDeclaration,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
@@ -699,7 +708,7 @@ a = 1;
         {
           data: { varNames: "'a'" },
           messageId: 'unsafeRefs',
-          type: 'ArrowFunctionExpression',
+          type: AST_NODE_TYPES.ArrowFunctionExpression,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
@@ -715,7 +724,7 @@ for (var i = 0; i < 10; ++i) {
         {
           data: { varNames: "'i'" },
           messageId: 'unsafeRefs',
-          type: 'ArrowFunctionExpression',
+          type: AST_NODE_TYPES.ArrowFunctionExpression,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
@@ -736,7 +745,7 @@ for (let x of xs) {
         {
           data: { varNames: "'a'" },
           messageId: 'unsafeRefs',
-          type: 'FunctionExpression',
+          type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
@@ -755,7 +764,7 @@ for (var x of xs) {
         {
           data: { varNames: "'x'" },
           messageId: 'unsafeRefs',
-          type: 'FunctionExpression',
+          type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
@@ -772,7 +781,7 @@ for (var x of xs) {
         {
           data: { varNames: "'x'" },
           messageId: 'unsafeRefs',
-          type: 'FunctionExpression',
+          type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
@@ -791,7 +800,7 @@ for (let x of xs) {
         {
           data: { varNames: "'a'" },
           messageId: 'unsafeRefs',
-          type: 'FunctionExpression',
+          type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
@@ -810,7 +819,7 @@ for (let x of xs) {
         {
           data: { varNames: "'a'" },
           messageId: 'unsafeRefs',
-          type: 'FunctionExpression',
+          type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
@@ -832,7 +841,7 @@ foo();
         {
           data: { varNames: "'a'" },
           messageId: 'unsafeRefs',
-          type: 'FunctionExpression',
+          type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },
@@ -854,7 +863,7 @@ foo();
         {
           data: { varNames: "'a'" },
           messageId: 'unsafeRefs',
-          type: 'FunctionExpression',
+          type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
       languageOptions: { parserOptions: { ecmaVersion: 6 } },

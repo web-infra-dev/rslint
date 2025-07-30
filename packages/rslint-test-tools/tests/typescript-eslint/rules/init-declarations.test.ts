@@ -1,6 +1,8 @@
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
+
+
 const ruleTester = new RuleTester({
   languageOptions: {
     parserOptions: {
@@ -38,13 +40,16 @@ for (var foo in []) {
 for (var foo of []) {
 }
       `,
+      languageOptions: { parserOptions: { ecmaVersion: 6 } },
     },
     {
       code: 'let a = true;',
+      languageOptions: { parserOptions: { ecmaVersion: 6 } },
       options: ['always'],
     },
     {
       code: 'const a = {};',
+      languageOptions: { parserOptions: { ecmaVersion: 6 } },
       options: ['always'],
     },
     {
@@ -58,6 +63,7 @@ function foo() {
   }
 }
       `,
+      languageOptions: { parserOptions: { ecmaVersion: 6 } },
       options: ['always'],
     },
     {
@@ -71,6 +77,7 @@ function foo() {
   }
 }
       `,
+      languageOptions: { parserOptions: { ecmaVersion: 6 } },
       options: ['always'],
     },
     {
@@ -81,14 +88,17 @@ function foo() {
   var c = true;
 }
       `,
+      languageOptions: { parserOptions: { ecmaVersion: 6 } },
       options: ['always'],
     },
     {
       code: 'var foo;',
+      languageOptions: { parserOptions: { ecmaVersion: 6 } },
       options: ['never'],
     },
     {
       code: 'var foo, bar, baz;',
+      languageOptions: { parserOptions: { ecmaVersion: 6 } },
       options: ['never'],
     },
     {
@@ -98,14 +108,17 @@ function foo() {
   var bar;
 }
       `,
+      languageOptions: { parserOptions: { ecmaVersion: 6 } },
       options: ['never'],
     },
     {
       code: 'let a;',
+      languageOptions: { parserOptions: { ecmaVersion: 6 } },
       options: ['never'],
     },
     {
       code: 'const a = 1;',
+      languageOptions: { parserOptions: { ecmaVersion: 6 } },
       options: ['never'],
     },
     {
@@ -117,6 +130,7 @@ function foo() {
   }
 }
       `,
+      languageOptions: { parserOptions: { ecmaVersion: 6 } },
       options: ['never'],
     },
     {
@@ -130,6 +144,7 @@ function foo() {
   }
 }
       `,
+      languageOptions: { parserOptions: { ecmaVersion: 6 } },
       options: ['never'],
     },
     {
@@ -140,6 +155,7 @@ function foo() {
   var c;
 }
       `,
+      languageOptions: { parserOptions: { ecmaVersion: 6 } },
       options: ['never'],
     },
     {
@@ -158,6 +174,7 @@ for (var foo in []) {
 for (var foo of []) {
 }
       `,
+      languageOptions: { parserOptions: { ecmaVersion: 6 } },
       options: ['never', { ignoreForLoopInit: true }],
     },
     {
@@ -242,7 +259,7 @@ var bar: string = function (): string {
     },
     {
       code: `
-var bar: string = function (arg1: string): string {
+var bar: string = function (arg1: stirng): string {
   return 'string';
 };
       `,
@@ -302,7 +319,7 @@ interface IEmployee {
       options: ['never'],
     },
     {
-      code: 'const foo: number = 123;',
+      code: "const foo: number = 'asd';",
       options: ['always'],
     },
     {

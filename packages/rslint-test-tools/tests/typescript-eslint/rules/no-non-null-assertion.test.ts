@@ -1,9 +1,27 @@
-import { RuleTester } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
-const ruleTester = new RuleTester({});
+const rootPath = getFixturesRootDir();
 
-ruleTester.run('@typescript-eslint/no-non-null-assertion', {
-  valid: ['x;', 'x.y;', 'x.y.z;', 'x?.y.z;', 'x?.y?.z;', '!x;'],
+
+const ruleTester = new RuleTester({
+  languageOptions: {
+    parserOptions: {
+      project: './tsconfig.json',
+      tsconfigRootDir: rootPath,
+    },
+  },
+});
+
+ruleTester.run('no-non-null-assertion', {
+  valid: [
+    //
+    'x;',
+    'x.y;',
+    'x.y.z;',
+    'x?.y.z;',
+    'x?.y?.z;',
+    '!x;',
+  ],
   invalid: [
     {
       code: 'x!;',
@@ -282,7 +300,7 @@ ruleTester.run('@typescript-eslint/no-non-null-assertion', {
       ],
     },
     {
-      code: `
+      code: noFormat`
 x!
 .y
       `,
@@ -304,7 +322,7 @@ x
       ],
     },
     {
-      code: `
+      code: noFormat`
 x!
 // comment
 .y
@@ -328,7 +346,7 @@ x
       ],
     },
     {
-      code: `
+      code: noFormat`
 x!
  // comment
     . /* comment */
@@ -354,7 +372,7 @@ x
       ],
     },
     {
-      code: `
+      code: noFormat`
 x!
  // comment
      /* comment */ ['y']

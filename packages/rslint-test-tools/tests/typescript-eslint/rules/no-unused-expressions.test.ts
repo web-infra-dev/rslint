@@ -1,12 +1,12 @@
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
+
+
 const ruleTester = new RuleTester({
   languageOptions: {
     parserOptions: {
       ecmaVersion: 6,
-      project: './tsconfig.json',
-      tsconfigRootDir: rootPath,
     },
   },
 });
