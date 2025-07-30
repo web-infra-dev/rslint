@@ -1,4 +1,3 @@
-/// <reference path="../global.d.ts" />
 import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
@@ -226,7 +225,6 @@ ruleTester.run('consistent-return', {
           endLine: 4,
           line: 4,
           messageId: 'missingReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
     },
@@ -246,7 +244,6 @@ ruleTester.run('consistent-return', {
           endLine: 5,
           line: 5,
           messageId: 'missingReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
     },
@@ -270,7 +267,6 @@ ruleTester.run('consistent-return', {
           endLine: 6,
           line: 6,
           messageId: 'unexpectedReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
         {
           column: 11,
@@ -279,7 +275,6 @@ ruleTester.run('consistent-return', {
           endLine: 9,
           line: 9,
           messageId: 'missingReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
     },
@@ -298,7 +293,6 @@ ruleTester.run('consistent-return', {
           endLine: 4,
           line: 4,
           messageId: 'missingReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
     },
@@ -317,7 +311,6 @@ ruleTester.run('consistent-return', {
           endLine: 4,
           line: 4,
           messageId: 'unexpectedReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
     },
@@ -336,7 +329,6 @@ ruleTester.run('consistent-return', {
           endLine: 4,
           line: 4,
           messageId: 'missingReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
     },
@@ -355,7 +347,6 @@ ruleTester.run('consistent-return', {
           endLine: 4,
           line: 4,
           messageId: 'unexpectedReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
     },
@@ -374,7 +365,6 @@ ruleTester.run('consistent-return', {
           endLine: 4,
           line: 4,
           messageId: 'unexpectedReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
     },
@@ -396,7 +386,6 @@ ruleTester.run('consistent-return', {
           endLine: 7,
           line: 7,
           messageId: 'missingReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
     },
@@ -417,7 +406,6 @@ ruleTester.run('consistent-return', {
           endLine: 6,
           line: 6,
           messageId: 'unexpectedReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
       options: [
@@ -444,7 +432,6 @@ ruleTester.run('consistent-return', {
           endLine: 7,
           line: 7,
           messageId: 'unexpectedReturnValue',
-          type: AST_NODE_TYPES.ReturnStatement,
         },
       ],
       options: [
