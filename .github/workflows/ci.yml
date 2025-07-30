@@ -9,6 +9,7 @@ on:
 
 env:
   GO_VERSION: '1.24.1'
+  GOMAXPROCS: 4
 
 jobs:
   test-go:
@@ -24,12 +25,13 @@ jobs:
           submodules: true
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: ./.github/actions/setup-go
         with:
           go-version: ${{ matrix.go-version }}
+          cache-name: test-go
       - name: Unit Test
         run: |
-          go test ./internal/...
+          go test -parallel 4 ./internal/...
 
   test-node:
     name: Test npm packages
@@ -48,9 +50,10 @@ jobs:
         with:
           node-version: '24'
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: ./.github/actions/setup-go
         with:
           go-version: ${{ matrix.go-version }}
+          cache-name: test-node
       - name: Install pnpm
         run: corepack enable
 

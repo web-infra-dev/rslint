@@ -51,6 +51,8 @@ type InvalidTestCase struct {
 }
 
 func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Rule, validTestCases []ValidTestCase, invalidTestCases []InvalidTestCase) {
+	t.Parallel()
+
 	onlyMode := slices.ContainsFunc(validTestCases, func(c ValidTestCase) bool { return c.Only }) ||
 		slices.ContainsFunc(invalidTestCases, func(c InvalidTestCase) bool { return c.Only })
 
@@ -105,6 +107,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 
 	for i, testCase := range validTestCases {
 		t.Run("valid-"+strconv.Itoa(i), func(t *testing.T) {
+			t.Parallel()
 			if (onlyMode && !testCase.Only) || testCase.Skip {
 				t.SkipNow()
 			}
@@ -123,6 +126,8 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 
 	for i, testCase := range invalidTestCases {
 		t.Run("invalid-"+strconv.Itoa(i), func(t *testing.T) {
+			t.Parallel()
+
 			if (onlyMode && !testCase.Only) || testCase.Skip {
 				t.SkipNow()
 			}
