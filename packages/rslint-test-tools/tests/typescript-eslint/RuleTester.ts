@@ -114,9 +114,7 @@ export class RuleTester {
           }
           const code =
             typeof validCase === 'string' ? validCase : validCase.code;
-          
-          
-          
+
           const options =
             typeof validCase === 'string' ? [] : validCase.options || [];
 
