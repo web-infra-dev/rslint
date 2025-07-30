@@ -993,7 +993,7 @@ async function test() {
       ],
     },
     {
-      skip:true,
+      skip: true,
       code: `
 const doSomething = async (
   obj1: { a?: { b?: { c?: () => Promise<void> } } },

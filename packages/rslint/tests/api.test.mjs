@@ -15,7 +15,7 @@ test('lint api', async t => {
       config,
       workingDirectory: cwd,
       ruleOptions: {
-        'no-unsafe-member-access': 'error'
+        'no-unsafe-member-access': 'error',
       },
       fileContents: {
         [virtual_entry]: `
@@ -29,9 +29,13 @@ test('lint api', async t => {
   });
   await test('diag snapshot', async t => {
     let config = path.resolve(import.meta.dirname, '../fixtures/rslint.json');
-    const diags = await lint({ config, workingDirectory: cwd,ruleOptions: {
-      'no-unsafe-member-access': 'error'
-    } });
+    const diags = await lint({
+      config,
+      workingDirectory: cwd,
+      ruleOptions: {
+        'no-unsafe-member-access': 'error',
+      },
+    });
     t.assert.snapshot(diags);
   });
 });

@@ -151,7 +151,13 @@ export class RuleTester {
       });
       await test('invalid', async t => {
         for (const item of cases.invalid) {
-          const { code, errors, only = false, skip = false,options=[] } = item;
+          const {
+            code,
+            errors,
+            only = false,
+            skip = false,
+            options = [],
+          } = item;
           if (skip) {
             continue;
           }
@@ -169,7 +175,7 @@ export class RuleTester {
             },
           });
           t.assert.snapshot(diags);
-          
+
           assert(
             diags.diagnostics?.length > 0,
             `Expected diagnostics for invalid case`,
