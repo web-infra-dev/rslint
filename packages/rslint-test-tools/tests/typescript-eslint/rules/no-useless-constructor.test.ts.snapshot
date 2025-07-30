@@ -1,80 +1,232 @@
-
 exports[`no-useless-constructor > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "ruleName": "no-useless-constructor",
+      "messageId": "noUselessConstructor",
+      "message": "Useless constructor.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 19
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
   "fileCount": 1,
   "ruleCount": 1
 }
 `;
+
 exports[`no-useless-constructor > invalid 2`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "ruleName": "no-useless-constructor",
+      "messageId": "noUselessConstructor",
+      "message": "Useless constructor.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
   "fileCount": 1,
   "ruleCount": 1
 }
 `;
+
 exports[`no-useless-constructor > invalid 3`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "ruleName": "no-useless-constructor",
+      "messageId": "noUselessConstructor",
+      "message": "Useless constructor.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
   "fileCount": 1,
   "ruleCount": 1
 }
 `;
+
 exports[`no-useless-constructor > invalid 4`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "ruleName": "no-useless-constructor",
+      "messageId": "noUselessConstructor",
+      "message": "Useless constructor.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
   "fileCount": 1,
   "ruleCount": 1
 }
 `;
+
 exports[`no-useless-constructor > invalid 5`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "ruleName": "no-useless-constructor",
+      "messageId": "noUselessConstructor",
+      "message": "Useless constructor.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
   "fileCount": 1,
   "ruleCount": 1
 }
 `;
+
 exports[`no-useless-constructor > invalid 6`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "ruleName": "no-useless-constructor",
+      "messageId": "noUselessConstructor",
+      "message": "Useless constructor.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
   "fileCount": 1,
   "ruleCount": 1
 }
 `;
+
 exports[`no-useless-constructor > invalid 7`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "ruleName": "no-useless-constructor",
+      "messageId": "noUselessConstructor",
+      "message": "Useless constructor.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
   "fileCount": 1,
   "ruleCount": 1
 }
 `;
+
 exports[`no-useless-constructor > invalid 8`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "ruleName": "no-useless-constructor",
+      "messageId": "noUselessConstructor",
+      "message": "Useless constructor.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
   "fileCount": 1,
   "ruleCount": 1
 }
 `;
+
 exports[`no-useless-constructor > invalid 9`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 1,
-  "ruleCount": 1
-}
-`;
-exports[`no-useless-constructor > invalid 10`] = `
-{
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "ruleName": "no-useless-constructor",
+      "messageId": "noUselessConstructor",
+      "message": "Useless constructor.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 26
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
   "fileCount": 1,
   "ruleCount": 1
 }

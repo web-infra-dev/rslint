@@ -108,12 +108,6 @@ func isConstructorUseless(node *ast.Node) bool {
 		return false
 	}
 
-	statements := body.Statements()
-	if statements == nil || len(statements) == 0 {
-		// Empty constructor body
-		return true
-	}
-
 	// Check if constructor extends a class
 	classNode := ctor.Parent
 	if classNode == nil || !ast.IsClassDeclaration(classNode) {
@@ -129,6 +123,17 @@ func isConstructorUseless(node *ast.Node) bool {
 				break
 			}
 		}
+	}
+
+	statements := body.Statements()
+	if statements == nil || len(statements) == 0 {
+		// Empty constructor body
+		// If class extends another class, empty constructor is NOT useless
+		// (even though it's a TypeScript error, we shouldn't flag it as useless)
+		if extendsClause {
+			return false
+		}
+		return true
 	}
 
 	if !extendsClause {
@@ -167,6 +172,46 @@ func isConstructorUseless(node *ast.Node) bool {
 		return false
 	}
 
+	// Special case: super(...arguments) is always useless if parameters are simple
+	if len(superArgs.Nodes) == 1 {
+		arg := superArgs.Nodes[0]
+		if arg.Kind == ast.KindSpreadElement {
+			spreadExpr := arg.AsSpreadElement().Expression
+			if spreadExpr.Kind == ast.KindIdentifier && 
+			   spreadExpr.AsIdentifier().Text == "arguments" {
+				// Check if any parameter has complex pattern (destructuring, default values)
+				// If so, the constructor is not useless even with super(...arguments)
+				for _, param := range ctorParams.Nodes {
+					paramDecl := param.AsParameterDeclaration()
+					// Check if parameter name is not a simple identifier (e.g., destructured)
+					if paramDecl.Name().Kind != ast.KindIdentifier {
+						return false
+					}
+					// Check if parameter has default value
+					if paramDecl.Initializer != nil {
+						return false
+					}
+				}
+				// All parameters are simple, so super(...arguments) is useless
+				return true
+			}
+		}
+	}
+
+	// Check if any parameter has complex pattern (destructuring, default values)
+	// If so, the constructor is not useless even with super(...arguments)
+	for _, param := range ctorParams.Nodes {
+		paramDecl := param.AsParameterDeclaration()
+		// Check if parameter name is not a simple identifier (e.g., destructured)
+		if paramDecl.Name().Kind != ast.KindIdentifier {
+			return false
+		}
+		// Check if parameter has default value
+		if paramDecl.Initializer != nil {
+			return false
+		}
+	}
+
 	// Count non-rest parameters
 	normalParamCount := 0
 	var restParam *ast.Node
@@ -188,8 +233,9 @@ func isConstructorUseless(node *ast.Node) bool {
 		lastArg := superArgs.Nodes[len(superArgs.Nodes)-1]
 		if lastArg.Kind != ast.KindSpreadElement {
 			// Check special case: super(...arguments)
+			// Only consider it useless if constructor has no parameters
 			if len(superArgs.Nodes) == 1 && lastArg.Kind == ast.KindIdentifier &&
-				lastArg.AsIdentifier().Text == "arguments" {
+				lastArg.AsIdentifier().Text == "arguments" && len(ctorParams.Nodes) == 0 {
 				return true
 			}
 			return false
@@ -215,8 +261,20 @@ func isConstructorUseless(node *ast.Node) bool {
 			return false
 		}
 	} else {
-		// No rest params - check exact match
+		// No rest params - check exact match or super(...arguments) with no params
 		if len(ctorParams.Nodes) != len(superArgs.Nodes) {
+			// Special case: constructor() { super(...arguments); }
+			// This should be considered useless when constructor has no parameters
+			if len(ctorParams.Nodes) == 0 && len(superArgs.Nodes) == 1 {
+				arg := superArgs.Nodes[0]
+				if arg.Kind == ast.KindSpreadElement {
+					spreadExpr := arg.AsSpreadElement().Expression
+					if spreadExpr.Kind == ast.KindIdentifier && 
+					   spreadExpr.AsIdentifier().Text == "arguments" {
+						return true
+					}
+				}
+			}
 			return false
 		}
 	}

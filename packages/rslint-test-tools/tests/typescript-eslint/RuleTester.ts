@@ -133,15 +133,20 @@ export class RuleTester {
           const code = typeof testCase === 'string' ? testCase : testCase.code;
           const options =
             typeof testCase === 'string' ? undefined : testCase.options;
+          const filename = 
+            typeof testCase === 'string' ? undefined : testCase.filename;
 
           const ruleConfig = options ? ['error', ...options] : 'error';
+          
+          // Use custom filename if provided, otherwise default to virtual.ts
+          const testFile = filename ? path.resolve(cwd, 'src', filename) : virtual_entry;
 
           const diags = await Promise.race<LintResponse>([
             lint({
               config,
               workingDirectory: cwd,
               fileContents: {
-                [virtual_entry]: code,
+                [testFile]: code,
               },
               ruleOptions: {
                 [ruleName]: JSON.stringify(ruleConfig),
@@ -173,16 +178,19 @@ export class RuleTester {
       await test('invalid', async t => {
         for (let i = 0; i < cases.invalid.length; i++) {
           const testCase = cases.invalid[i];
-          const { errors, code, options } = testCase;
+          const { errors, code, options, filename } = testCase;
 
           const ruleConfig = options ? ['error', ...options] : 'error';
+          
+          // Use custom filename if provided, otherwise default to virtual.ts
+          const testFile = filename ? path.resolve(cwd, 'src', filename) : virtual_entry;
 
           const diags = await Promise.race<LintResponse>([
             lint({
               config,
               workingDirectory: cwd,
               fileContents: {
-                [virtual_entry]: code,
+                [testFile]: code,
               },
               ruleOptions: {
                 [ruleName]: JSON.stringify(ruleConfig),

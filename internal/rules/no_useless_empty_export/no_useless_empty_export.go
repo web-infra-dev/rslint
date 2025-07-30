@@ -23,7 +23,9 @@ func isEmptyExport(node *ast.Node) bool {
 	// Check if it's specifically an empty export {}
 	// For export {}, ExportClause might be a NamedExports with zero elements
 	if exportDecl.ExportClause == nil {
-		// No export clause at all - this might be export * or similar
+		// Could be export declaration with embedded declaration like:
+		// export const _ = {} or export function foo() {}
+		// These are NOT empty exports
 		return false
 	}
 	
@@ -38,10 +40,31 @@ func isEmptyExport(node *ast.Node) bool {
 
 func isExportStatement(node *ast.Node) bool {
 	switch node.Kind {
-	case ast.KindExportDeclaration, ast.KindExportAssignment:
+	case ast.KindExportDeclaration:
+		exportDecl := node.AsExportDeclaration()
+		// Type-only exports don't count
+		if exportDecl.IsTypeOnly {
+			return false
+		}
+		// Empty exports are handled separately
+		if isEmptyExport(node) {
+			return false
+		}
+		// Any other export declaration is a real export
+		// This includes:
+		// - export { foo }
+		// - export { foo } from 'bar'
+		// - export * from 'bar'
+		// But apparently NOT export const/let/var/function/class
+		return true
+	case ast.KindExportAssignment:
 		return true
 	case ast.KindVariableStatement:
 		// Check if variable statement has export modifier
+		// Skip if it has declare modifier
+		if hasDeclareModifier(node) {
+			return false
+		}
 		varStmt := node.AsVariableStatement()
 		if varStmt.Modifiers() != nil {
 			for _, mod := range varStmt.Modifiers().Nodes {
@@ -50,9 +73,26 @@ func isExportStatement(node *ast.Node) bool {
 				}
 			}
 		}
-	case ast.KindFunctionDeclaration, ast.KindClassDeclaration, ast.KindInterfaceDeclaration, 
-	     ast.KindTypeAliasDeclaration, ast.KindEnumDeclaration, ast.KindModuleDeclaration:
-		// Check if these declarations have export modifier
+	case ast.KindFunctionDeclaration, ast.KindClassDeclaration:
+		// Skip if it has declare modifier
+		if hasDeclareModifier(node) {
+			return false
+		}
+		return hasExportModifier(node)
+	case ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration:
+		// Type-only declarations don't count as runtime exports
+		return false
+	case ast.KindEnumDeclaration:
+		// Enums are runtime values (unless they have declare modifier)
+		if hasDeclareModifier(node) {
+			return false
+		}
+		return hasExportModifier(node)
+	case ast.KindModuleDeclaration:
+		// Module declarations with declare are ambient
+		if hasDeclareModifier(node) {
+			return false
+		}
 		return hasExportModifier(node)
 	}
 	return false
@@ -253,24 +293,24 @@ var NoUselessEmptyExportRule = rule.Rule{
 			return rule.RuleListeners{}
 		}
 
-		// Process statements directly here since SourceFile listeners are not called by the linter
+		// First pass: collect all statements to check for exports
 		var emptyExports []*ast.Node
-		hasOtherExportsOrImports := false
+		hasOtherExports := false
 		
-		// Check all statements for exports/imports
+		// Check all statements upfront
 		for _, statement := range ctx.SourceFile.Statements.Nodes {
 			if isEmptyExport(statement) {
 				emptyExports = append(emptyExports, statement)
 			} else if isExportOrImportStatement(statement) {
-				hasOtherExportsOrImports = true
+				hasOtherExports = true
 			}
 		}
 		
-		// If we found other exports/imports, report the empty exports
-		if hasOtherExportsOrImports {
+		// If there are other exports, report the empty exports as useless
+		if hasOtherExports {
 			for _, emptyExport := range emptyExports {
 				ctx.ReportNodeWithFixes(emptyExport, rule.RuleMessage{
-					Id:          "uselessExport",
+					Id:          "uselessExport", 
 					Description: "Empty export does nothing and can be removed.",
 				}, rule.RuleFixRemove(ctx.SourceFile, emptyExport))
 			}
