@@ -73,12 +73,14 @@ export class RuleTester {
   public run(
     ruleName: string,
     cases: {
-      valid: (string | { code: string; options?: any[]; languageOptions?: any })[];
+      valid: (string | { code: string; options?: any[]; languageOptions?: any; filename?: string })[];
       invalid: {
         code: string;
         errors: any[];
         options?: any[];
         output?: string | null;
+        languageOptions?: any;
+        filename?: string;
       }[];
     },
   ) {

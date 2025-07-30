@@ -11,23 +11,24 @@ const ruleTester = new RuleTester({
 });
 
 // Module declarations for test cases
-declare module 'foo' {
-  export default class Foo {
-    constructor();
-  }
-  export interface A {}
-  export interface B {}
-  export interface C {}
-  export type Type = any;
-}
+// TypeScript complains about these not being real modules, but they're just for testing
+// declare module 'foo' {
+//   export default class Foo {
+//     constructor();
+//   }
+//   export interface A {}
+//   export interface B {}
+//   export interface C {}
+//   export type Type = any;
+// }
 
-declare module 'bar' {
-  export default class Bar {
-    constructor();
-  }
-  export interface A {}
-  export interface B {}
-}
+// declare module 'bar' {
+//   export default class Bar {
+//     constructor();
+//   }
+//   export interface A {}
+//   export interface B {}
+// }
 
     ruleTester.run('consistent-type-imports', {
       valid: [

@@ -23,7 +23,7 @@ test('no-inferrable-types simple', async () => {
     
     console.log('Result:', JSON.stringify(result, null, 2));
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error('Error:', error instanceof Error ? error.message : String(error));
     throw error;
   }
 });

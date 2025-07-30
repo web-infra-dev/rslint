@@ -1,4 +1,4 @@
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { RuleTester } from '../RuleTester.ts';
 
 const ruleTester = new RuleTester();
 
