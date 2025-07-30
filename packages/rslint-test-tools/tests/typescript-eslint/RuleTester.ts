@@ -114,9 +114,9 @@ export class RuleTester {
           }
           const code =
             typeof validCase === 'string' ? validCase : validCase.code;
-          // if(!code.includes("import { it } from 'node:test';")){
-          //   continue;
-          // }
+          
+          
+          
           const options =
             typeof validCase === 'string' ? [] : validCase.options || [];
 
