@@ -1,0 +1,1341 @@
+// Rstest Snapshot v1
+
+exports[`no-duplicate-type-constituents > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  1.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Intersection type constituent is duplicated with  true.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  null.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  any.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  string.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  Set<string>.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  IsArray<number>.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 3,
+        },
+        "start": {
+          "column": 45,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  string[].",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  string[][].",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  [1, 2, 3].",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  string.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  null.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  string.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  'A'.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 28,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  A1.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 5,
+        },
+        "start": {
+          "column": 15,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  A1.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 20,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 18,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 18,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  B.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 4,
+        },
+        "start": {
+          "column": 22,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 18,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 4,
+        },
+        "start": {
+          "column": 22,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 22`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 5,
+        },
+        "start": {
+          "column": 18,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 23`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  (A | B).",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 20,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 24`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 25`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  (A | B).",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 6,
+        },
+        "start": {
+          "column": 20,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  (A | B).",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 6,
+        },
+        "start": {
+          "column": 52,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 26`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 20,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  B.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 4,
+        },
+        "start": {
+          "column": 24,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  (A | B).",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 4,
+        },
+        "start": {
+          "column": 28,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 27`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with number.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  string.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 28`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  (number | (string | null)).",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 65,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 29`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Intersection type constituent is duplicated with number.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Intersection type constituent is duplicated with  string.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 30`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Intersection type constituent is duplicated with  number.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Intersection type constituent is duplicated with  string.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 31`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 29,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 32`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Union type constituent is duplicated with  string.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 33`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 34`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 35`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 25,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 36`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 37`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 38`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 39`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 40`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 26,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 41`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 26,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 42`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 3,
+        },
+        "start": {
+          "column": 29,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 43`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 44`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 45`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 46`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 3,
+        },
+        "start": {
+          "column": 35,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
