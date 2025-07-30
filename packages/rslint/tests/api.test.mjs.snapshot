@@ -1,48 +1,9 @@
-exports[`lint api > diag snapshot 1`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "no-unsafe-member-access",
-      "message": "Unsafe member access .b on an \`any\` value.",
-      "filePath": "src/index.ts",
-      "range": {
-        "start": {
-          "line": 2,
-          "column": 3
-        },
-        "end": {
-          "line": 2,
-          "column": 4
-        }
-      }
-    },
-    {
-      "ruleName": "no-unsafe-member-access",
-      "message": "Unsafe member access .c on an \`any\` value.",
-      "filePath": "src/index.ts",
-      "range": {
-        "start": {
-          "line": 5,
-          "column": 3
-        },
-        "end": {
-          "line": 5,
-          "column": 4
-        }
-      }
-    }
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
-  "ruleCount": 40
-}
-`;
-
 exports[`lint api > virtual file support 1`] = `
 {
   "diagnostics": [
     {
       "ruleName": "no-unsafe-member-access",
+      "messageId": "unsafeMemberExpression",
       "message": "Unsafe member access .b on an \`any\` value.",
       "filePath": "src/virtual.ts",
       "range": {
@@ -59,6 +20,48 @@ exports[`lint api > virtual file support 1`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 40
+  "ruleCount": 1
+}
+`;
+
+exports[`lint api > diag snapshot 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-unsafe-member-access",
+      "messageId": "unsafeMemberExpression",
+      "message": "Unsafe member access .b on an \`any\` value.",
+      "filePath": "src/index.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 3
+        },
+        "end": {
+          "line": 2,
+          "column": 4
+        }
+      }
+    },
+    {
+      "ruleName": "no-unsafe-member-access",
+      "messageId": "unsafeMemberExpression",
+      "message": "Unsafe member access .c on an \`any\` value.",
+      "filePath": "src/index.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
 }
 `;

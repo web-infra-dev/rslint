@@ -55,7 +55,7 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 	rslintconfig.RegisterAllTypeSriptEslintPluginRules()
 
 	// Load rslint configuration and determine which tsconfig files to use
-	_, tsConfigs, configDirectory := rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
+	config, tsConfigs, configDirectory := rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
 
 	// Get rules from request.RuleOptions
 	var rules []rule.Rule
@@ -67,8 +67,16 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 			}
 		}
 	} else {
-		// If no specific rules requested, don't run any rules (IPC mode should be explicit)
-		rules = []rule.Rule{}
+		// If no specific rules requested, use rules from configuration file
+		if len(config) > 0 {
+			for _, configEntry := range config {
+				for ruleName := range configEntry.Rules {
+					if r, exists := rslintconfig.GlobalRuleRegistry.GetRule(ruleName); exists {
+						rules = append(rules, r)
+					}
+				}
+			}
+		}
 	}
 
 	// Create compiler host
@@ -189,6 +197,18 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 							}
 						} else {
 							ruleOptions = opt
+						}
+					}
+				} else {
+					// Use rule options from configuration file
+					for _, configEntry := range config {
+						if opt, ok := configEntry.Rules[r.Name]; ok {
+							// Extract options from the rule configuration
+							// Rule config can be "error", ["error", {...}], etc.
+							if arr, isArray := opt.([]interface{}); isArray && len(arr) > 1 {
+								ruleOptions = arr[1]
+							}
+							break
 						}
 					}
 				}
