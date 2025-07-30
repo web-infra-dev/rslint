@@ -1,6 +1,7 @@
-import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
+
 const ruleTester = new RuleTester({
   languageOptions: {
     parserOptions: {
@@ -1993,3 +1994,5 @@ interface FooInterface {
     },
   ],
 });
+
+// Note: Additional ESLint-specific tests have been removed as they are not compatible with Node.js test runner

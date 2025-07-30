@@ -31,8 +31,8 @@ function checkDiagnosticEqual(
     const rslintDiag = rslintDiagnostic[i];
     const tsDiag = tsDiagnostic[i];
     // check rule match
-    // Use camelCased ruleName as messageId
-    const rslintMessageId = toCamelCase(rslintDiag.ruleName);
+    // Use actual messageId if available, otherwise fall back to camelCased ruleName
+    const rslintMessageId = rslintDiag.messageId || toCamelCase(rslintDiag.ruleName);
     assert(
       rslintMessageId === tsDiag.messageId,
       `Message mismatch: ${rslintMessageId} !== ${tsDiag.messageId}`,
