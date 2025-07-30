@@ -19,7 +19,7 @@ exports[`explicit-member-accessibility > invalid 1`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -45,7 +45,33 @@ exports[`explicit-member-accessibility > invalid 2`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "explicit-member-accessibility",
+      "messageId": "missingAccessibility",
+      "message": "Missing accessibility modifier on parameter property samosa.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 22
+        },
+        "end": {
+          "line": 3,
+          "column": 45
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;

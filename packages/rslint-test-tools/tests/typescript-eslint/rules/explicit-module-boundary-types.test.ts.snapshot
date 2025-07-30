@@ -8,18 +8,27 @@ exports[`explicit-module-boundary-types > invalid 1`] = `
       "filePath": "src/virtual.ts",
       "range": {
         "start": {
-          "line": 2,
+          "line": 1,
           "column": 17
         },
         "end": {
-          "line": 2,
+          "line": 1,
           "column": 21
         }
       }
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`explicit-module-boundary-types > invalid 2`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;

@@ -19,163 +19,7 @@ exports[`ban-ts-comment > invalid 1`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
-  "ruleCount": 1
-}
-`;
-
-exports[`ban-ts-comment > invalid 10`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "ban-ts-comment",
-      "messageId": "tsDirectiveCommentRequiresDescription",
-      "message": "Include a description after the \\"@ts-expect-error\\" directive to explain why the @ts-expect-error is necessary. The description must be 3 characters or longer.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 2,
-          "column": 1
-        },
-        "end": {
-          "line": 3,
-          "column": 31
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 7,
-  "ruleCount": 1
-}
-`;
-
-exports[`ban-ts-comment > invalid 11`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "ban-ts-comment",
-      "messageId": "tsDirectiveComment",
-      "message": "Do not use \\"@ts-expect-error\\" because it alters compilation errors.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 1
-        },
-        "end": {
-          "line": 1,
-          "column": 24
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 7,
-  "ruleCount": 1
-}
-`;
-
-exports[`ban-ts-comment > invalid 12`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "ban-ts-comment",
-      "messageId": "tsDirectiveComment",
-      "message": "Do not use \\"@ts-expect-error\\" because it alters compilation errors.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 1
-        },
-        "end": {
-          "line": 1,
-          "column": 40
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 7,
-  "ruleCount": 1
-}
-`;
-
-exports[`ban-ts-comment > invalid 13`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "ban-ts-comment",
-      "messageId": "tsDirectiveComment",
-      "message": "Do not use \\"@ts-expect-error\\" because it alters compilation errors.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 1
-        },
-        "end": {
-          "line": 1,
-          "column": 42
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 7,
-  "ruleCount": 1
-}
-`;
-
-exports[`ban-ts-comment > invalid 14`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "ban-ts-comment",
-      "messageId": "tsDirectiveComment",
-      "message": "Do not use \\"@ts-expect-error\\" because it alters compilation errors.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 3,
-          "column": 3
-        },
-        "end": {
-          "line": 3,
-          "column": 46
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 7,
-  "ruleCount": 1
-}
-`;
-
-exports[`ban-ts-comment > invalid 15`] = `
-{
-  "diagnostics": [
-    {
-      "ruleName": "ban-ts-comment",
-      "messageId": "tsDirectiveCommentRequiresDescription",
-      "message": "Include a description after the \\"@ts-expect-error\\" directive to explain why the @ts-expect-error is necessary. The description must be 3 characters or longer.",
-      "filePath": "src/virtual.ts",
-      "range": {
-        "start": {
-          "line": 1,
-          "column": 1
-        },
-        "end": {
-          "line": 1,
-          "column": 20
-        }
-      }
-    }
-  ],
-  "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -201,7 +45,7 @@ exports[`ban-ts-comment > invalid 2`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -227,7 +71,7 @@ exports[`ban-ts-comment > invalid 3`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -253,7 +97,7 @@ exports[`ban-ts-comment > invalid 4`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -279,7 +123,7 @@ exports[`ban-ts-comment > invalid 5`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -305,7 +149,7 @@ exports[`ban-ts-comment > invalid 6`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -331,7 +175,7 @@ exports[`ban-ts-comment > invalid 7`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -357,7 +201,7 @@ exports[`ban-ts-comment > invalid 8`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -383,7 +227,7 @@ exports[`ban-ts-comment > invalid 9`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
