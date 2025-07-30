@@ -15,8 +15,8 @@ func runMain() int {
 		case "--lsp":
 			// run in LSP mode for Language Server
 			return runLSP()
-		case "--api":
-			// run in API mode for JS API
+		case "--api", "--ipc":
+			// run in API/IPC mode for JS API
 			return runAPI()
 		}
 	}
