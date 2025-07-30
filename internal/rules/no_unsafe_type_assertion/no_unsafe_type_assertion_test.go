@@ -8,6 +8,7 @@ import (
 )
 
 func TestNoUnsafeTypeAssertionRule_BasicAssertions(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnsafeTypeAssertionRule, []rule_tester.ValidTestCase{
 		{Code: `
 declare const a: string;
@@ -170,6 +171,7 @@ const bar = foo as number[];
 }
 
 func TestNoUnsafeTypeAssertionRule_AnyAssertions(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnsafeTypeAssertionRule, []rule_tester.ValidTestCase{
 		{Code: `
 declare const _any_: any;
@@ -286,6 +288,7 @@ const bar = 'foo' as errorType;
 }
 
 func TestNoUnsafeTypeAssertionRule_NeverAssertions(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnsafeTypeAssertionRule, []rule_tester.ValidTestCase{
 		{Code: `
 declare const _never_: never;
@@ -330,6 +333,7 @@ _string_ as never;
 }
 
 func TestNoUnsafeTypeAssertionRule_FunctionAssertions(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnsafeTypeAssertionRule, []rule_tester.ValidTestCase{
 		{Code: `
 declare const _function_: Function;
@@ -389,6 +393,7 @@ _function_ as never;
 }
 
 func TestNoUnsafeTypeAssertionRule_ObjectAssertions(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnsafeTypeAssertionRule, []rule_tester.ValidTestCase{
 		{Code: `
 // additional properties should be allowed
@@ -464,6 +469,7 @@ a as { hello: string };
 }
 
 func TestNoUnsafeTypeAssertionRule_ArrayAssertions(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnsafeTypeAssertionRule, []rule_tester.ValidTestCase{
 		{Code: `
 declare const a: string[];
@@ -557,6 +563,7 @@ a as never[];
 }
 
 func TestNoUnsafeTypeAssertionRule_TupleAssertions(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnsafeTypeAssertionRule, []rule_tester.ValidTestCase{
 		{Code: `
 declare const a: [string];
@@ -729,6 +736,7 @@ a as [Promise<string>];
 }
 
 func TestNoUnsafeTypeAssertionRule_PromiseAssertions(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnsafeTypeAssertionRule, []rule_tester.ValidTestCase{
 		{Code: `
 declare const a: Promise<string>;
@@ -841,6 +849,7 @@ a as Promise<never>;
 }
 
 func TestNoUnsafeTypeAssertionRule_ClassAssertions(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnsafeTypeAssertionRule, []rule_tester.ValidTestCase{
 		{Code: `
 class Foo {}
@@ -903,6 +912,7 @@ a as Bar;
 }
 
 func TestNoUnsafeTypeAssertionRule_GenericAssertions(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnsafeTypeAssertionRule, []rule_tester.ValidTestCase{
 		{Code: `
 type Obj = { foo: string };

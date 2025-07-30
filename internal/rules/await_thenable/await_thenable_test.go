@@ -8,6 +8,8 @@ import (
 )
 
 func TestAwaitThenableRule(t *testing.T) {
+	t.Parallel()
+
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &AwaitThenableRule, []rule_tester.ValidTestCase{
 		{Code: `
 async function test() {

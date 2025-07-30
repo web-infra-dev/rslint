@@ -8,6 +8,7 @@ import (
 )
 
 func TestNoUnnecessaryTypeAssertionRule(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTypeAssertionRule, []rule_tester.ValidTestCase{
 		{Code: `
 import { TSESTree } from '@typescript-eslint/utils';

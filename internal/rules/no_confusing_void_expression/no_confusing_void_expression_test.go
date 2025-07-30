@@ -8,6 +8,7 @@ import (
 )
 
 func TestNoConfusingVoidExpressionRule(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoConfusingVoidExpressionRule, []rule_tester.ValidTestCase{
 		{Code: "() => Math.random();"},
 		{Code: "console.log('foo');"},

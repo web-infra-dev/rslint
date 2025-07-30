@@ -9,6 +9,7 @@ import (
 )
 
 func TestRestrictTemplateExpressionsRule(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &RestrictTemplateExpressionsRule, []rule_tester.ValidTestCase{
 		{Code: `
       const msg = ` + "`" + `arg = ${'foo'}` + "`" + `;

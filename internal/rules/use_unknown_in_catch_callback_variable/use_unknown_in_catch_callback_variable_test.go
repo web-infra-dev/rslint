@@ -8,6 +8,7 @@ import (
 )
 
 func TestUseUnknownInCatchCallbackVariableRule(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &UseUnknownInCatchCallbackVariableRule, []rule_tester.ValidTestCase{
 		{Code: `
       Promise.resolve().catch((err: unknown) => {

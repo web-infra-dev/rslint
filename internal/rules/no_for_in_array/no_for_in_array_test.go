@@ -8,6 +8,7 @@ import (
 )
 
 func TestNoForInArrayRule(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoForInArrayRule, []rule_tester.ValidTestCase{
 		{Code: `
 for (const x of [3, 4, 5]) {

@@ -8,6 +8,7 @@ import (
 )
 
 func TestNoUnnecessaryTypeArgumentsRule(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnnecessaryTypeArgumentsRule, []rule_tester.ValidTestCase{
 		{Code: "f<>();"},
 		{Code: "f<string>();"},

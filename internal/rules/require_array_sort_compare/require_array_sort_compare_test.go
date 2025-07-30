@@ -9,6 +9,7 @@ import (
 )
 
 func TestRequireArraySortCompareRule(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &RequireArraySortCompareRule, []rule_tester.ValidTestCase{
 		{Code: `
       function f(a: any[]) {

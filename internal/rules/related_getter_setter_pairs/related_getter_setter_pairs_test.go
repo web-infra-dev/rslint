@@ -8,6 +8,7 @@ import (
 )
 
 func TestRelatedGetterSetterPairsRule(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &RelatedGetterSetterPairsRule, []rule_tester.ValidTestCase{
 		{Code: `
 interface Example {

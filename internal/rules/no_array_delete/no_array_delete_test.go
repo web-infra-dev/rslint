@@ -8,6 +8,7 @@ import (
 )
 
 func TestNoArrayDeleteRule(t *testing.T) {
+	t.Parallel()
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoArrayDeleteRule, []rule_tester.ValidTestCase{
 		{Code: `
       declare const obj: { a: 1; b: 2 };
