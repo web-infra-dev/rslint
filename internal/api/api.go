@@ -54,12 +54,13 @@ type HandshakeResponse struct {
 
 // LintRequest represents a lint request from JS to Go
 type LintRequest struct {
-	Files            []string          `json:"files,omitempty"`
-	Config           string            `json:"config,omitempty"` // Path to rslint.json config file
-	Format           string            `json:"format,omitempty"`
-	WorkingDirectory string            `json:"workingDirectory,omitempty"`
-	RuleOptions      map[string]string `json:"ruleOptions,omitempty"`
-	FileContents     map[string]string `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
+	Files            []string               `json:"files,omitempty"`
+	Config           string                 `json:"config,omitempty"` // Path to rslint.json config file
+	Format           string                 `json:"format,omitempty"`
+	WorkingDirectory string                 `json:"workingDirectory,omitempty"`
+	// Supports both string level and array [level, options] format
+	RuleOptions      map[string]interface{} `json:"ruleOptions,omitempty"`
+	FileContents     map[string]string      `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
 }
 
 // LintResponse represents a lint response from Go to JS
@@ -89,11 +90,12 @@ type Range struct {
 
 // Diagnostic represents a single lint diagnostic
 type Diagnostic struct {
-	RuleName string `json:"ruleName"`
-	Message  string `json:"message"`
-	FilePath string `json:"filePath"`
-	Range    Range  `json:"range"`
-	Severity string `json:"severity,omitempty"`
+	RuleName  string `json:"ruleName"`
+	Message   string `json:"message"`
+	FilePath  string `json:"filePath"`
+	Range     Range  `json:"range"`
+	Severity  string `json:"severity,omitempty"`
+	MessageId string `json:"messageId"`
 }
 
 // Handler defines the interface for handling IPC messages

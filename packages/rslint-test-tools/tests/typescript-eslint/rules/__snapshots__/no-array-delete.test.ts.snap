@@ -6,6 +6,7 @@ exports[`no-array-delete > invalid 1`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 22,
@@ -31,6 +32,7 @@ exports[`no-array-delete > invalid 2`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 24,
@@ -56,6 +58,7 @@ exports[`no-array-delete > invalid 3`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 27,
@@ -81,6 +84,7 @@ exports[`no-array-delete > invalid 4`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 34,
@@ -106,6 +110,7 @@ exports[`no-array-delete > invalid 5`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 22,
@@ -131,6 +136,7 @@ exports[`no-array-delete > invalid 6`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 20,
@@ -156,6 +162,7 @@ exports[`no-array-delete > invalid 7`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 42,
@@ -181,6 +188,7 @@ exports[`no-array-delete > invalid 8`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 22,
@@ -206,6 +214,7 @@ exports[`no-array-delete > invalid 9`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 22,
@@ -231,6 +240,7 @@ exports[`no-array-delete > invalid 10`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 22,
@@ -256,6 +266,7 @@ exports[`no-array-delete > invalid 11`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 28,
@@ -281,6 +292,7 @@ exports[`no-array-delete > invalid 12`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 29,
@@ -306,6 +318,7 @@ exports[`no-array-delete > invalid 13`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 29,
@@ -331,6 +344,7 @@ exports[`no-array-delete > invalid 14`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 22,
@@ -356,6 +370,7 @@ exports[`no-array-delete > invalid 15`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 22,
@@ -381,6 +396,7 @@ exports[`no-array-delete > invalid 16`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 22,
@@ -406,6 +422,7 @@ exports[`no-array-delete > invalid 17`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 24,
@@ -431,6 +448,7 @@ exports[`no-array-delete > invalid 18`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 31,
@@ -456,6 +474,7 @@ exports[`no-array-delete > invalid 19`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 30,
@@ -481,6 +500,7 @@ exports[`no-array-delete > invalid 20`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 28,
@@ -506,6 +526,7 @@ exports[`no-array-delete > invalid 21`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 36,
@@ -531,6 +552,7 @@ exports[`no-array-delete > invalid 22`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
+      "messageId": "noArrayDelete",
       "range": {
         "end": {
           "column": 22,

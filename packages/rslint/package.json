@@ -8,6 +8,7 @@
   "type": "module",
   "scripts": {
     "build:bin": "go build -v -o bin/rslint ../../cmd/rslint",
+    "build:debug": "GOEXPERIMENT=noregabi go build -v -gcflags='all=-N -l' -o  bin/rslint ../../cmd/rslint ",
     "build:js": "tsc -b tsconfig.build.json --force",
     "dev": "tsc -b tsconfig.build.json --force --watch",
     "build": "pnpm build:bin && pnpm build:js",

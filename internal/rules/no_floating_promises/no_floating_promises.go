@@ -1,6 +1,8 @@
 package no_floating_promises
 
 import (
+	"encoding/json"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -9,13 +11,13 @@ import (
 )
 
 type NoFloatingPromisesOptions struct {
-	AllowForKnownSafeCalls          []utils.TypeOrValueSpecifier
-	AllowForKnownSafeCallsInline    []string
-	AllowForKnownSafePromises       []utils.TypeOrValueSpecifier
-	AllowForKnownSafePromisesInline []string
-	CheckThenables                  *bool
-	IgnoreIIFE                      *bool
-	IgnoreVoid                      *bool
+	AllowForKnownSafeCalls          []utils.TypeOrValueSpecifier `json:"allowForKnownSafeCalls"`
+	AllowForKnownSafeCallsInline    []string                     `json:"allowForKnownSafeCallsInline"`
+	AllowForKnownSafePromises       []utils.TypeOrValueSpecifier `json:"allowForKnownSafePromises"`
+	AllowForKnownSafePromisesInline []string                     `json:"allowForKnownSafePromisesInline"`
+	CheckThenables                  *bool                        `json:"checkThenables"`
+	IgnoreIIFE                      *bool                        `json:"ignoreIIFE"`
+	IgnoreVoid                      *bool                        `json:"ignoreVoid"`
 }
 
 var messageBase = "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler."
@@ -80,12 +82,24 @@ var NoFloatingPromisesRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(NoFloatingPromisesOptions)
 		if !ok {
+			// try convert options to JSON and back to struct
 			opts = NoFloatingPromisesOptions{
 				AllowForKnownSafeCalls:          []utils.TypeOrValueSpecifier{},
 				AllowForKnownSafeCallsInline:    []string{},
 				AllowForKnownSafePromises:       []utils.TypeOrValueSpecifier{},
 				AllowForKnownSafePromisesInline: []string{},
 			}
+			// get first element of options
+			options_array, _ := options.([]interface{})
+			// if options_array has at least one element, try to unmarshal it
+			if len(options_array) > 0 {
+				optsJSON, err := json.Marshal(options_array[0])
+				if err == nil {
+					json.Unmarshal(optsJSON, &opts)
+				}
+
+			}
+
 		}
 		if opts.CheckThenables == nil {
 			opts.CheckThenables = utils.Ref(false)
@@ -96,7 +110,6 @@ var NoFloatingPromisesRule = rule.Rule{
 		if opts.IgnoreVoid == nil {
 			opts.IgnoreVoid = utils.Ref(true)
 		}
-
 		isHigherPrecedenceThanUnary := func(node *ast.Node) bool {
 			operator := ast.KindUnknown
 			if ast.IsBinaryExpression(node) {

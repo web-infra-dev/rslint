@@ -170,13 +170,6 @@ func NewRule() rule.Rule {
 - Test files: `*_test.go` for Go, `*.test.ts` for TypeScript
 - Rule directories: `rule_name/` (snake_case)
 
-## Documentation Requirements
-
-- Document all public APIs
-- Include usage examples for rules
-- Maintain README files for major components
-- Update benchmarks when adding performance-critical features
-
 ## Compatibility & Migration
 
 - Maintain ESLint rule compatibility where possible

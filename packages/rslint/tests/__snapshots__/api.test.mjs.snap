@@ -6,6 +6,7 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "filePath": "src/index.ts",
       "message": "Unsafe member access .b on an \`any\` value.",
+      "messageId": "unsafeMemberExpression",
       "range": {
         "end": {
           "column": 4,
@@ -21,6 +22,7 @@ exports[`lint api > diag snapshot 1`] = `
     {
       "filePath": "src/index.ts",
       "message": "Unsafe member access .c on an \`any\` value.",
+      "messageId": "unsafeMemberExpression",
       "range": {
         "end": {
           "column": 4,
@@ -36,7 +38,7 @@ exports[`lint api > diag snapshot 1`] = `
   ],
   "errorCount": 2,
   "fileCount": 1,
-  "ruleCount": 40,
+  "ruleCount": 1,
 }
 `;
 
@@ -46,6 +48,7 @@ exports[`lint api > virtual file support 1`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Unsafe member access .b on an \`any\` value.",
+      "messageId": "unsafeMemberExpression",
       "range": {
         "end": {
           "column": 24,
@@ -61,6 +64,6 @@ exports[`lint api > virtual file support 1`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 40,
+  "ruleCount": 1,
 }
 `;
