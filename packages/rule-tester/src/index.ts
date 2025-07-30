@@ -63,8 +63,19 @@ function checkDiagnosticEqual(
   }
 }
 
+interface RuleTesterOptions {
+  languageOptions?: {
+    parserOptions?: {
+      project?: string;
+      tsconfigRootDir?: string;
+    };
+  };
+}
 export class RuleTester {
-  constructor(options: any) {}
+  options: RuleTesterOptions
+  constructor(options: RuleTesterOptions) {
+    this.options = options;
+  }
   public run(
     ruleName: string,
     cases: {
@@ -82,10 +93,10 @@ export class RuleTester {
     },
   ) {
     describe(ruleName, () => {
-      let cwd = path.resolve(import.meta.dirname, './fixtures');
+      let cwd = this.options.languageOptions?.parserOptions?.tsconfigRootDir || process.cwd();
       const config = path.resolve(
-        import.meta.dirname,
-        './fixtures/rslint.json',
+        cwd,
+        './rslint.json',
       );
       let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
       // test whether case has only
@@ -183,9 +194,7 @@ export class RuleTester {
   }
 }
 
-export function getFixturesRootDir(): string {
-  return path.join(import.meta.dirname, 'fixtures');
-}
+
 
 /**
  * Simple no-op tag to mark code samples as "should not format with prettier"
