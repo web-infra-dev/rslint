@@ -7,6 +7,34 @@ import { lint, type Diagnostic, type LintResponse } from '@rslint/core';
 
 import assert from 'node:assert';
 
+// Add globals for TypeScript-ESLint compatibility
+declare global {
+  var AST_NODE_TYPES: any;
+  var describe: any;
+}
+
+// Define AST_NODE_TYPES for test compatibility
+globalThis.AST_NODE_TYPES = {
+  ReturnStatement: 'ReturnStatement',
+  // Add other node types as needed
+};
+
+// Define describe for test compatibility (no-op implementation)
+globalThis.describe = Object.assign(
+  (title: string, callback: Function) => {
+    // Execute the callback directly
+    callback();
+  },
+  {
+    for: (array: any[]) => (template: string, callback: Function) => {
+      // Execute the callback for each item in the array
+      for (const item of array) {
+        callback(item);
+      }
+    }
+  }
+);
+
 interface TsDiagnostic {
   line: number;
   column: number;
