@@ -72,7 +72,7 @@ interface RuleTesterOptions {
   };
 }
 export class RuleTester {
-  options: RuleTesterOptions
+  options: RuleTesterOptions;
   constructor(options: RuleTesterOptions) {
     this.options = options;
   }
@@ -93,11 +93,10 @@ export class RuleTester {
     },
   ) {
     describe(ruleName, () => {
-      let cwd = this.options.languageOptions?.parserOptions?.tsconfigRootDir || process.cwd();
-      const config = path.resolve(
-        cwd,
-        './rslint.json',
-      );
+      let cwd =
+        this.options.languageOptions?.parserOptions?.tsconfigRootDir ||
+        process.cwd();
+      const config = path.resolve(cwd, './rslint.json');
       let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
       // test whether case has only
       let hasOnly =
@@ -193,8 +192,6 @@ export class RuleTester {
     });
   }
 }
-
-
 
 /**
  * Simple no-op tag to mark code samples as "should not format with prettier"
