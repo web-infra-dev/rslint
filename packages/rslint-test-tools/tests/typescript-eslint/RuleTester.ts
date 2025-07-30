@@ -32,8 +32,8 @@ function checkDiagnosticEqual(
     const tsDiag = tsDiagnostic[i];
     // check rule match
     assert(
-      toCamelCase(rslintDiag.ruleName) === tsDiag.messageId,
-      `Message mismatch: ${rslintDiag.ruleName} !== ${tsDiag.messageId}`,
+      toCamelCase(rslintDiag.messageId) === tsDiag.messageId,
+      `Message mismatch: ${rslintDiag.messageId} !== ${tsDiag.messageId}`,
     );
 
     // check range match
@@ -70,10 +70,16 @@ export class RuleTester {
   public run(
     ruleName: string,
     cases: {
-      valid: string[];
+      valid: (
+        | string
+        | { code: string; options?: any; only?: boolean; skip?: boolean }
+      )[];
       invalid: {
         code: string;
         errors: any[];
+        options?: any;
+        only?: boolean;
+        skip?: boolean;
       }[];
     },
   ) {
@@ -84,8 +90,46 @@ export class RuleTester {
         './fixtures/rslint.json',
       );
       let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
+      // test whether case has only
+      let hasOnly =
+        cases.valid.some(x => {
+          if (typeof x === 'object' && x.only) {
+            return true;
+          } else {
+            return false;
+          }
+        }) || cases.invalid.some(x => x.only);
       await test('valid', async () => {
-        for (const code of cases.valid) {
+        for (const validCase of cases.valid) {
+          if (typeof validCase === 'object' && validCase.skip) {
+            continue;
+          }
+          if (hasOnly) {
+            if (typeof validCase === 'string') {
+              continue;
+            }
+            if (!validCase.only) {
+              continue;
+            }
+          }
+          const code =
+            typeof validCase === 'string' ? validCase : validCase.code;
+
+          const options =
+            typeof validCase === 'string' ? [] : validCase.options || [];
+
+          // workaround for this hardcoded path https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/eslint-plugin/tests/rules/no-floating-promises.test.ts#L712
+          if (Array.isArray(options)) {
+            for (const opt of options) {
+              if (Array.isArray(opt.allowForKnownSafeCalls)) {
+                for (const item of opt.allowForKnownSafeCalls) {
+                  if (item.path) {
+                    item.path = virtual_entry;
+                  }
+                }
+              }
+            }
+          }
           const diags = await lint({
             config,
             workingDirectory: cwd,
@@ -93,9 +137,10 @@ export class RuleTester {
               [virtual_entry]: code,
             },
             ruleOptions: {
-              [ruleName]: 'error',
+              [ruleName]: options,
             },
           });
+
           assert(
             diags.diagnostics?.length === 0,
             `Expected no diagnostics for valid case, but got: ${JSON.stringify(diags)}`,
@@ -103,7 +148,20 @@ export class RuleTester {
         }
       });
       await test('invalid', async t => {
-        for (const { errors, code } of cases.invalid) {
+        for (const item of cases.invalid) {
+          const {
+            code,
+            errors,
+            only = false,
+            skip = false,
+            options = [],
+          } = item;
+          if (skip) {
+            continue;
+          }
+          if (hasOnly && !only) {
+            continue;
+          }
           const diags = await lint({
             config,
             workingDirectory: cwd,
@@ -111,10 +169,11 @@ export class RuleTester {
               [virtual_entry]: code,
             },
             ruleOptions: {
-              [ruleName]: 'error',
+              [ruleName]: options,
             },
           });
           t.assert.snapshot(diags);
+
           assert(
             diags.diagnostics?.length > 0,
             `Expected diagnostics for invalid case`,

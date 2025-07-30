@@ -203,3 +203,251 @@ func TestGetRulesForFileWithIgnores(t *testing.T) {
 		})
 	}
 }
+
+func TestParseArrayRuleConfig(t *testing.T) {
+	tests := []struct {
+		name            string
+		input           []interface{}
+		expectedLevel   string
+		expectedOptions map[string]interface{}
+		expectedNil     bool
+	}{
+		{
+			name:        "empty array",
+			input:       []interface{}{},
+			expectedNil: true,
+		},
+		{
+			name:            "error level only",
+			input:           []interface{}{"error"},
+			expectedLevel:   "error",
+			expectedOptions: map[string]interface{}{},
+		},
+		{
+			name:            "warn level only",
+			input:           []interface{}{"warn"},
+			expectedLevel:   "warn",
+			expectedOptions: map[string]interface{}{},
+		},
+		{
+			name:            "off level only",
+			input:           []interface{}{"off"},
+			expectedLevel:   "off",
+			expectedOptions: map[string]interface{}{},
+		},
+		{
+			name:            "error with options",
+			input:           []interface{}{"error", map[string]interface{}{"option1": "value1", "option2": 42}},
+			expectedLevel:   "error",
+			expectedOptions: map[string]interface{}{"option1": "value1", "option2": 42},
+		},
+		{
+			name:            "warn with options",
+			input:           []interface{}{"warn", map[string]interface{}{"allowExpressions": true}},
+			expectedLevel:   "warn",
+			expectedOptions: map[string]interface{}{"allowExpressions": true},
+		},
+		{
+			name:            "error with null options",
+			input:           []interface{}{"error", nil},
+			expectedLevel:   "error",
+			expectedOptions: map[string]interface{}{},
+		},
+		{
+			name:            "invalid options type",
+			input:           []interface{}{"warn", "invalid"},
+			expectedLevel:   "warn",
+			expectedOptions: map[string]interface{}{},
+		},
+		{
+			name:        "invalid level type",
+			input:       []interface{}{123},
+			expectedNil: true,
+		},
+		{
+			name:            "extra elements ignored",
+			input:           []interface{}{"error", map[string]interface{}{"test": true}, "extra", 123},
+			expectedLevel:   "error",
+			expectedOptions: map[string]interface{}{"test": true},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := parseArrayRuleConfig(tt.input)
+
+			if tt.expectedNil {
+				if result != nil {
+					t.Errorf("expected nil result, got %+v", result)
+				}
+				return
+			}
+
+			if result == nil {
+				t.Error("expected non-nil result")
+				return
+			}
+
+			if result.Level != tt.expectedLevel {
+				t.Errorf("expected level %q, got %q", tt.expectedLevel, result.Level)
+			}
+
+			if len(result.Options) != len(tt.expectedOptions) {
+				t.Errorf("expected %d options, got %d", len(tt.expectedOptions), len(result.Options))
+				return
+			}
+
+			for key, expectedValue := range tt.expectedOptions {
+				actualValue, exists := result.Options[key]
+				if !exists {
+					t.Errorf("expected option %q not found", key)
+					continue
+				}
+				if actualValue != expectedValue {
+					t.Errorf("expected option %q = %v, got %v", key, expectedValue, actualValue)
+				}
+			}
+		})
+	}
+}
+
+func TestRuleConfigMethods(t *testing.T) {
+	t.Run("GetOptions with nil config", func(t *testing.T) {
+		var rc *RuleConfig
+		options := rc.GetOptions()
+		if options == nil {
+			t.Error("expected non-nil options map")
+		}
+		if len(options) != 0 {
+			t.Errorf("expected empty options map, got %d items", len(options))
+		}
+	})
+
+	t.Run("GetOptions with nil Options field", func(t *testing.T) {
+		rc := &RuleConfig{Level: "error"}
+		options := rc.GetOptions()
+		if options == nil {
+			t.Error("expected non-nil options map")
+		}
+		if len(options) != 0 {
+			t.Errorf("expected empty options map, got %d items", len(options))
+		}
+	})
+
+	t.Run("GetOptions with existing options", func(t *testing.T) {
+		expectedOptions := map[string]interface{}{"test": true}
+		rc := &RuleConfig{
+			Level:   "warn",
+			Options: expectedOptions,
+		}
+		options := rc.GetOptions()
+		if len(options) != 1 {
+			t.Errorf("expected 1 option, got %d", len(options))
+		}
+		if options["test"] != true {
+			t.Error("expected test option to be true")
+		}
+	})
+
+	t.Run("SetOptions", func(t *testing.T) {
+		rc := &RuleConfig{Level: "error"}
+		newOptions := map[string]interface{}{"newOption": "value"}
+		rc.SetOptions(newOptions)
+
+		if len(rc.Options) != 1 {
+			t.Errorf("expected 1 option after SetOptions, got %d", len(rc.Options))
+		}
+		if rc.Options["newOption"] != "value" {
+			t.Error("expected newOption to be 'value'")
+		}
+	})
+
+	t.Run("SetOptions with nil config", func(t *testing.T) {
+		var rc *RuleConfig
+		// Should not panic
+		rc.SetOptions(map[string]interface{}{"test": true})
+		// Config should remain nil (this test verifies the method handles nil gracefully)
+	})
+}
+
+func TestGetRulesForFileWithArrayConfig(t *testing.T) {
+	config := RslintConfig{
+		{
+			Language: "javascript",
+			Files:    []string{},
+			Rules: map[string]interface{}{
+				"rule1": "error",
+				"rule2": []interface{}{"warn"},
+				"rule3": []interface{}{"error", map[string]interface{}{"option1": "value1"}},
+				"rule4": []interface{}{"off"},
+				"rule5": map[string]interface{}{
+					"level":   "warn",
+					"options": map[string]interface{}{"option2": "value2"},
+				},
+			},
+		},
+	}
+
+	rules := config.GetRulesForFile("test.ts")
+
+	// Test rule1 - simple string config
+	if rule1, exists := rules["rule1"]; exists {
+		if rule1.Level != "error" {
+			t.Errorf("expected rule1 level 'error', got %q", rule1.Level)
+		}
+		if len(rule1.GetOptions()) != 0 {
+			t.Errorf("expected rule1 to have no options, got %d", len(rule1.GetOptions()))
+		}
+	} else {
+		t.Error("expected rule1 to exist")
+	}
+
+	// Test rule2 - array with level only
+	if rule2, exists := rules["rule2"]; exists {
+		if rule2.Level != "warn" {
+			t.Errorf("expected rule2 level 'warn', got %q", rule2.Level)
+		}
+		if len(rule2.GetOptions()) != 0 {
+			t.Errorf("expected rule2 to have no options, got %d", len(rule2.GetOptions()))
+		}
+	} else {
+		t.Error("expected rule2 to exist")
+	}
+
+	// Test rule3 - array with level and options
+	if rule3, exists := rules["rule3"]; exists {
+		if rule3.Level != "error" {
+			t.Errorf("expected rule3 level 'error', got %q", rule3.Level)
+		}
+		options := rule3.GetOptions()
+		if len(options) != 1 {
+			t.Errorf("expected rule3 to have 1 option, got %d", len(options))
+		}
+		if options["option1"] != "value1" {
+			t.Errorf("expected rule3 option1 to be 'value1', got %v", options["option1"])
+		}
+	} else {
+		t.Error("expected rule3 to exist")
+	}
+
+	// Test rule4 - array with "off" (should not exist in enabled rules)
+	if _, exists := rules["rule4"]; exists {
+		t.Error("expected rule4 to be disabled (not exist in enabled rules)")
+	}
+
+	// Test rule5 - object config
+	if rule5, exists := rules["rule5"]; exists {
+		if rule5.Level != "warn" {
+			t.Errorf("expected rule5 level 'warn', got %q", rule5.Level)
+		}
+		options := rule5.GetOptions()
+		if len(options) != 1 {
+			t.Errorf("expected rule5 to have 1 option, got %d", len(options))
+		}
+		if options["option2"] != "value2" {
+			t.Errorf("expected rule5 option2 to be 'value2', got %v", options["option2"])
+		}
+	} else {
+		t.Error("expected rule5 to exist")
+	}
+}
