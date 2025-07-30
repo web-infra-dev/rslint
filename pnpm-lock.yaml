@@ -72,6 +72,22 @@ importers:
       '@types/node':
         specifier: 24.0.14
         version: 24.0.14
+      '@typescript-eslint/rule-tester':
+        specifier: workspace:*
+        version: link:../rule-tester
+
+  packages/rule-tester:
+    dependencies:
+      '@rslint/core':
+        specifier: workspace:*
+        version: link:../rslint
+    devDependencies:
+      '@types/node':
+        specifier: 24.0.14
+        version: 24.0.14
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
 
   packages/vscode-extension:
     devDependencies:

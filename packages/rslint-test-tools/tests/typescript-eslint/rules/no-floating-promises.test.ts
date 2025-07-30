@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 
-import { getFixturesRootDir, RuleTester } from '../RuleTester.ts';
+import { getFixturesRootDir, RuleTester } from '@typescript-eslint/rule-tester';
 
 const rootDir = getFixturesRootDir();
 
