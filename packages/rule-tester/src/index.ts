@@ -68,6 +68,7 @@ interface RuleTesterOptions {
     parserOptions?: {
       project?: string;
       tsconfigRootDir?: string;
+      projectService?: boolean;
     };
   };
 }
@@ -89,6 +90,7 @@ export class RuleTester {
         options?: any;
         only?: boolean;
         skip?: boolean;
+       languageOptions?: RuleTesterOptions['languageOptions'];
       }[];
     },
   ) {
