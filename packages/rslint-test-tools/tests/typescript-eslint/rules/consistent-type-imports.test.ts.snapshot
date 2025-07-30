@@ -19,7 +19,7 @@ exports[`consistent-type-imports > invalid 1`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -45,7 +45,7 @@ exports[`consistent-type-imports > invalid 10`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -71,7 +71,7 @@ exports[`consistent-type-imports > invalid 11`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -97,7 +97,7 @@ exports[`consistent-type-imports > invalid 12`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -123,7 +123,7 @@ exports[`consistent-type-imports > invalid 13`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -149,7 +149,7 @@ exports[`consistent-type-imports > invalid 14`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -175,7 +175,7 @@ exports[`consistent-type-imports > invalid 15`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -201,7 +201,7 @@ exports[`consistent-type-imports > invalid 16`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -243,7 +243,7 @@ exports[`consistent-type-imports > invalid 17`] = `
     }
   ],
   "errorCount": 2,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -269,7 +269,7 @@ exports[`consistent-type-imports > invalid 18`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -311,7 +311,7 @@ exports[`consistent-type-imports > invalid 19`] = `
     }
   ],
   "errorCount": 2,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -337,7 +337,7 @@ exports[`consistent-type-imports > invalid 2`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -379,7 +379,7 @@ exports[`consistent-type-imports > invalid 20`] = `
     }
   ],
   "errorCount": 2,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -421,7 +421,7 @@ exports[`consistent-type-imports > invalid 21`] = `
     }
   ],
   "errorCount": 2,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -495,7 +495,7 @@ exports[`consistent-type-imports > invalid 22`] = `
     }
   ],
   "errorCount": 4,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -569,7 +569,7 @@ exports[`consistent-type-imports > invalid 23`] = `
     }
   ],
   "errorCount": 4,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -595,7 +595,7 @@ exports[`consistent-type-imports > invalid 3`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -621,7 +621,7 @@ exports[`consistent-type-imports > invalid 4`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -647,7 +647,7 @@ exports[`consistent-type-imports > invalid 5`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -673,7 +673,7 @@ exports[`consistent-type-imports > invalid 6`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -699,7 +699,7 @@ exports[`consistent-type-imports > invalid 7`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -725,7 +725,7 @@ exports[`consistent-type-imports > invalid 8`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -751,7 +751,7 @@ exports[`consistent-type-imports > invalid 9`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;

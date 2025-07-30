@@ -19,7 +19,7 @@ exports[`no-useless-empty-export > invalid 1`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -45,7 +45,7 @@ exports[`no-useless-empty-export > invalid 2`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -71,7 +71,7 @@ exports[`no-useless-empty-export > invalid 3`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -97,7 +97,7 @@ exports[`no-useless-empty-export > invalid 4`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -123,7 +123,7 @@ exports[`no-useless-empty-export > invalid 5`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -149,7 +149,7 @@ exports[`no-useless-empty-export > invalid 6`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -175,7 +175,7 @@ exports[`no-useless-empty-export > invalid 7`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -217,7 +217,7 @@ exports[`no-useless-empty-export > invalid 8`] = `
     }
   ],
   "errorCount": 2,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;

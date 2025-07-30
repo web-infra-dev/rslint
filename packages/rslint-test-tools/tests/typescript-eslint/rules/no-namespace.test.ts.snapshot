@@ -51,7 +51,7 @@ exports[`no-namespace > invalid 1`] = `
     }
   ],
   "errorCount": 3,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;

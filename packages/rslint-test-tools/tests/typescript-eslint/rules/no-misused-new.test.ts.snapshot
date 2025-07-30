@@ -19,7 +19,7 @@ exports[`no-misused-new > invalid 1`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;

@@ -19,7 +19,7 @@ exports[`no-unnecessary-type-conversion > invalid 1`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -45,7 +45,7 @@ exports[`no-unnecessary-type-conversion > invalid 2`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
@@ -71,7 +71,7 @@ exports[`no-unnecessary-type-conversion > invalid 3`] = `
     }
   ],
   "errorCount": 1,
-  "fileCount": 7,
+  "fileCount": 1,
   "ruleCount": 1
 }
 `;
