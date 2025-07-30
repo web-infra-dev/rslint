@@ -81,6 +81,20 @@ export class RSLintService {
     this.chunks = [];
     this.chunkSize = 0;
     this.expectedSize = null;
+    
+    // Handle process errors
+    this.process.on('error', err => {
+      console.error('RSLint process error:', err);
+      this.rejectAllPending(err);
+    });
+    
+    this.process.on('exit', (code, signal) => {
+      if (code !== 0) {
+        const err = new Error(`RSLint process exited with code ${code}, signal ${signal}`);
+        console.error(err.message);
+        this.rejectAllPending(err);
+      }
+    });
   }
 
   /**
@@ -169,6 +183,16 @@ export class RSLintService {
     } else {
       pending.resolve(data);
     }
+  }
+  
+  /**
+   * Reject all pending messages
+   */
+  private rejectAllPending(error: Error): void {
+    for (const pending of this.pendingMessages.values()) {
+      pending.reject(error);
+    }
+    this.pendingMessages.clear();
   }
 
   /**
