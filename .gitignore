@@ -147,3 +147,5 @@ vite.config.ts.timestamp-*
 /rslint
 /bin/rslint
 npm/*/rslint
+
+.idea

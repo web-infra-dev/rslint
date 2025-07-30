@@ -1,0 +1,32 @@
+name: Setup Go
+description: Setup Go
+
+inputs:
+  go-version:
+    description: Go version range to set up.
+    default: '>=1.24.0'
+  cache-name:
+    description: Name of scoped cache for this set up.
+    default: 'cache'
+
+runs:
+  using: composite
+  steps:
+    - name: Install Go
+      id: install-go
+      uses: actions/setup-go@v5
+      with:
+        go-version: ${{ inputs.go-version }}
+        cache: false
+
+    - name: Go cache
+      uses: actions/cache@v4.2.3
+      with:
+        key: setup-go-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ hashFiles('**/go.sum') }}-${{ github.workflow }}-${{ inputs.cache-name }}
+        restore-keys: |
+          setup-go-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ hashFiles('**/go.sum') }}-${{ github.workflow }}-
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+          ~/Library/Caches/go-build
+          ~/AppData/Local/go-build
