@@ -90,7 +90,7 @@ export class RuleTester {
         options?: any;
         only?: boolean;
         skip?: boolean;
-        output?: string;
+        output?: string | string[];
         languageOptions?: RuleTesterOptions['languageOptions'];
       }[];
     },
