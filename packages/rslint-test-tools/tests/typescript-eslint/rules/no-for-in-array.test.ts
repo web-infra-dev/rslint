@@ -12,7 +12,7 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('no-for-in-array',  {
+ruleTester.run('no-for-in-array', {
   valid: [
     `
 for (const x of [3, 4, 5]) {
@@ -45,7 +45,7 @@ for (const key in obj) {
 
   invalid: [
     {
-      only:true,
+      only: true,
       code: `
 for (const x in [3, 4, 5]) {
   console.log(x);
