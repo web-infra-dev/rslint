@@ -17,13 +17,14 @@
     "build:npm": "zx scripts/build-npm.mjs",
     "version": "zx scripts/version.mjs",
     "release": "pnpm publish -r --no-git-checks ",
-    "publish:vsce": "zx scripts/publish-vsce.mjs",
+    "publish:vsce": "zx scripts/publish-marketplace.mjs",
+    "publish:ovsx": "zx scripts/publish-marketplace.mjs --marketplace=ovsx",
     "format": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --write .",
     "format:check": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --check .",
     "test": "pnpm -r test",
     "test:go": "go test ./internal/...",
     "typecheck": "pnpm tsc -b tsconfig.json",
-    "lint": "rslint --config rslint.json"
+    "lint": "rslint"
   },
   "devDependencies": {
     "prettier": "3.5.0",

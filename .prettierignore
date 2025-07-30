@@ -10,3 +10,4 @@
 typescript-go/
 packages/vscode-extension/.vscode-test-out
 packages/vscode-extension/.vscode-test
+pnpm-lock.yaml
