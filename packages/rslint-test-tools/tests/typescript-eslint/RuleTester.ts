@@ -3,7 +3,7 @@
 import path from 'node:path';
 import test from 'node:test';
 import util from 'node:util';
-import { lint, type Diagnostic } from '@rslint/core';
+import { lint, type Diagnostic, type LintResponse } from '@rslint/core';
 
 import assert from 'node:assert';
 
@@ -31,8 +31,8 @@ function checkDiagnosticEqual(
     const rslintDiag = rslintDiagnostic[i];
     const tsDiag = tsDiagnostic[i];
     // check rule match
-    // Use messageId if available, otherwise fall back to camelCased ruleName
-    const rslintMessageId = rslintDiag.messageId || toCamelCase(rslintDiag.ruleName);
+    // Use camelCased ruleName as messageId
+    const rslintMessageId = toCamelCase(rslintDiag.ruleName);
     assert(
       rslintMessageId === tsDiag.messageId,
       `Message mismatch: ${rslintMessageId} !== ${tsDiag.messageId}`,
@@ -96,7 +96,7 @@ export class RuleTester {
           
           const ruleConfig = options ? ['error', ...options] : 'error';
           
-          const diags = await Promise.race([
+          const diags = await Promise.race<LintResponse>([
             lint({
               config,
               workingDirectory: cwd,
@@ -104,7 +104,7 @@ export class RuleTester {
                 [virtual_entry]: code,
               },
               ruleOptions: {
-                [ruleName]: ruleConfig,
+                [ruleName]: JSON.stringify(ruleConfig),
               },
             }),
             new Promise((_, reject) => 
@@ -129,7 +129,7 @@ export class RuleTester {
           
           const ruleConfig = options ? ['error', ...options] : 'error';
           
-          const diags = await Promise.race([
+          const diags = await Promise.race<LintResponse>([
             lint({
               config,
               workingDirectory: cwd,
@@ -137,7 +137,7 @@ export class RuleTester {
                 [virtual_entry]: code,
               },
               ruleOptions: {
-                [ruleName]: ruleConfig,
+                [ruleName]: JSON.stringify(ruleConfig),
               },
             }),
             new Promise((_, reject) => 
