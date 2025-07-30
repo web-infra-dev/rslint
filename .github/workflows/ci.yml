@@ -57,13 +57,15 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: TypeCheck
-        run: pnpm typecheck
+
       - name: Format
         run: pnpm format:check
 
       - name: Build
         run: pnpm build
+
+      - name: TypeCheck
+        run: pnpm typecheck
 
       - name: Test on Linux
         if: runner.os == 'Linux'
