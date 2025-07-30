@@ -60,6 +60,22 @@ ruleTester.run('no-duplicate-type-constituents', {
     // Conditional types
     'type T<U> = U extends string ? string | number : number | boolean;',
 
+    // Tuple types - different tuples
+    'type T = [string, number] | [number, string];',
+    'type T = [string] | [string, number];',
+
+    // Mapped types
+    'type T<K extends keyof any> = { [P in K]: string } | { [P in K]: number };',
+
+    // Index access types
+    'type T = { a: string }["a"] | { b: number }["b"];',
+
+    // keyof types
+    'type T = keyof { a: string } | keyof { b: number };',
+
+    // typeof types
+    'type T = typeof String | typeof Number;',
+
     // ignoreUnions option
     {
       code: 'type T = string | string;',
@@ -291,6 +307,69 @@ ruleTester.run('no-duplicate-type-constituents', {
         type T = C | number | C;
       `,
       errors: [
+        {
+          messageId: 'duplicate',
+        },
+      ],
+    },
+
+    // Tuple type duplicates
+    {
+      code: 'type T = [string, number] | [boolean] | [string, number];',
+      errors: [
+        {
+          messageId: 'duplicate',
+        },
+      ],
+    },
+
+    // Template literal duplicates
+    {
+      code: 'type T = `prefix-${string}` | `prefix-${number}` | `prefix-${string}`;',
+      errors: [
+        {
+          messageId: 'duplicate',
+        },
+      ],
+    },
+
+    // keyof duplicates
+    {
+      code: 'type T = keyof { a: string } | keyof { b: number } | keyof { a: string };',
+      errors: [
+        {
+          messageId: 'duplicate',
+        },
+      ],
+    },
+
+    // typeof duplicates
+    {
+      code: 'type T = typeof String | typeof Number | typeof String;',
+      errors: [
+        {
+          messageId: 'duplicate',
+        },
+      ],
+    },
+
+    // Complex intersection duplicates
+    {
+      code: 'type T = { a: string } & { b: number } & { a: string };',
+      errors: [
+        {
+          messageId: 'duplicate',
+        },
+      ],
+    },
+
+    // Multiple nested duplicates
+    {
+      code: 'type T = (string | (number | string)) | (boolean | (string | object));',
+      errors: [
+        {
+          messageId: 'duplicate',
+        },
         {
           messageId: 'duplicate',
         },
