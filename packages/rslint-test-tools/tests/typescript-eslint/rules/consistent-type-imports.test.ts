@@ -1,8 +1,5 @@
 import { noFormat, RuleTester } from '../RuleTester.ts';
 
-// Rule would normally be imported but we're testing rslint's implementation
-// import rule from '../../src/rules/consistent-type-imports';
-
 const PARSER_OPTION_COMBOS = [
   {
     emitDecoratorMetadata: false,
