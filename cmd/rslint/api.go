@@ -66,6 +66,7 @@ type IPCHandler struct{}
 
 // HandleLint handles lint requests in IPC mode
 func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) {
+
 	// Format is not used for IPC mode as we return structured data
 	_ = req.Format
 
@@ -97,7 +98,7 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 	_, tsConfigs, configDirectory := rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
 
 	// Create rules
-	var rules = []rule.Rule{
+	var origin_rules = []rule.Rule{
 		await_thenable.AwaitThenableRule,
 		no_array_delete.NoArrayDeleteRule,
 		no_base_to_string.NoBaseToStringRule,
@@ -139,16 +140,21 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		unbound_method.UnboundMethodRule,
 		use_unknown_in_catch_callback_variable.UseUnknownInCatchCallbackVariableRule,
 	}
-
+	type RuleWithOption struct {
+		rule   rule.Rule
+		option interface{}
+	}
+	rulesWithOptions := []RuleWithOption{}
 	// filter rule based on request.RuleOptions
 	if len(req.RuleOptions) > 0 {
-		filteredRules := []rule.Rule{}
-		for _, r := range rules {
-			if _, ok := req.RuleOptions[r.Name]; ok {
-				filteredRules = append(filteredRules, r)
+		for _, r := range origin_rules {
+			if option, ok := req.RuleOptions[r.Name]; ok {
+				rulesWithOptions = append(rulesWithOptions, RuleWithOption{
+					rule:   r,
+					option: option,
+				})
 			}
 		}
-		rules = filteredRules
 	}
 
 	// Create compiler host
@@ -211,6 +217,7 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 
 	// Create collector function
 	diagnosticCollector := func(d rule.RuleDiagnostic) {
+
 		diagnosticsLock.Lock()
 		defer diagnosticsLock.Unlock()
 
@@ -221,9 +228,10 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		endLine, endColumn := scanner.GetLineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
 
 		diagnostic := ipc.Diagnostic{
-			RuleName: d.RuleName,
-			Message:  d.Message.Description,
-			FilePath: tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions),
+			RuleName:  d.RuleName,
+			MessageId: d.Message.Id,
+			Message:   d.Message.Description,
+			FilePath:  tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions),
 			Range: ipc.Range{
 				Start: ipc.Position{
 					Line:   startLine + 1, // Convert to 1-based indexing
@@ -246,11 +254,12 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		false, // Don't use single-threaded mode for IPC
 		files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			return utils.Map(rules, func(r rule.Rule) linter.ConfiguredRule {
+			return utils.Map(rulesWithOptions, func(r RuleWithOption) linter.ConfiguredRule {
+
 				return linter.ConfiguredRule{
-					Name: r.Name,
+					Name: r.rule.Name,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return r.Run(ctx, nil)
+						return r.rule.Run(ctx, r.option)
 					},
 				}
 			})
@@ -260,6 +269,7 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 	if err != nil {
 		return nil, fmt.Errorf("error running linter: %v", err)
 	}
+
 	if diagnostics == nil {
 		diagnostics = []ipc.Diagnostic{}
 	}
@@ -268,7 +278,7 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		Diagnostics: diagnostics,
 		ErrorCount:  errorsCount,
 		FileCount:   len(files),
-		RuleCount:   len(rules),
+		RuleCount:   len(rulesWithOptions),
 	}, nil
 }
 

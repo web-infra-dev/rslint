@@ -1,0 +1,3245 @@
+exports[`no-floating-promises > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 28
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 3
+        },
+        "end": {
+          "line": 4,
+          "column": 43
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 36
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 6,
+          "column": 38
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 26
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 3
+        },
+        "end": {
+          "line": 4,
+          "column": 26
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 31
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 26
+        }
+      },
+      "messageId": "floating"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 3
+        },
+        "end": {
+          "line": 4,
+          "column": 11
+        }
+      },
+      "messageId": "floating"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 1
+        },
+        "end": {
+          "line": 5,
+          "column": 23
+        }
+      },
+      "messageId": "floating"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 1
+        },
+        "end": {
+          "line": 5,
+          "column": 33
+        }
+      },
+      "messageId": "floating"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 1
+        },
+        "end": {
+          "line": 5,
+          "column": 21
+        }
+      },
+      "messageId": "floating"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 1
+        },
+        "end": {
+          "line": 5,
+          "column": 32
+        }
+      },
+      "messageId": "floating"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 3
+        },
+        "end": {
+          "line": 4,
+          "column": 11
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 37
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 16
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 6,
+          "column": 31
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 24
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 8,
+          "column": 3
+        },
+        "end": {
+          "line": 8,
+          "column": 26
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 12
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 16
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 23
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 6,
+          "column": 38
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 31
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 22`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 6,
+          "column": 11
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 26
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 8,
+          "column": 3
+        },
+        "end": {
+          "line": 8,
+          "column": 19
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 9,
+          "column": 3
+        },
+        "end": {
+          "line": 9,
+          "column": 21
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 23`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 10,
+          "column": 3
+        },
+        "end": {
+          "line": 10,
+          "column": 12
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 11,
+          "column": 3
+        },
+        "end": {
+          "line": 11,
+          "column": 27
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 24`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 18,
+          "column": 3
+        },
+        "end": {
+          "line": 18,
+          "column": 11
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 19,
+          "column": 3
+        },
+        "end": {
+          "line": 19,
+          "column": 26
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 20,
+          "column": 3
+        },
+        "end": {
+          "line": 20,
+          "column": 19
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 25`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 9
+        },
+        "end": {
+          "line": 4,
+          "column": 14
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 26`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 9
+        },
+        "end": {
+          "line": 4,
+          "column": 14
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 27`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 29
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 28`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 11
+        },
+        "end": {
+          "line": 3,
+          "column": 39
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 29`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 13
+        },
+        "end": {
+          "line": 6,
+          "column": 18
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 27
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 30`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 9
+        },
+        "end": {
+          "line": 4,
+          "column": 14
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 31`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 11
+        },
+        "end": {
+          "line": 3,
+          "column": 29
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 32`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 3
+        },
+        "end": {
+          "line": 4,
+          "column": 23
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 38
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 6,
+          "column": 31
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 33
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 33`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 6,
+          "column": 33
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 34`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 6,
+          "column": 36
+        }
+      },
+      "messageId": "floating"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 35`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 6,
+          "column": 28
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 36`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 6,
+          "column": 28
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 37`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 6,
+          "column": 28
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 38`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 26
+        }
+      },
+      "messageId": "floating"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 39`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 26
+        }
+      },
+      "messageId": "floating"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 30
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 40`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 26
+        }
+      },
+      "messageId": "floating"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 41`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 6,
+          "column": 41
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 42`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator. A rejection handler that is not a function will be ignored.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 45
+        }
+      },
+      "messageId": "floatingUselessRejectionHandlerVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator. A rejection handler that is not a function will be ignored.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 1
+        },
+        "end": {
+          "line": 5,
+          "column": 40
+        }
+      },
+      "messageId": "floatingUselessRejectionHandlerVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator. A rejection handler that is not a function will be ignored.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 1
+        },
+        "end": {
+          "line": 6,
+          "column": 37
+        }
+      },
+      "messageId": "floatingUselessRejectionHandlerVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator. A rejection handler that is not a function will be ignored.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 1
+        },
+        "end": {
+          "line": 7,
+          "column": 49
+        }
+      },
+      "messageId": "floatingUselessRejectionHandlerVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator. A rejection handler that is not a function will be ignored.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 10,
+          "column": 1
+        },
+        "end": {
+          "line": 10,
+          "column": 36
+        }
+      },
+      "messageId": "floatingUselessRejectionHandlerVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator. A rejection handler that is not a function will be ignored.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 11,
+          "column": 1
+        },
+        "end": {
+          "line": 11,
+          "column": 31
+        }
+      },
+      "messageId": "floatingUselessRejectionHandlerVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator. A rejection handler that is not a function will be ignored.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 12,
+          "column": 1
+        },
+        "end": {
+          "line": 12,
+          "column": 28
+        }
+      },
+      "messageId": "floatingUselessRejectionHandlerVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator. A rejection handler that is not a function will be ignored.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 13,
+          "column": 1
+        },
+        "end": {
+          "line": 13,
+          "column": 40
+        }
+      },
+      "messageId": "floatingUselessRejectionHandlerVoid"
+    }
+  ],
+  "errorCount": 8,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 43`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 23
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 44`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 50
+        }
+      },
+      "messageId": "floatingUselessRejectionHandler"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 45`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 49
+        }
+      },
+      "messageId": "floatingUselessRejectionHandler"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 46`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 45
+        }
+      },
+      "messageId": "floatingUselessRejectionHandler"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 1
+        },
+        "end": {
+          "line": 5,
+          "column": 40
+        }
+      },
+      "messageId": "floatingUselessRejectionHandler"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 1
+        },
+        "end": {
+          "line": 6,
+          "column": 37
+        }
+      },
+      "messageId": "floatingUselessRejectionHandler"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 1
+        },
+        "end": {
+          "line": 7,
+          "column": 49
+        }
+      },
+      "messageId": "floatingUselessRejectionHandler"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 10,
+          "column": 1
+        },
+        "end": {
+          "line": 10,
+          "column": 36
+        }
+      },
+      "messageId": "floatingUselessRejectionHandler"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 11,
+          "column": 1
+        },
+        "end": {
+          "line": 11,
+          "column": 31
+        }
+      },
+      "messageId": "floatingUselessRejectionHandler"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 12,
+          "column": 1
+        },
+        "end": {
+          "line": 12,
+          "column": 28
+        }
+      },
+      "messageId": "floatingUselessRejectionHandler"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 13,
+          "column": 1
+        },
+        "end": {
+          "line": 13,
+          "column": 40
+        }
+      },
+      "messageId": "floatingUselessRejectionHandler"
+    }
+  ],
+  "errorCount": 8,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 47`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 23
+        }
+      },
+      "messageId": "floating"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 48`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 36
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 49`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 22
+        }
+      },
+      "messageId": "floating"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 28
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 50`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 5,
+          "column": 22
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 51`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 22
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 52`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 37
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 53`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 39
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 54`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 42
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 55`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 32
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 56`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 56
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 57`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 26
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 58`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 39
+        }
+      },
+      "messageId": "floatingPromiseArrayVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 59`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 35
+        }
+      },
+      "messageId": "floatingPromiseArrayVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 40
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 3
+        },
+        "end": {
+          "line": 4,
+          "column": 55
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 48
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 6,
+          "column": 50
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 60`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 19
+        }
+      },
+      "messageId": "floatingPromiseArray"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 61`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 3
+        },
+        "end": {
+          "line": 4,
+          "column": 22
+        }
+      },
+      "messageId": "floatingPromiseArray"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 62`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 29
+        }
+      },
+      "messageId": "floatingPromiseArrayVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 63`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 45
+        }
+      },
+      "messageId": "floatingPromiseArrayVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 64`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 5,
+          "column": 4
+        }
+      },
+      "messageId": "floatingPromiseArrayVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 65`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 31
+        }
+      },
+      "messageId": "floatingPromiseArrayVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 66`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 5
+        }
+      },
+      "messageId": "floatingPromiseArrayVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 67`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 3
+        }
+      },
+      "messageId": "floatingPromiseArrayVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 68`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 5
+        }
+      },
+      "messageId": "floatingPromiseArrayVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 69`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 29
+        }
+      },
+      "messageId": "floatingPromiseArrayVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 24
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 3
+        },
+        "end": {
+          "line": 4,
+          "column": 39
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 32
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 70`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 10
+        }
+      },
+      "messageId": "floatingPromiseArrayVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 71`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 8,
+          "column": 12
+        }
+      },
+      "messageId": "floatingPromiseArrayVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 72`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 9
+        },
+        "end": {
+          "line": 5,
+          "column": 29
+        }
+      },
+      "messageId": "floatingPromiseArrayVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 73`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 9
+        },
+        "end": {
+          "line": 3,
+          "column": 31
+        }
+      },
+      "messageId": "floatingPromiseArrayVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 74`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 15,
+          "column": 1
+        },
+        "end": {
+          "line": 15,
+          "column": 9
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 75`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 17
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 76`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 21
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 77`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 25
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 78`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 27
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 79`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 21
+        }
+      },
+      "messageId": "floatingPromiseArrayVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 3
+        },
+        "end": {
+          "line": 5,
+          "column": 20
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 3
+        },
+        "end": {
+          "line": 6,
+          "column": 35
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 3
+        },
+        "end": {
+          "line": 7,
+          "column": 28
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 8,
+          "column": 3
+        },
+        "end": {
+          "line": 8,
+          "column": 30
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 80`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 1
+        },
+        "end": {
+          "line": 5,
+          "column": 5
+        }
+      },
+      "messageId": "floatingPromiseArrayVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 81`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 21
+        }
+      },
+      "messageId": "floatingPromiseArrayVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 82`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 12
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 83`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 9
+        },
+        "end": {
+          "line": 4,
+          "column": 33
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 84`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 9
+        },
+        "end": {
+          "line": 4,
+          "column": 44
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 85`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 9
+        },
+        "end": {
+          "line": 4,
+          "column": 47
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 86`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 17
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 87`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 8,
+          "column": 1
+        },
+        "end": {
+          "line": 8,
+          "column": 20
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 88`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 17
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 89`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 19
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 50
+        }
+      },
+      "messageId": "floatingVoid"
+    },
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 3
+        },
+        "end": {
+          "line": 4,
+          "column": 50
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 90`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 1
+        },
+        "end": {
+          "line": 6,
+          "column": 19
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 91`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 3
+        },
+        "end": {
+          "line": 4,
+          "column": 11
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 92`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 3
+        },
+        "end": {
+          "line": 4,
+          "column": 12
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 93`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 26
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 94`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 34
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 95`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 45
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 96`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 21
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 97`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 30
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 98`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 33
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-floating-promises > invalid 99`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-floating-promises",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 48
+        }
+      },
+      "messageId": "floatingVoid"
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

@@ -130,6 +130,21 @@ func (rc *RuleConfig) GetLevel() string {
 	return rc.Level
 }
 
+// GetOptions returns the rule options, ensuring we return a usable value
+func (rc *RuleConfig) GetOptions() map[string]interface{} {
+	if rc == nil || rc.Options == nil {
+		return make(map[string]interface{})
+	}
+	return rc.Options
+}
+
+// SetOptions sets the rule options
+func (rc *RuleConfig) SetOptions(options map[string]interface{}) {
+	if rc != nil {
+		rc.Options = options
+	}
+}
+
 // GetSeverity returns the diagnostic severity for this rule configuration
 func (rc *RuleConfig) GetSeverity() rule.DiagnosticSeverity {
 	if rc == nil {
@@ -143,6 +158,44 @@ func GetAllRulesForPlugin(plugin string) []rule.Rule {
 	} else {
 		return []rule.Rule{} // Return empty slice for unsupported plugins
 	}
+}
+
+// parseArrayRuleConfig parses array-style rule configuration like ["error", {...options}]
+// Supports ESLint-compatible formats:
+// - ["off"] -> disabled rule
+// - ["error"] -> enabled rule with error severity
+// - ["warn"] -> enabled rule with warning severity
+// - ["error", {...options}] -> enabled rule with error severity and options
+// - ["warn", {...options}] -> enabled rule with warning severity and options
+func parseArrayRuleConfig(ruleArray []interface{}) *RuleConfig {
+	if len(ruleArray) == 0 {
+		return nil
+	}
+
+	// First element should always be the severity level
+	level, ok := ruleArray[0].(string)
+	if !ok {
+		return nil
+	}
+
+	ruleConfig := &RuleConfig{Level: level}
+
+	// Second element (if present) should be the options object
+	if len(ruleArray) > 1 {
+		switch opts := ruleArray[1].(type) {
+		case map[string]interface{}:
+			ruleConfig.Options = opts
+		case nil:
+			// Explicitly null/nil options are valid
+			ruleConfig.Options = make(map[string]interface{})
+		default:
+			// Invalid options type, but still create the rule config with just the level
+			ruleConfig.Options = make(map[string]interface{})
+		}
+	}
+
+	// Additional elements are ignored (following ESLint behavior)
+	return ruleConfig
 }
 
 // GetRulesForFile returns enabled rules for a given file based on the configuration
@@ -187,17 +240,10 @@ func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConf
 						enabledRules[ruleName] = ruleConfig
 					}
 				case []interface{}:
-					// Handle array format like ["error", {...options}]
-					if len(v) > 0 {
-						if level, ok := v[0].(string); ok && level != "off" {
-							ruleConfig := &RuleConfig{Level: level}
-							if len(v) > 1 {
-								if options, ok := v[1].(map[string]interface{}); ok {
-									ruleConfig.Options = options
-								}
-							}
-							enabledRules[ruleName] = ruleConfig
-						}
+					// Handle array format like ["error", {...options}] or ["warn"] or ["off"]
+					ruleConfig := parseArrayRuleConfig(v)
+					if ruleConfig != nil && ruleConfig.IsEnabled() {
+						enabledRules[ruleName] = ruleConfig
 					}
 				}
 			}

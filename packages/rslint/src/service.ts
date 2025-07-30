@@ -17,9 +17,11 @@ interface Range {
 export interface Diagnostic {
   ruleName: string;
   message: string;
+  messageId: string;
   filePath: string;
   range: Range;
   severity?: string;
+  suggestions: any[];
 }
 
 export interface LintResponse {
