@@ -96,7 +96,7 @@ jobs:
 
   publish:
     name: Publish
-    needs: [ build, pre-check ]
+    needs: [build, pre-check]
     env:
       release_npm: ${{ inputs.to_release == 'all' || inputs.to_release == 'npm' }}
       release_extension: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
@@ -181,14 +181,14 @@ jobs:
             goarch: arm64
             node_arch: arm64
             node_os: linux
-#          - goos: windows
-#            goarch: amd64
-#            node_arch: x64
-#            node_os: win32
-#          - goos: windows
-#            goarch: arm64
-#            node_arch: arm64
-#            node_os: win32
+    #          - goos: windows
+    #            goarch: amd64
+    #            node_arch: x64
+    #            node_os: win32
+    #          - goos: windows
+    #            goarch: arm64
+    #            node_arch: arm64
+    #            node_os: win32
     steps:
       - name: Checkout
         uses: actions/checkout@v4
