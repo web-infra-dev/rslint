@@ -30,6 +30,13 @@
     "onLanguage:javascriptreact"
   ],
   "contributes": {
+    "commands": [
+      {
+        "command": "rslint.restartServer",
+        "title": "Restart Server",
+        "category": "rslint"
+      }
+    ],
     "configuration": {
       "type": "object",
       "title": "rslint",
