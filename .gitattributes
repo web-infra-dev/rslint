@@ -1,0 +1,42 @@
+# Set default behavior to automatically normalize line endings.
+* text=auto
+
+# Ensure these files always have LF line endings on checkout
+*.ts text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.cjs text eol=lf
+*.jsx text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.go text eol=lf
+
+# Shell scripts should always have LF
+*.sh text eol=lf
+
+# Windows batch files should have CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary files should not be touched
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.zip binary
+*.tar.gz binary
+*.tgz binary
+*.exe binary
+*.dll binary
+*.so binary
+*.dylib binary
