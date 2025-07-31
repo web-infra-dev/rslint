@@ -38,45 +38,6 @@ export function activate(context: ExtensionContext) {
     },
     // Enable all supported LSP features
     initializationOptions: {},
-    // Configure client capabilities
-    clientCapabilities: {
-      textDocument: {
-        completion: {
-          dynamicRegistration: false,
-          completionItem: {
-            snippetSupport: true,
-            commitCharactersSupport: true,
-            documentationFormat: ['markdown', 'plaintext'],
-            deprecatedSupport: true,
-            preselectSupport: true,
-          },
-        },
-        hover: {
-          dynamicRegistration: false,
-          contentFormat: ['markdown', 'plaintext'],
-        },
-        definition: {
-          dynamicRegistration: false,
-          linkSupport: true,
-        },
-        codeAction: {
-          dynamicRegistration: false,
-          codeActionLiteralSupport: {
-            codeActionKind: {
-              valueSet: [
-                'quickfix',
-                'refactor',
-                'refactor.extract',
-                'refactor.inline',
-                'refactor.rewrite',
-                'source',
-                'source.organizeImports',
-              ],
-            },
-          },
-        },
-      },
-    },
   };
 
   client = new LanguageClient(
@@ -86,18 +47,7 @@ export function activate(context: ExtensionContext) {
     clientOptions,
   );
 
-  // Add error handling
-  client
-    .onReady()
-    .then(() => {
-      window.showInformationMessage('Rslint language server is ready');
-    })
-    .catch(error => {
-      window.showErrorMessage(
-        `Failed to start Rslint language server: ${error.message}`,
-      );
-    });
-
+  // Start the client
   client.start();
 
   context.subscriptions.push(
