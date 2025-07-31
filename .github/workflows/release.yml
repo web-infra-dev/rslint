@@ -40,8 +40,57 @@ env:
   GO_VERSION: '1.24.1'
 
 jobs:
+  pre-check:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.inputs.branch }}
+          submodules: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download Artifact
+        uses: actions/download-artifact@v4.1.7
+        with:
+          path: binaries
+
+      - name: Move binaries
+        run: |
+          find binaries
+          cp -rf binaries/* npm/
+          find npm
+
+      - name: Format code
+        run: pnpm format:check
+
+      - name: TypeCheck
+        run: pnpm typecheck
+      - name: Lint code
+        run: pnpm lint
+      - name: Test on Linux
+        run: xvfb-run -a pnpm -r test
+
   publish:
-    name: Build
+    name: Publish
+    needs: [ build, pre-check ]
     env:
       release_npm: ${{ inputs.to_release == 'all' || inputs.to_release == 'npm' }}
       release_extension: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
@@ -73,27 +122,16 @@ jobs:
       - name: Format code
         run: pnpm format:check
 
-      - name: Build packages
-        run: pnpm build
-      - name: TypeCheck
-        run: pnpm typecheck
-      - name: Lint code
-        run: pnpm lint
-      - name: Test on Linux
-        if: runner.os == 'Linux'
-        run: xvfb-run -a pnpm -r test
-
       - name: Publish npm packages
         if: env.release_npm == 'true'
         env:
           NPM_TOKEN: ${{ secrets.RSLINT_NPM_TOKEN }}
         run: |
           npm config set "//registry.npmjs.org/:_authToken" "${NPM_TOKEN}"
-          pnpm build:npm
-          pnpm -r publish --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
+          pnpm -r publish --dry-run --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
 
       - name: Build and publish to Microsoft VS Code Marketplace
-        if: env.release_extension == 'true'
+        if: false
         env:
           VSCE_PAT: ${{ secrets.RSLINT_VSCE_PAT }}
         run: |
@@ -104,7 +142,7 @@ jobs:
           fi
 
       - name: Build and publish to Open VSX Registry
-        if: env.release_extension == 'true'
+        if: false
         env:
           OVSX_PAT: ${{ secrets.RSLINT_OVSX_PAT }}
         run: |
@@ -113,3 +151,63 @@ jobs:
           else
             pnpm publish:ovsx
           fi
+
+  build:
+    name: Build-Rslint-Binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: darwin
+            goarch: amd64
+            node_arch: x64
+            node_os: darwin
+          - goos: darwin
+            goarch: arm64
+            node_arch: arm64
+            node_os: darwin
+          - goos: linux
+            goarch: amd64
+            node_arch: x64
+            node_os: linux
+          - goos: linux
+            goarch: arm64
+            node_arch: arm64
+            node_os: linux
+          - goos: windows
+            goarch: amd64
+            node_arch: x64
+            node_os: win32
+          - goos: windows
+            goarch: arm64
+            node_arch: arm64
+            node_os: win32
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.inputs.branch }}
+          submodules: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Go Build packages
+        run: |
+          GOOS=${{ matrix.goos }} \
+          GOARCH=${{ matrix.goarch }} \ 
+          go build -o npm/${{ matrix.node_os }}-${{ matrix.node_arch }}/rslint ./cmd/rslint
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rslint-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: npm/${{ matrix.node_os }}-${{ matrix.node_arch }}/rslint
