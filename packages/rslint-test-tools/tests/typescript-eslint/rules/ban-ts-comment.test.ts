@@ -11,7 +11,7 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('ban-ts-comment', 'ts-expect-error', {
+ruleTester.run('ban-ts-comment (ts-expect-error)', {
   valid: [
     '// just a comment containing @ts-expect-error somewhere',
     `
@@ -448,7 +448,7 @@ if (false) {
   ],
 });
 
-ruleTester.run('ban-ts-comment', 'ts-ignore', {
+ruleTester.run('ban-ts-comment (ts-ignore)', {
   valid: [
     '// just a comment containing @ts-ignore somewhere',
     {
@@ -943,7 +943,7 @@ if (false) {
   ],
 });
 
-ruleTester.run('ban-ts-comment', 'ts-nocheck', {
+ruleTester.run('ban-ts-comment (ts-nocheck)', {
   valid: [
     '// just a comment containing @ts-nocheck somewhere',
     {
@@ -1145,7 +1145,7 @@ const a: true = false;
   ],
 });
 
-ruleTester.run('ban-ts-comment', 'ts-check', {
+ruleTester.run('ban-ts-comment (ts-check)', {
   valid: [
     '// just a comment containing @ts-check somewhere',
     `

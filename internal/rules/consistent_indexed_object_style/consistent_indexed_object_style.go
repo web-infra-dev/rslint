@@ -102,14 +102,28 @@ func checkTypeReference(ctx rule.RuleContext, node *ast.Node) {
 
 func checkInterfaceDeclaration(ctx rule.RuleContext, node *ast.Node) {
 	interfaceDecl := node.AsInterfaceDeclaration()
-	if interfaceDecl.Members == nil || len(interfaceDecl.Members.Nodes) != 1 {
+	if interfaceDecl.Members == nil {
 		return
 	}
 
-	member := interfaceDecl.Members.Nodes[0]
-	if member.Kind != ast.KindIndexSignature {
+	// Check if this interface has ONLY index signatures (no other members)
+	var indexSignatures []*ast.Node
+	hasOtherMembers := false
+	
+	for _, member := range interfaceDecl.Members.Nodes {
+		if member.Kind == ast.KindIndexSignature {
+			indexSignatures = append(indexSignatures, member)
+		} else {
+			hasOtherMembers = true
+		}
+	}
+	
+	// Only convert if there's exactly one index signature and no other members
+	if len(indexSignatures) != 1 || hasOtherMembers {
 		return
 	}
+
+	member := indexSignatures[0]
 
 	indexSig := member.AsIndexSignatureDeclaration()
 	if indexSig.Parameters == nil || len(indexSig.Parameters.Nodes) == 0 {
@@ -140,14 +154,11 @@ func checkInterfaceDeclaration(ctx rule.RuleContext, node *ast.Node) {
 	
 	// Check for circular references - be more specific
 	if interfaceName != "" {
-		// For direct self-references, block conversion
-		if isDirectSelfReference(valueType, interfaceName) {
-			return // Direct circular reference like Foo -> Foo
+		// Check if the value type contains any reference to the interface name
+		// This includes direct references, union/intersection types, etc.
+		if containsTypeReference(valueType, interfaceName) {
+			return // Contains circular reference - don't convert
 		}
-		
-		// Only block conversion for direct circular references
-		// Arrays, functions, tuples, etc. containing the type are allowed
-		// These don't create problematic circular references in practice
 		
 		// For indirect references through other interfaces, check for mutual references
 		if valueType.Kind == ast.KindTypeReference {
@@ -160,9 +171,6 @@ func checkInterfaceDeclaration(ctx rule.RuleContext, node *ast.Node) {
 				}
 			}
 		}
-		
-		// For wrapped references (arrays, functions, etc.), allow conversion
-		// These don't create problematic circular references
 	}
 
 	// Check if interface extends anything - if so, we can't safely convert
@@ -315,28 +323,13 @@ func findParentDeclaration(node *ast.Node) *ast.Node {
 	return nil
 }
 
-// Check if a type node is a direct self-reference (not in a union, array, etc)
-func isDirectSelfReference(typeNode *ast.Node, typeName string) bool {
-	if typeNode == nil || typeName == "" {
-		return false
-	}
-	
-	// Direct type reference
-	if typeNode.Kind == ast.KindTypeReference {
-		typeRef := typeNode.AsTypeReferenceNode()
-		if typeRef.TypeName != nil && ast.IsIdentifier(typeRef.TypeName) {
-			return typeRef.TypeName.AsIdentifier().Text == typeName
-		}
-	}
-	
-	return false
-}
 
 // Check if type contains any reference to the given type name that would cause circular dependency
 func containsTypeReference(typeNode *ast.Node, typeName string) bool {
 	if typeNode == nil || typeName == "" {
 		return false
 	}
+	
 	
 	switch typeNode.Kind {
 	case ast.KindTypeReference:
