@@ -42,6 +42,7 @@ env:
 jobs:
   pre-check:
     name: Test
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -156,6 +157,7 @@ jobs:
     name: Build-Rslint-Binaries
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - goos: darwin
@@ -203,9 +205,7 @@ jobs:
 
       - name: Go Build packages
         run: |
-          GOOS=${{ matrix.goos }} \
-          GOARCH=${{ matrix.goarch }} \ 
-          go build -o npm/${{ matrix.node_os }}-${{ matrix.node_arch }}/rslint ./cmd/rslint
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o npm/${{ matrix.node_os }}-${{ matrix.node_arch }}/rslint ./cmd/rslint
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
