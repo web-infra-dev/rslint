@@ -77,7 +77,9 @@ export class RSLintService {
     });
 
     // Set up binary message reading
-    this.process.stdout!.on('data', data => this.handleChunk(data));
+    this.process.stdout!.on('data', data => {
+      this.handleChunk(data);
+    });
     this.chunks = [];
     this.chunkSize = 0;
     this.expectedSize = null;
@@ -86,7 +88,7 @@ export class RSLintService {
   /**
    * Send a message to the rslint process
    */
-  private sendMessage(kind: string, data: any): Promise<any> {
+  private async sendMessage(kind: string, data: any): Promise<any> {
     return new Promise((resolve, reject) => {
       const id = this.nextMessageId++;
       const message = { id, kind, data };
@@ -181,7 +183,7 @@ export class RSLintService {
     await this.sendMessage('handshake', { version: '1.0.0' });
 
     // Send lint request
-    return await this.sendMessage('lint', {
+    return this.sendMessage('lint', {
       files,
       config,
       workingDirectory,
@@ -194,7 +196,7 @@ export class RSLintService {
   /**
    * Close the rslint process
    */
-  close(): Promise<void> {
+  async close(): Promise<void> {
     return new Promise(resolve => {
       this.sendMessage('exit', {}).finally(() => {
         this.process.stdin!.end();
