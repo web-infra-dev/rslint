@@ -19,9 +19,10 @@ env:
 jobs:
   test-go:
     name: Test Go
-    runs-on: rspack-ubuntu-22.04-large
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
         go-version: ['1.24.1']
     steps:
       - name: Checkout code
@@ -53,9 +54,10 @@ jobs:
 
   test-node:
     name: Test npm packages
-    runs-on: rspack-ubuntu-22.04-large
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
         go-version: ['1.24.1']
     steps:
       - name: Checkout code
