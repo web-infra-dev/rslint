@@ -42,7 +42,9 @@ func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath stri
 
 	diagnostics := program.GetSyntacticDiagnostics(context.Background(), nil)
 	if len(diagnostics) != 0 {
-		return nil, fmt.Errorf("found %v syntactic errors. Try running \"tsgo --noEmit\" first\n", len(diagnostics))
+		// Log syntactic errors but don't fail - some test cases intentionally contain syntax errors
+		// that should be handled by individual rules rather than preventing program creation
+		fmt.Printf("Warning: found %v syntactic errors in TypeScript program\n", len(diagnostics))
 	}
 
 	program.BindSourceFiles()

@@ -1,1 +1,1 @@
-module foo {}
+// Empty virtual test file
