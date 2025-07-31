@@ -124,15 +124,15 @@ export class RSLintService {
         reject(new Error(`Message ${id} (${kind}) timed out after 30 seconds`));
       }, 30000); // 30 second timeout
 
-      this.pendingMessages.set(id, { 
-        resolve: (result) => {
+      this.pendingMessages.set(id, {
+        resolve: result => {
           clearTimeout(timeoutId);
           resolve(result);
-        }, 
-        reject: (error) => {
+        },
+        reject: error => {
           clearTimeout(timeoutId);
           reject(error);
-        }
+        },
       });
 
       try {
@@ -146,7 +146,7 @@ export class RSLintService {
         const success = this.process.stdin!.write(
           Buffer.concat([length, jsonBuffer]),
         );
-        
+
         if (!success) {
           console.warn('Write buffer is full, may cause backpressure');
         }
@@ -260,7 +260,9 @@ export class RSLintService {
     return new Promise(resolve => {
       // Set a timeout to force cleanup if the process doesn't respond
       const timeout = setTimeout(() => {
-        console.warn('RSLint process did not respond to exit message, forcing cleanup');
+        console.warn(
+          'RSLint process did not respond to exit message, forcing cleanup',
+        );
         this.forceCleanup();
         resolve();
       }, 5000); // 5 second timeout
@@ -286,16 +288,16 @@ export class RSLintService {
     try {
       // Reject all pending messages
       this.rejectAllPending(new Error('Service shutting down'));
-      
+
       // Close stdin if it's still open
       if (this.process.stdin && !this.process.stdin.destroyed) {
         this.process.stdin.end();
       }
-      
+
       // Kill the process if it's still running
       if (!this.process.killed) {
         this.process.kill('SIGTERM');
-        
+
         // Force kill after a short delay if SIGTERM doesn't work
         setTimeout(() => {
           if (!this.process.killed) {
@@ -303,7 +305,7 @@ export class RSLintService {
           }
         }, 1000);
       }
-      
+
       // Clean up buffers
       this.chunks = [];
       this.chunkSize = 0;

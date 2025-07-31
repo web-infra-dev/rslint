@@ -3,7 +3,12 @@
 import path from 'node:path';
 import test from 'node:test';
 import util from 'node:util';
-import { lint, RSLintService, type Diagnostic, type LintResponse } from '@rslint/core';
+import {
+  lint,
+  RSLintService,
+  type Diagnostic,
+  type LintResponse,
+} from '@rslint/core';
 
 import assert from 'node:assert';
 
@@ -145,11 +150,12 @@ export class RuleTester {
         './fixtures/rslint.json',
       );
       let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
-      
+
       try {
         await test('valid', async () => {
           for (const testCase of cases.valid) {
-            const code = typeof testCase === 'string' ? testCase : testCase.code;
+            const code =
+              typeof testCase === 'string' ? testCase : testCase.code;
             const options =
               typeof testCase === 'string' ? undefined : testCase.options;
             const filename =
@@ -166,7 +172,7 @@ export class RuleTester {
             let diags: LintResponse | undefined;
             let attempts = 0;
             const maxAttempts = 3;
-            
+
             while (attempts < maxAttempts) {
               try {
                 diags = await lint({
@@ -185,16 +191,19 @@ export class RuleTester {
                 if (attempts >= maxAttempts) {
                   throw error;
                 }
-                console.warn(`Lint attempt ${attempts} failed, retrying...`, error);
+                console.warn(
+                  `Lint attempt ${attempts} failed, retrying...`,
+                  error,
+                );
                 // Wait a bit before retrying
                 await new Promise(resolve => setTimeout(resolve, 100));
               }
             }
-            
+
             if (!diags) {
               throw new Error('Failed to get lint results after retries');
             }
-            
+
             if (diags.diagnostics?.length > 0) {
               console.error('Failed valid test case:', code);
               console.error('Options:', JSON.stringify(options));
@@ -206,7 +215,7 @@ export class RuleTester {
             );
           }
         });
-        
+
         await test('invalid', async t => {
           for (let i = 0; i < cases.invalid.length; i++) {
             const testCase = cases.invalid[i];
@@ -223,7 +232,7 @@ export class RuleTester {
             let diags: LintResponse | undefined;
             let attempts = 0;
             const maxAttempts = 3;
-            
+
             while (attempts < maxAttempts) {
               try {
                 diags = await lint({
@@ -242,16 +251,19 @@ export class RuleTester {
                 if (attempts >= maxAttempts) {
                   throw error;
                 }
-                console.warn(`Lint attempt ${attempts} failed, retrying...`, error);
+                console.warn(
+                  `Lint attempt ${attempts} failed, retrying...`,
+                  error,
+                );
                 // Wait a bit before retrying
                 await new Promise(resolve => setTimeout(resolve, 100));
               }
             }
-            
+
             if (!diags) {
               throw new Error('Failed to get lint results after retries');
             }
-            
+
             t.assert.snapshot(diags);
             assert(
               diags.diagnostics?.length > 0,
