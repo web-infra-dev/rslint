@@ -1,12 +1,17 @@
-import { RuleTester } from '@typescript-eslint/rule-tester';
+import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
-import rule from '../../../src/rules/ban-ts-comment';
+const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
-  parser: '@typescript-eslint/parser',
+  languageOptions: {
+    parserOptions: {
+      project: './tsconfig.json',
+      tsconfigRootDir: rootPath,
+    },
+  },
 });
 
-ruleTester.run('ban-ts-comment', rule, {
+ruleTester.run('ban-ts-comment', {
   valid: [
     '// just a comment containing @ts-expect-error somewhere',
     {
@@ -115,7 +120,6 @@ if (false) {
   console.log('hello');
 }
       `,
-      language: 'javascript',
       options: [{ 'ts-check': 'allow-with-description' }],
     },
     {
@@ -125,7 +129,6 @@ if (false) {
   console.log('hello');
 }
       `,
-      language: 'javascript',
       options: [{ 'ts-check': true }],
     },
     {
@@ -135,7 +138,6 @@ if (false) {
   console.log('hello');
 }
       `,
-      language: 'javascript',
       options: [{ 'ts-check': true }],
     },
     {
@@ -212,7 +214,6 @@ if (false) {
   console.log('hello');
 }
       `,
-      language: 'javascript',
       options: [{ 'ts-check': 'allow-with-description' }],
     },
     {
@@ -522,7 +523,6 @@ if (false) {
   console.log('hello');
 }
       `,
-      language: 'javascript',
       options: [{ 'ts-check': false }],
       errors: [
         {
@@ -540,7 +540,6 @@ if (false) {
   console.log('hello');
 }
       `,
-      language: 'javascript',
       options: [{ 'ts-check': false }],
       errors: [
         {
@@ -558,7 +557,6 @@ if (false) {
   console.log('hello');
 }
       `,
-      language: 'javascript',
       options: [{ 'ts-check': 'allow-with-description' }],
       errors: [
         {
@@ -576,7 +574,6 @@ if (false) {
   console.log('hello');
 }
       `,
-      language: 'javascript',
       options: [{ 'ts-check': 'allow-with-description' }],
       errors: [
         {
@@ -808,7 +805,6 @@ if (false) {
   console.log('hello');
 }
       `,
-      language: 'javascript',
       errors: [
         {
           data: { directive: 'check' },
@@ -825,7 +821,6 @@ if (false) {
   console.log('hello');
 }
       `,
-      language: 'javascript',
       errors: [
         {
           data: { directive: 'check' },
@@ -842,7 +837,6 @@ if (false) {
   console.log('hello');
 }
       `,
-      language: 'javascript',
       errors: [
         {
           data: { directive: 'check' },
@@ -859,7 +853,6 @@ if (false) {
   console.log('hello');
 }
       `,
-      language: 'javascript',
       errors: [
         {
           data: { directive: 'check' },
