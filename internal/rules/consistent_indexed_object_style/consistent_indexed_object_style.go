@@ -153,12 +153,10 @@ func checkInterfaceDeclaration(ctx rule.RuleContext, node *ast.Node) {
 	}
 	
 	// Check for circular references
+	// Note: Self-referential interfaces like `interface Foo { [key: string]: Foo[] }`
+	// are valid and can be converted to `type Foo = Record<string, Foo[]>`
+	// We only need to check for complex circular chains that would be invalid
 	if interfaceName != "" {
-		// First check if the value type directly contains the interface name
-		if containsTypeReference(valueType, interfaceName) {
-			return // Direct self-reference - don't convert
-		}
-		
 		// Check if this interface is part of any circular reference chain
 		// This handles cases like Foo1 -> Foo2 -> Foo3 -> Foo1
 		if isPartOfCircularChain(ctx, interfaceName) {
@@ -255,23 +253,52 @@ func checkTypeLiteral(ctx rule.RuleContext, node *ast.Node) {
 		// The inner type literal directly references Foo but should still be converted
 		// The difference is: does the type literal create a circular dependency if converted to Record?
 		
-		// If this type literal is nested inside another type literal's index signature value,
-		// it can be converted even if it references the parent type
-		isNestedInIndexSignature := false
-		parent := node.Parent
-		for parent != nil && parent != parentDecl {
-			if parent.Kind == ast.KindIndexSignature {
-				isNestedInIndexSignature = true
-				break
+		if parentName != "" {
+			// Check if the parent type alias is a union type AND the value references the parent
+			// e.g., type Foo = { [key: string]: Foo } | Foo - should NOT convert
+			// but: type Foo = { [key: string]: string } | Foo - should convert
+			if parentDecl.Kind == ast.KindTypeAliasDeclaration {
+				typeAlias := parentDecl.AsTypeAliasDeclaration()
+				if typeAlias.Type != nil && typeAlias.Type.Kind == ast.KindUnionType {
+					// Only prevent conversion if the value type references the parent
+					if containsTypeReference(valueType, parentName) {
+						return // Don't convert type literals that reference parent in union type aliases
+					}
+				}
 			}
-			parent = parent.Parent
-		}
-		
-		if parentName != "" && !isNestedInIndexSignature {
-			// Check for direct self-reference
-			if containsTypeReference(valueType, parentName) {
-				return // Contains circular reference
+			
+			// Check if the value type is a union that contains the parent type
+			// e.g., type Foo = { [key: string]: string | Foo }
+			if valueType.Kind == ast.KindUnionType {
+				unionType := valueType.AsUnionTypeNode()
+				if unionType.Types != nil {
+					for _, t := range unionType.Types.Nodes {
+						if containsTypeReference(t, parentName) {
+							return // Value is a union containing self-reference - don't convert
+						}
+					}
+				}
 			}
+			
+			// Check if the value type contains a type literal that would reference the parent
+			// e.g., type Foo = { [key: string]: { [key: string]: Foo } }
+			// The outer type literal should not be converted because it creates a complex structure
+			if valueType.Kind == ast.KindTypeLiteral {
+				typeLit := valueType.AsTypeLiteralNode()
+				if typeLit.Members != nil && len(typeLit.Members.Nodes) == 1 {
+					member := typeLit.Members.Nodes[0]
+					if member.Kind == ast.KindIndexSignature {
+						indexSig := member.AsIndexSignatureDeclaration()
+						if indexSig.Type != nil && containsTypeReference(indexSig.Type, parentName) {
+							return // Outer type literal contains nested structure with parent reference
+						}
+					}
+				}
+			}
+			
+			// For type aliases, we only need to check for complex circular chains
+			// Simple self-references like `type Foo = { [key: string]: Foo[] }` 
+			// can be converted to `type Foo = Record<string, Foo[]>`
 			
 			// Check if this type alias is part of a circular chain
 			if isPartOfTypeAliasCircularChain(ctx, parentName) {
