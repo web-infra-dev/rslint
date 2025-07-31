@@ -65,7 +65,7 @@ async function cleanupTempDir(tempDir: string): Promise<void> {
   await fs.rm(tempDir, { recursive: true, force: true });
 }
 
-describe('CLI Configuration Tests', async () => {
+describe('CLI Configuration Tests', () => {
   test('should show help when --help flag is used', async () => {
     const result = await runRslint(['--help']);
     expect(result.exitCode).toBe(0);

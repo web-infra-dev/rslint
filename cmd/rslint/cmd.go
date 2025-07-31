@@ -432,7 +432,6 @@ func runCMD() int {
 	files := []*ast.SourceFile{}
 	for _, program := range programs {
 		cwdPath := string(tspath.ToPath("", currentDirectory, program.Host().FS().UseCaseSensitiveFileNames()).EnsureTrailingDirectorySeparator())
-		var matchedFiles strings.Builder
 		for _, file := range program.SourceFiles() {
 			p := string(file.Path())
 			if strings.Contains(p, "/node_modules/") {
