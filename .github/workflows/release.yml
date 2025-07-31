@@ -52,6 +52,7 @@ jobs:
         with:
           fetch-depth: 1
           ref: ${{ github.event.inputs.branch }}
+          submodules: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
