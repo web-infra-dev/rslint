@@ -1,6 +1,9 @@
 {
   "extends": ["../../tsconfig.spec.json"],
   "include": ["tests/**/*.ts"],
-  "compilerOptions": {},
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "module": "preserve"
+  },
   "references": []
 }
