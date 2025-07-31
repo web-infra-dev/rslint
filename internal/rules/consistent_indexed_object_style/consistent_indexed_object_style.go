@@ -18,10 +18,10 @@ var ConsistentIndexedObjectStyleRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := &Options{Mode: "record"}
 		if options != nil {
-			if optSlice, ok := options.([]interface{}); ok && len(optSlice) > 0 {
-				if modeStr, ok := optSlice[0].(string); ok {
-					opts.Mode = modeStr
-				}
+			// The API handler already extracts the options from ["error", "index-signature"] format
+			// So we should just get "index-signature" as a string
+			if modeStr, ok := options.(string); ok {
+				opts.Mode = modeStr
 			}
 		}
 
@@ -152,16 +152,15 @@ func checkInterfaceDeclaration(ctx rule.RuleContext, node *ast.Node) {
 		interfaceName = interfaceDecl.Name().AsIdentifier().Text
 	}
 	
-	// Check for circular references
-	// Note: Self-referential interfaces like `interface Foo { [key: string]: Foo[] }`
-	// are valid and can be converted to `type Foo = Record<string, Foo[]>`
-	// We only need to check for complex circular chains that would be invalid
+	// Check if the interface references itself or is part of a circular chain
+	// Self-referential and circular interfaces should NOT be converted to Record
+	// Examples:
+	// - interface Foo { [key: string]: Foo }
+	// - interface Foo<T> { [key: string]: Foo<T> | string }
+	// - interface Foo1 { [key: string]: Foo2 } interface Foo2 { [key: string]: Foo1 }
 	if interfaceName != "" {
-		// Check if this interface is part of any circular reference chain
-		// This handles cases like Foo1 -> Foo2 -> Foo3 -> Foo1
-		if isPartOfCircularChain(ctx, interfaceName) {
-			// Debug: fmt.Printf("Interface %s is part of circular chain\n", interfaceName)
-			return // Part of a circular chain - don't convert
+		if containsTypeReference(valueType, interfaceName) || isPartOfCircularChain(ctx, interfaceName) {
+			return // Self-referential or circular interface - don't convert
 		}
 	}
 
@@ -662,56 +661,81 @@ func isTypeAliasWithIndexSignature(ctx rule.RuleContext, typeName string) bool {
 
 // Check if an interface is part of a circular reference chain
 func isPartOfCircularChain(ctx rule.RuleContext, interfaceName string) bool {
-	// Use a map to track visited interfaces
-	visited := make(map[string]bool)
+	// Build a map of all interfaces and what they reference
+	interfaceRefs := make(map[string]string)
 	
-	// Helper function to check if we can reach back to the starting interface
-	var checkCircular func(currentInterface string, targetInterface string) bool
-	checkCircular = func(currentInterface string, targetInterface string) bool {
-		if visited[currentInterface] {
-			return currentInterface == targetInterface
-		}
-		visited[currentInterface] = true
-		
-		// Find the interface and check what it references
-		var referencedType string
-		var checkNode ast.Visitor
-		checkNode = func(node *ast.Node) bool {
-			if node.Kind == ast.KindInterfaceDeclaration {
-				interfaceDecl := node.AsInterfaceDeclaration()
-				if interfaceDecl.Name() != nil && ast.IsIdentifier(interfaceDecl.Name()) {
-					if interfaceDecl.Name().AsIdentifier().Text == currentInterface {
-						// Found the interface, check if it has a single index signature
-						if interfaceDecl.Members != nil && len(interfaceDecl.Members.Nodes) == 1 {
-							member := interfaceDecl.Members.Nodes[0]
-							if member.Kind == ast.KindIndexSignature {
-								indexSig := member.AsIndexSignatureDeclaration()
-								if indexSig.Type != nil {
-									// Extract the referenced type - could be direct or inside Record
-									referencedType = extractReferencedInterface(indexSig.Type)
-								}
+	var checkNode ast.Visitor
+	checkNode = func(node *ast.Node) bool {
+		if node.Kind == ast.KindInterfaceDeclaration {
+			interfaceDecl := node.AsInterfaceDeclaration()
+			if interfaceDecl.Name() != nil && ast.IsIdentifier(interfaceDecl.Name()) {
+				name := interfaceDecl.Name().AsIdentifier().Text
+				// Check if it has a single index signature
+				if interfaceDecl.Members != nil && len(interfaceDecl.Members.Nodes) == 1 {
+					member := interfaceDecl.Members.Nodes[0]
+					if member.Kind == ast.KindIndexSignature {
+						indexSig := member.AsIndexSignatureDeclaration()
+						if indexSig.Type != nil {
+							// Extract what this interface references
+							refType := extractDirectTypeReference(indexSig.Type)
+							if refType != "" {
+								interfaceRefs[name] = refType
 							}
 						}
-						return true // Stop traversal
 					}
 				}
 			}
-			// Continue traversal
-			node.ForEachChild(checkNode)
-			return false
 		}
-		
-		ctx.SourceFile.ForEachChild(checkNode)
-		
-		if referencedType != "" && isInterfaceWithIndexSignature(ctx, referencedType) {
-			return checkCircular(referencedType, targetInterface)
-		}
-		
+		// Continue traversal
+		node.ForEachChild(checkNode)
 		return false
 	}
 	
-	// Check if we can reach back to ourselves
-	return checkCircular(interfaceName, interfaceName)
+	ctx.SourceFile.ForEachChild(checkNode)
+	
+	// Now check if there's a circular chain starting from interfaceName
+	visited := make(map[string]bool)
+	current := interfaceName
+	
+	for {
+		if visited[current] {
+			// We've seen this before - there's a cycle
+			return true
+		}
+		visited[current] = true
+		
+		// Check what this interface references
+		next, exists := interfaceRefs[current]
+		if !exists || next == "" {
+			// No reference or references something else
+			return false
+		}
+		
+		current = next
+	}
+}
+
+// Extract the direct type reference from a type node (not inside unions, arrays, etc)
+func extractDirectTypeReference(typeNode *ast.Node) string {
+	if typeNode == nil {
+		return ""
+	}
+	
+	if typeNode.Kind == ast.KindTypeReference {
+		typeRef := typeNode.AsTypeReferenceNode()
+		if typeRef.TypeName != nil && ast.IsIdentifier(typeRef.TypeName) {
+			typeName := typeRef.TypeName.AsIdentifier().Text
+			// If it's a Record type, extract the value type
+			if typeName == "Record" && typeRef.TypeArguments != nil && len(typeRef.TypeArguments.Nodes) >= 2 {
+				// For Record<K, V>, check if V is a type reference
+				valueType := typeRef.TypeArguments.Nodes[1]
+				return extractDirectTypeReference(valueType)
+			}
+			return typeName
+		}
+	}
+	
+	return ""
 }
 
 func isDeeplyReferencingType(node *ast.Node, superTypeName string, visited map[*ast.Node]bool) bool {
