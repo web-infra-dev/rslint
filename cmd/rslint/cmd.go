@@ -318,6 +318,7 @@ Options:
   --config PATH     Which rslint config file to use. Defaults to rslint.json.
   --list-files      List matched files
   --format FORMAT   Output format: default | jsonline
+  --fix             Automatically fix problems
   --no-color        Disable colored output
   --force-color     Force colored output
   --quiet           Report errors only 
@@ -331,6 +332,7 @@ func runCMD() int {
 		help      bool
 		config    string
 		listFiles bool
+		fix       bool
 
 		traceOut       string
 		cpuprofOut     string
@@ -343,6 +345,7 @@ func runCMD() int {
 	flag.StringVar(&format, "format", "default", "output format")
 	flag.StringVar(&config, "config", "", "which rslint config to use")
 	flag.BoolVar(&listFiles, "list-files", false, "list matched files")
+	flag.BoolVar(&fix, "fix", false, "automatically fix problems")
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&help, "h", false, "show help")
 	flag.BoolVar(&noColor, "no-color", false, "disable colored output")
@@ -460,6 +463,13 @@ func runCMD() int {
 	diagnosticsChan := make(chan rule.RuleDiagnostic, 4096)
 	errorsCount := 0
 	warningsCount := 0
+	fixedCount := 0
+
+	// Store diagnostics by file for fixing
+	var diagnosticsByFile map[string][]rule.RuleDiagnostic
+	if fix {
+		diagnosticsByFile = make(map[string][]rule.RuleDiagnostic)
+	}
 
 	wg.Add(1)
 	go func() {
@@ -472,6 +482,13 @@ func runCMD() int {
 			} else if d.Severity == rule.SeverityWarning {
 				warningsCount++
 			}
+
+			// Store diagnostics by file for fixing
+			if fix {
+				fileName := d.SourceFile.FileName()
+				diagnosticsByFile[fileName] = append(diagnosticsByFile[fileName], d)
+			}
+
 			if errorsCount+warningsCount == 1 {
 				w.WriteByte('\n')
 			}
@@ -507,6 +524,37 @@ func runCMD() int {
 
 	wg.Wait()
 
+	// Apply fixes if --fix flag is enabled
+	if fix && len(diagnosticsByFile) > 0 {
+		for fileName, fileDiagnostics := range diagnosticsByFile {
+			// Only apply fixes for diagnostics that have fixes
+			diagnosticsWithFixes := make([]rule.RuleDiagnostic, 0)
+			for _, d := range fileDiagnostics {
+				if len(d.Fixes()) > 0 {
+					diagnosticsWithFixes = append(diagnosticsWithFixes, d)
+				}
+			}
+
+			if len(diagnosticsWithFixes) > 0 {
+				// Read the original file content
+				originalContent := string(diagnosticsWithFixes[0].SourceFile.Text())
+
+				// Apply fixes
+				fixedContent, unapplied, wasFixed := linter.ApplyRuleFixes(originalContent, diagnosticsWithFixes)
+
+				if wasFixed {
+					// Write the fixed content back to the file
+					err := os.WriteFile(fileName, []byte(fixedContent), 0644)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "error writing fixed file %s: %v\n", fileName, err)
+					} else {
+						fixedCount += len(diagnosticsWithFixes) - len(unapplied)
+					}
+				}
+			}
+		}
+	}
+
 	colors := setupColors()
 	var errorsColorFunc func(string, ...interface{}) string
 	if errorsCount == 0 {
@@ -541,20 +589,43 @@ func runCMD() int {
 		threadsCount = runtime.GOMAXPROCS(0)
 	}
 	if format == "default" {
-		fmt.Fprintf(
-			os.Stdout,
-			"Found %s %s and %s %s %s(linted %s %s with in %s using %s threads)%s\n",
-			errorsColorFunc("%d", errorsCount),
-			errorsText,
-			warningsColorFunc("%d", warningsCount),
-			warningsText,
-			colors.DimText(""),
-			colors.BoldText("%d", len(files)),
-			filesText,
-			colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
-			colors.BoldText("%d", threadsCount),
-			color.New().SprintFunc()(""), // Reset
-		)
+		if fix && fixedCount > 0 {
+			fixText := "issues"
+			if fixedCount == 1 {
+				fixText = "issue"
+			}
+			fmt.Fprintf(
+				os.Stdout,
+				"Found %s %s and %s %s %s(linted %s %s in %s using %s threads, fixed %s %s)%s\n",
+				errorsColorFunc("%d", errorsCount),
+				errorsText,
+				warningsColorFunc("%d", warningsCount),
+				warningsText,
+				colors.DimText(""),
+				colors.BoldText("%d", len(files)),
+				filesText,
+				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
+				colors.BoldText("%d", threadsCount),
+				colors.SuccessText("%d", fixedCount),
+				fixText,
+				color.New().SprintFunc()(""), // Reset
+			)
+		} else {
+			fmt.Fprintf(
+				os.Stdout,
+				"Found %s %s and %s %s %s(linted %s %s with in %s using %s threads)%s\n",
+				errorsColorFunc("%d", errorsCount),
+				errorsText,
+				warningsColorFunc("%d", warningsCount),
+				warningsText,
+				colors.DimText(""),
+				colors.BoldText("%d", len(files)),
+				filesText,
+				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
+				colors.BoldText("%d", threadsCount),
+				color.New().SprintFunc()(""), // Reset
+			)
+		}
 	}
 
 	// Exit with non-zero status code if errors were found
