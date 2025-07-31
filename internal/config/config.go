@@ -192,6 +192,7 @@ func (rc *RuleConfig) GetSeverity() rule.DiagnosticSeverity {
 	}
 	return rule.ParseSeverity(rc.Level)
 }
+
 func GetAllRulesForPlugin(plugin string) []rule.Rule {
 	if plugin == "@typescript-eslint" {
 		return getAllTypeScriptEslintPluginRules()

@@ -246,6 +246,11 @@ func checkTypeLiteral(ctx rule.RuleContext, node *ast.Node) {
 			if typeAlias.Name() != nil && ast.IsIdentifier(typeAlias.Name()) {
 				parentName = typeAlias.Name().AsIdentifier().Text
 			}
+		} else if parentDecl.Kind == ast.KindInterfaceDeclaration {
+			interfaceDecl := parentDecl.AsInterfaceDeclaration()
+			if interfaceDecl.Name() != nil && ast.IsIdentifier(interfaceDecl.Name()) {
+				parentName = interfaceDecl.Name().AsIdentifier().Text
+			}
 		}
 		
 		// For type Foo = { [key: string]: { [key: string]: Foo } };
@@ -268,13 +273,16 @@ func checkTypeLiteral(ctx rule.RuleContext, node *ast.Node) {
 			}
 			
 			// Check if the value type is a union that contains the parent type
-			// e.g., type Foo = { [key: string]: string | Foo }
-			if valueType.Kind == ast.KindUnionType {
+			// However, for interfaces with only index signatures, this is generally safe
+			// e.g., interface Foo { [key: string]: string | Foo } is fine to convert
+			// Only restrict when we have complex nested structures
+			if valueType.Kind == ast.KindUnionType && parentDecl.Kind == ast.KindTypeAliasDeclaration {
+				// Only apply this restriction for type aliases, not interfaces
 				unionType := valueType.AsUnionTypeNode()
 				if unionType.Types != nil {
 					for _, t := range unionType.Types.Nodes {
 						if containsTypeReference(t, parentName) {
-							return // Value is a union containing self-reference - don't convert
+							return // Value is a union containing self-reference in type alias - don't convert
 						}
 					}
 				}
