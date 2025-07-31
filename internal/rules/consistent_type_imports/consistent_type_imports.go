@@ -86,9 +86,15 @@ var ConsistentTypeImportsRule = rule.Rule{
 		// Check for decorator metadata compatibility
 		emitDecoratorMetadata := false
 		experimentalDecorators := false
-		// Note: For now, we'll skip the compiler options check as the API may not be available
-		// This is a simplification for the Go port
+		
+		// Get compiler options from program
+		if ctx.Program != nil {
+			compilerOpts := ctx.Program.Options()
+			emitDecoratorMetadata = compilerOpts.EmitDecoratorMetadata.IsTrue()
+			experimentalDecorators = compilerOpts.ExperimentalDecorators.IsTrue()
+		}
 
+		// Only skip decorator check if BOTH experimentalDecorators AND emitDecoratorMetadata are true
 		if experimentalDecorators && emitDecoratorMetadata {
 			listeners[ast.KindDecorator] = func(node *ast.Node) {
 				hasDecoratorMetadata = true
@@ -485,7 +491,8 @@ var ConsistentTypeImportsRule = rule.Rule{
 						// All imports are only used as types (no value specifiers and no unused)
 						// Check for import attributes/assertions
 						if !hasImportAttributes(report.Node) {
-							// Report entire import statement
+							// Report on the entire import declaration for now
+							// TODO: Report on just the import keyword when we have a way to get its exact position
 							ctx.ReportNodeWithSuggestions(report.Node, rule.RuleMessage{
 								Id:          "typeOverValue",
 								Description: "All imports in the declaration are only used as types. Use `import type`.",
@@ -508,10 +515,18 @@ var ConsistentTypeImportsRule = rule.Rule{
 						typeImports := formatWordList(importNames)
 						message := fmt.Sprintf("Imports %s are only used as type.", typeImports)
 
-						ctx.ReportNodeWithFixes(report.Node, rule.RuleMessage{
+						// Report on the entire import declaration for now
+						// TODO: Report on just the import keyword when we have a way to get its exact position
+						ctx.ReportNodeWithSuggestions(report.Node, rule.RuleMessage{
 							Id:          "someImportsAreOnlyTypes",
 							Description: message,
-						}, fixToTypeImportDeclaration(ctx.SourceFile, report, sourceImports, opts.FixStyle)...)
+						}, rule.RuleSuggestion{
+							Message: rule.RuleMessage{
+								Id:          "fixMixedImports", 
+								Description: "Fix mixed imports.",
+							},
+							FixesArr: fixToTypeImportDeclaration(ctx.SourceFile, report, sourceImports, opts.FixStyle),
+						})
 					}
 				}
 			}
