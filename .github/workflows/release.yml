@@ -87,8 +87,12 @@ jobs:
       - name: Format code
         run: pnpm format:check
 
+      - name: Build Rule Tester
+        run: pnpm --filter @typescript-eslint/rule-tester run build
+
       - name: TypeCheck
         run: pnpm typecheck
+
       - name: Lint code
         run: pnpm lint
       - name: Test on Linux
