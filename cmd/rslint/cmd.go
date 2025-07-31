@@ -316,7 +316,6 @@ Usage:
 
 Options:
   --config PATH     Which rslint config file to use. Defaults to rslint.json.
-  --list-files      List matched files
   --format FORMAT   Output format: default | jsonline
   --fix             Automatically fix problems
   --no-color        Disable colored output
@@ -329,10 +328,9 @@ func runCMD() int {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
 	var (
-		help      bool
-		config    string
-		listFiles bool
-		fix       bool
+		help   bool
+		config string
+		fix    bool
 
 		traceOut       string
 		cpuprofOut     string
@@ -344,7 +342,6 @@ func runCMD() int {
 	)
 	flag.StringVar(&format, "format", "default", "output format")
 	flag.StringVar(&config, "config", "", "which rslint config to use")
-	flag.BoolVar(&listFiles, "list-files", false, "list matched files")
 	flag.BoolVar(&fix, "fix", false, "automatically fix problems")
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&help, "h", false, "show help")
@@ -441,17 +438,9 @@ func runCMD() int {
 			if strings.Contains(p, "/node_modules/") {
 				continue
 			}
-			if fileName, matched := strings.CutPrefix(p, cwdPath); matched {
-				if listFiles {
-					matchedFiles.WriteString("Found file: ")
-					matchedFiles.WriteString(fileName)
-					matchedFiles.WriteByte('\n')
-				}
+			if _, matched := strings.CutPrefix(p, cwdPath); matched {
 				files = append(files, file)
 			}
-		}
-		if listFiles {
-			os.Stdout.WriteString(matchedFiles.String())
 		}
 		slices.SortFunc(files, func(a *ast.SourceFile, b *ast.SourceFile) int {
 			return len(b.Text()) - len(a.Text())

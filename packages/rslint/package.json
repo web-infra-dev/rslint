@@ -3,6 +3,7 @@
   "version": "0.0.20",
   "exports": {
     ".": "./dist/index.js",
+    "./bin": "./bin/rslint.cjs",
     "./package.json": "./package.json"
   },
   "type": "module",
