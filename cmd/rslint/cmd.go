@@ -321,6 +321,7 @@ Options:
   --ipc             Run in IPC mode (for JS integration)
   --no-color        Disable colored output
   --force-color     Force colored output
+  --quiet           Report errors only 
   -h, --help        Show help
 `
 
@@ -339,6 +340,7 @@ func runCMD() int {
 		ipcMode        bool
 		noColor        bool
 		forceColor     bool
+		quiet          bool
 	)
 	flag.StringVar(&format, "format", "default", "output format")
 	flag.StringVar(&config, "config", "", "which rslint config to use")
@@ -348,6 +350,7 @@ func runCMD() int {
 	flag.BoolVar(&ipcMode, "ipc", false, "run in IPC mode (for JS integration)")
 	flag.BoolVar(&noColor, "no-color", false, "disable colored output")
 	flag.BoolVar(&forceColor, "force-color", false, "force colored output")
+	flag.BoolVar(&quiet, "quiet", false, "report errors only")
 
 	flag.StringVar(&traceOut, "trace", "", "file to put trace to")
 	flag.StringVar(&cpuprofOut, "cpuprof", "", "file to put cpu profiling to")
@@ -479,6 +482,10 @@ func runCMD() int {
 			}
 			if errorsCount+warningsCount == 1 {
 				w.WriteByte('\n')
+			}
+			// Only print Error message when quiet is true
+			if quiet && d.Severity != rule.SeverityError {
+				continue
 			}
 			printDiagnostic(d, w, comparePathOptions, format)
 			if w.Available() < 4096 {
