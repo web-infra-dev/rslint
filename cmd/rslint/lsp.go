@@ -69,6 +69,14 @@ func (s *LSPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 	case "textDocument/diagnostic":
 		s.handleDidSave(ctx, req)
 		return nil, nil
+	case "textDocument/completion":
+		return s.handleCompletion(ctx, req)
+	case "textDocument/hover":
+		return s.handleHover(ctx, req)
+	case "textDocument/definition":
+		return s.handleDefinition(ctx, req)
+	case "textDocument/codeAction":
+		return s.handleCodeAction(ctx, req)
 	case "shutdown":
 		return s.handleShutdown(ctx, req)
 
@@ -101,6 +109,19 @@ func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request)
 		Capabilities: &lsproto.ServerCapabilities{
 			TextDocumentSync: &lsproto.TextDocumentSyncOptionsOrKind{
 				Kind: ptrTo(lsproto.TextDocumentSyncKindFull),
+			},
+			CompletionProvider: &lsproto.CompletionOptions{
+				TriggerCharacters: &[]string{".", ":", "@", "#"},
+				ResolveProvider:   ptrTo(false),
+			},
+			HoverProvider: &lsproto.BooleanOrHoverOptions{
+				Boolean: ptrTo(true),
+			},
+			DefinitionProvider: &lsproto.BooleanOrDefinitionOptions{
+				Boolean: ptrTo(true),
+			},
+			CodeActionProvider: &lsproto.BooleanOrCodeActionOptions{
+				Boolean: ptrTo(true),
 			},
 		},
 	}
@@ -405,4 +426,234 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 		diagnostics = []rule.RuleDiagnostic{}
 	}
 	return diagnostics, nil
+}
+
+func (s *LSPServer) handleCompletion(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
+	var params lsproto.CompletionParams
+	if err := json.Unmarshal(*req.Params, &params); err != nil {
+		return nil, &jsonrpc2.Error{
+			Code:    jsonrpc2.CodeParseError,
+			Message: "Failed to parse completion params",
+		}
+	}
+
+	uri := params.TextDocument.Uri
+	position := params.Position
+	
+	// Check if we have the document
+	content, exists := s.documents[uri]
+	if !exists {
+		return nil, nil
+	}
+
+	// Get completion items using TypeScript compiler
+	completionItems, err := s.getCompletionItems(string(uri), content, position)
+	if err != nil {
+		log.Printf("Error getting completion items: %v", err)
+		return nil, nil
+	}
+
+	return &lsproto.CompletionList{
+		IsIncomplete: false,
+		Items:        completionItems,
+	}, nil
+}
+
+func (s *LSPServer) handleHover(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
+	var params lsproto.HoverParams
+	if err := json.Unmarshal(*req.Params, &params); err != nil {
+		return nil, &jsonrpc2.Error{
+			Code:    jsonrpc2.CodeParseError,
+			Message: "Failed to parse hover params",
+		}
+	}
+
+	uri := params.TextDocument.Uri
+	position := params.Position
+	
+	// Check if we have the document
+	content, exists := s.documents[uri]
+	if !exists {
+		return nil, nil
+	}
+
+	// Get hover information using TypeScript compiler
+	hoverInfo, err := s.getHoverInfo(string(uri), content, position)
+	if err != nil {
+		log.Printf("Error getting hover info: %v", err)
+		return nil, nil
+	}
+
+	return hoverInfo, nil
+}
+
+func (s *LSPServer) handleDefinition(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
+	var params lsproto.DefinitionParams
+	if err := json.Unmarshal(*req.Params, &params); err != nil {
+		return nil, &jsonrpc2.Error{
+			Code:    jsonrpc2.CodeParseError,
+			Message: "Failed to parse definition params",
+		}
+	}
+
+	uri := params.TextDocument.Uri
+	position := params.Position
+	
+	// Check if we have the document
+	content, exists := s.documents[uri]
+	if !exists {
+		return nil, nil
+	}
+
+	// Get definition locations using TypeScript compiler
+	locations, err := s.getDefinitionLocations(string(uri), content, position)
+	if err != nil {
+		log.Printf("Error getting definition locations: %v", err)
+		return nil, nil
+	}
+
+	return locations, nil
+}
+
+func (s *LSPServer) handleCodeAction(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
+	var params lsproto.CodeActionParams
+	if err := json.Unmarshal(*req.Params, &params); err != nil {
+		return nil, &jsonrpc2.Error{
+			Code:    jsonrpc2.CodeParseError,
+			Message: "Failed to parse code action params",
+		}
+	}
+
+	uri := params.TextDocument.Uri
+	
+	// Check if we have the document
+	content, exists := s.documents[uri]
+	if !exists {
+		return nil, nil
+	}
+
+	// Get code actions based on diagnostics and context
+	codeActions, err := s.getCodeActions(string(uri), content, params)
+	if err != nil {
+		log.Printf("Error getting code actions: %v", err)
+		return nil, nil
+	}
+
+	return codeActions, nil
+}
+
+// Helper methods for LSP features
+func (s *LSPServer) getCompletionItems(uri string, content string, position lsproto.Position) ([]*lsproto.CompletionItem, error) {
+	// For now, return basic completion items
+	// In a full implementation, this would use the TypeScript compiler to get actual completions
+	
+	// Basic keyword completions
+	keywords := []string{
+		"function", "const", "let", "var", "if", "else", "for", "while", 
+		"class", "interface", "type", "enum", "import", "export", "return",
+		"async", "await", "promise", "boolean", "string", "number",
+	}
+	
+	var items []*lsproto.CompletionItem
+	for _, keyword := range keywords {
+		items = append(items, &lsproto.CompletionItem{
+			Label:  keyword,
+			Kind:   ptrTo(lsproto.CompletionItemKindKeyword),
+			Detail: ptrTo("TypeScript keyword"),
+		})
+	}
+	
+	return items, nil
+}
+
+func (s *LSPServer) getHoverInfo(uri string, content string, position lsproto.Position) (*lsproto.Hover, error) {
+	// For now, return basic hover information
+	// In a full implementation, this would use the TypeScript compiler to get type information
+	
+	// Get the word at position (simplified)
+	lines := strings.Split(content, "\n")
+	if int(position.Line) >= len(lines) {
+		return nil, nil
+	}
+	
+	line := lines[position.Line]
+	if int(position.Character) >= len(line) {
+		return nil, nil
+	}
+	
+	// Simple word extraction (this would be more sophisticated in a real implementation)
+	start := int(position.Character)
+	end := int(position.Character)
+	
+	// Find word boundaries
+	for start > 0 && isIdentifierChar(rune(line[start-1])) {
+		start--
+	}
+	for end < len(line) && isIdentifierChar(rune(line[end])) {
+		end++
+	}
+	
+	if start == end {
+		return nil, nil
+	}
+	
+	word := line[start:end]
+	
+	return &lsproto.Hover{
+		Contents: lsproto.MarkupContentOrStringOrMarkedStringWithLanguageOrMarkedStrings{
+			MarkupContent: &lsproto.MarkupContent{
+				Kind:  lsproto.MarkupKindMarkdown,
+				Value: fmt.Sprintf("**%s**\n\nHover information for identifier", word),
+			},
+		},
+		Range: &lsproto.Range{
+			Start: lsproto.Position{
+				Line:      position.Line,
+				Character: uint32(start),
+			},
+			End: lsproto.Position{
+				Line:      position.Line,
+				Character: uint32(end),
+			},
+		},
+	}, nil
+}
+
+func (s *LSPServer) getDefinitionLocations(uri string, content string, position lsproto.Position) ([]*lsproto.Location, error) {
+	// For now, return empty - in a full implementation this would use TypeScript compiler
+	// to find the actual definition location
+	return []*lsproto.Location{}, nil
+}
+
+func (s *LSPServer) getCodeActions(uri string, content string, params lsproto.CodeActionParams) ([]*lsproto.CodeAction, error) {
+	var actions []*lsproto.CodeAction
+	
+	// Generate quick fixes for diagnostics in the range
+	for _, diagnostic := range params.Context.Diagnostics {
+		if diagnostic.Source != nil && *diagnostic.Source == "rslint" {
+			// Create a sample fix action
+			action := &lsproto.CodeAction{
+				Title: fmt.Sprintf("Fix: %s", diagnostic.Message),
+				Kind:  ptrTo(lsproto.CodeActionKindQuickFix),
+				Diagnostics: &[]*lsproto.Diagnostic{diagnostic},
+				Edit: &lsproto.WorkspaceEdit{
+					Changes: &map[lsproto.DocumentUri][]*lsproto.TextEdit{
+						lsproto.DocumentUri(uri): {
+							{
+								Range:   diagnostic.Range,
+								NewText: "/* TODO: Auto-fix not implemented yet */",
+							},
+						},
+					},
+				},
+			}
+			actions = append(actions, action)
+		}
+	}
+	
+	return actions, nil
+}
+
+func isIdentifierChar(r rune) bool {
+	return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '_' || r == '$'
 }
