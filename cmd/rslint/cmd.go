@@ -596,7 +596,7 @@ func runCMD() int {
 			}
 			fmt.Fprintf(
 				os.Stdout,
-				"Found %s %s and %s %s %s(linted %s %s with in %s using %s threads, fixed %s %s)%s\n",
+				"Found %s %s and %s %s %s(linted %s %s in %s using %s threads, fixed %s %s)%s\n",
 				errorsColorFunc("%d", errorsCount),
 				errorsText,
 				warningsColorFunc("%d", warningsCount),
