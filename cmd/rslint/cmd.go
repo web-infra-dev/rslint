@@ -315,13 +315,14 @@ Usage:
   rslint [OPTIONS]
 
 Options:
-  --config PATH     Which rslint config file to use. Defaults to rslint.json.
-  --format FORMAT   Output format: default | jsonline
-  --fix             Automatically fix problems
-  --no-color        Disable colored output
-  --force-color     Force colored output
-  --quiet           Report errors only 
-  -h, --help        Show help
+  --config PATH         Which rslint config file to use. Defaults to rslint.json.
+  --format FORMAT       Output format: default | jsonline
+  --fix                 Automatically fix problems
+  --no-color            Disable colored output
+  --force-color         Force colored output
+  --quiet               Report errors only 
+  --max-warnings Int    Number of warnings to trigger nonzero exit code
+  -h, --help            Show help
 `
 
 func runCMD() int {
@@ -339,6 +340,7 @@ func runCMD() int {
 		noColor        bool
 		forceColor     bool
 		quiet          bool
+		maxWarnings    int
 	)
 	flag.StringVar(&format, "format", "default", "output format")
 	flag.StringVar(&config, "config", "", "which rslint config to use")
@@ -348,6 +350,7 @@ func runCMD() int {
 	flag.BoolVar(&noColor, "no-color", false, "disable colored output")
 	flag.BoolVar(&forceColor, "force-color", false, "force colored output")
 	flag.BoolVar(&quiet, "quiet", false, "report errors only")
+	flag.IntVar(&maxWarnings, "max-warnings", -1, "Number of warnings to trigger nonzero exit code")
 
 	flag.StringVar(&traceOut, "trace", "", "file to put trace to")
 	flag.StringVar(&cpuprofOut, "cpuprof", "", "file to put cpu profiling to")
@@ -616,8 +619,17 @@ func runCMD() int {
 		}
 	}
 
+	tooManyWarnings := false
+	if maxWarnings >= 0 && warningsCount > maxWarnings {
+		tooManyWarnings = true
+	}
+
+	if errorsCount == 0 && tooManyWarnings {
+		fmt.Fprintf(os.Stderr, "Rslint found too many warnings (maximum: %d).\n", maxWarnings)
+	}
+
 	// Exit with non-zero status code if errors were found
-	if errorsCount > 0 {
+	if errorsCount > 0 || tooManyWarnings {
 		return 1
 	}
 	return 0
