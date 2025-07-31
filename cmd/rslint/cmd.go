@@ -318,7 +318,6 @@ Options:
   --config PATH     Which rslint config file to use. Defaults to rslint.json.
   --list-files      List matched files
   --format FORMAT   Output format: default | jsonline
-  --ipc             Run in IPC mode (for JS integration)
   --no-color        Disable colored output
   --force-color     Force colored output
   --quiet           Report errors only 
@@ -337,7 +336,6 @@ func runCMD() int {
 		cpuprofOut     string
 		singleThreaded bool
 		format         string
-		ipcMode        bool
 		noColor        bool
 		forceColor     bool
 		quiet          bool
@@ -347,7 +345,6 @@ func runCMD() int {
 	flag.BoolVar(&listFiles, "list-files", false, "list matched files")
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&help, "h", false, "show help")
-	flag.BoolVar(&ipcMode, "ipc", false, "run in IPC mode (for JS integration)")
 	flag.BoolVar(&noColor, "no-color", false, "disable colored output")
 	flag.BoolVar(&forceColor, "force-color", false, "force colored output")
 	flag.BoolVar(&quiet, "quiet", false, "report errors only")
@@ -369,11 +366,6 @@ func runCMD() int {
 	}
 	if forceColor {
 		color.NoColor = false
-	}
-
-	// Check if we need to run in IPC mode
-	if ipcMode {
-		return runAPI()
 	}
 
 	enableVirtualTerminalProcessing()

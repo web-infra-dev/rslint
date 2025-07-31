@@ -14,7 +14,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
-	ipc "github.com/typescript-eslint/rslint/internal/api"
+	api "github.com/typescript-eslint/rslint/internal/api"
 	rslintconfig "github.com/typescript-eslint/rslint/internal/config"
 	"github.com/typescript-eslint/rslint/internal/linter"
 	"github.com/typescript-eslint/rslint/internal/rule"
@@ -65,7 +65,7 @@ import (
 type IPCHandler struct{}
 
 // HandleLint handles lint requests in IPC mode
-func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) {
+func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) {
 
 	// Format is not used for IPC mode as we return structured data
 	_ = req.Format
@@ -211,7 +211,7 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 	})
 
 	// Collect diagnostics
-	var diagnostics []ipc.Diagnostic
+	var diagnostics []api.Diagnostic
 	var diagnosticsLock sync.Mutex
 	errorsCount := 0
 
@@ -227,17 +227,17 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		startLine, startColumn := scanner.GetLineAndCharacterOfPosition(d.SourceFile, diagnosticStart)
 		endLine, endColumn := scanner.GetLineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
 
-		diagnostic := ipc.Diagnostic{
+		diagnostic := api.Diagnostic{
 			RuleName:  d.RuleName,
 			MessageId: d.Message.Id,
 			Message:   d.Message.Description,
 			FilePath:  tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions),
-			Range: ipc.Range{
-				Start: ipc.Position{
+			Range: api.Range{
+				Start: api.Position{
 					Line:   startLine + 1, // Convert to 1-based indexing
 					Column: startColumn + 1,
 				},
-				End: ipc.Position{
+				End: api.Position{
 					Line:   endLine + 1,
 					Column: endColumn + 1,
 				},
@@ -271,10 +271,10 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 	}
 
 	if diagnostics == nil {
-		diagnostics = []ipc.Diagnostic{}
+		diagnostics = []api.Diagnostic{}
 	}
 	// Create response
-	return &ipc.LintResponse{
+	return &api.LintResponse{
 		Diagnostics: diagnostics,
 		ErrorCount:  errorsCount,
 		FileCount:   len(files),
@@ -285,7 +285,7 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 // runAPI runs the linter in IPC mode
 func runAPI() int {
 	handler := &IPCHandler{}
-	service := ipc.NewService(os.Stdin, os.Stdout, handler)
+	service := api.NewService(os.Stdin, os.Stdout, handler)
 
 	if err := service.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "error in IPC mode: %v\n", err)
