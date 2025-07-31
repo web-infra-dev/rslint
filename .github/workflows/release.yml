@@ -164,24 +164,27 @@ jobs:
 
   build:
     name: Build-Rslint-Binaries
-    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
           - goos: darwin
+            runs_on: macos-13
             goarch: amd64
             node_arch: x64
             node_os: darwin
           - goos: darwin
+            runs_on: macos-latest
             goarch: arm64
             node_arch: arm64
             node_os: darwin
           - goos: linux
             goarch: amd64
+            runs_on: ubuntu-latest
             node_arch: x64
             node_os: linux
           - goos: linux
+            runs_on: ubuntu-24.04-arm
             goarch: arm64
             node_arch: arm64
             node_os: linux
@@ -193,6 +196,7 @@ jobs:
     #            goarch: arm64
     #            node_arch: arm64
     #            node_os: win32
+    runs-on: ${{ matrix.runs_on }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
