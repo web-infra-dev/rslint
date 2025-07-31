@@ -136,6 +136,13 @@ func (s *Service) readMessage() (*Message, error) {
 	// Unmarshal message
 	var msg Message
 	if err := json.Unmarshal(data, &msg); err != nil {
+		// Debug: log the problematic data for analysis
+		fmt.Fprintf(os.Stderr, "DEBUG: Failed to unmarshal message of length %d\n", len(data))
+		fmt.Fprintf(os.Stderr, "DEBUG: Raw data: %q\n", string(data))
+		if len(data) > 100 {
+			fmt.Fprintf(os.Stderr, "DEBUG: First 100 bytes: %q\n", string(data[:100]))
+			fmt.Fprintf(os.Stderr, "DEBUG: Last 100 bytes: %q\n", string(data[len(data)-100:]))
+		}
 		return nil, fmt.Errorf("failed to unmarshal message: %w", err)
 	}
 

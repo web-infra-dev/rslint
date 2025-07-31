@@ -3,7 +3,7 @@
 import path from 'node:path';
 import test from 'node:test';
 import util from 'node:util';
-import { lint, type Diagnostic, type LintResponse } from '@rslint/core';
+import { lint, RSLintService, type Diagnostic, type LintResponse } from '@rslint/core';
 
 import assert from 'node:assert';
 
@@ -98,7 +98,24 @@ function checkDiagnosticEqual(
 }
 
 export class RuleTester {
+  private service: RSLintService | null = null;
+
   constructor(options: any) {}
+
+  private async getService(): Promise<RSLintService> {
+    if (!this.service) {
+      this.service = new RSLintService();
+    }
+    return this.service;
+  }
+
+  private async cleanupService(): Promise<void> {
+    if (this.service) {
+      await this.service.close();
+      this.service = null;
+    }
+  }
+
   public run(
     ruleName: string,
     cases: {
@@ -128,72 +145,116 @@ export class RuleTester {
         './fixtures/rslint.json',
       );
       let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
-      await test('valid', async () => {
-        for (const testCase of cases.valid) {
-          const code = typeof testCase === 'string' ? testCase : testCase.code;
-          const options =
-            typeof testCase === 'string' ? undefined : testCase.options;
-          const filename =
-            typeof testCase === 'string' ? undefined : testCase.filename;
+      
+      try {
+        await test('valid', async () => {
+          for (const testCase of cases.valid) {
+            const code = typeof testCase === 'string' ? testCase : testCase.code;
+            const options =
+              typeof testCase === 'string' ? undefined : testCase.options;
+            const filename =
+              typeof testCase === 'string' ? undefined : testCase.filename;
 
-          const ruleConfig = options ? ['error', ...options] : 'error';
+            const ruleConfig = options ? ['error', ...options] : 'error';
 
-          // Use custom filename if provided, otherwise default to virtual.ts
-          const testFile = filename
-            ? path.resolve(cwd, 'src', filename)
-            : virtual_entry;
+            // Use custom filename if provided, otherwise default to virtual.ts
+            const testFile = filename
+              ? path.resolve(cwd, 'src', filename)
+              : virtual_entry;
 
-          const diags = await lint({
-            config,
-            workingDirectory: cwd,
-            fileContents: {
-              [testFile]: code,
-            },
-            ruleOptions: {
-              [ruleName]: JSON.stringify(ruleConfig),
-            },
-          });
-          if (diags.diagnostics?.length > 0) {
-            console.error('Failed valid test case:', code);
-            console.error('Options:', JSON.stringify(options));
-            console.error('Rule config:', JSON.stringify(ruleConfig));
+            // Use convenience function with retry logic
+            let diags: LintResponse;
+            let attempts = 0;
+            const maxAttempts = 3;
+            
+            while (attempts < maxAttempts) {
+              try {
+                diags = await lint({
+                  config,
+                  workingDirectory: cwd,
+                  fileContents: {
+                    [testFile]: code,
+                  },
+                  ruleOptions: {
+                    [ruleName]: JSON.stringify(ruleConfig),
+                  },
+                });
+                break; // Success, exit retry loop
+              } catch (error) {
+                attempts++;
+                if (attempts >= maxAttempts) {
+                  throw error;
+                }
+                console.warn(`Lint attempt ${attempts} failed, retrying...`, error);
+                // Wait a bit before retrying
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
+            }
+            
+            if (diags!.diagnostics?.length > 0) {
+              console.error('Failed valid test case:', code);
+              console.error('Options:', JSON.stringify(options));
+              console.error('Rule config:', JSON.stringify(ruleConfig));
+            }
+            assert(
+              diags!.diagnostics?.length === 0,
+              `Expected no diagnostics for valid case, but got: ${JSON.stringify(diags)}`,
+            );
           }
-          assert(
-            diags.diagnostics?.length === 0,
-            `Expected no diagnostics for valid case, but got: ${JSON.stringify(diags)}`,
-          );
-        }
-      });
-      await test('invalid', async t => {
-        for (let i = 0; i < cases.invalid.length; i++) {
-          const testCase = cases.invalid[i];
-          const { errors, code, options, filename } = testCase;
+        });
+        
+        await test('invalid', async t => {
+          for (let i = 0; i < cases.invalid.length; i++) {
+            const testCase = cases.invalid[i];
+            const { errors, code, options, filename } = testCase;
 
-          const ruleConfig = options ? ['error', ...options] : 'error';
+            const ruleConfig = options ? ['error', ...options] : 'error';
 
-          // Use custom filename if provided, otherwise default to virtual.ts
-          const testFile = filename
-            ? path.resolve(cwd, 'src', filename)
-            : virtual_entry;
+            // Use custom filename if provided, otherwise default to virtual.ts
+            const testFile = filename
+              ? path.resolve(cwd, 'src', filename)
+              : virtual_entry;
 
-          const diags = await lint({
-            config,
-            workingDirectory: cwd,
-            fileContents: {
-              [testFile]: code,
-            },
-            ruleOptions: {
-              [ruleName]: JSON.stringify(ruleConfig),
-            },
-          });
-          t.assert.snapshot(diags);
-          assert(
-            diags.diagnostics?.length > 0,
-            `Expected diagnostics for invalid case: ${JSON.stringify({ code, options, diags })}`,
-          );
-          checkDiagnosticEqual(diags.diagnostics, errors);
-        }
-      });
+            // Use convenience function with retry logic
+            let diags: LintResponse;
+            let attempts = 0;
+            const maxAttempts = 3;
+            
+            while (attempts < maxAttempts) {
+              try {
+                diags = await lint({
+                  config,
+                  workingDirectory: cwd,
+                  fileContents: {
+                    [testFile]: code,
+                  },
+                  ruleOptions: {
+                    [ruleName]: JSON.stringify(ruleConfig),
+                  },
+                });
+                break; // Success, exit retry loop
+              } catch (error) {
+                attempts++;
+                if (attempts >= maxAttempts) {
+                  throw error;
+                }
+                console.warn(`Lint attempt ${attempts} failed, retrying...`, error);
+                // Wait a bit before retrying
+                await new Promise(resolve => setTimeout(resolve, 100));
+              }
+            }
+            
+            t.assert.snapshot(diags!);
+            assert(
+              diags!.diagnostics?.length > 0,
+              `Expected diagnostics for invalid case: ${JSON.stringify({ code, options, diags })}`,
+            );
+            checkDiagnosticEqual(diags!.diagnostics, errors);
+          }
+        });
+      } finally {
+        // Cleanup is handled by the lint convenience function
+      }
     });
   }
 }

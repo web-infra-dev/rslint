@@ -89,13 +89,18 @@ export class RSLintService {
     });
 
     this.process.on('exit', (code, signal) => {
+      const err = new Error(
+        `RSLint process exited with code ${code}, signal ${signal}`,
+      );
       if (code !== 0) {
-        const err = new Error(
-          `RSLint process exited with code ${code}, signal ${signal}`,
-        );
         console.error(err.message);
-        this.rejectAllPending(err);
       }
+      this.rejectAllPending(err);
+    });
+
+    // Handle stdout/stderr close events
+    this.process.stdout!.on('close', () => {
+      this.rejectAllPending(new Error('RSLint process stdout closed'));
     });
   }
 
@@ -104,21 +109,52 @@ export class RSLintService {
    */
   private sendMessage(kind: string, data: any): Promise<any> {
     return new Promise((resolve, reject) => {
+      // Check if process is still alive
+      if (this.process.killed || this.process.exitCode !== null) {
+        reject(new Error('RSLint process is not running'));
+        return;
+      }
+
       const id = this.nextMessageId++;
       const message = { id, kind, data };
 
-      // Register promise callbacks
-      this.pendingMessages.set(id, { resolve, reject });
+      // Register promise callbacks with timeout
+      const timeoutId = setTimeout(() => {
+        this.pendingMessages.delete(id);
+        reject(new Error(`Message ${id} (${kind}) timed out after 30 seconds`));
+      }, 30000); // 30 second timeout
 
-      // Write message length as 4 bytes in little endian
-      const json = JSON.stringify(message);
-      const length = Buffer.alloc(4);
-      length.writeUInt32LE(json.length, 0);
+      this.pendingMessages.set(id, { 
+        resolve: (result) => {
+          clearTimeout(timeoutId);
+          resolve(result);
+        }, 
+        reject: (error) => {
+          clearTimeout(timeoutId);
+          reject(error);
+        }
+      });
 
-      // Send message
-      this.process.stdin!.write(
-        Buffer.concat([length, Buffer.from(json, 'utf8')]),
-      );
+      try {
+        // Write message length as 4 bytes in little endian
+        const json = JSON.stringify(message);
+        const jsonBuffer = Buffer.from(json, 'utf8');
+        const length = Buffer.alloc(4);
+        length.writeUInt32LE(jsonBuffer.length, 0); // Use byte length, not string length
+
+        // Send message
+        const success = this.process.stdin!.write(
+          Buffer.concat([length, jsonBuffer]),
+        );
+        
+        if (!success) {
+          console.warn('Write buffer is full, may cause backpressure');
+        }
+      } catch (error) {
+        clearTimeout(timeoutId);
+        this.pendingMessages.delete(id);
+        reject(error);
+      }
     });
   }
 
@@ -222,10 +258,58 @@ export class RSLintService {
    */
   close(): Promise<void> {
     return new Promise(resolve => {
-      this.sendMessage('exit', {}).finally(() => {
-        this.process.stdin!.end();
+      // Set a timeout to force cleanup if the process doesn't respond
+      const timeout = setTimeout(() => {
+        console.warn('RSLint process did not respond to exit message, forcing cleanup');
+        this.forceCleanup();
         resolve();
-      });
+      }, 5000); // 5 second timeout
+
+      this.sendMessage('exit', {})
+        .then(() => {
+          clearTimeout(timeout);
+          this.forceCleanup();
+          resolve();
+        })
+        .catch(() => {
+          clearTimeout(timeout);
+          this.forceCleanup();
+          resolve();
+        });
     });
+  }
+
+  /**
+   * Force cleanup of the process and resources
+   */
+  private forceCleanup(): void {
+    try {
+      // Reject all pending messages
+      this.rejectAllPending(new Error('Service shutting down'));
+      
+      // Close stdin if it's still open
+      if (this.process.stdin && !this.process.stdin.destroyed) {
+        this.process.stdin.end();
+      }
+      
+      // Kill the process if it's still running
+      if (!this.process.killed) {
+        this.process.kill('SIGTERM');
+        
+        // Force kill after a short delay if SIGTERM doesn't work
+        setTimeout(() => {
+          if (!this.process.killed) {
+            this.process.kill('SIGKILL');
+          }
+        }, 1000);
+      }
+      
+      // Clean up buffers
+      this.chunks = [];
+      this.chunkSize = 0;
+      this.expectedSize = null;
+    } catch (error) {
+      console.error('Error during force cleanup:', error);
+    }
   }
 }
