@@ -7,7 +7,7 @@ import {
   TransportKind,
 } from 'vscode-languageclient/node';
 
-let client: LanguageClient;
+let client: LanguageClient | undefined;
 
 async function createClient(
   context: ExtensionContext,
@@ -57,6 +57,8 @@ async function startClient(): Promise<void> {
 async function stopClient(): Promise<void> {
   if (client) {
     await client.stop();
+    client.dispose();
+    client = undefined;
   }
 }
 
@@ -64,8 +66,10 @@ async function restartServer(context: ExtensionContext): Promise<void> {
   try {
     window.showInformationMessage('Restarting Rslint language server...');
 
-    // Stop the current client
-    await stopClient();
+    // Stop the current client if it exists
+    if (client) {
+      await stopClient();
+    }
 
     // Create a new client
     client = await createClient(context);
@@ -77,8 +81,9 @@ async function restartServer(context: ExtensionContext): Promise<void> {
       'Rslint language server restarted successfully',
     );
   } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     window.showErrorMessage(
-      `Failed to restart Rslint language server: ${error}`,
+      `Failed to restart Rslint language server: ${errorMessage}`,
     );
   }
 }
@@ -110,5 +115,8 @@ export function deactivate(): Thenable<void> | undefined {
   if (!client) {
     return undefined;
   }
-  return client.stop();
+  return client.stop().then(() => {
+    client?.dispose();
+    client = undefined;
+  });
 }

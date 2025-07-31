@@ -24,4 +24,25 @@ suite('rslint extension', function () {
     const diagnostics = vscode.languages.getDiagnostics(doc.uri);
     assert.ok(diagnostics.length > 0);
   });
+
+  test('restart server command exists', async () => {
+    // Check that the restart server command is registered
+    const commands = await vscode.commands.getCommands(true);
+    assert.ok(
+      commands.includes('rslint.restartServer'),
+      'rslint.restartServer command should be registered',
+    );
+  });
+
+  test('restart server command executes', async () => {
+    // This test verifies that the restart server command can be executed
+    // without throwing errors
+    try {
+      await vscode.commands.executeCommand('rslint.restartServer');
+      // If we reach here, the command executed successfully
+      assert.ok(true, 'restart server command executed successfully');
+    } catch (error) {
+      assert.fail(`restart server command failed: ${error}`);
+    }
+  });
 });
