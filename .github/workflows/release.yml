@@ -219,5 +219,5 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: rslint-${{ matrix.goos }}-${{ matrix.goarch }}
+          name: ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint
           path: ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint
