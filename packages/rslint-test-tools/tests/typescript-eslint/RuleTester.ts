@@ -146,7 +146,7 @@ export class RuleTester {
     test(ruleName, async () => {
       // Extract the base rule name from test names like "ban-ts-comment (ts-expect-error)"
       const baseRuleName = ruleName.split(' ')[0];
-      
+
       let cwd = path.resolve(import.meta.dirname, './fixtures');
       const config = path.resolve(
         import.meta.dirname,
