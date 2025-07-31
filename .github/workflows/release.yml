@@ -176,14 +176,14 @@ jobs:
             goarch: arm64
             node_arch: arm64
             node_os: linux
-          - goos: windows
-            goarch: amd64
-            node_arch: x64
-            node_os: win32
-          - goos: windows
-            goarch: arm64
-            node_arch: arm64
-            node_os: win32
+#          - goos: windows
+#            goarch: amd64
+#            node_arch: x64
+#            node_os: win32
+#          - goos: windows
+#            goarch: arm64
+#            node_arch: arm64
+#            node_os: win32
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -210,9 +210,9 @@ jobs:
 
       - name: Go Build packages
         run: |
-          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o npm/${{ matrix.node_os }}-${{ matrix.node_arch }}/rslint ./cmd/rslint
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint ./cmd/rslint
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: rslint-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: npm/${{ matrix.node_os }}-${{ matrix.node_arch }}/rslint
+          path: ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint

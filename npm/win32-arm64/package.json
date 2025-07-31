@@ -1,5 +1,6 @@
 {
   "name": "@rslint/win32-arm64",
+  "private": true,
   "version": "0.0.20",
   "license": "MIT",
   "description": "binary for rslint",
