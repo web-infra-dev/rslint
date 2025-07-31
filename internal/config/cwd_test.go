@@ -4,8 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/bmatcuk/doublestar/v4"
 )
 
 func TestCwdHandling(t *testing.T) {
@@ -114,6 +112,8 @@ func TestNormalizePath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := normalizePath(tt.filePath, cwd)
+			// Normalize path separators for cross-platform compatibility
+			result = filepath.ToSlash(result)
 			if result != tt.expected {
 				t.Errorf("normalizePath(%q, %q) = %q, expected %q",
 					tt.filePath, cwd, result, tt.expected)
@@ -143,7 +143,7 @@ func TestDoublestarBehavior(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			matched, err := doublestar.PathMatch(tt.pattern, tt.path)
+			matched, err := pathMatch(tt.pattern, tt.path)
 			if err != nil {
 				t.Errorf("doublestar.PathMatch error: %v", err)
 				return

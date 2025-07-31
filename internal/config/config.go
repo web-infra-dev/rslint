@@ -331,6 +331,10 @@ func getAllTypeScriptEslintPluginRules() []rule.Rule {
 	return rules
 }
 
+func pathMatch(pattern, name string) (bool, error) {
+	return doublestar.PathMatch(filepath.ToSlash(pattern), filepath.ToSlash(name))
+}
+
 // isFileIgnored checks if a file should be ignored based on ignore patterns
 func isFileIgnored(filePath string, ignorePatterns []string) bool {
 	// Get current working directory for relative path resolution
@@ -345,13 +349,13 @@ func isFileIgnored(filePath string, ignorePatterns []string) bool {
 
 	for _, pattern := range ignorePatterns {
 		// Try matching against normalized path
-		if matched, err := doublestar.PathMatch(pattern, normalizedPath); err == nil && matched {
+		if matched, err := pathMatch(pattern, normalizedPath); err == nil && matched {
 			return true
 		}
 
 		// Also try matching against original path for absolute patterns
 		if normalizedPath != filePath {
-			if matched, err := doublestar.PathMatch(pattern, filePath); err == nil && matched {
+			if matched, err := pathMatch(pattern, filePath); err == nil && matched {
 				return true
 			}
 		}
@@ -359,7 +363,7 @@ func isFileIgnored(filePath string, ignorePatterns []string) bool {
 		// Try Unix-style path for cross-platform compatibility
 		unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
 		if unixPath != normalizedPath {
-			if matched, err := doublestar.PathMatch(pattern, unixPath); err == nil && matched {
+			if matched, err := pathMatch(pattern, unixPath); err == nil && matched {
 				return true
 			}
 		}
@@ -387,7 +391,7 @@ func normalizePath(filePath, cwd string) string {
 // isFileIgnoredSimple provides fallback matching when cwd is unavailable
 func isFileIgnoredSimple(filePath string, ignorePatterns []string) bool {
 	for _, pattern := range ignorePatterns {
-		if matched, err := doublestar.PathMatch(pattern, filePath); err == nil && matched {
+		if matched, err := pathMatch(pattern, filePath); err == nil && matched {
 			return true
 		}
 	}
