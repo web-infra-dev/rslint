@@ -18,10 +18,17 @@ var ConsistentIndexedObjectStyleRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := &Options{Mode: "record"}
 		if options != nil {
-			// The API handler already extracts the options from ["error", "index-signature"] format
-			// So we should just get "index-signature" as a string
-			if modeStr, ok := options.(string); ok {
-				opts.Mode = modeStr
+			// Handle different option formats
+			switch v := options.(type) {
+			case string:
+				opts.Mode = v
+			case []interface{}:
+				// If options is passed as an array, take the first element
+				if len(v) > 0 {
+					if modeStr, ok := v[0].(string); ok {
+						opts.Mode = modeStr
+					}
+				}
 			}
 		}
 
@@ -153,14 +160,21 @@ func checkInterfaceDeclaration(ctx rule.RuleContext, node *ast.Node) {
 	}
 	
 	// Check if the interface references itself or is part of a circular chain
-	// Self-referential and circular interfaces should NOT be converted to Record
+	// ANY reference to self (direct or nested) should NOT be converted to Record
+	// This matches TypeScript-ESLint behavior
 	// Examples:
-	// - interface Foo { [key: string]: Foo }
-	// - interface Foo<T> { [key: string]: Foo<T> | string }
-	// - interface Foo1 { [key: string]: Foo2 } interface Foo2 { [key: string]: Foo1 }
+	// - interface Foo { [key: string]: Foo } - Don't convert
+	// - interface Foo { [key: string]: Foo[] } - Don't convert  
+	// - interface Foo { [key: string]: { x: Foo } } - Don't convert
+	// - interface Foo1 { [key: string]: Foo2 } interface Foo2 { [key: string]: Foo1 } - Don't convert
 	if interfaceName != "" {
-		if containsTypeReference(valueType, interfaceName) || isPartOfCircularChain(ctx, interfaceName) {
-			return // Self-referential or circular interface - don't convert
+		// Check for any reference to self in the value type (deep check)
+		if containsTypeReference(valueType, interfaceName) {
+			return // Contains self-reference - don't convert
+		}
+		// Check for circular reference chains
+		if isPartOfCircularChain(ctx, interfaceName) {
+			return // Part of circular chain - don't convert
 		}
 	}
 
@@ -434,6 +448,13 @@ func containsTypeReference(typeNode *ast.Node, typeName string) bool {
 		typeLit := typeNode.AsTypeLiteralNode()
 		if typeLit.Members != nil {
 			for _, member := range typeLit.Members.Nodes {
+				// For property signatures, check the type
+				if member.Kind == ast.KindPropertySignature {
+					propSig := member.AsPropertySignatureDeclaration()
+					if propSig.Type != nil && containsTypeReference(propSig.Type, typeName) {
+						return true
+					}
+				}
 				// For index signatures, check the value type
 				if member.Kind == ast.KindIndexSignature {
 					indexSig := member.AsIndexSignatureDeclaration()
@@ -441,9 +462,12 @@ func containsTypeReference(typeNode *ast.Node, typeName string) bool {
 						return true
 					}
 				}
-				// For other members, recursively check
-				if containsTypeReference(member, typeName) {
-					return true
+				// For method signatures, check return type
+				if member.Kind == ast.KindMethodSignature {
+					methodSig := member.AsMethodSignatureDeclaration()
+					if methodSig.Type != nil && containsTypeReference(methodSig.Type, typeName) {
+						return true
+					}
 				}
 			}
 		}
