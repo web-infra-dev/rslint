@@ -163,7 +163,7 @@ export class RuleTester {
               : virtual_entry;
 
             // Use convenience function with retry logic
-            let diags: LintResponse;
+            let diags: LintResponse | undefined;
             let attempts = 0;
             const maxAttempts = 3;
             
@@ -191,13 +191,17 @@ export class RuleTester {
               }
             }
             
-            if (diags!.diagnostics?.length > 0) {
+            if (!diags) {
+              throw new Error('Failed to get lint results after retries');
+            }
+            
+            if (diags.diagnostics?.length > 0) {
               console.error('Failed valid test case:', code);
               console.error('Options:', JSON.stringify(options));
               console.error('Rule config:', JSON.stringify(ruleConfig));
             }
             assert(
-              diags!.diagnostics?.length === 0,
+              diags.diagnostics?.length === 0,
               `Expected no diagnostics for valid case, but got: ${JSON.stringify(diags)}`,
             );
           }
@@ -216,7 +220,7 @@ export class RuleTester {
               : virtual_entry;
 
             // Use convenience function with retry logic
-            let diags: LintResponse;
+            let diags: LintResponse | undefined;
             let attempts = 0;
             const maxAttempts = 3;
             
@@ -244,12 +248,16 @@ export class RuleTester {
               }
             }
             
-            t.assert.snapshot(diags!);
+            if (!diags) {
+              throw new Error('Failed to get lint results after retries');
+            }
+            
+            t.assert.snapshot(diags);
             assert(
-              diags!.diagnostics?.length > 0,
+              diags.diagnostics?.length > 0,
               `Expected diagnostics for invalid case: ${JSON.stringify({ code, options, diags })}`,
             );
-            checkDiagnosticEqual(diags!.diagnostics, errors);
+            checkDiagnosticEqual(diags.diagnostics, errors);
           }
         });
       } finally {
