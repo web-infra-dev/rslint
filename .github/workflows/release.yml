@@ -75,9 +75,14 @@ jobs:
 
       - name: Move binaries
         run: |
-          find binaries
-          cp -rf binaries/* npm/
-          find npm
+          for file in binaries/*; do
+            filename=$(basename "$file")
+            dirname="${filename%-rslint}"
+            target_dir="npm/$dirname"
+            mkdir -p "$target_dir"
+            mv "$file" "npm/$dirname/rslint"
+            echo "Moved $file to $target_dir/rslint"
+          done
 
       - name: Format code
         run: pnpm format:check
