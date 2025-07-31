@@ -152,24 +152,18 @@ func checkInterfaceDeclaration(ctx rule.RuleContext, node *ast.Node) {
 		interfaceName = interfaceDecl.Name().AsIdentifier().Text
 	}
 	
-	// Check for circular references - be more specific
+	// Check for circular references
 	if interfaceName != "" {
-		// Check if the value type contains any reference to the interface name
-		// This includes direct references, union/intersection types, etc.
+		// First check if the value type directly contains the interface name
 		if containsTypeReference(valueType, interfaceName) {
-			return // Contains circular reference - don't convert
+			return // Direct self-reference - don't convert
 		}
 		
-		// For indirect references through other interfaces, check for mutual references
-		if valueType.Kind == ast.KindTypeReference {
-			typeRef := valueType.AsTypeReferenceNode()
-			if typeRef.TypeName != nil && ast.IsIdentifier(typeRef.TypeName) {
-				referencedType := typeRef.TypeName.AsIdentifier().Text
-				// Check if this creates a circular chain
-				if referencedType != interfaceName && interfaceReferencesType(ctx, referencedType, interfaceName) {
-					return // Mutual circular reference like Foo1 <-> Foo2
-				}
-			}
+		// Check if this interface is part of any circular reference chain
+		// This handles cases like Foo1 -> Foo2 -> Foo3 -> Foo1
+		if isPartOfCircularChain(ctx, interfaceName) {
+			// Debug: fmt.Printf("Interface %s is part of circular chain\n", interfaceName)
+			return // Part of a circular chain - don't convert
 		}
 	}
 
@@ -273,8 +267,16 @@ func checkTypeLiteral(ctx rule.RuleContext, node *ast.Node) {
 			parent = parent.Parent
 		}
 		
-		if parentName != "" && !isNestedInIndexSignature && containsTypeReference(valueType, parentName) {
-			return // Contains circular reference
+		if parentName != "" && !isNestedInIndexSignature {
+			// Check for direct self-reference
+			if containsTypeReference(valueType, parentName) {
+				return // Contains circular reference
+			}
+			
+			// Check if this type alias is part of a circular chain
+			if isPartOfTypeAliasCircularChain(ctx, parentName) {
+				return // Part of a circular chain - don't convert
+			}
 		}
 	}
 
@@ -413,16 +415,23 @@ func containsTypeReference(typeNode *ast.Node, typeName string) bool {
 		}
 	case ast.KindConditionalType:
 		// For conditional types like "Foo extends T ? string : number"
-		// Check only the true and false types, not the check or extends types
-		// Because using Foo in "Foo extends T" is not a circular reference - it's just a type predicate
+		// We need to check all parts including the check type
 		conditionalType := typeNode.AsConditionalTypeNode()
+		// Check the check type (the "Foo" in "Foo extends T")
+		if conditionalType.CheckType != nil && containsTypeReference(conditionalType.CheckType, typeName) {
+			return true
+		}
+		// Check the extends type (the "T" in "Foo extends T")
+		if conditionalType.ExtendsType != nil && containsTypeReference(conditionalType.ExtendsType, typeName) {
+			return true
+		}
+		// Check the true and false branches
 		if conditionalType.TrueType != nil && containsTypeReference(conditionalType.TrueType, typeName) {
 			return true
 		}
 		if conditionalType.FalseType != nil && containsTypeReference(conditionalType.FalseType, typeName) {
 			return true
 		}
-		// Note: We don't check CheckType or ExtendsType as these are type predicates, not circular refs
 	}
 	
 	return false
@@ -495,6 +504,179 @@ func interfaceReferencesType(ctx rule.RuleContext, interfaceName string, targetT
 	
 	ctx.SourceFile.ForEachChild(checkNode)
 	return found
+}
+
+// Extract the interface name that is referenced, handling Record types
+func extractReferencedInterface(typeNode *ast.Node) string {
+	if typeNode == nil {
+		return ""
+	}
+	
+	if typeNode.Kind == ast.KindTypeReference {
+		typeRef := typeNode.AsTypeReferenceNode()
+		if typeRef.TypeName != nil && ast.IsIdentifier(typeRef.TypeName) {
+			// Check if it's a Record type
+			if typeRef.TypeName.AsIdentifier().Text == "Record" && 
+			   typeRef.TypeArguments != nil && len(typeRef.TypeArguments.Nodes) >= 2 {
+				// For Record<K, V>, check if V is an interface reference
+				valueType := typeRef.TypeArguments.Nodes[1]
+				if valueType.Kind == ast.KindTypeReference {
+					valueTypeRef := valueType.AsTypeReferenceNode()
+					if valueTypeRef.TypeName != nil && ast.IsIdentifier(valueTypeRef.TypeName) {
+						return valueTypeRef.TypeName.AsIdentifier().Text
+					}
+				}
+			} else {
+				// Direct type reference
+				return typeRef.TypeName.AsIdentifier().Text
+			}
+		}
+	}
+	
+	return ""
+}
+
+// Check if a type alias is part of a circular reference chain
+func isPartOfTypeAliasCircularChain(ctx rule.RuleContext, typeAliasName string) bool {
+	visited := make(map[string]bool)
+	
+	var checkCircular func(currentTypeAlias string, targetTypeAlias string) bool
+	checkCircular = func(currentTypeAlias string, targetTypeAlias string) bool {
+		if visited[currentTypeAlias] {
+			return currentTypeAlias == targetTypeAlias
+		}
+		visited[currentTypeAlias] = true
+		
+		// Find the type alias and check what it references
+		var referencedType string
+		var checkNode ast.Visitor
+		checkNode = func(node *ast.Node) bool {
+			if node.Kind == ast.KindTypeAliasDeclaration {
+				typeAlias := node.AsTypeAliasDeclaration()
+				if typeAlias.Name() != nil && ast.IsIdentifier(typeAlias.Name()) {
+					if typeAlias.Name().AsIdentifier().Text == currentTypeAlias {
+						// Found the type alias, check if it's a type literal with single index signature
+						if typeAlias.Type != nil && typeAlias.Type.Kind == ast.KindTypeLiteral {
+							typeLit := typeAlias.Type.AsTypeLiteralNode()
+							if typeLit.Members != nil && len(typeLit.Members.Nodes) == 1 {
+								member := typeLit.Members.Nodes[0]
+								if member.Kind == ast.KindIndexSignature {
+									indexSig := member.AsIndexSignatureDeclaration()
+									if indexSig.Type != nil {
+										// Extract the referenced type - could be direct or inside Record
+										referencedType = extractReferencedInterface(indexSig.Type)
+									}
+								}
+							}
+						}
+						return true // Stop traversal
+					}
+				}
+			}
+			// Continue traversal
+			node.ForEachChild(checkNode)
+			return false
+		}
+		
+		ctx.SourceFile.ForEachChild(checkNode)
+		
+		if referencedType != "" && isTypeAliasWithIndexSignature(ctx, referencedType) {
+			return checkCircular(referencedType, targetTypeAlias)
+		}
+		
+		return false
+	}
+	
+	return checkCircular(typeAliasName, typeAliasName)
+}
+
+// Check if a type alias has a type literal with an index signature
+func isTypeAliasWithIndexSignature(ctx rule.RuleContext, typeName string) bool {
+	var hasIndexSignature bool
+	
+	var checkNode ast.Visitor
+	checkNode = func(node *ast.Node) bool {
+		if node.Kind == ast.KindTypeAliasDeclaration {
+			typeAlias := node.AsTypeAliasDeclaration()
+			if typeAlias.Name() != nil && ast.IsIdentifier(typeAlias.Name()) {
+				if typeAlias.Name().AsIdentifier().Text == typeName {
+					// Check if it's a type literal with index signature
+					if typeAlias.Type != nil && typeAlias.Type.Kind == ast.KindTypeLiteral {
+						typeLit := typeAlias.Type.AsTypeLiteralNode()
+						if typeLit.Members != nil {
+							for _, member := range typeLit.Members.Nodes {
+								if member.Kind == ast.KindIndexSignature {
+									hasIndexSignature = true
+									return true
+								}
+							}
+						}
+					}
+					return true
+				}
+			}
+		}
+		// Continue traversal
+		node.ForEachChild(checkNode)
+		return false
+	}
+	
+	ctx.SourceFile.ForEachChild(checkNode)
+	return hasIndexSignature
+}
+
+// Check if an interface is part of a circular reference chain
+func isPartOfCircularChain(ctx rule.RuleContext, interfaceName string) bool {
+	// Use a map to track visited interfaces
+	visited := make(map[string]bool)
+	
+	// Helper function to check if we can reach back to the starting interface
+	var checkCircular func(currentInterface string, targetInterface string) bool
+	checkCircular = func(currentInterface string, targetInterface string) bool {
+		if visited[currentInterface] {
+			return currentInterface == targetInterface
+		}
+		visited[currentInterface] = true
+		
+		// Find the interface and check what it references
+		var referencedType string
+		var checkNode ast.Visitor
+		checkNode = func(node *ast.Node) bool {
+			if node.Kind == ast.KindInterfaceDeclaration {
+				interfaceDecl := node.AsInterfaceDeclaration()
+				if interfaceDecl.Name() != nil && ast.IsIdentifier(interfaceDecl.Name()) {
+					if interfaceDecl.Name().AsIdentifier().Text == currentInterface {
+						// Found the interface, check if it has a single index signature
+						if interfaceDecl.Members != nil && len(interfaceDecl.Members.Nodes) == 1 {
+							member := interfaceDecl.Members.Nodes[0]
+							if member.Kind == ast.KindIndexSignature {
+								indexSig := member.AsIndexSignatureDeclaration()
+								if indexSig.Type != nil {
+									// Extract the referenced type - could be direct or inside Record
+									referencedType = extractReferencedInterface(indexSig.Type)
+								}
+							}
+						}
+						return true // Stop traversal
+					}
+				}
+			}
+			// Continue traversal
+			node.ForEachChild(checkNode)
+			return false
+		}
+		
+		ctx.SourceFile.ForEachChild(checkNode)
+		
+		if referencedType != "" && isInterfaceWithIndexSignature(ctx, referencedType) {
+			return checkCircular(referencedType, targetInterface)
+		}
+		
+		return false
+	}
+	
+	// Check if we can reach back to ourselves
+	return checkCircular(interfaceName, interfaceName)
 }
 
 func isDeeplyReferencingType(node *ast.Node, superTypeName string, visited map[*ast.Node]bool) bool {
