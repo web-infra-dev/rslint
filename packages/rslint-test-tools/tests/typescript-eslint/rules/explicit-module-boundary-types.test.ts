@@ -1,4 +1,4 @@
-import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
 

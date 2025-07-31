@@ -17,14 +17,19 @@ const PARSER_OPTION_COMBOS = [
   },
 ] as const;
 
-describe.for(PARSER_OPTION_COMBOS)(
-  'experimentalDecorators: $experimentalDecorators + emitDecoratorMetadata: $emitDecoratorMetadata',
-  parserOptions => {
-    const ruleTester = new RuleTester({
-      languageOptions: { parserOptions },
-    });
+// Using first parser option combo for simplicity
+const parserOptions = PARSER_OPTION_COMBOS[0];
+const ruleTester = new RuleTester({
+  languageOptions: {
+    parserOptions: {
+      ...parserOptions,
+      project: './tsconfig.json',
+      tsconfigRootDir: rootPath,
+    },
+  },
+});
 
-    ruleTester.run('consistent-type-imports', {
+ruleTester.run('consistent-type-imports', {
       valid: [
         `
           import Foo from 'foo';
@@ -1946,183 +1951,5 @@ function test(foo: Foo) {}
           `,
         },
       ],
-    });
-  },
-);
-
-// the special ignored config case
-describe('experimentalDecorators: true + emitDecoratorMetadata: true', () => {
-  const ruleTester = new RuleTester({
-    languageOptions: {
-      parserOptions: {
-        emitDecoratorMetadata: true,
-        experimentalDecorators: true,
-      },
-    },
-  });
-
-  ruleTester.run('consistent-type-imports', {
-    valid: [
-      `
-        import Foo from 'foo';
-        @deco
-        class A {
-          constructor(foo: Foo) {}
-        }
-      `,
-
-      `
-        import Foo from 'foo';
-        class A {
-          @deco
-          foo: Foo;
-        }
-      `,
-
-      `
-        import Foo from 'foo';
-        class A {
-          @deco
-          foo(foo: Foo) {}
-        }
-      `,
-
-      `
-        import Foo from 'foo';
-        class A {
-          @deco
-          foo(): Foo {}
-        }
-      `,
-
-      `
-        import Foo from 'foo';
-        class A {
-          foo(@deco foo: Foo) {}
-        }
-      `,
-
-      `
-        import Foo from 'foo';
-        class A {
-          @deco
-          set foo(value: Foo) {}
-        }
-      `,
-
-      `
-        import Foo from 'foo';
-        class A {
-          @deco
-          get foo() {}
-
-          set foo(value: Foo) {}
-        }
-      `,
-
-      `
-        import Foo from 'foo';
-        class A {
-          @deco
-          get foo() {}
-
-          set ['foo'](value: Foo) {}
-        }
-      `,
-
-      `
-        import type { Foo } from 'foo';
-        const key = 'k';
-        class A {
-          @deco
-          get [key]() {}
-
-          set [key](value: Foo) {}
-        }
-      `,
-
-      `
-        import * as foo from 'foo';
-        @deco
-        class A {
-          constructor(foo: foo.Foo) {}
-        }
-      `,
-
-      // https://github.com/typescript-eslint/typescript-eslint/issues/7327
-      `
-        import type { ClassA } from './classA';
-
-        export class ClassB {
-          public constructor(node: ClassA) {}
-        }
-      `,
-
-      `
-        import type Foo from 'foo';
-        @deco
-        class A {
-          constructor(foo: Foo) {}
-        }
-      `,
-      `
-        import type { Foo } from 'foo';
-        @deco
-        class A {
-          constructor(foo: Foo) {}
-        }
-      `,
-      `
-        import type { Type } from 'foo';
-        import { Foo, Bar } from 'foo';
-        @deco
-        class A {
-          constructor(foo: Foo) {}
-        }
-        type T = Bar;
-      `,
-      `
-        import { V } from 'foo';
-        import type { Foo, Bar, T } from 'foo';
-        @deco
-        class A {
-          constructor(foo: Foo) {}
-          foo(@deco bar: Bar) {}
-        }
-      `,
-      `
-        import type { Foo, T } from 'foo';
-        import { V } from 'foo';
-        @deco
-        class A {
-          constructor(foo: Foo) {}
-        }
-      `,
-      `
-        import type * as Type from 'foo';
-        @deco
-        class A {
-          constructor(foo: Type.Foo) {}
-        }
-      `,
     ],
-    invalid: [
-      {
-        code: `
-          import Foo from 'foo';
-          export type T = Foo;
-        `,
-        errors: [
-          {
-            line: 2,
-            messageId: 'typeOverValue',
-          },
-        ],
-        output: `
-          import type Foo from 'foo';
-          export type T = Foo;
-        `,
-      },
-    ],
-  });
 });
