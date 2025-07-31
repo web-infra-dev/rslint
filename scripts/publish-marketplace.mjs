@@ -2,6 +2,7 @@
 import fs from 'fs';
 import { argv } from 'zx';
 const marketplace = argv.marketplace || 'vsce';
+const prerelease = argv.prerelease || false;
 
 $.verbose = true;
 async function publish_all() {
@@ -30,7 +31,7 @@ async function publish_all() {
       console.log(`Dry run: Skipping actual publish for ${os}-${arch}`);
       continue;
     }
-    await $`cd packages/vscode-extension && pnpm ${marketplace} publish --packagePath ./rslint-${os}-${arch}-${version}.vsix `;
+    await $`cd packages/vscode-extension && pnpm ${marketplace} publish --packagePath ./rslint-${os}-${arch}-${version}.vsix ${prerelease ? '--pre-release' : ''}`;
     console.log(`Finish Publishing v${version} for ${os}-${arch}.`);
   }
 }
