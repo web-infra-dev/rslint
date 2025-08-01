@@ -47,11 +47,6 @@ jobs:
       fail-fast: true
       matrix:
         include:
-          - goos: darwin
-            runs_on: macos-latest
-            goarch: arm64
-            node_arch: arm64
-            node_os: darwin
           - goos: linux
             goarch: amd64
             runs_on: ubuntu-latest
