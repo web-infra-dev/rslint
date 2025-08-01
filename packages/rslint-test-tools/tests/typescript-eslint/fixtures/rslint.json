@@ -1,6 +1,6 @@
 [
   {
-    "language": "javascript",
+    "language": "typescript",
     "files": [],
     "languageOptions": {
       "parserOptions": {

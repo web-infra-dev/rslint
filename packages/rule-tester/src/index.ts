@@ -103,6 +103,8 @@ export class RuleTester {
       }[];
     },
   ) {
+    // Extract the base rule name from descriptive test names like 'ban-ts-comment (ts-expect-error)'
+    const baseRuleName = ruleName.split(' ')[0];
     describe(ruleName, () => {
       let cwd =
         this.options.languageOptions?.parserOptions?.tsconfigRootDir ||
@@ -160,7 +162,7 @@ export class RuleTester {
               [virtual_entry]: code,
             },
             ruleOptions: {
-              [ruleName]: options,
+              [baseRuleName]: options,
             },
           });
 
@@ -194,7 +196,7 @@ export class RuleTester {
               [virtual_entry]: code,
             },
             ruleOptions: {
-              [ruleName]: options,
+              [baseRuleName]: options,
             },
           });
           expect(diags).toMatchSnapshot();
