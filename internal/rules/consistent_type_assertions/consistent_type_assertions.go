@@ -16,9 +16,9 @@ type Options struct {
 	ArrayLiteralTypeAssertions   string `json:"arrayLiteralTypeAssertions,omitempty"`
 }
 
-// Default options
+// Default options - when no options are provided, both styles are allowed
 var defaultOptions = Options{
-	AssertionStyle:              "as",
+	AssertionStyle:              "", // Empty means both styles are allowed
 	ObjectLiteralTypeAssertions: "allow",
 	ArrayLiteralTypeAssertions:  "allow",
 }
@@ -44,44 +44,58 @@ func buildNeverMessage() rule.RuleMessage {
 	}
 }
 
+func buildUseAsAssertionMessage() rule.RuleMessage {
+	return rule.RuleMessage{
+		Id:          "use-as-assertion",
+		Description: "Use as assertion instead.",
+	}
+}
+
+func buildUseAngleBracketAssertionMessage() rule.RuleMessage {
+	return rule.RuleMessage{
+		Id:          "use-angle-bracket-assertion",
+		Description: "Use angle bracket assertion instead.",
+	}
+}
+
 func buildReplaceArrayTypeAssertionWithAnnotationMessage(cast string) rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "replaceArrayTypeAssertionWithAnnotation",
+		Id:          "array-literal-assertion-suggestion",
 		Description: fmt.Sprintf("Use const x: %s = [ ... ] instead.", cast),
 	}
 }
 
 func buildReplaceArrayTypeAssertionWithSatisfiesMessage(cast string) rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "replaceArrayTypeAssertionWithSatisfies",
+		Id:          "array-literal-assertion-suggestion",
 		Description: fmt.Sprintf("Use const x = [ ... ] satisfies %s instead.", cast),
 	}
 }
 
 func buildReplaceObjectTypeAssertionWithAnnotationMessage(cast string) rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "replaceObjectTypeAssertionWithAnnotation",
+		Id:          "object-literal-assertion-suggestion",
 		Description: fmt.Sprintf("Use const x: %s = { ... } instead.", cast),
 	}
 }
 
 func buildReplaceObjectTypeAssertionWithSatisfiesMessage(cast string) rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "replaceObjectTypeAssertionWithSatisfies",
+		Id:          "object-literal-assertion-suggestion",
 		Description: fmt.Sprintf("Use const x = { ... } satisfies %s instead.", cast),
 	}
 }
 
 func buildUnexpectedArrayTypeAssertionMessage() rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "unexpectedArrayTypeAssertion",
+		Id:          "array-literal-assertion",
 		Description: "Always prefer const x: T[] = [ ... ].",
 	}
 }
 
 func buildUnexpectedObjectTypeAssertionMessage() rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "unexpectedObjectTypeAssertion", 
+		Id:          "object-literal-assertion", 
 		Description: "Always prefer const x: T = { ... }.",
 	}
 }
@@ -419,15 +433,37 @@ var ConsistentTypeAssertionsRule = rule.Rule{
 	Name: "consistent-type-assertions",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := defaultOptions
+		
+		// Parse options with dual-format support (handles both array and object formats)
 		if options != nil {
-			if bytes, err := json.Marshal(options); err == nil {
-				json.Unmarshal(bytes, &opts)
+			var optsMap map[string]interface{}
+			var ok bool
+			
+			// Handle array format: [{ option: value }]
+			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
+				optsMap, ok = optArray[0].(map[string]interface{})
+			} else {
+				// Handle direct object format: { option: value }
+				optsMap, ok = options.(map[string]interface{})
+			}
+			
+			if ok {
+				if val, ok := optsMap["assertionStyle"].(string); ok {
+					opts.AssertionStyle = val
+				}
+				if val, ok := optsMap["objectLiteralTypeAssertions"].(string); ok {
+					opts.ObjectLiteralTypeAssertions = val
+				}
+				if val, ok := optsMap["arrayLiteralTypeAssertions"].(string); ok {
+					opts.ArrayLiteralTypeAssertions = val
+				}
 			}
 		}
 
 		return rule.RuleListeners{
 			ast.KindAsExpression: func(node *ast.Node) {
-				if opts.AssertionStyle != "as" {
+				// Only report style violation if a specific style is configured
+				if opts.AssertionStyle == "angle-bracket" || opts.AssertionStyle == "never" {
 					reportIncorrectAssertionType(ctx, node, opts, true)
 					return
 				}
@@ -436,7 +472,8 @@ var ConsistentTypeAssertionsRule = rule.Rule{
 				checkExpressionForArrayAssertion(ctx, node, opts, true)
 			},
 			ast.KindTypeAssertionExpression: func(node *ast.Node) {
-				if opts.AssertionStyle != "angle-bracket" {
+				// Only report style violation if a specific style is configured
+				if opts.AssertionStyle == "as" || opts.AssertionStyle == "never" {
 					reportIncorrectAssertionType(ctx, node, opts, false)
 					return
 				}

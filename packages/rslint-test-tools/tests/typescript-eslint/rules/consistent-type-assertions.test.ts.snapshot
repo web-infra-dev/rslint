@@ -3,8 +3,8 @@ exports[`consistent-type-assertions > invalid 1`] = `
   "diagnostics": [
     {
       "ruleName": "consistent-type-assertions",
-      "messageId": "angle-bracket",
-      "message": "Use '<Foo>' instead of 'as Foo'.",
+      "messageId": "angle-bracket-assertion",
+      "message": "Use 'as const' instead of '<const>'.",
       "filePath": "src/virtual.ts",
       "range": {
         "start": {
@@ -13,7 +13,7 @@ exports[`consistent-type-assertions > invalid 1`] = `
         },
         "end": {
           "line": 1,
-          "column": 39
+          "column": 23
         }
       }
     }
@@ -289,8 +289,8 @@ exports[`consistent-type-assertions > invalid 2`] = `
   "diagnostics": [
     {
       "ruleName": "consistent-type-assertions",
-      "messageId": "angle-bracket",
-      "message": "Use '<A>' instead of 'as A'.",
+      "messageId": "angle-bracket-assertion",
+      "message": "Use 'as const' instead of '<const>'.",
       "filePath": "src/virtual.ts",
       "range": {
         "start": {
@@ -299,7 +299,7 @@ exports[`consistent-type-assertions > invalid 2`] = `
         },
         "end": {
           "line": 1,
-          "column": 17
+          "column": 23
         }
       }
     }

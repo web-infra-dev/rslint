@@ -397,12 +397,22 @@ var NoUseBeforeDefineRule = rule.Rule{
 					ast.KindTypeLiteral,
 					ast.KindMappedType:
 					return true
-				case ast.KindAsExpression,
-					ast.KindTypeAssertionExpression,
-					ast.KindSatisfiesExpression:
-					// These are type contexts
-					asExpr := parent
-					if node == asExpr.Children().Nodes[len(asExpr.Children().Nodes)-1] {
+				case ast.KindAsExpression:
+					// For as expressions, check if we're in the type part
+					asExpr := parent.AsAsExpression()
+					if asExpr != nil && node == asExpr.Type {
+						return true
+					}
+				case ast.KindTypeAssertionExpression:
+					// For type assertion expressions, check if we're in the type part
+					typeAssertion := parent.AsTypeAssertion()
+					if typeAssertion != nil && node == typeAssertion.Type {
+						return true
+					}
+				case ast.KindSatisfiesExpression:
+					// For satisfies expressions, check if we're in the type part
+					satisfiesExpr := parent.AsSatisfiesExpression()
+					if satisfiesExpr != nil && node == satisfiesExpr.Type {
 						return true
 					}
 				}

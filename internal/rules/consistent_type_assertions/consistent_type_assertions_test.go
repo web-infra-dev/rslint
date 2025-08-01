@@ -305,7 +305,7 @@ function foo() {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
-						MessageId: "angle-bracket",
+						MessageId: "as-assertion",
 						Line:      1,
 						Column:    11,
 					},
@@ -318,7 +318,7 @@ function foo() {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
-						MessageId: "angle-bracket",
+						MessageId: "as-assertion",
 						Line:      1,
 						Column:    11,
 					},
@@ -333,7 +333,7 @@ function foo() {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
-						MessageId: "as",
+						MessageId: "angle-bracket-assertion",
 						Line:      1,
 						Column:    11,
 					},
@@ -346,7 +346,7 @@ function foo() {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
-						MessageId: "as",
+						MessageId: "angle-bracket-assertion",
 						Line:      1,
 						Column:    11,
 					},
@@ -416,16 +416,16 @@ function foo() {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
-						MessageId: "unexpectedObjectTypeAssertion",
+						MessageId: "object-literal-assertion",
 						Line:      1,
 						Column:    11,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{
-								MessageId: "replaceObjectTypeAssertionWithAnnotation",
+								MessageId: "object-literal-assertion-suggestion",
 								Output:    "const x: Foo<int> = {};",
 							},
 							{
-								MessageId: "replaceObjectTypeAssertionWithSatisfies",
+								MessageId: "object-literal-assertion-suggestion",
 								Output:    "const x = {} satisfies Foo<int>;",
 							},
 						},
@@ -440,16 +440,16 @@ function foo() {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
-						MessageId: "unexpectedObjectTypeAssertion",
+						MessageId: "object-literal-assertion",
 						Line:      1,
 						Column:    11,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{
-								MessageId: "replaceObjectTypeAssertionWithAnnotation",
+								MessageId: "object-literal-assertion-suggestion",
 								Output:    "const x: a | b = {};",
 							},
 							{
-								MessageId: "replaceObjectTypeAssertionWithSatisfies",
+								MessageId: "object-literal-assertion-suggestion",
 								Output:    "const x = {} satisfies a | b;",
 							},
 						},
@@ -464,12 +464,12 @@ function foo() {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
-						MessageId: "unexpectedObjectTypeAssertion",
+						MessageId: "object-literal-assertion",
 						Line:      1,
 						Column:    7,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{
-								MessageId: "replaceObjectTypeAssertionWithSatisfies",
+								MessageId: "object-literal-assertion-suggestion",
 								Output:    "print({ bar: 5 } satisfies Foo);",
 							},
 						},
@@ -486,16 +486,16 @@ function foo() {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
-						MessageId: "unexpectedObjectTypeAssertion",
+						MessageId: "object-literal-assertion",
 						Line:      1,
 						Column:    11,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{
-								MessageId: "replaceObjectTypeAssertionWithAnnotation",
+								MessageId: "object-literal-assertion-suggestion",
 								Output:    "const x: Foo<int> = {};",
 							},
 							{
-								MessageId: "replaceObjectTypeAssertionWithSatisfies",
+								MessageId: "object-literal-assertion-suggestion",
 								Output:    "const x = {} satisfies Foo<int>;",
 							},
 						},
@@ -512,16 +512,16 @@ function foo() {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
-						MessageId: "unexpectedArrayTypeAssertion",
+						MessageId: "array-literal-assertion",
 						Line:      1,
 						Column:    11,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{
-								MessageId: "replaceArrayTypeAssertionWithAnnotation",
+								MessageId: "array-literal-assertion-suggestion",
 								Output:    "const x: string[] = [];",
 							},
 							{
-								MessageId: "replaceArrayTypeAssertionWithSatisfies",
+								MessageId: "array-literal-assertion-suggestion",
 								Output:    "const x = [] satisfies string[];",
 							},
 						},
@@ -536,16 +536,16 @@ function foo() {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
-						MessageId: "unexpectedArrayTypeAssertion",
+						MessageId: "array-literal-assertion",
 						Line:      1,
 						Column:    11,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{
-								MessageId: "replaceArrayTypeAssertionWithAnnotation",
+								MessageId: "array-literal-assertion-suggestion",
 								Output:    "const x: string[] = [];",
 							},
 							{
-								MessageId: "replaceArrayTypeAssertionWithSatisfies",
+								MessageId: "array-literal-assertion-suggestion",
 								Output:    "const x = [] satisfies string[];",
 							},
 						},
@@ -562,12 +562,12 @@ function foo() {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
-						MessageId: "unexpectedArrayTypeAssertion",
+						MessageId: "array-literal-assertion",
 						Line:      1,
 						Column:    19,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{
-								MessageId: "replaceArrayTypeAssertionWithSatisfies",
+								MessageId: "array-literal-assertion-suggestion",
 								Output:    "const foo = () => [5] satisfies Foo;",
 							},
 						},
