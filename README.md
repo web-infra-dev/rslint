@@ -2,6 +2,13 @@
 
 Rslint aims to be a drop-in replacement for ESLint and TypeScript-ESLint, just as Rspack serves as a drop-in replacement for webpack and may integrated into Rspack in the future.
 
+<p>
+  <a href="https://discord.gg/YtTedhuq7N"><img src="https://img.shields.io/badge/chat-discord-blue?style=flat-square&logo=discord&colorA=564341&colorB=EDED91" alt="discord channel" /></a>
+  <a href="https://npmjs.com/package/@rslint/core?activeTab=readme"><img src="https://img.shields.io/npm/v/@rslint/core?style=flat-square&colorA=564341&colorB=EDED91" alt="npm version" /></a>
+  <a href="https://npmcharts.com/compare/@rslint/core?minimal=true"><img src="https://img.shields.io/npm/dm/@rslint/core.svg?style=flat-square&colorA=564341&colorB=EDED91" alt="downloads" /></a>
+  <a href="https://github.com/web-infra-dev/rslint/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square&colorA=564341&colorB=EDED91" alt="license" /></a>
+</p>
+
 > [!NOTE]
 > Rslint is a fork of [tsgolint](https://github.com/typescript-eslint/tsgolint), an experimental proof-of-concept typescript-go powered JS/TS linter. We would like to express our heartfelt gratitude to the tsgolint team, especially to [@auvred](https://github.com/auvred) for their pioneering work and innovative approach to TypeScript linting. We decided to fork tsgolint because it serves as a proof-of-concept with no current plans for continued development on this direction in the near term ([reference](https://x.com/bradzacher/status/1943475629376282998)).
 
@@ -43,7 +50,7 @@ This repo has adopted the ByteDance open source code of conduct. Please check [C
 ## 🙏 Credits
 
 Rslint has been inspired by several outstanding projects in the community. We would like to acknowledge and express our sincere gratitude to the following developers, teams and projects:
-  
+
 - [@auvred](https://github.com/auvred) - The original author of [tsgolint](https://github.com/typescript-eslint/tsgolint), from which Rslint is forked. We are deeply grateful for his pioneering work and innovative approach to TypeScript linting.
 - [@JamesHenry](https://github.com/JamesHenry) - The creator of [typescript-eslint](https://github.com/typescript-eslint/typescript-eslint), who has provided valuable guidance and suggestions for Rslint's development.
 - The [typescript-eslint](https://github.com/typescript-eslint) team - Rslint's configuration design and test cases have been significantly influenced by and adapted from typescript-eslint's excellent implementation.
