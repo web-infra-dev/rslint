@@ -2,9 +2,390 @@
 
 exports[`no-non-null-asserted-nullish-coalescing > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 0,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 10,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 10,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
 }
 `;

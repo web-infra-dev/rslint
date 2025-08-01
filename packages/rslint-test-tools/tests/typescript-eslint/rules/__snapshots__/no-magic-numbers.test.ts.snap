@@ -2,9 +2,1256 @@
 
 exports[`no-magic-numbers > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 0,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: -1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 2.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 3.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: -1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 1000.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: -1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 6,
+        },
+        "start": {
+          "column": 10,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 2.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 4,
+        },
+        "start": {
+          "column": 16,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 3.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 5,
+        },
+        "start": {
+          "column": 30,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 4.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 6,
+        },
+        "start": {
+          "column": 23,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: -5.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 7,
+        },
+        "start": {
+          "column": 16,
+          "line": 7,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 6.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 8,
+        },
+        "start": {
+          "column": 17,
+          "line": 8,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 100n.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 9,
+        },
+        "start": {
+          "column": 24,
+          "line": 9,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 7,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 0.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: -1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 171.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 56.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 10n.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: -2.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: -2.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: -2.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 3.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 4.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 2.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 0.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 22,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 0.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 3.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 0.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 2.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 0.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 1.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 22`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: -2.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 23`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 3n.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 24`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: -4n.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 25`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 5.6.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 26`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: -7.8.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 27`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 10.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 28`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: -188.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 29`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 100.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 30`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: -30000.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 31`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 0.000005.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 32`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: -7e-8.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 33`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 110.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 34`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: -31000.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 35`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: 0.0000051.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-magic-numbers > invalid 36`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "No magic number: -7.1e-8.",
+      "messageId": "noMagic",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-magic-numbers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
 }
 `;

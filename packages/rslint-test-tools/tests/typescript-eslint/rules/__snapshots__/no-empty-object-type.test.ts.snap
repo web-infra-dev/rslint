@@ -2,9 +2,598 @@
 
 exports[`no-empty-object-type > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "An empty interface declaration allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the '{{ option }}' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyInterface",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 0,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "An empty interface declaration allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the '{{ option }}' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyInterface",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 6,
+        },
+        "start": {
+          "column": 11,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 6,
+        },
+        "start": {
+          "column": 11,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 6,
+        },
+        "start": {
+          "column": 11,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 6,
+        },
+        "start": {
+          "column": 11,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The \`{}\` ("empty object") type allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the '{{ option }}' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyObject",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "An interface declaring no members is equivalent to its supertype.",
+      "messageId": "noEmptyInterfaceWithSuper",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 20,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The \`{}\` ("empty object") type allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the '{{ option }}' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyObject",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The \`{}\` ("empty object") type allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the '{{ option }}' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyObject",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The \`{}\` ("empty object") type allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the '{{ option }}' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyObject",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The \`{}\` ("empty object") type allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the '{{ option }}' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyObject",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The \`{}\` ("empty object") type allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the '{{ option }}' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyObject",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The \`{}\` ("empty object") type allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the '{{ option }}' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyObject",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The \`{}\` ("empty object") type allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the '{{ option }}' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyObject",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "The \`{}\` ("empty object") type allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the '{{ option }}' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyObject",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-object-type > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "An empty interface declaration allows any non-nullish value, including literals like \`0\` and \`""\`.
+- If that's what you want, disable this lint rule with an inline comment or configure the '{{ option }}' rule option.
+- If you want a type meaning "any object", you probably want \`object\` instead.
+- If you want a type meaning "any value", you probably want \`unknown\` instead.",
+      "messageId": "noEmptyInterface",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-object-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
 }
 `;

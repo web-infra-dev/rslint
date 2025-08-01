@@ -5,6 +5,6 @@ exports[`no-unsafe-declaration-merging > invalid 1`] = `
   "diagnostics": [],
   "errorCount": 0,
   "fileCount": 1,
-  "ruleCount": 0,
+  "ruleCount": 1,
 }
 `;

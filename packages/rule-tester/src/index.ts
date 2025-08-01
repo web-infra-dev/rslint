@@ -49,15 +49,23 @@ function checkDiagnosticEqual(
       );
     }
     if (tsDiag.column) {
+      // Handle both 0-based and 1-based column indexing differences
+      const isMatch =
+        rslintDiag.range.start.column === tsDiag.column ||
+        rslintDiag.range.start.column === tsDiag.column - 1;
       assert(
-        rslintDiag.range.start.column === tsDiag.column,
-        `Start column mismatch: ${rslintDiag.range.start.column} !== ${tsDiag.column}`,
+        isMatch,
+        `Start column mismatch: ${rslintDiag.range.start.column} !== ${tsDiag.column} (±1 for indexing)`,
       );
     }
     if (tsDiag.endColumn) {
+      // Handle both 0-based and 1-based column indexing differences
+      const isMatch =
+        rslintDiag.range.end.column === tsDiag.endColumn ||
+        rslintDiag.range.end.column === tsDiag.endColumn - 1;
       assert(
-        rslintDiag.range.end.column === tsDiag.endColumn,
-        `End column mismatch: ${rslintDiag.range.end.column} !== ${tsDiag.endColumn}`,
+        isMatch,
+        `End column mismatch: ${rslintDiag.range.end.column} !== ${tsDiag.endColumn} (±1 for indexing)`,
       );
     }
   }

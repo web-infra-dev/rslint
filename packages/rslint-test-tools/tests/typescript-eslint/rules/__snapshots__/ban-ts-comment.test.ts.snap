@@ -4,7 +4,7 @@ exports[`ban-ts-comment (ts-check) > invalid 1`] = `
 {
   "diagnostics": [],
   "errorCount": 0,
-  "fileCount": 73,
+  "fileCount": 1,
   "ruleCount": 0,
 }
 `;
@@ -13,7 +13,7 @@ exports[`ban-ts-comment (ts-expect-error) > invalid 1`] = `
 {
   "diagnostics": [],
   "errorCount": 0,
-  "fileCount": 73,
+  "fileCount": 1,
   "ruleCount": 0,
 }
 `;
@@ -22,7 +22,7 @@ exports[`ban-ts-comment (ts-ignore) > invalid 1`] = `
 {
   "diagnostics": [],
   "errorCount": 0,
-  "fileCount": 73,
+  "fileCount": 1,
   "ruleCount": 0,
 }
 `;
@@ -31,7 +31,7 @@ exports[`ban-ts-comment (ts-nocheck) > invalid 1`] = `
 {
   "diagnostics": [],
   "errorCount": 0,
-  "fileCount": 73,
+  "fileCount": 1,
   "ruleCount": 0,
 }
 `;

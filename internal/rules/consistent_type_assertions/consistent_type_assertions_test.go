@@ -305,7 +305,7 @@ function foo() {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
-						MessageId: "as-assertion",
+						MessageId: "angle-bracket",
 						Line:      1,
 						Column:    11,
 					},
@@ -318,7 +318,7 @@ function foo() {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
-						MessageId: "as-assertion",
+						MessageId: "angle-bracket",
 						Line:      1,
 						Column:    11,
 					},
@@ -333,7 +333,7 @@ function foo() {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
-						MessageId: "angle-bracket-assertion",
+						MessageId: "as",
 						Line:      1,
 						Column:    11,
 					},
@@ -346,7 +346,7 @@ function foo() {
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
-						MessageId: "angle-bracket-assertion",
+						MessageId: "as",
 						Line:      1,
 						Column:    11,
 					},

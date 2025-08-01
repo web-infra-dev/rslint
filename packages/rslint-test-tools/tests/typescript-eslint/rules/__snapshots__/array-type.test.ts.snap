@@ -4,7 +4,7 @@ exports[`array-type > invalid 1`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<number>' is forbidden. Use 'number[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -30,7 +30,7 @@ exports[`array-type > invalid 2`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -56,7 +56,7 @@ exports[`array-type > invalid 3`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'ReadonlyArray<number>' is forbidden. Use 'readonly number[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -82,7 +82,7 @@ exports[`array-type > invalid 4`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'ReadonlyArray<T>' is forbidden. Use 'readonly T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -108,7 +108,7 @@ exports[`array-type > invalid 5`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<number>' is forbidden. Use 'number[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -134,7 +134,7 @@ exports[`array-type > invalid 6`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -160,7 +160,7 @@ exports[`array-type > invalid 7`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'ReadonlyArray<number>' is forbidden. Use 'readonly number[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -186,7 +186,7 @@ exports[`array-type > invalid 8`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'ReadonlyArray<T>' is forbidden. Use 'readonly T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -212,7 +212,7 @@ exports[`array-type > invalid 9`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<number>' is forbidden. Use 'number[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -238,7 +238,7 @@ exports[`array-type > invalid 10`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -264,7 +264,7 @@ exports[`array-type > invalid 11`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'ReadonlyArray<number>' is forbidden for simple types. Use 'readonly number[]' instead.",
       "messageId": "errorStringArraySimple",
       "range": {
@@ -290,7 +290,7 @@ exports[`array-type > invalid 12`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'readonly T[]' is forbidden for non-simple types. Use 'ReadonlyArray<T>' instead.",
       "messageId": "errorStringGenericSimple",
       "range": {
@@ -316,7 +316,7 @@ exports[`array-type > invalid 13`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<number>' is forbidden. Use 'number[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -342,7 +342,7 @@ exports[`array-type > invalid 14`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -368,7 +368,7 @@ exports[`array-type > invalid 15`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'readonly number[]' is forbidden. Use 'ReadonlyArray<number>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -394,7 +394,7 @@ exports[`array-type > invalid 16`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'readonly T[]' is forbidden. Use 'ReadonlyArray<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -420,7 +420,7 @@ exports[`array-type > invalid 17`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<number>' is forbidden for simple types. Use 'number[]' instead.",
       "messageId": "errorStringArraySimple",
       "range": {
@@ -446,7 +446,7 @@ exports[`array-type > invalid 18`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
       "messageId": "errorStringGenericSimple",
       "range": {
@@ -472,7 +472,7 @@ exports[`array-type > invalid 19`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'ReadonlyArray<number>' is forbidden for simple types. Use 'readonly number[]' instead.",
       "messageId": "errorStringArraySimple",
       "range": {
@@ -498,7 +498,7 @@ exports[`array-type > invalid 20`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'readonly T[]' is forbidden for non-simple types. Use 'ReadonlyArray<T>' instead.",
       "messageId": "errorStringGenericSimple",
       "range": {
@@ -524,7 +524,7 @@ exports[`array-type > invalid 21`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<number>' is forbidden for simple types. Use 'number[]' instead.",
       "messageId": "errorStringArraySimple",
       "range": {
@@ -550,7 +550,7 @@ exports[`array-type > invalid 22`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
       "messageId": "errorStringGenericSimple",
       "range": {
@@ -576,7 +576,7 @@ exports[`array-type > invalid 23`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'ReadonlyArray<number>' is forbidden. Use 'readonly number[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -602,7 +602,7 @@ exports[`array-type > invalid 24`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'ReadonlyArray<T>' is forbidden. Use 'readonly T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -628,7 +628,7 @@ exports[`array-type > invalid 25`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<number>' is forbidden for simple types. Use 'number[]' instead.",
       "messageId": "errorStringArraySimple",
       "range": {
@@ -654,7 +654,7 @@ exports[`array-type > invalid 26`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
       "messageId": "errorStringGenericSimple",
       "range": {
@@ -680,7 +680,7 @@ exports[`array-type > invalid 27`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'ReadonlyArray<number>' is forbidden for simple types. Use 'readonly number[]' instead.",
       "messageId": "errorStringArraySimple",
       "range": {
@@ -706,7 +706,7 @@ exports[`array-type > invalid 28`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'readonly T[]' is forbidden for non-simple types. Use 'ReadonlyArray<T>' instead.",
       "messageId": "errorStringGenericSimple",
       "range": {
@@ -732,7 +732,7 @@ exports[`array-type > invalid 29`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<number>' is forbidden for simple types. Use 'number[]' instead.",
       "messageId": "errorStringArraySimple",
       "range": {
@@ -758,7 +758,7 @@ exports[`array-type > invalid 30`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
       "messageId": "errorStringGenericSimple",
       "range": {
@@ -784,7 +784,7 @@ exports[`array-type > invalid 31`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'readonly number[]' is forbidden. Use 'ReadonlyArray<number>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -810,7 +810,7 @@ exports[`array-type > invalid 32`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'readonly T[]' is forbidden. Use 'ReadonlyArray<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -836,7 +836,7 @@ exports[`array-type > invalid 33`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'number[]' is forbidden. Use 'Array<number>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -862,7 +862,7 @@ exports[`array-type > invalid 34`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -888,7 +888,7 @@ exports[`array-type > invalid 35`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'readonly number[]' is forbidden. Use 'ReadonlyArray<number>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -914,7 +914,7 @@ exports[`array-type > invalid 36`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'readonly T[]' is forbidden. Use 'ReadonlyArray<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -940,7 +940,7 @@ exports[`array-type > invalid 37`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'number[]' is forbidden. Use 'Array<number>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -966,7 +966,7 @@ exports[`array-type > invalid 38`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -992,7 +992,7 @@ exports[`array-type > invalid 39`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'ReadonlyArray<number>' is forbidden. Use 'readonly number[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -1018,7 +1018,7 @@ exports[`array-type > invalid 40`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'ReadonlyArray<T>' is forbidden. Use 'readonly T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -1044,7 +1044,7 @@ exports[`array-type > invalid 41`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'number[]' is forbidden. Use 'Array<number>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -1070,7 +1070,7 @@ exports[`array-type > invalid 42`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -1096,7 +1096,7 @@ exports[`array-type > invalid 43`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'ReadonlyArray<number>' is forbidden for simple types. Use 'readonly number[]' instead.",
       "messageId": "errorStringArraySimple",
       "range": {
@@ -1122,7 +1122,7 @@ exports[`array-type > invalid 44`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'readonly T[]' is forbidden for non-simple types. Use 'ReadonlyArray<T>' instead.",
       "messageId": "errorStringGenericSimple",
       "range": {
@@ -1148,7 +1148,7 @@ exports[`array-type > invalid 45`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'number[]' is forbidden. Use 'Array<number>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -1174,7 +1174,7 @@ exports[`array-type > invalid 46`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -1200,7 +1200,7 @@ exports[`array-type > invalid 47`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'readonly number[]' is forbidden. Use 'ReadonlyArray<number>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -1226,7 +1226,7 @@ exports[`array-type > invalid 48`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'readonly T[]' is forbidden. Use 'ReadonlyArray<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -1252,7 +1252,7 @@ exports[`array-type > invalid 49`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'bigint[]' is forbidden. Use 'Array<bigint>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -1278,7 +1278,7 @@ exports[`array-type > invalid 50`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -1304,7 +1304,7 @@ exports[`array-type > invalid 51`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'ReadonlyArray<bigint>' is forbidden for simple types. Use 'readonly bigint[]' instead.",
       "messageId": "errorStringArraySimple",
       "range": {
@@ -1330,7 +1330,7 @@ exports[`array-type > invalid 52`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -1356,7 +1356,7 @@ exports[`array-type > invalid 53`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'readonly bigint[]' is forbidden. Use 'ReadonlyArray<bigint>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -1382,7 +1382,7 @@ exports[`array-type > invalid 54`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'readonly T[]' is forbidden. Use 'ReadonlyArray<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -1408,7 +1408,7 @@ exports[`array-type > invalid 55`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<Bar>' is forbidden. Use 'Bar[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -1434,7 +1434,7 @@ exports[`array-type > invalid 56`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Bar[]' is forbidden. Use 'Array<Bar>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -1460,7 +1460,7 @@ exports[`array-type > invalid 57`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Bar[]' is forbidden. Use 'Array<Bar>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -1486,7 +1486,7 @@ exports[`array-type > invalid 58`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<Bar>' is forbidden. Use 'Bar[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -1502,7 +1502,7 @@ exports[`array-type > invalid 58`] = `
       "ruleName": "array-type",
     },
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<Bar>' is forbidden. Use 'Bar[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -1528,7 +1528,7 @@ exports[`array-type > invalid 59`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<undefined>' is forbidden for simple types. Use 'undefined[]' instead.",
       "messageId": "errorStringArraySimple",
       "range": {
@@ -1554,7 +1554,7 @@ exports[`array-type > invalid 60`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<string>' is forbidden for simple types. Use 'string[]' instead.",
       "messageId": "errorStringArraySimple",
       "range": {
@@ -1580,7 +1580,7 @@ exports[`array-type > invalid 61`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<any>' is forbidden for simple types. Use 'any[]' instead.",
       "messageId": "errorStringArraySimple",
       "range": {
@@ -1606,7 +1606,7 @@ exports[`array-type > invalid 62`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
       "messageId": "errorStringGenericSimple",
       "range": {
@@ -1632,7 +1632,7 @@ exports[`array-type > invalid 63`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<T>' is forbidden for simple types. Use 'T[]' instead.",
       "messageId": "errorStringArraySimple",
       "range": {
@@ -1658,7 +1658,7 @@ exports[`array-type > invalid 64`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
       "messageId": "errorStringGenericSimple",
       "range": {
@@ -1684,7 +1684,7 @@ exports[`array-type > invalid 65`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<T>' is forbidden for simple types. Use 'T[]' instead.",
       "messageId": "errorStringArraySimple",
       "range": {
@@ -1710,7 +1710,7 @@ exports[`array-type > invalid 66`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
       "messageId": "errorStringGenericSimple",
       "range": {
@@ -1736,7 +1736,7 @@ exports[`array-type > invalid 67`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
       "messageId": "errorStringGenericSimple",
       "range": {
@@ -1762,7 +1762,7 @@ exports[`array-type > invalid 68`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
       "messageId": "errorStringGenericSimple",
       "range": {
@@ -1788,7 +1788,7 @@ exports[`array-type > invalid 69`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
       "messageId": "errorStringGenericSimple",
       "range": {
@@ -1814,7 +1814,7 @@ exports[`array-type > invalid 70`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<fooName.BarType>' is forbidden for simple types. Use 'fooName.BarType[]' instead.",
       "messageId": "errorStringArraySimple",
       "range": {
@@ -1840,7 +1840,7 @@ exports[`array-type > invalid 71`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
       "messageId": "errorStringGenericSimple",
       "range": {
@@ -1866,7 +1866,7 @@ exports[`array-type > invalid 72`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<undefined>' is forbidden. Use 'undefined[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -1892,7 +1892,7 @@ exports[`array-type > invalid 73`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<string>' is forbidden. Use 'string[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -1918,7 +1918,7 @@ exports[`array-type > invalid 74`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<any>' is forbidden. Use 'any[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -1944,7 +1944,7 @@ exports[`array-type > invalid 75`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -1970,7 +1970,7 @@ exports[`array-type > invalid 76`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -1996,7 +1996,7 @@ exports[`array-type > invalid 77`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -2022,7 +2022,7 @@ exports[`array-type > invalid 78`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -2048,7 +2048,7 @@ exports[`array-type > invalid 79`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -2074,7 +2074,7 @@ exports[`array-type > invalid 80`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -2100,7 +2100,7 @@ exports[`array-type > invalid 81`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -2126,7 +2126,7 @@ exports[`array-type > invalid 82`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<any>' is forbidden. Use 'any[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -2152,7 +2152,7 @@ exports[`array-type > invalid 83`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<any>' is forbidden. Use 'any[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -2178,7 +2178,7 @@ exports[`array-type > invalid 84`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<any>' is forbidden for simple types. Use 'any[]' instead.",
       "messageId": "errorStringArraySimple",
       "range": {
@@ -2204,7 +2204,7 @@ exports[`array-type > invalid 85`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<any>' is forbidden for simple types. Use 'any[]' instead.",
       "messageId": "errorStringArraySimple",
       "range": {
@@ -2230,7 +2230,7 @@ exports[`array-type > invalid 86`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'number[]' is forbidden. Use 'Array<number>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -2256,7 +2256,7 @@ exports[`array-type > invalid 87`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'string[]' is forbidden. Use 'Array<string>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -2282,7 +2282,7 @@ exports[`array-type > invalid 88`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -2308,7 +2308,7 @@ exports[`array-type > invalid 89`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -2334,7 +2334,7 @@ exports[`array-type > invalid 90`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -2360,7 +2360,7 @@ exports[`array-type > invalid 91`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -2386,7 +2386,7 @@ exports[`array-type > invalid 92`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -2412,7 +2412,7 @@ exports[`array-type > invalid 93`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -2438,7 +2438,7 @@ exports[`array-type > invalid 94`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -2464,7 +2464,7 @@ exports[`array-type > invalid 95`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'string[]' is forbidden. Use 'Array<string>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -2490,7 +2490,7 @@ exports[`array-type > invalid 96`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -2516,7 +2516,7 @@ exports[`array-type > invalid 97`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
@@ -2542,7 +2542,7 @@ exports[`array-type > invalid 98`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'ReadonlyArray<object>' is forbidden. Use 'readonly object[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -2568,7 +2568,7 @@ exports[`array-type > invalid 99`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -2594,7 +2594,7 @@ exports[`array-type > invalid 100`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'ReadonlyArray<T>' is forbidden. Use 'readonly T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -2620,7 +2620,7 @@ exports[`array-type > invalid 101`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Readonly<string[]>' is forbidden. Use 'readonly string[][]' instead.",
       "messageId": "errorStringArrayReadonly",
       "range": {
@@ -2646,7 +2646,7 @@ exports[`array-type > invalid 102`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Readonly<string[]>' is forbidden for simple types. Use 'readonly string[][]' instead.",
       "messageId": "errorStringArraySimpleReadonly",
       "range": {
@@ -2672,7 +2672,7 @@ exports[`array-type > invalid 103`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
       "messageId": "errorStringArray",
       "range": {
@@ -2698,7 +2698,7 @@ exports[`array-type > invalid 104`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
       "messageId": "errorStringGenericSimple",
       "range": {
@@ -2724,7 +2724,7 @@ exports[`array-type > invalid 105`] = `
 {
   "diagnostics": [
     {
-      "filePath": "tests/typescript-eslint/fixtures/src/virtual.ts",
+      "filePath": "src/virtual.ts",
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
       "messageId": "errorStringGeneric",
       "range": {
