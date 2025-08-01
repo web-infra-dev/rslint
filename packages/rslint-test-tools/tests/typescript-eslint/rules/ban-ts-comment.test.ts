@@ -1,6 +1,6 @@
 import { noFormat, RuleTester } from '../RuleTester.ts';
 
-const ruleTester = new RuleTester();
+const ruleTester = new RuleTester({});
 
 ruleTester.run('ban-ts-comment (ts-expect-error)', {
   valid: [
