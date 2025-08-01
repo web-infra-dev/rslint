@@ -39,3 +39,15 @@ Please read the [Contributing Guide](https://github.com/web-infra-dev/rslint/blo
 ### Code of conduct
 
 This repo has adopted the ByteDance open source code of conduct. Please check [Code of conduct](./CODE_OF_CONDUCT.md) for more details.
+
+## 🙏 Credits
+
+Rslint has been inspired by several outstanding projects in the community. We would like to acknowledge and express our sincere gratitude to the following developers, teams and projects:
+  
+- [@auvred](https://github.com/auvred) - The original author of [tsgolint](https://github.com/typescript-eslint/tsgolint), from which Rslint is forked. We are deeply grateful for his pioneering work and innovative approach to TypeScript linting.
+- [@JamesHenry](https://github.com/JamesHenry) - The creator of [typescript-eslint](https://github.com/typescript-eslint/typescript-eslint), who has provided valuable guidance and suggestions for Rslint's development.
+- The [typescript-eslint](https://github.com/typescript-eslint) team - Rslint's configuration design and test cases have been significantly influenced by and adapted from typescript-eslint's excellent implementation.
+
+## 📖 License
+
+Rslint is licensed under the [MIT License](https://github.com/web-infra-dev/rslint/blob/main/LICENSE).
