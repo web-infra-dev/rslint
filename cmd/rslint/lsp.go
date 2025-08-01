@@ -352,29 +352,6 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 	// Initialize rule registry with all available rules
 	config.RegisterAllTypeSriptEslintPluginRules()
 
-	// Find all source files from all programs, prioritizing the file matching the URI
-	var targetFile *ast.SourceFile
-	uriPath := uriToPath(string(uri))
-
-	for _, program := range programs {
-		for _, file := range program.SourceFiles() {
-
-			if file.FileName() == uriPath {
-				targetFile = file
-			}
-		}
-	}
-
-	// If we found a target file, prioritize it, otherwise use all files
-	var files []*ast.SourceFile
-	if targetFile != nil {
-		files = []*ast.SourceFile{targetFile}
-	} else {
-		log.Printf("Target file not found for URI %s, processing all files", uri)
-	}
-
-	log.Printf("Processing %d files from %d programs", len(files), len(programs))
-
 	// Collect diagnostics
 	var diagnostics []rule.RuleDiagnostic
 	var diagnosticsLock sync.Mutex
@@ -385,12 +362,11 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 		defer diagnosticsLock.Unlock()
 		diagnostics = append(diagnostics, d)
 	}
-
 	// Run linter with all programs using rule registry
-	err := linter.RunLinter(
+	_, err := linter.RunLinter(
 		programs,
 		false, // Don't use single-threaded mode for LSP
-		files,
+		nil,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
 			return activeRules

@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"slices"
-	"strings"
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -174,42 +172,6 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		programs = append(programs, program)
 	}
 
-	// Find source files from all programs
-	files := []*ast.SourceFile{}
-
-	// If specific files are provided, use those
-	if len(req.Files) > 0 {
-		for _, filePath := range req.Files {
-			absPath := tspath.ResolvePath(configDirectory, filePath)
-			// Try to find the file in any of the programs
-			for _, program := range programs {
-				sourceFile := program.GetSourceFile(absPath)
-				if sourceFile != nil {
-					files = append(files, sourceFile)
-					break // Found in this program, no need to check others
-				}
-			}
-		}
-	} else {
-		// Otherwise use all source files from all programs
-		for _, program := range programs {
-			for _, file := range program.SourceFiles() {
-				p := string(file.Path())
-				if strings.Contains(p, "/node_modules/") {
-					continue
-				}
-				// skip bundled files
-				if strings.Contains(p, "bundled:") {
-					continue
-				}
-				files = append(files, file)
-			}
-		}
-	}
-	slices.SortFunc(files, func(a *ast.SourceFile, b *ast.SourceFile) int {
-		return len(b.Text()) - len(a.Text())
-	})
-
 	// Collect diagnostics
 	var diagnostics []api.Diagnostic
 	var diagnosticsLock sync.Mutex
@@ -249,10 +211,10 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	}
 
 	// Run linter
-	err = linter.RunLinter(
+	lintedFilesCount, err := linter.RunLinter(
 		programs,
 		false, // Don't use single-threaded mode for IPC
-		files,
+		nil,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			return utils.Map(rulesWithOptions, func(r RuleWithOption) linter.ConfiguredRule {
 
@@ -277,7 +239,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	return &api.LintResponse{
 		Diagnostics: diagnostics,
 		ErrorCount:  errorsCount,
-		FileCount:   len(files),
+		FileCount:   int(lintedFilesCount),
 		RuleCount:   len(rulesWithOptions),
 	}, nil
 }
