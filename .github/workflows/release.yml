@@ -119,9 +119,10 @@ jobs:
           node-version: '24'
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: ./.github/actions/setup-go
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache-name: linux-x86
 
       - name: Install pnpm
         run: corepack enable
@@ -188,14 +189,16 @@ jobs:
             goarch: arm64
             node_arch: arm64
             node_os: linux
-    #          - goos: windows
-    #            goarch: amd64
-    #            node_arch: x64
-    #            node_os: win32
-    #          - goos: windows
-    #            goarch: arm64
-    #            node_arch: arm64
-    #            node_os: win32
+          - goos: windows
+            goarch: amd64
+            node_arch: x64
+            node_os: win32
+            runs_on: windows-latest
+          - goos: windows
+            goarch: arm64
+            node_arch: arm64
+            node_os: win32
+            runs_on: windows-latest
     runs-on: ${{ matrix.runs_on }}
     steps:
       - name: Checkout
@@ -211,9 +214,10 @@ jobs:
           node-version: '24'
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: ./.github/actions/setup-go
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache-name: ${{ matrix.node_os }}-${{ matrix.node_arch }}
 
       - name: Install pnpm
         run: corepack enable
