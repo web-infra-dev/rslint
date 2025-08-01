@@ -61,7 +61,7 @@ jobs:
         uses: ./.github/actions/setup-go
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-name: release-go
+          cache-name: linux-x86
 
       - name: Install pnpm
         run: corepack enable
@@ -81,8 +81,8 @@ jobs:
             dirname="${filename%-rslint}"
             target_dir="npm/$dirname"
             mkdir -p "$target_dir"
-            mv "$file" "npm/$dirname/rslint"
-            echo "Moved $file to $target_dir/rslint"
+            cp "$file" "npm/$dirname/rslint"
+            echo "Copy $file to $target_dir/rslint"
           done
 
       - name: Format code
