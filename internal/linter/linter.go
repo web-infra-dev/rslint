@@ -3,6 +3,7 @@ package linter
 import (
 	"context"
 	"strings"
+	"sync/atomic"
 
 	"github.com/typescript-eslint/rslint/internal/rule"
 	"github.com/typescript-eslint/rslint/internal/utils"
@@ -18,9 +19,13 @@ type ConfiguredRule struct {
 	Run      func(ctx rule.RuleContext) rule.RuleListeners
 }
 
-func RunLinter(programs []*compiler.Program, singleThreaded bool, files *[]*ast.SourceFile, getRulesForFile func(sourceFile *ast.SourceFile) []ConfiguredRule, onDiagnostic func(diagnostic rule.RuleDiagnostic)) error {
+// when allowedFiles is passed as nil which means all files are allowed
+// when allowedFiles is passed as slice, only files in the slice are allowed
+func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []*ast.SourceFile, getRulesForFile func(sourceFile *ast.SourceFile) []ConfiguredRule, onDiagnostic func(diagnostic rule.RuleDiagnostic)) (int32, error) {
 
 	wg := core.NewWorkGroup(singleThreaded)
+
+	var lintedFileCount atomic.Int32
 	for _, program := range programs {
 		checker, done := program.GetTypeChecker(context.Background())
 		defer done()
@@ -28,13 +33,27 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, files *[]*ast.
 
 			wg.Queue(func() {
 				for _, file := range program.GetSourceFiles() {
+
 					p := string(file.Path())
 					// skip lint node_modules and bundled files
 					// FIXME: we may have better api to tell whether a file is a bundled file or not
 					if strings.Contains(p, "/node_modules/") || strings.Contains(p, "bundled:") {
 						continue
 					}
-					*files = append(*files, file)
+					// only lint allowedFiles if allowedFiles is not empty
+					if allowFiles != nil {
+						found := false
+						for _, f := range allowFiles {
+							if f.Path() == file.Path() {
+								found = true
+								break
+							}
+						}
+						if !found {
+							continue
+						}
+					}
+					lintedFileCount.Add(1)
 					registeredListeners := make(map[ast.Kind][](func(node *ast.Node)), 20)
 					{
 						rules := getRulesForFile(file)
@@ -186,5 +205,5 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, files *[]*ast.
 
 	}
 	wg.RunAndWait()
-	return nil
+	return lintedFileCount.Load(), nil
 }

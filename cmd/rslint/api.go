@@ -172,9 +172,6 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		programs = append(programs, program)
 	}
 
-	// Find source files from all programs
-	files := []*ast.SourceFile{}
-
 	// Collect diagnostics
 	var diagnostics []api.Diagnostic
 	var diagnosticsLock sync.Mutex
@@ -214,10 +211,10 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	}
 
 	// Run linter
-	err = linter.RunLinter(
+	lintedFilesCount, err := linter.RunLinter(
 		programs,
 		false, // Don't use single-threaded mode for IPC
-		&files,
+		nil,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			return utils.Map(rulesWithOptions, func(r RuleWithOption) linter.ConfiguredRule {
 
@@ -242,7 +239,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	return &api.LintResponse{
 		Diagnostics: diagnostics,
 		ErrorCount:  errorsCount,
-		FileCount:   len(files),
+		FileCount:   int(lintedFilesCount),
 		RuleCount:   len(rulesWithOptions),
 	}, nil
 }

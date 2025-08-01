@@ -362,12 +362,11 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 		defer diagnosticsLock.Unlock()
 		diagnostics = append(diagnostics, d)
 	}
-	files := []*ast.SourceFile{}
 	// Run linter with all programs using rule registry
-	err := linter.RunLinter(
+	_, err := linter.RunLinter(
 		programs,
 		false, // Don't use single-threaded mode for LSP
-		&files,
+		nil,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
 			return activeRules

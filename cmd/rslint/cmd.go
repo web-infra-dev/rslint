@@ -430,8 +430,6 @@ func runCMD() int {
 
 	}
 
-	files := []*ast.SourceFile{}
-
 	var wg sync.WaitGroup
 
 	diagnosticsChan := make(chan rule.RuleDiagnostic, 4096)
@@ -477,10 +475,10 @@ func runCMD() int {
 		}
 	}()
 
-	err = linter.RunLinter(
+	lintedfileCount, err := linter.RunLinter(
 		programs,
 		singleThreaded,
-		&files,
+		nil,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
 			return activeRules
@@ -555,7 +553,7 @@ func runCMD() int {
 	}
 
 	filesText := "files"
-	if len(files) == 1 {
+	if lintedfileCount == 1 {
 		filesText = "file"
 	}
 	threadsCount := 1
@@ -576,7 +574,7 @@ func runCMD() int {
 				warningsColorFunc("%d", warningsCount),
 				warningsText,
 				colors.DimText(""),
-				colors.BoldText("%d", len(files)),
+				colors.BoldText("%d", lintedfileCount),
 				filesText,
 				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
 				colors.BoldText("%d", threadsCount),
@@ -593,7 +591,7 @@ func runCMD() int {
 				warningsColorFunc("%d", warningsCount),
 				warningsText,
 				colors.DimText(""),
-				colors.BoldText("%d", len(files)),
+				colors.BoldText("%d", lintedfileCount),
 				filesText,
 				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
 				colors.BoldText("%d", threadsCount),
