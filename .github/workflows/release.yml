@@ -58,7 +58,7 @@ jobs:
             node_arch: x64
             node_os: linux
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runs_on }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -92,7 +92,8 @@ jobs:
       - name: Move binaries
         run: |
           find ./binaries
-          for file in binaries/*; do
+          for file in binaries/*/*-rslint; do
+            echo "Processing $file"
             filename=$(basename "$file")
             dirname="${filename%-rslint}"
             target_dir="npm/$dirname"
