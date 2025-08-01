@@ -1,7 +1,6 @@
 package consistent_type_assertions
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/microsoft/typescript-go/shim/ast"
