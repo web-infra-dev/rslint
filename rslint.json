@@ -2,7 +2,10 @@
   {
     "language": "javascript", // includes typescript & javascript, we may support register other language in the future
     "files": [], // extra files out of tsconfig.json
-    "ignores": ["node_modules/**"],
+    "ignores": [
+      "node_modules/**",
+      "./packages/rslint-test-tools/tests/**/*.test.ts"
+    ],
     "languageOptions": {
       "parserOptions": {
         // enable project service for typed linting which will run tsgo language service behind the scene
@@ -13,12 +16,14 @@
         "project": [
           "./packages/rslint/tsconfig.build.json",
           "./packages/rslint-test-tools/tsconfig.spec.json",
-          "./packages/vscode-extension/tsconfig.build.json"
+          "./packages/vscode-extension/tsconfig.build.json",
+          "./packages/rule-tester/tsconfig.build.json"
         ]
       }
     },
     "rules": {
-      "@typescript-eslint/promise-function-async": "warn",
+      "@typescript-eslint/non-nullable-type-assertion-style": "warn",
+      "@typescript-eslint/promise-function-async": ["warn"],
       "@typescript-eslint/no-floating-promises": "warn",
       "@typescript-eslint/no-unsafe-return": "warn",
       "@typescript-eslint/return-await": "warn",
@@ -28,7 +33,8 @@
       "@typescript-eslint/no-unsafe-call": "warn",
       "@typescript-eslint/no-confusing-void-expression": "warn",
       "@typescript-eslint/no-redundant-type-constituents": "warn",
-      "@typescript-eslint/no-unsafe-type-assertion": "warn"
+      "@typescript-eslint/no-unsafe-type-assertion": "warn",
+      "@typescript-eslint/no-unsafe-enum-comparison": "warn"
     },
     "plugins": ["@typescript-eslint"]
   }

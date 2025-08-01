@@ -1,23 +1,9 @@
 {
   "extends": ["../../tsconfig.spec.json"],
-  "include": ["tests/**/*.ts", "tests/**/*.d.ts"],
-  "compilerOptions": {},
-  "references": [],
-  "exclude": [
-    "tests/typescript-eslint/rules/consistent-return.test.ts",
-    "tests/typescript-eslint/rules/consistent-type-assertions.test.ts",
-    "tests/typescript-eslint/rules/consistent-type-imports.test.ts",
-    "tests/typescript-eslint/rules/no-duplicate-enum-values.test.ts",
-    "tests/typescript-eslint/rules/no-empty-interface.test.ts",
-    "tests/typescript-eslint/rules/no-empty-object-type.test.ts",
-    "tests/typescript-eslint/rules/no-inferrable-types-simple.test.ts",
-    "tests/typescript-eslint/rules/no-invalid-this.test.ts",
-    "tests/typescript-eslint/rules/no-loop-func.test.ts",
-    "tests/typescript-eslint/rules/no-loss-of-precision.test.ts",
-    "tests/typescript-eslint/rules/no-misused-new.test.ts",
-    "tests/typescript-eslint/rules/no-namespace.test.ts",
-    "tests/typescript-eslint/rules/no-redeclare.test.ts",
-    "tests/typescript-eslint/rules/no-this-alias.test.ts",
-    "tests/typescript-eslint/rules/no-unnecessary-type-constraint.test.ts"
-  ]
+  "include": ["tests/**/*.ts"],
+  "compilerOptions": {
+    "moduleResolution": "bundler",
+    "module": "preserve"
+  },
+  "references": []
 }

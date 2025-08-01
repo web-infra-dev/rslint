@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"slices"
@@ -15,10 +14,50 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
-	ipc "github.com/typescript-eslint/rslint/internal/api"
+	api "github.com/typescript-eslint/rslint/internal/api"
 	rslintconfig "github.com/typescript-eslint/rslint/internal/config"
 	"github.com/typescript-eslint/rslint/internal/linter"
 	"github.com/typescript-eslint/rslint/internal/rule"
+	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
+	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
+	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
+	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_void_expression"
+	"github.com/typescript-eslint/rslint/internal/rules/no_duplicate_type_constituents"
+	"github.com/typescript-eslint/rslint/internal/rules/no_floating_promises"
+	"github.com/typescript-eslint/rslint/internal/rules/no_for_in_array"
+	"github.com/typescript-eslint/rslint/internal/rules/no_implied_eval"
+	"github.com/typescript-eslint/rslint/internal/rules/no_meaningless_void_operator"
+	"github.com/typescript-eslint/rslint/internal/rules/no_misused_promises"
+	"github.com/typescript-eslint/rslint/internal/rules/no_misused_spread"
+	"github.com/typescript-eslint/rslint/internal/rules/no_mixed_enums"
+	"github.com/typescript-eslint/rslint/internal/rules/no_redundant_type_constituents"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_boolean_literal_compare"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_template_expression"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_type_arguments"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_type_assertion"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_argument"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_assignment"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_call"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_enum_comparison"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_member_access"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_return"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_type_assertion"
+	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_unary_minus"
+	"github.com/typescript-eslint/rslint/internal/rules/non_nullable_type_assertion_style"
+	"github.com/typescript-eslint/rslint/internal/rules/only_throw_error"
+	"github.com/typescript-eslint/rslint/internal/rules/prefer_promise_reject_errors"
+	"github.com/typescript-eslint/rslint/internal/rules/prefer_reduce_type_parameter"
+	"github.com/typescript-eslint/rslint/internal/rules/prefer_return_this_type"
+	"github.com/typescript-eslint/rslint/internal/rules/promise_function_async"
+	"github.com/typescript-eslint/rslint/internal/rules/related_getter_setter_pairs"
+	"github.com/typescript-eslint/rslint/internal/rules/require_array_sort_compare"
+	"github.com/typescript-eslint/rslint/internal/rules/require_await"
+	"github.com/typescript-eslint/rslint/internal/rules/restrict_plus_operands"
+	"github.com/typescript-eslint/rslint/internal/rules/restrict_template_expressions"
+	"github.com/typescript-eslint/rslint/internal/rules/return_await"
+	"github.com/typescript-eslint/rslint/internal/rules/switch_exhaustiveness_check"
+	"github.com/typescript-eslint/rslint/internal/rules/unbound_method"
+	"github.com/typescript-eslint/rslint/internal/rules/use_unknown_in_catch_callback_variable"
 	"github.com/typescript-eslint/rslint/internal/utils"
 )
 
@@ -26,7 +65,8 @@ import (
 type IPCHandler struct{}
 
 // HandleLint handles lint requests in IPC mode
-func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) {
+func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) {
+
 	// Format is not used for IPC mode as we return structured data
 	_ = req.Format
 
@@ -55,26 +95,64 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 	rslintconfig.RegisterAllTypeSriptEslintPluginRules()
 
 	// Load rslint configuration and determine which tsconfig files to use
-	config, tsConfigs, configDirectory := rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
+	_, tsConfigs, configDirectory := rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
 
-	// Get rules from request.RuleOptions
-	var rules []rule.Rule
+	// Create rules
+	var origin_rules = []rule.Rule{
+		await_thenable.AwaitThenableRule,
+		no_array_delete.NoArrayDeleteRule,
+		no_base_to_string.NoBaseToStringRule,
+		no_confusing_void_expression.NoConfusingVoidExpressionRule,
+		no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule,
+		no_floating_promises.NoFloatingPromisesRule,
+		no_for_in_array.NoForInArrayRule,
+		no_implied_eval.NoImpliedEvalRule,
+		no_meaningless_void_operator.NoMeaninglessVoidOperatorRule,
+		no_misused_promises.NoMisusedPromisesRule,
+		no_misused_spread.NoMisusedSpreadRule,
+		no_mixed_enums.NoMixedEnumsRule,
+		no_redundant_type_constituents.NoRedundantTypeConstituentsRule,
+		no_unnecessary_boolean_literal_compare.NoUnnecessaryBooleanLiteralCompareRule,
+		no_unnecessary_template_expression.NoUnnecessaryTemplateExpressionRule,
+		no_unnecessary_type_arguments.NoUnnecessaryTypeArgumentsRule,
+		no_unnecessary_type_assertion.NoUnnecessaryTypeAssertionRule,
+		no_unsafe_argument.NoUnsafeArgumentRule,
+		no_unsafe_assignment.NoUnsafeAssignmentRule,
+		no_unsafe_call.NoUnsafeCallRule,
+		no_unsafe_enum_comparison.NoUnsafeEnumComparisonRule,
+		no_unsafe_member_access.NoUnsafeMemberAccessRule,
+		no_unsafe_return.NoUnsafeReturnRule,
+		no_unsafe_type_assertion.NoUnsafeTypeAssertionRule,
+		no_unsafe_unary_minus.NoUnsafeUnaryMinusRule,
+		non_nullable_type_assertion_style.NonNullableTypeAssertionStyleRule,
+		only_throw_error.OnlyThrowErrorRule,
+		prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
+		prefer_reduce_type_parameter.PreferReduceTypeParameterRule,
+		prefer_return_this_type.PreferReturnThisTypeRule,
+		promise_function_async.PromiseFunctionAsyncRule,
+		related_getter_setter_pairs.RelatedGetterSetterPairsRule,
+		require_array_sort_compare.RequireArraySortCompareRule,
+		require_await.RequireAwaitRule,
+		restrict_plus_operands.RestrictPlusOperandsRule,
+		restrict_template_expressions.RestrictTemplateExpressionsRule,
+		return_await.ReturnAwaitRule,
+		switch_exhaustiveness_check.SwitchExhaustivenessCheckRule,
+		unbound_method.UnboundMethodRule,
+		use_unknown_in_catch_callback_variable.UseUnknownInCatchCallbackVariableRule,
+	}
+	type RuleWithOption struct {
+		rule   rule.Rule
+		option interface{}
+	}
+	rulesWithOptions := []RuleWithOption{}
+	// filter rule based on request.RuleOptions
 	if len(req.RuleOptions) > 0 {
-		// Only use the rules specified in the request
-		for ruleName := range req.RuleOptions {
-			if r, exists := rslintconfig.GlobalRuleRegistry.GetRule(ruleName); exists {
-				rules = append(rules, r)
-			}
-		}
-	} else {
-		// If no specific rules requested, use rules from configuration file
-		if len(config) > 0 {
-			for _, configEntry := range config {
-				for ruleName := range configEntry.Rules {
-					if r, exists := rslintconfig.GlobalRuleRegistry.GetRule(ruleName); exists {
-						rules = append(rules, r)
-					}
-				}
+		for _, r := range origin_rules {
+			if option, ok := req.RuleOptions[r.Name]; ok {
+				rulesWithOptions = append(rulesWithOptions, RuleWithOption{
+					rule:   r,
+					option: option,
+				})
 			}
 		}
 	}
@@ -133,12 +211,13 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 	})
 
 	// Collect diagnostics
-	var diagnostics []ipc.Diagnostic
+	var diagnostics []api.Diagnostic
 	var diagnosticsLock sync.Mutex
 	errorsCount := 0
 
 	// Create collector function
 	diagnosticCollector := func(d rule.RuleDiagnostic) {
+
 		diagnosticsLock.Lock()
 		defer diagnosticsLock.Unlock()
 
@@ -148,17 +227,17 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		startLine, startColumn := scanner.GetLineAndCharacterOfPosition(d.SourceFile, diagnosticStart)
 		endLine, endColumn := scanner.GetLineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
 
-		diagnostic := ipc.Diagnostic{
+		diagnostic := api.Diagnostic{
 			RuleName:  d.RuleName,
-			MessageID: d.Message.Id,
+			MessageId: d.Message.Id,
 			Message:   d.Message.Description,
 			FilePath:  tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions),
-			Range: ipc.Range{
-				Start: ipc.Position{
+			Range: api.Range{
+				Start: api.Position{
 					Line:   startLine + 1, // Convert to 1-based indexing
 					Column: startColumn + 1,
 				},
-				End: ipc.Position{
+				End: api.Position{
 					Line:   endLine + 1,
 					Column: endColumn + 1,
 				},
@@ -175,48 +254,12 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 		false, // Don't use single-threaded mode for IPC
 		files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			return utils.Map(rules, func(r rule.Rule) linter.ConfiguredRule {
-				// Get rule options from request if available
-				var ruleOptions interface{}
-				if req.RuleOptions != nil {
-					if opt, ok := req.RuleOptions[r.Name]; ok {
-						// Handle case where options are sent as JSON string
-						if optStr, isString := opt.(string); isString {
-							var parsed interface{}
-							if err := json.Unmarshal([]byte(optStr), &parsed); err == nil {
-								// Successfully parsed JSON string
-								// If it's an array like ["error", {...}], extract the options object
-								if arr, isArray := parsed.([]interface{}); isArray && len(arr) > 1 {
-									ruleOptions = arr[1]
-								} else {
-									ruleOptions = parsed
-								}
-							} else {
-								// If not valid JSON, use the original value
-								ruleOptions = opt
-							}
-						} else {
-							ruleOptions = opt
-						}
-					}
-				} else {
-					// Use rule options from configuration file
-					for _, configEntry := range config {
-						if opt, ok := configEntry.Rules[r.Name]; ok {
-							// Extract options from the rule configuration
-							// Rule config can be "error", ["error", {...}], etc.
-							if arr, isArray := opt.([]interface{}); isArray && len(arr) > 1 {
-								ruleOptions = arr[1]
-							}
-							break
-						}
-					}
-				}
-				
+			return utils.Map(rulesWithOptions, func(r RuleWithOption) linter.ConfiguredRule {
+
 				return linter.ConfiguredRule{
-					Name: r.Name,
+					Name: r.rule.Name,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return r.Run(ctx, ruleOptions)
+						return r.rule.Run(ctx, r.option)
 					},
 				}
 			})
@@ -226,22 +269,23 @@ func (h *IPCHandler) HandleLint(req ipc.LintRequest) (*ipc.LintResponse, error) 
 	if err != nil {
 		return nil, fmt.Errorf("error running linter: %v", err)
 	}
+
 	if diagnostics == nil {
-		diagnostics = []ipc.Diagnostic{}
+		diagnostics = []api.Diagnostic{}
 	}
 	// Create response
-	return &ipc.LintResponse{
+	return &api.LintResponse{
 		Diagnostics: diagnostics,
 		ErrorCount:  errorsCount,
 		FileCount:   len(files),
-		RuleCount:   len(rules),
+		RuleCount:   len(rulesWithOptions),
 	}, nil
 }
 
 // runAPI runs the linter in IPC mode
 func runAPI() int {
 	handler := &IPCHandler{}
-	service := ipc.NewService(os.Stdin, os.Stdout, handler)
+	service := api.NewService(os.Stdin, os.Stdout, handler)
 
 	if err := service.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "error in IPC mode: %v\n", err)

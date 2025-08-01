@@ -315,39 +315,42 @@ Usage:
   rslint [OPTIONS]
 
 Options:
-  --config PATH     Which rslint config file to use. Defaults to rslint.json.
-  --list-files      List matched files
-  --format FORMAT   Output format: default | jsonline
-  --ipc             Run in IPC mode (for JS integration)
-  --no-color        Disable colored output
-  --force-color     Force colored output
-  -h, --help        Show help
+  --config PATH         Which rslint config file to use. Defaults to rslint.json.
+  --format FORMAT       Output format: default | jsonline
+  --fix                 Automatically fix problems
+  --no-color            Disable colored output
+  --force-color         Force colored output
+  --quiet               Report errors only 
+  --max-warnings Int    Number of warnings to trigger nonzero exit code
+  -h, --help            Show help
 `
 
 func runCMD() int {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
 	var (
-		help      bool
-		config    string
-		listFiles bool
+		help   bool
+		config string
+		fix    bool
 
 		traceOut       string
 		cpuprofOut     string
 		singleThreaded bool
 		format         string
-		ipcMode        bool
 		noColor        bool
 		forceColor     bool
+		quiet          bool
+		maxWarnings    int
 	)
 	flag.StringVar(&format, "format", "default", "output format")
 	flag.StringVar(&config, "config", "", "which rslint config to use")
-	flag.BoolVar(&listFiles, "list-files", false, "list matched files")
+	flag.BoolVar(&fix, "fix", false, "automatically fix problems")
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&help, "h", false, "show help")
-	flag.BoolVar(&ipcMode, "ipc", false, "run in IPC mode (for JS integration)")
 	flag.BoolVar(&noColor, "no-color", false, "disable colored output")
 	flag.BoolVar(&forceColor, "force-color", false, "force colored output")
+	flag.BoolVar(&quiet, "quiet", false, "report errors only")
+	flag.IntVar(&maxWarnings, "max-warnings", -1, "Number of warnings to trigger nonzero exit code")
 
 	flag.StringVar(&traceOut, "trace", "", "file to put trace to")
 	flag.StringVar(&cpuprofOut, "cpuprof", "", "file to put cpu profiling to")
@@ -366,11 +369,6 @@ func runCMD() int {
 	}
 	if forceColor {
 		color.NoColor = false
-	}
-
-	// Check if we need to run in IPC mode
-	if ipcMode {
-		return runAPI()
 	}
 
 	enableVirtualTerminalProcessing()
@@ -437,23 +435,14 @@ func runCMD() int {
 	files := []*ast.SourceFile{}
 	for _, program := range programs {
 		cwdPath := string(tspath.ToPath("", currentDirectory, program.Host().FS().UseCaseSensitiveFileNames()).EnsureTrailingDirectorySeparator())
-		var matchedFiles strings.Builder
 		for _, file := range program.SourceFiles() {
 			p := string(file.Path())
 			if strings.Contains(p, "/node_modules/") {
 				continue
 			}
-			if fileName, matched := strings.CutPrefix(p, cwdPath); matched {
-				if listFiles {
-					matchedFiles.WriteString("Found file: ")
-					matchedFiles.WriteString(fileName)
-					matchedFiles.WriteByte('\n')
-				}
+			if _, matched := strings.CutPrefix(p, cwdPath); matched {
 				files = append(files, file)
 			}
-		}
-		if listFiles {
-			os.Stdout.WriteString(matchedFiles.String())
 		}
 		slices.SortFunc(files, func(a *ast.SourceFile, b *ast.SourceFile) int {
 			return len(b.Text()) - len(a.Text())
@@ -465,6 +454,13 @@ func runCMD() int {
 	diagnosticsChan := make(chan rule.RuleDiagnostic, 4096)
 	errorsCount := 0
 	warningsCount := 0
+	fixedCount := 0
+
+	// Store diagnostics by file for fixing
+	var diagnosticsByFile map[string][]rule.RuleDiagnostic
+	if fix {
+		diagnosticsByFile = make(map[string][]rule.RuleDiagnostic)
+	}
 
 	wg.Add(1)
 	go func() {
@@ -477,8 +473,19 @@ func runCMD() int {
 			} else if d.Severity == rule.SeverityWarning {
 				warningsCount++
 			}
+
+			// Store diagnostics by file for fixing
+			if fix {
+				fileName := d.SourceFile.FileName()
+				diagnosticsByFile[fileName] = append(diagnosticsByFile[fileName], d)
+			}
+
 			if errorsCount+warningsCount == 1 {
 				w.WriteByte('\n')
+			}
+			// Only print Error message when quiet is true
+			if quiet && d.Severity != rule.SeverityError {
+				continue
 			}
 			printDiagnostic(d, w, comparePathOptions, format)
 			if w.Available() < 4096 {
@@ -507,6 +514,37 @@ func runCMD() int {
 	}
 
 	wg.Wait()
+
+	// Apply fixes if --fix flag is enabled
+	if fix && len(diagnosticsByFile) > 0 {
+		for fileName, fileDiagnostics := range diagnosticsByFile {
+			// Only apply fixes for diagnostics that have fixes
+			diagnosticsWithFixes := make([]rule.RuleDiagnostic, 0)
+			for _, d := range fileDiagnostics {
+				if len(d.Fixes()) > 0 {
+					diagnosticsWithFixes = append(diagnosticsWithFixes, d)
+				}
+			}
+
+			if len(diagnosticsWithFixes) > 0 {
+				// Read the original file content
+				originalContent := string(diagnosticsWithFixes[0].SourceFile.Text())
+
+				// Apply fixes
+				fixedContent, unapplied, wasFixed := linter.ApplyRuleFixes(originalContent, diagnosticsWithFixes)
+
+				if wasFixed {
+					// Write the fixed content back to the file
+					err := os.WriteFile(fileName, []byte(fixedContent), 0644)
+					if err != nil {
+						fmt.Fprintf(os.Stderr, "error writing fixed file %s: %v\n", fileName, err)
+					} else {
+						fixedCount += len(diagnosticsWithFixes) - len(unapplied)
+					}
+				}
+			}
+		}
+	}
 
 	colors := setupColors()
 	var errorsColorFunc func(string, ...interface{}) string
@@ -542,24 +580,56 @@ func runCMD() int {
 		threadsCount = runtime.GOMAXPROCS(0)
 	}
 	if format == "default" {
-		fmt.Fprintf(
-			os.Stdout,
-			"Found %s %s and %s %s %s(linted %s %s with in %s using %s threads)%s\n",
-			errorsColorFunc("%d", errorsCount),
-			errorsText,
-			warningsColorFunc("%d", warningsCount),
-			warningsText,
-			colors.DimText(""),
-			colors.BoldText("%d", len(files)),
-			filesText,
-			colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
-			colors.BoldText("%d", threadsCount),
-			color.New().SprintFunc()(""), // Reset
-		)
+		if fix && fixedCount > 0 {
+			fixText := "issues"
+			if fixedCount == 1 {
+				fixText = "issue"
+			}
+			fmt.Fprintf(
+				os.Stdout,
+				"Found %s %s and %s %s %s(linted %s %s in %s using %s threads, fixed %s %s)%s\n",
+				errorsColorFunc("%d", errorsCount),
+				errorsText,
+				warningsColorFunc("%d", warningsCount),
+				warningsText,
+				colors.DimText(""),
+				colors.BoldText("%d", len(files)),
+				filesText,
+				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
+				colors.BoldText("%d", threadsCount),
+				colors.SuccessText("%d", fixedCount),
+				fixText,
+				color.New().SprintFunc()(""), // Reset
+			)
+		} else {
+			fmt.Fprintf(
+				os.Stdout,
+				"Found %s %s and %s %s %s(linted %s %s with in %s using %s threads)%s\n",
+				errorsColorFunc("%d", errorsCount),
+				errorsText,
+				warningsColorFunc("%d", warningsCount),
+				warningsText,
+				colors.DimText(""),
+				colors.BoldText("%d", len(files)),
+				filesText,
+				colors.BoldText("%v", time.Since(timeBefore).Round(time.Millisecond)),
+				colors.BoldText("%d", threadsCount),
+				color.New().SprintFunc()(""), // Reset
+			)
+		}
+	}
+
+	tooManyWarnings := false
+	if maxWarnings >= 0 && warningsCount > maxWarnings {
+		tooManyWarnings = true
+	}
+
+	if errorsCount == 0 && tooManyWarnings {
+		fmt.Fprintf(os.Stderr, "Rslint found too many warnings (maximum: %d).\n", maxWarnings)
 	}
 
 	// Exit with non-zero status code if errors were found
-	if errorsCount > 0 {
+	if errorsCount > 0 || tooManyWarnings {
 		return 1
 	}
 	return 0

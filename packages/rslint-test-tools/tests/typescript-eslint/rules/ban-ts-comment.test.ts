@@ -1,4 +1,5 @@
-import { noFormat, RuleTester } from '../RuleTester.ts';
+import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
+import { getFixturesRootDir } from '../RuleTester.ts';
 
 const ruleTester = new RuleTester({});
 

@@ -1,6 +1,6 @@
 {
   "name": "rslint-monorepo",
-  "version": "0.0.20",
+  "version": "0.1.0",
   "private": true,
   "description": "Rslint Monorepo",
   "homepage": "https://github.com/web-infra-dev/rslint#readme",
@@ -16,7 +16,7 @@
     "build": "pnpm -r build",
     "build:npm": "zx scripts/build-npm.mjs",
     "version": "zx scripts/version.mjs",
-    "release": "pnpm publish -r --no-git-checks ",
+    "release": "pnpm publish -r --no-git-checks",
     "publish:vsce": "zx scripts/publish-marketplace.mjs",
     "publish:ovsx": "zx scripts/publish-marketplace.mjs --marketplace=ovsx",
     "format": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --write .",
@@ -24,14 +24,25 @@
     "test": "pnpm -r test",
     "test:go": "go test ./internal/...",
     "typecheck": "pnpm tsc -b tsconfig.json",
-    "lint": "rslint"
+    "lint": "rslint",
+    "prepare": "husky"
   },
   "devDependencies": {
+    "@rslint/core": "workspace:*",
+    "@rstest/core": "^0.0.10",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.2",
     "prettier": "3.5.0",
     "typescript": "5.8.3",
-    "@rslint/core": "workspace:*",
-    "tsx": "^4.20.3",
     "zx": "8.7.1"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "prettier --write"
+    ],
+    "*.{json,css,scss,md,yaml,yml}": [
+      "prettier --write"
+    ]
   },
   "packageManager": "pnpm@10.13.1",
   "engines": {

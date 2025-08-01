@@ -44,8 +44,6 @@ After building, you can test the rslint CLI:
 # Test the binary
 ./packages/rslint/bin/rslint --help
 
-# List files that would be linted
-./packages/rslint/bin/rslint --list-files
 
 # Lint the project itself
 ./packages/rslint/bin/rslint --config rslint.json

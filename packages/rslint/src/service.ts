@@ -18,9 +18,11 @@ export interface Diagnostic {
   ruleName: string;
   messageId?: string;
   message: string;
+  messageId: string;
   filePath: string;
   range: Range;
   severity?: string;
+  suggestions: any[];
 }
 
 export interface LintResponse {
@@ -67,17 +69,18 @@ export class RSLintService {
     this.rslintPath =
       options.rslintPath || path.join(import.meta.dirname, '../bin/rslint');
 
-    this.process = spawn(this.rslintPath, ['--ipc'], {
+    this.process = spawn(this.rslintPath, ['--api'], {
       stdio: ['pipe', 'pipe', 'inherit'],
       cwd: options.workingDirectory || process.cwd(),
       env: {
         ...process.env,
-        RSLINT_IPC: '1', // Alternative way to enable IPC mode
       },
     });
 
     // Set up binary message reading
-    this.process.stdout!.on('data', data => this.handleChunk(data));
+    this.process.stdout!.on('data', data => {
+      this.handleChunk(data);
+    });
     this.chunks = [];
     this.chunkSize = 0;
     this.expectedSize = null;
@@ -107,7 +110,7 @@ export class RSLintService {
   /**
    * Send a message to the rslint process
    */
-  private sendMessage(kind: string, data: any): Promise<any> {
+  private async sendMessage(kind: string, data: any): Promise<any> {
     return new Promise((resolve, reject) => {
       // Check if process is still alive
       if (this.process.killed || this.process.exitCode !== null) {
@@ -243,7 +246,7 @@ export class RSLintService {
     await this.sendMessage('handshake', { version: '1.0.0' });
 
     // Send lint request
-    return await this.sendMessage('lint', {
+    return this.sendMessage('lint', {
       files,
       config,
       workingDirectory,
@@ -256,7 +259,7 @@ export class RSLintService {
   /**
    * Close the rslint process
    */
-  close(): Promise<void> {
+  async close(): Promise<void> {
     return new Promise(resolve => {
       // Set a timeout to force cleanup if the process doesn't respond
       const timeout = setTimeout(() => {

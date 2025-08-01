@@ -54,12 +54,13 @@ type HandshakeResponse struct {
 
 // LintRequest represents a lint request from JS to Go
 type LintRequest struct {
-	Files            []string          `json:"files,omitempty"`
-	Config           string            `json:"config,omitempty"` // Path to rslint.json config file
-	Format           string            `json:"format,omitempty"`
-	WorkingDirectory string            `json:"workingDirectory,omitempty"`
+	Files            []string               `json:"files,omitempty"`
+	Config           string                 `json:"config,omitempty"` // Path to rslint.json config file
+	Format           string                 `json:"format,omitempty"`
+	WorkingDirectory string                 `json:"workingDirectory,omitempty"`
+	// Supports both string level and array [level, options] format
 	RuleOptions      map[string]interface{} `json:"ruleOptions,omitempty"`
-	FileContents     map[string]string `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
+	FileContents     map[string]string      `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
 }
 
 // LintResponse represents a lint response from Go to JS
@@ -90,11 +91,11 @@ type Range struct {
 // Diagnostic represents a single lint diagnostic
 type Diagnostic struct {
 	RuleName  string `json:"ruleName"`
-	MessageID string `json:"messageId,omitempty"`
 	Message   string `json:"message"`
 	FilePath  string `json:"filePath"`
 	Range     Range  `json:"range"`
 	Severity  string `json:"severity,omitempty"`
+	MessageId string `json:"messageId"`
 }
 
 // Handler defines the interface for handling IPC messages
@@ -136,13 +137,6 @@ func (s *Service) readMessage() (*Message, error) {
 	// Unmarshal message
 	var msg Message
 	if err := json.Unmarshal(data, &msg); err != nil {
-		// Debug: log the problematic data for analysis
-		fmt.Fprintf(os.Stderr, "DEBUG: Failed to unmarshal message of length %d\n", len(data))
-		fmt.Fprintf(os.Stderr, "DEBUG: Raw data: %q\n", string(data))
-		if len(data) > 100 {
-			fmt.Fprintf(os.Stderr, "DEBUG: First 100 bytes: %q\n", string(data[:100]))
-			fmt.Fprintf(os.Stderr, "DEBUG: Last 100 bytes: %q\n", string(data[len(data)-100:]))
-		}
 		return nil, fmt.Errorf("failed to unmarshal message: %w", err)
 	}
 

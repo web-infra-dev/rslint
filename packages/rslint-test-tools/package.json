@@ -1,12 +1,12 @@
 {
   "name": "@rslint/test-tools",
-  "version": "0.0.20",
+  "version": "0.1.0",
   "type": "module",
   "main": "src/index.ts",
   "private": true,
   "scripts": {
-    "test": "node --import=tsx/esm --test-force-exit --test-timeout 60000 --test tests/typescript-eslint/rules/*.test.ts",
-    "test:update": "node --import=tsx/esm --test --test-timeout 60000 --test-update-snapshots --test-force-exit tests/typescript-eslint/rules/*.test.ts"
+    "test": "rstest run --testTimeout=0",
+    "test:update": "rstest run -u --testTimeout=0"
   },
   "keywords": [],
   "author": "",
@@ -15,7 +15,7 @@
   "devDependencies": {
     "@types/node": "24.0.14",
     "@rslint/core": "workspace:*",
-    "tsx": "^4.6.0"
+    "@typescript-eslint/rule-tester": "workspace:*"
   },
   "publishConfig": {
     "access": "public"

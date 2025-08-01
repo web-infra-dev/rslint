@@ -48,11 +48,13 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string) []l
 
 		if ruleConfig.IsEnabled() {
 			if ruleImpl, exists := r.rules[ruleName]; exists {
+				// Capture the ruleConfig in the closure to pass options correctly
+				ruleConfigCopy := ruleConfig
 				enabledRules = append(enabledRules, linter.ConfiguredRule{
-					Name:     ruleImpl.Name,
+					Name:     ruleName, // Use the registered rule name, not the implementation name
 					Severity: ruleConfig.GetSeverity(),
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
-						return ruleImpl.Run(ctx, nil)
+						return ruleImpl.Run(ctx, ruleConfigCopy.Options)
 					},
 				})
 			}

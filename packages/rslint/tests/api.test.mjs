@@ -1,10 +1,10 @@
-import { lint, RSLintService } from '@rslint/core';
-import test from 'node:test';
+import { lint } from '@rslint/core';
+import { describe, test, expect } from '@rstest/core';
 import path from 'node:path';
 
-test('lint api', async t => {
+describe('lint api', async t => {
   let cwd = path.resolve(import.meta.dirname, '../fixtures');
-  await t.test('virtual file support', async t => {
+  test('virtual file support', async t => {
     let config = path.resolve(
       import.meta.dirname,
       '../fixtures/rslint.virtual.json',
@@ -14,6 +14,9 @@ test('lint api', async t => {
     const diags = await lint({
       config,
       workingDirectory: cwd,
+      ruleOptions: {
+        'no-unsafe-member-access': 'error',
+      },
       fileContents: {
         [virtual_entry]: `
                     let a:any = 10;
@@ -22,11 +25,17 @@ test('lint api', async t => {
       },
     });
 
-    t.assert.snapshot(diags);
+    expect(diags).toMatchSnapshot();
   });
-  await test('diag snapshot', async t => {
+  test('diag snapshot', async t => {
     let config = path.resolve(import.meta.dirname, '../fixtures/rslint.json');
-    const diags = await lint({ config, workingDirectory: cwd });
-    t.assert.snapshot(diags);
+    const diags = await lint({
+      config,
+      workingDirectory: cwd,
+      ruleOptions: {
+        'no-unsafe-member-access': 'error',
+      },
+    });
+    expect(diags).toMatchSnapshot();
   });
 });

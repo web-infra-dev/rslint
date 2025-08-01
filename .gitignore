@@ -147,6 +147,7 @@ vite.config.ts.timestamp-*
 /rslint
 /bin/rslint
 npm/*/rslint
+npm/*/rslint.exe
 
 # IntelliJ IDEA
 .idea/

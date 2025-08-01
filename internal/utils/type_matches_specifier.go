@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -13,19 +14,56 @@ import (
 
 type TypeOrValueSpecifierFrom uint8
 
+// unmarshal TypeOrValueSpecifierFrom from JSON string
+func (s *TypeOrValueSpecifierFrom) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return fmt.Errorf("failed to unmarshal TypeOrValueSpecifierFrom: %w", err)
+	}
+	switch str {
+	case "file":
+		*s = TypeOrValueSpecifierFromFile
+	case "lib":
+		*s = TypeOrValueSpecifierFromLib
+	case "package":
+		*s = TypeOrValueSpecifierFromPackage
+	default:
+		return fmt.Errorf("unknown TypeOrValueSpecifierFrom value: %s", str)
+	}
+	return nil
+}
+
 const (
 	TypeOrValueSpecifierFromFile TypeOrValueSpecifierFrom = iota
 	TypeOrValueSpecifierFromLib
 	TypeOrValueSpecifierFromPackage
 )
 
+type NameList []string
+
+// unmarshal a string or a list of strings to NameList
+func (s *NameList) UnmarshalJSON(data []byte) error {
+	var singleName string
+	if err := json.Unmarshal(data, &singleName); err == nil {
+		*s = NameList{singleName}
+		return nil
+	}
+
+	var names []string
+	if err := json.Unmarshal(data, &names); err != nil {
+		return fmt.Errorf("failed to unmarshal NameList: %w", err)
+	}
+	*s = names
+	return nil
+}
+
 type TypeOrValueSpecifier struct {
-	From TypeOrValueSpecifierFrom
-	Name []string
+	From TypeOrValueSpecifierFrom `json:"from"`
+	Name NameList                 `json:"name"`
 	// Can be used when From == TypeOrValueSpecifierFromFile
-	Path string
+	Path string `json:"path"`
 	// Can be used when From == TypeOrValueSpecifierFromPackage
-	Package string
+	Package string `json:"package"`
 }
 
 func typeMatchesStringSpecifier(

@@ -9,6 +9,6 @@
       }
     },
     "rules": {},
-    "plugins": ["@typescript-eslint"]
+    "plugins": []
   }
 ]

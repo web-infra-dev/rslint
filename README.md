@@ -14,6 +14,7 @@ Rslint aims to be a drop-in replacement for ESLint and TypeScript-ESLint, just a
 
 ### Goals
 
+- Minimal Migration Cost: Rslint aims to be highly compatible with ESLint and TypeScript-ESLint configurations, significantly reducing the cost of migration.
 - Typed Linting First: We believe typed linting is essential for advanced semantic analysis. Rslint enables typed linting by default and aims to make it effortless to adopt — no complex setup required.
 - TypeScript Semantics as the Single Source of Truth:
   While it’s possible to reimplement TypeScript’s semantics in another language, achieving 100% consistency is extremely difficult and often leads to subtle edge-case bugs—such as discrepancies in resolver behavior, symbol resolution, and project reference support. Rslint avoids these pitfalls by adopting tsgo’s native TypeScript semantics for static analysis, ensuring full alignment and eliminating inconsistencies.
