@@ -1967,7 +1967,7 @@ describe('experimentalDecorators: true + emitDecoratorMetadata: true', () => {
     },
   });
 
-  ruleTester.run('consistent-type-imports', rule, {
+  ruleTester.run('consistent-type-imports', {
     valid: [
       `
         import Foo from 'foo';

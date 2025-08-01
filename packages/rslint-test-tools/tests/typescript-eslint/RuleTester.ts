@@ -15,6 +15,7 @@ import assert from 'node:assert';
 // Add globals for TypeScript-ESLint compatibility
 declare global {
   var AST_NODE_TYPES: any;
+  var AST_TOKEN_TYPES: any;
   var describe: any;
 }
 
@@ -22,6 +23,12 @@ declare global {
 globalThis.AST_NODE_TYPES = {
   ReturnStatement: 'ReturnStatement',
   // Add other node types as needed
+};
+
+// Define AST_TOKEN_TYPES for test compatibility
+globalThis.AST_TOKEN_TYPES = {
+  Identifier: 'Identifier',
+  // Add other token types as needed
 };
 
 // Define describe for test compatibility (no-op implementation)
