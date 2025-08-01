@@ -40,9 +40,24 @@ env:
   GO_VERSION: '1.24.1'
 
 jobs:
-  pre-check:
+  check:
     name: Test
     needs: build
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - goos: darwin
+            runs_on: macos-latest
+            goarch: arm64
+            node_arch: arm64
+            node_os: darwin
+          - goos: linux
+            goarch: amd64
+            runs_on: ubuntu-latest
+            node_arch: x64
+            node_os: linux
+
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -61,7 +76,7 @@ jobs:
         uses: ./.github/actions/setup-go
         with:
           go-version: ${{ env.GO_VERSION }}
-          cache-name: linux-x86
+          cache-name: ${{ matrix.node_os }}-${{ matrix.node_arch }}
 
       - name: Install pnpm
         run: corepack enable
@@ -76,14 +91,16 @@ jobs:
 
       - name: Move binaries
         run: |
+          find ./binaries
           for file in binaries/*; do
             filename=$(basename "$file")
             dirname="${filename%-rslint}"
             target_dir="npm/$dirname"
             mkdir -p "$target_dir"
-            cp "$file" "npm/$dirname/rslint"
             echo "Copy $file to $target_dir/rslint"
+            cp "$file" "npm/$dirname/rslint"
           done
+          find ./npm
 
       - name: Format code
         run: pnpm format:check
@@ -101,7 +118,7 @@ jobs:
 
   publish:
     name: Publish
-    needs: [build, pre-check]
+    needs: [build, check]
     env:
       release_npm: ${{ inputs.to_release == 'all' || inputs.to_release == 'npm' }}
       release_extension: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
