@@ -4,6 +4,7 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -617,7 +618,14 @@ function foo() {
     },
     {
       code: 'const bar = <Foo style={[5] as Bar} />;',
-      languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
+      // @ts-ignore - JSX tests not yet supported
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaFeatures: { jsx: true },
+        },
+      },
       options: [
         {
           arrayLiteralTypeAssertions: 'allow-as-parameter',
@@ -696,7 +704,14 @@ function foo() {
     { code: 'const x = [1] as const;', options: [{ assertionStyle: 'never' }] },
     {
       code: 'const bar = <Foo style={{ bar: 5 } as Bar} />;',
-      languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
+      // @ts-ignore - JSX tests not yet supported
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaFeatures: { jsx: true },
+        },
+      },
       options: [
         {
           assertionStyle: 'as',
@@ -706,10 +721,12 @@ function foo() {
     },
     {
       code: '123;',
+      // @ts-ignore - parser options not yet supported
+      // @ts-ignore
       languageOptions: {
         // simulate a 3rd party parser that doesn't provide parser services
         parser: {
-          parse: (): TSESTree.Program => parser.parse('123;'),
+          parse: (): any => (global as any).parser?.parse('123;'),
         },
       },
     },
@@ -1816,9 +1833,16 @@ function foo() {
     {
       code: 'const foo = <Foo style={{ bar: 5 } as Bar} />;',
       errors: [{ line: 1, messageId: 'never' }],
-      languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },
+      // @ts-ignore - JSX tests not yet supported
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaFeatures: { jsx: true },
+        },
+      },
       options: [{ assertionStyle: 'never' }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'const a = <any>(b, c);',

@@ -4,6 +4,7 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -64,7 +65,7 @@ class Bar {}
           messageId: 'noEmpty',
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: noFormat`interface Foo extends {}`,
@@ -75,7 +76,7 @@ class Bar {}
           messageId: 'noEmpty',
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -123,7 +124,7 @@ class Bar {}
         },
       ],
       options: [{ allowSingleExtends: false }],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -279,9 +280,10 @@ declare module FooBar {
           ],
         },
       ],
+      // @ts-ignore
       filename: 'test.d.ts',
       // output matches input because a suggestion was made
-      output: null,
+      output: null as any,
     },
   ],
 });

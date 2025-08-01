@@ -6,6 +6,7 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 const rootDir = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',

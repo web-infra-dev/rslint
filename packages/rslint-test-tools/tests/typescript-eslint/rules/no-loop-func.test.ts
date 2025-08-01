@@ -4,6 +4,7 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -34,6 +35,7 @@ for (let i = 0; i < 10; i += 1) {
   someArray = someArray.filter((item: MyType) => !!item);
 }
       `,
+      // @ts-ignore
       languageOptions: {
         globals: {
           MyType: 'readonly',
@@ -47,6 +49,7 @@ for (let i = 0; i < 10; i += 1) {
   someArray = someArray.filter((item: MyType) => !!item);
 }
       `,
+      // @ts-ignore
       languageOptions: {
         globals: {
           MyType: 'writable',
@@ -97,7 +100,13 @@ for (var x of xs.filter(function (x) {
 })) {
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
 
     // no refers to variables that declared on upper scope.
@@ -117,7 +126,13 @@ for (var i of {}) {
   (function () {});
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
 
     // functions which are using unmodified variables are OK.
@@ -129,7 +144,13 @@ for (let i = 0; i < l; i++) {
   });
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -140,7 +161,13 @@ for (let i in {}) {
   });
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -150,7 +177,13 @@ for (const i of {}) {
   });
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -159,7 +192,13 @@ for (let i = 0; i < 10; ++i) {
   }
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -170,7 +209,13 @@ for (let i = 0; i < l; i++) {
   });
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -181,7 +226,13 @@ for (let i in {}) {
   });
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -192,7 +243,13 @@ for (let i of {}) {
   });
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -205,7 +262,13 @@ for (let i = 0; i < l; i++) {
   });
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -218,7 +281,13 @@ for (let i in {}) {
   }
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -231,7 +300,13 @@ for (let i of {}) {
   };
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -242,7 +317,13 @@ for (let i = 0; i < l; i++) {
   });
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -253,7 +334,13 @@ for (let i in {}) {
   });
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -264,7 +351,13 @@ for (let i of {}) {
   });
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: [
@@ -277,13 +370,25 @@ for (let i of {}) {
         '}',
         'result.__default = 6;',
       ].join('\n'),
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: ['while (true) {', '    (function() { a; });', '}', 'let a;'].join(
         '\n',
       ),
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     /*
      * These loops _look_ like they might be unsafe, but because i is undeclared, they're fine
@@ -339,7 +444,13 @@ for (var i = 0; i < l; i++) {
   });
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -349,7 +460,13 @@ for (let i = 0; i < l; i++) {
   });
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -360,7 +477,13 @@ for (var i in {}) {
   });
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -371,7 +494,13 @@ for (let i in {}) {
   });
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -381,7 +510,13 @@ for (const i of {}) {
   });
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -390,7 +525,13 @@ for (let i = 0; i < 10; ++i) {
   }
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     // IIFE
     {
@@ -408,7 +549,13 @@ while (current) {
   current = current.upper;
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     `
 for (
@@ -438,7 +585,13 @@ for (var i = 0; i < 10; ++i) {
   })();
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -448,7 +601,13 @@ for (var i = 0; i < 10; ++i) {
   })();
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -457,7 +616,13 @@ for (var i = 0; i < 5; i++) {
   arr.push((f => f)((() => i)()));
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -470,7 +635,13 @@ for (var i = 0; i < 5; i++) {
   );
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
   ],
   invalid: [
@@ -539,7 +710,13 @@ for (var i of {}) {
           type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -556,7 +733,13 @@ for (var i = 0; i < l; i++) {
           type: AST_NODE_TYPES.ArrowFunctionExpression,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -610,7 +793,13 @@ for (let i = 0; i < l; i++) {
           type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -629,7 +818,13 @@ for (let i in {}) {
           type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -648,7 +843,13 @@ a = 1;
           type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -669,7 +870,13 @@ for (let i = 0; i < l; i++) {
           type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -690,7 +897,13 @@ for (let i in {}) {
           type: AST_NODE_TYPES.FunctionDeclaration,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -711,7 +924,13 @@ a = 1;
           type: AST_NODE_TYPES.ArrowFunctionExpression,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -727,7 +946,13 @@ for (var i = 0; i < 10; ++i) {
           type: AST_NODE_TYPES.ArrowFunctionExpression,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -748,7 +973,13 @@ for (let x of xs) {
           type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -767,7 +998,13 @@ for (var x of xs) {
           type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -784,7 +1021,13 @@ for (var x of xs) {
           type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -803,7 +1046,13 @@ for (let x of xs) {
           type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -822,7 +1071,13 @@ for (let x of xs) {
           type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -844,7 +1099,13 @@ foo();
           type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -866,7 +1127,13 @@ foo();
           type: AST_NODE_TYPES.FunctionExpression,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
   ],
 });

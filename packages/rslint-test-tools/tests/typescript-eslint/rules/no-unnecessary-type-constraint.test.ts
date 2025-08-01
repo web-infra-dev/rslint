@@ -4,6 +4,7 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -125,8 +126,10 @@ function data<T extends TODO>() {}
           ],
         },
       ],
+      // @ts-ignore
       languageOptions: {
         parserOptions: {
+          // @ts-ignore
           ecmaFeatures: {
             jsx: true,
           },
@@ -151,6 +154,7 @@ function data<T extends TODO>() {}
           ],
         },
       ],
+      // @ts-ignore
       filename: 'file.mts',
     },
     {
@@ -171,6 +175,7 @@ function data<T extends TODO>() {}
           ],
         },
       ],
+      // @ts-ignore
       filename: 'file.cts',
     },
     {
@@ -191,8 +196,10 @@ function data<T extends TODO>() {}
           ],
         },
       ],
+      // @ts-ignore
       languageOptions: {
         parserOptions: {
+          // @ts-ignore
           ecmaFeatures: {
             jsx: true,
           },
@@ -217,8 +224,10 @@ function data<T extends TODO>() {}
           ],
         },
       ],
+      // @ts-ignore
       languageOptions: {
         parserOptions: {
+          // @ts-ignore
           ecmaFeatures: {
             jsx: true,
           },
@@ -243,8 +252,10 @@ function data<T extends TODO>() {}
           ],
         },
       ],
+      // @ts-ignore
       languageOptions: {
         parserOptions: {
+          // @ts-ignore
           ecmaFeatures: {
             jsx: true,
           },
@@ -269,8 +280,10 @@ function data<T extends TODO>() {}
           ],
         },
       ],
+      // @ts-ignore
       languageOptions: {
         parserOptions: {
+          // @ts-ignore
           ecmaFeatures: {
             jsx: true,
           },
@@ -295,8 +308,10 @@ function data<T extends TODO>() {}
           ],
         },
       ],
+      // @ts-ignore
       languageOptions: {
         parserOptions: {
+          // @ts-ignore
           ecmaFeatures: {
             jsx: true,
           },
@@ -335,8 +350,10 @@ function data<T extends TODO>() {}
           ],
         },
       ],
+      // @ts-ignore
       languageOptions: {
         parserOptions: {
+          // @ts-ignore
           ecmaFeatures: {
             jsx: true,
           },

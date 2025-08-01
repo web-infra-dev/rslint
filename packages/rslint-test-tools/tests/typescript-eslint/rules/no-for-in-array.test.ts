@@ -4,6 +4,7 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 
 const rootDir = getFixturesRootDir();
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -337,6 +338,7 @@ for (const x in arrayLike) {
           messageId: 'forInViolation',
         },
       ],
+      // @ts-ignore
       languageOptions: {
         parserOptions: {
           project: './tsconfig.lib-dom.json',
@@ -362,6 +364,7 @@ for (const x in arrayLike) {
           messageId: 'forInViolation',
         },
       ],
+      // @ts-ignore
       languageOptions: {
         parserOptions: {
           project: './tsconfig.lib-dom.json',

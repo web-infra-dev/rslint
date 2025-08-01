@@ -4,6 +4,7 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -72,11 +73,13 @@ export declare namespace foo {
     },
     {
       code: 'namespace foo {}',
+      // @ts-ignore
       filename: 'test.d.ts',
       options: [{ allowDefinitionFiles: true }],
     },
     {
       code: 'module foo {}',
+      // @ts-ignore
       filename: 'test.d.ts',
       options: [{ allowDefinitionFiles: true }],
     },
@@ -197,6 +200,7 @@ export declare namespace foo {
           messageId: 'moduleSyntaxIsPreferred',
         },
       ],
+      // @ts-ignore
       filename: 'test.d.ts',
       options: [{ allowDefinitionFiles: false }],
     },
@@ -209,6 +213,7 @@ export declare namespace foo {
           messageId: 'moduleSyntaxIsPreferred',
         },
       ],
+      // @ts-ignore
       filename: 'test.d.ts',
       options: [{ allowDefinitionFiles: false }],
     },
@@ -221,6 +226,7 @@ export declare namespace foo {
           messageId: 'moduleSyntaxIsPreferred',
         },
       ],
+      // @ts-ignore
       filename: 'test.d.ts',
       options: [{ allowDefinitionFiles: false }],
     },
@@ -233,6 +239,7 @@ export declare namespace foo {
           messageId: 'moduleSyntaxIsPreferred',
         },
       ],
+      // @ts-ignore
       filename: 'test.d.ts',
       options: [{ allowDefinitionFiles: false }],
     },

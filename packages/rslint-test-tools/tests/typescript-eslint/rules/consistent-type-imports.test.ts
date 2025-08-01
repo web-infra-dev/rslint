@@ -20,10 +20,12 @@ const PARSER_OPTION_COMBOS = [
 
 describe.for(PARSER_OPTION_COMBOS)(
   'experimentalDecorators: $experimentalDecorators + emitDecoratorMetadata: $emitDecoratorMetadata',
-  parserOptions => {
+  (parserOptions: any) => {
     const ruleTester = new RuleTester({
+      // @ts-ignore
       languageOptions: {
         parserOptions: {
+          // @ts-ignore
           ...parserOptions,
           project: './tsconfig.json',
           tsconfigRootDir: rootPath,
@@ -298,8 +300,11 @@ export const ComponentFoo: React.FC = () => {
   return <div>Foo Foo</div>;
 };
           `,
+          // @ts-ignore
           languageOptions: {
             parserOptions: {
+              // @ts-ignore
+              // @ts-ignore
               ecmaFeatures: {
                 jsx: true,
               },
@@ -314,8 +319,11 @@ export const ComponentFoo: h.FC = () => {
   return <div>Foo Foo</div>;
 };
           `,
+          // @ts-ignore
           languageOptions: {
             parserOptions: {
+              // @ts-ignore
+              // @ts-ignore
               ecmaFeatures: {
                 jsx: true,
               },
@@ -331,8 +339,11 @@ export const ComponentFoo: Fragment = () => {
   return <>Foo Foo</>;
 };
           `,
+          // @ts-ignore
           languageOptions: {
             parserOptions: {
+              // @ts-ignore
+              // @ts-ignore
               ecmaFeatures: {
                 jsx: true,
               },
@@ -907,7 +918,7 @@ let bar: import('foo').Bar;
               messageId: 'noImportTypeAnnotations',
             },
           ],
-          output: null,
+          output: null as any,
         },
         {
           code: `
@@ -920,7 +931,7 @@ let foo: import('foo');
             },
           ],
           options: [{ prefer: 'type-imports' }],
-          output: null,
+          output: null as any,
         },
         {
           code: `
@@ -1960,8 +1971,10 @@ function test(foo: Foo) {}
 // the special ignored config case
 describe('experimentalDecorators: true + emitDecoratorMetadata: true', () => {
   const ruleTester = new RuleTester({
+    // @ts-ignore
     languageOptions: {
       parserOptions: {
+        // @ts-ignore
         emitDecoratorMetadata: true,
         experimentalDecorators: true,
       },

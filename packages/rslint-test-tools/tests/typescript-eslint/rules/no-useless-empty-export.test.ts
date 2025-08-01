@@ -6,8 +6,10 @@ const rootPath = getFixturesRootDir();
 /* eslint "@typescript-eslint/internal/plugin-test-formatting": ["error", { formatWithPrettier: false }] */
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
+      // @ts-ignore
       ecmaVersion: 2020,
       sourceType: 'module',
     },
@@ -43,6 +45,7 @@ ruleTester.run('no-useless-empty-export', {
         export type A = 1;
         export {};
       `,
+      // @ts-ignore
       filename: 'foo.d.ts',
     },
     {
@@ -50,6 +53,7 @@ ruleTester.run('no-useless-empty-export', {
         export declare const a = 2;
         export {};
       `,
+      // @ts-ignore
       filename: 'foo.d.ts',
     },
     {
@@ -57,6 +61,7 @@ ruleTester.run('no-useless-empty-export', {
         import type { A } from '_';
         export {};
       `,
+      // @ts-ignore
       filename: 'foo.d.ts',
     },
     {
@@ -64,6 +69,7 @@ ruleTester.run('no-useless-empty-export', {
         import { A } from '_';
         export {};
       `,
+      // @ts-ignore
       filename: 'foo.d.ts',
     },
   ],

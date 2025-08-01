@@ -4,6 +4,7 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -35,7 +36,7 @@ ruleTester.run('no-unsafe-function-type', {
           messageId: 'bannedFunctionType',
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: Function[];',
@@ -46,7 +47,7 @@ ruleTester.run('no-unsafe-function-type', {
           messageId: 'bannedFunctionType',
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: Function | number;',
@@ -57,7 +58,7 @@ ruleTester.run('no-unsafe-function-type', {
           messageId: 'bannedFunctionType',
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -72,7 +73,7 @@ ruleTester.run('no-unsafe-function-type', {
           messageId: 'bannedFunctionType',
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -87,7 +88,7 @@ ruleTester.run('no-unsafe-function-type', {
           messageId: 'bannedFunctionType',
         },
       ],
-      output: null,
+      output: null as any,
     },
   ],
 });

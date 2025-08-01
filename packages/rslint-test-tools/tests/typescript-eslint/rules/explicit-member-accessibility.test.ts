@@ -4,6 +4,7 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -393,7 +394,7 @@ export class XXXX {
           },
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -440,7 +441,7 @@ export class WithParameterProperty {
         },
       ],
       options: [{ accessibility: 'explicit' }],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -495,7 +496,7 @@ export class XXXX {
           },
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -547,7 +548,7 @@ class Test {
           overrides: { parameterProperties: 'explicit' },
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -612,7 +613,7 @@ class Test {
           ],
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -674,7 +675,7 @@ class Test {
           ],
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -785,7 +786,7 @@ class Test {
           ],
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -1034,7 +1035,7 @@ class Test {
         },
       ],
       options: [{ overrides: { constructors: 'no-public' } }],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -1242,7 +1243,7 @@ class Test {
           ],
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -1305,7 +1306,7 @@ class Test {
           overrides: { parameterProperties: 'no-public' },
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -1351,7 +1352,7 @@ class Test {
           ],
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -1430,7 +1431,7 @@ class Test {
           overrides: { properties: 'explicit' },
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -1506,7 +1507,7 @@ class Test {
         },
       ],
       options: [{ accessibility: 'explicit' }],
-      output: null,
+      output: null as any,
     },
     {
       code: noFormat`
@@ -1834,7 +1835,7 @@ abstract class SomeClass {
         },
       ],
       options: [{ accessibility: 'explicit' }],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -1909,7 +1910,7 @@ abstract class SomeClass {
         },
       ],
       options: [{ accessibility: 'explicit' }],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -2482,7 +2483,7 @@ class DecoratedClass {
           ],
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -2529,7 +2530,7 @@ abstract class SomeClass {
         },
       ],
       options: [{ accessibility: 'explicit' }],
-      output: null,
+      output: null as any,
     },
   ],
 });

@@ -4,6 +4,7 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -134,7 +135,7 @@ ruleTester.run('prefer-as-const', {
           ],
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: "let foo: 'bar' = 'bar';",
@@ -151,7 +152,7 @@ ruleTester.run('prefer-as-const', {
           ],
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let foo: 2 = 2;',
@@ -168,7 +169,7 @@ ruleTester.run('prefer-as-const', {
           ],
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: "let foo: 'bar' = 'bar' as 'bar';",
@@ -248,7 +249,7 @@ class foo {
           ],
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -273,7 +274,7 @@ class foo {
           ],
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: `

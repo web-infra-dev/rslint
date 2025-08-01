@@ -17,6 +17,7 @@ const arrayDestructureError = {
 };
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',

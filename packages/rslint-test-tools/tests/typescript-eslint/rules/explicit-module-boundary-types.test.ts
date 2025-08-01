@@ -4,6 +4,7 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -510,8 +511,10 @@ export const Foo: FC = () => (
   <div a={e => {}} b={function (e) {}} c={function foo(e) {}}></div>
 );
       `,
+      // @ts-ignore
       languageOptions: {
         parserOptions: {
+          // @ts-ignore
           ecmaFeatures: { jsx: true },
         },
       },
@@ -522,8 +525,10 @@ export const Foo: JSX.Element = (
   <div a={e => {}} b={function (e) {}} c={function foo(e) {}}></div>
 );
       `,
+      // @ts-ignore
       languageOptions: {
         parserOptions: {
+          // @ts-ignore
           ecmaFeatures: { jsx: true },
         },
       },

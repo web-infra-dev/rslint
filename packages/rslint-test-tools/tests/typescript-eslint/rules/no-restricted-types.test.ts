@@ -4,6 +4,7 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -56,7 +57,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { bigint: 'Use Ok instead.' } }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: boolean;',
@@ -72,7 +73,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { boolean: 'Use Ok instead.' } }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: never;',
@@ -88,7 +89,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { never: 'Use Ok instead.' } }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: null;',
@@ -104,7 +105,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { null: 'Use Ok instead.' } }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: number;',
@@ -120,7 +121,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { number: 'Use Ok instead.' } }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: object;',
@@ -136,7 +137,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { object: 'Use Ok instead.' } }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: string;',
@@ -152,7 +153,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { string: 'Use Ok instead.' } }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: symbol;',
@@ -168,7 +169,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { symbol: 'Use Ok instead.' } }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: undefined;',
@@ -184,7 +185,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { undefined: 'Use Ok instead.' } }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: unknown;',
@@ -200,7 +201,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { unknown: 'Use Ok instead.' } }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: void;',
@@ -216,7 +217,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { void: 'Use Ok instead.' } }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: [];',
@@ -232,7 +233,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { '[]': 'Use unknown[] instead.' } }],
-      output: null,
+      output: null as any,
     },
     {
       code: noFormat`let value: [  ];`,
@@ -248,7 +249,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { '[]': 'Use unknown[] instead.' } }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: [[]];',
@@ -264,7 +265,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { '[]': 'Use unknown[] instead.' } }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: Banned;',
@@ -280,7 +281,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { Banned: true } }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: Banned;',
@@ -296,7 +297,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { Banned: "Use '{}' instead." } }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: Banned[];',
@@ -312,7 +313,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { Banned: "Use '{}' instead." } }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: [Banned];',
@@ -328,7 +329,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { Banned: "Use '{}' instead." } }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let value: Banned;',
@@ -344,7 +345,7 @@ ruleTester.run('no-restricted-types', {
         },
       ],
       options: [{ types: { Banned: '' } }],
-      output: null,
+      output: null as any,
     },
     {
       code: 'let b: { c: Banned };',
@@ -606,7 +607,7 @@ ruleTester.run('no-restricted-types', {
           },
         },
       ],
-      output: null,
+      output: null as any,
     },
     {
       code: noFormat`type Intersection = Banned<A,B>;`,
@@ -628,7 +629,7 @@ ruleTester.run('no-restricted-types', {
           },
         },
       ],
-      output: null,
+      output: null as any,
     },
   ],
 });

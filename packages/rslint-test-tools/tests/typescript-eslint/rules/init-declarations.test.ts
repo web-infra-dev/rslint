@@ -4,6 +4,7 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -40,16 +41,34 @@ for (var foo in []) {
 for (var foo of []) {
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: 'let a = true;',
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
       options: ['always'],
     },
     {
       code: 'const a = {};',
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
       options: ['always'],
     },
     {
@@ -63,7 +82,13 @@ function foo() {
   }
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
       options: ['always'],
     },
     {
@@ -77,7 +102,13 @@ function foo() {
   }
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
       options: ['always'],
     },
     {
@@ -88,17 +119,35 @@ function foo() {
   var c = true;
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
       options: ['always'],
     },
     {
       code: 'var foo;',
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
       options: ['never'],
     },
     {
       code: 'var foo, bar, baz;',
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
       options: ['never'],
     },
     {
@@ -108,17 +157,35 @@ function foo() {
   var bar;
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
       options: ['never'],
     },
     {
       code: 'let a;',
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
       options: ['never'],
     },
     {
       code: 'const a = 1;',
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
       options: ['never'],
     },
     {
@@ -130,7 +197,13 @@ function foo() {
   }
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
       options: ['never'],
     },
     {
@@ -144,7 +217,13 @@ function foo() {
   }
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
       options: ['never'],
     },
     {
@@ -155,7 +234,13 @@ function foo() {
   var c;
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
       options: ['never'],
     },
     {
@@ -174,7 +259,13 @@ for (var foo in []) {
 for (var foo of []) {
 }
       `,
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
       options: ['never', { ignoreForLoopInit: true }],
     },
     {

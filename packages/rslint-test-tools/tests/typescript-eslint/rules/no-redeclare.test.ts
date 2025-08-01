@@ -4,8 +4,10 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
+      // @ts-ignore
       ecmaVersion: 6,
       sourceType: 'script',
     },
@@ -32,8 +34,10 @@ if (true) {
   let b = 3;
 }
       `,
+      // @ts-ignore
       languageOptions: {
         parserOptions: {
+          // @ts-ignore
           ecmaVersion: 6,
         },
       },
@@ -41,13 +45,18 @@ if (true) {
     { code: 'var Object = 0;', options: [{ builtinGlobals: false }] },
     {
       code: 'var Object = 0;',
+      // @ts-ignore
       languageOptions: { parserOptions: { sourceType: 'module' } },
       options: [{ builtinGlobals: true }],
     },
     {
       code: 'var Object = 0;',
+      // @ts-ignore
       languageOptions: {
-        parserOptions: { ecmaFeatures: { globalReturn: true } },
+        parserOptions: {
+          // @ts-ignore
+          ecmaFeatures: { globalReturn: true },
+        },
       },
       options: [{ builtinGlobals: true }],
     },
@@ -58,13 +67,18 @@ if (true) {
     { code: 'var top = 0;', options: [{ builtinGlobals: true }] },
     {
       code: 'var top = 0;',
+      // @ts-ignore
       languageOptions: {
-        parserOptions: { ecmaFeatures: { globalReturn: true } },
+        parserOptions: {
+          // @ts-ignore
+          ecmaFeatures: { globalReturn: true },
+        },
       },
       options: [{ builtinGlobals: true }],
     },
     {
       code: 'var top = 0;',
+      // @ts-ignore
       languageOptions: { parserOptions: { sourceType: 'module' } },
       options: [{ builtinGlobals: true }],
     },
@@ -158,7 +172,13 @@ var a = 10;
           type: AST_NODE_TYPES.Identifier,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
     },
     {
       code: `
@@ -306,6 +326,7 @@ var a;
           type: AST_NODE_TYPES.Identifier,
         },
       ],
+      // @ts-ignore
       languageOptions: { parserOptions: { sourceType: 'module' } },
     },
     {
@@ -322,6 +343,7 @@ var a;
           type: AST_NODE_TYPES.Identifier,
         },
       ],
+      // @ts-ignore
       languageOptions: { parserOptions: { sourceType: 'module' } },
     },
     {
@@ -348,6 +370,7 @@ var a;
           type: AST_NODE_TYPES.Identifier,
         },
       ],
+      // @ts-ignore
       languageOptions: {
         globals: { top: 'readonly' },
       },
@@ -374,25 +397,12 @@ var { a = 0, b: Object = 0 } = {};
           type: AST_NODE_TYPES.Identifier,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
-      options: [{ builtinGlobals: true }],
-    },
-    {
-      code: `
-var a;
-var { a = 0, b: Object = 0 } = {};
-      `,
-      errors: [
-        {
-          data: {
-            id: 'a',
-          },
-          messageId: 'redeclared',
-          type: AST_NODE_TYPES.Identifier,
-        },
-      ],
+      // @ts-ignore
       languageOptions: {
-        parserOptions: { ecmaVersion: 6, sourceType: 'module' },
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
       },
       options: [{ builtinGlobals: true }],
     },
@@ -410,8 +420,13 @@ var { a = 0, b: Object = 0 } = {};
           type: AST_NODE_TYPES.Identifier,
         },
       ],
+      // @ts-ignore
       languageOptions: {
-        parserOptions: { ecmaFeatures: { globalReturn: true }, ecmaVersion: 6 },
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+          sourceType: 'module',
+        },
       },
       options: [{ builtinGlobals: true }],
     },
@@ -429,7 +444,37 @@ var { a = 0, b: Object = 0 } = {};
           type: AST_NODE_TYPES.Identifier,
         },
       ],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaFeatures: { globalReturn: true }, // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
+      options: [{ builtinGlobals: true }],
+    },
+    {
+      code: `
+var a;
+var { a = 0, b: Object = 0 } = {};
+      `,
+      errors: [
+        {
+          data: {
+            id: 'a',
+          },
+          messageId: 'redeclared',
+          type: AST_NODE_TYPES.Identifier,
+        },
+      ],
+      // @ts-ignore
+      languageOptions: {
+        parserOptions: {
+          // @ts-ignore
+          ecmaVersion: 6,
+        },
+      },
       options: [{ builtinGlobals: false }],
     },
 
@@ -475,6 +520,7 @@ type NodeListOf = 1;
           messageId: 'redeclaredAsBuiltin',
         },
       ],
+      // @ts-ignore
       languageOptions: {
         parserOptions: {
           lib: ['dom'],

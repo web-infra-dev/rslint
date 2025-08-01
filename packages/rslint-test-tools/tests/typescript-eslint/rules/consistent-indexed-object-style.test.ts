@@ -4,6 +4,7 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -373,7 +374,7 @@ interface B extends A {
 }
       `,
       errors: [{ column: 1, line: 2, messageId: 'preferRecord' }],
-      output: null,
+      output: null as any,
     },
     // Readonly interface with generic parameter
     {

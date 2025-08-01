@@ -4,6 +4,7 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -462,8 +463,10 @@ console.log(this);
 z(x => console.log(x, this));
       `,
       errors,
+      // @ts-ignore
       languageOptions: {
         parserOptions: {
+          // @ts-ignore
           ecmaFeatures: { globalReturn: true },
         },
       },
@@ -539,8 +542,10 @@ return function () {
 };
       `,
       errors,
+      // @ts-ignore
       languageOptions: {
         parserOptions: {
+          // @ts-ignore
           ecmaFeatures: { globalReturn: true },
         },
       },

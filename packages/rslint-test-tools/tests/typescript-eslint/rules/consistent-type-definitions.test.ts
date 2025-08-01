@@ -4,6 +4,7 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -280,7 +281,7 @@ declare global {
         },
       ],
       options: ['type'],
-      output: null,
+      output: null as any,
     },
     {
       code: `
@@ -298,7 +299,7 @@ declare global {
         },
       ],
       options: ['type'],
-      output: null,
+      output: null as any,
     },
     {
       // https://github.com/typescript-eslint/typescript-eslint/issues/3894
