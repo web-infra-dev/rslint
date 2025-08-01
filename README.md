@@ -64,7 +64,10 @@ Rslint has been inspired by several outstanding projects in the community. We wo
 
 - [@auvred](https://github.com/auvred) - The original author of [tsgolint](https://github.com/typescript-eslint/tsgolint), from which Rslint is forked. We are deeply grateful for his pioneering work and innovative approach to TypeScript linting.
 - [@JamesHenry](https://github.com/JamesHenry) - The creator of [typescript-eslint](https://github.com/typescript-eslint/typescript-eslint), who has provided valuable guidance and suggestions for Rslint's development.
+
 - The [typescript-eslint](https://github.com/typescript-eslint) team - Rslint's configuration design and test cases have been significantly influenced by and adapted from typescript-eslint's excellent implementation.
+
+- The [ESLint](https://github.com/eslint/eslint) team - Rslint builds upon the foundational work of ESLint, the pioneering JavaScript linter that established the standards and patterns for static code analysis in the JavaScript ecosystem.
 
 ## 📖 License
 
