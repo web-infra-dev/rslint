@@ -76,12 +76,12 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 		program, err := utils.CreateProgram(true, fs, rootDir, tsconfigPath, host)
 		assert.NilError(t, err, "couldn't create program. code: "+code)
 
-		files := []*ast.SourceFile{program.GetSourceFile(fileName)}
+		files := []*ast.SourceFile{}
 
 		err = linter.RunLinter(
 			[]*compiler.Program{program},
 			true,
-			files,
+			&files,
 			func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 				return []linter.ConfiguredRule{
 					{
