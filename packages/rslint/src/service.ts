@@ -16,9 +16,8 @@ interface Range {
 
 export interface Diagnostic {
   ruleName: string;
-  messageId?: string;
-  message: string;
   messageId: string;
+  message: string;
   filePath: string;
   range: Range;
   severity?: string;

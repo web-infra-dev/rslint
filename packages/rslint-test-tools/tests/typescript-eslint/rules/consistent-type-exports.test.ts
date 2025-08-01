@@ -1,4 +1,5 @@
-import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
+import { getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
 /* eslint-disable @typescript-eslint/internal/plugin-test-formatting -- Prettier doesn't yet support TS 5.6 string literal module identifiers */

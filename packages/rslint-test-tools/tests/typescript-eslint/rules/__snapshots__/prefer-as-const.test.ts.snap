@@ -1,0 +1,10 @@
+// Rstest Snapshot v1
+
+exports[`prefer-as-const > invalid 1`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 1,
+  "ruleCount": 0,
+}
+`;

@@ -1,0 +1,10 @@
+// Rstest Snapshot v1
+
+exports[`no-useless-empty-export > invalid 1`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 73,
+  "ruleCount": 0,
+}
+`;

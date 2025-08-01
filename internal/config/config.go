@@ -269,13 +269,9 @@ func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConf
 
 		if matches {
 
-			/// Merge rules from plugin
-			for _, plugin := range entry.Plugins {
-
-				for _, rule := range GetAllRulesForPlugin(plugin) {
-					enabledRules[rule.Name] = &RuleConfig{Level: "error"} // Default level for plugin rules
-				}
-			}
+			/// Make rules from plugin available (but don't auto-enable them)
+			// Plugin specification should only make rules available, not automatically enable them.
+			// Rules are only enabled if explicitly configured in the "rules" section.
 			// Merge rules from this entry
 			for ruleName, ruleValue := range entry.Rules {
 

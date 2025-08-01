@@ -99,7 +99,10 @@ export class RuleTester {
       let cwd =
         this.options.languageOptions?.parserOptions?.tsconfigRootDir ||
         process.cwd();
-      const config = path.resolve(cwd, './rslint.json');
+      // Always use the absolute path to the project root's rslint.json
+      // The project root is determined by looking for the location of this file
+      const projectRoot = path.resolve(import.meta.dirname, '../../..');
+      const config = path.resolve(projectRoot, 'rslint.json');
       let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
       // test whether case has only
       let hasOnly =
@@ -141,9 +144,10 @@ export class RuleTester {
               }
             }
           }
+          // Use the existing project config with virtual file content
           const diags = await lint({
             config,
-            workingDirectory: cwd,
+            workingDirectory: projectRoot,
             fileContents: {
               [virtual_entry]: code,
             },
@@ -173,9 +177,10 @@ export class RuleTester {
           if (hasOnly && !only) {
             continue;
           }
+          // Use the existing project config with virtual file content
           const diags = await lint({
             config,
-            workingDirectory: cwd,
+            workingDirectory: projectRoot,
             fileContents: {
               [virtual_entry]: code,
             },

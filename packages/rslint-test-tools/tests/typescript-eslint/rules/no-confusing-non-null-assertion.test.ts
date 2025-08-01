@@ -1,4 +1,5 @@
-import { noFormat, RuleTester, getFixturesRootDir } from '../RuleTester.ts';
+import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
+import { getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
 // this rule enforces adding parens, which prettier will want to fix and break the tests
