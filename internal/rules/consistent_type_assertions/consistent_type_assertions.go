@@ -24,14 +24,14 @@ var defaultOptions = Options{
 
 func buildAngleBracketMessage(cast string) rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "angle-bracket",
+		Id:          "as-assertion",
 		Description: fmt.Sprintf("Use '<%s>' instead of 'as %s'.", cast, cast),
 	}
 }
 
 func buildAsMessage(cast string) rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "as",
+		Id:          "angle-bracket-assertion",
 		Description: fmt.Sprintf("Use 'as %s' instead of '<%s>'.", cast, cast),
 	}
 }
