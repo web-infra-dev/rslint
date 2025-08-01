@@ -1,1 +1,1 @@
-const x = "foo" as const;
+const x = 'foo' as const;
