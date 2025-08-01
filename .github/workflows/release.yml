@@ -60,9 +60,10 @@ jobs:
           node-version: '24'
 
       - name: Setup Go
-        uses: actions/setup-go@v5
+        uses: ./.github/actions/setup-go
         with:
           go-version: ${{ env.GO_VERSION }}
+          cache-name: release-go
 
       - name: Install pnpm
         run: corepack enable
