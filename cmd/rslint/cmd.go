@@ -10,9 +10,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"runtime/trace"
-	"slices"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 	"unicode"
@@ -433,21 +431,6 @@ func runCMD() int {
 	}
 
 	files := []*ast.SourceFile{}
-	for _, program := range programs {
-		cwdPath := string(tspath.ToPath("", currentDirectory, program.Host().FS().UseCaseSensitiveFileNames()).EnsureTrailingDirectorySeparator())
-		for _, file := range program.SourceFiles() {
-			p := string(file.Path())
-			if strings.Contains(p, "/node_modules/") {
-				continue
-			}
-			if _, matched := strings.CutPrefix(p, cwdPath); matched {
-				files = append(files, file)
-			}
-		}
-		slices.SortFunc(files, func(a *ast.SourceFile, b *ast.SourceFile) int {
-			return len(b.Text()) - len(a.Text())
-		})
-	}
 
 	var wg sync.WaitGroup
 
@@ -497,7 +480,7 @@ func runCMD() int {
 	err = linter.RunLinter(
 		programs,
 		singleThreaded,
-		files,
+		&files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
 			return activeRules

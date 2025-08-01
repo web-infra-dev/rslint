@@ -252,7 +252,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	err = linter.RunLinter(
 		programs,
 		false, // Don't use single-threaded mode for IPC
-		files,
+		&files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			return utils.Map(rulesWithOptions, func(r RuleWithOption) linter.ConfiguredRule {
 

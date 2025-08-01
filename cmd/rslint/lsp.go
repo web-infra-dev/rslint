@@ -390,7 +390,7 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 	err := linter.RunLinter(
 		programs,
 		false, // Don't use single-threaded mode for LSP
-		files,
+		&files,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
 			return activeRules
