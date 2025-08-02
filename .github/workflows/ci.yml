@@ -14,7 +14,7 @@ env:
 jobs:
   test-go:
     name: Test Go
-    runs-on: ubuntu-latest
+    runs-on: rspack-ubuntu-22.04-large
     strategy:
       matrix:
         go-version: ['1.24.1']
@@ -35,7 +35,7 @@ jobs:
 
   test-node:
     name: Test npm packages
-    runs-on: ubuntu-latest
+    runs-on: rspack-ubuntu-22.04-large
     strategy:
       matrix:
         go-version: ['1.24.1']
@@ -69,6 +69,12 @@ jobs:
       - name: TypeCheck
         run: pnpm typecheck
 
+      - name: Install xvfb and dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libxss1 libgtk-3-0 libgconf-2-4 libnss3 libxrandr2 libasound2 libpangocairo-1.0-0 libatk1.0-0 libcairo-gobject2 libgtk-3-0 libgdk-pixbuf2.0-0
+
       - name: Test on Linux
         if: runner.os == 'Linux'
         run: xvfb-run -a pnpm -r test
@@ -85,7 +91,7 @@ jobs:
       - test-go
       - test-node
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: rspack-ubuntu-22.04-large
     name: CI Done
     steps:
       - run: exit 1
