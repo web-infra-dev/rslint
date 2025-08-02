@@ -5,7 +5,6 @@ import (
 	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -549,61 +548,78 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 
 			// Simple check for return type
 			if !hasReturnType(node) {
-				// Calculate correct position for TypeScript-ESLint compatibility
-				var reportRange core.TextRange
+				// Report at specific sub-elements for better position accuracy
 				switch node.Kind {
 				case ast.KindFunctionDeclaration:
-					// For "export function test", report at "function" keyword (column 8)
-					// Look for the function keyword position
-					text := string(ctx.SourceFile.Text())
-					pos := node.Pos()
-					// Find "function" keyword
-					for i := pos; i < len(text)-8; i++ {
-						if text[i:i+8] == "function" {
-							reportRange = core.NewTextRange(i, i+8)
-							break
-						}
-					}
-					if reportRange.End() == 0 {
-						reportRange = core.NewTextRange(node.Pos(), node.Pos())
+					// For function declarations, report at the function name if available
+					funcDecl := node.AsFunctionDeclaration()
+					if funcDecl.Name() != nil {
+						ctx.ReportNode(funcDecl.Name(), buildMissingReturnTypeMessage())
+					} else {
+						ctx.ReportNode(node, buildMissingReturnTypeMessage())
 					}
 				case ast.KindFunctionExpression:
-					// For "= function ()", report at "function" keyword (column 17 in test)
-					text := string(ctx.SourceFile.Text())
-					pos := node.Pos()
-					// Find "function" keyword  
-					for i := pos; i < len(text)-8; i++ {
-						if text[i:i+8] == "function" {
-							reportRange = core.NewTextRange(i, i+8)
-							break
+					// For function expressions, try to find a good reporting position
+					// Check if it's in a variable declaration to report at the variable name
+					parent := node.Parent
+					if parent != nil && parent.Kind == ast.KindVariableDeclaration {
+						varDecl := parent.AsVariableDeclaration()
+						if varDecl.Name() != nil {
+							ctx.ReportNode(varDecl.Name(), buildMissingReturnTypeMessage())
+						} else {
+							ctx.ReportNode(node, buildMissingReturnTypeMessage())
 						}
-					}
-					if reportRange.End() == 0 {
-						reportRange = core.NewTextRange(node.Pos(), node.Pos())
+					} else {
+						ctx.ReportNode(node, buildMissingReturnTypeMessage())
 					}
 				case ast.KindArrowFunction:
-					// For "() => 'test'", report at parameter list start (column 25)
-					// Need to add offset to get to the correct position
-					arrowPos := node.Pos() + 4  // Empirical adjustment
-					reportRange = core.NewTextRange(arrowPos, arrowPos)
+					// For arrow functions, report at the arrow function itself
+					// But check if it's in a variable or property assignment
+					parent := node.Parent
+					if parent != nil && parent.Kind == ast.KindVariableDeclaration {
+						varDecl := parent.AsVariableDeclaration()
+						if varDecl.Name() != nil {
+							ctx.ReportNode(varDecl.Name(), buildMissingReturnTypeMessage())
+						} else {
+							ctx.ReportNode(node, buildMissingReturnTypeMessage())
+						}
+					} else if parent != nil && parent.Kind == ast.KindPropertyAssignment {
+						propAssign := parent.AsPropertyAssignment()
+						if propAssign.Name() != nil {
+							ctx.ReportNode(propAssign.Name(), buildMissingReturnTypeMessage())
+						} else {
+							ctx.ReportNode(node, buildMissingReturnTypeMessage())
+						}
+					} else {
+						ctx.ReportNode(node, buildMissingReturnTypeMessage())
+					}
 				case ast.KindMethodDeclaration:
-					// For class methods, report at method name
+					// For methods, report at the method name
 					method := node.AsMethodDeclaration()
 					if method.Name() != nil {
-						reportRange = core.NewTextRange(method.Name().Pos(), method.Name().End())
+						ctx.ReportNode(method.Name(), buildMissingReturnTypeMessage())
 					} else {
-						reportRange = core.NewTextRange(node.Pos(), node.Pos())
+						ctx.ReportNode(node, buildMissingReturnTypeMessage())
 					}
 				case ast.KindGetAccessor:
-					// For get accessors, report at "get" keyword
-					reportRange = core.NewTextRange(node.Pos(), node.Pos())
+					// For get accessors, report at the property name
+					accessor := node.AsGetAccessorDeclaration()
+					if accessor.Name() != nil {
+						ctx.ReportNode(accessor.Name(), buildMissingReturnTypeMessage())
+					} else {
+						ctx.ReportNode(node, buildMissingReturnTypeMessage())
+					}
 				case ast.KindSetAccessor:
-					// For set accessors, report at "set" keyword
-					reportRange = core.NewTextRange(node.Pos(), node.Pos())
+					// For set accessors, report at the property name
+					accessor := node.AsSetAccessorDeclaration()
+					if accessor.Name() != nil {
+						ctx.ReportNode(accessor.Name(), buildMissingReturnTypeMessage())
+					} else {
+						ctx.ReportNode(node, buildMissingReturnTypeMessage())
+					}
 				default:
-					reportRange = core.NewTextRange(node.Pos(), node.Pos())
+					ctx.ReportNode(node, buildMissingReturnTypeMessage())
 				}
-				ctx.ReportRange(reportRange, buildMissingReturnTypeMessage())
 			}
 
 			// Simple parameter check

@@ -113,10 +113,9 @@ var NoUnusedVarsRule = rule.Rule{
 		// Use global state to collect all variables and usages
 		variables := make(map[string]*VariableInfo)
 		usages := make(map[string][]*ast.Node)
-		processed := false
 
 		return rule.RuleListeners{
-			// Collect variable declarations and process immediately
+			// Collect variable declarations
 			ast.KindVariableDeclaration: func(node *ast.Node) {
 				varDecl := node.AsVariableDeclaration()
 				if ast.IsIdentifier(varDecl.Name()) {
@@ -129,16 +128,10 @@ var NoUnusedVarsRule = rule.Rule{
 						References:     []*ast.Node{},
 						Definition:     node,
 					}
-					
-					// Process immediately after adding the variable
-					if !processed {
-						processed = true
-						processUnusedVariables(ctx, opts, variables, usages)
-					}
 				}
 			},
 			
-			// Collect function declarations and process
+			// Collect function declarations
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
 				funcDecl := node.AsFunctionDeclaration()
 				if funcDecl.Name() != nil && ast.IsIdentifier(funcDecl.Name()) {
@@ -151,12 +144,6 @@ var NoUnusedVarsRule = rule.Rule{
 						References:     []*ast.Node{},
 						Definition:     node,
 					}
-				}
-				
-				// Process after function declarations too (for standalone functions)
-				if !processed && len(variables) > 0 {
-					processed = true
-					processUnusedVariables(ctx, opts, variables, usages)
 				}
 			},
 			
@@ -176,7 +163,7 @@ var NoUnusedVarsRule = rule.Rule{
 				}
 			},
 			
-			// Collect catch clause variables and process
+			// Collect catch clause variables
 			ast.KindCatchClause: func(node *ast.Node) {
 				catchClause := node.AsCatchClause()
 				if catchClause.VariableDeclaration != nil {
@@ -204,20 +191,9 @@ var NoUnusedVarsRule = rule.Rule{
 				}
 			},
 			
-			// Also trigger processing in blocks for cases like try/catch
-			ast.KindBlock: func(node *ast.Node) {
-				if !processed && len(variables) > 0 {
-					processed = true
-					processUnusedVariables(ctx, opts, variables, usages)
-				}
-			},
-			
-			// Process on try statements for catch clauses
-			ast.KindTryStatement: func(node *ast.Node) {
-				if !processed && len(variables) > 0 {
-					processed = true
-					processUnusedVariables(ctx, opts, variables, usages)
-				}
+			// Process everything at the end when all nodes have been visited
+			rule.ListenerOnExit(ast.KindSourceFile): func(node *ast.Node) {
+				processUnusedVariables(ctx, opts, variables, usages)
 			},
 		}
 	},
