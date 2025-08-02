@@ -5,7 +5,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
-	"github.com/typescript-eslint/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 type NoShadowOptions struct {

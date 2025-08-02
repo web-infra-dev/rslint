@@ -3,9 +3,9 @@ package no_dynamic_delete_test
 import (
 	"testing"
 
-	"github.com/typescript-eslint/rslint/internal/rule_tester"
-	"github.com/typescript-eslint/rslint/internal/rules/fixtures"
-	"github.com/typescript-eslint/rslint/internal/rules/no_dynamic_delete"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rules/no_dynamic_delete"
 )
 
 func TestNoDynamicDelete(t *testing.T) {

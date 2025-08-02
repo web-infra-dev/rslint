@@ -5,7 +5,7 @@ import (
 	"regexp"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/typescript-eslint/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 type Config struct {

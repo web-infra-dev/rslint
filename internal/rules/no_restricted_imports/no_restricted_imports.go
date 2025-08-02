@@ -7,7 +7,7 @@ import (
 
 	"github.com/gobwas/glob"
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/typescript-eslint/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 // PathRestriction represents a restricted import path configuration

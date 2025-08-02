@@ -1,6 +1,6 @@
 module github.com/web-infra-dev/rslint
 
-go 1.24.1
+go 1.24.2
 
 replace (
 	github.com/microsoft/typescript-go => ./typescript-go
@@ -22,6 +22,7 @@ replace (
 require (
 	github.com/bmatcuk/doublestar/v4 v4.9.1
 	github.com/fatih/color v1.18.0
+	github.com/gobwas/glob v0.2.3
 	github.com/microsoft/typescript-go/shim/ast v0.0.0
 	github.com/microsoft/typescript-go/shim/bundled v0.0.0
 	github.com/microsoft/typescript-go/shim/checker v0.0.0
@@ -37,7 +38,7 @@ require (
 	github.com/microsoft/typescript-go/shim/vfs/osvfs v0.0.0
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	golang.org/x/sys v0.34.0
-	golang.org/x/tools v0.32.0
+	golang.org/x/tools v0.34.0
 	gotest.tools/v3 v3.5.2
 )
 
@@ -45,14 +46,14 @@ require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
-	golang.org/x/mod v0.24.0 // indirect
+	golang.org/x/mod v0.25.0 // indirect
 	golang.org/x/sync v0.16.0 // indirect
 )
 
 require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
-	github.com/go-json-experiment/json v0.0.0-20250714165856-be8212f5270d // indirect
+	github.com/go-json-experiment/json v0.0.0-20250725192818-e39067aee2d2 // indirect
 	github.com/microsoft/typescript-go v0.0.0-20250725221625-c05da65ec429 // indirect
 	github.com/sourcegraph/jsonrpc2 v0.2.1
-	golang.org/x/text v0.24.0
+	golang.org/x/text v0.27.0
 )

@@ -3,7 +3,7 @@ package no_useless_constructor
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/typescript-eslint/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 func buildNoUselessConstructorMessage() rule.RuleMessage {

@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/typescript-eslint/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 var NoDuplicateEnumValuesRule = rule.Rule{
