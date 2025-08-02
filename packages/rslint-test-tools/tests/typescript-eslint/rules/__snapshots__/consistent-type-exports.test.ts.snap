@@ -1,0 +1,504 @@
+// Rstest Snapshot v1
+
+exports[`consistent-type-exports > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Type export Type1 is not a value and should be exported using \`export type\`.",
+      "messageId": "singleExportIsType",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Type export Type1 is not a value and should be exported using \`export type\`.",
+      "messageId": "singleExportIsType",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Type exports Type1 and Type2 are not values and should be exported using \`export type\`.",
+      "messageId": "multipleExportsAreTypes",
+      "range": {
+        "end": {
+          "column": 74,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Type export Type2 as Foo is not a value and should be exported using \`export type\`.",
+      "messageId": "singleExportIsType",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Type export Type2 as Foo is not a value and should be exported using \`export type\`.",
+      "messageId": "singleExportIsType",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 6,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Type export Type2 is not a value and should be exported using \`export type\`.",
+      "messageId": "singleExportIsType",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Type exports Alias and IFace are not values and should be exported using \`export type\`.",
+      "messageId": "multipleExportsAreTypes",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 9,
+        },
+        "start": {
+          "column": 1,
+          "line": 9,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 6,
+        },
+        "start": {
+          "column": 1,
+          "line": 6,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Type export T is not a value and should be exported using \`export type\`.",
+      "messageId": "singleExportIsType",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Type export T is not a value and should be exported using \`export type\`.",
+      "messageId": "singleExportIsType",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "messageId": "typeOverValue",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Type exports Type1 and Type2 as Foo are not values and should be exported using \`export type\`.",
+      "messageId": "multipleExportsAreTypes",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 7,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Type exports Type1 and Type2 as Foo are not values and should be exported using \`export type\`.",
+      "messageId": "multipleExportsAreTypes",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 7,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "consistent-type-exports",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-exports > invalid 20`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -1,0 +1,259 @@
+exports[`no-loss-of-precision > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loss-of-precision",
+      "messageId": "noLossOfPrecision",
+      "message": "This number literal will lose precision at runtime.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loss-of-precision > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loss-of-precision",
+      "messageId": "noLossOfPrecision",
+      "message": "This number literal will lose precision at runtime.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 68
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loss-of-precision > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loss-of-precision",
+      "messageId": "noLossOfPrecision",
+      "message": "This number literal will lose precision at runtime.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 32
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loss-of-precision > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loss-of-precision",
+      "messageId": "noLossOfPrecision",
+      "message": "This number literal will lose precision at runtime.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 34
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loss-of-precision > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loss-of-precision",
+      "messageId": "noLossOfPrecision",
+      "message": "This number literal will lose precision at runtime.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 84
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loss-of-precision > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loss-of-precision",
+      "messageId": "noLossOfPrecision",
+      "message": "This number literal will lose precision at runtime.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 12
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loss-of-precision > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loss-of-precision",
+      "messageId": "noLossOfPrecision",
+      "message": "This number literal will lose precision at runtime.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loss-of-precision > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loss-of-precision",
+      "messageId": "noLossOfPrecision",
+      "message": "This number literal will lose precision at runtime.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 31
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loss-of-precision > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loss-of-precision",
+      "messageId": "noLossOfPrecision",
+      "message": "This number literal will lose precision at runtime.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-loss-of-precision > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-loss-of-precision",
+      "messageId": "noLossOfPrecision",
+      "message": "This number literal will lose precision at runtime.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

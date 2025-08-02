@@ -1,0 +1,1833 @@
+// Rstest Snapshot v1
+
+exports[`no-invalid-this > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 23,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 23,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 5,
+        },
+        "start": {
+          "column": 25,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 5,
+        },
+        "start": {
+          "column": 25,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 6,
+        },
+        "start": {
+          "column": 29,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 6,
+        },
+        "start": {
+          "column": 29,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 6,
+        },
+        "start": {
+          "column": 29,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 6,
+        },
+        "start": {
+          "column": 19,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 7,
+        },
+        "start": {
+          "column": 29,
+          "line": 7,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 5,
+        },
+        "start": {
+          "column": 27,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 5,
+        },
+        "start": {
+          "column": 17,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 6,
+        },
+        "start": {
+          "column": 27,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 6,
+        },
+        "start": {
+          "column": 29,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 5,
+        },
+        "start": {
+          "column": 27,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 6,
+        },
+        "start": {
+          "column": 29,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 5,
+        },
+        "start": {
+          "column": 27,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 22`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 23`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 24`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 25`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 26`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 27`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 28`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 29`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 30`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 31`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 32`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 33`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 34`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 35`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 36`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 37`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 38`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 39`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 40`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 41`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 42`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 43`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 5,
+        },
+        "start": {
+          "column": 27,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-this > invalid 44`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Unexpected 'this'.",
+      "messageId": "unexpectedThis",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 5,
+        },
+        "start": {
+          "column": 27,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-invalid-this",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

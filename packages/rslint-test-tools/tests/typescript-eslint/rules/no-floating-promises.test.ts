@@ -1,15 +1,16 @@
 import * as path from 'node:path';
 
 import { RuleTester } from '@typescript-eslint/rule-tester';
-import { getFixturesRootDir } from '../RuleTester';
+import { getFixturesRootDir } from '../RuleTester.ts';
 
-const rootDir = getFixturesRootDir();
+const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
-      tsconfigRootDir: rootDir,
+      tsconfigRootDir: rootPath,
     },
   },
 });
@@ -711,7 +712,7 @@ myTag\`abc\`;
               path: process.env.TYPESCRIPT_ESLINT_PROJECT_SERVICE
                 ? 'file.ts'
                 : path.posix.join(
-                    ...path.relative(process.cwd(), rootDir).split(path.sep),
+                    ...path.relative(process.cwd(), rootPath).split(path.sep),
                     'file.ts',
                   ),
             },

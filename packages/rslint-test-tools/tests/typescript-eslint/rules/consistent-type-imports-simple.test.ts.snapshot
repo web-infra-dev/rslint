@@ -1,0 +1,51 @@
+exports[`@typescript-eslint/consistent-type-imports > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "typeOverValue",
+      "message": "All imports in the declaration are only used as types. Use \`import type\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/consistent-type-imports > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "typeOverValue",
+      "message": "All imports in the declaration are only used as types. Use \`import type\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

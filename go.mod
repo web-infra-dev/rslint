@@ -3,6 +3,7 @@ module github.com/typescript-eslint/rslint
 go 1.24.1
 
 replace (
+	github.com/microsoft/typescript-go => ./typescript-go
 	github.com/microsoft/typescript-go/shim/ast => ./shim/ast
 	github.com/microsoft/typescript-go/shim/bundled => ./shim/bundled
 	github.com/microsoft/typescript-go/shim/checker => ./shim/checker
@@ -41,6 +42,7 @@ require (
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.9.1 // indirect
+	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect

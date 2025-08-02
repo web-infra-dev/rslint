@@ -1,0 +1,25 @@
+exports[`consistent-type-exports > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-exports",
+      "messageId": "typeOverValue",
+      "message": "All exports in the declaration are only used as types. Use \`export type\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 51
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 2,
+  "ruleCount": 1
+}
+`;

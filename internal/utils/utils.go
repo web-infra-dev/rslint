@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"iter"
 	"slices"
 	"unicode"
@@ -19,29 +20,77 @@ func GetCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) iter
 	nodeFactory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
 
 	return func(yield func(ast.CommentRange) bool) {
-		for commentRange := range scanner.GetTrailingCommentRanges(nodeFactory, sourceFile.Text(), inRange.Pos()) {
-			if commentRange.Pos() >= inRange.End() {
-				break
-			}
-			if !yield(commentRange) {
-				return
+		// Simple approach: get all comments from position 0 and filter
+		// This is less efficient but more reliable than trying to optimize the start position
+		seenComments := make(map[string]bool)
+		
+		// Get all leading comments from the beginning of the file
+		for commentRange := range scanner.GetLeadingCommentRanges(nodeFactory, sourceFile.Text(), 0) {
+			// Check if comment overlaps with our range (more flexible)
+			if commentRange.Pos() < inRange.End() && commentRange.End() > inRange.Pos() {
+				key := fmt.Sprintf("%d-%d", commentRange.Pos(), commentRange.End())
+				if !seenComments[key] {
+					seenComments[key] = true
+					if !yield(commentRange) {
+						return
+					}
+				}
 			}
 		}
-
-		for commentRange := range scanner.GetLeadingCommentRanges(nodeFactory, sourceFile.Text(), inRange.Pos()) {
-			if commentRange.Pos() >= inRange.End() {
-				break
-			}
-			if !yield(commentRange) {
-				return
+		
+		// Get all trailing comments from the beginning of the file
+		for commentRange := range scanner.GetTrailingCommentRanges(nodeFactory, sourceFile.Text(), 0) {
+			// Check if comment overlaps with our range (more flexible)
+			if commentRange.Pos() < inRange.End() && commentRange.End() > inRange.Pos() {
+				key := fmt.Sprintf("%d-%d", commentRange.Pos(), commentRange.End())
+				if !seenComments[key] {
+					seenComments[key] = true
+					if !yield(commentRange) {
+						return
+					}
+				}
 			}
 		}
 	}
 }
 
 func HasCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) bool {
+	// First try the scanner-based approach
 	for range GetCommentsInRange(sourceFile, inRange) {
 		return true
+	}
+	
+	// Fallback: directly check the source text for comment patterns
+	sourceText := sourceFile.Text()
+	if inRange.Pos() >= 0 && inRange.End() <= len(sourceText) {
+		rangeText := sourceText[inRange.Pos():inRange.End()]
+		// Check for /* */ comments and // comments
+		if containsBlockComment(rangeText) || containsLineComment(rangeText) {
+			return true
+		}
+	}
+	
+	return false
+}
+
+func containsBlockComment(text string) bool {
+	i := 0
+	for i < len(text)-1 {
+		if text[i] == '/' && text[i+1] == '*' {
+			return true
+		}
+		i++
+	}
+	return false
+}
+
+func containsLineComment(text string) bool {
+	i := 0
+	for i < len(text)-1 {
+		if text[i] == '/' && text[i+1] == '/' {
+			return true
+		}
+		i++
 	}
 	return false
 }

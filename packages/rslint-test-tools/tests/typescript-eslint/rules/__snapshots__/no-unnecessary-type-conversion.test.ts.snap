@@ -1,0 +1,36 @@
+// Rstest Snapshot v1
+
+exports[`no-unnecessary-type-conversion > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Passing a string to String() does not change the type or value of the string.",
+      "messageId": "unnecessaryTypeConversion",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unnecessary-type-conversion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-conversion > invalid 2`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -1,0 +1,12 @@
+[
+  {
+    "language": "typescript",
+    "files": ["*.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "project": ["./tsconfig.json"]
+      }
+    },
+    "rules": { "no-unused-vars": "error" },
+  },
+]

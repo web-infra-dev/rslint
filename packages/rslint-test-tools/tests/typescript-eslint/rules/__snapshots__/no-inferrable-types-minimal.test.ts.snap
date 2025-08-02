@@ -1,0 +1,27 @@
+// Rstest Snapshot v1
+
+exports[`no-inferrable-types > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

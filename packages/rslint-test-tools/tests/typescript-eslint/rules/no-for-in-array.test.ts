@@ -1,13 +1,14 @@
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
 
-import { getFixturesRootDir } from '../RuleTester';
+import { getFixturesRootDir } from '../RuleTester.ts';
 
-const rootDir = getFixturesRootDir();
+const rootPath = getFixturesRootDir();
 const ruleTester = new RuleTester({
+  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
-      tsconfigRootDir: rootDir,
+      tsconfigRootDir: rootPath,
     },
   },
 });
@@ -337,11 +338,12 @@ for (const x in arrayLike) {
           messageId: 'forInViolation',
         },
       ],
+      // @ts-ignore
       languageOptions: {
         parserOptions: {
           project: './tsconfig.lib-dom.json',
           projectService: false,
-          tsconfigRootDir: rootDir,
+          tsconfigRootDir: rootPath,
         },
       },
     },
@@ -362,11 +364,12 @@ for (const x in arrayLike) {
           messageId: 'forInViolation',
         },
       ],
+      // @ts-ignore
       languageOptions: {
         parserOptions: {
           project: './tsconfig.lib-dom.json',
           projectService: false,
-          tsconfigRootDir: rootDir,
+          tsconfigRootDir: rootPath,
         },
       },
     },

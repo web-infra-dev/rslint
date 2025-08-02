@@ -1,0 +1,757 @@
+exports[`consistent-type-imports > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "typeOverValue",
+      "message": "All imports in the declaration are only used as types. Use \`import type\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "typeOverValue",
+      "message": "All imports in the declaration are only used as types. Use \`import type\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "typeOverValue",
+      "message": "All imports in the declaration are only used as types. Use \`import type\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 25
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "someImportsAreOnlyTypes",
+      "message": "Imports \\"A\\" are only used as type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "someImportsAreOnlyTypes",
+      "message": "Imports \\"A\\" and \\"C\\" are only used as type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 31
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "someImportsAreOnlyTypes",
+      "message": "Imports \\"A\\", \\"C\\" and \\"D\\" are only used as type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 34
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "someImportsAreOnlyTypes",
+      "message": "Imports \\"A\\", \\"C\\" and \\"D\\" are only used as type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 34
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "someImportsAreOnlyTypes",
+      "message": "Imports \\"A\\" are only used as type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "someImportsAreOnlyTypes",
+      "message": "Imports \\"B\\" are only used as type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 28
+        }
+      }
+    },
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "someImportsAreOnlyTypes",
+      "message": "Imports \\"C\\" and \\"D\\" are only used as type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 1
+        },
+        "end": {
+          "line": 5,
+          "column": 31
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "someImportsAreOnlyTypes",
+      "message": "Imports \\"B\\" are only used as type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 42
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "someImportsAreOnlyTypes",
+      "message": "Imports \\"A\\" are only used as type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 31
+        }
+      }
+    },
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "someImportsAreOnlyTypes",
+      "message": "Imports \\"D\\" are only used as type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 32
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "typeOverValue",
+      "message": "All imports in the declaration are only used as types. Use \`import type\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "someImportsAreOnlyTypes",
+      "message": "Imports \\"B\\" are only used as type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 31
+        }
+      }
+    },
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "someImportsAreOnlyTypes",
+      "message": "Imports \\"E\\" are only used as type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 32
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "someImportsAreOnlyTypes",
+      "message": "Imports \\"C\\" are only used as type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 31
+        }
+      }
+    },
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "someImportsAreOnlyTypes",
+      "message": "Imports \\"F\\" are only used as type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 32
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 22`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "typeOverValue",
+      "message": "All imports in the declaration are only used as types. Use \`import type\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 44
+        }
+      }
+    },
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "typeOverValue",
+      "message": "All imports in the declaration are only used as types. Use \`import type\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 33
+        }
+      }
+    },
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "typeOverValue",
+      "message": "All imports in the declaration are only used as types. Use \`import type\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 41
+        }
+      }
+    },
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "typeOverValue",
+      "message": "All imports in the declaration are only used as types. Use \`import type\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 1
+        },
+        "end": {
+          "line": 5,
+          "column": 57
+        }
+      }
+    }
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 23`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "someImportsAreOnlyTypes",
+      "message": "Imports \\"Type1\\" are only used as type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 46
+        }
+      }
+    },
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "someImportsAreOnlyTypes",
+      "message": "Imports \\"Type2\\" are only used as type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 48
+        }
+      }
+    },
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "someImportsAreOnlyTypes",
+      "message": "Imports \\"Type3\\" are only used as type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 49
+        }
+      }
+    },
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "someImportsAreOnlyTypes",
+      "message": "Imports \\"Type4\\" and \\"Type5\\" are only used as type.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 1
+        },
+        "end": {
+          "line": 5,
+          "column": 65
+        }
+      }
+    }
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "typeOverValue",
+      "message": "All imports in the declaration are only used as types. Use \`import type\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "typeOverValue",
+      "message": "All imports in the declaration are only used as types. Use \`import type\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 28
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "typeOverValue",
+      "message": "All imports in the declaration are only used as types. Use \`import type\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 38
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "typeOverValue",
+      "message": "All imports in the declaration are only used as types. Use \`import type\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "typeOverValue",
+      "message": "All imports in the declaration are only used as types. Use \`import type\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "typeOverValue",
+      "message": "All imports in the declaration are only used as types. Use \`import type\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-imports > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-imports",
+      "messageId": "typeOverValue",
+      "message": "All imports in the declaration are only used as types. Use \`import type\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 26
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

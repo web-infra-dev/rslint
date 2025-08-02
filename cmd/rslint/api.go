@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -16,46 +17,6 @@ import (
 	rslintconfig "github.com/typescript-eslint/rslint/internal/config"
 	"github.com/typescript-eslint/rslint/internal/linter"
 	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
-	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
-	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
-	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_void_expression"
-	"github.com/typescript-eslint/rslint/internal/rules/no_duplicate_type_constituents"
-	"github.com/typescript-eslint/rslint/internal/rules/no_floating_promises"
-	"github.com/typescript-eslint/rslint/internal/rules/no_for_in_array"
-	"github.com/typescript-eslint/rslint/internal/rules/no_implied_eval"
-	"github.com/typescript-eslint/rslint/internal/rules/no_meaningless_void_operator"
-	"github.com/typescript-eslint/rslint/internal/rules/no_misused_promises"
-	"github.com/typescript-eslint/rslint/internal/rules/no_misused_spread"
-	"github.com/typescript-eslint/rslint/internal/rules/no_mixed_enums"
-	"github.com/typescript-eslint/rslint/internal/rules/no_redundant_type_constituents"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_boolean_literal_compare"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_template_expression"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_type_arguments"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_type_assertion"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_argument"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_assignment"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_call"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_enum_comparison"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_member_access"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_return"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_type_assertion"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_unary_minus"
-	"github.com/typescript-eslint/rslint/internal/rules/non_nullable_type_assertion_style"
-	"github.com/typescript-eslint/rslint/internal/rules/only_throw_error"
-	"github.com/typescript-eslint/rslint/internal/rules/prefer_promise_reject_errors"
-	"github.com/typescript-eslint/rslint/internal/rules/prefer_reduce_type_parameter"
-	"github.com/typescript-eslint/rslint/internal/rules/prefer_return_this_type"
-	"github.com/typescript-eslint/rslint/internal/rules/promise_function_async"
-	"github.com/typescript-eslint/rslint/internal/rules/related_getter_setter_pairs"
-	"github.com/typescript-eslint/rslint/internal/rules/require_array_sort_compare"
-	"github.com/typescript-eslint/rslint/internal/rules/require_await"
-	"github.com/typescript-eslint/rslint/internal/rules/restrict_plus_operands"
-	"github.com/typescript-eslint/rslint/internal/rules/restrict_template_expressions"
-	"github.com/typescript-eslint/rslint/internal/rules/return_await"
-	"github.com/typescript-eslint/rslint/internal/rules/switch_exhaustiveness_check"
-	"github.com/typescript-eslint/rslint/internal/rules/unbound_method"
-	"github.com/typescript-eslint/rslint/internal/rules/use_unknown_in_catch_callback_variable"
 	"github.com/typescript-eslint/rslint/internal/utils"
 )
 
@@ -95,49 +56,8 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	// Load rslint configuration and determine which tsconfig files to use
 	_, tsConfigs, configDirectory := rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
 
-	// Create rules
-	var origin_rules = []rule.Rule{
-		await_thenable.AwaitThenableRule,
-		no_array_delete.NoArrayDeleteRule,
-		no_base_to_string.NoBaseToStringRule,
-		no_confusing_void_expression.NoConfusingVoidExpressionRule,
-		no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule,
-		no_floating_promises.NoFloatingPromisesRule,
-		no_for_in_array.NoForInArrayRule,
-		no_implied_eval.NoImpliedEvalRule,
-		no_meaningless_void_operator.NoMeaninglessVoidOperatorRule,
-		no_misused_promises.NoMisusedPromisesRule,
-		no_misused_spread.NoMisusedSpreadRule,
-		no_mixed_enums.NoMixedEnumsRule,
-		no_redundant_type_constituents.NoRedundantTypeConstituentsRule,
-		no_unnecessary_boolean_literal_compare.NoUnnecessaryBooleanLiteralCompareRule,
-		no_unnecessary_template_expression.NoUnnecessaryTemplateExpressionRule,
-		no_unnecessary_type_arguments.NoUnnecessaryTypeArgumentsRule,
-		no_unnecessary_type_assertion.NoUnnecessaryTypeAssertionRule,
-		no_unsafe_argument.NoUnsafeArgumentRule,
-		no_unsafe_assignment.NoUnsafeAssignmentRule,
-		no_unsafe_call.NoUnsafeCallRule,
-		no_unsafe_enum_comparison.NoUnsafeEnumComparisonRule,
-		no_unsafe_member_access.NoUnsafeMemberAccessRule,
-		no_unsafe_return.NoUnsafeReturnRule,
-		no_unsafe_type_assertion.NoUnsafeTypeAssertionRule,
-		no_unsafe_unary_minus.NoUnsafeUnaryMinusRule,
-		non_nullable_type_assertion_style.NonNullableTypeAssertionStyleRule,
-		only_throw_error.OnlyThrowErrorRule,
-		prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
-		prefer_reduce_type_parameter.PreferReduceTypeParameterRule,
-		prefer_return_this_type.PreferReturnThisTypeRule,
-		promise_function_async.PromiseFunctionAsyncRule,
-		related_getter_setter_pairs.RelatedGetterSetterPairsRule,
-		require_array_sort_compare.RequireArraySortCompareRule,
-		require_await.RequireAwaitRule,
-		restrict_plus_operands.RestrictPlusOperandsRule,
-		restrict_template_expressions.RestrictTemplateExpressionsRule,
-		return_await.ReturnAwaitRule,
-		switch_exhaustiveness_check.SwitchExhaustivenessCheckRule,
-		unbound_method.UnboundMethodRule,
-		use_unknown_in_catch_callback_variable.UseUnknownInCatchCallbackVariableRule,
-	}
+	// Get all rules from the registry instead of using a hardcoded list
+	availableRules := rslintconfig.GlobalRuleRegistry.GetAllRules()
 	type RuleWithOption struct {
 		rule   rule.Rule
 		option interface{}
@@ -145,14 +65,19 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	rulesWithOptions := []RuleWithOption{}
 	// filter rule based on request.RuleOptions
 	if len(req.RuleOptions) > 0 {
-		for _, r := range origin_rules {
-			if option, ok := req.RuleOptions[r.Name]; ok {
+		for ruleName, ruleImpl := range availableRules {
+			if option, ok := req.RuleOptions[ruleName]; ok {
+				// When testing a single rule, enable it with error severity
 				rulesWithOptions = append(rulesWithOptions, RuleWithOption{
-					rule:   r,
+					rule:   ruleImpl,
 					option: option,
 				})
 			}
 		}
+	} else {
+		// If no specific rules requested, this shouldn't happen in test mode
+		// but we'll return empty to be safe
+		rulesWithOptions = []RuleWithOption{}
 	}
 
 	// Create compiler host

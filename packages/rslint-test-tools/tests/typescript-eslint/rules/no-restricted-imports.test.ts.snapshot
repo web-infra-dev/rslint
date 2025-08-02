@@ -1,0 +1,606 @@
+exports[`no-restricted-imports > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "path",
+      "message": "'import1' import is restricted.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "importNameWithCustomMessage",
+      "message": "Please use Bar from /import-bar/baz/ instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 34
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "importNameWithCustomMessage",
+      "message": "Please use Bar from /import-bar/baz/ instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 34
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "patternWithCustomMessage",
+      "message": "usage of import1 private modules not allowed.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "patternWithCustomMessage",
+      "message": "usage of import1 private modules not allowed.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 43
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "path",
+      "message": "'import-foo' import is restricted.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 21
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "path",
+      "message": "'import-foo' import is restricted.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 21
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "pathWithCustomMessage",
+      "message": "Please use import-bar instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 30
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "pathWithCustomMessage",
+      "message": "Please use import-bar instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "importNameWithCustomMessage",
+      "message": "Please use Bar from /import-bar/baz/ instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 34
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "importNameWithCustomMessage",
+      "message": "Please use Bar from /import-bar/baz/ instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 34
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "path",
+      "message": "'import1' import is restricted.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 33
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "patternWithCustomMessage",
+      "message": "usage of import1 private modules not allowed.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "patternWithCustomMessage",
+      "message": "usage of import1 private modules not allowed.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 43
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 22`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "patternWithCustomMessage",
+      "message": "usage of import1 private modules not allowed.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 43
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 23`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "patternWithCustomMessage",
+      "message": "usage of import1 private modules not allowed.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 47
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 24`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "path",
+      "message": "'import1' import is restricted.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 31
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "path",
+      "message": "'import1' import is restricted.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 27
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "path",
+      "message": "'import1' import is restricted.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 31
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "patterns",
+      "message": "'import1/private/foo' import is restricted by pattern.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "patterns",
+      "message": "'import1/private/foo' import is restricted by pattern.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 43
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "pathWithCustomMessage",
+      "message": "Please use import-bar instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 30
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-restricted-imports > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-restricted-imports",
+      "messageId": "pathWithCustomMessage",
+      "message": "Please use import-bar instead.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 34
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
