@@ -68,9 +68,12 @@ jobs:
 
       - name: TypeCheck
         run: pnpm typecheck
-      - name: Install xvfb
+
+      - name: Install xvfb and dependencies
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y xvfb && sudo apt-get install libatk1.0-0
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libxss1 libgtk-3-0 libgconf-2-4 libnss3 libxrandr2 libasound2 libpangocairo-1.0-0 libatk1.0-0 libcairo-gobject2 libgtk-3-0 libgdk-pixbuf2.0-0
 
       - name: Test on Linux
         if: runner.os == 'Linux'
