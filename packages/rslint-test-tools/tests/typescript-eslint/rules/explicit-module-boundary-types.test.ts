@@ -1,10 +1,10 @@
+import { describe, test, expect } from '@rstest/core';
 import { RuleTester } from '@typescript-eslint/rule-tester';
 import { getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
-  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -13,37 +13,39 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('explicit-module-boundary-types', {
-  valid: [
-    {
-      code: `
+describe('explicit-module-boundary-types', () => {
+  test('rule tests', () => {
+    ruleTester.run('explicit-module-boundary-types', {
+      valid: [
+        {
+          code: `
 function test(): void {
   return;
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export function test(): void {
   return;
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export var fn = function (): number {
   return 1;
 };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export var arrowFn = (): string => 'test';
       `,
-    },
-    {
-      // not exported
-      code: `
+        },
+        {
+          // not exported
+          code: `
 class Test {
   constructor(one) {}
   get prop(one) {
@@ -57,9 +59,9 @@ class Test {
   abstract abs(one);
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export class Test {
   constructor(one: string) {}
   get prop(one: string): void {
@@ -73,9 +75,9 @@ export class Test {
   abstract abs(one: string): void;
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export class Test {
   private constructor(one) {}
   private get prop(one) {
@@ -89,20 +91,20 @@ export class Test {
   private abstract abs(one);
 }
       `,
-    },
-    `
+        },
+        `
 export class PrivateProperty {
   #property = () => null;
 }
     `,
-    `
+        `
 export class PrivateMethod {
   #method() {}
 }
     `,
-    {
-      // https://github.com/typescript-eslint/typescript-eslint/issues/2150
-      code: `
+        {
+          // https://github.com/typescript-eslint/typescript-eslint/issues/2150
+          code: `
 export class Test {
   constructor();
   constructor(value?: string) {
@@ -110,17 +112,17 @@ export class Test {
   }
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 declare class MyClass {
   constructor(options?: MyClass.Options);
 }
 export { MyClass };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export function test(): void {
   nested();
   return;
@@ -128,17 +130,17 @@ export function test(): void {
   function nested() {}
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export function test(): string {
   const nested = () => 'value';
   return nested();
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export function test(): string {
   class Nested {
     public method() {
@@ -148,153 +150,153 @@ export function test(): string {
   return new Nested().method();
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export var arrowFn: Foo = () => 'test';
       `,
-      options: [
-        {
-          allowTypedFunctionExpressions: true,
+          options: [
+            {
+              allowTypedFunctionExpressions: true,
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export var funcExpr: Foo = function () {
   return 'test';
 };
       `,
-      options: [
-        {
-          allowTypedFunctionExpressions: true,
+          options: [
+            {
+              allowTypedFunctionExpressions: true,
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: 'const x = (() => {}) as Foo;',
-      options: [{ allowTypedFunctionExpressions: true }],
-    },
-    {
-      code: 'const x = <Foo>(() => {});',
-      options: [{ allowTypedFunctionExpressions: true }],
-    },
-    {
-      code: `
+        {
+          code: 'const x = (() => {}) as Foo;',
+          options: [{ allowTypedFunctionExpressions: true }],
+        },
+        {
+          code: 'const x = <Foo>(() => {});',
+          options: [{ allowTypedFunctionExpressions: true }],
+        },
+        {
+          code: `
 export const x = {
   foo: () => {},
 } as Foo;
       `,
-      options: [{ allowTypedFunctionExpressions: true }],
-    },
-    {
-      code: `
+          options: [{ allowTypedFunctionExpressions: true }],
+        },
+        {
+          code: `
 export const x = <Foo>{
   foo: () => {},
 };
       `,
-      options: [{ allowTypedFunctionExpressions: true }],
-    },
-    {
-      code: `
+          options: [{ allowTypedFunctionExpressions: true }],
+        },
+        {
+          code: `
 export const x: Foo = {
   foo: () => {},
 };
       `,
-      options: [{ allowTypedFunctionExpressions: true }],
-    },
-    // https://github.com/typescript-eslint/typescript-eslint/issues/2864
-    {
-      code: `
+          options: [{ allowTypedFunctionExpressions: true }],
+        },
+        // https://github.com/typescript-eslint/typescript-eslint/issues/2864
+        {
+          code: `
 export const x = {
   foo: { bar: () => {} },
 } as Foo;
       `,
-      options: [{ allowTypedFunctionExpressions: true }],
-    },
-    {
-      code: `
+          options: [{ allowTypedFunctionExpressions: true }],
+        },
+        {
+          code: `
 export const x = <Foo>{
   foo: { bar: () => {} },
 };
       `,
-      options: [{ allowTypedFunctionExpressions: true }],
-    },
-    {
-      code: `
+          options: [{ allowTypedFunctionExpressions: true }],
+        },
+        {
+          code: `
 export const x: Foo = {
   foo: { bar: () => {} },
 };
       `,
-      options: [{ allowTypedFunctionExpressions: true }],
-    },
-    // https://github.com/typescript-eslint/typescript-eslint/issues/484
-    {
-      code: `
+          options: [{ allowTypedFunctionExpressions: true }],
+        },
+        // https://github.com/typescript-eslint/typescript-eslint/issues/484
+        {
+          code: `
 type MethodType = () => void;
 
 export class App {
   public method: MethodType = () => {};
 }
       `,
-      options: [{ allowTypedFunctionExpressions: true }],
-    },
-    // https://github.com/typescript-eslint/typescript-eslint/issues/525
-    {
-      code: `
+          options: [{ allowTypedFunctionExpressions: true }],
+        },
+        // https://github.com/typescript-eslint/typescript-eslint/issues/525
+        {
+          code: `
 export const myObj = {
   set myProp(val: number) {
     this.myProp = val;
   },
 };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export default () => (): void => {};
       `,
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+          options: [{ allowHigherOrderFunctions: true }],
+        },
+        {
+          code: `
 export default () => function (): void {};
       `,
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+          options: [{ allowHigherOrderFunctions: true }],
+        },
+        {
+          code: `
 export default () => {
   return (): void => {};
 };
       `,
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+          options: [{ allowHigherOrderFunctions: true }],
+        },
+        {
+          code: `
 export default () => {
   return function (): void {};
 };
       `,
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+          options: [{ allowHigherOrderFunctions: true }],
+        },
+        {
+          code: `
 export function fn() {
   return (): void => {};
 }
       `,
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+          options: [{ allowHigherOrderFunctions: true }],
+        },
+        {
+          code: `
 export function fn() {
   return function (): void {};
 }
       `,
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+          options: [{ allowHigherOrderFunctions: true }],
+        },
+        {
+          code: `
 export function FunctionDeclaration() {
   return function FunctionExpression_Within_FunctionDeclaration() {
     return function FunctionExpression_Within_FunctionExpression() {
@@ -309,20 +311,20 @@ export function FunctionDeclaration() {
   };
 }
       `,
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+          options: [{ allowHigherOrderFunctions: true }],
+        },
+        {
+          code: `
 export default () => () => {
   return (): void => {
     return;
   };
 };
       `,
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+          options: [{ allowHigherOrderFunctions: true }],
+        },
+        {
+          code: `
 export default () => () => {
   const foo = 'foo';
   return (): void => {
@@ -330,10 +332,10 @@ export default () => () => {
   };
 };
       `,
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+          options: [{ allowHigherOrderFunctions: true }],
+        },
+        {
+          code: `
 export default () => () => {
   const foo = () => (): string => 'foo';
   return (): void => {
@@ -341,10 +343,10 @@ export default () => () => {
   };
 };
       `,
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+          options: [{ allowHigherOrderFunctions: true }],
+        },
+        {
+          code: `
 export class Accumulator {
   private count: number = 0;
 
@@ -355,27 +357,27 @@ export class Accumulator {
 
 new Accumulator().accumulate(() => 1);
       `,
-      options: [
-        {
-          allowTypedFunctionExpressions: true,
+          options: [
+            {
+              allowTypedFunctionExpressions: true,
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export const func1 = (value: number) => ({ type: 'X', value }) as const;
 export const func2 = (value: number) => ({ type: 'X', value }) as const;
 export const func3 = (value: number) => x as const;
 export const func4 = (value: number) => x as const;
       `,
-      options: [
-        {
-          allowDirectConstAssertionInArrowFunctions: true,
+          options: [
+            {
+              allowDirectConstAssertionInArrowFunctions: true,
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 interface R {
   type: string;
   value: number;
@@ -384,14 +386,14 @@ interface R {
 export const func = (value: number) =>
   ({ type: 'X', value }) as const satisfies R;
       `,
-      options: [
-        {
-          allowDirectConstAssertionInArrowFunctions: true,
+          options: [
+            {
+              allowDirectConstAssertionInArrowFunctions: true,
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 interface R {
   type: string;
   value: number;
@@ -400,14 +402,14 @@ interface R {
 export const func = (value: number) =>
   ({ type: 'X', value }) as const satisfies R satisfies R;
       `,
-      options: [
-        {
-          allowDirectConstAssertionInArrowFunctions: true,
+          options: [
+            {
+              allowDirectConstAssertionInArrowFunctions: true,
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 interface R {
   type: string;
   value: number;
@@ -416,25 +418,25 @@ interface R {
 export const func = (value: number) =>
   ({ type: 'X', value }) as const satisfies R satisfies R satisfies R;
       `,
-      options: [
-        {
-          allowDirectConstAssertionInArrowFunctions: true,
+          options: [
+            {
+              allowDirectConstAssertionInArrowFunctions: true,
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export const func1 = (value: string) => value;
 export const func2 = (value: number) => ({ type: 'X', value });
       `,
-      options: [
-        {
-          allowedNames: ['func1', 'func2'],
+          options: [
+            {
+              allowedNames: ['func1', 'func2'],
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export function func1() {
   return 0;
 }
@@ -444,14 +446,14 @@ export const foo = {
   },
 };
       `,
-      options: [
-        {
-          allowedNames: ['func1', 'func2'],
+          options: [
+            {
+              allowedNames: ['func1', 'func2'],
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export class Test {
   get prop() {
     return 1;
@@ -472,138 +474,138 @@ export class Test {
   };
 }
       `,
-      options: [
-        {
-          allowedNames: ['prop', 'method', 'null', 'foo'],
+          options: [
+            {
+              allowedNames: ['prop', 'method', 'null', 'foo'],
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
         export function foo(outer: string) {
           return function (inner: string): void {};
         }
       `,
-      options: [
-        {
-          allowHigherOrderFunctions: true,
+          options: [
+            {
+              allowHigherOrderFunctions: true,
+            },
+          ],
         },
-      ],
-    },
-    // https://github.com/typescript-eslint/typescript-eslint/issues/1552
-    {
-      code: `
+        // https://github.com/typescript-eslint/typescript-eslint/issues/1552
+        {
+          code: `
         export type Ensurer = (blocks: TFBlock[]) => TFBlock[];
 
         export const myEnsurer: Ensurer = blocks => {
           return blocks;
         };
       `,
-      options: [
-        {
-          allowTypedFunctionExpressions: true,
+          options: [
+            {
+              allowTypedFunctionExpressions: true,
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export const Foo: FC = () => (
   <div a={e => {}} b={function (e) {}} c={function foo(e) {}}></div>
 );
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaFeatures: { jsx: true },
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaFeatures: { jsx: true },
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 export const Foo: JSX.Element = (
   <div a={e => {}} b={function (e) {}} c={function foo(e) {}}></div>
 );
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaFeatures: { jsx: true },
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaFeatures: { jsx: true },
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 const test = (): void => {
   return;
 };
 export default test;
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 function test(): void {
   return;
 }
 export default test;
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 const test = (): void => {
   return;
 };
 export default [test];
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 function test(): void {
   return;
 }
 export default [test];
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 const test = (): void => {
   return;
 };
 export default { test };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 function test(): void {
   return;
 }
 export default { test };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 const foo = (arg => arg) as Foo;
 export default foo;
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 let foo = (arg => arg) as Foo;
 foo = 3;
 export default foo;
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 class Foo {
   bar = (arg: string): string => arg;
 }
 export default { Foo };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 class Foo {
   bar(): void {
     return;
@@ -611,34 +613,34 @@ class Foo {
 }
 export default { Foo };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export class Foo {
   accessor bar = (): void => {
     return;
   };
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export function foo(): (n: number) => string {
   return n => String(n);
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export const foo = (a: string): ((n: number) => string) => {
   return function (n) {
     return String(n);
   };
 };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export function a(): void {
   function b() {}
   const x = () => {};
@@ -651,9 +653,9 @@ export function a(): void {
   return;
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export function a(): void {
   function b() {
     function c() {}
@@ -674,38 +676,38 @@ export function a(): void {
   return;
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export function a() {
   return function b(): () => void {
     return function c() {};
   };
 }
       `,
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+          options: [{ allowHigherOrderFunctions: true }],
+        },
+        {
+          code: `
 export var arrowFn = () => (): void => {};
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export function fn() {
   return function (): void {};
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export function foo(outer: string) {
   return function (inner: string): void {};
 }
       `,
-    },
-    // shouldn't check functions that aren't directly exported - https://github.com/typescript-eslint/typescript-eslint/issues/2134
-    `
+        },
+        // shouldn't check functions that aren't directly exported - https://github.com/typescript-eslint/typescript-eslint/issues/2134
+        `
 export function foo(): unknown {
   return new Proxy(apiInstance, {
     get: (target, property) => {
@@ -714,71 +716,71 @@ export function foo(): unknown {
   });
 }
     `,
-    {
-      code: 'export default (() => true)();',
-      options: [
         {
-          allowTypedFunctionExpressions: false,
+          code: 'export default (() => true)();',
+          options: [
+            {
+              allowTypedFunctionExpressions: false,
+            },
+          ],
         },
-      ],
-    },
-    // explicit assertions are allowed
-    {
-      code: 'export const x = (() => {}) as Foo;',
-      options: [{ allowTypedFunctionExpressions: false }],
-    },
-    {
-      code: `
+        // explicit assertions are allowed
+        {
+          code: 'export const x = (() => {}) as Foo;',
+          options: [{ allowTypedFunctionExpressions: false }],
+        },
+        {
+          code: `
 interface Foo {}
 export const x = {
   foo: () => {},
 } as Foo;
       `,
-      options: [{ allowTypedFunctionExpressions: false }],
-    },
-    // allowArgumentsExplicitlyTypedAsAny
-    {
-      code: `
+          options: [{ allowTypedFunctionExpressions: false }],
+        },
+        // allowArgumentsExplicitlyTypedAsAny
+        {
+          code: `
 export function foo(foo: any): void {}
       `,
-      options: [{ allowArgumentsExplicitlyTypedAsAny: true }],
-    },
-    {
-      code: `
+          options: [{ allowArgumentsExplicitlyTypedAsAny: true }],
+        },
+        {
+          code: `
 export function foo({ foo }: any): void {}
       `,
-      options: [{ allowArgumentsExplicitlyTypedAsAny: true }],
-    },
-    {
-      code: `
+          options: [{ allowArgumentsExplicitlyTypedAsAny: true }],
+        },
+        {
+          code: `
 export function foo([bar]: any): void {}
       `,
-      options: [{ allowArgumentsExplicitlyTypedAsAny: true }],
-    },
-    {
-      code: `
+          options: [{ allowArgumentsExplicitlyTypedAsAny: true }],
+        },
+        {
+          code: `
 export function foo(...bar: any): void {}
       `,
-      options: [{ allowArgumentsExplicitlyTypedAsAny: true }],
-    },
-    {
-      code: `
+          options: [{ allowArgumentsExplicitlyTypedAsAny: true }],
+        },
+        {
+          code: `
 export function foo(...[a]: any): void {}
       `,
-      options: [{ allowArgumentsExplicitlyTypedAsAny: true }],
-    },
-    // assignment patterns are ignored
-    `
+          options: [{ allowArgumentsExplicitlyTypedAsAny: true }],
+        },
+        // assignment patterns are ignored
+        `
 export function foo(arg = 1): void {}
     `,
-    // https://github.com/typescript-eslint/typescript-eslint/issues/2161
-    {
-      code: `
+        // https://github.com/typescript-eslint/typescript-eslint/issues/2161
+        {
+          code: `
 export const foo = (): ((n: number) => string) => n => String(n);
       `,
-    },
-    // https://github.com/typescript-eslint/typescript-eslint/issues/2173
-    `
+        },
+        // https://github.com/typescript-eslint/typescript-eslint/issues/2173
+        `
 export function foo(): (n: number) => (m: number) => string {
   return function (n) {
     return function (m) {
@@ -787,34 +789,34 @@ export function foo(): (n: number) => (m: number) => string {
   };
 }
     `,
-    `
+        `
 export const foo = (): ((n: number) => (m: number) => string) => n => m =>
   String(n + m);
     `,
-    `
+        `
 export const bar: () => (n: number) => string = () => n => String(n);
     `,
-    `
+        `
 type Buz = () => (n: number) => string;
 
 export const buz: Buz = () => n => String(n);
     `,
-    `
+        `
 export abstract class Foo<T> {
   abstract set value(element: T);
 }
     `,
-    `
+        `
 export declare class Foo {
   set time(seconds: number);
 }
     `,
-    `
+        `
 export class A {
   b = A;
 }
     `,
-    `
+        `
 interface Foo {
   f: (x: boolean) => boolean;
 }
@@ -825,7 +827,7 @@ export const a: Foo[] = [
   },
 ];
     `,
-    `
+        `
 interface Foo {
   f: (x: boolean) => boolean;
 }
@@ -834,50 +836,50 @@ export const a: Foo = {
   f: (x: boolean) => x,
 };
     `,
-    {
-      code: `
+        {
+          code: `
 export function test(a: string): string;
 export function test(a: number): number;
 export function test(a: unknown) {
   return a;
 }
       `,
-      options: [
-        {
-          allowOverloadFunctions: true,
+          options: [
+            {
+              allowOverloadFunctions: true,
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export default function test(a: string): string;
 export default function test(a: number): number;
 export default function test(a: unknown) {
   return a;
 }
       `,
-      options: [
-        {
-          allowOverloadFunctions: true,
+          options: [
+            {
+              allowOverloadFunctions: true,
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export default function (a: string): string;
 export default function (a: number): number;
 export default function (a: unknown) {
   return a;
 }
       `,
-      options: [
-        {
-          allowOverloadFunctions: true,
+          options: [
+            {
+              allowOverloadFunctions: true,
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export class Test {
   test(a: string): string;
   test(a: number): number;
@@ -886,78 +888,78 @@ export class Test {
   }
 }
       `,
-      options: [
-        {
-          allowOverloadFunctions: true,
+          options: [
+            {
+              allowOverloadFunctions: true,
+            },
+          ],
         },
       ],
-    },
-  ],
-  invalid: [
-    {
-      code: `
+      invalid: [
+        {
+          code: `
 export function test(a: number, b: number) {
   return;
 }
       `,
-      errors: [
-        {
-          column: 8,
-          endColumn: 21,
-          endLine: 2,
-          line: 2,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 8,
+              endColumn: 21,
+              endLine: 2,
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export function test() {
   return;
 }
       `,
-      errors: [
-        {
-          column: 8,
-          endColumn: 21,
-          endLine: 2,
-          line: 2,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 8,
+              endColumn: 21,
+              endLine: 2,
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export var fn = function () {
   return 1;
 };
       `,
-      errors: [
-        {
-          column: 17,
-          endColumn: 26,
-          endLine: 2,
-          line: 2,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 17,
+              endColumn: 26,
+              endLine: 2,
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export var arrowFn = () => 'test';
       `,
-      errors: [
-        {
-          column: 25,
-          endColumn: 27,
-          endLine: 2,
-          line: 2,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 25,
+              endColumn: 27,
+              endLine: 2,
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export class Test {
   constructor() {}
   get prop() {
@@ -974,69 +976,69 @@ export class Test {
   abstract abs(arg);
 }
       `,
-      errors: [
-        {
-          column: 3,
-          endColumn: 11,
-          endLine: 4,
-          line: 4,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 3,
+              endColumn: 11,
+              endLine: 4,
+              line: 4,
+              messageId: 'missingReturnType',
+            },
+            {
+              column: 12,
+              data: {
+                name: 'value',
+              },
+              endColumn: 17,
+              endLine: 7,
+              line: 7,
+              messageId: 'missingArgType',
+            },
+            {
+              column: 3,
+              endColumn: 9,
+              endLine: 8,
+              line: 8,
+              messageId: 'missingReturnType',
+            },
+            {
+              column: 3,
+              endColumn: 11,
+              endLine: 11,
+              line: 11,
+              messageId: 'missingReturnType',
+            },
+            {
+              column: 11,
+              data: {
+                name: 'arg',
+              },
+              endColumn: 14,
+              endLine: 11,
+              line: 11,
+              messageId: 'missingArgType',
+            },
+            {
+              column: 15,
+              endColumn: 21,
+              endLine: 15,
+              line: 15,
+              messageId: 'missingReturnType',
+            },
+            {
+              column: 16,
+              data: {
+                name: 'arg',
+              },
+              endColumn: 19,
+              endLine: 15,
+              line: 15,
+              messageId: 'missingArgType',
+            },
+          ],
         },
         {
-          column: 12,
-          data: {
-            name: 'value',
-          },
-          endColumn: 17,
-          endLine: 7,
-          line: 7,
-          messageId: 'missingArgType',
-        },
-        {
-          column: 3,
-          endColumn: 9,
-          endLine: 8,
-          line: 8,
-          messageId: 'missingReturnType',
-        },
-        {
-          column: 3,
-          endColumn: 11,
-          endLine: 11,
-          line: 11,
-          messageId: 'missingReturnType',
-        },
-        {
-          column: 11,
-          data: {
-            name: 'arg',
-          },
-          endColumn: 14,
-          endLine: 11,
-          line: 11,
-          messageId: 'missingArgType',
-        },
-        {
-          column: 15,
-          endColumn: 21,
-          endLine: 15,
-          line: 15,
-          messageId: 'missingReturnType',
-        },
-        {
-          column: 16,
-          data: {
-            name: 'arg',
-          },
-          endColumn: 19,
-          endLine: 15,
-          line: 15,
-          messageId: 'missingArgType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 export class Foo {
   public a = () => {};
   public b = function () {};
@@ -1046,200 +1048,200 @@ export class Foo {
   static e = function () {};
 }
       `,
-      errors: [
-        {
-          column: 3,
-          endColumn: 14,
-          endLine: 3,
-          line: 3,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 3,
+              endColumn: 14,
+              endLine: 3,
+              line: 3,
+              messageId: 'missingReturnType',
+            },
+            {
+              column: 3,
+              endColumn: 23,
+              endLine: 4,
+              line: 4,
+              messageId: 'missingReturnType',
+            },
+            {
+              column: 3,
+              endColumn: 27,
+              endLine: 5,
+              line: 5,
+              messageId: 'missingReturnType',
+            },
+            {
+              column: 3,
+              endColumn: 14,
+              endLine: 7,
+              line: 7,
+              messageId: 'missingReturnType',
+            },
+            {
+              column: 3,
+              endColumn: 23,
+              endLine: 8,
+              line: 8,
+              messageId: 'missingReturnType',
+            },
+          ],
         },
         {
-          column: 3,
-          endColumn: 23,
-          endLine: 4,
-          line: 4,
-          messageId: 'missingReturnType',
+          code: 'export default () => (true ? () => {} : (): void => {});',
+          errors: [
+            {
+              column: 19,
+              endColumn: 21,
+              endLine: 1,
+              line: 1,
+              messageId: 'missingReturnType',
+            },
+          ],
         },
         {
-          column: 3,
-          endColumn: 27,
-          endLine: 5,
-          line: 5,
-          messageId: 'missingReturnType',
+          code: "export var arrowFn = () => 'test';",
+          errors: [
+            {
+              column: 25,
+              endColumn: 27,
+              endLine: 1,
+              line: 1,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [{ allowTypedFunctionExpressions: true }],
         },
         {
-          column: 3,
-          endColumn: 14,
-          endLine: 7,
-          line: 7,
-          messageId: 'missingReturnType',
-        },
-        {
-          column: 3,
-          endColumn: 23,
-          endLine: 8,
-          line: 8,
-          messageId: 'missingReturnType',
-        },
-      ],
-    },
-    {
-      code: 'export default () => (true ? () => {} : (): void => {});',
-      errors: [
-        {
-          column: 19,
-          endColumn: 21,
-          endLine: 1,
-          line: 1,
-          messageId: 'missingReturnType',
-        },
-      ],
-    },
-    {
-      code: "export var arrowFn = () => 'test';",
-      errors: [
-        {
-          column: 25,
-          endColumn: 27,
-          endLine: 1,
-          line: 1,
-          messageId: 'missingReturnType',
-        },
-      ],
-      options: [{ allowTypedFunctionExpressions: true }],
-    },
-    {
-      code: `
+          code: `
 export var funcExpr = function () {
   return 'test';
 };
       `,
-      errors: [
-        {
-          column: 23,
-          endColumn: 32,
-          endLine: 2,
-          line: 2,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 23,
+              endColumn: 32,
+              endLine: 2,
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [{ allowTypedFunctionExpressions: true }],
         },
-      ],
-      options: [{ allowTypedFunctionExpressions: true }],
-    },
-    {
-      code: `
+        {
+          code: `
 interface Foo {}
 export const x: Foo = {
   foo: () => {},
 };
       `,
-      errors: [
-        {
-          column: 3,
-          endColumn: 8,
-          endLine: 4,
-          line: 4,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 3,
+              endColumn: 8,
+              endLine: 4,
+              line: 4,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [{ allowTypedFunctionExpressions: false }],
         },
-      ],
-      options: [{ allowTypedFunctionExpressions: false }],
-    },
-    {
-      code: 'export default () => () => {};',
-      errors: [
         {
-          column: 25,
-          endColumn: 27,
-          endLine: 1,
-          line: 1,
-          messageId: 'missingReturnType',
+          code: 'export default () => () => {};',
+          errors: [
+            {
+              column: 25,
+              endColumn: 27,
+              endLine: 1,
+              line: 1,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [{ allowHigherOrderFunctions: true }],
         },
-      ],
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: 'export default () => function () {};',
-      errors: [
         {
-          column: 22,
-          endColumn: 31,
-          endLine: 1,
-          line: 1,
-          messageId: 'missingReturnType',
+          code: 'export default () => function () {};',
+          errors: [
+            {
+              column: 22,
+              endColumn: 31,
+              endLine: 1,
+              line: 1,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [{ allowHigherOrderFunctions: true }],
         },
-      ],
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+        {
+          code: `
 export default () => {
   return () => {};
 };
       `,
-      errors: [
-        {
-          column: 13,
-          endColumn: 15,
-          endLine: 3,
-          line: 3,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 13,
+              endColumn: 15,
+              endLine: 3,
+              line: 3,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [{ allowHigherOrderFunctions: true }],
         },
-      ],
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+        {
+          code: `
 export default () => {
   return function () {};
 };
       `,
-      errors: [
-        {
-          column: 10,
-          endColumn: 19,
-          endLine: 3,
-          line: 3,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 10,
+              endColumn: 19,
+              endLine: 3,
+              line: 3,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [{ allowHigherOrderFunctions: true }],
         },
-      ],
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+        {
+          code: `
 export function fn() {
   return () => {};
 }
       `,
-      errors: [
-        {
-          column: 13,
-          endColumn: 15,
-          endLine: 3,
-          line: 3,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 13,
+              endColumn: 15,
+              endLine: 3,
+              line: 3,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [{ allowHigherOrderFunctions: true }],
         },
-      ],
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+        {
+          code: `
 export function fn() {
   return function () {};
 }
       `,
-      errors: [
-        {
-          column: 10,
-          endColumn: 19,
-          endLine: 3,
-          line: 3,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 10,
+              endColumn: 19,
+              endLine: 3,
+              line: 3,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [{ allowHigherOrderFunctions: true }],
         },
-      ],
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+        {
+          code: `
 export function FunctionDeclaration() {
   return function FunctionExpression_Within_FunctionDeclaration() {
     return function FunctionExpression_Within_FunctionExpression() {
@@ -1254,84 +1256,84 @@ export function FunctionDeclaration() {
   };
 }
       `,
-      errors: [
-        {
-          column: 14,
-          endColumn: 16,
-          endLine: 9,
-          line: 9,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 14,
+              endColumn: 16,
+              endLine: 9,
+              line: 9,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [{ allowHigherOrderFunctions: true }],
         },
-      ],
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+        {
+          code: `
 export default () => () => {
   return () => {
     return;
   };
 };
       `,
-      errors: [
-        {
-          column: 13,
-          endColumn: 15,
-          endLine: 3,
-          line: 3,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 13,
+              endColumn: 15,
+              endLine: 3,
+              line: 3,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [{ allowHigherOrderFunctions: true }],
         },
-      ],
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+        {
+          code: `
 export const func1 = (value: number) => ({ type: 'X', value }) as any;
 export const func2 = (value: number) => ({ type: 'X', value }) as Action;
       `,
-      errors: [
-        {
-          column: 38,
-          endColumn: 40,
-          endLine: 2,
-          line: 2,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 38,
+              endColumn: 40,
+              endLine: 2,
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+            {
+              column: 38,
+              endColumn: 40,
+              endLine: 3,
+              line: 3,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [
+            {
+              allowDirectConstAssertionInArrowFunctions: true,
+            },
+          ],
         },
         {
-          column: 38,
-          endColumn: 40,
-          endLine: 3,
-          line: 3,
-          messageId: 'missingReturnType',
-        },
-      ],
-      options: [
-        {
-          allowDirectConstAssertionInArrowFunctions: true,
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 export const func = (value: number) => ({ type: 'X', value }) as const;
       `,
-      errors: [
-        {
-          column: 37,
-          endColumn: 39,
-          endLine: 2,
-          line: 2,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 37,
+              endColumn: 39,
+              endLine: 2,
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [
+            {
+              allowDirectConstAssertionInArrowFunctions: false,
+            },
+          ],
         },
-      ],
-      options: [
         {
-          allowDirectConstAssertionInArrowFunctions: false,
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 interface R {
   type: string;
   value: number;
@@ -1340,23 +1342,23 @@ interface R {
 export const func = (value: number) =>
   ({ type: 'X', value }) as const satisfies R;
       `,
-      errors: [
-        {
-          column: 37,
-          endColumn: 39,
-          endLine: 7,
-          line: 7,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 37,
+              endColumn: 39,
+              endLine: 7,
+              line: 7,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [
+            {
+              allowDirectConstAssertionInArrowFunctions: false,
+            },
+          ],
         },
-      ],
-      options: [
         {
-          allowDirectConstAssertionInArrowFunctions: false,
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 export class Test {
   constructor() {}
   get prop() {
@@ -1370,30 +1372,30 @@ export class Test {
   foo = () => 'bar';
 }
       `,
-      errors: [
-        {
-          column: 3,
-          endColumn: 9,
-          endLine: 8,
-          line: 8,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 3,
+              endColumn: 9,
+              endLine: 8,
+              line: 8,
+              messageId: 'missingReturnType',
+            },
+            {
+              column: 3,
+              endColumn: 9,
+              endLine: 12,
+              line: 12,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [
+            {
+              allowedNames: ['prop'],
+            },
+          ],
         },
         {
-          column: 3,
-          endColumn: 9,
-          endLine: 12,
-          line: 12,
-          messageId: 'missingReturnType',
-        },
-      ],
-      options: [
-        {
-          allowedNames: ['prop'],
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 export class Test {
   constructor(
     public foo,
@@ -1401,304 +1403,304 @@ export class Test {
   ) {}
 }
       `,
-      errors: [
-        {
-          column: 12,
-          data: {
-            name: 'foo',
-          },
-          line: 4,
-          messageId: 'missingArgType',
+          errors: [
+            {
+              column: 12,
+              data: {
+                name: 'foo',
+              },
+              line: 4,
+              messageId: 'missingArgType',
+            },
+            {
+              column: 5,
+              data: {
+                name: 'bar',
+              },
+              line: 5,
+              messageId: 'missingArgType',
+            },
+          ],
         },
         {
-          column: 5,
-          data: {
-            name: 'bar',
-          },
-          line: 5,
-          messageId: 'missingArgType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 export const func1 = (value: number) => value;
 export const func2 = (value: number) => value;
       `,
-      errors: [
-        {
-          column: 38,
-          endColumn: 40,
-          endLine: 2,
-          line: 2,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 38,
+              endColumn: 40,
+              endLine: 2,
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [
+            {
+              allowedNames: ['func2'],
+            },
+          ],
         },
-      ],
-      options: [
         {
-          allowedNames: ['func2'],
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 export function fn(test): string {
   return '123';
 }
       `,
-      errors: [
-        {
-          column: 20,
-          data: {
-            name: 'test',
-          },
-          endColumn: 24,
-          endLine: 2,
-          line: 2,
-          messageId: 'missingArgType',
+          errors: [
+            {
+              column: 20,
+              data: {
+                name: 'test',
+              },
+              endColumn: 24,
+              endLine: 2,
+              line: 2,
+              messageId: 'missingArgType',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export const fn = (one: number, two): string => '123';
       `,
-      errors: [
-        {
-          column: 33,
-          data: {
-            name: 'two',
-          },
-          endColumn: 36,
-          endLine: 2,
-          line: 2,
-          messageId: 'missingArgType',
+          errors: [
+            {
+              column: 33,
+              data: {
+                name: 'two',
+              },
+              endColumn: 36,
+              endLine: 2,
+              line: 2,
+              messageId: 'missingArgType',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export function foo(outer) {
   return function (inner) {};
 }
       `,
-      errors: [
-        {
-          data: {
-            name: 'outer',
-          },
-          line: 2,
-          messageId: 'missingArgType',
+          errors: [
+            {
+              data: {
+                name: 'outer',
+              },
+              line: 2,
+              messageId: 'missingArgType',
+            },
+            {
+              line: 3,
+              messageId: 'missingReturnType',
+            },
+            {
+              data: {
+                name: 'inner',
+              },
+              line: 3,
+              messageId: 'missingArgType',
+            },
+          ],
+          options: [{ allowHigherOrderFunctions: true }],
         },
         {
-          line: 3,
-          messageId: 'missingReturnType',
+          code: 'export const baz = arg => arg as const;',
+          errors: [
+            {
+              data: {
+                name: 'arg',
+              },
+              line: 1,
+              messageId: 'missingArgType',
+            },
+          ],
+          options: [{ allowDirectConstAssertionInArrowFunctions: true }],
         },
         {
-          data: {
-            name: 'inner',
-          },
-          line: 3,
-          messageId: 'missingArgType',
-        },
-      ],
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: 'export const baz = arg => arg as const;',
-      errors: [
-        {
-          data: {
-            name: 'arg',
-          },
-          line: 1,
-          messageId: 'missingArgType',
-        },
-      ],
-      options: [{ allowDirectConstAssertionInArrowFunctions: true }],
-    },
-    {
-      code: `
+          code: `
 const foo = arg => arg;
 export default foo;
       `,
-      errors: [
-        {
-          data: {
-            name: 'arg',
-          },
-          line: 2,
-          messageId: 'missingArgType',
+          errors: [
+            {
+              data: {
+                name: 'arg',
+              },
+              line: 2,
+              messageId: 'missingArgType',
+            },
+            {
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+          ],
         },
         {
-          line: 2,
-          messageId: 'missingReturnType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 const foo = arg => arg;
 export = foo;
       `,
-      errors: [
-        {
-          data: {
-            name: 'arg',
-          },
-          line: 2,
-          messageId: 'missingArgType',
+          errors: [
+            {
+              data: {
+                name: 'arg',
+              },
+              line: 2,
+              messageId: 'missingArgType',
+            },
+            {
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+          ],
         },
         {
-          line: 2,
-          messageId: 'missingReturnType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 let foo = (arg: number): number => arg;
 foo = arg => arg;
 export default foo;
       `,
-      errors: [
-        {
-          data: {
-            name: 'arg',
-          },
-          line: 3,
-          messageId: 'missingArgType',
+          errors: [
+            {
+              data: {
+                name: 'arg',
+              },
+              line: 3,
+              messageId: 'missingArgType',
+            },
+            {
+              line: 3,
+              messageId: 'missingReturnType',
+            },
+          ],
         },
         {
-          line: 3,
-          messageId: 'missingReturnType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 const foo = arg => arg;
 export default [foo];
       `,
-      errors: [
-        {
-          data: {
-            name: 'arg',
-          },
-          line: 2,
-          messageId: 'missingArgType',
+          errors: [
+            {
+              data: {
+                name: 'arg',
+              },
+              line: 2,
+              messageId: 'missingArgType',
+            },
+            {
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+          ],
         },
         {
-          line: 2,
-          messageId: 'missingReturnType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 const foo = arg => arg;
 export default { foo };
       `,
-      errors: [
-        {
-          data: {
-            name: 'arg',
-          },
-          line: 2,
-          messageId: 'missingArgType',
+          errors: [
+            {
+              data: {
+                name: 'arg',
+              },
+              line: 2,
+              messageId: 'missingArgType',
+            },
+            {
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+          ],
         },
         {
-          line: 2,
-          messageId: 'missingReturnType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 function foo(arg) {
   return arg;
 }
 export default foo;
       `,
-      errors: [
-        {
-          line: 2,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+            {
+              data: {
+                name: 'arg',
+              },
+              line: 2,
+              messageId: 'missingArgType',
+            },
+          ],
         },
         {
-          data: {
-            name: 'arg',
-          },
-          line: 2,
-          messageId: 'missingArgType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 function foo(arg) {
   return arg;
 }
 export default [foo];
       `,
-      errors: [
-        {
-          line: 2,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+            {
+              data: {
+                name: 'arg',
+              },
+              line: 2,
+              messageId: 'missingArgType',
+            },
+          ],
         },
         {
-          data: {
-            name: 'arg',
-          },
-          line: 2,
-          messageId: 'missingArgType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 function foo(arg) {
   return arg;
 }
 export default { foo };
       `,
-      errors: [
-        {
-          line: 2,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+            {
+              data: {
+                name: 'arg',
+              },
+              line: 2,
+              messageId: 'missingArgType',
+            },
+          ],
         },
         {
-          data: {
-            name: 'arg',
-          },
-          line: 2,
-          messageId: 'missingArgType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 const bar = function foo(arg) {
   return arg;
 };
 export default { bar };
       `,
-      errors: [
-        {
-          line: 2,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+            {
+              data: {
+                name: 'arg',
+              },
+              line: 2,
+              messageId: 'missingArgType',
+            },
+          ],
         },
         {
-          data: {
-            name: 'arg',
-          },
-          line: 2,
-          messageId: 'missingArgType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 class Foo {
   bool(arg) {
     return arg;
@@ -1706,22 +1708,22 @@ class Foo {
 }
 export default Foo;
       `,
-      errors: [
-        {
-          line: 3,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              line: 3,
+              messageId: 'missingReturnType',
+            },
+            {
+              data: {
+                name: 'arg',
+              },
+              line: 3,
+              messageId: 'missingArgType',
+            },
+          ],
         },
         {
-          data: {
-            name: 'arg',
-          },
-          line: 3,
-          messageId: 'missingArgType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 class Foo {
   bool = arg => {
     return arg;
@@ -1729,22 +1731,22 @@ class Foo {
 }
 export default Foo;
       `,
-      errors: [
-        {
-          line: 3,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              line: 3,
+              messageId: 'missingReturnType',
+            },
+            {
+              data: {
+                name: 'arg',
+              },
+              line: 3,
+              messageId: 'missingArgType',
+            },
+          ],
         },
         {
-          data: {
-            name: 'arg',
-          },
-          line: 3,
-          messageId: 'missingArgType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 class Foo {
   bool = function (arg) {
     return arg;
@@ -1752,22 +1754,22 @@ class Foo {
 }
 export default Foo;
       `,
-      errors: [
-        {
-          line: 3,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              line: 3,
+              messageId: 'missingReturnType',
+            },
+            {
+              data: {
+                name: 'arg',
+              },
+              line: 3,
+              messageId: 'missingArgType',
+            },
+          ],
         },
         {
-          data: {
-            name: 'arg',
-          },
-          line: 3,
-          messageId: 'missingArgType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 class Foo {
   accessor bool = arg => {
     return arg;
@@ -1775,22 +1777,22 @@ class Foo {
 }
 export default Foo;
       `,
-      errors: [
-        {
-          data: {
-            name: 'arg',
-          },
-          line: 3,
-          messageId: 'missingArgType',
+          errors: [
+            {
+              data: {
+                name: 'arg',
+              },
+              line: 3,
+              messageId: 'missingArgType',
+            },
+            {
+              line: 3,
+              messageId: 'missingReturnType',
+            },
+          ],
         },
         {
-          line: 3,
-          messageId: 'missingReturnType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 class Foo {
   accessor bool = function (arg) {
     return arg;
@@ -1798,22 +1800,22 @@ class Foo {
 }
 export default Foo;
       `,
-      errors: [
-        {
-          line: 3,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              line: 3,
+              messageId: 'missingReturnType',
+            },
+            {
+              data: {
+                name: 'arg',
+              },
+              line: 3,
+              messageId: 'missingArgType',
+            },
+          ],
         },
         {
-          data: {
-            name: 'arg',
-          },
-          line: 3,
-          messageId: 'missingArgType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 class Foo {
   bool = function (arg) {
     return arg;
@@ -1821,66 +1823,66 @@ class Foo {
 }
 export default [Foo];
       `,
-      errors: [
-        {
-          line: 3,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              line: 3,
+              messageId: 'missingReturnType',
+            },
+            {
+              data: {
+                name: 'arg',
+              },
+              line: 3,
+              messageId: 'missingArgType',
+            },
+          ],
         },
         {
-          data: {
-            name: 'arg',
-          },
-          line: 3,
-          messageId: 'missingArgType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 let test = arg => argl;
 test = (): void => {
   return;
 };
 export default test;
       `,
-      errors: [
-        {
-          data: {
-            name: 'arg',
-          },
-          line: 2,
-          messageId: 'missingArgType',
+          errors: [
+            {
+              data: {
+                name: 'arg',
+              },
+              line: 2,
+              messageId: 'missingArgType',
+            },
+            {
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+          ],
         },
         {
-          line: 2,
-          messageId: 'missingReturnType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 let test = arg => argl;
 test = (): void => {
   return;
 };
 export { test };
       `,
-      errors: [
-        {
-          data: {
-            name: 'arg',
-          },
-          line: 2,
-          messageId: 'missingArgType',
+          errors: [
+            {
+              data: {
+                name: 'arg',
+              },
+              line: 2,
+              messageId: 'missingArgType',
+            },
+            {
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+          ],
         },
         {
-          line: 2,
-          messageId: 'missingReturnType',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 export const foo =
   () =>
   (a: string): ((n: number) => string) => {
@@ -1889,71 +1891,71 @@ export const foo =
     };
   };
       `,
-      errors: [
-        {
-          column: 6,
-          line: 3,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 6,
+              line: 3,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [{ allowHigherOrderFunctions: false }],
         },
-      ],
-      options: [{ allowHigherOrderFunctions: false }],
-    },
-    {
-      code: `
+        {
+          code: `
 export var arrowFn = () => () => {};
       `,
-      errors: [
-        {
-          column: 31,
-          line: 2,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 31,
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [{ allowHigherOrderFunctions: true }],
         },
-      ],
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+        {
+          code: `
 export function fn() {
   return function () {};
 }
       `,
-      errors: [
-        {
-          column: 10,
-          line: 3,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 10,
+              line: 3,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [{ allowHigherOrderFunctions: true }],
         },
-      ],
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+        {
+          code: `
 export function foo(outer) {
   return function (inner): void {};
 }
       `,
-      errors: [
-        {
-          column: 21,
-          data: {
-            name: 'outer',
-          },
-          line: 2,
-          messageId: 'missingArgType',
+          errors: [
+            {
+              column: 21,
+              data: {
+                name: 'outer',
+              },
+              line: 2,
+              messageId: 'missingArgType',
+            },
+            {
+              column: 20,
+              data: {
+                name: 'inner',
+              },
+              line: 3,
+              messageId: 'missingArgType',
+            },
+          ],
+          options: [{ allowHigherOrderFunctions: true }],
         },
         {
-          column: 20,
-          data: {
-            name: 'inner',
-          },
-          line: 3,
-          messageId: 'missingArgType',
-        },
-      ],
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    {
-      code: `
+          code: `
 export function foo(outer: boolean) {
   if (outer) {
     return 'string';
@@ -1961,162 +1963,162 @@ export function foo(outer: boolean) {
   return function (inner): void {};
 }
       `,
-      errors: [
-        {
-          column: 8,
-          data: {
-            name: 'inner',
-          },
-          line: 2,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 8,
+              data: {
+                name: 'inner',
+              },
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [{ allowHigherOrderFunctions: true }],
         },
-      ],
-      options: [{ allowHigherOrderFunctions: true }],
-    },
-    // test a few different argument patterns
-    {
-      code: `
+        // test a few different argument patterns
+        {
+          code: `
 export function foo({ foo }): void {}
       `,
-      errors: [
-        {
-          column: 21,
-          data: {
-            type: 'Object pattern',
-          },
-          line: 2,
-          messageId: 'missingArgTypeUnnamed',
+          errors: [
+            {
+              column: 21,
+              data: {
+                type: 'Object pattern',
+              },
+              line: 2,
+              messageId: 'missingArgTypeUnnamed',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export function foo([bar]): void {}
       `,
-      errors: [
-        {
-          column: 21,
-          data: {
-            type: 'Array pattern',
-          },
-          line: 2,
-          messageId: 'missingArgTypeUnnamed',
+          errors: [
+            {
+              column: 21,
+              data: {
+                type: 'Array pattern',
+              },
+              line: 2,
+              messageId: 'missingArgTypeUnnamed',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export function foo(...bar): void {}
       `,
-      errors: [
-        {
-          column: 21,
-          data: {
-            name: 'bar',
-          },
-          line: 2,
-          messageId: 'missingArgType',
+          errors: [
+            {
+              column: 21,
+              data: {
+                name: 'bar',
+              },
+              line: 2,
+              messageId: 'missingArgType',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export function foo(...[a]): void {}
       `,
-      errors: [
-        {
-          column: 21,
-          data: {
-            type: 'Rest',
-          },
-          line: 2,
-          messageId: 'missingArgTypeUnnamed',
+          errors: [
+            {
+              column: 21,
+              data: {
+                type: 'Rest',
+              },
+              line: 2,
+              messageId: 'missingArgTypeUnnamed',
+            },
+          ],
         },
-      ],
-    },
-    // allowArgumentsExplicitlyTypedAsAny
-    {
-      code: `
+        // allowArgumentsExplicitlyTypedAsAny
+        {
+          code: `
 export function foo(foo: any): void {}
       `,
-      errors: [
-        {
-          column: 21,
-          data: {
-            name: 'foo',
-          },
-          line: 2,
-          messageId: 'anyTypedArg',
+          errors: [
+            {
+              column: 21,
+              data: {
+                name: 'foo',
+              },
+              line: 2,
+              messageId: 'anyTypedArg',
+            },
+          ],
+          options: [{ allowArgumentsExplicitlyTypedAsAny: false }],
         },
-      ],
-      options: [{ allowArgumentsExplicitlyTypedAsAny: false }],
-    },
-    {
-      code: `
+        {
+          code: `
 export function foo({ foo }: any): void {}
       `,
-      errors: [
-        {
-          column: 21,
-          data: {
-            type: 'Object pattern',
-          },
-          line: 2,
-          messageId: 'anyTypedArgUnnamed',
+          errors: [
+            {
+              column: 21,
+              data: {
+                type: 'Object pattern',
+              },
+              line: 2,
+              messageId: 'anyTypedArgUnnamed',
+            },
+          ],
+          options: [{ allowArgumentsExplicitlyTypedAsAny: false }],
         },
-      ],
-      options: [{ allowArgumentsExplicitlyTypedAsAny: false }],
-    },
-    {
-      code: `
+        {
+          code: `
 export function foo([bar]: any): void {}
       `,
-      errors: [
-        {
-          column: 21,
-          data: {
-            type: 'Array pattern',
-          },
-          line: 2,
-          messageId: 'anyTypedArgUnnamed',
+          errors: [
+            {
+              column: 21,
+              data: {
+                type: 'Array pattern',
+              },
+              line: 2,
+              messageId: 'anyTypedArgUnnamed',
+            },
+          ],
+          options: [{ allowArgumentsExplicitlyTypedAsAny: false }],
         },
-      ],
-      options: [{ allowArgumentsExplicitlyTypedAsAny: false }],
-    },
-    {
-      code: `
+        {
+          code: `
 export function foo(...bar: any): void {}
       `,
-      errors: [
-        {
-          column: 21,
-          data: {
-            name: 'bar',
-          },
-          line: 2,
-          messageId: 'anyTypedArg',
+          errors: [
+            {
+              column: 21,
+              data: {
+                name: 'bar',
+              },
+              line: 2,
+              messageId: 'anyTypedArg',
+            },
+          ],
+          options: [{ allowArgumentsExplicitlyTypedAsAny: false }],
         },
-      ],
-      options: [{ allowArgumentsExplicitlyTypedAsAny: false }],
-    },
-    {
-      code: `
+        {
+          code: `
 export function foo(...[a]: any): void {}
       `,
-      errors: [
-        {
-          column: 21,
-          data: {
-            type: 'Rest',
-          },
-          line: 2,
-          messageId: 'anyTypedArgUnnamed',
+          errors: [
+            {
+              column: 21,
+              data: {
+                type: 'Rest',
+              },
+              line: 2,
+              messageId: 'anyTypedArgUnnamed',
+            },
+          ],
+          options: [{ allowArgumentsExplicitlyTypedAsAny: false }],
         },
-      ],
-      options: [{ allowArgumentsExplicitlyTypedAsAny: false }],
-    },
-    {
-      code: `
+        {
+          code: `
 export function func1() {
   return 0;
 }
@@ -2126,81 +2128,81 @@ export const foo = {
   },
 };
       `,
-      errors: [
-        {
-          column: 8,
-          endColumn: 22,
-          endLine: 2,
-          line: 2,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 8,
+              endColumn: 22,
+              endLine: 2,
+              line: 2,
+              messageId: 'missingReturnType',
+            },
+            {
+              column: 3,
+              endColumn: 8,
+              endLine: 6,
+              line: 6,
+              messageId: 'missingReturnType',
+            },
+          ],
+          options: [
+            {
+              allowedNames: [],
+            },
+          ],
         },
         {
-          column: 3,
-          endColumn: 8,
-          endLine: 6,
-          line: 6,
-          messageId: 'missingReturnType',
-        },
-      ],
-      options: [
-        {
-          allowedNames: [],
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 export function test(a: string): string;
 export function test(a: number): number;
 export function test(a: unknown) {
   return a;
 }
       `,
-      errors: [
-        {
-          column: 8,
-          endColumn: 21,
-          line: 4,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 8,
+              endColumn: 21,
+              line: 4,
+              messageId: 'missingReturnType',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export default function test(a: string): string;
 export default function test(a: number): number;
 export default function test(a: unknown) {
   return a;
 }
       `,
-      errors: [
-        {
-          column: 16,
-          endColumn: 29,
-          line: 4,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 16,
+              endColumn: 29,
+              line: 4,
+              messageId: 'missingReturnType',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export default function (a: string): string;
 export default function (a: number): number;
 export default function (a: unknown) {
   return a;
 }
       `,
-      errors: [
-        {
-          column: 16,
-          endColumn: 25,
-          line: 4,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 16,
+              endColumn: 25,
+              line: 4,
+              messageId: 'missingReturnType',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 export class Test {
   test(a: string): string;
   test(a: number): number;
@@ -2209,14 +2211,16 @@ export class Test {
   }
 }
       `,
-      errors: [
-        {
-          column: 3,
-          endColumn: 7,
-          line: 5,
-          messageId: 'missingReturnType',
+          errors: [
+            {
+              column: 3,
+              endColumn: 7,
+              line: 5,
+              messageId: 'missingReturnType',
+            },
+          ],
         },
       ],
-    },
-  ],
+    });
+  });
 });

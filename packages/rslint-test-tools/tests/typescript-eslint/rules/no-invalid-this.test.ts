@@ -1,10 +1,10 @@
+import { describe, test, expect } from '@rstest/core';
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
 import { getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
-  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -18,9 +18,11 @@ const errors = [
   { messageId: 'unexpectedThis' as const },
 ];
 
-ruleTester.run('no-invalid-this', {
-  valid: [
-    `
+describe('no-invalid-this', () => {
+  test('run rule', () => {
+    ruleTester.run('no-invalid-this', {
+      valid: [
+        `
 describe('foo', () => {
   it('does something', function (this: Mocha.Context) {
     this.timeout(100);
@@ -28,7 +30,7 @@ describe('foo', () => {
   });
 });
     `,
-    `
+        `
       interface SomeType {
         prop: string;
       }
@@ -36,19 +38,19 @@ describe('foo', () => {
         this.prop;
       }
     `,
-    `
+        `
 function foo(this: prop) {
   this.propMethod();
 }
     `,
-    `
+        `
 z(function (x, this: context) {
   console.log(x, this);
 });
     `,
-    // https://github.com/eslint/eslint/issues/3287
+        // https://github.com/eslint/eslint/issues/3287
 
-    `
+        `
 function foo() {
   /** @this Obj*/ return function bar() {
     console.log(this);
@@ -57,51 +59,51 @@ function foo() {
 }
     `,
 
-    // https://github.com/eslint/eslint/issues/6824
+        // https://github.com/eslint/eslint/issues/6824
 
-    `
+        `
 var Ctor = function () {
   console.log(this);
   z(x => console.log(x, this));
 };
     `,
-    // Constructors.
-    {
-      code: `
+        // Constructors.
+        {
+          code: `
 function Foo() {
   console.log(this);
   z(x => console.log(x, this));
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 function Foo() {
   console.log(this);
   z(x => console.log(x, this));
 }
       `,
-      options: [{}], // test the default value in schema
-    },
-    {
-      code: `
+          options: [{}], // test the default value in schema
+        },
+        {
+          code: `
 function Foo() {
   console.log(this);
   z(x => console.log(x, this));
 }
       `,
-      options: [{ capIsConstructor: true }], // test explicitly set option to the default value
-    },
-    {
-      code: `
+          options: [{ capIsConstructor: true }], // test explicitly set option to the default value
+        },
+        {
+          code: `
 var Foo = function Foo() {
   console.log(this);
   z(x => console.log(x, this));
 };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 class A {
   constructor() {
     console.log(this);
@@ -109,11 +111,11 @@ class A {
   }
 }
       `,
-    },
+        },
 
-    // On a property.
-    {
-      code: `
+        // On a property.
+        {
+          code: `
 var obj = {
   foo: function () {
     console.log(this);
@@ -121,9 +123,9 @@ var obj = {
   },
 };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 var obj = {
   foo() {
     console.log(this);
@@ -131,9 +133,9 @@ var obj = {
   },
 };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 var obj = {
   foo:
     foo ||
@@ -143,9 +145,9 @@ var obj = {
     },
 };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 var obj = {
   foo: hasNative
     ? foo
@@ -155,9 +157,9 @@ var obj = {
       },
 };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 var obj = {
   foo: (function () {
     return function () {
@@ -167,9 +169,9 @@ var obj = {
   })(),
 };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 Object.defineProperty(obj, 'foo', {
   value: function () {
     console.log(this);
@@ -177,9 +179,9 @@ Object.defineProperty(obj, 'foo', {
   },
 });
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 Object.defineProperties(obj, {
   foo: {
     value: function () {
@@ -189,19 +191,19 @@ Object.defineProperties(obj, {
   },
 });
       `,
-    },
+        },
 
-    // Assigns to a property.
-    {
-      code: `
+        // Assigns to a property.
+        {
+          code: `
 obj.foo = function () {
   console.log(this);
   z(x => console.log(x, this));
 };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 obj.foo =
   foo ||
   function () {
@@ -209,9 +211,9 @@ obj.foo =
     z(x => console.log(x, this));
   };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 obj.foo = foo
   ? bar
   : function () {
@@ -219,9 +221,9 @@ obj.foo = foo
       z(x => console.log(x, this));
     };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 obj.foo = (function () {
   return function () {
     console.log(this);
@@ -229,31 +231,31 @@ obj.foo = (function () {
   };
 })();
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 obj.foo = (() =>
   function () {
     console.log(this);
     z(x => console.log(x, this));
   })();
       `,
-    },
+        },
 
-    // Bind/Call/Apply
-    `
+        // Bind/Call/Apply
+        `
 (function () {
   console.log(this);
   z(x => console.log(x, this));
 }).call(obj);
     `,
-    `
+        `
 var foo = function () {
   console.log(this);
   z(x => console.log(x, this));
 }.bind(obj);
     `,
-    `
+        `
 Reflect.apply(
   function () {
     console.log(this);
@@ -263,15 +265,15 @@ Reflect.apply(
   [],
 );
     `,
-    `
+        `
 (function () {
   console.log(this);
   z(x => console.log(x, this));
 }).apply(obj);
     `,
 
-    // Class Instance Methods.
-    `
+        // Class Instance Methods.
+        `
 class A {
   foo() {
     console.log(this);
@@ -280,21 +282,21 @@ class A {
 }
     `,
 
-    // Class Properties.
-    `
+        // Class Properties.
+        `
 class A {
   b = 0;
   c = this.b;
 }
     `,
 
-    `
+        `
 class A {
   b = new Array(this, 1, 2, 3);
 }
     `,
 
-    `
+        `
 class A {
   b = () => {
     console.log(this);
@@ -302,9 +304,9 @@ class A {
 }
     `,
 
-    // Array methods.
+        // Array methods.
 
-    `
+        `
 Array.from(
   [],
   function () {
@@ -315,65 +317,65 @@ Array.from(
 );
     `,
 
-    `
+        `
 foo.every(function () {
   console.log(this);
   z(x => console.log(x, this));
 }, obj);
     `,
 
-    `
+        `
 foo.filter(function () {
   console.log(this);
   z(x => console.log(x, this));
 }, obj);
     `,
 
-    `
+        `
 foo.find(function () {
   console.log(this);
   z(x => console.log(x, this));
 }, obj);
     `,
 
-    `
+        `
 foo.findIndex(function () {
   console.log(this);
   z(x => console.log(x, this));
 }, obj);
     `,
 
-    `
+        `
 foo.forEach(function () {
   console.log(this);
   z(x => console.log(x, this));
 }, obj);
     `,
 
-    `
+        `
 foo.map(function () {
   console.log(this);
   z(x => console.log(x, this));
 }, obj);
     `,
 
-    `
+        `
 foo.some(function () {
   console.log(this);
   z(x => console.log(x, this));
 }, obj);
     `,
 
-    // @this tag.
+        // @this tag.
 
-    `
+        `
 /** @this Obj */ function foo() {
   console.log(this);
   z(x => console.log(x, this));
 }
     `,
 
-    `
+        `
 foo(
   /* @this Obj */ function () {
     console.log(this);
@@ -382,7 +384,7 @@ foo(
 );
     `,
 
-    `
+        `
 /**
  * @returns {void}
  * @this Obj
@@ -393,14 +395,14 @@ function foo() {
 }
     `,
 
-    `
+        `
 Ctor = function () {
   console.log(this);
   z(x => console.log(x, this));
 };
     `,
 
-    `
+        `
 function foo(
   Ctor = function () {
     console.log(this);
@@ -409,7 +411,7 @@ function foo(
 ) {}
     `,
 
-    `
+        `
 [
   obj.method = function () {
     console.log(this);
@@ -418,9 +420,9 @@ function foo(
 ] = a;
     `,
 
-    // Static
+        // Static
 
-    `
+        `
 class A {
   static foo() {
     console.log(this);
@@ -428,18 +430,18 @@ class A {
   }
 }
     `,
-    `
+        `
 class A {
   a = 5;
   b = this.a;
   accessor c = this.a;
 }
     `,
-  ],
+      ],
 
-  invalid: [
-    {
-      code: `
+      invalid: [
+        {
+          code: `
 interface SomeType {
   prop: string;
 }
@@ -447,122 +449,122 @@ function foo() {
   this.prop;
 }
       `,
-      errors: [{ messageId: 'unexpectedThis' }],
-    },
-    // Global.
-    {
-      code: `
-console.log(this);
-z(x => console.log(x, this));
-      `,
-      errors,
-    },
-    {
-      code: `
-console.log(this);
-z(x => console.log(x, this));
-      `,
-      errors,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
-          // @ts-ignore
-          ecmaFeatures: { globalReturn: true },
+          errors: [{ messageId: 'unexpectedThis' }],
         },
-      },
-    },
+        // Global.
+        {
+          code: `
+console.log(this);
+z(x => console.log(x, this));
+      `,
+          errors,
+        },
+        {
+          code: `
+console.log(this);
+z(x => console.log(x, this));
+      `,
+          errors,
+          // @ts-ignore
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaFeatures: { globalReturn: true },
+            },
+          },
+        },
 
-    // IIFE.
-    {
-      code: `
+        // IIFE.
+        {
+          code: `
 (function () {
   console.log(this);
   z(x => console.log(x, this));
 })();
       `,
-      errors,
-    },
+          errors,
+        },
 
-    // Just functions.
-    {
-      code: `
+        // Just functions.
+        {
+          code: `
 function foo() {
   console.log(this);
   z(x => console.log(x, this));
 }
       `,
-      errors,
-    },
-    {
-      code: `
+          errors,
+        },
+        {
+          code: `
 function foo() {
   console.log(this);
   z(x => console.log(x, this));
 }
       `,
-      errors,
-      options: [{ capIsConstructor: false }], // test that the option doesn't reverse the logic and mistakenly allows lowercase functions
-    },
-    {
-      code: `
+          errors,
+          options: [{ capIsConstructor: false }], // test that the option doesn't reverse the logic and mistakenly allows lowercase functions
+        },
+        {
+          code: `
 function Foo() {
   console.log(this);
   z(x => console.log(x, this));
 }
       `,
-      errors,
-      options: [{ capIsConstructor: false }],
-    },
-    {
-      code: `
+          errors,
+          options: [{ capIsConstructor: false }],
+        },
+        {
+          code: `
 function foo() {
   'use strict';
   console.log(this);
   z(x => console.log(x, this));
 }
       `,
-      errors,
-    },
-    {
-      code: `
+          errors,
+        },
+        {
+          code: `
 function Foo() {
   'use strict';
   console.log(this);
   z(x => console.log(x, this));
 }
       `,
-      errors,
-      options: [{ capIsConstructor: false }],
-    },
-    {
-      code: `
+          errors,
+          options: [{ capIsConstructor: false }],
+        },
+        {
+          code: `
 return function () {
   console.log(this);
   z(x => console.log(x, this));
 };
       `,
-      errors,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
+          errors,
           // @ts-ignore
-          ecmaFeatures: { globalReturn: true },
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaFeatures: { globalReturn: true },
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 var foo = function () {
   console.log(this);
   z(x => console.log(x, this));
 }.bar(obj);
       `,
-      errors,
-    },
+          errors,
+        },
 
-    // Functions in methods.
-    {
-      code: `
+        // Functions in methods.
+        {
+          code: `
 var obj = {
   foo: function () {
     function foo() {
@@ -573,10 +575,10 @@ var obj = {
   },
 };
       `,
-      errors,
-    },
-    {
-      code: `
+          errors,
+        },
+        {
+          code: `
 var obj = {
   foo() {
     function foo() {
@@ -587,10 +589,10 @@ var obj = {
   },
 };
       `,
-      errors,
-    },
-    {
-      code: `
+          errors,
+        },
+        {
+          code: `
 var obj = {
   foo: function () {
     return function () {
@@ -600,10 +602,10 @@ var obj = {
   },
 };
       `,
-      errors,
-    },
-    {
-      code: `
+          errors,
+        },
+        {
+          code: `
 var obj = {
   foo: function () {
     'use strict';
@@ -614,10 +616,10 @@ var obj = {
   },
 };
       `,
-      errors,
-    },
-    {
-      code: `
+          errors,
+        },
+        {
+          code: `
 obj.foo = function () {
   return function () {
     console.log(this);
@@ -625,10 +627,10 @@ obj.foo = function () {
   };
 };
       `,
-      errors,
-    },
-    {
-      code: `
+          errors,
+        },
+        {
+          code: `
 obj.foo = function () {
   'use strict';
   return function () {
@@ -637,13 +639,13 @@ obj.foo = function () {
   };
 };
       `,
-      errors,
-    },
+          errors,
+        },
 
-    // Class Methods.
+        // Class Methods.
 
-    {
-      code: `
+        {
+          code: `
 class A {
   foo() {
     return function () {
@@ -653,13 +655,13 @@ class A {
   }
 }
       `,
-      errors,
-    },
+          errors,
+        },
 
-    // Class Properties.
+        // Class Properties.
 
-    {
-      code: `
+        {
+          code: `
 class A {
   b = new Array(1, 2, function () {
     console.log(this);
@@ -667,11 +669,11 @@ class A {
   });
 }
       `,
-      errors,
-    },
+          errors,
+        },
 
-    {
-      code: `
+        {
+          code: `
 class A {
   b = () => {
     function c() {
@@ -681,13 +683,13 @@ class A {
   };
 }
       `,
-      errors,
-    },
+          errors,
+        },
 
-    // Class Static methods.
+        // Class Static methods.
 
-    {
-      code: `
+        {
+          code: `
 obj.foo = (function () {
   return () => {
     console.log(this);
@@ -695,216 +697,216 @@ obj.foo = (function () {
   };
 })();
       `,
-      errors,
-    },
-    {
-      code: `
+          errors,
+        },
+        {
+          code: `
 obj.foo = (() => () => {
   console.log(this);
   z(x => console.log(x, this));
 })();
       `,
-      errors,
-    },
-    // Bind/Call/Apply
+          errors,
+        },
+        // Bind/Call/Apply
 
-    {
-      code: `
+        {
+          code: `
 var foo = function () {
   console.log(this);
   z(x => console.log(x, this));
 }.bind(null);
       `,
-      errors,
-    },
+          errors,
+        },
 
-    {
-      code: `
+        {
+          code: `
 (function () {
   console.log(this);
   z(x => console.log(x, this));
 }).call(undefined);
       `,
-      errors,
-    },
+          errors,
+        },
 
-    {
-      code: `
+        {
+          code: `
 (function () {
   console.log(this);
   z(x => console.log(x, this));
 }).apply(void 0);
       `,
-      errors,
-    },
+          errors,
+        },
 
-    // Array methods.
-    {
-      code: `
+        // Array methods.
+        {
+          code: `
 Array.from([], function () {
   console.log(this);
   z(x => console.log(x, this));
 });
       `,
-      errors,
-    },
-    {
-      code: `
+          errors,
+        },
+        {
+          code: `
 foo.every(function () {
   console.log(this);
   z(x => console.log(x, this));
 });
       `,
-      errors,
-    },
-    {
-      code: `
+          errors,
+        },
+        {
+          code: `
 foo.filter(function () {
   console.log(this);
   z(x => console.log(x, this));
 });
       `,
-      errors,
-    },
-    {
-      code: `
+          errors,
+        },
+        {
+          code: `
 foo.find(function () {
   console.log(this);
   z(x => console.log(x, this));
 });
       `,
-      errors,
-    },
-    {
-      code: `
+          errors,
+        },
+        {
+          code: `
 foo.findIndex(function () {
   console.log(this);
   z(x => console.log(x, this));
 });
       `,
-      errors,
-    },
-    {
-      code: `
+          errors,
+        },
+        {
+          code: `
 foo.forEach(function () {
   console.log(this);
   z(x => console.log(x, this));
 });
       `,
-      errors,
-    },
-    {
-      code: `
+          errors,
+        },
+        {
+          code: `
 foo.map(function () {
   console.log(this);
   z(x => console.log(x, this));
 });
       `,
-      errors,
-    },
-    {
-      code: `
+          errors,
+        },
+        {
+          code: `
 foo.some(function () {
   console.log(this);
   z(x => console.log(x, this));
 });
       `,
-      errors,
-    },
+          errors,
+        },
 
-    {
-      code: `
+        {
+          code: `
 foo.forEach(function () {
   console.log(this);
   z(x => console.log(x, this));
 }, null);
       `,
-      errors,
-    },
+          errors,
+        },
 
-    // @this tag.
+        // @this tag.
 
-    {
-      code: `
+        {
+          code: `
 /** @returns {void} */ function foo() {
   console.log(this);
   z(x => console.log(x, this));
 }
       `,
-      errors,
-    },
-    {
-      code: `
+          errors,
+        },
+        {
+          code: `
 /** @this Obj */ foo(function () {
   console.log(this);
   z(x => console.log(x, this));
 });
       `,
-      errors,
-    },
+          errors,
+        },
 
-    {
-      code: `
+        {
+          code: `
 var Ctor = function () {
   console.log(this);
   z(x => console.log(x, this));
 };
       `,
-      errors,
-      options: [{ capIsConstructor: false }],
-    },
-    {
-      code: `
+          errors,
+          options: [{ capIsConstructor: false }],
+        },
+        {
+          code: `
 var func = function () {
   console.log(this);
   z(x => console.log(x, this));
 };
       `,
-      errors,
-    },
-    {
-      code: `
+          errors,
+        },
+        {
+          code: `
 var func = function () {
   console.log(this);
   z(x => console.log(x, this));
 };
       `,
-      errors,
-      options: [{ capIsConstructor: false }],
-    },
+          errors,
+          options: [{ capIsConstructor: false }],
+        },
 
-    {
-      code: `
+        {
+          code: `
 Ctor = function () {
   console.log(this);
   z(x => console.log(x, this));
 };
       `,
-      errors,
-      options: [{ capIsConstructor: false }],
-    },
-    {
-      code: `
+          errors,
+          options: [{ capIsConstructor: false }],
+        },
+        {
+          code: `
 func = function () {
   console.log(this);
   z(x => console.log(x, this));
 };
       `,
-      errors,
-    },
-    {
-      code: `
+          errors,
+        },
+        {
+          code: `
 func = function () {
   console.log(this);
   z(x => console.log(x, this));
 };
       `,
-      errors,
-      options: [{ capIsConstructor: false }],
-    },
+          errors,
+          options: [{ capIsConstructor: false }],
+        },
 
-    {
-      code: `
+        {
+          code: `
 function foo(
   func = function () {
     console.log(this);
@@ -912,11 +914,11 @@ function foo(
   },
 ) {}
       `,
-      errors,
-    },
+          errors,
+        },
 
-    {
-      code: `
+        {
+          code: `
 [
   func = function () {
     console.log(this);
@@ -924,7 +926,9 @@ function foo(
   },
 ] = a;
       `,
-      errors,
-    },
-  ],
+          errors,
+        },
+      ],
+    });
+  });
 });

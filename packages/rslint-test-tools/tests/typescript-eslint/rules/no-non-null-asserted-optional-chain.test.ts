@@ -1,10 +1,9 @@
+import { describe, test, expect } from '@rstest/core';
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
 import { getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
-
 const ruleTester = new RuleTester({
-  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -13,162 +12,166 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('no-non-null-asserted-optional-chain', {
-  valid: [
-    'foo.bar!;',
-    'foo.bar!.baz;',
-    'foo.bar!.baz();',
-    'foo.bar()!;',
-    'foo.bar()!();',
-    'foo.bar()!.baz;',
-    'foo?.bar;',
-    'foo?.bar();',
-    '(foo?.bar).baz!;',
-    '(foo?.bar()).baz!;',
-    'foo?.bar!.baz;',
-    'foo?.bar!();',
-    "foo?.['bar']!.baz;",
-  ],
-  invalid: [
-    {
-      code: 'foo?.bar!;',
-      errors: [
+describe('no-non-null-asserted-optional-chain', () => {
+  test('rule tests', () => {
+    ruleTester.run('no-non-null-asserted-optional-chain', {
+      valid: [
+        'foo.bar!;',
+        'foo.bar!.baz;',
+        'foo.bar!.baz();',
+        'foo.bar()!;',
+        'foo.bar()!();',
+        'foo.bar()!.baz;',
+        'foo?.bar;',
+        'foo?.bar();',
+        '(foo?.bar).baz!;',
+        '(foo?.bar()).baz!;',
+        'foo?.bar!.baz;',
+        'foo?.bar!();',
+        "foo?.['bar']!.baz;",
+      ],
+      invalid: [
         {
-          messageId: 'noNonNullOptionalChain',
-          suggestions: [
+          code: 'foo?.bar!;',
+          errors: [
             {
-              messageId: 'suggestRemovingNonNull',
-              output: 'foo?.bar;',
+              messageId: 'noNonNullOptionalChain',
+              suggestions: [
+                {
+                  messageId: 'suggestRemovingNonNull',
+                  output: 'foo?.bar;',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          code: "foo?.['bar']!;",
+          errors: [
+            {
+              messageId: 'noNonNullOptionalChain',
+              suggestions: [
+                {
+                  messageId: 'suggestRemovingNonNull',
+                  output: "foo?.['bar'];",
+                },
+              ],
+            },
+          ],
+        },
+        {
+          code: 'foo?.bar()!;',
+          errors: [
+            {
+              messageId: 'noNonNullOptionalChain',
+              suggestions: [
+                {
+                  messageId: 'suggestRemovingNonNull',
+                  output: 'foo?.bar();',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          code: 'foo.bar?.()!;',
+          errors: [
+            {
+              messageId: 'noNonNullOptionalChain',
+              suggestions: [
+                {
+                  messageId: 'suggestRemovingNonNull',
+                  output: 'foo.bar?.();',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          code: noFormat`(foo?.bar)!.baz`,
+          errors: [
+            {
+              messageId: 'noNonNullOptionalChain',
+              suggestions: [
+                {
+                  messageId: 'suggestRemovingNonNull',
+                  output: `(foo?.bar).baz`,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          code: noFormat`(foo?.bar)!().baz`,
+          errors: [
+            {
+              messageId: 'noNonNullOptionalChain',
+              suggestions: [
+                {
+                  messageId: 'suggestRemovingNonNull',
+                  output: `(foo?.bar)().baz`,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          code: noFormat`(foo?.bar)!`,
+          errors: [
+            {
+              messageId: 'noNonNullOptionalChain',
+              suggestions: [
+                {
+                  messageId: 'suggestRemovingNonNull',
+                  output: `(foo?.bar)`,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          code: noFormat`(foo?.bar)!()`,
+          errors: [
+            {
+              messageId: 'noNonNullOptionalChain',
+              suggestions: [
+                {
+                  messageId: 'suggestRemovingNonNull',
+                  output: `(foo?.bar)()`,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          code: noFormat`(foo?.bar!)`,
+          errors: [
+            {
+              messageId: 'noNonNullOptionalChain',
+              suggestions: [
+                {
+                  messageId: 'suggestRemovingNonNull',
+                  output: `(foo?.bar)`,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          code: noFormat`(foo?.bar!)()`,
+          errors: [
+            {
+              messageId: 'noNonNullOptionalChain',
+              suggestions: [
+                {
+                  messageId: 'suggestRemovingNonNull',
+                  output: `(foo?.bar)()`,
+                },
+              ],
             },
           ],
         },
       ],
-    },
-    {
-      code: "foo?.['bar']!;",
-      errors: [
-        {
-          messageId: 'noNonNullOptionalChain',
-          suggestions: [
-            {
-              messageId: 'suggestRemovingNonNull',
-              output: "foo?.['bar'];",
-            },
-          ],
-        },
-      ],
-    },
-    {
-      code: 'foo?.bar()!;',
-      errors: [
-        {
-          messageId: 'noNonNullOptionalChain',
-          suggestions: [
-            {
-              messageId: 'suggestRemovingNonNull',
-              output: 'foo?.bar();',
-            },
-          ],
-        },
-      ],
-    },
-    {
-      code: 'foo.bar?.()!;',
-      errors: [
-        {
-          messageId: 'noNonNullOptionalChain',
-          suggestions: [
-            {
-              messageId: 'suggestRemovingNonNull',
-              output: 'foo.bar?.();',
-            },
-          ],
-        },
-      ],
-    },
-    {
-      code: noFormat`(foo?.bar)!.baz`,
-      errors: [
-        {
-          messageId: 'noNonNullOptionalChain',
-          suggestions: [
-            {
-              messageId: 'suggestRemovingNonNull',
-              output: `(foo?.bar).baz`,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      code: noFormat`(foo?.bar)!().baz`,
-      errors: [
-        {
-          messageId: 'noNonNullOptionalChain',
-          suggestions: [
-            {
-              messageId: 'suggestRemovingNonNull',
-              output: `(foo?.bar)().baz`,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      code: noFormat`(foo?.bar)!`,
-      errors: [
-        {
-          messageId: 'noNonNullOptionalChain',
-          suggestions: [
-            {
-              messageId: 'suggestRemovingNonNull',
-              output: `(foo?.bar)`,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      code: noFormat`(foo?.bar)!()`,
-      errors: [
-        {
-          messageId: 'noNonNullOptionalChain',
-          suggestions: [
-            {
-              messageId: 'suggestRemovingNonNull',
-              output: `(foo?.bar)()`,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      code: noFormat`(foo?.bar!)`,
-      errors: [
-        {
-          messageId: 'noNonNullOptionalChain',
-          suggestions: [
-            {
-              messageId: 'suggestRemovingNonNull',
-              output: `(foo?.bar)`,
-            },
-          ],
-        },
-      ],
-    },
-    {
-      code: noFormat`(foo?.bar!)()`,
-      errors: [
-        {
-          messageId: 'noNonNullOptionalChain',
-          suggestions: [
-            {
-              messageId: 'suggestRemovingNonNull',
-              output: `(foo?.bar)()`,
-            },
-          ],
-        },
-      ],
-    },
-  ],
+    });
+  });
 });

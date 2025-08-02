@@ -1,10 +1,10 @@
+import { describe, test, expect } from '@rstest/core';
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
 import { getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
-  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -13,11 +13,13 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('no-unsafe-function-type', {
-  valid: [
-    'let value: () => void;',
-    'let value: <T>(t: T) => T;',
-    `
+describe('no-unsafe-function-type', () => {
+  test('should work', () => {
+    ruleTester.run('no-unsafe-function-type', {
+      valid: [
+        'let value: () => void;',
+        'let value: <T>(t: T) => T;',
+        `
       // create a scope since it's illegal to declare a duplicate identifier
       // 'Function' in the global script scope.
       {
@@ -25,70 +27,72 @@ ruleTester.run('no-unsafe-function-type', {
         let value: Function;
       }
     `,
-  ],
-  invalid: [
-    {
-      code: 'let value: Function;',
-      errors: [
-        {
-          column: 12,
-          line: 1,
-          messageId: 'bannedFunctionType',
-        },
       ],
-      output: null as any,
-    },
-    {
-      code: 'let value: Function[];',
-      errors: [
+      invalid: [
         {
-          column: 12,
-          line: 1,
-          messageId: 'bannedFunctionType',
+          code: 'let value: Function;',
+          errors: [
+            {
+              column: 12,
+              line: 1,
+              messageId: 'bannedFunctionType',
+            },
+          ],
+          output: null as any,
         },
-      ],
-      output: null as any,
-    },
-    {
-      code: 'let value: Function | number;',
-      errors: [
         {
-          column: 12,
-          line: 1,
-          messageId: 'bannedFunctionType',
+          code: 'let value: Function[];',
+          errors: [
+            {
+              column: 12,
+              line: 1,
+              messageId: 'bannedFunctionType',
+            },
+          ],
+          output: null as any,
         },
-      ],
-      output: null as any,
-    },
-    {
-      code: `
+        {
+          code: 'let value: Function | number;',
+          errors: [
+            {
+              column: 12,
+              line: 1,
+              messageId: 'bannedFunctionType',
+            },
+          ],
+          output: null as any,
+        },
+        {
+          code: `
         class Weird implements Function {
           // ...
         }
       `,
-      errors: [
-        {
-          column: 32,
-          line: 2,
-          messageId: 'bannedFunctionType',
+          errors: [
+            {
+              column: 32,
+              line: 2,
+              messageId: 'bannedFunctionType',
+            },
+          ],
+          output: null as any,
         },
-      ],
-      output: null as any,
-    },
-    {
-      code: `
+        {
+          code: `
         interface Weird extends Function {
           // ...
         }
       `,
-      errors: [
-        {
-          column: 33,
-          line: 2,
-          messageId: 'bannedFunctionType',
+          errors: [
+            {
+              column: 33,
+              line: 2,
+              messageId: 'bannedFunctionType',
+            },
+          ],
+          output: null as any,
         },
       ],
-      output: null as any,
-    },
-  ],
+    });
+  });
 });

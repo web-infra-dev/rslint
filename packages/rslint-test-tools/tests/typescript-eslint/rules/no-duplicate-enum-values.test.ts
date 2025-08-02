@@ -1,10 +1,10 @@
+import { describe, test, expect } from '@rstest/core';
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
 import { getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
-  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -13,40 +13,42 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('no-duplicate-enum-values', {
-  valid: [
-    `
+describe('no-duplicate-enum-values', () => {
+  test('rule tests', () => {
+    ruleTester.run('no-duplicate-enum-values', {
+      valid: [
+        `
 enum E {
   A,
   B,
 }
     `,
-    `
+        `
 enum E {
   A = 1,
   B,
 }
     `,
-    `
+        `
 enum E {
   A = 1,
   B = 2,
 }
     `,
-    `
+        `
 enum E {
   A = 'A',
   B = 'B',
 }
     `,
-    `
+        `
 enum E {
   A = 'A',
   B = 'B',
   C,
 }
     `,
-    `
+        `
 enum E {
   A = 'A',
   B = 'B',
@@ -54,14 +56,14 @@ enum E {
   D = 1 + 1,
 }
     `,
-    `
+        `
 enum E {
   A = 3,
   B = 2,
   C,
 }
     `,
-    `
+        `
 enum E {
   A = 'A',
   B = 'B',
@@ -69,62 +71,62 @@ enum E {
   D = foo(),
 }
     `,
-    `
+        `
 enum E {
   A = '',
   B = 0,
 }
     `,
-    `
+        `
 enum E {
   A = 0,
   B = -0,
   C = NaN,
 }
     `,
-    `
+        `
 const A = 'A';
 enum E {
   A = 'A',
   B = \`\${A}\`,
 }
     `,
-  ],
-  invalid: [
-    {
-      code: `
+      ],
+      invalid: [
+        {
+          code: `
 enum E {
   A = 1,
   B = 1,
 }
       `,
-      errors: [
-        {
-          column: 3,
-          data: { value: 1 },
-          line: 4,
-          messageId: 'duplicateValue',
+          errors: [
+            {
+              column: 3,
+              data: { value: 1 },
+              line: 4,
+              messageId: 'duplicateValue',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 enum E {
   A = 'A',
   B = 'A',
 }
       `,
-      errors: [
-        {
-          column: 3,
-          data: { value: 'A' },
-          line: 4,
-          messageId: 'duplicateValue',
+          errors: [
+            {
+              column: 3,
+              data: { value: 'A' },
+              line: 4,
+              messageId: 'duplicateValue',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 enum E {
   A = 'A',
   B = 'A',
@@ -132,52 +134,54 @@ enum E {
   D = 1,
 }
       `,
-      errors: [
-        {
-          column: 3,
-          data: { value: 'A' },
-          line: 4,
-          messageId: 'duplicateValue',
+          errors: [
+            {
+              column: 3,
+              data: { value: 'A' },
+              line: 4,
+              messageId: 'duplicateValue',
+            },
+            {
+              column: 3,
+              data: { value: 1 },
+              line: 6,
+              messageId: 'duplicateValue',
+            },
+          ],
         },
         {
-          column: 3,
-          data: { value: 1 },
-          line: 6,
-          messageId: 'duplicateValue',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 enum E {
   A = 'A',
   B = \`A\`,
 }
       `,
-      errors: [
-        {
-          column: 3,
-          data: { value: 'A' },
-          line: 4,
-          messageId: 'duplicateValue',
+          errors: [
+            {
+              column: 3,
+              data: { value: 'A' },
+              line: 4,
+              messageId: 'duplicateValue',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 enum E {
   A = \`A\`,
   B = \`A\`,
 }
       `,
-      errors: [
-        {
-          column: 3,
-          data: { value: 'A' },
-          line: 4,
-          messageId: 'duplicateValue',
+          errors: [
+            {
+              column: 3,
+              data: { value: 'A' },
+              line: 4,
+              messageId: 'duplicateValue',
+            },
+          ],
         },
       ],
-    },
-  ],
+    });
+  });
 });

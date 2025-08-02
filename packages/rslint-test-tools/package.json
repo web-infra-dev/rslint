@@ -13,11 +13,14 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
-    "@types/node": "24.0.14",
     "@rslint/core": "workspace:*",
+    "@types/node": "24.0.14",
     "@typescript-eslint/rule-tester": "workspace:*"
   },
   "publishConfig": {
     "access": "public"
+  },
+  "dependencies": {
+    "@typescript-eslint/utils": "^8.38.0"
   }
 }

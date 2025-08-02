@@ -1,3 +1,4 @@
+import { describe, test, expect } from '@rstest/core';
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
 import { getFixturesRootDir } from '../RuleTester.ts';
 
@@ -5,7 +6,6 @@ const rootPath = getFixturesRootDir();
 /* eslint-disable @typescript-eslint/internal/plugin-test-formatting -- Prettier doesn't yet support TS 5.6 string literal module identifiers */
 
 const ruleTester = new RuleTester({
-  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -14,16 +14,18 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('consistent-type-exports', {
-  valid: [
-    // unknown module should be ignored
-    "export { Foo } from 'foo';",
+describe('consistent-type-exports', () => {
+  test('rule tests', () => {
+    ruleTester.run('consistent-type-exports', {
+      valid: [
+        // unknown module should be ignored
+        "export { Foo } from 'foo';",
 
-    "export type { Type1 } from './consistent-type-exports';",
-    "export { value1 } from './consistent-type-exports';",
-    'export { value1 as "🍎" } from \'./consistent-type-exports\';',
-    "export type { value1 } from './consistent-type-exports';",
-    `
+        "export type { Type1 } from './consistent-type-exports';",
+        "export { value1 } from './consistent-type-exports';",
+        'export { value1 as "🍎" } from \'./consistent-type-exports\';',
+        "export type { value1 } from './consistent-type-exports';",
+        `
 const variable = 1;
 class Class {}
 enum Enum {}
@@ -34,7 +36,7 @@ namespace ValueNS {
 
 export { variable, Class, Enum, Func, ValueNS };
     `,
-    `
+        `
 type Alias = 1;
 interface IFace {}
 namespace TypeNS {
@@ -43,180 +45,181 @@ namespace TypeNS {
 
 export type { Alias, IFace, TypeNS };
     `,
-    `
+        `
 const foo = 1;
 export type { foo };
     `,
-    `
+        `
 namespace NonTypeNS {
   export const x = 1;
 }
 
 export { NonTypeNS };
     `,
-    "export * from './unknown-module';",
-    "export * from './consistent-type-exports';",
-    "export type * from './consistent-type-exports/type-only-exports';",
-    "export type * from './consistent-type-exports/type-only-reexport';",
-    "export * from './consistent-type-exports/value-reexport';",
-    "export * as foo from './consistent-type-exports';",
-    "export type * as foo from './consistent-type-exports/type-only-exports';",
-    "export type * as foo from './consistent-type-exports/type-only-reexport';",
-    "export * as foo from './consistent-type-exports/value-reexport';",
-  ],
-  invalid: [
-    {
-      code: "export { Type1 } from './consistent-type-exports';",
-      errors: [
-        {
-          column: 1,
-          line: 1,
-          messageId: 'typeOverValue',
-        },
+        "export * from './unknown-module';",
+        "export * from './consistent-type-exports';",
+        "export type * from './consistent-type-exports/type-only-exports';",
+        "export type * from './consistent-type-exports/type-only-reexport';",
+        "export * from './consistent-type-exports/value-reexport';",
+        "export * as foo from './consistent-type-exports';",
+        "export type * as foo from './consistent-type-exports/type-only-exports';",
+        "export type * as foo from './consistent-type-exports/type-only-reexport';",
+        "export * as foo from './consistent-type-exports/value-reexport';",
       ],
-      output: "export type { Type1 } from './consistent-type-exports';",
-    },
-    {
-      code: 'export { Type1 as "🍎" } from \'./consistent-type-exports\';',
-      errors: [
+      invalid: [
         {
-          column: 1,
-          line: 1,
-          messageId: 'typeOverValue',
+          code: "export { Type1 } from './consistent-type-exports';",
+          errors: [
+            {
+              column: 1,
+              line: 1,
+              messageId: 'typeOverValue',
+            },
+          ],
+          output: "export type { Type1 } from './consistent-type-exports';",
         },
-      ],
-      output:
-        'export type { Type1 as "🍎" } from \'./consistent-type-exports\';',
-    },
-    {
-      code: "export { Type1, value1 } from './consistent-type-exports';",
-      errors: [
         {
-          column: 1,
-          line: 1,
-          messageId: 'singleExportIsType',
+          code: 'export { Type1 as "🍎" } from \'./consistent-type-exports\';',
+          errors: [
+            {
+              column: 1,
+              line: 1,
+              messageId: 'typeOverValue',
+            },
+          ],
+          output:
+            'export type { Type1 as "🍎" } from \'./consistent-type-exports\';',
         },
-      ],
-      output:
-        `export type { Type1 } from './consistent-type-exports';\n` +
-        `export { value1 } from './consistent-type-exports';`,
-    },
-    {
-      code: `
+        {
+          code: "export { Type1, value1 } from './consistent-type-exports';",
+          errors: [
+            {
+              column: 1,
+              line: 1,
+              messageId: 'singleExportIsType',
+            },
+          ],
+          output:
+            `export type { Type1 } from './consistent-type-exports';\n` +
+            `export { value1 } from './consistent-type-exports';`,
+        },
+        {
+          code: `
 export { Type1, value1, value2 } from './consistent-type-exports';
       `,
-      errors: [
-        {
-          column: 1,
-          line: 2,
-          messageId: 'singleExportIsType',
-        },
-      ],
-      output: `
+          errors: [
+            {
+              column: 1,
+              line: 2,
+              messageId: 'singleExportIsType',
+            },
+          ],
+          output: `
 export type { Type1 } from './consistent-type-exports';
 export { value1, value2 } from './consistent-type-exports';
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export { Type1, value1, Type2, value2 } from './consistent-type-exports';
       `,
-      errors: [
-        {
-          column: 1,
-          line: 2,
-          messageId: 'multipleExportsAreTypes',
-        },
-      ],
-      output: `
+          errors: [
+            {
+              column: 1,
+              line: 2,
+              messageId: 'multipleExportsAreTypes',
+            },
+          ],
+          output: `
 export type { Type1, Type2 } from './consistent-type-exports';
 export { value1, value2 } from './consistent-type-exports';
       `,
-    },
-    {
-      code: "export { Type2 as Foo } from './consistent-type-exports';",
-      errors: [
-        {
-          column: 1,
-          line: 1,
-          messageId: 'typeOverValue',
         },
-      ],
-      output: "export type { Type2 as Foo } from './consistent-type-exports';",
-    },
-    {
-      code: `
+        {
+          code: "export { Type2 as Foo } from './consistent-type-exports';",
+          errors: [
+            {
+              column: 1,
+              line: 1,
+              messageId: 'typeOverValue',
+            },
+          ],
+          output:
+            "export type { Type2 as Foo } from './consistent-type-exports';",
+        },
+        {
+          code: `
 export { Type2 as Foo, value1 } from './consistent-type-exports';
       `,
-      errors: [
-        {
-          column: 1,
-          line: 2,
-          messageId: 'singleExportIsType',
-        },
-      ],
-      output: `
+          errors: [
+            {
+              column: 1,
+              line: 2,
+              messageId: 'singleExportIsType',
+            },
+          ],
+          output: `
 export type { Type2 as Foo } from './consistent-type-exports';
 export { value1 } from './consistent-type-exports';
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export {
   Type2 as Foo,
   value1 as BScope,
   value2 as CScope,
 } from './consistent-type-exports';
       `,
-      errors: [
-        {
-          column: 1,
-          line: 2,
-          messageId: 'singleExportIsType',
-        },
-      ],
-      output: `
+          errors: [
+            {
+              column: 1,
+              line: 2,
+              messageId: 'singleExportIsType',
+            },
+          ],
+          output: `
 export type { Type2 as Foo } from './consistent-type-exports';
 export { value1 as BScope, value2 as CScope } from './consistent-type-exports';
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 import { Type2 } from './consistent-type-exports';
 export { Type2 };
       `,
-      errors: [
-        {
-          column: 1,
-          line: 3,
-          messageId: 'typeOverValue',
-        },
-      ],
-      output: `
+          errors: [
+            {
+              column: 1,
+              line: 3,
+              messageId: 'typeOverValue',
+            },
+          ],
+          output: `
 import { Type2 } from './consistent-type-exports';
 export type { Type2 };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 import { value2, Type2 } from './consistent-type-exports';
 export { value2, Type2 };
       `,
-      errors: [
-        {
-          column: 1,
-          line: 3,
-          messageId: 'singleExportIsType',
-        },
-      ],
-      output: `
+          errors: [
+            {
+              column: 1,
+              line: 3,
+              messageId: 'singleExportIsType',
+            },
+          ],
+          output: `
 import { value2, Type2 } from './consistent-type-exports';
 export type { Type2 };
 export { value2 };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 type Alias = 1;
 interface IFace {}
 namespace TypeNS {
@@ -226,14 +229,14 @@ namespace TypeNS {
 
 export { Alias, IFace, TypeNS };
       `,
-      errors: [
-        {
-          column: 1,
-          line: 9,
-          messageId: 'multipleExportsAreTypes',
-        },
-      ],
-      output: `
+          errors: [
+            {
+              column: 1,
+              line: 9,
+              messageId: 'multipleExportsAreTypes',
+            },
+          ],
+          output: `
 type Alias = 1;
 interface IFace {}
 namespace TypeNS {
@@ -244,124 +247,124 @@ namespace TypeNS {
 export type { Alias, IFace };
 export { TypeNS };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 namespace TypeNS {
   export interface Foo {}
 }
 
 export { TypeNS };
       `,
-      errors: [
-        {
-          column: 1,
-          line: 6,
-          messageId: 'typeOverValue',
-        },
-      ],
-      output: `
+          errors: [
+            {
+              column: 1,
+              line: 6,
+              messageId: 'typeOverValue',
+            },
+          ],
+          output: `
 namespace TypeNS {
   export interface Foo {}
 }
 
 export type { TypeNS };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 type T = 1;
 export { type T, T };
       `,
-      errors: [
-        {
-          column: 1,
-          line: 3,
-          messageId: 'typeOverValue',
-        },
-      ],
-      output: `
+          errors: [
+            {
+              column: 1,
+              line: 3,
+              messageId: 'typeOverValue',
+            },
+          ],
+          output: `
 type T = 1;
 export type { T, T };
       `,
-    },
-    {
-      code: noFormat`
+        },
+        {
+          code: noFormat`
 type T = 1;
 export { type/* */T, type     /* */T, T };
       `,
-      errors: [
-        {
-          column: 1,
-          line: 3,
-          messageId: 'typeOverValue',
-        },
-      ],
-      output: `
+          errors: [
+            {
+              column: 1,
+              line: 3,
+              messageId: 'typeOverValue',
+            },
+          ],
+          output: `
 type T = 1;
 export type { /* */T, /* */T, T };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 type T = 1;
 const x = 1;
 export { type T, T, x };
       `,
-      errors: [
-        {
-          column: 1,
-          line: 4,
-          messageId: 'singleExportIsType',
-        },
-      ],
-      output: `
+          errors: [
+            {
+              column: 1,
+              line: 4,
+              messageId: 'singleExportIsType',
+            },
+          ],
+          output: `
 type T = 1;
 const x = 1;
 export type { T, T };
 export { x };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 type T = 1;
 const x = 1;
 export { T, x };
       `,
-      errors: [
-        {
-          column: 1,
-          line: 4,
-          messageId: 'singleExportIsType',
-        },
-      ],
-      options: [{ fixMixedExportsWithInlineTypeSpecifier: true }],
-      output: `
+          errors: [
+            {
+              column: 1,
+              line: 4,
+              messageId: 'singleExportIsType',
+            },
+          ],
+          options: [{ fixMixedExportsWithInlineTypeSpecifier: true }],
+          output: `
 type T = 1;
 const x = 1;
 export { type T, x };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 type T = 1;
 export { type T, T };
       `,
-      errors: [
-        {
-          column: 1,
-          line: 3,
-          messageId: 'typeOverValue',
-        },
-      ],
-      options: [{ fixMixedExportsWithInlineTypeSpecifier: true }],
-      output: `
+          errors: [
+            {
+              column: 1,
+              line: 3,
+              messageId: 'typeOverValue',
+            },
+          ],
+          options: [{ fixMixedExportsWithInlineTypeSpecifier: true }],
+          output: `
 type T = 1;
 export type { T, T };
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export {
   Type1,
   Type2 as Foo,
@@ -369,21 +372,21 @@ export {
   value2 as CScope,
 } from './consistent-type-exports';
       `,
-      errors: [
-        {
-          column: 1,
-          line: 2,
-          messageId: 'multipleExportsAreTypes',
-        },
-      ],
-      options: [{ fixMixedExportsWithInlineTypeSpecifier: false }],
-      output: `
+          errors: [
+            {
+              column: 1,
+              line: 2,
+              messageId: 'multipleExportsAreTypes',
+            },
+          ],
+          options: [{ fixMixedExportsWithInlineTypeSpecifier: false }],
+          output: `
 export type { Type1, Type2 as Foo, value1 as BScope } from './consistent-type-exports';
 export { value2 as CScope } from './consistent-type-exports';
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 export {
   Type1,
   Type2 as Foo,
@@ -391,15 +394,15 @@ export {
   value2 as CScope,
 } from './consistent-type-exports';
       `,
-      errors: [
-        {
-          column: 1,
-          line: 2,
-          messageId: 'multipleExportsAreTypes',
-        },
-      ],
-      options: [{ fixMixedExportsWithInlineTypeSpecifier: true }],
-      output: `
+          errors: [
+            {
+              column: 1,
+              line: 2,
+              messageId: 'multipleExportsAreTypes',
+            },
+          ],
+          options: [{ fixMixedExportsWithInlineTypeSpecifier: true }],
+          output: `
 export {
   type Type1,
   type Type2 as Foo,
@@ -407,80 +410,82 @@ export {
   value2 as CScope,
 } from './consistent-type-exports';
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
         export * from './consistent-type-exports/type-only-exports';
       `,
-      errors: [
-        {
-          column: 9,
-          endColumn: 69,
-          endLine: 2,
-          line: 2,
-          messageId: 'typeOverValue',
-        },
-      ],
-      output: `
+          errors: [
+            {
+              column: 9,
+              endColumn: 69,
+              endLine: 2,
+              line: 2,
+              messageId: 'typeOverValue',
+            },
+          ],
+          output: `
         export type * from './consistent-type-exports/type-only-exports';
       `,
-    },
-    {
-      code: noFormat`
+        },
+        {
+          code: noFormat`
         /* comment 1 */ export
           /* comment 2 */ *
             // comment 3
             from './consistent-type-exports/type-only-exports';
       `,
-      errors: [
-        {
-          column: 25,
-          endColumn: 64,
-          endLine: 5,
-          line: 2,
-          messageId: 'typeOverValue',
-        },
-      ],
-      output: `
+          errors: [
+            {
+              column: 25,
+              endColumn: 64,
+              endLine: 5,
+              line: 2,
+              messageId: 'typeOverValue',
+            },
+          ],
+          output: `
         /* comment 1 */ export
           /* comment 2 */ type *
             // comment 3
             from './consistent-type-exports/type-only-exports';
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
         export * from './consistent-type-exports/type-only-reexport';
       `,
-      errors: [
-        {
-          column: 9,
-          endColumn: 70,
-          endLine: 2,
-          line: 2,
-          messageId: 'typeOverValue',
-        },
-      ],
-      output: `
+          errors: [
+            {
+              column: 9,
+              endColumn: 70,
+              endLine: 2,
+              line: 2,
+              messageId: 'typeOverValue',
+            },
+          ],
+          output: `
         export type * from './consistent-type-exports/type-only-reexport';
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
         export * as foo from './consistent-type-exports/type-only-reexport';
       `,
-      errors: [
-        {
-          column: 9,
-          endColumn: 77,
-          endLine: 2,
-          line: 2,
-          messageId: 'typeOverValue',
-        },
-      ],
-      output: `
+          errors: [
+            {
+              column: 9,
+              endColumn: 77,
+              endLine: 2,
+              line: 2,
+              messageId: 'typeOverValue',
+            },
+          ],
+          output: `
         export type * as foo from './consistent-type-exports/type-only-reexport';
       `,
-    },
-  ],
+        },
+      ],
+    });
+  });
 });

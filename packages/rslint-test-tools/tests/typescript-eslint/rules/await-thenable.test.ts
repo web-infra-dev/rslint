@@ -1,3 +1,4 @@
+import { describe, test, expect } from '@rstest/core';
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
 
 import { getFixturesRootDir } from '../RuleTester.ts';
@@ -5,7 +6,6 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
-  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -14,20 +14,22 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('await-thenable', {
-  valid: [
-    `
+describe('await-thenable', () => {
+  test('rule tests', () => {
+    ruleTester.run('await-thenable', {
+      valid: [
+        `
 async function test() {
   await Promise.resolve('value');
   await Promise.reject(new Error('message'));
 }
     `,
-    `
+        `
 async function test() {
   await (async () => true)();
 }
     `,
-    `
+        `
 async function test() {
   function returnsPromise() {
     return Promise.resolve('value');
@@ -35,31 +37,31 @@ async function test() {
   await returnsPromise();
 }
     `,
-    `
+        `
 async function test() {
   async function returnsPromiseAsync() {}
   await returnsPromiseAsync();
 }
     `,
-    `
+        `
 async function test() {
   let anyValue: any;
   await anyValue;
 }
     `,
-    `
+        `
 async function test() {
   let unknownValue: unknown;
   await unknownValue;
 }
     `,
-    `
+        `
 async function test() {
   const numberPromise: Promise<number>;
   await numberPromise;
 }
     `,
-    `
+        `
 async function test() {
   class Foo extends Promise<number> {}
   const foo: Foo = Foo.resolve(2);
@@ -70,7 +72,7 @@ async function test() {
   await bar;
 }
     `,
-    `
+        `
 async function test() {
   await (Math.random() > 0.5 ? numberPromise : 0);
   await (Math.random() > 0.5 ? foo : 0);
@@ -80,7 +82,7 @@ async function test() {
   await intersectionPromise;
 }
     `,
-    `
+        `
 async function test() {
   class Thenable {
     then(callback: () => {}) {}
@@ -90,7 +92,7 @@ async function test() {
   await thenable;
 }
     `,
-    `
+        `
 // https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/promise-polyfill/index.d.ts
 // Type definitions for promise-polyfill 6.0
 // Project: https://github.com/taylorhakes/promise-polyfill
@@ -110,7 +112,7 @@ async function test() {
   await promise;
 }
     `,
-    `
+        `
 // https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/bluebird/index.d.ts
 // Type definitions for bluebird 3.5
 // Project: https://github.com/petkaantonov/bluebird
@@ -177,7 +179,7 @@ async function test() {
   await bluebird;
 }
     `,
-    `
+        `
 const doSomething = async (
   obj1: { a?: { b?: { c?: () => Promise<void> } } },
   obj2: { a?: { b?: { c: () => Promise<void> } } },
@@ -197,8 +199,8 @@ const doSomething = async (
   await callback?.();
 };
     `,
-    {
-      code: `
+        {
+          code: `
 async function* asyncYieldNumbers() {
   yield 1;
   yield 2;
@@ -208,9 +210,9 @@ for await (const value of asyncYieldNumbers()) {
   console.log(value);
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 declare const anee: any;
 async function forAwait() {
   for await (const value of anee) {
@@ -218,213 +220,213 @@ async function forAwait() {
   }
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 declare const asyncIter: AsyncIterable<string> | Iterable<string>;
 for await (const s of asyncIter) {
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 declare const d: AsyncDisposable;
 
 await using foo = d;
 
 export {};
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 using foo = {
   [Symbol.dispose]() {},
 };
 
 export {};
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 await using foo = 3 as any;
 
 export {};
       `,
-    },
-    {
-      // bad bad code but not this rule's problem
-      code: `
+        },
+        {
+          // bad bad code but not this rule's problem
+          code: `
 using foo = {
   async [Symbol.dispose]() {},
 };
 
 export {};
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 declare const maybeAsyncDisposable: Disposable | AsyncDisposable;
 async function foo() {
   await using _ = maybeAsyncDisposable;
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 async function iterateUsing(arr: Array<AsyncDisposable>) {
   for (await using foo of arr) {
   }
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 async function wrapper<T>(value: T) {
   return await value;
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 async function wrapper<T extends unknown>(value: T) {
   return await value;
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 async function wrapper<T extends any>(value: T) {
   return await value;
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 async function wrapper<T extends Promise<unknown>>(value: T) {
   return await value;
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 async function wrapper<T extends number | Promise<unknown>>(value: T) {
   return await value;
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 class C<T> {
   async wrapper<T>(value: T) {
     return await value;
   }
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 class C<R> {
   async wrapper<T extends R>(value: T) {
     return await value;
   }
 }
       `,
-    },
-    {
-      code: `
+        },
+        {
+          code: `
 class C<R extends unknown> {
   async wrapper<T extends R>(value: T) {
     return await value;
   }
 }
       `,
-    },
-  ],
+        },
+      ],
 
-  invalid: [
-    {
-      code: 'await 0;',
-      errors: [
+      invalid: [
         {
-          line: 1,
-          messageId: 'await',
-          suggestions: [
+          code: 'await 0;',
+          errors: [
             {
-              messageId: 'removeAwait',
-              output: ' 0;',
+              line: 1,
+              messageId: 'await',
+              suggestions: [
+                {
+                  messageId: 'removeAwait',
+                  output: ' 0;',
+                },
+              ],
             },
           ],
         },
-      ],
-    },
-    {
-      code: "await 'value';",
-      errors: [
         {
-          line: 1,
-          messageId: 'await',
-          suggestions: [
+          code: "await 'value';",
+          errors: [
             {
-              messageId: 'removeAwait',
-              output: " 'value';",
+              line: 1,
+              messageId: 'await',
+              suggestions: [
+                {
+                  messageId: 'removeAwait',
+                  output: " 'value';",
+                },
+              ],
             },
           ],
         },
-      ],
-    },
-    {
-      code: "async () => await (Math.random() > 0.5 ? '' : 0);",
-      errors: [
         {
-          line: 1,
-          messageId: 'await',
-          suggestions: [
+          code: "async () => await (Math.random() > 0.5 ? '' : 0);",
+          errors: [
             {
-              messageId: 'removeAwait',
-              output: "async () =>  (Math.random() > 0.5 ? '' : 0);",
+              line: 1,
+              messageId: 'await',
+              suggestions: [
+                {
+                  messageId: 'removeAwait',
+                  output: "async () =>  (Math.random() > 0.5 ? '' : 0);",
+                },
+              ],
             },
           ],
         },
-      ],
-    },
-    {
-      code: noFormat`async () => await(Math.random() > 0.5 ? '' : 0);`,
-      errors: [
         {
-          line: 1,
-          messageId: 'await',
-          suggestions: [
+          code: noFormat`async () => await(Math.random() > 0.5 ? '' : 0);`,
+          errors: [
             {
-              messageId: 'removeAwait',
-              output: "async () => (Math.random() > 0.5 ? '' : 0);",
+              line: 1,
+              messageId: 'await',
+              suggestions: [
+                {
+                  messageId: 'removeAwait',
+                  output: "async () => (Math.random() > 0.5 ? '' : 0);",
+                },
+              ],
             },
           ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 class NonPromise extends Array {}
 await new NonPromise();
       `,
-      errors: [
-        {
-          line: 3,
-          messageId: 'await',
-          suggestions: [
+          errors: [
             {
-              messageId: 'removeAwait',
-              output: `
+              line: 3,
+              messageId: 'await',
+              suggestions: [
+                {
+                  messageId: 'removeAwait',
+                  output: `
 class NonPromise extends Array {}
  new NonPromise();
       `,
+                },
+              ],
             },
           ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 async function test() {
   class IncorrectThenable {
     then() {}
@@ -434,14 +436,14 @@ async function test() {
   await thenable;
 }
       `,
-      errors: [
-        {
-          line: 8,
-          messageId: 'await',
-          suggestions: [
+          errors: [
             {
-              messageId: 'removeAwait',
-              output: `
+              line: 8,
+              messageId: 'await',
+              suggestions: [
+                {
+                  messageId: 'removeAwait',
+                  output: `
 async function test() {
   class IncorrectThenable {
     then() {}
@@ -451,76 +453,76 @@ async function test() {
    thenable;
 }
       `,
+                },
+              ],
             },
           ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 declare const callback: (() => void) | undefined;
 await callback?.();
       `,
-      errors: [
-        {
-          line: 3,
-          messageId: 'await',
-          suggestions: [
+          errors: [
             {
-              messageId: 'removeAwait',
-              output: `
+              line: 3,
+              messageId: 'await',
+              suggestions: [
+                {
+                  messageId: 'removeAwait',
+                  output: `
 declare const callback: (() => void) | undefined;
  callback?.();
       `,
+                },
+              ],
             },
           ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 declare const obj: { a?: { b?: () => void } };
 await obj.a?.b?.();
       `,
-      errors: [
-        {
-          line: 3,
-          messageId: 'await',
-          suggestions: [
+          errors: [
             {
-              messageId: 'removeAwait',
-              output: `
+              line: 3,
+              messageId: 'await',
+              suggestions: [
+                {
+                  messageId: 'removeAwait',
+                  output: `
 declare const obj: { a?: { b?: () => void } };
  obj.a?.b?.();
       `,
+                },
+              ],
             },
           ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 declare const obj: { a: { b: { c?: () => void } } } | undefined;
 await obj?.a.b.c?.();
       `,
-      errors: [
-        {
-          line: 3,
-          messageId: 'await',
-          suggestions: [
+          errors: [
             {
-              messageId: 'removeAwait',
-              output: `
+              line: 3,
+              messageId: 'await',
+              suggestions: [
+                {
+                  messageId: 'removeAwait',
+                  output: `
 declare const obj: { a: { b: { c?: () => void } } } | undefined;
  obj?.a.b.c?.();
       `,
+                },
+              ],
             },
           ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 function* yieldNumbers() {
   yield 1;
   yield 2;
@@ -530,17 +532,17 @@ for await (const value of yieldNumbers()) {
   console.log(value);
 }
       `,
-      errors: [
-        {
-          column: 1,
-          endColumn: 42,
-          endLine: 7,
-          line: 7,
-          messageId: 'forAwaitOfNonAsyncIterable',
-          suggestions: [
+          errors: [
             {
-              messageId: 'convertToOrdinaryFor',
-              output: `
+              column: 1,
+              endColumn: 42,
+              endLine: 7,
+              line: 7,
+              messageId: 'forAwaitOfNonAsyncIterable',
+              suggestions: [
+                {
+                  messageId: 'convertToOrdinaryFor',
+                  output: `
 function* yieldNumbers() {
   yield 1;
   yield 2;
@@ -550,13 +552,13 @@ for  (const value of yieldNumbers()) {
   console.log(value);
 }
       `,
+                },
+              ],
             },
           ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 function* yieldNumberPromises() {
   yield Promise.resolve(1);
   yield Promise.resolve(2);
@@ -566,13 +568,13 @@ for await (const value of yieldNumberPromises()) {
   console.log(value);
 }
       `,
-      errors: [
-        {
-          messageId: 'forAwaitOfNonAsyncIterable',
-          suggestions: [
+          errors: [
             {
-              messageId: 'convertToOrdinaryFor',
-              output: `
+              messageId: 'forAwaitOfNonAsyncIterable',
+              suggestions: [
+                {
+                  messageId: 'convertToOrdinaryFor',
+                  output: `
 function* yieldNumberPromises() {
   yield Promise.resolve(1);
   yield Promise.resolve(2);
@@ -582,71 +584,71 @@ for  (const value of yieldNumberPromises()) {
   console.log(value);
 }
       `,
+                },
+              ],
             },
           ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 declare const disposable: Disposable;
 async function foo() {
   await using d = disposable;
 }
       `,
-      errors: [
-        {
-          column: 19,
-          endColumn: 29,
-          endLine: 4,
-          line: 4,
-          messageId: 'awaitUsingOfNonAsyncDisposable',
-          suggestions: [
+          errors: [
             {
-              messageId: 'removeAwait',
-              output: `
+              column: 19,
+              endColumn: 29,
+              endLine: 4,
+              line: 4,
+              messageId: 'awaitUsingOfNonAsyncDisposable',
+              suggestions: [
+                {
+                  messageId: 'removeAwait',
+                  output: `
 declare const disposable: Disposable;
 async function foo() {
    using d = disposable;
 }
       `,
+                },
+              ],
             },
           ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 async function foo() {
   await using _ = {
     async [Symbol.dispose]() {},
   };
 }
       `,
-      errors: [
-        {
-          column: 19,
-          endColumn: 4,
-          endLine: 5,
-          line: 3,
-          messageId: 'awaitUsingOfNonAsyncDisposable',
-          suggestions: [
+          errors: [
             {
-              messageId: 'removeAwait',
-              output: `
+              column: 19,
+              endColumn: 4,
+              endLine: 5,
+              line: 3,
+              messageId: 'awaitUsingOfNonAsyncDisposable',
+              suggestions: [
+                {
+                  messageId: 'removeAwait',
+                  output: `
 async function foo() {
    using _ = {
     async [Symbol.dispose]() {},
   };
 }
       `,
+                },
+              ],
             },
           ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 declare const disposable: Disposable;
 declare const asyncDisposable: AsyncDisposable;
 async function foo() {
@@ -657,32 +659,32 @@ async function foo() {
     e = disposable;
 }
       `,
-      errors: [
-        {
-          column: 19,
-          endColumn: 29,
-          endLine: 5,
-          line: 5,
-          messageId: 'awaitUsingOfNonAsyncDisposable',
+          errors: [
+            {
+              column: 19,
+              endColumn: 29,
+              endLine: 5,
+              line: 5,
+              messageId: 'awaitUsingOfNonAsyncDisposable',
+            },
+            {
+              column: 9,
+              endColumn: 19,
+              endLine: 7,
+              line: 7,
+              messageId: 'awaitUsingOfNonAsyncDisposable',
+            },
+            {
+              column: 9,
+              endColumn: 19,
+              endLine: 9,
+              line: 9,
+              messageId: 'awaitUsingOfNonAsyncDisposable',
+            },
+          ],
         },
         {
-          column: 9,
-          endColumn: 19,
-          endLine: 7,
-          line: 7,
-          messageId: 'awaitUsingOfNonAsyncDisposable',
-        },
-        {
-          column: 9,
-          endColumn: 19,
-          endLine: 9,
-          line: 9,
-          messageId: 'awaitUsingOfNonAsyncDisposable',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
 declare const anee: any;
 declare const disposable: Disposable;
 async function foo() {
@@ -690,101 +692,103 @@ async function foo() {
     b = disposable;
 }
       `,
-      errors: [
-        {
-          column: 9,
-          endColumn: 19,
-          endLine: 6,
-          line: 6,
-          messageId: 'awaitUsingOfNonAsyncDisposable',
+          errors: [
+            {
+              column: 9,
+              endColumn: 19,
+              endLine: 6,
+              line: 6,
+              messageId: 'awaitUsingOfNonAsyncDisposable',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 async function wrapper<T extends number>(value: T) {
   return await value;
 }
       `,
-      errors: [
-        {
-          column: 10,
-          endColumn: 21,
-          endLine: 3,
-          line: 3,
-          messageId: 'await',
-          suggestions: [
+          errors: [
             {
-              messageId: 'removeAwait',
-              output: `
+              column: 10,
+              endColumn: 21,
+              endLine: 3,
+              line: 3,
+              messageId: 'await',
+              suggestions: [
+                {
+                  messageId: 'removeAwait',
+                  output: `
 async function wrapper<T extends number>(value: T) {
   return  value;
 }
       `,
+                },
+              ],
             },
           ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 class C<T> {
   async wrapper<T extends string>(value: T) {
     return await value;
   }
 }
       `,
-      errors: [
-        {
-          column: 12,
-          endColumn: 23,
-          endLine: 4,
-          line: 4,
-          messageId: 'await',
-          suggestions: [
+          errors: [
             {
-              messageId: 'removeAwait',
-              output: `
+              column: 12,
+              endColumn: 23,
+              endLine: 4,
+              line: 4,
+              messageId: 'await',
+              suggestions: [
+                {
+                  messageId: 'removeAwait',
+                  output: `
 class C<T> {
   async wrapper<T extends string>(value: T) {
     return  value;
   }
 }
       `,
+                },
+              ],
             },
           ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 class C<R extends number> {
   async wrapper<T extends R>(value: T) {
     return await value;
   }
 }
       `,
-      errors: [
-        {
-          column: 12,
-          endColumn: 23,
-          endLine: 4,
-          line: 4,
-          messageId: 'await',
-          suggestions: [
+          errors: [
             {
-              messageId: 'removeAwait',
-              output: `
+              column: 12,
+              endColumn: 23,
+              endLine: 4,
+              line: 4,
+              messageId: 'await',
+              suggestions: [
+                {
+                  messageId: 'removeAwait',
+                  output: `
 class C<R extends number> {
   async wrapper<T extends R>(value: T) {
     return  value;
   }
 }
       `,
+                },
+              ],
             },
           ],
         },
       ],
-    },
-  ],
+    });
+  });
 });

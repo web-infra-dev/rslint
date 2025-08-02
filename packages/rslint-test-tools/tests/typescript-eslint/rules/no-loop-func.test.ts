@@ -1,18 +1,11 @@
+import { describe, test, expect } from '@rstest/core';
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
+import { AST_NODE_TYPES } from '@typescript-eslint/utils';
 import { getFixturesRootDir } from '../RuleTester.ts';
-
-// Define AST_NODE_TYPES for test compatibility
-const AST_NODE_TYPES = {
-  FunctionExpression: 'FunctionExpression',
-  FunctionDeclaration: 'FunctionDeclaration',
-  ArrowFunctionExpression: 'ArrowFunctionExpression',
-  Identifier: 'Identifier',
-} as const;
 
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
-  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -21,71 +14,73 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('no-loop-func', {
-  valid: [
-    `
+describe('no-loop-func', () => {
+  test('should work', () => {
+    ruleTester.run('no-loop-func', {
+      valid: [
+        `
 for (let i = 0; i < 10; i++) {
   function foo() {
     console.log('A');
   }
 }
     `,
-    `
+        `
 let someArray: MyType[] = [];
 for (let i = 0; i < 10; i += 1) {
   someArray = someArray.filter((item: MyType) => !!item);
 }
     `,
-    {
-      code: `
+        {
+          code: `
 let someArray: MyType[] = [];
 for (let i = 0; i < 10; i += 1) {
   someArray = someArray.filter((item: MyType) => !!item);
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        globals: {
-          MyType: 'readonly',
+          // @ts-ignore
+          languageOptions: {
+            globals: {
+              MyType: 'readonly',
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 let someArray: MyType[] = [];
 for (let i = 0; i < 10; i += 1) {
   someArray = someArray.filter((item: MyType) => !!item);
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        globals: {
-          MyType: 'writable',
+          // @ts-ignore
+          languageOptions: {
+            globals: {
+              MyType: 'writable',
+            },
+          },
         },
-      },
-    },
-    `
+        `
 type MyType = 1;
 let someArray: MyType[] = [];
 for (let i = 0; i < 10; i += 1) {
   someArray = someArray.filter((item: MyType) => !!item);
 }
     `,
-  ],
-  invalid: [],
-});
+      ],
+      invalid: [],
+    });
 
-// Forked from https://github.com/eslint/eslint/blob/89a4a0a260b8eb11487fe3d5d4d80f4630933eb3/tests/lib/rules/no-loop-func.js
-ruleTester.run('no-loop-func ESLint tests', {
-  valid: [
-    "string = 'function a() {}';",
-    `
+    // Forked from https://github.com/eslint/eslint/blob/89a4a0a260b8eb11487fe3d5d4d80f4630933eb3/tests/lib/rules/no-loop-func.js
+    ruleTester.run('no-loop-func ESLint tests', {
+      valid: [
+        "string = 'function a() {}';",
+        `
 for (var i = 0; i < l; i++) {}
 var a = function () {
   i;
 };
     `,
-    `
+        `
 for (
   var i = 0,
     a = function () {
@@ -95,73 +90,73 @@ for (
   i++
 ) {}
     `,
-    `
+        `
 for (var x in xs.filter(function (x) {
   return x != upper;
 })) {
 }
     `,
-    {
-      code: `
+        {
+          code: `
 for (var x of xs.filter(function (x) {
   return x != upper;
 })) {
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
 
-    // no refers to variables that declared on upper scope.
-    `
+        // no refers to variables that declared on upper scope.
+        `
 for (var i = 0; i < l; i++) {
   (function () {});
 }
     `,
-    `
+        `
 for (var i in {}) {
   (function () {});
 }
     `,
-    {
-      code: `
+        {
+          code: `
 for (var i of {}) {
   (function () {});
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
 
-    // functions which are using unmodified variables are OK.
-    {
-      code: `
+        // functions which are using unmodified variables are OK.
+        {
+          code: `
 for (let i = 0; i < l; i++) {
   (function () {
     i;
   });
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 for (let i in {}) {
   i = 7;
   (function () {
@@ -169,47 +164,47 @@ for (let i in {}) {
   });
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 for (const i of {}) {
   (function () {
     i;
   });
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 for (let i = 0; i < 10; ++i) {
   for (let x in xs.filter(x => x != i)) {
   }
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 let a = 0;
 for (let i = 0; i < l; i++) {
   (function () {
@@ -217,16 +212,16 @@ for (let i = 0; i < l; i++) {
   });
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 let a = 0;
 for (let i in {}) {
   (function () {
@@ -234,16 +229,16 @@ for (let i in {}) {
   });
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 let a = 0;
 for (let i of {}) {
   (function () {
@@ -251,16 +246,16 @@ for (let i of {}) {
   });
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 let a = 0;
 for (let i = 0; i < l; i++) {
   (function () {
@@ -270,16 +265,16 @@ for (let i = 0; i < l; i++) {
   });
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 let a = 0;
 for (let i in {}) {
   function foo() {
@@ -289,16 +284,16 @@ for (let i in {}) {
   }
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 let a = 0;
 for (let i of {}) {
   () => {
@@ -308,16 +303,16 @@ for (let i of {}) {
   };
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 var a = 0;
 for (let i = 0; i < l; i++) {
   (function () {
@@ -325,16 +320,16 @@ for (let i = 0; i < l; i++) {
   });
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 var a = 0;
 for (let i in {}) {
   (function () {
@@ -342,16 +337,16 @@ for (let i in {}) {
   });
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 var a = 0;
 for (let i of {}) {
   (function () {
@@ -359,57 +354,60 @@ for (let i of {}) {
   });
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: [
-        'let result = {};',
-        'for (const score in scores) {',
-        '  const letters = scores[score];',
-        "  letters.split('').forEach(letter => {",
-        '    result[letter] = score;',
-        '  });',
-        '}',
-        'result.__default = 6;',
-      ].join('\n'),
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
+        {
+          code: [
+            'let result = {};',
+            'for (const score in scores) {',
+            '  const letters = scores[score];',
+            "  letters.split('').forEach(letter => {",
+            '    result[letter] = score;',
+            '  });',
+            '}',
+            'result.__default = 6;',
+          ].join('\n'),
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: ['while (true) {', '    (function() { a; });', '}', 'let a;'].join(
-        '\n',
-      ),
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
+        {
+          code: [
+            'while (true) {',
+            '    (function() { a; });',
+            '}',
+            'let a;',
+          ].join('\n'),
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    /*
-     * These loops _look_ like they might be unsafe, but because i is undeclared, they're fine
-     * at least as far as this rule is concerned - the loop doesn't declare/generate the variable.
-     */
-    `
+        /*
+         * These loops _look_ like they might be unsafe, but because i is undeclared, they're fine
+         * at least as far as this rule is concerned - the loop doesn't declare/generate the variable.
+         */
+        `
 while (i) {
   (function () {
     i;
   });
 }
     `,
-    `
+        `
 do {
   (function () {
     i;
@@ -417,13 +415,13 @@ do {
 } while (i);
     `,
 
-    /**
-     * These loops _look_ like they might be unsafe, but because i is declared outside the loop
-     * and is not updated in or after the loop, they're fine as far as this rule is concerned.
-     * The variable that's captured is just the one variable shared by all the loops, but that's
-     * explicitly expected in these cases.
-     */
-    `
+        /**
+         * These loops _look_ like they might be unsafe, but because i is declared outside the loop
+         * and is not updated in or after the loop, they're fine as far as this rule is concerned.
+         * The variable that's captured is just the one variable shared by all the loops, but that's
+         * explicitly expected in these cases.
+         */
+        `
 var i;
 while (i) {
   (function () {
@@ -431,7 +429,7 @@ while (i) {
   });
 }
     `,
-    `
+        `
 var i;
 do {
   (function () {
@@ -440,44 +438,44 @@ do {
 } while (i);
     `,
 
-    /**
-     * These loops use an undeclared variable, and so shouldn't be flagged by this rule,
-     * they'll be picked up by no-undef.
-     */
-    {
-      code: `
+        /**
+         * These loops use an undeclared variable, and so shouldn't be flagged by this rule,
+         * they'll be picked up by no-undef.
+         */
+        {
+          code: `
 for (var i = 0; i < l; i++) {
   (function () {
     undeclared;
   });
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 for (let i = 0; i < l; i++) {
   (function () {
     undeclared;
   });
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 for (var i in {}) {
   i = 7;
   (function () {
@@ -485,16 +483,16 @@ for (var i in {}) {
   });
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 for (let i in {}) {
   i = 7;
   (function () {
@@ -502,48 +500,48 @@ for (let i in {}) {
   });
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 for (const i of {}) {
   (function () {
     undeclared;
   });
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 for (let i = 0; i < 10; ++i) {
   for (let x in xs.filter(x => x != undeclared)) {
   }
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    // IIFE
-    {
-      code: `
+        // IIFE
+        {
+          code: `
 let current = getStart();
 while (current) {
   (() => {
@@ -557,15 +555,15 @@ while (current) {
   current = current.upper;
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    `
+        `
 for (
   var i = 0;
   (function () {
@@ -575,7 +573,7 @@ for (
   i++
 ) {}
     `,
-    `
+        `
 for (
   var i = 0;
   i < l;
@@ -585,55 +583,55 @@ for (
     i++
 ) {}
     `,
-    {
-      code: `
+        {
+          code: `
 for (var i = 0; i < 10; ++i) {
   (() => {
     i;
   })();
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 for (var i = 0; i < 10; ++i) {
   (function a() {
     i;
   })();
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 var arr = [];
 for (var i = 0; i < 5; i++) {
   arr.push((f => f)((() => i)()));
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 var arr = [];
 for (var i = 0; i < 5; i++) {
   arr.push(
@@ -643,34 +641,34 @@ for (var i = 0; i < 5; i++) {
   );
 }
       `,
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-  ],
-  invalid: [
-    {
-      code: `
+      ],
+      invalid: [
+        {
+          code: `
 for (var i = 0; i < l; i++) {
   (function () {
     i;
   });
 }
       `,
-      errors: [
-        {
-          data: { varNames: "'i'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.FunctionExpression,
+          errors: [
+            {
+              data: { varNames: "'i'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.FunctionExpression,
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 for (var i = 0; i < l; i++) {
   for (var j = 0; j < m; j++) {
     (function () {
@@ -679,94 +677,94 @@ for (var i = 0; i < l; i++) {
   }
 }
       `,
-      errors: [
-        {
-          data: { varNames: "'i', 'j'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.FunctionExpression,
+          errors: [
+            {
+              data: { varNames: "'i', 'j'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.FunctionExpression,
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 for (var i in {}) {
   (function () {
     i;
   });
 }
       `,
-      errors: [
-        {
-          data: { varNames: "'i'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.FunctionExpression,
+          errors: [
+            {
+              data: { varNames: "'i'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.FunctionExpression,
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 for (var i of {}) {
   (function () {
     i;
   });
 }
       `,
-      errors: [
-        {
-          data: { varNames: "'i'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.FunctionExpression,
-        },
-      ],
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
+          errors: [
+            {
+              data: { varNames: "'i'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.FunctionExpression,
+            },
+          ],
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 for (var i = 0; i < l; i++) {
   () => {
     i;
   };
 }
       `,
-      errors: [
-        {
-          data: { varNames: "'i'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.ArrowFunctionExpression,
-        },
-      ],
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
+          errors: [
+            {
+              data: { varNames: "'i'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.ArrowFunctionExpression,
+            },
+          ],
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 for (var i = 0; i < l; i++) {
   var a = function () {
     i;
   };
 }
       `,
-      errors: [
-        {
-          data: { varNames: "'i'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.FunctionExpression,
+          errors: [
+            {
+              data: { varNames: "'i'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.FunctionExpression,
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
 for (var i = 0; i < l; i++) {
   function a() {
     i;
@@ -774,18 +772,18 @@ for (var i = 0; i < l; i++) {
   a();
 }
       `,
-      errors: [
-        {
-          data: { varNames: "'i'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.FunctionDeclaration,
+          errors: [
+            {
+              data: { varNames: "'i'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.FunctionDeclaration,
+            },
+          ],
         },
-      ],
-    },
 
-    // Warns functions which are using modified variables.
-    {
-      code: `
+        // Warns functions which are using modified variables.
+        {
+          code: `
 let a;
 for (let i = 0; i < l; i++) {
   a = 1;
@@ -794,23 +792,23 @@ for (let i = 0; i < l; i++) {
   });
 }
       `,
-      errors: [
-        {
-          data: { varNames: "'a'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.FunctionExpression,
-        },
-      ],
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
+          errors: [
+            {
+              data: { varNames: "'a'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.FunctionExpression,
+            },
+          ],
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 let a;
 for (let i in {}) {
   (function () {
@@ -819,23 +817,23 @@ for (let i in {}) {
   a = 1;
 }
       `,
-      errors: [
-        {
-          data: { varNames: "'a'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.FunctionExpression,
-        },
-      ],
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
+          errors: [
+            {
+              data: { varNames: "'a'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.FunctionExpression,
+            },
+          ],
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 let a;
 for (let i of {}) {
   (function () {
@@ -844,23 +842,23 @@ for (let i of {}) {
 }
 a = 1;
       `,
-      errors: [
-        {
-          data: { varNames: "'a'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.FunctionExpression,
-        },
-      ],
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
+          errors: [
+            {
+              data: { varNames: "'a'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.FunctionExpression,
+            },
+          ],
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 let a;
 for (let i = 0; i < l; i++) {
   (function () {
@@ -871,23 +869,23 @@ for (let i = 0; i < l; i++) {
   a = 1;
 }
       `,
-      errors: [
-        {
-          data: { varNames: "'a'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.FunctionExpression,
-        },
-      ],
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
+          errors: [
+            {
+              data: { varNames: "'a'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.FunctionExpression,
+            },
+          ],
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 let a;
 for (let i in {}) {
   a = 1;
@@ -898,23 +896,23 @@ for (let i in {}) {
   }
 }
       `,
-      errors: [
-        {
-          data: { varNames: "'a'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.FunctionDeclaration,
-        },
-      ],
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
+          errors: [
+            {
+              data: { varNames: "'a'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.FunctionDeclaration,
+            },
+          ],
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 let a;
 for (let i of {}) {
   () => {
@@ -925,45 +923,45 @@ for (let i of {}) {
 }
 a = 1;
       `,
-      errors: [
-        {
-          data: { varNames: "'a'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.ArrowFunctionExpression,
-        },
-      ],
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
+          errors: [
+            {
+              data: { varNames: "'a'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.ArrowFunctionExpression,
+            },
+          ],
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 for (var i = 0; i < 10; ++i) {
   for (let x in xs.filter(x => x != i)) {
   }
 }
       `,
-      errors: [
-        {
-          data: { varNames: "'i'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.ArrowFunctionExpression,
-        },
-      ],
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
+          errors: [
+            {
+              data: { varNames: "'i'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.ArrowFunctionExpression,
+            },
+          ],
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 for (let x of xs) {
   let a;
   for (let y of ys) {
@@ -974,23 +972,23 @@ for (let x of xs) {
   }
 }
       `,
-      errors: [
-        {
-          data: { varNames: "'a'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.FunctionExpression,
-        },
-      ],
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
+          errors: [
+            {
+              data: { varNames: "'a'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.FunctionExpression,
+            },
+          ],
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 for (var x of xs) {
   for (let y of ys) {
     (function () {
@@ -999,46 +997,46 @@ for (var x of xs) {
   }
 }
       `,
-      errors: [
-        {
-          data: { varNames: "'x'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.FunctionExpression,
-        },
-      ],
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
+          errors: [
+            {
+              data: { varNames: "'x'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.FunctionExpression,
+            },
+          ],
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 for (var x of xs) {
   (function () {
     x;
   });
 }
       `,
-      errors: [
-        {
-          data: { varNames: "'x'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.FunctionExpression,
-        },
-      ],
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
+          errors: [
+            {
+              data: { varNames: "'x'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.FunctionExpression,
+            },
+          ],
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 var a;
 for (let x of xs) {
   a = 1;
@@ -1047,23 +1045,23 @@ for (let x of xs) {
   });
 }
       `,
-      errors: [
-        {
-          data: { varNames: "'a'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.FunctionExpression,
-        },
-      ],
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
+          errors: [
+            {
+              data: { varNames: "'a'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.FunctionExpression,
+            },
+          ],
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 var a;
 for (let x of xs) {
   (function () {
@@ -1072,23 +1070,23 @@ for (let x of xs) {
   a = 1;
 }
       `,
-      errors: [
-        {
-          data: { varNames: "'a'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.FunctionExpression,
-        },
-      ],
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
+          errors: [
+            {
+              data: { varNames: "'a'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.FunctionExpression,
+            },
+          ],
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 let a;
 function foo() {
   a = 10;
@@ -1100,23 +1098,23 @@ for (let x of xs) {
 }
 foo();
       `,
-      errors: [
-        {
-          data: { varNames: "'a'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.FunctionExpression,
-        },
-      ],
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
+          errors: [
+            {
+              data: { varNames: "'a'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.FunctionExpression,
+            },
+          ],
           // @ts-ignore
-          ecmaVersion: 6,
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
-      },
-    },
-    {
-      code: `
+        {
+          code: `
 let a;
 function foo() {
   a = 10;
@@ -1128,20 +1126,22 @@ function foo() {
 }
 foo();
       `,
-      errors: [
-        {
-          data: { varNames: "'a'" },
-          messageId: 'unsafeRefs',
-          type: AST_NODE_TYPES.FunctionExpression,
+          errors: [
+            {
+              data: { varNames: "'a'" },
+              messageId: 'unsafeRefs',
+              type: AST_NODE_TYPES.FunctionExpression,
+            },
+          ],
+          // @ts-ignore
+          languageOptions: {
+            parserOptions: {
+              // @ts-ignore
+              ecmaVersion: 6,
+            },
+          },
         },
       ],
-      // @ts-ignore
-      languageOptions: {
-        parserOptions: {
-          // @ts-ignore
-          ecmaVersion: 6,
-        },
-      },
-    },
-  ],
+    });
+  });
 });

@@ -1,4 +1,6 @@
+import { describe, test, expect } from '@rstest/core';
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
+import { AST_NODE_TYPES } from '@typescript-eslint/utils';
 import { getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
@@ -26,71 +28,73 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('no-this-alias', {
-  valid: [
-    'const self = foo(this);',
-    {
-      code: `
+describe('no-this-alias', () => {
+  test('rule tests', () => {
+    ruleTester.run('no-this-alias', {
+      valid: [
+        'const self = foo(this);',
+        {
+          code: `
 const { props, state } = this;
 const { length } = this;
 const { length, toString } = this;
 const [foo] = this;
 const [foo, bar] = this;
       `,
-      options: [
-        {
-          allowDestructuring: true,
+          options: [
+            {
+              allowDestructuring: true,
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: 'const self = this;',
-      options: [
         {
-          allowedNames: ['self'],
+          code: 'const self = this;',
+          options: [
+            {
+              allowedNames: ['self'],
+            },
+          ],
         },
-      ],
-    },
-    // https://github.com/bradzacher/eslint-plugin-typescript/issues/281
-    `
+        // https://github.com/bradzacher/eslint-plugin-typescript/issues/281
+        `
 declare module 'foo' {
   declare const aVar: string;
 }
     `,
-  ],
-
-  invalid: [
-    {
-      code: 'const self = this;',
-      errors: [idError],
-      options: [
-        {
-          allowDestructuring: true,
-        },
       ],
-    },
-    {
-      code: 'const self = this;',
-      errors: [idError],
-    },
-    {
-      code: `
+
+      invalid: [
+        {
+          code: 'const self = this;',
+          errors: [idError],
+          options: [
+            {
+              allowDestructuring: true,
+            },
+          ],
+        },
+        {
+          code: 'const self = this;',
+          errors: [idError],
+        },
+        {
+          code: `
 let that;
 that = this;
       `,
-      errors: [idError],
-    },
-    {
-      code: 'const { props, state } = this;',
-      errors: [destructureError],
-      options: [
-        {
-          allowDestructuring: false,
+          errors: [idError],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: 'const { props, state } = this;',
+          errors: [destructureError],
+          options: [
+            {
+              allowDestructuring: false,
+            },
+          ],
+        },
+        {
+          code: `
 var unscoped = this;
 
 function testFunction() {
@@ -100,10 +104,10 @@ const testLambda = () => {
   const inLambda = this;
 };
       `,
-      errors: [idError, idError, idError],
-    },
-    {
-      code: `
+          errors: [idError, idError, idError],
+        },
+        {
+          code: `
 class TestClass {
   constructor() {
     const inConstructor = this;
@@ -123,20 +127,22 @@ class TestClass {
   }
 }
       `,
-      errors: [
-        idError,
-        idError,
-        idError,
-        destructureError,
-        destructureError,
-        arrayDestructureError,
-        arrayDestructureError,
-      ],
-      options: [
-        {
-          allowDestructuring: false,
+          errors: [
+            idError,
+            idError,
+            idError,
+            destructureError,
+            destructureError,
+            arrayDestructureError,
+            arrayDestructureError,
+          ],
+          options: [
+            {
+              allowDestructuring: false,
+            },
+          ],
         },
       ],
-    },
-  ],
+    });
+  });
 });

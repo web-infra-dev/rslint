@@ -1,9 +1,9 @@
+import { describe, test, expect } from '@rstest/core';
 import { RuleTester } from '@typescript-eslint/rule-tester';
 import { getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
 const ruleTester = new RuleTester({
-  // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
@@ -12,21 +12,23 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('consistent-return', {
-  valid: [
-    // base rule
-    `
+describe('consistent-return', () => {
+  test('rule tests', () => {
+    ruleTester.run('consistent-return', {
+      valid: [
+        // base rule
+        `
       function foo() {
         return;
       }
     `,
-    `
+        `
       const foo = (flag: boolean) => {
         if (flag) return true;
         return false;
       };
     `,
-    `
+        `
       class A {
         foo() {
           if (a) return true;
@@ -34,17 +36,17 @@ ruleTester.run('consistent-return', {
         }
       }
     `,
-    {
-      code: `
+        {
+          code: `
         const foo = (flag: boolean) => {
           if (flag) return;
           else return undefined;
         };
       `,
-      options: [{ treatUndefinedAsUnspecified: true }],
-    },
-    // void
-    `
+          options: [{ treatUndefinedAsUnspecified: true }],
+        },
+        // void
+        `
       declare function bar(): void;
       function foo(flag: boolean): void {
         if (flag) {
@@ -53,7 +55,7 @@ ruleTester.run('consistent-return', {
         return;
       }
     `,
-    `
+        `
       declare function bar(): void;
       const foo = (flag: boolean): void => {
         if (flag) {
@@ -62,7 +64,7 @@ ruleTester.run('consistent-return', {
         return bar();
       };
     `,
-    `
+        `
       function foo(flag?: boolean): number | void {
         if (flag) {
           return 42;
@@ -70,7 +72,7 @@ ruleTester.run('consistent-return', {
         return;
       }
     `,
-    `
+        `
       function foo(): boolean;
       function foo(flag: boolean): void;
       function foo(flag?: boolean): boolean | void {
@@ -80,7 +82,7 @@ ruleTester.run('consistent-return', {
         return true;
       }
     `,
-    `
+        `
       class Foo {
         baz(): void {}
         bar(flag: boolean): void {
@@ -89,7 +91,7 @@ ruleTester.run('consistent-return', {
         }
       }
     `,
-    `
+        `
       declare function bar(): void;
       function foo(flag: boolean): void {
         function fn(): string {
@@ -101,7 +103,7 @@ ruleTester.run('consistent-return', {
         return;
       }
     `,
-    `
+        `
       class Foo {
         foo(flag: boolean): void {
           const bar = (): void => {
@@ -115,8 +117,8 @@ ruleTester.run('consistent-return', {
         }
       }
     `,
-    // async
-    `
+        // async
+        `
       declare function bar(): void;
       async function foo(flag?: boolean): Promise<void> {
         if (flag) {
@@ -125,7 +127,7 @@ ruleTester.run('consistent-return', {
         return;
       }
     `,
-    `
+        `
       declare function bar(): Promise<void>;
       async function foo(flag?: boolean): Promise<ReturnType<typeof bar>> {
         if (flag) {
@@ -134,7 +136,7 @@ ruleTester.run('consistent-return', {
         return;
       }
     `,
-    `
+        `
       async function foo(flag?: boolean): Promise<Promise<void | undefined>> {
         if (flag) {
           return undefined;
@@ -142,7 +144,7 @@ ruleTester.run('consistent-return', {
         return;
       }
     `,
-    `
+        `
       type PromiseVoidNumber = Promise<void | number>;
       async function foo(flag?: boolean): PromiseVoidNumber {
         if (flag) {
@@ -151,7 +153,7 @@ ruleTester.run('consistent-return', {
         return;
       }
     `,
-    `
+        `
       class Foo {
         baz(): void {}
         async bar(flag: boolean): Promise<void> {
@@ -160,8 +162,8 @@ ruleTester.run('consistent-return', {
         }
       }
     `,
-    {
-      code: `
+        {
+          code: `
         declare const undef: undefined;
         function foo(flag: boolean) {
           if (flag) {
@@ -170,14 +172,14 @@ ruleTester.run('consistent-return', {
           return 'foo';
         }
       `,
-      options: [
-        {
-          treatUndefinedAsUnspecified: false,
+          options: [
+            {
+              treatUndefinedAsUnspecified: false,
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
         function foo(flag: boolean): undefined {
           if (flag) {
             return undefined;
@@ -185,14 +187,14 @@ ruleTester.run('consistent-return', {
           return;
         }
       `,
-      options: [
-        {
-          treatUndefinedAsUnspecified: true,
+          options: [
+            {
+              treatUndefinedAsUnspecified: true,
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
         declare const undef: undefined;
         function foo(flag: boolean): undefined {
           if (flag) {
@@ -201,53 +203,53 @@ ruleTester.run('consistent-return', {
           return;
         }
       `,
-      options: [
-        {
-          treatUndefinedAsUnspecified: true,
+          options: [
+            {
+              treatUndefinedAsUnspecified: true,
+            },
+          ],
         },
       ],
-    },
-  ],
-  invalid: [
-    {
-      code: `
+      invalid: [
+        {
+          code: `
         function foo(flag: boolean): any {
           if (flag) return true;
           else return;
         }
       `,
-      errors: [
-        {
-          column: 16,
-          data: { name: "Function 'foo'" },
-          endColumn: 23,
-          endLine: 4,
-          line: 4,
-          messageId: 'missingReturnValue',
+          errors: [
+            {
+              column: 16,
+              data: { name: "Function 'foo'" },
+              endColumn: 23,
+              endLine: 4,
+              line: 4,
+              messageId: 'missingReturnValue',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
         function bar(): undefined {}
         function foo(flag: boolean): undefined {
           if (flag) return bar();
           return;
         }
       `,
-      errors: [
-        {
-          column: 11,
-          data: { name: "Function 'foo'" },
-          endColumn: 18,
-          endLine: 5,
-          line: 5,
-          messageId: 'missingReturnValue',
+          errors: [
+            {
+              column: 11,
+              data: { name: "Function 'foo'" },
+              endColumn: 18,
+              endLine: 5,
+              line: 5,
+              messageId: 'missingReturnValue',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
         declare function foo(): void;
         function bar(flag: boolean): undefined {
           function baz(): undefined {
@@ -258,117 +260,117 @@ ruleTester.run('consistent-return', {
           return;
         }
       `,
-      errors: [
-        {
-          column: 13,
-          data: { name: "Function 'baz'" },
-          endColumn: 30,
-          endLine: 6,
-          line: 6,
-          messageId: 'unexpectedReturnValue',
+          errors: [
+            {
+              column: 13,
+              data: { name: "Function 'baz'" },
+              endColumn: 30,
+              endLine: 6,
+              line: 6,
+              messageId: 'unexpectedReturnValue',
+            },
+            {
+              column: 11,
+              data: { name: "Function 'bar'" },
+              endColumn: 18,
+              endLine: 9,
+              line: 9,
+              messageId: 'missingReturnValue',
+            },
+          ],
         },
         {
-          column: 11,
-          data: { name: "Function 'bar'" },
-          endColumn: 18,
-          endLine: 9,
-          line: 9,
-          messageId: 'missingReturnValue',
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
         function foo(flag: boolean): Promise<void> {
           if (flag) return Promise.resolve(void 0);
           else return;
         }
       `,
-      errors: [
-        {
-          column: 16,
-          data: { name: "Function 'foo'" },
-          endColumn: 23,
-          endLine: 4,
-          line: 4,
-          messageId: 'missingReturnValue',
+          errors: [
+            {
+              column: 16,
+              data: { name: "Function 'foo'" },
+              endColumn: 23,
+              endLine: 4,
+              line: 4,
+              messageId: 'missingReturnValue',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
         async function foo(flag: boolean): Promise<string> {
           if (flag) return;
           else return 'value';
         }
       `,
-      errors: [
-        {
-          column: 16,
-          data: { name: "Async function 'foo'" },
-          endColumn: 31,
-          endLine: 4,
-          line: 4,
-          messageId: 'unexpectedReturnValue',
+          errors: [
+            {
+              column: 16,
+              data: { name: "Async function 'foo'" },
+              endColumn: 31,
+              endLine: 4,
+              line: 4,
+              messageId: 'unexpectedReturnValue',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
         async function foo(flag: boolean): Promise<string | undefined> {
           if (flag) return 'value';
           else return;
         }
       `,
-      errors: [
-        {
-          column: 16,
-          data: { name: "Async function 'foo'" },
-          endColumn: 23,
-          endLine: 4,
-          line: 4,
-          messageId: 'missingReturnValue',
+          errors: [
+            {
+              column: 16,
+              data: { name: "Async function 'foo'" },
+              endColumn: 23,
+              endLine: 4,
+              line: 4,
+              messageId: 'missingReturnValue',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
         async function foo(flag: boolean) {
           if (flag) return;
           return 1;
         }
       `,
-      errors: [
-        {
-          column: 11,
-          data: { name: "Async function 'foo'" },
-          endColumn: 20,
-          endLine: 4,
-          line: 4,
-          messageId: 'unexpectedReturnValue',
+          errors: [
+            {
+              column: 11,
+              data: { name: "Async function 'foo'" },
+              endColumn: 20,
+              endLine: 4,
+              line: 4,
+              messageId: 'unexpectedReturnValue',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
         function foo(flag: boolean): Promise<string | undefined> {
           if (flag) return;
           else return 'value';
         }
       `,
-      errors: [
-        {
-          column: 16,
-          data: { name: "Function 'foo'" },
-          endColumn: 31,
-          endLine: 4,
-          line: 4,
-          messageId: 'unexpectedReturnValue',
+          errors: [
+            {
+              column: 16,
+              data: { name: "Function 'foo'" },
+              endColumn: 31,
+              endLine: 4,
+              line: 4,
+              messageId: 'unexpectedReturnValue',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
         declare function bar(): Promise<void>;
         function foo(flag?: boolean): Promise<void> {
           if (flag) {
@@ -377,19 +379,19 @@ ruleTester.run('consistent-return', {
           return;
         }
       `,
-      errors: [
-        {
-          column: 11,
-          data: { name: "Function 'foo'" },
-          endColumn: 18,
-          endLine: 7,
-          line: 7,
-          messageId: 'missingReturnValue',
+          errors: [
+            {
+              column: 11,
+              data: { name: "Function 'foo'" },
+              endColumn: 18,
+              endLine: 7,
+              line: 7,
+              messageId: 'missingReturnValue',
+            },
+          ],
         },
-      ],
-    },
-    {
-      code: `
+        {
+          code: `
         function foo(flag: boolean): undefined | boolean {
           if (flag) {
             return undefined;
@@ -397,24 +399,24 @@ ruleTester.run('consistent-return', {
           return true;
         }
       `,
-      errors: [
-        {
-          column: 11,
-          data: { name: "Function 'foo'" },
-          endColumn: 23,
-          endLine: 6,
-          line: 6,
-          messageId: 'unexpectedReturnValue',
+          errors: [
+            {
+              column: 11,
+              data: { name: "Function 'foo'" },
+              endColumn: 23,
+              endLine: 6,
+              line: 6,
+              messageId: 'unexpectedReturnValue',
+            },
+          ],
+          options: [
+            {
+              treatUndefinedAsUnspecified: true,
+            },
+          ],
         },
-      ],
-      options: [
         {
-          treatUndefinedAsUnspecified: true,
-        },
-      ],
-    },
-    {
-      code: `
+          code: `
         declare const undefOrNum: undefined | number;
         function foo(flag: boolean) {
           if (flag) {
@@ -423,21 +425,23 @@ ruleTester.run('consistent-return', {
           return undefOrNum;
         }
       `,
-      errors: [
-        {
-          column: 11,
-          data: { name: "Function 'foo'" },
-          endColumn: 29,
-          endLine: 7,
-          line: 7,
-          messageId: 'unexpectedReturnValue',
+          errors: [
+            {
+              column: 11,
+              data: { name: "Function 'foo'" },
+              endColumn: 29,
+              endLine: 7,
+              line: 7,
+              messageId: 'unexpectedReturnValue',
+            },
+          ],
+          options: [
+            {
+              treatUndefinedAsUnspecified: true,
+            },
+          ],
         },
       ],
-      options: [
-        {
-          treatUndefinedAsUnspecified: true,
-        },
-      ],
-    },
-  ],
+    });
+  });
 });
