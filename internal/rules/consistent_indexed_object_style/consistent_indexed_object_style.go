@@ -303,19 +303,27 @@ func checkTypeLiteral(ctx rule.RuleContext, node *ast.Node) {
 		// For type Foo = { [key: string]: { [key: string]: Foo } };
 		// The outer type literal contains Foo in its nested structure, so it shouldn't be converted
 		// The inner type literal directly references Foo but should still be converted
-		// The difference is: does the type literal create a circular dependency if converted to Record?
+		// Only block if this type literal would create the circular reference at the top level
 		
 		if parentName != "" {
-			// For any type literal that references its parent type, don't convert
-			// This includes direct references and references in unions
-			// Only check if valueType is not nil (for cases where value type exists)
-			if valueType != nil && containsTypeReferenceWithVisited(valueType, parentName, make(map[string]bool)) {
-				return // Contains self-reference - don't convert
+			// Only block conversion if this type literal is the direct type of the type alias
+			// and contains a self-reference that would create a circular dependency
+			if node.Parent != nil && node.Parent.Kind == ast.KindTypeAliasDeclaration {
+				// This is the direct type of a type alias
+				// Check if converting this would make it reference itself directly
+				// e.g., type Foo = { [key: string]: Foo } should NOT be converted
+				//       but type Foo = { [key: string]: { [key: string]: Foo } } the inner one SHOULD be converted
+				if valueType != nil && isDirectSelfReference(valueType, parentName) {
+					return // Direct self-reference at top level - don't convert
+				}
 			}
+			// For nested type literals, allow conversion even if they reference the parent type
 			
-			// Check if this type alias is part of a circular chain
-			if isPartOfUnifiedCircularChain(ctx, parentName) {
-				return // Part of a circular chain - don't convert
+			// Check if this type alias is part of a circular chain (but skip for nested cases)
+			if node.Parent != nil && node.Parent.Kind == ast.KindTypeAliasDeclaration {
+				if isPartOfUnifiedCircularChain(ctx, parentName) {
+					return // Part of a circular chain - don't convert
+				}
 			}
 		}
 	}
@@ -985,6 +993,23 @@ func isDeeplyReferencingType(node *ast.Node, superTypeName string, visited map[*
 		}
 	}
 
+	return false
+}
+
+// Check if a value type is a direct self-reference (not nested in other structures)
+func isDirectSelfReference(valueType *ast.Node, typeName string) bool {
+	if valueType == nil || typeName == "" {
+		return false
+	}
+	
+	// Check if it's a direct type reference to self
+	if valueType.Kind == ast.KindTypeReference {
+		typeRef := valueType.AsTypeReferenceNode()
+		if typeRef.TypeName != nil && ast.IsIdentifier(typeRef.TypeName) {
+			return typeRef.TypeName.AsIdentifier().Text == typeName
+		}
+	}
+	
 	return false
 }
 

@@ -1,17 +1,22 @@
 #!/usr/bin/env node
 
-// RSLint Automated Rule Porter
+// RSLint Automated Rule Porter - Improved Version
 //
 // This script automatically ports missing TypeScript-ESLint rules to Go for RSLint.
+// Improvements based on learnings from the autoporter branch experience:
+// 1. Better prompts with specific patterns and common pitfalls to avoid
+// 2. Enhanced error detection and recovery
+// 3. Improved test verification with rstest framework support
+// 4. Better handling of rule registration and configuration
+// 5. More comprehensive context for Claude about RSLint patterns
+// 6. Automatic download of missing test files from typescript-eslint repo
+//
 // It uses Claude CLI to:
 // 1. Discover missing rules by comparing TypeScript-ESLint's rules with existing RSLint rules
 // 2. Download rule source and test files from the TypeScript-ESLint repository
 // 3. Port each rule from TypeScript to Go following RSLint patterns
 // 4. Transform and adapt test files to work with RSLint's test framework
 // 5. Register new rules in the appropriate configuration files
-//
-// IMPORTANT: This script ONLY creates and edits files. It does NOT run tests or builds.
-// Use /Users/bytedance/dev/rslint/automate-build-test.js to run tests after porting.
 //
 // Usage: node automated-port.js [--concurrent] [--workers=N] [--list] [--status]
 
@@ -31,7 +36,7 @@ const { randomBytes } = require('crypto');
 const os = require('os');
 
 // Configuration
-const MAX_PORT_ATTEMPTS = 3; // Maximum attempts to port a single rule
+const MAX_PORT_ATTEMPTS = 3;
 const GITHUB_RAW_BASE =
   'https://raw.githubusercontent.com/typescript-eslint/typescript-eslint/main';
 const RULES_INDEX_URL = `${GITHUB_RAW_BASE}/packages/eslint-plugin/src/rules/index.ts`;
@@ -40,12 +45,38 @@ const RULES_INDEX_URL = `${GITHUB_RAW_BASE}/packages/eslint-plugin/src/rules/ind
 const WORK_QUEUE_DIR = join(os.tmpdir(), 'rslint-port-automation');
 const WORKER_ID = process.env.RSLINT_WORKER_ID || null;
 const IS_WORKER = !!WORKER_ID;
-const DEFAULT_WORKERS = 3; // Fewer workers for porting to avoid rate limiting
+const DEFAULT_WORKERS = 3;
 
 // Progress tracking
 let totalRules = 0;
 let completedRules = 0;
 let failedRules = 0;
+
+// Known issues and patterns from our experience
+const KNOWN_ISSUES = {
+  registration: [
+    'dot_notation',
+    'explicit_function_return_type',
+    'method_signature_style',
+    'no_type_alias',
+    'no_var_requires',
+  ],
+  missingTests: [
+    'method_signature_style',
+    'explicit_function_return_type',
+    'no_var_requires',
+  ],
+  commonPitfalls: {
+    astNodeTypes:
+      'Must import AST_NODE_TYPES from @typescript-eslint/utils in tests',
+    testFramework: 'Tests must use rstest framework with describe/test blocks',
+    registration:
+      'Rules must be registered with both namespaced and non-namespaced names',
+    todoPattern: 'Use TODO(port) for incomplete features that need attention',
+    messageIds:
+      'Ensure messageId is included in diagnostics for test compatibility',
+  },
+};
 
 // Work queue management (reused from automate-build-test.js)
 class WorkQueue {
@@ -557,13 +588,98 @@ async function fetchFromGitHub(url) {
   });
 }
 
-// Fetch original TypeScript-ESLint rule sources (similar to automate-build-test.js)
+// Download missing test files
+async function downloadMissingTests() {
+  log('Checking for missing test files...', 'info');
+
+  const testDir = join(
+    __dirname,
+    'packages/rslint-test-tools/tests/typescript-eslint/rules',
+  );
+
+  // Get all existing rules from internal/rules
+  const existingRules = await getExistingRules();
+
+  let downloadedCount = 0;
+  let skippedCount = 0;
+  let failedCount = 0;
+
+  for (const rule of existingRules) {
+    const testFile = join(testDir, `${rule}.test.ts`);
+
+    try {
+      // Check if test file already exists
+      await readFile(testFile, 'utf8');
+      skippedCount++;
+    } catch (err) {
+      if (err.code === 'ENOENT') {
+        // Test file doesn't exist, download it
+        log(`Downloading missing test for ${rule}...`, 'porter');
+
+        const testUrl = `${GITHUB_RAW_BASE}/packages/eslint-plugin/tests/rules/${rule}.test.ts`;
+        const testContent = await fetchFromGitHub(testUrl);
+
+        if (testContent) {
+          // Transform the test content to use rstest format
+          let transformedContent = testContent;
+
+          // Add rstest imports if not present
+          if (!transformedContent.includes('@rstest/core')) {
+            transformedContent = `import { describe, test, expect } from '@rstest/core';
+${transformedContent}`;
+          }
+
+          // Wrap RuleTester.run in describe/test blocks if needed
+          if (
+            !transformedContent.includes('describe(') &&
+            transformedContent.includes('ruleTester.run(')
+          ) {
+            transformedContent = transformedContent.replace(
+              /ruleTester\.run\(['"]([^'"]+)['"],/g,
+              `describe('$1', () => {
+  test('rule tests', () => {
+    ruleTester.run('$1',`,
+            );
+
+            // Find the end of the ruleTester.run call and close the blocks
+            transformedContent = transformedContent.replace(
+              /\);\s*$/m,
+              `);
+  });
+});`,
+            );
+          }
+
+          await writeFile(testFile, transformedContent);
+          log(`✓ Downloaded test for ${rule}`, 'success');
+          downloadedCount++;
+        } else {
+          log(
+            `✗ No test found for ${rule} in TypeScript-ESLint repo`,
+            'warning',
+          );
+          failedCount++;
+        }
+      } else {
+        log(`Error checking test for ${rule}: ${err.message}`, 'error');
+        failedCount++;
+      }
+    }
+  }
+
+  log(
+    `Test file check complete: ${downloadedCount} downloaded, ${skippedCount} already existed, ${failedCount} failed`,
+    'info',
+  );
+
+  return { downloadedCount, skippedCount, failedCount };
+}
+
+// Fetch original TypeScript-ESLint rule sources
 async function fetchOriginalRule(ruleName) {
-  // Try to fetch the rule implementation
   const ruleUrl = `${GITHUB_RAW_BASE}/packages/eslint-plugin/src/rules/${ruleName}.ts`;
   const ruleContent = await fetchFromGitHub(ruleUrl);
 
-  // Try to fetch the test file
   const testUrl = `${GITHUB_RAW_BASE}/packages/eslint-plugin/tests/rules/${ruleName}.test.ts`;
   const testContent = await fetchFromGitHub(testUrl);
 
@@ -572,6 +688,35 @@ async function fetchOriginalRule(ruleName) {
     ruleContent,
     testContent,
   };
+}
+
+// Verify rule registration
+async function verifyRuleRegistration(ruleName) {
+  try {
+    const configPath = join(__dirname, 'internal', 'config', 'config.go');
+    const configContent = await readFile(configPath, 'utf8');
+
+    const snakeCaseRule = ruleName.replace(/-/g, '_');
+    const namespacedName = `@typescript-eslint/${ruleName}`;
+
+    // Check for both registrations
+    const hasNamespaced = configContent.includes(`"${namespacedName}"`);
+    const hasNonNamespaced = configContent.includes(`"${ruleName}"`);
+    const hasImport = configContent.includes(`${snakeCaseRule}.Rule`);
+
+    return {
+      isRegistered: hasNamespaced && hasNonNamespaced && hasImport,
+      hasNamespaced,
+      hasNonNamespaced,
+      hasImport,
+    };
+  } catch (error) {
+    log(
+      `Failed to verify registration for ${ruleName}: ${error.message}`,
+      'error',
+    );
+    return { isRegistered: false };
+  }
 }
 
 // Run Go build to verify compilation
@@ -635,17 +780,19 @@ async function runGoTest(ruleName) {
   }
 }
 
-// Run TypeScript test for a specific rule
+// Run TypeScript test with rstest
 async function runTypeScriptTest(ruleName) {
   try {
     log(`Running TypeScript test for ${ruleName}...`, 'info');
 
+    // Use rstest instead of node --test
     const testResult = await runCommand(
-      'node',
+      'npx',
       [
-        '--import=tsx/esm',
-        '--test',
+        'rstest',
+        'run',
         `tests/typescript-eslint/rules/${ruleName}.test.ts`,
+        '--testTimeout=0',
       ],
       {
         timeout: 120000,
@@ -673,26 +820,137 @@ async function runTypeScriptTest(ruleName) {
   }
 }
 
-// Fix failed tests using Claude CLI
-async function fixTestFailures(
+// Create improved porting prompt with all learnings
+function createImprovedPortingPrompt(ruleName, originalSources) {
+  let prompt = `Go into plan mode first to analyze this TypeScript-ESLint rule and plan the porting to Go.\n\n`;
+
+  prompt += `Task: Port the TypeScript-ESLint rule "${ruleName}" to Go for the RSLint project.\n\n`;
+
+  // Add known issues context
+  if (KNOWN_ISSUES.registration.includes(ruleName)) {
+    prompt += `⚠️ IMPORTANT: This rule was previously missing registration. Make sure to register it properly.\n\n`;
+  }
+  if (KNOWN_ISSUES.missingTests.includes(ruleName)) {
+    prompt += `⚠️ IMPORTANT: This rule was previously missing tests. Make sure to create comprehensive tests.\n\n`;
+  }
+
+  // Add critical learnings section
+  prompt += `--- CRITICAL LEARNINGS FROM PREVIOUS PORTS ---
+
+1. **Rule Registration (MUST DO)**:
+   - Register in /Users/bytedance/dev/rslint/internal/config/config.go
+   - Add BOTH namespaced and non-namespaced versions:
+     GlobalRuleRegistry.Register("@typescript-eslint/${ruleName}", ${ruleName.replace(/-/g, '_')}.Rule)
+     GlobalRuleRegistry.Register("${ruleName}", ${ruleName.replace(/-/g, '_')}.Rule)
+   - Import the rule package at the top of config.go
+
+2. **Test Framework Requirements**:
+   - Tests MUST use rstest framework with describe/test blocks
+   - Import pattern MUST be:
+     import { describe, test, expect } from '@rstest/core';
+     import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
+     import { getFixturesRootDir } from '../RuleTester.ts';
+   - If tests use AST_NODE_TYPES, import from '@typescript-eslint/utils'
+   - Structure:
+     describe('${ruleName}', () => {
+       test('rule tests', () => {
+         ruleTester.run('${ruleName}', { ... });
+       });
+     });
+
+3. **Common Implementation Patterns**:
+   - Use utils.GetNameFromMember() for property name extraction
+   - Include messageId in diagnostics: ctx.ReportNode(node, RuleMessage{MessageId: "camelCaseId", Description: "..."})
+   - For TODO items, use TODO(port) to mark incomplete features
+   - Access class members via node.Members() which returns []*ast.Node directly
+
+4. **Position/Range Handling**:
+   - RSLint uses 1-based line and column numbers
+   - IPC API converts between 0-based and 1-based automatically
+   - Be careful about what part of node to highlight in errors
+
+5. **Testing Best Practices**:
+   - Ensure all test cases from original are preserved
+   - Don't skip test cases - mark with TODO(port) if complex
+   - Test file must compile with TypeScript
+   - Download missing test files from typescript-eslint repo if needed
+
+--- END CRITICAL LEARNINGS ---\n\n`;
+
+  if (originalSources) {
+    prompt += `\n--- ORIGINAL TYPESCRIPT-ESLINT IMPLEMENTATION ---\n`;
+
+    if (originalSources.ruleContent) {
+      prompt += `\nOriginal rule implementation (${originalSources.ruleName}.ts) from GitHub:\n`;
+      prompt += `\`\`\`typescript\n${originalSources.ruleContent}\n\`\`\`\n`;
+    }
+
+    if (originalSources.testContent) {
+      prompt += `\nOriginal test file (${originalSources.ruleName}.test.ts) from GitHub:\n`;
+      prompt += `\`\`\`typescript\n${originalSources.testContent}\n\`\`\`\n`;
+    }
+
+    prompt += `\n--- END ORIGINAL SOURCES ---\n\n`;
+  }
+
+  prompt += `After analyzing in plan mode, port this rule to Go following these steps:
+
+1. **Create the Go rule**:
+   - Directory: /Users/bytedance/dev/rslint/internal/rules/${ruleName.replace(/-/g, '_')}/
+   - Rule file: ${ruleName.replace(/-/g, '_')}.go
+   - Test file: ${ruleName.replace(/-/g, '_')}_test.go
+   - Follow patterns from existing rules like array_type, ban_ts_comment, consistent_indexed_object_style
+
+2. **Transform the test file**:
+   - Save to: /Users/bytedance/dev/rslint/packages/rslint-test-tools/tests/typescript-eslint/rules/${ruleName}.test.ts
+   - MUST use rstest format with describe/test blocks (see learnings above)
+   - Preserve ALL test cases from original
+
+3. **Register the rule**:
+   - Add to /Users/bytedance/dev/rslint/internal/config/config.go
+   - Register with BOTH namespaced and non-namespaced names
+   - Add import for the rule package
+
+4. **Implementation Guidelines**:
+   - Maintain exact same rule logic and behavior as TypeScript version
+   - Use RSLint utility functions (utils package) for common operations
+   - Include proper error messages with messageId
+   - Mark incomplete features with TODO(port)
+   - Don't simplify - implement the full rule functionality
+
+IMPORTANT: 
+- ONLY create and edit files - do NOT run any commands
+- Do NOT skip test cases or simplify implementations
+- Focus on complete, production-ready implementation
+- This script will handle all testing and verification`;
+
+  return prompt;
+}
+
+// Enhanced test failure fix prompt
+function createImprovedFixPrompt(
   ruleName,
   goTestResult,
   tsTestResult,
-  attemptNumber = 1,
+  registrationStatus,
 ) {
-  const maxFixAttempts = 2;
+  let prompt = `Fix the issues for the RSLint rule "${ruleName}". `;
 
-  if (attemptNumber > maxFixAttempts) {
-    log(`Max fix attempts reached for ${ruleName}`, 'error');
-    return false;
+  if (!registrationStatus.isRegistered) {
+    prompt += `\n⚠️ CRITICAL: Rule is not properly registered! `;
+    if (!registrationStatus.hasImport) {
+      prompt += `Missing import in config.go. `;
+    }
+    if (
+      !registrationStatus.hasNamespaced ||
+      !registrationStatus.hasNonNamespaced
+    ) {
+      prompt += `Missing registration (needs both namespaced and non-namespaced). `;
+    }
+    prompt += `\n`;
   }
 
-  log(
-    `Attempting to fix test failures for ${ruleName} (attempt ${attemptNumber}/${maxFixAttempts})`,
-    'warning',
-  );
-
-  let prompt = `Fix the test failures for the RSLint rule "${ruleName}". Here are the test results:\n\n`;
+  prompt += `Here are the test results:\n\n`;
 
   if (!goTestResult.success) {
     prompt += `--- GO TEST FAILURE ---\n`;
@@ -710,6 +968,13 @@ async function fixTestFailures(
     prompt += `--- TYPESCRIPT TEST FAILURE ---\n`;
     prompt += `Exit code: Non-zero\n`;
     if (tsTestResult.output) {
+      // Check for common rstest issues
+      if (tsTestResult.output.includes('No test suites found')) {
+        prompt += `\n⚠️ Test file not using rstest format! Must wrap in describe/test blocks.\n`;
+      }
+      if (tsTestResult.output.includes('AST_NODE_TYPES is not defined')) {
+        prompt += `\n⚠️ Missing AST_NODE_TYPES import from '@typescript-eslint/utils'\n`;
+      }
       prompt += `Stdout:\n${tsTestResult.output}\n`;
     }
     if (tsTestResult.error) {
@@ -718,29 +983,25 @@ async function fixTestFailures(
     prompt += `\n`;
   }
 
-  prompt += `Please analyze these test failures and fix the implementation. Make sure to:
+  prompt += `Please fix these issues. Common fixes needed:
 
-1. Fix any compilation errors in the Go code
-2. Fix any test assertion failures 
-3. Ensure both Go and TypeScript tests pass
-4. Maintain the rule's intended behavior
+1. **Registration Issues**:
+   - Add import in config.go: import "${ruleName.replace(/-/g, '_')} github.com/web-infra-dev/rslint/internal/rules/${ruleName.replace(/-/g, '_')}"
+   - Register with both names in config.go init()
+
+2. **Test Framework Issues**:
+   - Ensure test uses rstest format with describe/test blocks
+   - Import AST_NODE_TYPES from '@typescript-eslint/utils' if needed
+   - Check for duplicate variable declarations
+
+3. **Implementation Issues**:
+   - Ensure messageId is included in all diagnostics
+   - Fix any compilation errors
+   - Implement missing functionality marked with TODO(port)
 
 Focus on the most critical errors first. Do not run any commands - just edit the files to fix the issues.`;
 
-  try {
-    const result = await runClaudePortingWithStreaming(prompt);
-
-    if (result.code === 0) {
-      log(`✓ Claude completed fix attempt for ${ruleName}`, 'success');
-      return true;
-    } else {
-      log(`✗ Claude fix attempt failed for ${ruleName}`, 'error');
-      return false;
-    }
-  } catch (error) {
-    log(`Error during fix attempt for ${ruleName}: ${error.message}`, 'error');
-    return false;
-  }
+  return prompt;
 }
 
 // Port a single rule using Claude CLI with build and test verification
@@ -771,51 +1032,8 @@ async function portSingleRule(ruleName, attemptNumber = 1) {
   }
 
   try {
-    // Create the porting prompt
-    let prompt = `Go into plan mode first to analyze this TypeScript-ESLint rule and plan the porting to Go.\n\n`;
-
-    prompt += `Task: Port the TypeScript-ESLint rule "${ruleName}" to Go for the RSLint project.\n\n`;
-
-    if (originalSources) {
-      prompt += `\n--- ORIGINAL TYPESCRIPT-ESLINT IMPLEMENTATION ---\n`;
-
-      if (originalSources.ruleContent) {
-        prompt += `\nOriginal rule implementation (${originalSources.ruleName}.ts) from GitHub:\n`;
-        prompt += `\`\`\`typescript\n${originalSources.ruleContent}\n\`\`\`\n`;
-      }
-
-      if (originalSources.testContent) {
-        prompt += `\nOriginal test file (${originalSources.ruleName}.test.ts) from GitHub:\n`;
-        prompt += `\`\`\`typescript\n${originalSources.testContent}\n\`\`\`\n`;
-      }
-
-      prompt += `\n--- END ORIGINAL SOURCES ---\n\n`;
-    }
-
-    prompt += `After analyzing in plan mode, port this rule to Go following these steps:
-
-1. **Create the Go rule**:
-   - Directory: /Users/bytedance/dev/rslint/internal/rules/${ruleName.replace(/-/g, '_')}/
-   - Rule file: ${ruleName.replace(/-/g, '_')}.go
-   - Test file: ${ruleName.replace(/-/g, '_')}_test.go
-   - Follow existing patterns (see /Users/bytedance/dev/rslint/internal/rules/array_type/ as reference)
-
-2. **Transform the test file**:
-   - Save to: /Users/bytedance/dev/rslint/packages/rslint-test-tools/tests/typescript-eslint/rules/${ruleName}.test.ts
-   - Use import: import { RuleTester, getFixturesRootDir } from '../RuleTester.ts';
-   - Adapt to RSLint test patterns
-
-3. **Register the rule** in appropriate configuration files
-
-IMPORTANT: 
-- ONLY create and edit files - do NOT run any commands
-- Do NOT execute test commands, build commands, or any bash commands
-- Do NOT try to verify the code by running tests
-- Focus solely on file creation and editing
-- This script will handle all testing and building after you're done
-
-Focus on maintaining the same rule logic and behavior as the TypeScript version while following RSLint's Go patterns.`;
-
+    // Create improved porting prompt
+    const prompt = createImprovedPortingPrompt(ruleName, originalSources);
     const result = await runClaudePortingWithStreaming(prompt);
 
     if (result.code !== 0) {
@@ -847,110 +1065,104 @@ Focus on maintaining the same rule logic and behavior as the TypeScript version 
     }
 
     log(
-      `✓ Rule porting completed for ${ruleName}, now running build and tests...`,
+      `✓ Rule porting completed for ${ruleName}, now verifying...`,
       'success',
     );
 
-    // Step 1: Run go build to verify compilation
-    const buildSuccess = await runGoBuild();
-    if (!buildSuccess) {
-      log(
-        `Build failed after porting ${ruleName}, attempting fix...`,
-        'warning',
-      );
-
-      const fixSuccess = await fixTestFailures(
-        ruleName,
-        { success: false, error: 'Build compilation failed' },
-        { success: true },
-        1,
-      );
-
-      if (fixSuccess) {
-        // Retry build after fix
-        const retryBuildSuccess = await runGoBuild();
-        if (!retryBuildSuccess) {
-          log(`Build still failing after fix attempt for ${ruleName}`, 'error');
-          if (attemptNumber < MAX_PORT_ATTEMPTS) {
-            return await portSingleRule(ruleName, attemptNumber + 1);
-          } else {
-            failedRules++;
-            return false;
-          }
-        }
-      }
+    // Verify registration
+    const registrationStatus = await verifyRuleRegistration(ruleName);
+    if (!registrationStatus.isRegistered) {
+      log(`⚠️ Rule ${ruleName} is not properly registered!`, 'warning');
     }
 
-    // Step 2: Run Go tests
-    const goTestResult = await runGoTest(ruleName);
+    // Run build
+    const buildResult = await runCommand('go', ['build', './cmd/rslint'], {
+      timeout: 60000,
+      cwd: __dirname,
+    });
 
-    // Step 3: Run TypeScript tests
+    const buildSuccess = buildResult.code === 0;
+    if (!buildSuccess) {
+      log(`Build failed after porting ${ruleName}`, 'error');
+    }
+
+    // Run Go test
+    const ruleDir = ruleName.replace(/-/g, '_');
+    const goTestResult = await runCommand(
+      'go',
+      ['test', '-v', `./internal/rules/${ruleDir}`],
+      {
+        timeout: 120000,
+        cwd: __dirname,
+      },
+    );
+
+    // Run TypeScript test with rstest
     const tsTestResult = await runTypeScriptTest(ruleName);
 
-    // Step 4: Check if both tests passed
-    if (goTestResult.success && tsTestResult.success) {
+    // Check results
+    if (
+      buildSuccess &&
+      goTestResult.code === 0 &&
+      tsTestResult.success &&
+      registrationStatus.isRegistered
+    ) {
       const duration = Date.now() - startTime;
       log(
-        `✓ Successfully ported and tested ${ruleName} in ${Math.round(duration / 1000)}s`,
+        `✓ Successfully ported ${ruleName} in ${Math.round(duration / 1000)}s`,
         'success',
       );
       completedRules++;
       return true;
     }
 
-    // Step 5: If tests failed, attempt to fix them
-    log(
-      `Test failures detected for ${ruleName}, attempting fixes...`,
-      'warning',
-    );
+    // Attempt to fix issues
+    log(`Issues detected for ${ruleName}, attempting fixes...`, 'warning');
 
-    const fixAttempted = await fixTestFailures(
+    const fixPrompt = createImprovedFixPrompt(
       ruleName,
-      goTestResult,
+      {
+        success: goTestResult.code === 0,
+        output: goTestResult.stdout,
+        error: goTestResult.stderr,
+      },
       tsTestResult,
-      1,
+      registrationStatus,
     );
 
-    if (fixAttempted) {
-      // Re-run tests after fix attempt
-      log(`Re-running tests after fix attempt for ${ruleName}...`, 'info');
+    const fixResult = await runClaudePortingWithStreaming(fixPrompt);
 
-      // Re-run build first
-      const reBuildSuccess = await runGoBuild();
-      if (!reBuildSuccess) {
-        log(`Build still failing after fix for ${ruleName}`, 'error');
-        if (attemptNumber < MAX_PORT_ATTEMPTS) {
-          return await portSingleRule(ruleName, attemptNumber + 1);
-        } else {
-          failedRules++;
-          return false;
-        }
-      }
+    if (fixResult.code === 0) {
+      // Re-verify after fix
+      const newRegistrationStatus = await verifyRuleRegistration(ruleName);
+      const reBuildResult = await runCommand('go', ['build', './cmd/rslint'], {
+        timeout: 60000,
+        cwd: __dirname,
+      });
 
-      const reGoTestResult = await runGoTest(ruleName);
-      const reTsTestResult = await runTypeScriptTest(ruleName);
-
-      if (reGoTestResult.success && reTsTestResult.success) {
-        const duration = Date.now() - startTime;
-        log(
-          `✓ Successfully ported and fixed ${ruleName} in ${Math.round(duration / 1000)}s`,
-          'success',
+      if (reBuildResult.code === 0) {
+        const reGoTestResult = await runCommand(
+          'go',
+          ['test', '-v', `./internal/rules/${ruleDir}`],
+          {
+            timeout: 120000,
+            cwd: __dirname,
+          },
         );
-        completedRules++;
-        return true;
-      } else {
-        log(`Tests still failing after fix attempt for ${ruleName}`, 'error');
+        const reTsTestResult = await runTypeScriptTest(ruleName);
 
-        // Display final test results for debugging
-        if (!reGoTestResult.success) {
-          console.log(`${colors.red}Final Go test output:${colors.reset}`);
-          console.log(reGoTestResult.output || reGoTestResult.error);
-        }
-        if (!reTsTestResult.success) {
-          console.log(
-            `${colors.red}Final TypeScript test output:${colors.reset}`,
+        if (
+          reGoTestResult.code === 0 &&
+          reTsTestResult.success &&
+          newRegistrationStatus.isRegistered
+        ) {
+          const duration = Date.now() - startTime;
+          log(
+            `✓ Successfully ported and fixed ${ruleName} in ${Math.round(duration / 1000)}s`,
+            'success',
           );
-          console.log(reTsTestResult.output || reTsTestResult.error);
+          completedRules++;
+          return true;
         }
       }
     }
@@ -1008,6 +1220,10 @@ async function portAllMissingRules(
   if (!IS_WORKER) {
     console.log('\n' + '='.repeat(60));
     log(`Starting rule porting with ${totalRules} missing rules`, 'info');
+    log(
+      `Known issues to address: ${KNOWN_ISSUES.registration.length} unregistered, ${KNOWN_ISSUES.missingTests.length} missing tests`,
+      'warning',
+    );
     console.log('='.repeat(60));
   }
 
@@ -1350,7 +1566,10 @@ async function main() {
       if (missingRules.length > 0) {
         console.log(`\n${colors.yellow}Missing rules to port:${colors.reset}`);
         missingRules.forEach((rule, i) => {
-          console.log(`${colors.gray}  ${i + 1}. ${rule}${colors.reset}`);
+          const marker = KNOWN_ISSUES.registration.includes(rule) ? ' ⚠️' : '';
+          console.log(
+            `${colors.gray}  ${i + 1}. ${rule}${marker}${colors.reset}`,
+          );
         });
       } else {
         console.log(
@@ -1375,6 +1594,12 @@ async function main() {
       console.log(
         `${colors.yellow}⚠ Remaining: ${missingRules.length}${colors.reset}`,
       );
+      console.log(
+        `${colors.red}⚠ Known unregistered: ${KNOWN_ISSUES.registration.length}${colors.reset}`,
+      );
+      console.log(
+        `${colors.red}⚠ Known missing tests: ${KNOWN_ISSUES.missingTests.length}${colors.reset}`,
+      );
 
       if (missingRules.length > 0) {
         console.log(`\n${colors.blue}Next rules to port:${colors.reset}`);
@@ -1390,7 +1615,10 @@ async function main() {
       return;
     }
 
-    // No pre-checks needed for Claude CLI approach
+    // Download any missing test files first
+    if (!IS_WORKER) {
+      await downloadMissingTests();
+    }
 
     // Main porting process
     await portAllMissingRules(concurrentMode, workerCount);

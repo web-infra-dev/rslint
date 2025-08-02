@@ -2,191 +2,62 @@ package no_unused_vars
 
 import (
 	"testing"
+
+	"github.com/typescript-eslint/rslint/internal/rule_tester"
+	"github.com/typescript-eslint/rslint/internal/rules/fixtures"
 )
 
 func TestNoUnusedVarsRule(t *testing.T) {
-	// TODO: Convert this test to use rule_tester.RunRuleTester format
-	// This test uses an incompatible structure with []rule_tester.TestCase
-	/*
-	tester := rule_tester.New(t)
+	validTestCases := []rule_tester.ValidTestCase{
+		{Code: `const foo = 5; console.log(foo);`},
+		{Code: `function foo() {} foo();`},
+		{Code: `function foo(bar) { console.log(bar); }`},
+		{Code: `try {} catch (e) { console.log(e); }`},
+		{Code: `const { foo, ...rest } = { foo: 1, bar: 2 }; console.log(rest);`, Options: map[string]interface{}{"ignoreRestSiblings": true}},
+		{Code: `const _foo = 1;`, Options: map[string]interface{}{"varsIgnorePattern": "^_"}},
+		{Code: `function foo(bar) {}`, Options: map[string]interface{}{"args": "none"}},
+		{Code: `try {} catch (e) {}`, Options: map[string]interface{}{"caughtErrors": "none"}},
+		{Code: `export const foo = 1;`},
+		{Code: `import type { Foo } from "./foo"; const bar: Foo = {};`},
+	}
 
-	tester.Run("no-unused-vars", NoUnusedVarsRule, []rule_tester.TestCase{
-		// Valid cases
+	invalidTestCases := []rule_tester.InvalidTestCase{
 		{
-			Name: "variable is used",
-			Code: `const foo = 5; console.log(foo);`,
-		},
-		{
-			Name: "function is used",
-			Code: `function foo() {} foo();`,
-		},
-		{
-			Name: "parameter is used",
-			Code: `function foo(bar) { console.log(bar); }`,
-		},
-		{
-			Name: "catch variable is used",
-			Code: `try {} catch (e) { console.log(e); }`,
-		},
-		{
-			Name: "rest siblings with ignoreRestSiblings",
-			Code: `const { foo, ...rest } = { foo: 1, bar: 2 }; console.log(rest);`,
-			Options: map[string]interface{}{
-				"ignoreRestSiblings": true,
-			},
-		},
-		{
-			Name: "vars ignore pattern",
-			Code: `const _foo = 1;`,
-			Options: map[string]interface{}{
-				"varsIgnorePattern": "^_",
-			},
-		},
-		{
-			Name: "args none",
-			Code: `function foo(bar) {}`,
-			Options: map[string]interface{}{
-				"args": "none",
-			},
-		},
-		{
-			Name: "caught errors none",
-			Code: `try {} catch (e) {}`,
-			Options: map[string]interface{}{
-				"caughtErrors": "none",
-			},
-		},
-		{
-			Name: "exported variable",
-			Code: `export const foo = 1;`,
-		},
-		{
-			Name: "type-only import",
-			Code: `import type { Foo } from "./foo"; const bar: Foo = {};`,
-		},
-
-		// Invalid cases
-		{
-			Name: "unused variable",
 			Code: `const foo = 5;`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "unusedVar",
-					Data: map[string]interface{}{
-						"varName":    "foo",
-						"action":     "defined",
-						"additional": "",
-					},
-				},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 7}},
 		},
 		{
-			Name: "unused function",
 			Code: `function foo() {}`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "unusedVar",
-					Data: map[string]interface{}{
-						"varName":    "foo",
-						"action":     "defined",
-						"additional": "",
-					},
-				},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 10}},
 		},
 		{
-			Name: "unused parameter",
 			Code: `function foo(bar) {}`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "unusedVar",
-					Data: map[string]interface{}{
-						"varName":    "bar",
-						"action":     "defined",
-						"additional": "",
-					},
-				},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 14}},
 		},
 		{
-			Name: "unused catch variable",
 			Code: `try {} catch (e) {}`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "unusedVar",
-					Data: map[string]interface{}{
-						"varName":    "e",
-						"action":     "defined",
-						"additional": "",
-					},
-				},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 15}},
 		},
 		{
-			Name: "assigned but unused",
 			Code: `let foo = 5; foo = 10;`,
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "unusedVar",
-					Data: map[string]interface{}{
-						"varName":    "foo",
-						"action":     "assigned a value",
-						"additional": "",
-					},
-				},
-			},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 5}},
 		},
 		{
-			Name: "only used as type",
 			Code: `const foo = 1; type Bar = typeof foo;`,
-			Options: map[string]interface{}{
-				"vars": "all",
-			},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "usedOnlyAsType",
-					Data: map[string]interface{}{
-						"varName":    "foo",
-						"action":     "defined",
-						"additional": "",
-					},
-				},
-			},
+			Options: map[string]interface{}{"vars": "all"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "usedOnlyAsType", Line: 1, Column: 7}},
 		},
 		{
-			Name: "vars ignore pattern message",
 			Code: `const foo = 1;`,
-			Options: map[string]interface{}{
-				"varsIgnorePattern": "^_",
-			},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "unusedVar",
-					Data: map[string]interface{}{
-						"varName":    "foo",
-						"action":     "defined",
-						"additional": ". Allowed unused vars must match ^_",
-					},
-				},
-			},
+			Options: map[string]interface{}{"varsIgnorePattern": "^_"},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 7}},
 		},
 		{
-			Name: "report used ignore pattern",
 			Code: `const _foo = 1; console.log(_foo);`,
-			Options: map[string]interface{}{
-				"varsIgnorePattern":       "^_",
-				"reportUsedIgnorePattern": true,
-			},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "usedIgnoredVar",
-					Data: map[string]interface{}{
-						"varName":    "_foo",
-						"additional": ". Used vars must not match ^_",
-					},
-				},
-			},
+			Options: map[string]interface{}{"varsIgnorePattern": "^_", "reportUsedIgnorePattern": true},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "usedIgnoredVar", Line: 1, Column: 7}},
 		},
-	})
-	*/
+	}
+
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnusedVarsRule, validTestCases, invalidTestCases)
 }

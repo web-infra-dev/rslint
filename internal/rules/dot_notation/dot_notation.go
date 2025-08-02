@@ -5,6 +5,7 @@ import (
 	"regexp"
 
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/typescript-eslint/rslint/internal/rule"
 	"github.com/typescript-eslint/rslint/internal/utils"
@@ -167,34 +168,107 @@ func checkPropertyAccessKeywords(ctx rule.RuleContext, node *ast.Node) {
 }
 
 func shouldAllowBracketNotation(ctx rule.RuleContext, node *ast.Node, propertyName string, opts DotNotationOptions, allowIndexSignaturePropertyAccess bool) bool {
-	// For now, implement basic logic based on options
-	// This is a simplified implementation that should handle the test cases
+	// Enhanced implementation using TypeScript type checker for accurate property analysis
 	
-	// If allowPrivateClassPropertyAccess is true, allow bracket notation for private properties
+	// Get the object being accessed
+	elementAccess := node.AsElementAccessExpression()
+	if elementAccess == nil || elementAccess.Expression == nil {
+		return false
+	}
+	
+	// Get the type of the object being accessed
+	objectType := ctx.TypeChecker.GetTypeAtLocation(elementAccess.Expression)
+	if objectType == nil {
+		return false
+	}
+	
+	// If allowPrivateClassPropertyAccess is true, check for actual private properties
 	if opts.AllowPrivateClassPropertyAccess {
-		// Simple heuristic: if property name suggests it's private (starts with underscore or contains "priv")
-		if propertyName == "priv_prop" {
+		if isPrivateProperty(ctx, objectType, propertyName) {
 			return true
 		}
 	}
 	
-	// If allowProtectedClassPropertyAccess is true, allow bracket notation for protected properties
+	// If allowProtectedClassPropertyAccess is true, check for actual protected properties  
 	if opts.AllowProtectedClassPropertyAccess {
-		// Simple heuristic: if property name suggests it's protected
-		if propertyName == "protected_prop" {
+		if isProtectedProperty(ctx, objectType, propertyName) {
 			return true
 		}
 	}
 	
-	// If allowIndexSignaturePropertyAccess is true, allow bracket notation for index signature properties
+	// If allowIndexSignaturePropertyAccess is true, check for actual index signatures
 	if allowIndexSignaturePropertyAccess {
-		// Simple heuristic: if property name is "hello" (from test case)
-		if propertyName == "hello" {
+		if hasIndexSignature(ctx, objectType) {
 			return true
 		}
 	}
 	
 	return false
+}
+
+// isPrivateProperty checks if a property is private using TypeScript's type checker
+func isPrivateProperty(ctx rule.RuleContext, objectType *checker.Type, propertyName string) bool {
+	if objectType == nil {
+		return false
+	}
+	
+	// Get the property symbol from the type
+	symbol := ctx.TypeChecker.GetPropertyOfType(objectType, propertyName)
+	if symbol == nil {
+		return false
+	}
+	
+	// Check if any of the symbol's declarations have private modifier
+	if symbol.Declarations != nil {
+		for _, decl := range symbol.Declarations {
+			if ast.HasSyntacticModifier(decl, ast.ModifierFlagsPrivate) {
+				return true
+			}
+		}
+	}
+	
+	return false
+}
+
+// isProtectedProperty checks if a property is protected using TypeScript's type checker
+func isProtectedProperty(ctx rule.RuleContext, objectType *checker.Type, propertyName string) bool {
+	if objectType == nil {
+		return false
+	}
+	
+	// Get the property symbol from the type
+	symbol := ctx.TypeChecker.GetPropertyOfType(objectType, propertyName)
+	if symbol == nil {
+		return false
+	}
+	
+	// Check if any of the symbol's declarations have protected modifier
+	if symbol.Declarations != nil {
+		for _, decl := range symbol.Declarations {
+			if ast.HasSyntacticModifier(decl, ast.ModifierFlagsProtected) {
+				return true
+			}
+		}
+	}
+	
+	return false
+}
+
+// hasIndexSignature checks if a type has index signatures
+func hasIndexSignature(ctx rule.RuleContext, objectType *checker.Type) bool {
+	if objectType == nil {
+		return false
+	}
+	
+	// Check for string index signature
+	stringIndexType := ctx.TypeChecker.GetStringIndexType(objectType)
+	if stringIndexType != nil {
+		return true
+	}
+	
+	// Check for number index signature
+	numberIndexType := ctx.TypeChecker.GetNumberIndexType(objectType)
+	return numberIndexType != nil
 }
 
 func createFix(ctx rule.RuleContext, node *ast.Node, propertyName string) rule.RuleFix {

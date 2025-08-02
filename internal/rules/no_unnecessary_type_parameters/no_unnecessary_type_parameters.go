@@ -71,12 +71,30 @@ func (c *typeParameterCounter) visitType(t *checker.Type, assumeMultipleUses, is
 		return
 	}
 
-	// Simplified type parameter handling - TypeScript type utilities not available in Go
-	// TODO: Implement proper type parameter detection using available checker.Type methods
+	// Enhanced type parameter detection using available checker methods
+	// Check if this is a type parameter by examining its symbol
+	symbol := t.Symbol()
+	if symbol != nil {
+		// Check if this is a type parameter symbol
+		flags := symbol.Flags
+		if flags&ast.SymbolFlagsTypeParameter != 0 {
+			// This is a type parameter - track its usage
+			if param, exists := c.typeParameters[symbol.ValueDeclaration]; exists {
+				param.count++
+				if assumeMultipleUses {
+					param.assumedMultiple = true
+				}
+			}
+			return
+		}
+	}
 	
-	// Basic type checking using available methods
+	// Handle array-like types and their element types
 	if c.checker.IsArrayLikeType(t) {
-		// Handle array-like types
+		// Visit the element type of arrays
+		if indexType := c.checker.GetNumberIndexType(t); indexType != nil {
+			c.visitType(indexType, assumeMultipleUses, false)
+		}
 		return
 	}
 	
@@ -103,14 +121,32 @@ func (c *typeParameterCounter) visitSignature(sig *checker.Signature) {
 		return
 	}
 	
-	// Simplified signature handling - some methods may not be available
-	// TODO: Implement proper signature traversal using available checker methods
+	// Enhanced signature traversal using available checker methods
+	// Visit parameter types
+	params := sig.Parameters()
+	for _, param := range params {
+		if param.ValueDeclaration != nil {
+			paramType := c.checker.GetTypeOfSymbolAtLocation(param, param.ValueDeclaration)
+			if paramType != nil {
+				c.visitType(paramType, false, false)
+			}
+		}
+	}
 	
-	// Get declaration if available
+	// Visit return type
+	returnType := c.checker.GetReturnTypeOfSignature(sig)
+	if returnType != nil {
+		c.visitType(returnType, false, false)
+	}
+	
+	// Visit declaration if available
 	if sig.Declaration() != nil {
 		decl := sig.Declaration()
 		// Visit the declaration's type if available
-		c.visitType(c.checker.GetTypeAtLocation(decl), false, true)
+		declType := c.checker.GetTypeAtLocation(decl)
+		if declType != nil {
+			c.visitType(declType, false, true)
+		}
 	}
 }
 
@@ -143,15 +179,39 @@ func (c *typeParameterCounter) visitSymbolsListOnce(symbols []*ast.Symbol, assum
 }
 
 func isMappedType(t *checker.Type) bool {
-	// Simplified implementation - MappedType detection not available in this version
-	// TODO: Implement proper mapped type detection
+	// Enhanced mapped type detection using available type flags
+	if t == nil {
+		return false
+	}
+	
+	// Check if this type has mapped type characteristics
+	flags := t.Flags()
+	// Mapped types are typically object types with specific flags
+	if flags&checker.TypeFlagsObject != 0 {
+		// Additional checks for mapped type patterns could go here
+		// For now, we use a conservative approach
+		symbol := t.Symbol()
+		if symbol != nil {
+			// Check if the symbol indicates a mapped type
+			symbolFlags := symbol.Flags
+			return symbolFlags&ast.SymbolFlagsTypeParameter != 0
+		}
+	}
 	return false
 }
 
 func isOperatorType(t *checker.Type) bool {
-	// Simplified implementation - operator type detection not available in this version
-	// TODO: Implement proper operator type detection
-	return false
+	// Enhanced operator type detection using available type information
+	if t == nil {
+		return false
+	}
+	
+	// Check for union and intersection types which are common operator types
+	flags := t.Flags()
+	return flags&checker.TypeFlagsUnion != 0 || 
+		   flags&checker.TypeFlagsIntersection != 0 ||
+		   flags&checker.TypeFlagsIndex != 0 ||
+		   flags&checker.TypeFlagsIndexedAccess != 0
 }
 
 // Scope functionality not available in this rule system - simplified for now
@@ -279,18 +339,37 @@ func getBodyStart(node *ast.Node) int {
 
 func getReturnType(node *ast.Node) *ast.Node {
 	switch node.Kind {
-	// Simplified - some AST kinds may not be available
-	// TODO: Add proper AST kind handling
+	// Enhanced AST kind handling for all function-like nodes
 	case ast.KindFunctionDeclaration:
 		return node.AsFunctionDeclaration().Type
 	case ast.KindFunctionExpression:
 		return node.AsFunctionExpression().Type
-	case ast.KindMethodDeclaration, ast.KindMethodSignature:
+	case ast.KindArrowFunction:
+		return node.AsArrowFunction().Type
+	case ast.KindMethodDeclaration:
 		return node.AsMethodDeclaration().Type
-	case ast.KindCallSignature, ast.KindConstructSignature:
+	case ast.KindMethodSignature:
+		return node.AsMethodSignatureDeclaration().Type
+	case ast.KindGetAccessor:
+		return node.AsGetAccessorDeclaration().Type
+	case ast.KindSetAccessor:
+		return node.AsSetAccessorDeclaration().Type
+	case ast.KindCallSignature:
 		return node.AsCallSignatureDeclaration().Type
-	case ast.KindFunctionType, ast.KindConstructorType:
+	case ast.KindConstructSignature:
+		return node.AsConstructSignatureDeclaration().Type
+	case ast.KindFunctionType:
 		return node.AsFunctionTypeNode().Type
+	case ast.KindConstructorType:
+		return node.AsConstructorTypeNode().Type
+	case ast.KindTypeAliasDeclaration:
+		return node.AsTypeAliasDeclaration().Type
+	case ast.KindInterfaceDeclaration:
+		// Interface doesn't have a direct return type, but we can return nil
+		return nil
+	case ast.KindClassDeclaration:
+		// Class doesn't have a direct return type, but we can return nil
+		return nil
 	}
 	return nil
 }

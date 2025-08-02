@@ -102,6 +102,11 @@ import (
 	"github.com/typescript-eslint/rslint/internal/rules/switch_exhaustiveness_check"
 	"github.com/typescript-eslint/rslint/internal/rules/unbound_method"
 	"github.com/typescript-eslint/rslint/internal/rules/use_unknown_in_catch_callback_variable"
+	"github.com/typescript-eslint/rslint/internal/rules/dot_notation"
+	"github.com/typescript-eslint/rslint/internal/rules/explicit_function_return_type"
+	"github.com/typescript-eslint/rslint/internal/rules/method_signature_style"
+	"github.com/typescript-eslint/rslint/internal/rules/no_type_alias"
+	"github.com/typescript-eslint/rslint/internal/rules/no_var_requires"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -498,6 +503,16 @@ func RegisterAllTypeSriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("unbound-method", unbound_method.UnboundMethodRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/use-unknown-in-catch-callback-variable", use_unknown_in_catch_callback_variable.UseUnknownInCatchCallbackVariableRule)
 	GlobalRuleRegistry.Register("use-unknown-in-catch-callback-variable", use_unknown_in_catch_callback_variable.UseUnknownInCatchCallbackVariableRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/dot-notation", dot_notation.DotNotationRule)
+	GlobalRuleRegistry.Register("dot-notation", dot_notation.DotNotationRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/explicit-function-return-type", explicit_function_return_type.ExplicitFunctionReturnTypeRule)
+	GlobalRuleRegistry.Register("explicit-function-return-type", explicit_function_return_type.ExplicitFunctionReturnTypeRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/method-signature-style", method_signature_style.MethodSignatureStyleRule)
+	GlobalRuleRegistry.Register("method-signature-style", method_signature_style.MethodSignatureStyleRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-type-alias", no_type_alias.NoTypeAliasRule)
+	GlobalRuleRegistry.Register("no-type-alias", no_type_alias.NoTypeAliasRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-var-requires", no_var_requires.NoVarRequiresRule)
+	GlobalRuleRegistry.Register("no-var-requires", no_var_requires.NoVarRequiresRule)
 }
 
 // getAllTypeScriptEslintPluginRules returns all registered rules (for backward compatibility when no config is provided)

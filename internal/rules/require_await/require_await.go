@@ -172,8 +172,9 @@ var RequireAwaitRule = rule.Rule{
 				//     },
 				//   ],
 				// });
-				// TODO(port): getFunctionHeadLoc
-				ctx.ReportNode(node, buildMissingAwaitMessage())
+				// Report at function head location for better error reporting
+				headLoc := utils.GetFunctionHeadLoc(node, ctx.SourceFile)
+				ctx.ReportRange(headLoc, buildMissingAwaitMessage())
 			}
 
 			currentScope = currentScope.upper

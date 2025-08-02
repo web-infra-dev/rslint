@@ -310,8 +310,19 @@ func isTypedFunctionParameter(funcNode, callNode *ast.Node, checker *checker.Che
 	if argIndex < len(params) {
 		paramType := checker.GetTypeOfSymbol(params[argIndex])
 		if paramType != nil {
-			// Check if it's a function type - simplified check
-			return true // For now, assume typed parameters are valid
+			// Enhanced function type detection using TypeScript's type checking
+			// Check if the parameter type is a function type by looking for call signatures
+			callSignatures := checker.GetSignaturesOfType(paramType, 0) // SignatureKindCall = 0
+			if len(callSignatures) > 0 {
+				// This parameter expects a function - return type information is available
+				return true
+			}
+			
+			// Check if it's a constructor type  
+			constructSignatures := checker.GetSignaturesOfType(paramType, 1) // SignatureKindConstruct = 1
+			if len(constructSignatures) > 0 {
+				return true
+			}
 		}
 	}
 	

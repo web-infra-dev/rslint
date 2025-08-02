@@ -488,6 +488,95 @@ func traverseChildren(node *ast.Node, callback func(*ast.Node)) {
 		if catchClause.Block != nil {
 			callback(catchClause.Block)
 		}
+	case ast.KindArrowFunction:
+		arrowFunc := node.AsArrowFunction()
+		if arrowFunc.Body != nil {
+			callback(arrowFunc.Body)
+		}
+	case ast.KindFunctionExpression:
+		funcExpr := node.AsFunctionExpression()
+		if funcExpr.Body != nil {
+			callback(funcExpr.Body)
+		}
+	case ast.KindReturnStatement:
+		returnStmt := node.AsReturnStatement()
+		if returnStmt.Expression != nil {
+			callback(returnStmt.Expression)
+		}
+	case ast.KindIfStatement:
+		ifStmt := node.AsIfStatement()
+		if ifStmt.Expression != nil {
+			callback(ifStmt.Expression)
+		}
+		if ifStmt.ThenStatement != nil {
+			callback(ifStmt.ThenStatement)
+		}
+		if ifStmt.ElseStatement != nil {
+			callback(ifStmt.ElseStatement)
+		}
+	case ast.KindForStatement:
+		forStmt := node.AsForStatement()
+		if forStmt.Initializer != nil {
+			callback(forStmt.Initializer)
+		}
+		if forStmt.Condition != nil {
+			callback(forStmt.Condition)
+		}
+		if forStmt.Incrementor != nil {
+			callback(forStmt.Incrementor)
+		}
+		if forStmt.Statement != nil {
+			callback(forStmt.Statement)
+		}
+	case ast.KindWhileStatement:
+		whileStmt := node.AsWhileStatement()
+		if whileStmt.Expression != nil {
+			callback(whileStmt.Expression)
+		}
+		if whileStmt.Statement != nil {
+			callback(whileStmt.Statement)
+		}
+	case ast.KindBinaryExpression:
+		binExpr := node.AsBinaryExpression()
+		if binExpr.Left != nil {
+			callback(binExpr.Left)
+		}
+		if binExpr.Right != nil {
+			callback(binExpr.Right)
+		}
+	case ast.KindClassDeclaration:
+		classDecl := node.AsClassDeclaration()
+		if classDecl.Members != nil {
+			for _, member := range classDecl.Members.Nodes {
+				callback(member)
+			}
+		}
+	case ast.KindMethodDeclaration:
+		methodDecl := node.AsMethodDeclaration()
+		if methodDecl.Body != nil {
+			callback(methodDecl.Body)
+		}
+	case ast.KindObjectLiteralExpression:
+		objLiteral := node.AsObjectLiteralExpression()
+		if objLiteral.Properties != nil {
+			for _, prop := range objLiteral.Properties.Nodes {
+				callback(prop)
+			}
+		}
+	case ast.KindPropertyAssignment:
+		propAssign := node.AsPropertyAssignment()
+		if propAssign.Initializer != nil {
+			callback(propAssign.Initializer)
+		}
+	case ast.KindArrayLiteralExpression:
+		arrayLiteral := node.AsArrayLiteralExpression()
+		if arrayLiteral.Elements != nil {
+			for _, element := range arrayLiteral.Elements.Nodes {
+				if element != nil {
+					callback(element)
+				}
+			}
+		}
 	}
 }
 

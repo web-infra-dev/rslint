@@ -17,6 +17,76 @@ func buildNoUnnecessaryTemplateExpressionMessage() rule.RuleMessage {
 	}
 }
 
+func createUnnecessaryTemplateExpressionFix(ctx rule.RuleContext, prevQuasiEnd int, expression *ast.Node) []rule.RuleFix {
+	sourceText := ctx.SourceFile.Text()
+	
+	// Calculate the exact range of the ${...} expression
+	expressionStart := prevQuasiEnd - 2 // Position of "${" 
+	expressionEnd := expression.End() + 1 // Position after "}"
+	
+	// Get the content inside ${...}
+	innerContent := string(sourceText[prevQuasiEnd:expression.End()])
+	
+	// Determine the replacement text based on the type of expression
+	var replacementText string
+	
+	switch expression.Kind {
+	case ast.KindStringLiteral:
+		// For string literals like ${'test'}, we need to extract the string content
+		strLiteral := expression.AsStringLiteral()
+		replacementText = strLiteral.Text
+		
+	case ast.KindNumericLiteral:
+		// For numeric literals like ${123}, keep as-is
+		replacementText = innerContent
+		
+	case ast.KindTrueKeyword, ast.KindFalseKeyword, ast.KindNullKeyword:
+		// For boolean/null literals, keep as-is
+		replacementText = innerContent
+		
+	case ast.KindIdentifier:
+		// For identifiers like ${undefined}, keep as-is
+		replacementText = innerContent
+		
+	case ast.KindTemplateExpression:
+		// For nested template literals, we need to unwrap them
+		replacementText = extractTemplateContent(ctx, expression)
+		
+	default:
+		// For other expressions, keep the content as-is but remove the ${...} wrapper
+		replacementText = innerContent
+	}
+	
+	// Handle escaping for template literal context
+	replacementText = escapeForTemplateLiteral(replacementText)
+	
+	return []rule.RuleFix{
+		rule.RuleFixReplaceRange(core.NewTextRange(expressionStart, expressionEnd), replacementText),
+	}
+}
+
+func extractTemplateContent(ctx rule.RuleContext, templateNode *ast.Node) string {
+	// For nested template literals, extract the actual content
+	sourceText := ctx.SourceFile.Text()
+	start := templateNode.Pos() + 1 // Skip opening backtick
+	end := templateNode.End() - 1   // Skip closing backtick
+	return string(sourceText[start:end])
+}
+
+func escapeForTemplateLiteral(content string) string {
+	// Handle escaping for template literal context
+	// This is a simplified version - proper escaping would need more careful handling
+	result := content
+	
+	// Escape backticks
+	result = strings.Replace(result, "`", "\\`", -1)
+	
+	// Escape ${} sequences that aren't already escaped
+	result = strings.Replace(result, "${", "\\${", -1)
+	
+	return result
+}
+
 func isUnderlyingTypeString(t *checker.Type) bool {
 	return utils.Every(utils.UnionTypeParts(t), func(t *checker.Type) bool {
 		return utils.Some(utils.IntersectionTypeParts(t), func(t *checker.Type) bool {
@@ -163,8 +233,16 @@ var NoUnnecessaryTemplateExpressionRule = rule.Rule{
 					continue
 				}
 
-				// TODO(port): implement fixes
-				ctx.ReportRange(core.NewTextRange(prevQuasiEnd-2, utils.TrimNodeTextRange(ctx.SourceFile, literal).Pos()+1), buildNoUnnecessaryTemplateExpressionMessage())
+				// Generate fix to remove unnecessary template expression
+				fixes := createUnnecessaryTemplateExpressionFix(ctx, prevQuasiEnd, expr)
+				ctx.ReportRangeWithSuggestions(core.NewTextRange(prevQuasiEnd-2, utils.TrimNodeTextRange(ctx.SourceFile, literal).Pos()+1), buildNoUnnecessaryTemplateExpressionMessage(), 
+					rule.RuleSuggestion{
+						Message: rule.RuleMessage{
+							Id:          "removeUnnecessaryTemplateExpression",
+							Description: "Remove unnecessary template expression",
+						},
+						FixesArr: fixes,
+					})
 			}
 		}
 

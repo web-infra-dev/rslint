@@ -2,47 +2,31 @@ package no_unsafe_declaration_merging
 
 import (
 	"testing"
+
+	"github.com/typescript-eslint/rslint/internal/rule_tester"
+	"github.com/typescript-eslint/rslint/internal/rules/fixtures"
 )
 
 func TestNoUnsafeDeclarationMerging(t *testing.T) {
-	// TODO: Convert this test to use rule_tester.RunRuleTester format
-	// This test uses an incompatible structure with rule_tester.TestCases
-	/*
-	tester := rule_tester.New(t)
-
-	tester.Run("no-unsafe-declaration-merging", NoUnsafeDeclarationMergingRule, rule_tester.TestCases{
-		Valid: []rule_tester.ValidTestCase{
-			{
-				Code: `
+	validTestCases := []rule_tester.ValidTestCase{
+		{Code: `
 interface Foo {}
 class Bar implements Foo {}
-`,
-			},
-			{
-				Code: `
+`},
+		{Code: `
 namespace Foo {}
 namespace Foo {}
-`,
-			},
-			{
-				Code: `
+`},
+		{Code: `
 enum Foo {}
 namespace Foo {}
-`,
-			},
-			{
-				Code: `
+`},
+		{Code: `
 namespace Fooo {}
 function Foo() {}
-`,
-			},
-			{
-				Code: `
-const Foo = class {};
-`,
-			},
-			{
-				Code: `
+`},
+		{Code: `const Foo = class {};`},
+		{Code: `
 interface Foo {
   props: string;
 }
@@ -50,10 +34,8 @@ interface Foo {
 function bar() {
   return class Foo {};
 }
-`,
-			},
-			{
-				Code: `
+`},
+		{Code: `
 interface Foo {
   props: string;
 }
@@ -61,76 +43,50 @@ interface Foo {
 (function bar() {
   class Foo {}
 })();
-`,
-			},
-			{
-				Code: `
+`},
+		{Code: `
 declare global {
   interface Foo {}
 }
 
 class Foo {}
+`},
+	}
+
+	invalidTestCases := []rule_tester.InvalidTestCase{
+		{
+			Code: `
+interface Foo {}
+class Foo {}
 `,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeMerging", Line: 2, Column: 11},
+				{MessageId: "unsafeMerging", Line: 3, Column: 7},
 			},
 		},
-		Invalid: []rule_tester.InvalidTestCase{
-			{
-				Code: `
-interface Foo {}
-class Foo {}
-`,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{
-						MessageId: "unsafeMerging",
-						Line:      2,
-						Column:    11,
-					},
-					{
-						MessageId: "unsafeMerging",
-						Line:      3,
-						Column:    7,
-					},
-				},
-			},
-			{
-				Code: `
+		{
+			Code: `
 class Foo {}
 interface Foo {}
 `,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{
-						MessageId: "unsafeMerging",
-						Line:      2,
-						Column:    7,
-					},
-					{
-						MessageId: "unsafeMerging",
-						Line:      3,
-						Column:    11,
-					},
-				},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeMerging", Line: 2, Column: 7},
+				{MessageId: "unsafeMerging", Line: 3, Column: 11},
 			},
-			{
-				Code: `
+		},
+		{
+			Code: `
 declare global {
   interface Foo {}
   class Foo {}
 }
 `,
-				Errors: []rule_tester.InvalidTestCaseError{
-					{
-						MessageId: "unsafeMerging",
-						Line:      3,
-						Column:    13,
-					},
-					{
-						MessageId: "unsafeMerging",
-						Line:      4,
-						Column:    9,
-					},
-				},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "unsafeMerging", Line: 3, Column: 13},
+				{MessageId: "unsafeMerging", Line: 4, Column: 9},
 			},
 		},
-	})
-	*/
+	}
+
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoUnsafeDeclarationMergingRule, validTestCases, invalidTestCases)
 }

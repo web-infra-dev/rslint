@@ -542,11 +542,9 @@ var NoMisusedPromisesRule = rule.Rule{
 						if returnType != nil {
 							ctx.ReportNode(returnType, buildVoidReturnPropertyMessage())
 						} else {
-							ctx.ReportNode(
-								// TODO(port): getFunctionHeadLoc(functionNode, context.sourceCode)
-								property.Initializer,
-								buildVoidReturnPropertyMessage(),
-							)
+							// Report at function head location for better error reporting
+							headLoc := utils.GetFunctionHeadLoc(property.Initializer, ctx.SourceFile)
+							ctx.ReportRange(headLoc, buildVoidReturnPropertyMessage())
 						}
 					} else {
 						ctx.ReportNode(property.Initializer, buildVoidReturnPropertyMessage())
@@ -599,11 +597,9 @@ var NoMisusedPromisesRule = rule.Rule{
 					if node.Type() != nil {
 						ctx.ReportNode(node.Type(), buildVoidReturnPropertyMessage())
 					} else {
-						ctx.ReportNode(
-							// TODO(port): getFunctionHeadLoc(functionNode, context.sourceCode)
-							node,
-							buildVoidReturnPropertyMessage(),
-						)
+						// Report at function head location for better error reporting
+						headLoc := utils.GetFunctionHeadLoc(node, ctx.SourceFile)
+						ctx.ReportRange(headLoc, buildVoidReturnPropertyMessage())
 					}
 				}
 			}

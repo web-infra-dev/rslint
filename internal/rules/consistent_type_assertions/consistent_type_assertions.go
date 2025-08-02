@@ -59,42 +59,42 @@ func buildUseAngleBracketAssertionMessage() rule.RuleMessage {
 
 func buildReplaceArrayTypeAssertionWithAnnotationMessage(cast string) rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "replaceArrayTypeAssertionWithAnnotation",
+		Id:          "array-literal-assertion-suggestion",
 		Description: fmt.Sprintf("Use const x: %s = [ ... ] instead.", cast),
 	}
 }
 
 func buildReplaceArrayTypeAssertionWithSatisfiesMessage(cast string) rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "replaceArrayTypeAssertionWithSatisfies",
+		Id:          "array-literal-assertion-suggestion",
 		Description: fmt.Sprintf("Use const x = [ ... ] satisfies %s instead.", cast),
 	}
 }
 
 func buildReplaceObjectTypeAssertionWithAnnotationMessage(cast string) rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "replaceObjectTypeAssertionWithAnnotation",
+		Id:          "object-literal-assertion-suggestion",
 		Description: fmt.Sprintf("Use const x: %s = { ... } instead.", cast),
 	}
 }
 
 func buildReplaceObjectTypeAssertionWithSatisfiesMessage(cast string) rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "replaceObjectTypeAssertionWithSatisfies",
+		Id:          "object-literal-assertion-suggestion",
 		Description: fmt.Sprintf("Use const x = { ... } satisfies %s instead.", cast),
 	}
 }
 
 func buildUnexpectedArrayTypeAssertionMessage() rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "unexpectedArrayTypeAssertion",
+		Id:          "array-literal-assertion",
 		Description: "Always prefer const x: T[] = [ ... ].",
 	}
 }
 
 func buildUnexpectedObjectTypeAssertionMessage() rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "unexpectedObjectTypeAssertion", 
+		Id:          "object-literal-assertion", 
 		Description: "Always prefer const x: T = { ... }.",
 	}
 }

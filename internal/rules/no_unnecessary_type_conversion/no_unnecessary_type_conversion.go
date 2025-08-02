@@ -30,6 +30,8 @@ func getListeners(ctx rule.RuleContext) rule.RuleListeners {
 			binExpr := node.AsBinaryExpression()
 			if binExpr.OperatorToken.Kind == ast.KindPlusToken {
 				handleStringConcatenation(ctx, node)
+			} else if binExpr.OperatorToken.Kind == ast.KindPlusEqualsToken {
+				handleStringConcatenationAssignment(ctx, node)
 			}
 		},
 
@@ -37,6 +39,38 @@ func getListeners(ctx rule.RuleContext) rule.RuleListeners {
 			unaryExpr := node.AsPrefixUnaryExpression()
 			if unaryExpr.Operator == ast.KindPlusToken {
 				handleUnaryPlus(ctx, node)
+			} else if unaryExpr.Operator == ast.KindExclamationToken {
+				// Check for double negation (!!) 
+				if unaryExpr.Operand != nil && unaryExpr.Operand.Kind == ast.KindPrefixUnaryExpression {
+					innerUnary := unaryExpr.Operand.AsPrefixUnaryExpression()
+					if innerUnary.Operator == ast.KindExclamationToken {
+						handleDoubleNegation(ctx, unaryExpr.Operand)
+					}
+				}
+			} else if unaryExpr.Operator == ast.KindTildeToken {
+				// Check for double tilde (~~)
+				if unaryExpr.Operand != nil && unaryExpr.Operand.Kind == ast.KindPrefixUnaryExpression {
+					innerUnary := unaryExpr.Operand.AsPrefixUnaryExpression()
+					if innerUnary.Operator == ast.KindTildeToken {
+						handleDoubleTilde(ctx, unaryExpr.Operand)
+					}
+				}
+			}
+		},
+
+		ast.KindPropertyAccessExpression: func(node *ast.Node) {
+			propAccess := node.AsPropertyAccessExpression()
+			if propAccess.Name() != nil && ast.IsIdentifier(propAccess.Name()) {
+				propertyName := propAccess.Name().AsIdentifier().Text
+				if propertyName == "toString" {
+					// Check if this is followed by a call expression
+					if node.Parent != nil && node.Parent.Kind == ast.KindCallExpression {
+						callExpr := node.Parent.AsCallExpression()
+						if callExpr.Expression == node {
+							handleToStringCall(ctx, node)
+						}
+					}
+				}
 			}
 		},
 
@@ -77,9 +111,24 @@ func handleCallExpression(ctx rule.RuleContext, node *ast.Node) {
 		return
 	}
 	
-	// For now, skip symbol checking to get basic functionality working
-	// TODO: Add proper shadowing detection later
-	_ = ctx.TypeChecker.GetSymbolAtLocation(callee)
+	// Check for shadowing - if the function is redefined locally, skip this check
+	calleeSymbol := ctx.TypeChecker.GetSymbolAtLocation(callee)
+	if calleeSymbol != nil {
+		// Check if this symbol is the global built-in function
+		// If it has a declaration, it might be shadowed
+		declarations := calleeSymbol.Declarations
+		if len(declarations) > 0 {
+			// If there are user declarations, this might be a shadowed function
+			// For built-ins, we expect no user declarations or only library declarations
+			for _, decl := range declarations {
+				sourceFile := ast.GetSourceFileOfNode(decl)
+				if sourceFile != nil && !isLibraryFile(sourceFile) {
+					// This appears to be a user-defined function shadowing the built-in
+					return
+				}
+			}
+		}
+	}
 	
 	arguments := callExpr.Arguments
 	if arguments == nil || len(arguments.Nodes) == 0 {
@@ -98,15 +147,26 @@ func handleCallExpression(ctx rule.RuleContext, node *ast.Node) {
 	ctx.ReportNodeWithSuggestions(callee, rule.RuleMessage{
 		Id:          "unnecessaryTypeConversion",
 		Description: message,
-	}, rule.RuleSuggestion{
-		Message: rule.RuleMessage{
-			Id:          "suggestRemove",
-			Description: "Remove the type conversion.",
+	}, 
+		rule.RuleSuggestion{
+			Message: rule.RuleMessage{
+				Id:          "suggestRemove",
+				Description: "Remove the type conversion.",
+			},
+			FixesArr: []rule.RuleFix{
+				rule.RuleFixReplaceRange(core.NewTextRange(node.Pos(), node.End()), argText),
+			},
 		},
-		FixesArr: []rule.RuleFix{
-			rule.RuleFixReplaceRange(core.NewTextRange(node.Pos(), node.End()), argText),
-		},
-	})
+		rule.RuleSuggestion{
+			Message: rule.RuleMessage{
+				Id:          "suggestSatisfies",
+				Description: fmt.Sprintf("Instead, assert that the value satisfies the %s type.", typeString),
+			},
+			FixesArr: []rule.RuleFix{
+				rule.RuleFixReplaceRange(core.NewTextRange(node.Pos(), node.End()), 
+					fmt.Sprintf("%s satisfies %s", argText, typeString)),
+			},
+		})
 }
 
 func handleToStringCall(ctx rule.RuleContext, node *ast.Node) {
@@ -130,15 +190,26 @@ func handleToStringCall(ctx rule.RuleContext, node *ast.Node) {
 	ctx.ReportRangeWithSuggestions(core.NewTextRange(propAccess.Name().Pos(), callExpr.End()), rule.RuleMessage{
 		Id:          "unnecessaryTypeConversion",
 		Description: message,
-	}, rule.RuleSuggestion{
-		Message: rule.RuleMessage{
-			Id:          "suggestRemove",
-			Description: "Remove the type conversion.",
+	}, 
+		rule.RuleSuggestion{
+			Message: rule.RuleMessage{
+				Id:          "suggestRemove",
+				Description: "Remove the type conversion.",
+			},
+			FixesArr: []rule.RuleFix{
+				rule.RuleFixReplaceRange(core.NewTextRange(callExpr.Pos(), callExpr.End()), objText),
+			},
 		},
-		FixesArr: []rule.RuleFix{
-			rule.RuleFixReplaceRange(core.NewTextRange(callExpr.Pos(), callExpr.End()), objText),
-		},
-	})
+		rule.RuleSuggestion{
+			Message: rule.RuleMessage{
+				Id:          "suggestSatisfies",
+				Description: "Instead, assert that the value satisfies the string type.",
+			},
+			FixesArr: []rule.RuleFix{
+				rule.RuleFixReplaceRange(core.NewTextRange(callExpr.Pos(), callExpr.End()), 
+					fmt.Sprintf("%s satisfies string", objText)),
+			},
+		})
 }
 
 func handleStringConcatenation(ctx rule.RuleContext, node *ast.Node) {
@@ -236,15 +307,26 @@ func reportStringConcatenation(ctx rule.RuleContext, node, innerNode *ast.Node, 
 	ctx.ReportRangeWithSuggestions(reportRange, rule.RuleMessage{
 		Id:          "unnecessaryTypeConversion",
 		Description: message,
-	}, rule.RuleSuggestion{
-		Message: rule.RuleMessage{
-			Id:          "suggestRemove",
-			Description: "Remove the type conversion.",
+	}, 
+		rule.RuleSuggestion{
+			Message: rule.RuleMessage{
+				Id:          "suggestRemove",
+				Description: "Remove the type conversion.",
+			},
+			FixesArr: []rule.RuleFix{
+				rule.RuleFixReplaceRange(core.NewTextRange(node.Pos(), node.End()), innerText),
+			},
 		},
-		FixesArr: []rule.RuleFix{
-			rule.RuleFixReplaceRange(core.NewTextRange(node.Pos(), node.End()), innerText),
-		},
-	})
+		rule.RuleSuggestion{
+			Message: rule.RuleMessage{
+				Id:          "suggestSatisfies",
+				Description: "Instead, assert that the value satisfies the string type.",
+			},
+			FixesArr: []rule.RuleFix{
+				rule.RuleFixReplaceRange(core.NewTextRange(node.Pos(), node.End()), 
+					fmt.Sprintf("%s satisfies string", innerText)),
+			},
+		})
 }
 
 func handleUnaryPlus(ctx rule.RuleContext, node *ast.Node) {
@@ -307,16 +389,56 @@ func handleUnaryOperator(ctx rule.RuleContext, node *ast.Node, typeString, viola
 	)
 	
 	operandText := string(ctx.SourceFile.Text()[operand.Pos():operand.End()])
+	suggestionType := "string"
+	if typeString == "number" {
+		suggestionType = "number"
+	} else if typeString == "boolean" {
+		suggestionType = "boolean"
+	}
+	
 	ctx.ReportRangeWithSuggestions(reportRange, rule.RuleMessage{
 		Id:          "unnecessaryTypeConversion",
 		Description: message,
-	}, rule.RuleSuggestion{
-		Message: rule.RuleMessage{
-			Id:          "suggestRemove",
-			Description: "Remove the type conversion.",
+	}, 
+		rule.RuleSuggestion{
+			Message: rule.RuleMessage{
+				Id:          "suggestRemove",
+				Description: "Remove the type conversion.",
+			},
+			FixesArr: []rule.RuleFix{
+				rule.RuleFixReplaceRange(core.NewTextRange(outerNode.Pos(), outerNode.End()), operandText),
+			},
 		},
-		FixesArr: []rule.RuleFix{
-			rule.RuleFixReplaceRange(core.NewTextRange(outerNode.Pos(), outerNode.End()), operandText),
-		},
-	})
+		rule.RuleSuggestion{
+			Message: rule.RuleMessage{
+				Id:          "suggestSatisfies",
+				Description: fmt.Sprintf("Instead, assert that the value satisfies the %s type.", suggestionType),
+			},
+			FixesArr: []rule.RuleFix{
+				rule.RuleFixReplaceRange(core.NewTextRange(outerNode.Pos(), outerNode.End()), 
+					fmt.Sprintf("%s satisfies %s", operandText, suggestionType)),
+			},
+		})
+}
+
+// isLibraryFile checks if a source file is a library declaration file
+func isLibraryFile(sourceFile *ast.SourceFile) bool {
+	if sourceFile == nil {
+		return false
+	}
+	
+	fileName := sourceFile.FileName()
+	// Check if it's a TypeScript declaration file
+	if len(fileName) > 5 && fileName[len(fileName)-5:] == ".d.ts" {
+		return true
+	}
+	
+	// Check if it's in node_modules or a known library path
+	if strings.Contains(fileName, "node_modules") || 
+	   strings.Contains(fileName, "lib.") ||
+	   strings.Contains(fileName, "typescript/lib") {
+		return true
+	}
+	
+	return false
 }

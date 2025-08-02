@@ -1,4 +1,4 @@
-import { describe, test, expect } from '@rstest/core';
+import { test, describe } from '@rstest/core';
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
 import { getFixturesRootDir } from '../RuleTester.ts';
 
