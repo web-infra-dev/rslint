@@ -36,7 +36,7 @@ export interface LintOptions {
   files?: string[];
   config?: string; // Path to rslint.json config file
   workingDirectory?: string;
-  ruleOptions?: Record<string, string>;
+  ruleOptions?: Record<string, any>;
   fileContents?: Record<string, string>; // Map of file paths to their contents for VFS
 }
 

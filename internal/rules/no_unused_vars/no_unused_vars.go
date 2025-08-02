@@ -110,55 +110,232 @@ var NoUnusedVarsRule = rule.Rule{
 			}
 		}
 
-		// Collect all variables when the program exits
 		return rule.RuleListeners{
+			// Process everything in the source file visitor
 			ast.KindSourceFile: func(node *ast.Node) {
-				// Process all variables at the end of the file
-				collectAndReportUnusedVariables(ctx, opts, node)
+				variables := make(map[string]*VariableInfo)
+				usages := make(map[string][]*ast.Node)
+				
+				// Collect declarations and usages
+				collectAllNodes(node, variables, usages)
+				
+				// Mark variables as used based on usages
+				for varName, usageNodes := range usages {
+					if varInfo, exists := variables[varName]; exists {
+						varInfo.References = usageNodes
+						for _, usage := range usageNodes {
+							if !isTypeOnlyUsage(usage) {
+								varInfo.Used = true
+								break
+							} else {
+								varInfo.OnlyUsedAsType = true
+							}
+						}
+					}
+				}
+				
+				// Report unused variables
+				for _, varInfo := range variables {
+					if shouldReportVariable(ctx, opts, varInfo, variables) {
+						reportUnusedVariable(ctx, opts, varInfo)
+					}
+				}
 			},
 		}
 	},
 }
 
-func collectAndReportUnusedVariables(ctx rule.RuleContext, opts TranslatedOptions, sourceFile *ast.Node) {
-	// Get all variables in the source file
-	variables := collectVariables(ctx, sourceFile)
+func collectAllNodes(node *ast.Node, variables map[string]*VariableInfo, usages map[string][]*ast.Node) {
+	visited := make(map[*ast.Node]bool)
+	collectAllNodesHelper(node, variables, usages, visited)
+}
 
-	for _, varInfo := range variables {
-		if shouldReportVariable(ctx, opts, varInfo) {
-			reportUnusedVariable(ctx, opts, varInfo)
+func collectAllNodesHelper(node *ast.Node, variables map[string]*VariableInfo, usages map[string][]*ast.Node, visited map[*ast.Node]bool) {
+	if node == nil || visited[node] {
+		return
+	}
+	visited[node] = true
+
+	// Collect variable declarations
+	switch node.Kind {
+	case ast.KindVariableDeclaration:
+		varDecl := node.AsVariableDeclaration()
+		if ast.IsIdentifier(varDecl.Name()) {
+			nameNode := varDecl.Name()
+			name := nameNode.AsIdentifier().Text
+			variables[name] = &VariableInfo{
+				Variable:   nameNode,
+				Used:       false,
+				OnlyUsedAsType: false,
+				References: []*ast.Node{},
+				Definition: node,
+			}
+		}
+	case ast.KindFunctionDeclaration:
+		funcDecl := node.AsFunctionDeclaration()
+		if funcDecl.Name() != nil && ast.IsIdentifier(funcDecl.Name()) {
+			nameNode := funcDecl.Name()
+			name := nameNode.AsIdentifier().Text
+			variables[name] = &VariableInfo{
+				Variable:   nameNode,
+				Used:       false,
+				OnlyUsedAsType: false,
+				References: []*ast.Node{},
+				Definition: node,
+			}
+		}
+	case ast.KindParameter:
+		paramDecl := node.AsParameterDeclaration()
+		if ast.IsIdentifier(paramDecl.Name()) {
+			nameNode := paramDecl.Name()
+			name := nameNode.AsIdentifier().Text
+			variables[name] = &VariableInfo{
+				Variable:   nameNode,
+				Used:       false,
+				OnlyUsedAsType: false,
+				References: []*ast.Node{},
+				Definition: node,
+			}
+		}
+	case ast.KindCatchClause:
+		catchClause := node.AsCatchClause()
+		if catchClause.VariableDeclaration != nil {
+			nameDecl := catchClause.VariableDeclaration
+			if ast.IsIdentifier(nameDecl.Name()) {
+				nameNode := nameDecl.Name()
+				name := nameNode.AsIdentifier().Text
+				variables[name] = &VariableInfo{
+					Variable:   nameNode,
+					Used:       false,
+					OnlyUsedAsType: false,
+					References: []*ast.Node{},
+					Definition: nameDecl,
+				}
+			}
+		}
+	case ast.KindIdentifier:
+		// Collect usage
+		if !isPartOfDeclaration(node) {
+			name := node.AsIdentifier().Text
+			usages[name] = append(usages[name], node)
+		}
+	}
+
+	// Recursively traverse children using simplified traversal
+	simpleTraverseChildren(node, func(child *ast.Node) {
+		collectAllNodesHelper(child, variables, usages, visited)
+	})
+}
+
+func simpleTraverseChildren(node *ast.Node, callback func(*ast.Node)) {
+	if node == nil {
+		return
+	}
+
+	// Basic traversal for common node types
+	switch node.Kind {
+	case ast.KindSourceFile:
+		sourceFile := node.AsSourceFile()
+		for _, stmt := range sourceFile.Statements.Nodes {
+			callback(stmt)
+		}
+	case ast.KindVariableStatement:
+		varStmt := node.AsVariableStatement()
+		if varStmt.DeclarationList != nil {
+			callback(varStmt.DeclarationList)
+		}
+	case ast.KindVariableDeclarationList:
+		declList := node.AsVariableDeclarationList()
+		for _, decl := range declList.Declarations.Nodes {
+			callback(decl)
+		}
+	case ast.KindVariableDeclaration:
+		varDecl := node.AsVariableDeclaration()
+		if varDecl.Initializer != nil {
+			callback(varDecl.Initializer)
+		}
+	case ast.KindFunctionDeclaration:
+		funcDecl := node.AsFunctionDeclaration()
+		if funcDecl.Parameters != nil {
+			for _, param := range funcDecl.Parameters.Nodes {
+				callback(param)
+			}
+		}
+		if funcDecl.Body != nil {
+			callback(funcDecl.Body)
+		}
+	case ast.KindBlock:
+		block := node.AsBlock()
+		for _, stmt := range block.Statements.Nodes {
+			callback(stmt)
+		}
+	case ast.KindExpressionStatement:
+		exprStmt := node.AsExpressionStatement()
+		if exprStmt.Expression != nil {
+			callback(exprStmt.Expression)
+		}
+	case ast.KindCallExpression:
+		callExpr := node.AsCallExpression()
+		if callExpr.Expression != nil {
+			callback(callExpr.Expression)
+		}
+		if callExpr.Arguments != nil {
+			for _, arg := range callExpr.Arguments.Nodes {
+				callback(arg)
+			}
+		}
+	case ast.KindPropertyAccessExpression:
+		propAccess := node.AsPropertyAccessExpression()
+		if propAccess.Expression != nil {
+			callback(propAccess.Expression)
+		}
+	case ast.KindExportDeclaration:
+		exportDecl := node.AsExportDeclaration()
+		if exportDecl.ExportClause != nil {
+			callback(exportDecl.ExportClause)
+		}
+	case ast.KindNamedExports:
+		namedExports := node.AsNamedExports()
+		for _, element := range namedExports.Elements.Nodes {
+			callback(element)
+		}
+	case ast.KindExportSpecifier:
+		exportSpec := node.AsExportSpecifier()
+		if exportSpec.Name() != nil {
+			callback(exportSpec.Name())
+		}
+	case ast.KindReturnStatement:
+		returnStmt := node.AsReturnStatement()
+		if returnStmt.Expression != nil {
+			callback(returnStmt.Expression)
+		}
+	case ast.KindBinaryExpression:
+		binExpr := node.AsBinaryExpression()
+		if binExpr.Left != nil {
+			callback(binExpr.Left)
+		}
+		if binExpr.Right != nil {
+			callback(binExpr.Right)
 		}
 	}
 }
 
-func collectVariables(ctx rule.RuleContext, sourceFile *ast.Node) map[*ast.Node]*VariableInfo {
-	variables := make(map[*ast.Node]*VariableInfo)
-	
-	// This is a simplified version - in a real implementation, we would need to:
-	// 1. Walk the entire AST
-	// 2. Track all variable declarations
-	// 3. Track all variable references
-	// 4. Determine if references are type-only
-	// 5. Handle scope correctly
-	
-	// For now, we'll use a visitor pattern to collect information
-	// Simple recursive traversal since VisitEachChild is not available
-	collectVariableInfo(ctx, sourceFile, variables)
-	
-	return variables
-}
+func collectDeclarations(node *ast.Node, variables map[string]*VariableInfo) {
+	if node == nil {
+		return
+	}
 
-func collectVariableInfo(ctx rule.RuleContext, node *ast.Node, variables map[*ast.Node]*VariableInfo) {
-	// Handle variable declarations
 	switch node.Kind {
 	case ast.KindVariableStatement:
 		varStmt := node.AsVariableStatement()
 		if varStmt.DeclarationList != nil {
 			declList := varStmt.DeclarationList.AsVariableDeclarationList()
 			for _, decl := range declList.Declarations.Nodes {
-				if ast.IsIdentifier(decl.AsVariableDeclaration().Name()) {
-					nameNode := decl.AsVariableDeclaration().Name()
-					variables[nameNode] = &VariableInfo{
+				varDecl := decl.AsVariableDeclaration()
+				if ast.IsIdentifier(varDecl.Name()) {
+					nameNode := varDecl.Name()
+					name := nameNode.AsIdentifier().Text
+					variables[name] = &VariableInfo{
 						Variable:   nameNode,
 						Used:       false,
 						OnlyUsedAsType: false,
@@ -170,9 +347,10 @@ func collectVariableInfo(ctx rule.RuleContext, node *ast.Node, variables map[*as
 		}
 	case ast.KindFunctionDeclaration:
 		funcDecl := node.AsFunctionDeclaration()
-		if funcDecl.Name() != nil {
+		if funcDecl.Name() != nil && ast.IsIdentifier(funcDecl.Name()) {
 			nameNode := funcDecl.Name()
-			variables[nameNode] = &VariableInfo{
+			name := nameNode.AsIdentifier().Text
+			variables[name] = &VariableInfo{
 				Variable:   nameNode,
 				Used:       false,
 				OnlyUsedAsType: false,
@@ -183,55 +361,157 @@ func collectVariableInfo(ctx rule.RuleContext, node *ast.Node, variables map[*as
 		// Handle parameters
 		if funcDecl.Parameters != nil {
 			for _, param := range funcDecl.Parameters.Nodes {
-				handleParameter(ctx, param, variables)
-			}
-		}
-	case ast.KindParameter:
-		handleParameter(ctx, node, variables)
-	case ast.KindCatchClause:
-		catchClause := node.AsCatchClause()
-		if catchClause.VariableDeclaration != nil {
-			name := catchClause.VariableDeclaration.Name()
-			if ast.IsIdentifier(name) {
-				variables[name] = &VariableInfo{
-					Variable:   name,
-					Used:       false,
-					OnlyUsedAsType: false,
-					References: []*ast.Node{},
-					Definition: catchClause.VariableDeclaration,
+				paramDecl := param.AsParameterDeclaration()
+				if ast.IsIdentifier(paramDecl.Name()) {
+					nameNode := paramDecl.Name()
+					name := nameNode.AsIdentifier().Text
+					variables[name] = &VariableInfo{
+						Variable:   nameNode,
+						Used:       false,
+						OnlyUsedAsType: false,
+						References: []*ast.Node{},
+						Definition: param,
+					}
 				}
 			}
 		}
-	case ast.KindIdentifier:
-		// Handle variable references - simplified
-		if varInfo, exists := variables[node]; exists {
-			varInfo.References = append(varInfo.References, node)
-			// Check if this is a type-only usage
-			if !isTypeOnlyUsage(node) {
-				varInfo.Used = true
-			} else if !varInfo.Used {
-				varInfo.OnlyUsedAsType = true
+	case ast.KindCatchClause:
+		catchClause := node.AsCatchClause()
+		if catchClause.VariableDeclaration != nil {
+			nameDecl := catchClause.VariableDeclaration
+			if ast.IsIdentifier(nameDecl.Name()) {
+				nameNode := nameDecl.Name()
+				name := nameNode.AsIdentifier().Text
+				variables[name] = &VariableInfo{
+					Variable:   nameNode,
+					Used:       false,
+					OnlyUsedAsType: false,
+					References: []*ast.Node{},
+					Definition: nameDecl,
+				}
 			}
 		}
 	}
 
-	// Recursively process children - simplified traversal
-	// In a real implementation, we would need proper AST traversal
+	// Recursively traverse children
+	traverseChildren(node, func(child *ast.Node) {
+		collectDeclarations(child, variables)
+	})
 }
 
-func handleParameter(ctx rule.RuleContext, param *ast.Node, variables map[*ast.Node]*VariableInfo) {
-	paramDecl := param.AsParameterDeclaration()
-	if ast.IsIdentifier(paramDecl.Name()) {
-		nameNode := paramDecl.Name()
-		variables[nameNode] = &VariableInfo{
-			Variable:   nameNode,
-			Used:       false,
-			OnlyUsedAsType: false,
-			References: []*ast.Node{},
-			Definition: param,
+func collectUsages(node *ast.Node, usages map[string][]*ast.Node) {
+	if node == nil {
+		return
+	}
+
+	if node.Kind == ast.KindIdentifier {
+		// Skip identifiers that are part of declarations
+		if !isPartOfDeclaration(node) {
+			name := node.AsIdentifier().Text
+			usages[name] = append(usages[name], node)
+		}
+	}
+
+	// Recursively traverse children
+	traverseChildren(node, func(child *ast.Node) {
+		collectUsages(child, usages)
+	})
+}
+
+func traverseChildren(node *ast.Node, callback func(*ast.Node)) {
+	if node == nil {
+		return
+	}
+
+	// This is a simplified traversal - we traverse known child nodes
+	switch node.Kind {
+	case ast.KindSourceFile:
+		sourceFile := node.AsSourceFile()
+		for _, stmt := range sourceFile.Statements.Nodes {
+			callback(stmt)
+		}
+	case ast.KindVariableStatement:
+		varStmt := node.AsVariableStatement()
+		if varStmt.DeclarationList != nil {
+			callback(varStmt.DeclarationList)
+		}
+	case ast.KindVariableDeclarationList:
+		declList := node.AsVariableDeclarationList()
+		for _, decl := range declList.Declarations.Nodes {
+			callback(decl)
+		}
+	case ast.KindVariableDeclaration:
+		varDecl := node.AsVariableDeclaration()
+		if varDecl.Initializer != nil {
+			callback(varDecl.Initializer)
+		}
+	case ast.KindFunctionDeclaration:
+		funcDecl := node.AsFunctionDeclaration()
+		if funcDecl.Body != nil {
+			callback(funcDecl.Body)
+		}
+	case ast.KindBlock:
+		block := node.AsBlock()
+		for _, stmt := range block.Statements.Nodes {
+			callback(stmt)
+		}
+	case ast.KindExpressionStatement:
+		exprStmt := node.AsExpressionStatement()
+		if exprStmt.Expression != nil {
+			callback(exprStmt.Expression)
+		}
+	case ast.KindCallExpression:
+		callExpr := node.AsCallExpression()
+		if callExpr.Expression != nil {
+			callback(callExpr.Expression)
+		}
+		if callExpr.Arguments != nil {
+			for _, arg := range callExpr.Arguments.Nodes {
+				callback(arg)
+			}
+		}
+	case ast.KindPropertyAccessExpression:
+		propAccess := node.AsPropertyAccessExpression()
+		if propAccess.Expression != nil {
+			callback(propAccess.Expression)
+		}
+	case ast.KindTryStatement:
+		tryStmt := node.AsTryStatement()
+		if tryStmt.TryBlock != nil {
+			callback(tryStmt.TryBlock)
+		}
+		if tryStmt.CatchClause != nil {
+			callback(tryStmt.CatchClause)
+		}
+	case ast.KindCatchClause:
+		catchClause := node.AsCatchClause()
+		if catchClause.Block != nil {
+			callback(catchClause.Block)
 		}
 	}
 }
+
+func isPartOfDeclaration(node *ast.Node) bool {
+	parent := node.Parent
+	if parent == nil {
+		return false
+	}
+
+	switch parent.Kind {
+	case ast.KindVariableDeclaration:
+		varDecl := parent.AsVariableDeclaration()
+		return varDecl.Name() == node
+	case ast.KindFunctionDeclaration:
+		funcDecl := parent.AsFunctionDeclaration()
+		return funcDecl.Name() == node
+	case ast.KindParameter:
+		paramDecl := parent.AsParameterDeclaration()
+		return paramDecl.Name() == node
+	}
+
+	return false
+}
+
 
 func isTypeOnlyUsage(node *ast.Node) bool {
 	parent := node.Parent
@@ -252,7 +532,7 @@ func isTypeOnlyUsage(node *ast.Node) bool {
 	return false
 }
 
-func shouldReportVariable(ctx rule.RuleContext, opts TranslatedOptions, varInfo *VariableInfo) bool {
+func shouldReportVariable(ctx rule.RuleContext, opts TranslatedOptions, varInfo *VariableInfo, allVariables map[string]*VariableInfo) bool {
 	// Skip if variable is used
 	if varInfo.Used && !opts.ReportUsedIgnorePattern {
 		return false
@@ -260,6 +540,16 @@ func shouldReportVariable(ctx rule.RuleContext, opts TranslatedOptions, varInfo 
 
 	// Skip if only used as type and it's an import
 	if varInfo.OnlyUsedAsType && isImportDeclaration(varInfo.Definition) {
+		return false
+	}
+
+	// Skip if variable is exported
+	if isExported(varInfo) {
+		return false
+	}
+
+	// Skip if function references other local variables (TypeScript-ESLint specific behavior)
+	if isFunctionReferencingLocalVariables(varInfo, allVariables) {
 		return false
 	}
 
@@ -293,7 +583,7 @@ func shouldReportVariable(ctx rule.RuleContext, opts TranslatedOptions, varInfo 
 		if opts.ArgsIgnorePattern != nil && opts.ArgsIgnorePattern.MatchString(name) {
 			return opts.ReportUsedIgnorePattern && varInfo.Used
 		}
-		if opts.Args == "after-used" && !isAfterLastUsedParam(ctx, varInfo) {
+		if opts.Args == "after-used" && !isAfterLastUsedParam(ctx, varInfo, allVariables) {
 			return false
 		}
 	case VariableTypeVariable:
@@ -373,8 +663,23 @@ func getVariableName(varInfo *VariableInfo) string {
 }
 
 func isGlobalVariable(varInfo *VariableInfo) bool {
-	// Check if the variable is in global scope
-	// This is a simplified check - in reality, we'd need to check the scope chain
+	// In a module/file context, top-level declarations are considered global
+	if varInfo.Definition == nil {
+		return false
+	}
+	
+	// Check if the definition is at the top level of a source file
+	parent := varInfo.Definition.Parent
+	for parent != nil {
+		switch parent.Kind {
+		case ast.KindSourceFile:
+			return true // This is a top-level declaration
+		case ast.KindBlock, ast.KindFunctionDeclaration, ast.KindArrowFunction, ast.KindFunctionExpression:
+			return false // This is inside a function or block
+		}
+		parent = parent.Parent
+	}
+	
 	return false
 }
 
@@ -394,10 +699,105 @@ func isImportDeclaration(definition *ast.Node) bool {
 	return false
 }
 
-func isAfterLastUsedParam(ctx rule.RuleContext, varInfo *VariableInfo) bool {
+func isExported(varInfo *VariableInfo) bool {
+	if varInfo.Definition == nil {
+		return false
+	}
+
+	// Check if the variable is part of an export declaration
+	parent := varInfo.Definition.Parent
+	for parent != nil {
+		switch parent.Kind {
+		case ast.KindExportDeclaration:
+			return true
+		case ast.KindModuleDeclaration:
+			return true
+		}
+		parent = parent.Parent
+	}
+
+	// Check if variable is referenced in an export statement
+	for _, ref := range varInfo.References {
+		refParent := ref.Parent
+		for refParent != nil {
+			if refParent.Kind == ast.KindExportDeclaration {
+				return true
+			}
+			refParent = refParent.Parent
+		}
+	}
+
+	return false
+}
+
+func isAfterLastUsedParam(ctx rule.RuleContext, varInfo *VariableInfo, allVariables map[string]*VariableInfo) bool {
 	// Check if this parameter comes after the last used parameter
-	// This requires analyzing all parameters in the function
-	return true // Simplified for now
+	if varInfo.Definition == nil || varInfo.Definition.Kind != ast.KindParameter {
+		return false
+	}
+
+	// Find the parent function
+	parent := varInfo.Definition.Parent
+	for parent != nil {
+		if parent.Kind == ast.KindFunctionDeclaration || parent.Kind == ast.KindFunctionExpression || parent.Kind == ast.KindArrowFunction {
+			break
+		}
+		parent = parent.Parent
+	}
+
+	if parent == nil {
+		return false
+	}
+
+	// Get all parameters
+	var parameters []*ast.Node
+	switch parent.Kind {
+	case ast.KindFunctionDeclaration:
+		funcDecl := parent.AsFunctionDeclaration()
+		if funcDecl.Parameters != nil {
+			parameters = funcDecl.Parameters.Nodes
+		}
+	case ast.KindFunctionExpression:
+		funcExpr := parent.AsFunctionExpression()
+		if funcExpr.Parameters != nil {
+			parameters = funcExpr.Parameters.Nodes
+		}
+	case ast.KindArrowFunction:
+		arrowFunc := parent.AsArrowFunction()
+		if arrowFunc.Parameters != nil {
+			parameters = arrowFunc.Parameters.Nodes
+		}
+	}
+
+	// Find the index of current parameter
+	currentParamIndex := -1
+	for i, param := range parameters {
+		if param == varInfo.Definition {
+			currentParamIndex = i
+			break
+		}
+	}
+
+	if currentParamIndex == -1 {
+		return false
+	}
+
+	// Check if any parameter after this one is used
+	// For "after-used" mode: only report unused parameters that come after all used parameters
+	for i := currentParamIndex + 1; i < len(parameters); i++ {
+		param := parameters[i]
+		if param.Kind == ast.KindParameter {
+			paramDecl := param.AsParameterDeclaration()
+			if ast.IsIdentifier(paramDecl.Name()) {
+				paramName := paramDecl.Name().AsIdentifier().Text
+				if paramInfo, exists := allVariables[paramName]; exists && paramInfo.Used {
+					return false // This parameter comes before a used parameter, so don't report it
+				}
+			}
+		}
+	}
+
+	return true // This parameter comes after all used parameters, so it can be reported
 }
 
 func hasRestSibling(varInfo *VariableInfo) bool {
@@ -576,6 +976,56 @@ func getAdditionalMessage(opts TranslatedOptions, varType VariableType) string {
 	}
 	
 	return ""
+}
+
+func isFunctionReferencingLocalVariables(varInfo *VariableInfo, allVariables map[string]*VariableInfo) bool {
+	// Only apply this to function declarations
+	if varInfo.Definition == nil || varInfo.Definition.Kind != ast.KindFunctionDeclaration {
+		return false
+	}
+
+	// Get the function body
+	funcDecl := varInfo.Definition.AsFunctionDeclaration()
+	if funcDecl.Body == nil {
+		return false
+	}
+
+	// Check if the function body references any local variables
+	referencedVars := make(map[string]bool)
+	collectReferencesInNode(funcDecl.Body, referencedVars)
+
+	// Check if any of the referenced variables are local variables in the same scope
+	for refVar := range referencedVars {
+		if localVarInfo, exists := allVariables[refVar]; exists {
+			// Skip if it's the function itself
+			if localVarInfo == varInfo {
+				continue
+			}
+			// If it references another local variable, consider it "used"
+			return true
+		}
+	}
+
+	return false
+}
+
+func collectReferencesInNode(node *ast.Node, refs map[string]bool) {
+	if node == nil {
+		return
+	}
+
+	if node.Kind == ast.KindIdentifier {
+		// Skip identifiers that are part of declarations
+		if !isPartOfDeclaration(node) {
+			name := node.AsIdentifier().Text
+			refs[name] = true
+		}
+	}
+
+	// Recursively traverse children
+	simpleTraverseChildren(node, func(child *ast.Node) {
+		collectReferencesInNode(child, refs)
+	})
 }
 
 func buildMessage(messageId, varName, action, additional string) rule.RuleMessage {

@@ -66,31 +66,6 @@ var NoInferrableTypesRule = rule.Rule{
 				case ast.KindNonNullExpression:
 					node = node.AsNonNullExpression().Expression
 				default:
-					// Handle optional chaining - check if this is a chain expression
-					if ast.IsOptionalChain(node) {
-						// For optional chaining, we want to get the base expression
-						// This handles cases like BigInt?.(10), Number?.('1'), etc.
-						switch node.Kind {
-						case ast.KindCallExpression:
-							callExpr := node.AsCallExpression()
-							if callExpr.QuestionDotToken != nil {
-								node = callExpr.Expression
-								continue
-							}
-						case ast.KindPropertyAccessExpression:
-							propAccess := node.AsPropertyAccessExpression()
-							if propAccess.QuestionDotToken != nil {
-								node = propAccess.Expression
-								continue
-							}
-						case ast.KindElementAccessExpression:
-							elemAccess := node.AsElementAccessExpression()
-							if elemAccess.QuestionDotToken != nil {
-								node = elemAccess.Expression
-								continue
-							}
-						}
-					}
 					return node
 				}
 			}
@@ -112,17 +87,20 @@ var NoInferrableTypesRule = rule.Rule{
 		}
 
 		isFunctionCall := func(init *ast.Node, callName string) bool {
+			// First unwrap any parentheses and non-null assertions
 			node := skipChainExpression(init)
 			if node == nil || node.Kind != ast.KindCallExpression {
 				return false
 			}
 			
 			callExpr := node.AsCallExpression()
-			if callExpr.Expression.Kind != ast.KindIdentifier {
-				return false
+			// For calls like BigInt?.(10), the expression is still an identifier "BigInt"
+			// The optional chaining token is stored separately
+			if callExpr.Expression.Kind == ast.KindIdentifier {
+				return callExpr.Expression.AsIdentifier().Text == callName
 			}
 			
-			return callExpr.Expression.AsIdentifier().Text == callName
+			return false
 		}
 
 		isLiteral := func(init *ast.Node, typeName string) bool {
@@ -307,9 +285,7 @@ var NoInferrableTypesRule = rule.Rule{
 		inferrableVariableVisitor := func(node *ast.Node) {
 			varDecl := node.AsVariableDeclaration()
 			if varDecl.Type != nil && varDecl.Initializer != nil {
-				// For variable declarations, report on the identifier name
-				reportTarget := varDecl.Name()
-				reportInferrableType(node, varDecl.Type, varDecl.Initializer, reportTarget.AsNode())
+				reportInferrableType(node, varDecl.Type, varDecl.Initializer, nil)
 			}
 		}
 
@@ -335,15 +311,10 @@ var NoInferrableTypesRule = rule.Rule{
 			}
 
 			for _, param := range params {
-				// Handle parameter properties (TypeScript constructor parameters)
 				if param.Kind == ast.KindParameter {
 					paramNode := param.AsParameterDeclaration()
-					
-					// Check for parameters with default values and type annotations
 					if paramNode.Initializer != nil && paramNode.Type != nil {
-						// For parameters, report on the parameter name
-						reportTarget := paramNode.Name().AsNode()
-						reportInferrableType(param, paramNode.Type, paramNode.Initializer, reportTarget)
+						reportInferrableType(param, paramNode.Type, paramNode.Initializer, nil)
 					}
 				}
 			}
@@ -354,57 +325,20 @@ var NoInferrableTypesRule = rule.Rule{
 				return
 			}
 
-			// Check for readonly, optional properties
-			var isReadonly, isOptional bool
 			var typeAnnotation, value *ast.Node
-
 			switch node.Kind {
 			case ast.KindPropertyDeclaration:
 				propDecl := node.AsPropertyDeclaration()
-				
-				// Skip readonly properties
-				if propDecl.Modifiers() != nil {
-					for _, mod := range propDecl.Modifiers().Nodes {
-						if mod.Kind == ast.KindReadonlyKeyword {
-							isReadonly = true
-							break
-						}
-					}
-				}
-				
-				isOptional = ast.HasQuestionToken(node)
 				typeAnnotation = propDecl.Type
 				value = propDecl.Initializer
-
 			case ast.KindPropertySignature:
-				// For accessor properties, check if it has the accessor keyword
 				propSig := node.AsPropertySignatureDeclaration()
-				if propSig.Modifiers() != nil {
-					for _, mod := range propSig.Modifiers().Nodes {
-						if mod.Kind == ast.KindAccessorKeyword {
-							// This is an accessor property
-							isOptional = ast.HasQuestionToken(node)
-							typeAnnotation = propSig.Type
-							value = propSig.Initializer
-							break
-						}
-					}
-				}
+				typeAnnotation = propSig.Type
+				value = propSig.Initializer
+				
 			}
 
-			if isReadonly || isOptional {
-				return
-			}
-
-			// For properties, report on the property name
-			var reportTarget *ast.Node
-			switch node.Kind {
-			case ast.KindPropertyDeclaration:
-				reportTarget = node.AsPropertyDeclaration().Name().AsNode()
-			case ast.KindPropertySignature:
-				reportTarget = node.AsPropertySignatureDeclaration().Name().AsNode()
-			}
-			reportInferrableType(node, typeAnnotation, value, reportTarget)
+			reportInferrableType(node, typeAnnotation, value, nil)
 		}
 
 		return rule.RuleListeners{

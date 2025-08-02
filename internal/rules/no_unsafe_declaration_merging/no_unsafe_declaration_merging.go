@@ -9,12 +9,15 @@ var NoUnsafeDeclarationMergingRule = rule.Rule{
 	Name: "no-unsafe-declaration-merging",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		// Helper function to check if a symbol has declarations of a specific kind
-		hasDeclarationOfKind := func(symbol any, kind ast.Kind) bool {
-			if symbol == nil {
+		hasDeclarationOfKind := func(symbol *ast.Symbol, kind ast.Kind) bool {
+			if symbol == nil || symbol.Declarations == nil {
 				return false
 			}
-			// Note: This is a simplified check - in a real implementation,
-			// we would need to access the symbol's declarations
+			for _, decl := range symbol.Declarations {
+				if decl != nil && decl.Kind == kind {
+					return true
+				}
+			}
 			return false
 		}
 

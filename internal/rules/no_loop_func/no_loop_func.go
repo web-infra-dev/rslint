@@ -95,10 +95,27 @@ func getTopLoopNode(node *ast.Node, excludedNode *ast.Node) *ast.Node {
 // Check if the reference is safe
 func isSafe(loopNode *ast.Node, reference *ast.Symbol, variable *ast.Symbol, ctx rule.RuleContext) bool {
 	if variable == nil || len(variable.Declarations) == 0 {
+		// Variables without declarations are likely global variables or built-ins
+		// These are generally safe since they're not loop-bound
 		return true
 	}
 
 	declaration := variable.Declarations[0]
+	
+	// Check if this is a declaration from a library file (lib.*.d.ts)
+	// These are global/built-in declarations and should be considered safe
+	sourceFile := ast.GetSourceFileOfNode(declaration)
+	if sourceFile != nil {
+		fileName := sourceFile.FileName()
+		if strings.Contains(fileName, "lib.") && strings.HasSuffix(fileName, ".d.ts") {
+			return true
+		}
+		// Also check for node_modules/@types or similar built-in type definitions
+		if strings.Contains(fileName, "node_modules/@types") || 
+		   strings.Contains(fileName, "typescript/lib/") {
+			return true
+		}
+	}
 	
 	// Get the kind of variable declaration
 	kind := ""
@@ -127,11 +144,43 @@ func isSafe(loopNode *ast.Node, reference *ast.Symbol, variable *ast.Symbol, ctx
 		return true
 	}
 
-	// Check for write references after the border
-	// Note: topLoop analysis removed for simplicity
-	// Check if there are any write references to this variable after the border
-	// For now, we'll assume any non-const variable referenced in a loop function is potentially unsafe
-	// This is a conservative approach
+	// Check if this is a function parameter, which is generally safe
+	if declaration.Parent != nil && declaration.Parent.Kind == ast.KindParameter {
+		return true
+	}
+
+	// For 'var' declarations, check if they're actually loop control variables
+	if kind == "var" {
+		// Check if this variable is declared as part of a loop statement
+		parent := declaration.Parent
+		for parent != nil {
+			switch parent.Kind {
+			case ast.KindForStatement:
+				forStmt := parent.AsForStatement()
+				if forStmt.Initializer != nil && 
+					(declaration.Pos() >= forStmt.Initializer.Pos() && 
+					 declaration.End() <= forStmt.Initializer.End()) {
+					// This is a loop control variable - unsafe
+					return false
+				}
+			case ast.KindForInStatement, ast.KindForOfStatement:
+				forInOf := parent.AsForInOrOfStatement()
+				if forInOf.Initializer != nil &&
+					(declaration.Pos() >= forInOf.Initializer.Pos() && 
+					 declaration.End() <= forInOf.Initializer.End()) {
+					// This is a loop control variable - unsafe
+					return false
+				}
+			}
+			parent = parent.Parent
+		}
+		
+		// If it's a 'var' but not a loop control variable, it might still be unsafe
+		// if it's modified within the loop. For now, we'll be conservative.
+		return false
+	}
+
+	// For variables not covered by the above cases, assume they're unsafe
 	return false
 }
 
@@ -180,6 +229,9 @@ func getUnsafeRefs(node *ast.Node, loopNode *ast.Node, ctx rule.RuleContext) []s
 						unsafeRefs = append(unsafeRefs, varName)
 					}
 				}
+			} else {
+				// Variables with no declarations are likely globals or built-ins
+				// These should be safe, so we don't add them to unsafe refs
 			}
 		}
 

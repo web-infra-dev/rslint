@@ -284,12 +284,12 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 
 		if diagnosticHighlightActive {
 			underlineEnd = lineTextEnd
-		} else if int(lineMap[line]) <= diagnosticStart && (line == len(lineMap) || diagnosticStart < int(lineMap[line+1])) {
+		} else if int(lineMap[line]) <= diagnosticStart && (line+1 >= len(lineMap) || diagnosticStart < int(lineMap[line+1])) {
 			underlineStart = min(max(lineTextStart, diagnosticStart), lineTextEnd)
 			underlineEnd = lineTextEnd
 			diagnosticHighlightActive = true
 		}
-		if int(lineMap[line]) <= diagnosticEnd && (line == len(lineMap) || diagnosticEnd < int(lineMap[line+1])) {
+		if int(lineMap[line]) <= diagnosticEnd && (line+1 >= len(lineMap) || diagnosticEnd < int(lineMap[line+1])) {
 			underlineEnd = min(max(underlineStart, diagnosticEnd), lineTextEnd)
 			diagnosticHighlightActive = false
 		}

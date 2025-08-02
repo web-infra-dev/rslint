@@ -48,6 +48,9 @@ var ConsistentIndexedObjectStyleRule = rule.Rule{
 			ast.KindTypeLiteral: func(node *ast.Node) {
 				checkTypeLiteral(ctx, node)
 			},
+			ast.KindMappedType: func(node *ast.Node) {
+				checkMappedType(ctx, node)
+			},
 		}
 	},
 }
@@ -169,11 +172,11 @@ func checkInterfaceDeclaration(ctx rule.RuleContext, node *ast.Node) {
 	// - interface Foo1 { [key: string]: Foo2 } interface Foo2 { [key: string]: Foo1 } - Don't convert
 	if interfaceName != "" {
 		// Check for any reference to self in the value type (deep check)
-		if containsTypeReference(valueType, interfaceName) {
+		if containsTypeReferenceWithVisited(valueType, interfaceName, make(map[string]bool)) {
 			return // Contains self-reference - don't convert
 		}
-		// Check for circular reference chains
-		if isPartOfCircularChain(ctx, interfaceName) {
+		// Check for circular reference chains - handles both interface-to-interface and mixed chains
+		if isPartOfUnifiedCircularChain(ctx, interfaceName) {
 			return // Part of circular chain - don't convert
 		}
 	}
@@ -225,28 +228,59 @@ func checkTypeLiteral(ctx rule.RuleContext, node *ast.Node) {
 	}
 
 	member := typeLit.Members.Nodes[0]
-	if member.Kind != ast.KindIndexSignature {
+	if member.Kind != ast.KindIndexSignature && member.Kind != ast.KindMappedType {
 		return
 	}
 
-	indexSig := member.AsIndexSignatureDeclaration()
-	if indexSig.Parameters == nil || len(indexSig.Parameters.Nodes) == 0 {
-		return
-	}
+	var keyType, valueType *ast.Node
+	var valueText string
 
-	param := indexSig.Parameters.Nodes[0]
-	if param.Kind != ast.KindParameter {
-		return
-	}
+	if member.Kind == ast.KindIndexSignature {
+		indexSig := member.AsIndexSignatureDeclaration()
+		if indexSig.Parameters == nil || len(indexSig.Parameters.Nodes) == 0 {
+			return
+		}
 
-	paramDecl := param.AsParameterDeclaration()
-	keyType := paramDecl.Type
-	if keyType == nil {
-		return
-	}
+		param := indexSig.Parameters.Nodes[0]
+		if param.Kind != ast.KindParameter {
+			return
+		}
 
-	valueType := indexSig.Type
-	if valueType == nil {
+		paramDecl := param.AsParameterDeclaration()
+		keyType = paramDecl.Type
+		if keyType == nil {
+			return
+		}
+
+		valueType = indexSig.Type
+		// Handle missing value type (e.g., [k in string]; without a type)
+		// In such cases, we should convert to Record<KeyType, any>
+		if valueType == nil {
+			valueText = "any"
+		} else {
+			valueText = strings.TrimSpace(ctx.SourceFile.Text()[valueType.Pos():valueType.End()])
+		}
+	} else if member.Kind == ast.KindMappedType {
+		mappedType := member.AsMappedTypeNode()
+		if mappedType.TypeParameter == nil {
+			return
+		}
+
+		// For mapped types like [K in string]: T, the constraint is the key type
+		keyType = mappedType.TypeParameter.AsTypeParameter().Constraint
+		if keyType == nil {
+			return
+		}
+
+		valueType = mappedType.Type
+		// Handle missing value type (e.g., [k in string]; without a type)
+		// In such cases, we should convert to Record<KeyType, any>
+		if valueType == nil {
+			valueText = "any"
+		} else {
+			valueText = strings.TrimSpace(ctx.SourceFile.Text()[valueType.Pos():valueType.End()])
+		}
+	} else {
 		return
 	}
 
@@ -272,64 +306,22 @@ func checkTypeLiteral(ctx rule.RuleContext, node *ast.Node) {
 		// The difference is: does the type literal create a circular dependency if converted to Record?
 		
 		if parentName != "" {
-			// Check if the parent type alias is a union type AND the value references the parent
-			// e.g., type Foo = { [key: string]: Foo } | Foo - should NOT convert
-			// but: type Foo = { [key: string]: string } | Foo - should convert
-			if parentDecl.Kind == ast.KindTypeAliasDeclaration {
-				typeAlias := parentDecl.AsTypeAliasDeclaration()
-				if typeAlias.Type != nil && typeAlias.Type.Kind == ast.KindUnionType {
-					// Only prevent conversion if the value type references the parent
-					if containsTypeReference(valueType, parentName) {
-						return // Don't convert type literals that reference parent in union type aliases
-					}
-				}
+			// For any type literal that references its parent type, don't convert
+			// This includes direct references and references in unions
+			// Only check if valueType is not nil (for cases where value type exists)
+			if valueType != nil && containsTypeReferenceWithVisited(valueType, parentName, make(map[string]bool)) {
+				return // Contains self-reference - don't convert
 			}
-			
-			// Check if the value type is a union that contains the parent type
-			// However, for interfaces with only index signatures, this is generally safe
-			// e.g., interface Foo { [key: string]: string | Foo } is fine to convert
-			// Only restrict when we have complex nested structures
-			if valueType.Kind == ast.KindUnionType && parentDecl.Kind == ast.KindTypeAliasDeclaration {
-				// Only apply this restriction for type aliases, not interfaces
-				unionType := valueType.AsUnionTypeNode()
-				if unionType.Types != nil {
-					for _, t := range unionType.Types.Nodes {
-						if containsTypeReference(t, parentName) {
-							return // Value is a union containing self-reference in type alias - don't convert
-						}
-					}
-				}
-			}
-			
-			// Check if the value type contains a type literal that would reference the parent
-			// e.g., type Foo = { [key: string]: { [key: string]: Foo } }
-			// The outer type literal should not be converted because it creates a complex structure
-			if valueType.Kind == ast.KindTypeLiteral {
-				typeLit := valueType.AsTypeLiteralNode()
-				if typeLit.Members != nil && len(typeLit.Members.Nodes) == 1 {
-					member := typeLit.Members.Nodes[0]
-					if member.Kind == ast.KindIndexSignature {
-						indexSig := member.AsIndexSignatureDeclaration()
-						if indexSig.Type != nil && containsTypeReference(indexSig.Type, parentName) {
-							return // Outer type literal contains nested structure with parent reference
-						}
-					}
-				}
-			}
-			
-			// For type aliases, we only need to check for complex circular chains
-			// Simple self-references like `type Foo = { [key: string]: Foo[] }` 
-			// can be converted to `type Foo = Record<string, Foo[]>`
 			
 			// Check if this type alias is part of a circular chain
-			if isPartOfTypeAliasCircularChain(ctx, parentName) {
+			if isPartOfUnifiedCircularChain(ctx, parentName) {
 				return // Part of a circular chain - don't convert
 			}
 		}
 	}
 
 	keyText := strings.TrimSpace(ctx.SourceFile.Text()[keyType.Pos():keyType.End()])
-	valueText := strings.TrimSpace(ctx.SourceFile.Text()[valueType.Pos():valueType.End()])
+	// Note: valueText was already calculated above to handle missing value types
 
 	var recordText string
 	if ast.HasSyntacticModifier(member, ast.ModifierFlagsReadonly) {
@@ -339,6 +331,122 @@ func checkTypeLiteral(ctx rule.RuleContext, node *ast.Node) {
 	}
 
 	// Check if we need to preserve a space before the type literal
+	startPos := node.Pos()
+	fixText := recordText
+	if startPos > 0 {
+		prevChar := ctx.SourceFile.Text()[startPos-1]
+		if prevChar == ' ' {
+			// Don't include the space in the fix range
+			startPos = startPos
+		} else if prevChar == '=' || prevChar == ':' {
+			// Add a space if there wasn't one
+			fixText = " " + recordText
+		}
+	}
+	
+	ctx.ReportNodeWithFixes(node, rule.RuleMessage{
+		Id:          "preferRecord",
+		Description: "A record is preferred over an index signature.",
+	}, rule.RuleFix{
+		Range: core.NewTextRange(startPos, node.End()),
+		Text:  fixText,
+	})
+}
+
+func checkMappedType(ctx rule.RuleContext, node *ast.Node) {
+	mappedType := node.AsMappedTypeNode()
+	if mappedType.TypeParameter == nil {
+		return
+	}
+
+	// For mapped types like [K in string]: T, the constraint is the key type
+	keyType := mappedType.TypeParameter.AsTypeParameter().Constraint
+	if keyType == nil {
+		return
+	}
+	
+
+	valueType := mappedType.Type
+	var valueText string
+	// Handle missing value type (e.g., [k in string]; without a type)
+	// In such cases, we should convert to Record<KeyType, any>
+	if valueType == nil {
+		valueText = "any"
+	} else {
+		valueText = strings.TrimSpace(ctx.SourceFile.Text()[valueType.Pos():valueType.End()])
+	}
+
+	// Check for circular references
+	parentDecl := findParentDeclaration(node)
+	if parentDecl != nil {
+		var parentName string
+		if parentDecl.Kind == ast.KindTypeAliasDeclaration {
+			typeAlias := parentDecl.AsTypeAliasDeclaration()
+			if typeAlias.Name() != nil && ast.IsIdentifier(typeAlias.Name()) {
+				parentName = typeAlias.Name().AsIdentifier().Text
+			}
+		} else if parentDecl.Kind == ast.KindInterfaceDeclaration {
+			interfaceDecl := parentDecl.AsInterfaceDeclaration()
+			if interfaceDecl.Name() != nil && ast.IsIdentifier(interfaceDecl.Name()) {
+				parentName = interfaceDecl.Name().AsIdentifier().Text
+			}
+		}
+		
+		if parentName != "" {
+			// For any mapped type that references its parent type, don't convert
+			// This includes direct references and references in unions
+			// Only check if valueType is not nil (for cases where value type exists)
+			if valueType != nil && containsTypeReferenceWithVisited(valueType, parentName, make(map[string]bool)) {
+				return // Contains self-reference - don't convert
+			}
+			
+			// Check if this type alias is part of a circular chain
+			if isPartOfUnifiedCircularChain(ctx, parentName) {
+				return // Part of a circular chain - don't convert
+			}
+		}
+	}
+
+	keyText := strings.TrimSpace(ctx.SourceFile.Text()[keyType.Pos():keyType.End()])
+	
+	var recordText string
+	if ast.HasSyntacticModifier(node, ast.ModifierFlagsReadonly) {
+		recordText = fmt.Sprintf("Readonly<Record<%s, %s>>", keyText, valueText)
+	} else {
+		recordText = fmt.Sprintf("Record<%s, %s>", keyText, valueText)
+	}
+
+	// For mapped types, we need to replace the parent type (the whole type alias)
+	// because the mapped type is the direct value of the type alias  
+	if parentDecl != nil && parentDecl.Kind == ast.KindTypeAliasDeclaration {
+		typeAlias := parentDecl.AsTypeAliasDeclaration()
+		if typeAlias.Name() != nil && ast.IsIdentifier(typeAlias.Name()) {
+			typeName := typeAlias.Name().AsIdentifier().Text
+			
+			// Build the full replacement for the type alias
+			var genericTypes string
+			if typeAlias.TypeParameters != nil && len(typeAlias.TypeParameters.Nodes) > 0 {
+				var paramTexts []string
+				for _, param := range typeAlias.TypeParameters.Nodes {
+					paramTexts = append(paramTexts, strings.TrimSpace(ctx.SourceFile.Text()[param.Pos():param.End()]))
+				}
+				genericTypes = "<" + strings.Join(paramTexts, ", ") + ">"
+			}
+			
+			replacement := fmt.Sprintf("type %s%s = %s;", typeName, genericTypes, recordText)
+			
+			ctx.ReportNodeWithFixes(node, rule.RuleMessage{
+				Id:          "preferRecord",
+				Description: "A record is preferred over an index signature.",
+			}, rule.RuleFix{
+				Range: core.NewTextRange(parentDecl.Pos(), parentDecl.End()),
+				Text:  replacement,
+			})
+			return
+		}
+	}
+	
+	// Fallback for standalone mapped types (though this shouldn't happen normally)
 	startPos := node.Pos()
 	fixText := recordText
 	if startPos > 0 {
@@ -376,6 +484,11 @@ func findParentDeclaration(node *ast.Node) *ast.Node {
 
 // Check if type contains any reference to the given type name that would cause circular dependency
 func containsTypeReference(typeNode *ast.Node, typeName string) bool {
+	return containsTypeReferenceWithVisited(typeNode, typeName, make(map[string]bool))
+}
+
+// Check if type contains any reference to the given type name with a visited set to prevent infinite recursion
+func containsTypeReferenceWithVisited(typeNode *ast.Node, typeName string, visited map[string]bool) bool {
 	if typeNode == nil || typeName == "" {
 		return false
 	}
@@ -385,14 +498,25 @@ func containsTypeReference(typeNode *ast.Node, typeName string) bool {
 	case ast.KindTypeReference:
 		typeRef := typeNode.AsTypeReferenceNode()
 		if typeRef.TypeName != nil && ast.IsIdentifier(typeRef.TypeName) {
-			if typeRef.TypeName.AsIdentifier().Text == typeName {
+			referencedTypeName := typeRef.TypeName.AsIdentifier().Text
+			if referencedTypeName == typeName {
 				return true
+			}
+			// For type aliases, we need to check if the referenced type alias
+			// contains a reference to the target type name. This handles cases like:
+			// type ExampleRoot = ExampleUnion | ExampleObject;
+			// interface ExampleObject { [key: string]: ExampleRoot; }
+			if !visited[referencedTypeName] {
+				visited[referencedTypeName] = true
+				if containsTypeReferenceInTypeAliasWithVisited(typeNode, referencedTypeName, typeName, visited) {
+					return true
+				}
 			}
 		}
 		// Check type arguments
 		if typeRef.TypeArguments != nil {
 			for _, arg := range typeRef.TypeArguments.Nodes {
-				if containsTypeReference(arg, typeName) {
+				if containsTypeReferenceWithVisited(arg, typeName, visited) {
 					return true
 				}
 			}
@@ -400,17 +524,17 @@ func containsTypeReference(typeNode *ast.Node, typeName string) bool {
 	case ast.KindIndexedAccessType:
 		// Handle Foo[number], Foo["key"], etc.
 		indexedAccess := typeNode.AsIndexedAccessTypeNode()
-		if indexedAccess.ObjectType != nil && containsTypeReference(indexedAccess.ObjectType, typeName) {
+		if indexedAccess.ObjectType != nil && containsTypeReferenceWithVisited(indexedAccess.ObjectType, typeName, visited) {
 			return true
 		}
-		if indexedAccess.IndexType != nil && containsTypeReference(indexedAccess.IndexType, typeName) {
+		if indexedAccess.IndexType != nil && containsTypeReferenceWithVisited(indexedAccess.IndexType, typeName, visited) {
 			return true
 		}
 	case ast.KindUnionType:
 		unionType := typeNode.AsUnionTypeNode()
 		if unionType.Types != nil {
 			for _, t := range unionType.Types.Nodes {
-				if containsTypeReference(t, typeName) {
+				if containsTypeReferenceWithVisited(t, typeName, visited) {
 					return true
 				}
 			}
@@ -419,7 +543,7 @@ func containsTypeReference(typeNode *ast.Node, typeName string) bool {
 		intersectionType := typeNode.AsIntersectionTypeNode()
 		if intersectionType.Types != nil {
 			for _, t := range intersectionType.Types.Nodes {
-				if containsTypeReference(t, typeName) {
+				if containsTypeReferenceWithVisited(t, typeName, visited) {
 					return true
 				}
 			}
@@ -427,13 +551,13 @@ func containsTypeReference(typeNode *ast.Node, typeName string) bool {
 	case ast.KindArrayType:
 		arrayType := typeNode.AsArrayTypeNode()
 		if arrayType.ElementType != nil {
-			return containsTypeReference(arrayType.ElementType, typeName)
+			return containsTypeReferenceWithVisited(arrayType.ElementType, typeName, visited)
 		}
 	case ast.KindTupleType:
 		tupleType := typeNode.AsTupleTypeNode()
 		if tupleType.Elements != nil {
 			for _, elem := range tupleType.Elements.Nodes {
-				if containsTypeReference(elem, typeName) {
+				if containsTypeReferenceWithVisited(elem, typeName, visited) {
 					return true
 				}
 			}
@@ -441,7 +565,7 @@ func containsTypeReference(typeNode *ast.Node, typeName string) bool {
 	case ast.KindFunctionType, ast.KindConstructorType:
 		// Check return type
 		if typeNode.Type() != nil {
-			return containsTypeReference(typeNode.Type(), typeName)
+			return containsTypeReferenceWithVisited(typeNode.Type(), typeName, visited)
 		}
 	case ast.KindTypeLiteral:
 		// Check inside type literal members
@@ -451,21 +575,21 @@ func containsTypeReference(typeNode *ast.Node, typeName string) bool {
 				// For property signatures, check the type
 				if member.Kind == ast.KindPropertySignature {
 					propSig := member.AsPropertySignatureDeclaration()
-					if propSig.Type != nil && containsTypeReference(propSig.Type, typeName) {
+					if propSig.Type != nil && containsTypeReferenceWithVisited(propSig.Type, typeName, visited) {
 						return true
 					}
 				}
 				// For index signatures, check the value type
 				if member.Kind == ast.KindIndexSignature {
 					indexSig := member.AsIndexSignatureDeclaration()
-					if indexSig.Type != nil && containsTypeReference(indexSig.Type, typeName) {
+					if indexSig.Type != nil && containsTypeReferenceWithVisited(indexSig.Type, typeName, visited) {
 						return true
 					}
 				}
 				// For method signatures, check return type
 				if member.Kind == ast.KindMethodSignature {
 					methodSig := member.AsMethodSignatureDeclaration()
-					if methodSig.Type != nil && containsTypeReference(methodSig.Type, typeName) {
+					if methodSig.Type != nil && containsTypeReferenceWithVisited(methodSig.Type, typeName, visited) {
 						return true
 					}
 				}
@@ -476,18 +600,18 @@ func containsTypeReference(typeNode *ast.Node, typeName string) bool {
 		// We need to check all parts including the check type
 		conditionalType := typeNode.AsConditionalTypeNode()
 		// Check the check type (the "Foo" in "Foo extends T")
-		if conditionalType.CheckType != nil && containsTypeReference(conditionalType.CheckType, typeName) {
+		if conditionalType.CheckType != nil && containsTypeReferenceWithVisited(conditionalType.CheckType, typeName, visited) {
 			return true
 		}
 		// Check the extends type (the "T" in "Foo extends T")
-		if conditionalType.ExtendsType != nil && containsTypeReference(conditionalType.ExtendsType, typeName) {
+		if conditionalType.ExtendsType != nil && containsTypeReferenceWithVisited(conditionalType.ExtendsType, typeName, visited) {
 			return true
 		}
 		// Check the true and false branches
-		if conditionalType.TrueType != nil && containsTypeReference(conditionalType.TrueType, typeName) {
+		if conditionalType.TrueType != nil && containsTypeReferenceWithVisited(conditionalType.TrueType, typeName, visited) {
 			return true
 		}
-		if conditionalType.FalseType != nil && containsTypeReference(conditionalType.FalseType, typeName) {
+		if conditionalType.FalseType != nil && containsTypeReferenceWithVisited(conditionalType.FalseType, typeName, visited) {
 			return true
 		}
 	}
@@ -862,4 +986,147 @@ func isDeeplyReferencingType(node *ast.Node, superTypeName string, visited map[*
 	}
 
 	return false
+}
+
+// Check if a type name (interface or type alias) is part of a circular reference chain
+// This handles mixed chains where interfaces and type aliases reference each other
+func isPartOfUnifiedCircularChain(ctx rule.RuleContext, typeName string) bool {
+	// Build a map of all types (interfaces and type aliases) and what they reference
+	typeRefs := make(map[string]string)
+	
+	var checkNode ast.Visitor
+	checkNode = func(node *ast.Node) bool {
+		switch node.Kind {
+		case ast.KindInterfaceDeclaration:
+			interfaceDecl := node.AsInterfaceDeclaration()
+			if interfaceDecl.Name() != nil && ast.IsIdentifier(interfaceDecl.Name()) {
+				name := interfaceDecl.Name().AsIdentifier().Text
+				// Check if it has a single index signature
+				if interfaceDecl.Members != nil && len(interfaceDecl.Members.Nodes) == 1 {
+					member := interfaceDecl.Members.Nodes[0]
+					if member.Kind == ast.KindIndexSignature {
+						indexSig := member.AsIndexSignatureDeclaration()
+						if indexSig.Type != nil {
+							// Extract what this interface references
+							refType := extractDirectTypeReference(indexSig.Type)
+							if refType != "" {
+								typeRefs[name] = refType
+							}
+							// Also check if the type directly contains a reference to this interface
+							// This handles cases like: interface Foo { [key: string]: SomeUnion | Foo }
+							if containsTypeReference(indexSig.Type, name) {
+								// If it contains a self-reference, don't try to convert it
+								// We mark it as referencing itself to prevent conversion
+								typeRefs[name] = name
+							}
+						}
+					}
+				}
+			}
+		case ast.KindTypeAliasDeclaration:
+			typeAlias := node.AsTypeAliasDeclaration()
+			if typeAlias.Name() != nil && ast.IsIdentifier(typeAlias.Name()) {
+				name := typeAlias.Name().AsIdentifier().Text
+				// Check if it's a type literal with single index signature
+				if typeAlias.Type != nil && typeAlias.Type.Kind == ast.KindTypeLiteral {
+					typeLit := typeAlias.Type.AsTypeLiteralNode()
+					if typeLit.Members != nil && len(typeLit.Members.Nodes) == 1 {
+						member := typeLit.Members.Nodes[0]
+						if member.Kind == ast.KindIndexSignature {
+							indexSig := member.AsIndexSignatureDeclaration()
+							if indexSig.Type != nil {
+								// Extract the referenced type - could be direct or inside Record
+								refType := extractDirectTypeReference(indexSig.Type)
+								if refType != "" {
+									typeRefs[name] = refType
+								}
+								// Also check if the type directly contains a reference to this type alias
+								// This handles cases like: type Foo = { [key: string]: SomeUnion | Foo }
+								if containsTypeReference(indexSig.Type, name) {
+									// If it contains a self-reference, don't try to convert it
+									// We mark it as referencing itself to prevent conversion
+									typeRefs[name] = name
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		// Continue traversal
+		node.ForEachChild(checkNode)
+		return false
+	}
+	
+	ctx.SourceFile.ForEachChild(checkNode)
+	
+	// Now check if there's a circular chain starting from typeName
+	visited := make(map[string]bool) 
+	current := typeName
+	
+	for {
+		if visited[current] {
+			// We've seen this before - there's a cycle
+			return true
+		}
+		visited[current] = true
+		
+		// Check what this type references
+		next, exists := typeRefs[current]
+		if !exists || next == "" {
+			// No reference or references something else
+			return false
+		}
+		
+		current = next
+	}
+}
+
+// Check if a type alias contains a reference to a target type
+// This function looks up the type alias declaration and checks its type definition
+func containsTypeReferenceInTypeAlias(sourceNode *ast.Node, typeAliasName string, targetTypeName string) bool {
+	return containsTypeReferenceInTypeAliasWithVisited(sourceNode, typeAliasName, targetTypeName, make(map[string]bool))
+}
+
+// Check if a type alias contains a reference to a target type with visited tracking
+func containsTypeReferenceInTypeAliasWithVisited(sourceNode *ast.Node, typeAliasName string, targetTypeName string, visited map[string]bool) bool {
+	// We need access to the entire source file to look up the type alias
+	// Walk up the AST to find the source file
+	var sourceFile *ast.Node
+	current := sourceNode
+	for current != nil {
+		if current.Kind == ast.KindSourceFile {
+			sourceFile = current
+			break
+		}
+		current = current.Parent
+	}
+	
+	if sourceFile == nil {
+		return false
+	}
+	
+	// Look for the type alias declaration
+	var found bool
+	var checkNode ast.Visitor
+	checkNode = func(node *ast.Node) bool {
+		if node.Kind == ast.KindTypeAliasDeclaration {
+			typeAlias := node.AsTypeAliasDeclaration()
+			if typeAlias.Name() != nil && ast.IsIdentifier(typeAlias.Name()) {
+				if typeAlias.Name().AsIdentifier().Text == typeAliasName {
+					// Found the type alias, check if its type contains the target type
+					if typeAlias.Type != nil {
+						found = containsTypeReferenceWithVisited(typeAlias.Type, targetTypeName, visited)
+					}
+					return true // Stop traversal
+				}
+			}
+		}
+		// Continue traversal
+		node.ForEachChild(checkNode)
+		return false
+	}
+	
+	sourceFile.ForEachChild(checkNode)
+	return found
 }

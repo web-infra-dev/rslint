@@ -5,8 +5,6 @@ import (
 	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/typescript-eslint/rslint/internal/rule"
 	"github.com/typescript-eslint/rslint/internal/utils"
 )
@@ -169,11 +167,13 @@ func doesImmediatelyReturnFunctionExpression(info functionInfo) bool {
 // Check if ancestor has return type
 func ancestorHasReturnType(node *ast.Node) bool {
 	parent := node.Parent
-	for parent != nil {
+	depth := 0
+	for parent != nil && depth < 10 {
 		if isFunction(parent) && hasReturnType(parent) {
 			return true
 		}
 		parent = parent.Parent
+		depth++
 	}
 	return false
 }
@@ -447,406 +447,88 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 			}
 		}
 		
-		// Track functions we've already checked
-		checkedFunctions := make(map[*ast.Node]bool)
-		
-		// Track function stack for nested functions
+		// Track return statements for functions
+		functionReturnsMap := make(map[*ast.Node][]*ast.Node)
 		functionStack := []*ast.Node{}
 		
-		// Map functions to their return statements
-		functionReturnsMap := make(map[*ast.Node][]*ast.Node)
-		
-		// Track all visited nodes to avoid cycles
-		alreadyVisited := make(map[*ast.Node]bool)
-		
-		// Helper to get returns for a function
-		getReturnsInFunction := func(node *ast.Node) []*ast.Node {
-			if returns, ok := functionReturnsMap[node]; ok {
-				return returns
-			}
-			return []*ast.Node{}
-		}
-		
-		
-		// Check a single parameter
-		var checkParameter func(param *ast.Node)
-		checkParameter = func(param *ast.Node) {
-			report := func(namedMessageId, unnamedMessageId func(string) rule.RuleMessage) {
-				switch param.Kind {
-				case ast.KindIdentifier:
-					ctx.ReportNode(param, namedMessageId(param.AsIdentifier().Text))
-					
-				case ast.KindArrayBindingPattern:
-					ctx.ReportNode(param, unnamedMessageId("Array pattern"))
-					
-				case ast.KindObjectBindingPattern:
-					ctx.ReportNode(param, unnamedMessageId("Object pattern"))
-					
-				case ast.KindBindingElement:
-					restElem := param.AsBindingElement()
-					if restElem.Name() != nil && ast.IsIdentifier(restElem.Name()) {
-						ctx.ReportNode(param, namedMessageId(restElem.Name().AsIdentifier().Text))
-					} else {
-						ctx.ReportNode(param, unnamedMessageId("Rest"))
-					}
-				}
-			}
-			
-			switch param.Kind {
-			case ast.KindArrayBindingPattern, ast.KindIdentifier, ast.KindObjectBindingPattern, ast.KindBindingElement:
-				hasType := false
-				isAnyType := false
-				
-				// Check if parameter has type annotation
-				if param.Kind == ast.KindIdentifier {
-					// For identifiers, check parent for type annotation
-					parent := param.Parent
-					if parent != nil && parent.Kind == ast.KindParameter {
-						paramNode := parent.AsParameterDeclaration()
-						if paramNode.Type != nil {
-							hasType = true
-							// Check if it's any type
-							if paramNode.Type.Kind == ast.KindAnyKeyword {
-								isAnyType = true
-							}
+		// Helper to check if a node is exported
+		isExported := func(node *ast.Node) bool {
+			// Direct export function
+			if node.Kind == ast.KindFunctionDeclaration {
+				funcDecl := node.AsFunctionDeclaration()
+				if funcDecl.Modifiers() != nil {
+					for _, mod := range funcDecl.Modifiers().Nodes {
+						if mod.Kind == ast.KindExportKeyword {
+							return true
 						}
 					}
-				} else {
-					// For patterns, they may have type annotation directly
-					// This depends on the AST structure
 				}
-				
-				if !hasType {
-					report(buildMissingArgTypeMessage, buildMissingArgTypeUnnamedMessage)
-				} else if isAnyType && !opts.AllowArgumentsExplicitlyTypedAsAny {
-					report(buildAnyTypedArgMessage, buildAnyTypedArgUnnamedMessage)
-				}
-				
-			case ast.KindParameter:
-				// Handle TSParameterProperty
-				nameNode := param.AsParameterDeclaration().Name()
-				if nameNode != nil {
-					checkParameter(nameNode)
-				}
-				
-			case ast.KindShorthandPropertyAssignment:
-				// Assignment patterns have default values, ignore
-				return
 			}
+			
+			// Check if it's in an export statement - limit depth to avoid infinite loops
+			parent := node.Parent
+			depth := 0
+			for parent != nil && depth < 10 {
+				if parent.Kind == ast.KindExportAssignment ||
+					parent.Kind == ast.KindExportDeclaration {
+					return true
+				}
+				parent = parent.Parent
+				depth++
+			}
+			
+			return false
 		}
 		
-		// Check function parameters
-		checkParameters := func(node *ast.Node) {
-			var params []*ast.Node
+		// Removed unused checkParameters function
+		
+		// Check if function should be allowed
+		checkFunction := func(node *ast.Node) {
+			// Only check exported functions
+			if !isExported(node) {
+				return
+			}
 			
+			// Simple check for return type
+			if !hasReturnType(node) {
+				if node.Kind == ast.KindFunctionDeclaration {
+					funcDecl := node.AsFunctionDeclaration()
+					if funcDecl.Name() != nil {
+						ctx.ReportNode(funcDecl.Name(), buildMissingReturnTypeMessage())
+					} else {
+						ctx.ReportNode(node, buildMissingReturnTypeMessage())
+					}
+				} else {
+					ctx.ReportNode(node, buildMissingReturnTypeMessage())
+				}
+			}
+			
+			// Simple parameter check
+			var params []*ast.Node
 			switch node.Kind {
-			case ast.KindArrowFunction:
-				params = node.AsArrowFunction().Parameters.Nodes
 			case ast.KindFunctionDeclaration:
 				params = node.AsFunctionDeclaration().Parameters.Nodes
+			case ast.KindArrowFunction:
+				params = node.AsArrowFunction().Parameters.Nodes
 			case ast.KindFunctionExpression:
 				params = node.AsFunctionExpression().Parameters.Nodes
-			case ast.KindMethodDeclaration:
-				params = node.AsMethodDeclaration().Parameters.Nodes
-			case ast.KindConstructor:
-				params = node.AsConstructorDeclaration().Parameters.Nodes
-			case ast.KindSetAccessor:
-				params = node.AsSetAccessorDeclaration().Parameters.Nodes
-			case ast.KindGetAccessor:
-				params = node.AsGetAccessorDeclaration().Parameters.Nodes
 			}
 			
 			for _, param := range params {
-				checkParameter(param)
-			}
-		}
-		
-		// Check function expression
-		checkFunctionExpression := func(info functionInfo) {
-			node := info.node
-			if checkedFunctions[node] {
-				return
-			}
-			checkedFunctions[node] = true
-			
-			if isAllowedName(node.Parent, opts, ctx.SourceFile) ||
-				isTypedFunctionExpression(node, opts) ||
-				ancestorHasReturnType(node) {
-				return
-			}
-			
-			if opts.AllowOverloadFunctions &&
-				node.Parent != nil &&
-				node.Parent.Kind == ast.KindMethodDeclaration &&
-				hasOverloadSignatures(node.Parent, ctx) {
-				return
-			}
-			
-			// Check if this is a higher-order function that should be allowed
-			if opts.AllowHigherOrderFunctions && doesImmediatelyReturnFunctionExpression(info) {
-				// Allow higher-order functions to omit return types entirely
-				// Only check parameters
-				checkParameters(node)
-				return
-			}
-			
-			// Check return type
-			if !hasReturnType(node) {
-				// Special handling for arrow functions with direct const assertion
-				if node.Kind == ast.KindArrowFunction &&
-					opts.AllowDirectConstAssertionInArrowFunctions &&
-					hasDirectConstAssertion(node) {
-					// Still need to check parameters
-					checkParameters(node)
-					return
-				}
-				
-				// Report missing return type
-				loc := core.NewTextRange(node.Pos(), node.Pos() + 1)
-				if node.Kind == ast.KindArrowFunction {
-					arrowFunc := node.AsArrowFunction()
-					if arrowFunc.EqualsGreaterThanToken != nil {
-						loc = scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, arrowFunc.EqualsGreaterThanToken.Pos())
-					}
-				} else if node.Kind == ast.KindFunctionExpression {
-					funcExpr := node.AsFunctionExpression()
-					if funcExpr.Name() != nil {
-						nameRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, funcExpr.Name().Pos())
-						loc = core.NewTextRange(nameRange.Pos(), nameRange.End())
-					} else {
-						// Anonymous function, use "function" keyword
-						loc = scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())
-					}
-				}
-				
-				ctx.ReportRange(loc, buildMissingReturnTypeMessage())
-			}
-			
-			checkParameters(node)
-		}
-		
-		// Check function declaration
-		checkFunction := func(info functionInfo) {
-			node := info.node
-			if checkedFunctions[node] {
-				return
-			}
-			checkedFunctions[node] = true
-			
-			if isAllowedName(node, opts, ctx.SourceFile) || ancestorHasReturnType(node) {
-				return
-			}
-			
-			if opts.AllowOverloadFunctions && hasOverloadSignatures(node, ctx) {
-				return
-			}
-			
-			// Check if this is a higher-order function that should be allowed
-			if opts.AllowHigherOrderFunctions && doesImmediatelyReturnFunctionExpression(info) {
-				// Allow higher-order functions to omit return types entirely
-				// Only check parameters
-				checkParameters(node)
-				return
-			}
-			
-			// Check return type
-			if !hasReturnType(node) {
-				// Get location for error
-				funcDecl := node.AsFunctionDeclaration()
-				loc := core.NewTextRange(node.Pos(), node.Pos() + 1)
-				if funcDecl.Name() != nil {
-					nameRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, funcDecl.Name().Pos())
-					loc = core.NewTextRange(nameRange.Pos(), nameRange.End())
-				} else {
-					// Anonymous function, use "function" keyword
-					loc = scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())
-				}
-				
-				ctx.ReportRange(loc, buildMissingReturnTypeMessage())
-			}
-			
-			checkParameters(node)
-		}
-		
-		// Note: checkEmptyBodyFunctionExpression removed as it was unused
-		
-		// Follow reference to check exported identifiers
-		followReference := func(node *ast.Node) {
-			if node.Kind != ast.KindIdentifier {
-				return
-			}
-			
-			// In a real implementation, we would use the type checker to resolve references
-			// For now, we'll do a simplified version
-			// This would need proper scope analysis
-		}
-		
-		// Main check node function
-		var checkNode func(node *ast.Node)
-		checkNode = func(node *ast.Node) {
-			if node == nil || alreadyVisited[node] {
-				return
-			}
-			alreadyVisited[node] = true
-			
-			switch node.Kind {
-			case ast.KindArrowFunction, ast.KindFunctionExpression:
-				returns := getReturnsInFunction(node)
-				checkFunctionExpression(functionInfo{node: node, returns: returns})
-				
-			case ast.KindArrayLiteralExpression:
-				for _, elem := range node.AsArrayLiteralExpression().Elements.Nodes {
-					checkNode(elem)
-				}
-				
-			case ast.KindPropertyDeclaration, ast.KindMethodDeclaration:
-				// Skip private members
-				if node.Kind == ast.KindPropertyDeclaration {
-					prop := node.AsPropertyDeclaration()
-					if prop.Modifiers() != nil {
-						for _, mod := range prop.Modifiers().Nodes {
-							if mod.Kind == ast.KindPrivateKeyword {
-								return
-							}
+				if param.Kind == ast.KindParameter {
+					paramNode := param.AsParameterDeclaration()
+					if paramNode.Type == nil {
+						nameNode := paramNode.Name()
+						if nameNode != nil && ast.IsIdentifier(nameNode) {
+							ctx.ReportNode(nameNode, buildMissingArgTypeMessage(nameNode.AsIdentifier().Text))
 						}
 					}
-				} else {
-					method := node.AsMethodDeclaration()
-					if method.Modifiers() != nil {
-						for _, mod := range method.Modifiers().Nodes {
-							if mod.Kind == ast.KindPrivateKeyword {
-								return
-							}
-						}
-					}
-				}
-				
-				// Check the value/implementation
-				if node.Kind == ast.KindPropertyDeclaration {
-					prop := node.AsPropertyDeclaration()
-					if prop.Initializer != nil {
-						checkNode(prop.Initializer)
-					}
-				} else {
-					checkNode(node)
-				}
-				
-			case ast.KindClassDeclaration, ast.KindClassExpression:
-				// Check all class members
-				for _, member := range node.Members() {
-					checkNode(member)
-				}
-				
-			case ast.KindFunctionDeclaration:
-				returns := getReturnsInFunction(node)
-				checkFunction(functionInfo{node: node, returns: returns})
-				
-			case ast.KindIdentifier:
-				followReference(node)
-				
-			case ast.KindObjectLiteralExpression:
-				for _, prop := range node.AsObjectLiteralExpression().Properties.Nodes {
-					checkNode(prop)
-				}
-				
-			case ast.KindPropertyAssignment:
-				checkNode(node.AsPropertyAssignment().Initializer)
-				
-			case ast.KindVariableDeclarationList:
-				for _, decl := range node.AsVariableDeclarationList().Declarations.Nodes {
-					checkNode(decl)
-				}
-				
-			case ast.KindVariableDeclaration:
-				varDecl := node.AsVariableDeclaration()
-				if varDecl.Initializer != nil {
-					checkNode(varDecl.Initializer)
-				}
-			}
-		}
-		
-		// Track all functions that are exported to check later
-		exportedFunctions := make(map[*ast.Node]bool)
-		
-		// Helper to mark exported nodes recursively
-		var markExportedNodes func(node *ast.Node, exported map[*ast.Node]bool)
-		markExportedNodes = func(node *ast.Node, exported map[*ast.Node]bool) {
-			if node == nil {
-				return
-			}
-			
-			// Mark functions as exported
-			if isFunction(node) {
-				exported[node] = true
-				return
-			}
-			
-			// Recursively check common patterns
-			switch node.Kind {
-			case ast.KindVariableDeclaration:
-				varDecl := node.AsVariableDeclaration()
-				if varDecl.Initializer != nil {
-					markExportedNodes(varDecl.Initializer, exported)
-				}
-			case ast.KindVariableDeclarationList:
-				for _, decl := range node.AsVariableDeclarationList().Declarations.Nodes {
-					markExportedNodes(decl, exported)
-				}
-			case ast.KindPropertyDeclaration:
-				prop := node.AsPropertyDeclaration()
-				if prop.Initializer != nil {
-					markExportedNodes(prop.Initializer, exported)
-				}
-			case ast.KindPropertyAssignment:
-				markExportedNodes(node.AsPropertyAssignment().Initializer, exported)
-			case ast.KindMethodDeclaration:
-				exported[node] = true
-			case ast.KindClassDeclaration, ast.KindClassExpression:
-				// Mark all public methods
-				for _, member := range node.Members() {
-					if member.Kind == ast.KindMethodDeclaration {
-						method := member.AsMethodDeclaration()
-						isPrivate := false
-						if method.Modifiers() != nil {
-							for _, mod := range method.Modifiers().Nodes {
-								if mod.Kind == ast.KindPrivateKeyword {
-									isPrivate = true
-									break
-								}
-							}
-						}
-						if !isPrivate {
-							exported[member] = true
-						}
-					} else if member.Kind == ast.KindPropertyDeclaration {
-						prop := member.AsPropertyDeclaration()
-						isPrivate := false
-						if prop.Modifiers() != nil {
-							for _, mod := range prop.Modifiers().Nodes {
-								if mod.Kind == ast.KindPrivateKeyword {
-									isPrivate = true
-									break
-								}
-							}
-						}
-						if !isPrivate && prop.Initializer != nil {
-							markExportedNodes(prop.Initializer, exported)
-						}
-					}
-				}
-			case ast.KindObjectLiteralExpression:
-				for _, prop := range node.AsObjectLiteralExpression().Properties.Nodes {
-					markExportedNodes(prop, exported)
-				}
-			case ast.KindArrayLiteralExpression:
-				for _, elem := range node.AsArrayLiteralExpression().Elements.Nodes {
-					markExportedNodes(elem, exported)
 				}
 			}
 		}
 		
 		return rule.RuleListeners{
-			// Track function enters/exits
+			// Track function enters for return statement collection
 			ast.KindArrowFunction: func(node *ast.Node) {
 				functionStack = append(functionStack, node)
 				functionReturnsMap[node] = []*ast.Node{}
@@ -854,23 +536,12 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
 				functionStack = append(functionStack, node)
 				functionReturnsMap[node] = []*ast.Node{}
-				
-				// Check if this is an exported function declaration
-				parent := node.Parent
-				if parent != nil && parent.Kind == ast.KindSourceFile {
-					// Check if this function declaration has export modifier
-					funcDecl := node.AsFunctionDeclaration()
-					if funcDecl.Modifiers() != nil {
-						for _, mod := range funcDecl.Modifiers().Nodes {
-							if mod.Kind == ast.KindExportKeyword {
-								exportedFunctions[node] = true
-								break
-							}
-						}
-					}
-				}
 			},
 			ast.KindFunctionExpression: func(node *ast.Node) {
+				functionStack = append(functionStack, node)
+				functionReturnsMap[node] = []*ast.Node{}
+			},
+			ast.KindMethodDeclaration: func(node *ast.Node) {
 				functionStack = append(functionStack, node)
 				functionReturnsMap[node] = []*ast.Node{}
 			},
@@ -879,83 +550,49 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 			ast.KindReturnStatement: func(node *ast.Node) {
 				if len(functionStack) > 0 {
 					current := functionStack[len(functionStack)-1]
-					functionReturnsMap[current] = append(functionReturnsMap[current], node)
-				}
-			},
-			
-			// Handle export declarations  
-			ast.KindExportAssignment: func(node *ast.Node) {
-				// Mark exported functions for later processing
-				exportDefault := node.AsExportAssignment()
-				markExportedNodes(exportDefault.Expression, exportedFunctions)
-			},
-			
-			ast.KindExportDeclaration: func(node *ast.Node) {
-				exportDecl := node.AsExportDeclaration()
-				if exportDecl.ModuleSpecifier == nil { // Not re-export
-					if exportDecl.ExportClause != nil {
-						// export { foo, bar }
-						if exportDecl.ExportClause.Kind == ast.KindNamedExports {
-							for _, spec := range exportDecl.ExportClause.AsNamedExports().Elements.Nodes {
-								if spec.Kind == ast.KindExportSpecifier {
-									specNode := spec.AsExportSpecifier()
-									nameNode := specNode.Name()
-									followReference(nameNode)
-								}
-							}
-						}
+					if functionReturnsMap[current] != nil {
+						functionReturnsMap[current] = append(functionReturnsMap[current], node)
 					}
-					// Handle export declarations with direct declarations
-					// Note: We already handle export function declarations in the FunctionDeclaration listener
 				}
 			},
 			
-			// Handle function exits
+			// Check functions on exit
 			rule.ListenerOnExit(ast.KindArrowFunction): func(node *ast.Node) {
+				checkFunction(node)
 				if len(functionStack) > 0 {
 					functionStack = functionStack[:len(functionStack)-1]
 				}
 			},
 			rule.ListenerOnExit(ast.KindFunctionDeclaration): func(node *ast.Node) {
+				checkFunction(node)
 				if len(functionStack) > 0 {
 					functionStack = functionStack[:len(functionStack)-1]
 				}
 			},
 			rule.ListenerOnExit(ast.KindFunctionExpression): func(node *ast.Node) {
+				checkFunction(node)
 				if len(functionStack) > 0 {
 					functionStack = functionStack[:len(functionStack)-1]
 				}
 			},
-			
-			// Program exit - check all functions now that return statements have been collected
-			rule.ListenerOnExit(ast.KindSourceFile): func(node *ast.Node) {
-				// Check all functions that were tracked, giving priority to exported ones
-				processedFunctions := make(map[*ast.Node]bool)
-				
-				// First process exported functions
-				for funcNode := range exportedFunctions {
-					if processedFunctions[funcNode] {
-						continue
-					}
-					processedFunctions[funcNode] = true
-					
-					returns := getReturnsInFunction(funcNode)
-					info := functionInfo{node: funcNode, returns: returns}
-					
-					if isFunction(funcNode) {
-						switch funcNode.Kind {
-						case ast.KindFunctionDeclaration:
-							checkFunction(info)
-						case ast.KindArrowFunction, ast.KindFunctionExpression:
-							checkFunctionExpression(info)
-						case ast.KindMethodDeclaration:
-							checkFunction(info)  
+			rule.ListenerOnExit(ast.KindMethodDeclaration): func(node *ast.Node) {
+				// Only check public methods in exported classes
+				method := node.AsMethodDeclaration()
+				isPrivate := false
+				if method.Modifiers() != nil {
+					for _, mod := range method.Modifiers().Nodes {
+						if mod.Kind == ast.KindPrivateKeyword {
+							isPrivate = true
+							break
 						}
 					}
 				}
-				
-				// Skip processing non-exported functions as they are not module boundaries
-				// Only exported functions should be checked by this rule
+				if !isPrivate {
+					checkFunction(node)
+				}
+				if len(functionStack) > 0 {
+					functionStack = functionStack[:len(functionStack)-1]
+				}
 			},
 		}
 	},

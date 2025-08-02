@@ -194,6 +194,64 @@ var NoShadowRule = rule.Rule{
 
 		// Forward declare checkVariable
 		var checkVariable func(variable *Variable)
+		
+		// Check for function type parameter name value shadow
+		isFunctionTypeParameterNameValueShadow := func(variable *Variable, shadowed *Variable) bool {
+			if !opts.IgnoreFunctionTypeParameterNameValueShadow {
+				return false
+			}
+
+			if !variable.IsValue || !shadowed.IsValue {
+				return false
+			}
+
+			// Only apply to parameters
+			if !ast.IsParameter(variable.Node) {
+				return false
+			}
+
+			// Simple check: if the parameter's parent is an arrow function or function type, 
+			// and that's ultimately part of a type alias, interface, or other type context,
+			// then ignore the shadow.
+			node := variable.Node
+			parent := node.Parent
+			
+			// Skip if no parent
+			if parent == nil {
+				return false
+			}
+			
+			// Check if the immediate parent or grandparent indicates a type context
+			for depth := 0; depth < 10 && parent != nil; depth++ {
+				switch parent.Kind {
+				case ast.KindFunctionType,
+					 ast.KindCallSignature,
+					 ast.KindMethodSignature,
+					 ast.KindConstructSignature,
+					 ast.KindConstructorType:
+					// Direct function type contexts - definitely ignore
+					return true
+					
+				case ast.KindTypeAliasDeclaration,
+					 ast.KindInterfaceDeclaration:
+					// Type declaration contexts - ignore parameters in these
+					return true
+					
+				case ast.KindFunctionDeclaration,
+					 ast.KindMethodDeclaration,
+					 ast.KindFunctionExpression,
+					 ast.KindConstructor,
+					 ast.KindGetAccessor,
+					 ast.KindSetAccessor:
+					// Actual function implementations - don't ignore
+					return false
+				}
+				
+				parent = parent.Parent
+			}
+			
+			return false
+		}
 
 		// Helper to add variable to current scope
 		addVariable := func(name string, node *ast.Node, isType bool, isValue bool) {
@@ -201,7 +259,31 @@ var NoShadowRule = rule.Rule{
 			if v, exists := scope.Variables[name]; exists {
 				// Check for same-scope redeclaration
 				if v.IsValue && isValue {
-					// Same scope redeclaration - always report as shadowing
+					// Before reporting, check if this should be ignored due to function type parameter shadowing
+					if ast.IsParameter(node) && opts.IgnoreFunctionTypeParameterNameValueShadow {
+						// Create a temporary variable to use the existing ignore function
+						tempVariable := &Variable{
+							Name:       name,
+							Node:       node,
+							IsType:     isType,
+							IsValue:    isValue,
+							DeclaredAt: node,
+							Scope:      scope,
+						}
+						
+						if isFunctionTypeParameterNameValueShadow(tempVariable, v) {
+							// Don't report the error, just update the existing variable
+							if isType {
+								v.IsType = true
+							}
+							if isValue {
+								v.IsValue = true
+							}
+							return
+						}
+					}
+					
+					// Same scope redeclaration - report as shadowing
 					line, character := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile, v.Node.Pos())
 					ctx.ReportNode(node, rule.RuleMessage{
 						Id:          "noShadow",
@@ -332,27 +414,6 @@ var NoShadowRule = rule.Rule{
 			
 			line, character := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile, variable.Node.Pos())
 			return int(line + 1), int(character + 1), false
-		}
-
-		// Check for function type parameter name value shadow
-		isFunctionTypeParameterNameValueShadow := func(variable *Variable, shadowed *Variable) bool {
-			if !opts.IgnoreFunctionTypeParameterNameValueShadow {
-				return false
-			}
-
-			if !variable.IsValue || !shadowed.IsValue {
-				return false
-			}
-
-			// Check if this is specifically a function type parameter (not a regular function parameter)
-			// Function type parameters are in function type signatures, not regular function declarations
-			parent := variable.Node.Parent
-			if parent == nil {
-				return false
-			}
-			
-			// Only ignore if it's in a function type context (not a regular function declaration)
-			return allowedFunctionVariableDefTypes[parent.Kind] && parent.Kind != ast.KindFunctionDeclaration
 		}
 
 		// Process variable declarations

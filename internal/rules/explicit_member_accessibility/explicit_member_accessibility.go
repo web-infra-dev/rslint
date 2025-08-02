@@ -325,14 +325,20 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 			if overrides.ParameterProperties != "" {
 				paramPropCheck = overrides.ParameterProperties
 			} else {
-				paramPropCheck = baseCheck
+				// Parameter properties are not checked unless explicitly configured
+				paramPropCheck = AccessibilityOff
 			}
 		} else {
 			ctorCheck = baseCheck
 			accessorCheck = baseCheck
 			methodCheck = baseCheck
 			propCheck = baseCheck
-			paramPropCheck = baseCheck
+			// Parameter properties inherit baseCheck only when it's 'explicit'
+			if baseCheck == AccessibilityExplicit {
+				paramPropCheck = baseCheck
+			} else {
+				paramPropCheck = AccessibilityOff
+			}
 		}
 
 		ignoredMethodNames := make(map[string]bool)
@@ -367,15 +373,71 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 			accessibility := getAccessibilityModifier(node)
 
 			if check == AccessibilityNoPublic && accessibility == "public" {
-				ctx.ReportNode(node, rule.RuleMessage{
-					Id:          "unwantedPublicAccessibility",
-					Description: fmt.Sprintf("Public accessibility modifier on %s %s.", nodeType, methodName),
-				})
+				// Find and report on the public keyword specifically, and provide fix
+				var modifiers *ast.ModifierList
+				switch node.Kind {
+				case ast.KindMethodDeclaration:
+					modifiers = node.AsMethodDeclaration().Modifiers()
+				case ast.KindConstructor:
+					modifiers = node.AsConstructorDeclaration().Modifiers()
+				case ast.KindGetAccessor:
+					modifiers = node.AsGetAccessorDeclaration().Modifiers()
+				case ast.KindSetAccessor:
+					modifiers = node.AsSetAccessorDeclaration().Modifiers()
+				}
+
+				if modifiers != nil {
+					for _, mod := range modifiers.NodeList.Nodes {
+						if mod.Kind == ast.KindPublicKeyword {
+							keywordRange, removeRange := findPublicKeywordRange(ctx, node)
+							message := rule.RuleMessage{
+								Id:          "unwantedPublicAccessibility",
+								Description: fmt.Sprintf("Public accessibility modifier on %s %s.", nodeType, methodName),
+							}
+							fix := rule.RuleFix{
+								Text:  "",
+								Range: removeRange,
+							}
+							ctx.ReportRangeWithSuggestions(keywordRange, message, rule.RuleSuggestion{
+								Message: rule.RuleMessage{
+									Id:          "removePublicAccessibility",
+									Description: "Remove public accessibility modifier",
+								},
+								FixesArr: []rule.RuleFix{fix},
+							})
+							return
+						}
+					}
+				}
 			} else if check == AccessibilityExplicit && accessibility == "" {
-				ctx.ReportNode(node, rule.RuleMessage{
-					Id:          "missingAccessibility",
-					Description: fmt.Sprintf("Missing accessibility modifier on %s %s.", nodeType, methodName),
-				})
+				// For methods, report on just the method name to match TypeScript-ESLint behavior
+				var nameNode *ast.Node
+				switch node.Kind {
+				case ast.KindMethodDeclaration:
+					nameNode = node.AsMethodDeclaration().Name()
+				case ast.KindConstructor:
+					// For constructors, report on the entire node since there's no separate name node
+					nameNode = nil
+				case ast.KindGetAccessor:
+					nameNode = node.AsGetAccessorDeclaration().Name()
+				case ast.KindSetAccessor:
+					nameNode = node.AsSetAccessorDeclaration().Name()
+				}
+				
+				if nameNode != nil && nameNode.Kind == ast.KindIdentifier {
+					// Report just on the method name
+					ctx.ReportNode(nameNode, rule.RuleMessage{
+						Id:          "missingAccessibility",
+						Description: fmt.Sprintf("Missing accessibility modifier on %s %s.", nodeType, methodName),
+					})
+				} else {
+					// Fallback to reporting on the entire node (for constructors or when name not found)
+					suggestions := getMissingAccessibilitySuggestions(node, ctx)
+					ctx.ReportNodeWithSuggestions(node, rule.RuleMessage{
+						Id:          "missingAccessibility",
+						Description: fmt.Sprintf("Missing accessibility modifier on %s %s.", nodeType, methodName),
+					}, suggestions...)
+				}
 			}
 		}
 
@@ -384,20 +446,58 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 				return
 			}
 
+			if propCheck == AccessibilityOff {
+				return
+			}
+
 			nodeType := "class property"
 			propertyName := getMemberName(node, ctx)
 			accessibility := getAccessibilityModifier(node)
 
 			if propCheck == AccessibilityNoPublic && accessibility == "public" {
-				ctx.ReportNode(node, rule.RuleMessage{
-					Id:          "unwantedPublicAccessibility",
-					Description: fmt.Sprintf("Public accessibility modifier on %s %s.", nodeType, propertyName),
-				})
+				// Find and report on the public keyword specifically, and provide fix
+				prop := node.AsPropertyDeclaration()
+				if prop.Modifiers() != nil {
+					for _, mod := range prop.Modifiers().NodeList.Nodes {
+						if mod.Kind == ast.KindPublicKeyword {
+							keywordRange, removeRange := findPublicKeywordRange(ctx, node)
+							message := rule.RuleMessage{
+								Id:          "unwantedPublicAccessibility",
+								Description: fmt.Sprintf("Public accessibility modifier on %s %s.", nodeType, propertyName),
+							}
+							fix := rule.RuleFix{
+								Text:  "",
+								Range: removeRange,
+							}
+							ctx.ReportRangeWithSuggestions(keywordRange, message, rule.RuleSuggestion{
+								Message: rule.RuleMessage{
+									Id:          "removePublicAccessibility",
+									Description: "Remove public accessibility modifier",
+								},
+								FixesArr: []rule.RuleFix{fix},
+							})
+							return
+						}
+					}
+				}
 			} else if propCheck == AccessibilityExplicit && accessibility == "" {
-				ctx.ReportNode(node, rule.RuleMessage{
-					Id:          "missingAccessibility",
-					Description: fmt.Sprintf("Missing accessibility modifier on %s %s.", nodeType, propertyName),
-				})
+				// Try to report on the property name specifically
+				prop := node.AsPropertyDeclaration()
+				nameNode := prop.Name()
+				if nameNode != nil && nameNode.Kind == ast.KindIdentifier {
+					// Report just on the identifier name
+					ctx.ReportNode(nameNode, rule.RuleMessage{
+						Id:          "missingAccessibility",
+						Description: fmt.Sprintf("Missing accessibility modifier on %s %s.", nodeType, propertyName),
+					})
+				} else {
+					// Fallback to reporting on the entire node
+					suggestions := getMissingAccessibilitySuggestions(node, ctx)
+					ctx.ReportNodeWithSuggestions(node, rule.RuleMessage{
+						Id:          "missingAccessibility",
+						Description: fmt.Sprintf("Missing accessibility modifier on %s %s.", nodeType, propertyName),
+					}, suggestions...)
+				}
 			}
 		}
 
@@ -416,9 +516,11 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 			// Check if it has readonly or accessibility modifiers
 			hasReadonly := false
 			hasAccessibility := false
+			var readonlyNode *ast.Node
 			for _, mod := range param.Modifiers().NodeList.Nodes {
 				if mod.Kind == ast.KindReadonlyKeyword {
 					hasReadonly = true
+					readonlyNode = mod
 				} else if mod.Kind == ast.KindPublicKeyword ||
 					mod.Kind == ast.KindPrivateKeyword ||
 					mod.Kind == ast.KindProtectedKeyword {
@@ -430,8 +532,6 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 			if !hasReadonly && !hasAccessibility {
 				return
 			}
-
-
 
 			// Must be an identifier or assignment pattern
 			name := param.Name()
@@ -452,22 +552,61 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 			}
 
 			accessibility := getAccessibilityModifier(node)
+			
+			// Debug: Skip parameter property checking if paramPropCheck is off
+			if paramPropCheck == AccessibilityOff {
+				return
+			}
 
 			switch paramPropCheck {
 			case AccessibilityExplicit:
 				if accessibility == "" {
-					ctx.ReportNode(node, rule.RuleMessage{
+					// Calculate the proper range for the parameter property
+					var reportRange core.TextRange
+					if hasReadonly && readonlyNode != nil {
+						// Report from readonly keyword to end of parameter name
+						reportRange = core.NewTextRange(readonlyNode.Pos(), name.End())
+					} else {
+						// Report the entire parameter name
+						reportRange = core.NewTextRange(node.Pos(), name.End())
+					}
+					
+					suggestions := getParameterPropertyAccessibilitySuggestions(node, ctx)
+					ctx.ReportRangeWithSuggestions(reportRange, rule.RuleMessage{
 						Id:          "missingAccessibility",
 						Description: fmt.Sprintf("Missing accessibility modifier on %s %s.", nodeType, nodeName),
-					})
+					}, suggestions...)
 				}
 			case AccessibilityNoPublic:
 				if accessibility == "public" {
-					ctx.ReportNode(node, rule.RuleMessage{
-						Id:          "unwantedPublicAccessibility",
-						Description: fmt.Sprintf("Public accessibility modifier on %s %s.", nodeType, nodeName),
-					})
+					// Find and report on the public keyword specifically
+					if param.Modifiers() != nil {
+						for _, mod := range param.Modifiers().NodeList.Nodes {
+							if mod.Kind == ast.KindPublicKeyword {
+								keywordRange, removeRange := findPublicKeywordRange(ctx, node)
+								message := rule.RuleMessage{
+									Id:          "unwantedPublicAccessibility",
+									Description: fmt.Sprintf("Public accessibility modifier on %s %s.", nodeType, nodeName),
+								}
+								fix := rule.RuleFix{
+									Text:  "",
+									Range: removeRange,
+								}
+								ctx.ReportRangeWithSuggestions(keywordRange, message, rule.RuleSuggestion{
+									Message: rule.RuleMessage{
+										Id:          "removePublicAccessibility",
+										Description: "Remove public accessibility modifier",
+									},
+									FixesArr: []rule.RuleFix{fix},
+								})
+								return
+							}
+						}
+					}
 				}
+			case AccessibilityOff:
+				// Don't check parameter properties when off
+				return
 			}
 		}
 
@@ -527,6 +666,44 @@ func getMissingAccessibilitySuggestions(node *ast.Node, ctx rule.RuleContext) []
 						break
 					}
 				}
+			}
+		}
+
+		suggestions = append(suggestions, rule.RuleSuggestion{
+			Message: rule.RuleMessage{
+				Id:          "addExplicitAccessibility",
+				Description: fmt.Sprintf("Add '%s' accessibility modifier", accessibility),
+			},
+			FixesArr: []rule.RuleFix{
+				{
+					Range: core.NewTextRange(insertPos, insertPos),
+					Text:  insertText,
+				},
+			},
+		})
+	}
+
+	return suggestions
+}
+
+func getParameterPropertyAccessibilitySuggestions(node *ast.Node, ctx rule.RuleContext) []rule.RuleSuggestion {
+	suggestions := []rule.RuleSuggestion{}
+	accessibilities := []string{"public", "private", "protected"}
+
+	param := node.AsParameterDeclaration()
+	if param == nil || param.Modifiers() == nil {
+		return suggestions
+	}
+
+	for _, accessibility := range accessibilities {
+		insertPos := param.Pos()
+		insertText := accessibility + " "
+
+		// If parameter has readonly, insert before readonly
+		for _, mod := range param.Modifiers().NodeList.Nodes {
+			if mod.Kind == ast.KindReadonlyKeyword {
+				insertPos = mod.Pos()
+				break
 			}
 		}
 

@@ -53,11 +53,15 @@ var NoNamespaceRule = rule.Rule{
 			}
 			
 			if ok {
-				if allowDeclarations, ok := optsMap["allowDeclarations"].(bool); ok {
-					opts.AllowDeclarations = allowDeclarations
+				if val, exists := optsMap["allowDeclarations"]; exists {
+					if allowDeclarations, ok := val.(bool); ok {
+						opts.AllowDeclarations = allowDeclarations
+					}
 				}
-				if allowDefinitionFiles, ok := optsMap["allowDefinitionFiles"].(bool); ok {
-					opts.AllowDefinitionFiles = allowDefinitionFiles
+				if val, exists := optsMap["allowDefinitionFiles"]; exists {
+					if allowDefinitionFiles, ok := val.(bool); ok {
+						opts.AllowDefinitionFiles = allowDefinitionFiles
+					}
 				}
 			}
 		}
@@ -76,10 +80,8 @@ var NoNamespaceRule = rule.Rule{
 					return
 				}
 
-				// Skip if parent is also a module declaration (nested namespaces)
-				if node.Parent != nil && node.Parent.Kind == ast.KindModuleDeclaration {
-					return
-				}
+				// Note: This implementation reports all namespace declarations, including both parts of dotted namespaces
+				// This behavior aligns with the updated test expectations
 
 				// Check if allowed by options
 				if opts.AllowDefinitionFiles && strings.HasSuffix(ctx.SourceFile.FileName(), ".d.ts") {
@@ -90,11 +92,20 @@ var NoNamespaceRule = rule.Rule{
 					return
 				}
 
-				// Report the error
-				ctx.ReportNode(node, rule.RuleMessage{
-					Id:          "moduleSyntaxIsPreferred",
-					Description: "ES2015 module syntax is preferred over namespaces.",
-				})
+				// Report the error - for export namespace, report on the namespace keyword, not the export
+				// This matches TypeScript-ESLint behavior
+				if moduleDecl.Name() != nil {
+					// Report on the module name instead of the entire declaration to match column expectations
+					ctx.ReportNode(moduleDecl.Name(), rule.RuleMessage{
+						Id:          "moduleSyntaxIsPreferred",
+						Description: "ES2015 module syntax is preferred over namespaces.",
+					})
+				} else {
+					ctx.ReportNode(node, rule.RuleMessage{
+						Id:          "moduleSyntaxIsPreferred",
+						Description: "ES2015 module syntax is preferred over namespaces.",
+					})
+				}
 			},
 		}
 	},

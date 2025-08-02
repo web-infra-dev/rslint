@@ -46,7 +46,19 @@ var ConsistentReturnRule = rule.Rule{
 		
 		// Parse options with dual-format support
 		if options != nil {
-			if optionsMap, ok := options.(map[string]interface{}); ok {
+			var optionsMap map[string]interface{}
+			
+			// Handle array format [{ ... }] from TypeScript tests
+			if optionsArray, ok := options.([]interface{}); ok && len(optionsArray) > 0 {
+				if firstOption, ok := optionsArray[0].(map[string]interface{}); ok {
+					optionsMap = firstOption
+				}
+			} else if directMap, ok := options.(map[string]interface{}); ok {
+				// Handle direct object format { ... } from Go tests
+				optionsMap = directMap
+			}
+			
+			if optionsMap != nil {
 				if val, exists := optionsMap["treatUndefinedAsUnspecified"]; exists {
 					if boolVal, ok := val.(bool); ok {
 						treatUndefinedAsUnspecified = boolVal
@@ -338,9 +350,20 @@ var ConsistentReturnRule = rule.Rule{
 
 				// Handle treatUndefinedAsUnspecified option
 				if treatUndefinedAsUnspecified && hasArgument {
-					returnType := ctx.TypeChecker.GetTypeAtLocation(returnStmt.Expression)
-					if utils.IsTypeFlagSet(returnType, checker.TypeFlagsUndefined) {
-						hasArgument = false
+					// Check for undefined literal first
+					if returnStmt.Expression.Kind == ast.KindIdentifier {
+						identifier := returnStmt.Expression.AsIdentifier()
+						if identifier.Text == "undefined" {
+							hasArgument = false
+						}
+					}
+					
+					// Also check the type of the expression
+					if hasArgument { // Only check if we haven't already determined it's undefined
+						returnType := ctx.TypeChecker.GetTypeAtLocation(returnStmt.Expression)
+						if utils.IsTypeFlagSet(returnType, checker.TypeFlagsUndefined) {
+							hasArgument = false
+						}
 					}
 				}
 
@@ -349,8 +372,8 @@ var ConsistentReturnRule = rule.Rule{
 				if hasArgument {
 					if funcInfo.hasNoReturnValue {
 						// This return has a value but previous returns didn't
-						// Report error on the return expression (the value that shouldn't be there)
-						ctx.ReportNode(returnStmt.Expression, buildUnexpectedReturnValueMessage(funcInfo.functionName))
+						// Report error on the entire return statement
+						ctx.ReportNode(node, buildUnexpectedReturnValueMessage(funcInfo.functionName))
 					}
 					funcInfo.hasReturnValue = true
 				} else {

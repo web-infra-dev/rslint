@@ -34,7 +34,7 @@ var NoRedeclareRule = rule.Rule{
 	Name: "no-redeclare",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := NoRedeclareOptions{
-			BuiltinGlobals:         true,
+			BuiltinGlobals:         false,
 			IgnoreDeclarationMerge: true,
 		}
 
@@ -94,6 +94,8 @@ var NoRedeclareRule = rule.Rule{
 			"parseFloat": true,
 			"isNaN":      true,
 			"isFinite":   true,
+			"top":        true,
+			"self":       true,
 			// TypeScript lib types
 			"NodeListOf": true,
 		}

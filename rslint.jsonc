@@ -2,6 +2,11 @@
   {
     "language": "typescript",
     "files": ["*.ts"],
-    "rules": { "consistent-indexed-object-style": "error" },
+    "languageOptions": {
+      "parserOptions": {
+        "project": ["./tsconfig.json"]
+      }
+    },
+    "rules": { "no-unused-vars": "error" },
   },
 ]

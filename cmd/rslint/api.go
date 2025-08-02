@@ -10,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -68,12 +69,17 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	if len(req.RuleOptions) > 0 {
 		for ruleName, ruleImpl := range availableRules {
 			if option, ok := req.RuleOptions[ruleName]; ok {
+				// When testing a single rule, enable it with error severity
 				rulesWithOptions = append(rulesWithOptions, RuleWithOption{
 					rule:   ruleImpl,
 					option: option,
 				})
 			}
 		}
+	} else {
+		// If no specific rules requested, this shouldn't happen in test mode
+		// but we'll return empty to be safe
+		rulesWithOptions = []RuleWithOption{}
 	}
 
 	// Create compiler host
@@ -100,12 +106,34 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	if len(req.Files) > 0 {
 		for _, filePath := range req.Files {
 			absPath := tspath.ResolvePath(configDirectory, filePath)
+			found := false
 			// Try to find the file in any of the programs
 			for _, program := range programs {
 				sourceFile := program.GetSourceFile(absPath)
 				if sourceFile != nil {
 					files = append(files, sourceFile)
+					found = true
 					break // Found in this program, no need to check others
+				}
+			}
+			
+			// If not found in any program but exists in virtual file contents, create source file directly
+			if !found && len(req.FileContents) > 0 {
+				if _, exists := req.FileContents[absPath]; exists {
+					// Create parse options for virtual file
+					opts := ast.SourceFileParseOptions{
+						FileName:                       absPath,
+						Path:                           tspath.Path(absPath),
+						CompilerOptions:                core.SourceFileAffectingCompilerOptions{},
+						ExternalModuleIndicatorOptions: ast.ExternalModuleIndicatorOptions{},
+						JSDocParsingMode:               ast.JSDocParsingModeParseAll,
+					}
+					
+					// Use the compiler host to parse the virtual file
+					sourceFile := host.GetSourceFile(opts)
+					if sourceFile != nil {
+						files = append(files, sourceFile)
+					}
 				}
 			}
 		}

@@ -66,6 +66,12 @@ class Bar {
 					"ignoreTypeValueShadow": true,
 				},
 			},
+			{
+				Code: `let test = 1; type TestType = typeof test; type Func = (test: string) => typeof test;`,
+				Options: map[string]interface{}{
+					"ignoreFunctionTypeParameterNameValueShadow": true,
+				},
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			{

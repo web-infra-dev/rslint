@@ -19,9 +19,10 @@ var NoDupeClassMembersRule = rule.Rule{
 	Name: "no-dupe-class-members",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		type MemberInfo struct {
-			node     *ast.Node
-			isStatic bool
-			kind     string // "method", "property", "getter", "setter"
+			node         *ast.Node
+			isStatic     bool
+			kind         string // "method", "property", "getter", "setter"
+			isOverload   bool   // true if this is a method overload (no body)
 		}
 
 		// Track class members: map[className][memberName][static/instance] -> []MemberInfo
@@ -39,7 +40,7 @@ var NoDupeClassMembersRule = rule.Rule{
 		}
 
 		getMemberName := func(node *ast.Node) string {
-			// First check if it's a numeric literal that needs evaluation
+			// Get the name node from the member
 			var nameNode *ast.Node
 			switch {
 			case ast.IsMethodDeclaration(node):
@@ -52,8 +53,12 @@ var NoDupeClassMembersRule = rule.Rule{
 				nameNode = node.AsSetAccessorDeclaration().Name()
 			}
 			
+			if nameNode == nil {
+				return ""
+			}
+			
 			// Check if it's a numeric literal and evaluate it
-			if nameNode != nil && nameNode.Kind == ast.KindNumericLiteral {
+			if nameNode.Kind == ast.KindNumericLiteral {
 				numLit := nameNode.AsNumericLiteral()
 				// Parse the numeric literal text to get its actual value
 				// This will convert both "10" and "1e1" to "10"
@@ -62,36 +67,20 @@ var NoDupeClassMembersRule = rule.Rule{
 				return fmt.Sprintf("%g", val)
 			}
 			
+			// For string literals, return the unquoted value for error messages
+			if nameNode.Kind == ast.KindStringLiteral {
+				strLit := nameNode.AsStringLiteral()
+				text := strLit.Text
+				// Remove quotes
+				if len(text) >= 2 && ((text[0] == '"' && text[len(text)-1] == '"') || (text[0] == '\'' && text[len(text)-1] == '\'')) {
+					return text[1 : len(text)-1]
+				}
+				return text
+			}
+			
 			// Use the robust utility function for getting member names
-			memberName, _ := utils.GetNameFromMember(ctx.SourceFile, node)
-			if memberName != "" {
-				return memberName
-			}
-
-			// Fallback for specific node types
-			switch {
-			case ast.IsMethodDeclaration(node):
-				method := node.AsMethodDeclaration()
-				if method.Name() != nil && ast.IsIdentifier(method.Name()) {
-					return method.Name().AsIdentifier().Text
-				}
-			case ast.IsPropertyDeclaration(node):
-				prop := node.AsPropertyDeclaration()
-				if prop.Name() != nil && ast.IsIdentifier(prop.Name()) {
-					return prop.Name().AsIdentifier().Text
-				}
-			case ast.IsGetAccessorDeclaration(node):
-				getter := node.AsGetAccessorDeclaration()
-				if getter.Name() != nil && ast.IsIdentifier(getter.Name()) {
-					return getter.Name().AsIdentifier().Text
-				}
-			case ast.IsSetAccessorDeclaration(node):
-				setter := node.AsSetAccessorDeclaration()
-				if setter.Name() != nil && ast.IsIdentifier(setter.Name()) {
-					return setter.Name().AsIdentifier().Text
-				}
-			}
-			return ""
+			memberName, _ := utils.GetNameFromMember(ctx.SourceFile, nameNode)
+			return memberName
 		}
 
 		isStatic := func(node *ast.Node) bool {
@@ -146,23 +135,29 @@ var NoDupeClassMembersRule = rule.Rule{
 			return ""
 		}
 
+		isMethodOverload := func(node *ast.Node) bool {
+			if !ast.IsMethodDeclaration(node) {
+				return false
+			}
+			method := node.AsMethodDeclaration()
+			// A method overload has no body (body is nil)
+			return method.Body == nil
+		}
+
 		processMember := func(classNode *ast.Node, memberNode *ast.Node) {
 			// Skip computed properties
 			if isComputed(memberNode) {
-				fmt.Printf("DEBUG: Skipping computed property\n")
 				return
 			}
 
 			memberName := getMemberName(memberNode)
 			if memberName == "" {
-				fmt.Printf("DEBUG: Member name is empty for kind %v\n", memberNode.Kind)
 				return
 			}
 			
 			memberIsStatic := isStatic(memberNode)
 			memberKind := getMemberKind(memberNode)
-			
-			fmt.Printf("DEBUG: Processing member %s (kind: %s, static: %v)\n", memberName, memberKind, memberIsStatic)
+			memberIsOverload := isMethodOverload(memberNode)
 
 			// Initialize maps if needed
 			if classMembersMap[classNode] == nil {
@@ -189,8 +184,27 @@ var NoDupeClassMembersRule = rule.Rule{
 						return
 					}
 					// Different accessor types (getter/setter) can coexist, so continue
-				} else if memberKind == "method" || memberKind == "property" {
-					// For methods and properties, they conflict with any existing member
+				} else if memberKind == "method" {
+					// For methods, check if they are overloads
+					if existing.kind == "method" {
+						// If both are overloads, they can coexist (TypeScript method overloads)
+						if memberIsOverload && existing.isOverload {
+							continue
+						}
+						// If one is an overload and the other is implementation, they can coexist
+						if memberIsOverload || existing.isOverload {
+							continue
+						}
+						// Both are implementations - this is a duplicate
+						ctx.ReportNode(memberNode, buildUnexpectedMessage(memberName))
+						return
+					} else {
+						// Method conflicts with property/accessor
+						ctx.ReportNode(memberNode, buildUnexpectedMessage(memberName))
+						return
+					}
+				} else if memberKind == "property" {
+					// For properties, they conflict with any existing member
 					ctx.ReportNode(memberNode, buildUnexpectedMessage(memberName))
 					return
 				}
@@ -200,9 +214,10 @@ var NoDupeClassMembersRule = rule.Rule{
 			classMembersMap[classNode][memberName][memberIsStatic] = append(
 				existingMembers,
 				MemberInfo{
-					node:     memberNode,
-					isStatic: memberIsStatic,
-					kind:     memberKind,
+					node:       memberNode,
+					isStatic:   memberIsStatic,
+					kind:       memberKind,
+					isOverload: memberIsOverload,
 				},
 			)
 		}
@@ -214,12 +229,8 @@ var NoDupeClassMembersRule = rule.Rule{
 					return
 				}
 
-				// Debug: check if we get any class at all
-				fmt.Printf("DEBUG: Processing class with %d members\n", len(classDecl.Members.Nodes))
-
 				// Process all members of the class
 				for _, member := range classDecl.Members.Nodes {
-					fmt.Printf("DEBUG: Processing member of kind %v\n", member.Kind)
 					processMember(node, member)
 				}
 			},
