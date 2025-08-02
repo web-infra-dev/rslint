@@ -49,11 +49,10 @@ jobs:
         include:
           - goos: linux
             goarch: amd64
-            runs_on: ubuntu-latest
             node_arch: x64
             node_os: linux
 
-    runs-on: ${{ matrix.runs_on }}
+    runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -118,7 +117,7 @@ jobs:
     env:
       release_npm: ${{ inputs.to_release == 'all' || inputs.to_release == 'npm' }}
       release_extension: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
-    runs-on: ubuntu-latest
+    runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -184,22 +183,18 @@ jobs:
       matrix:
         include:
           - goos: darwin
-            runs_on: macos-13
             goarch: amd64
             node_arch: x64
             node_os: darwin
           - goos: darwin
-            runs_on: macos-latest
             goarch: arm64
             node_arch: arm64
             node_os: darwin
           - goos: linux
             goarch: amd64
-            runs_on: ubuntu-latest
             node_arch: x64
             node_os: linux
           - goos: linux
-            runs_on: ubuntu-latest
             goarch: arm64
             node_arch: arm64
             node_os: linux
@@ -207,13 +202,11 @@ jobs:
             goarch: amd64
             node_arch: x64
             node_os: win32
-            runs_on: windows-latest
           - goos: windows
             goarch: arm64
             node_arch: arm64
             node_os: win32
-            runs_on: windows-latest
-    runs-on: ${{ matrix.runs_on }}
+    runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout
         uses: actions/checkout@v4
