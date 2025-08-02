@@ -83,6 +83,14 @@ jobs:
           sudo apt update
           sudo apt install -y libasound2 libgbm1 libgtk-3-0 libnss3 xvfb
 
+      - name: VSCode Test Cache
+        uses: actions/cache@v4.2.3
+        with:
+          path: packages/vscode-extension/.vscode-test
+          key: 'vscode-test'
+          restore-keys: |
+            - 'vscode-test-'
+
       - name: Test on Linux
         if: runner.os == 'Linux'
         run: xvfb-run -a pnpm -r test
