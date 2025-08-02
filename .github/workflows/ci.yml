@@ -85,7 +85,7 @@ jobs:
       - test-go
       - test-node
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: rspack-ubuntu-22.04-large
     name: CI Done
     steps:
       - run: exit 1
