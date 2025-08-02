@@ -14,7 +14,7 @@ env:
 jobs:
   test-go:
     name: Test Go
-    runs-on: ubuntu-latest
+    runs-on: rspack-ubuntu-22.04-large
     strategy:
       matrix:
         go-version: ['1.24.1']
@@ -35,7 +35,7 @@ jobs:
 
   test-node:
     name: Test npm packages
-    runs-on: ubuntu-latest
+    runs-on: rspack-ubuntu-22.04-large
     strategy:
       matrix:
         go-version: ['1.24.1']
