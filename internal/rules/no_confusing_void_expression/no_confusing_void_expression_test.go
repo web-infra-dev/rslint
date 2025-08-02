@@ -3,8 +3,8 @@ package no_confusing_void_expression
 import (
 	"testing"
 
-	"github.com/typescript-eslint/rslint/internal/rule_tester"
-	"github.com/typescript-eslint/rslint/internal/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/rules/fixtures"
 )
 
 func TestNoConfusingVoidExpressionRule(t *testing.T) {

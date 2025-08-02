@@ -1,4 +1,4 @@
-module github.com/typescript-eslint/rslint
+module github.com/web-infra-dev/rslint
 
 go 1.24.1
 

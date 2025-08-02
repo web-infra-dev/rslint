@@ -6,8 +6,8 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func buildErrorTypeOverridesMessage(typeName, container string) rule.RuleMessage {
