@@ -24,12 +24,13 @@ suite('rslint extension', function () {
       path.resolve(
         require.resolve('@rslint/core'),
         '../..',
-        'fixtures/src/index.ts',
+        `fixtures/src/`,
+        filename,
       ),
     );
   }
 
-  test.only('diagnostics', async () => {
+  test('diagnostics', async () => {
     const doc = await openFixture('index.ts');
     await vscode.window.showTextDocument(doc);
 
@@ -80,7 +81,7 @@ suite('rslint extension', function () {
     }
   });
 
-  test.only('code actions - disable rule for line', async () => {
+  test('code actions - disable rule for line', async () => {
     const doc = await openFixture('disable.ts');
     await vscode.window.showTextDocument(doc);
 
@@ -133,7 +134,7 @@ suite('rslint extension', function () {
   });
 
   test('code actions - disable rule for file', async () => {
-    const doc = await openFixture('disable.ts');
+    const doc = await openFixture('disable-file.ts');
     await vscode.window.showTextDocument(doc);
 
     const diagnostics = await waitForDiagnostics(doc);

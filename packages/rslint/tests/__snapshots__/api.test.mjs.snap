@@ -4,6 +4,22 @@ exports[`lint api > diag snapshot 1`] = `
 {
   "diagnostics": [
     {
+      "filePath": "src/disable-file.ts",
+      "message": "Unsafe member access .someProperty on an \`any\` value.",
+      "messageId": "unsafeMemberExpression",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-unsafe-member-access",
+    },
+    {
       "filePath": "src/disable.ts",
       "message": "Unsafe member access .someProperty on an \`any\` value.",
       "messageId": "unsafeMemberExpression",
@@ -52,8 +68,8 @@ exports[`lint api > diag snapshot 1`] = `
       "ruleName": "no-unsafe-member-access",
     },
   ],
-  "errorCount": 3,
-  "fileCount": 3,
+  "errorCount": 4,
+  "fileCount": 4,
   "ruleCount": 1,
 }
 `;
