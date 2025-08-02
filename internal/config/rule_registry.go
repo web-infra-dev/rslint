@@ -1,8 +1,8 @@
 package config
 
 import (
-	"github.com/typescript-eslint/rslint/internal/linter"
-	"github.com/typescript-eslint/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 // EnabledRuleWithConfig combines a rule with its configuration

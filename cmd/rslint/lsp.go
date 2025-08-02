@@ -18,10 +18,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/sourcegraph/jsonrpc2"
-	"github.com/typescript-eslint/rslint/internal/config"
-	"github.com/typescript-eslint/rslint/internal/linter"
-	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func ptrTo[T any](v T) *T {
@@ -30,14 +30,16 @@ func ptrTo[T any](v T) *T {
 
 // LSP Server implementation
 type LSPServer struct {
-	conn      *jsonrpc2.Conn
-	rootURI   string
-	documents map[lsproto.DocumentUri]string // URI -> content
+	conn        *jsonrpc2.Conn
+	rootURI     string
+	documents   map[lsproto.DocumentUri]string                // URI -> content
+	diagnostics map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
 }
 
 func NewLSPServer() *LSPServer {
 	return &LSPServer{
-		documents: make(map[lsproto.DocumentUri]string),
+		documents:   make(map[lsproto.DocumentUri]string),
+		diagnostics: make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
 	}
 }
 
@@ -69,6 +71,8 @@ func (s *LSPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 	case "textDocument/diagnostic":
 		s.handleDidSave(ctx, req)
 		return nil, nil
+	case "textDocument/codeAction":
+		return s.handleCodeAction(ctx, req)
 	case "shutdown":
 		return s.handleShutdown(ctx, req)
 
@@ -101,6 +105,9 @@ func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request)
 		Capabilities: &lsproto.ServerCapabilities{
 			TextDocumentSync: &lsproto.TextDocumentSyncOptionsOrKind{
 				Kind: ptrTo(lsproto.TextDocumentSyncKindFull),
+			},
+			CodeActionProvider: &lsproto.BooleanOrCodeActionOptions{
+				Boolean: ptrTo(true),
 			},
 		},
 	}
@@ -153,6 +160,61 @@ func (s *LSPServer) handleDidSave(ctx context.Context, req *jsonrpc2.Request) {
 
 func (s *LSPServer) handleShutdown(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
 	return nil, nil
+}
+
+func (s *LSPServer) handleCodeAction(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
+	var params lsproto.CodeActionParams
+	if err := json.Unmarshal(*req.Params, &params); err != nil {
+		return nil, &jsonrpc2.Error{
+			Code:    jsonrpc2.CodeParseError,
+			Message: "Failed to parse code action params",
+		}
+	}
+
+	uri := params.TextDocument.Uri
+
+	// Get stored diagnostics for this document
+	ruleDiagnostics, exists := s.diagnostics[uri]
+	if !exists {
+		return []*lsproto.CodeAction{}, nil
+	}
+
+	var codeActions []*lsproto.CodeAction
+
+	// Find diagnostics that overlap with the requested range
+	for _, ruleDiag := range ruleDiagnostics {
+		// Check if diagnostic range overlaps with requested range
+		diagStartLine, diagStartChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
+		diagEndLine, diagEndChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
+
+		diagRange := lsproto.Range{
+			Start: lsproto.Position{Line: uint32(diagStartLine), Character: uint32(diagStartChar)},
+			End:   lsproto.Position{Line: uint32(diagEndLine), Character: uint32(diagEndChar)},
+		}
+
+		if rangesOverlap(diagRange, params.Range) {
+			// Add code action for fixes
+			codeAction := createCodeActionFromRuleDiagnostic(ruleDiag, uri)
+			if codeAction != nil {
+				codeActions = append(codeActions, codeAction)
+			}
+			// add extract disable rule actions
+			disableActions := createDisableRuleActions(ruleDiag, uri)
+			codeActions = append(codeActions, disableActions...)
+
+			// Add code actions for suggestions
+			if ruleDiag.Suggestions != nil {
+				for _, suggestion := range *ruleDiag.Suggestions {
+					suggestionAction := createCodeActionFromSuggestion(ruleDiag, suggestion, uri)
+					if suggestionAction != nil {
+						codeActions = append(codeActions, suggestionAction)
+					}
+				}
+			}
+		}
+	}
+
+	return codeActions, nil
 }
 
 func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri, content string) {
@@ -255,6 +317,9 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 	if err != nil {
 		log.Printf("Error running lint: %v", err)
 	}
+
+	// Store rule diagnostics for code actions
+	s.diagnostics[uri] = rule_diags
 
 	for _, diagnostic := range rule_diags {
 		lspDiag := convertRuleDiagnosticToLSP(diagnostic, content)
@@ -381,4 +446,216 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 		diagnostics = []rule.RuleDiagnostic{}
 	}
 	return diagnostics, nil
+}
+
+// Helper function to check if two ranges overlap
+func rangesOverlap(a, b lsproto.Range) bool {
+	return !(a.End.Line < b.Start.Line ||
+		(a.End.Line == b.Start.Line && a.End.Character < b.Start.Character) ||
+		b.End.Line < a.Start.Line ||
+		(b.End.Line == a.Start.Line && b.End.Character < a.Start.Character))
+}
+
+// Helper function to create a code action from a rule diagnostic
+func createCodeActionFromRuleDiagnostic(ruleDiag rule.RuleDiagnostic, uri lsproto.DocumentUri) *lsproto.CodeAction {
+	fixes := ruleDiag.Fixes()
+	if len(fixes) == 0 {
+		return nil
+	}
+
+	// Convert rule fixes to LSP text edits
+	var textEdits []*lsproto.TextEdit
+	for _, fix := range fixes {
+		startLine, startChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, fix.Range.Pos())
+		endLine, endChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, fix.Range.End())
+
+		textEdit := &lsproto.TextEdit{
+			Range: lsproto.Range{
+				Start: lsproto.Position{Line: uint32(startLine), Character: uint32(startChar)},
+				End:   lsproto.Position{Line: uint32(endLine), Character: uint32(endChar)},
+			},
+			NewText: fix.Text,
+		}
+		textEdits = append(textEdits, textEdit)
+	}
+
+	// Create workspace edit
+	workspaceEdit := &lsproto.WorkspaceEdit{
+		Changes: &map[lsproto.DocumentUri][]*lsproto.TextEdit{
+			uri: textEdits,
+		},
+	}
+
+	// Create the corresponding LSP diagnostic for reference
+	diagStartLine, diagStartChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
+	diagEndLine, diagEndChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
+
+	lspDiagnostic := &lsproto.Diagnostic{
+		Range: lsproto.Range{
+			Start: lsproto.Position{Line: uint32(diagStartLine), Character: uint32(diagStartChar)},
+			End:   lsproto.Position{Line: uint32(diagEndLine), Character: uint32(diagEndChar)},
+		},
+		Severity: ptrTo(lsproto.DiagnosticSeverity(ruleDiag.Severity.Int())),
+		Source:   ptrTo("rslint"),
+		Message:  fmt.Sprintf("[%s] %s", ruleDiag.RuleName, ruleDiag.Message.Description),
+	}
+
+	return &lsproto.CodeAction{
+		Title:       fmt.Sprintf("Fix: %s", ruleDiag.Message.Description),
+		Kind:        ptrTo(lsproto.CodeActionKind("quickfix")),
+		Edit:        workspaceEdit,
+		Diagnostics: &[]*lsproto.Diagnostic{lspDiagnostic},
+		IsPreferred: ptrTo(true), // Mark auto-fixes as preferred
+	}
+}
+
+// Helper function to create a code action from a rule suggestion
+func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rule.RuleSuggestion, uri lsproto.DocumentUri) *lsproto.CodeAction {
+	fixes := suggestion.Fixes()
+	if len(fixes) == 0 {
+		return nil
+	}
+
+	// Convert rule fixes to LSP text edits
+	var textEdits []*lsproto.TextEdit
+	for _, fix := range fixes {
+		startLine, startChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, fix.Range.Pos())
+		endLine, endChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, fix.Range.End())
+
+		textEdit := &lsproto.TextEdit{
+			Range: lsproto.Range{
+				Start: lsproto.Position{Line: uint32(startLine), Character: uint32(startChar)},
+				End:   lsproto.Position{Line: uint32(endLine), Character: uint32(endChar)},
+			},
+			NewText: fix.Text,
+		}
+		textEdits = append(textEdits, textEdit)
+	}
+
+	// Create workspace edit
+	workspaceEdit := &lsproto.WorkspaceEdit{
+		Changes: &map[lsproto.DocumentUri][]*lsproto.TextEdit{
+			uri: textEdits,
+		},
+	}
+
+	// Create the corresponding LSP diagnostic for reference
+	diagStartLine, diagStartChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
+	diagEndLine, diagEndChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
+
+	lspDiagnostic := &lsproto.Diagnostic{
+		Range: lsproto.Range{
+			Start: lsproto.Position{Line: uint32(diagStartLine), Character: uint32(diagStartChar)},
+			End:   lsproto.Position{Line: uint32(diagEndLine), Character: uint32(diagEndChar)},
+		},
+		Severity: ptrTo(lsproto.DiagnosticSeverity(ruleDiag.Severity.Int())),
+		Source:   ptrTo("rslint"),
+		Message:  fmt.Sprintf("[%s] %s", ruleDiag.RuleName, ruleDiag.Message.Description),
+	}
+
+	return &lsproto.CodeAction{
+		Title:       fmt.Sprintf("Suggestion: %s", suggestion.Message.Description),
+		Kind:        ptrTo(lsproto.CodeActionKind("quickfix")),
+		Edit:        workspaceEdit,
+		Diagnostics: &[]*lsproto.Diagnostic{lspDiagnostic},
+		IsPreferred: ptrTo(false), // Mark suggestions as not preferred
+	}
+}
+
+// Helper function to create disable rule actions for diagnostics without fixes
+func createDisableRuleActions(ruleDiag rule.RuleDiagnostic, uri lsproto.DocumentUri) []*lsproto.CodeAction {
+	var actions []*lsproto.CodeAction
+
+	// Create the corresponding LSP diagnostic for reference
+	diagStartLine, diagStartChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
+	diagEndLine, diagEndChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
+
+	lspDiagnostic := &lsproto.Diagnostic{
+		Range: lsproto.Range{
+			Start: lsproto.Position{Line: uint32(diagStartLine), Character: uint32(diagStartChar)},
+			End:   lsproto.Position{Line: uint32(diagEndLine), Character: uint32(diagEndChar)},
+		},
+		Severity: ptrTo(lsproto.DiagnosticSeverity(ruleDiag.Severity.Int())),
+		Source:   ptrTo("rslint"),
+		Message:  fmt.Sprintf("[%s] %s", ruleDiag.RuleName, ruleDiag.Message.Description),
+	}
+
+	// Action 1: Disable rule for this line
+	disableLineAction := createDisableRuleForLineAction(ruleDiag, uri, lspDiagnostic)
+	if disableLineAction != nil {
+		actions = append(actions, disableLineAction)
+	}
+
+	// Action 2: Disable rule for entire file
+	disableFileAction := createDisableRuleForFileAction(ruleDiag, uri, lspDiagnostic)
+	if disableFileAction != nil {
+		actions = append(actions, disableFileAction)
+	}
+
+	return actions
+}
+
+// Helper function to create a "disable rule for this line" action
+func createDisableRuleForLineAction(ruleDiag rule.RuleDiagnostic, uri lsproto.DocumentUri, lspDiagnostic *lsproto.Diagnostic) *lsproto.CodeAction {
+	// Get the line where the diagnostic occurs
+	lineStart := lspDiagnostic.Range.Start.Line
+
+	// Create text edit to add eslint-disable-next-line comment
+	disableComment := fmt.Sprintf("// eslint-disable-next-line %s\n", ruleDiag.RuleName)
+
+	// Find the start of the line to insert the comment
+	lineStartPos := lsproto.Position{Line: lineStart, Character: 0}
+
+	textEdit := &lsproto.TextEdit{
+		Range: lsproto.Range{
+			Start: lineStartPos,
+			End:   lineStartPos,
+		},
+		NewText: disableComment,
+	}
+
+	workspaceEdit := &lsproto.WorkspaceEdit{
+		Changes: &map[lsproto.DocumentUri][]*lsproto.TextEdit{
+			uri: {textEdit},
+		},
+	}
+
+	return &lsproto.CodeAction{
+		Title:       fmt.Sprintf("Disable %s for this line", ruleDiag.RuleName),
+		Kind:        ptrTo(lsproto.CodeActionKind("quickfix")),
+		Edit:        workspaceEdit,
+		Diagnostics: &[]*lsproto.Diagnostic{lspDiagnostic},
+		IsPreferred: ptrTo(false),
+	}
+}
+
+// Helper function to create a "disable rule for entire file" action
+func createDisableRuleForFileAction(ruleDiag rule.RuleDiagnostic, uri lsproto.DocumentUri, lspDiagnostic *lsproto.Diagnostic) *lsproto.CodeAction {
+	// Create text edit to add eslint-disable comment at the top of the file
+	disableComment := fmt.Sprintf("/* eslint-disable %s */\n", ruleDiag.RuleName)
+
+	// Insert at the very beginning of the file
+	fileStartPos := lsproto.Position{Line: 0, Character: 0}
+
+	textEdit := &lsproto.TextEdit{
+		Range: lsproto.Range{
+			Start: fileStartPos,
+			End:   fileStartPos,
+		},
+		NewText: disableComment,
+	}
+
+	workspaceEdit := &lsproto.WorkspaceEdit{
+		Changes: &map[lsproto.DocumentUri][]*lsproto.TextEdit{
+			uri: {textEdit},
+		},
+	}
+
+	return &lsproto.CodeAction{
+		Title:       fmt.Sprintf("Disable %s for entire file", ruleDiag.RuleName),
+		Kind:        ptrTo(lsproto.CodeActionKind("quickfix")),
+		Edit:        workspaceEdit,
+		Diagnostics: &[]*lsproto.Diagnostic{lspDiagnostic},
+		IsPreferred: ptrTo(false),
+	}
 }

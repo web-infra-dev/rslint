@@ -6,8 +6,8 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func certaintyToString(certainty usefulness) string {
@@ -275,7 +275,6 @@ var NoBaseToStringRule = rule.Rule{
 				// // eslint-disable-next-line @typescript-eslint/internal/prefer-ast-types-enum
 				// const variable = scope.set.get('String');
 				// return !variable?.defs.length;
-				return true
 			}
 			return false
 		}
