@@ -1,1 +1,1 @@
-const x = <const>'foo';
+const angleTest = <const>'foo';
