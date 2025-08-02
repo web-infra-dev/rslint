@@ -49,11 +49,10 @@ jobs:
         include:
           - goos: linux
             goarch: amd64
-            runs_on: ubuntu-latest
             node_arch: x64
             node_os: linux
 
-    runs-on: ${{ matrix.runs_on }}
+    runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -109,6 +108,13 @@ jobs:
 
       - name: Lint code
         run: pnpm lint
+
+      - name: Install xvfb and dependencies
+        if: ${{ runner.os == 'Linux' && runner.environment == 'self-hosted' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libxss1 libgtk-3-0 libgconf-2-4 libnss3 libxrandr2 libasound2 libpangocairo-1.0-0 libatk1.0-0 libcairo-gobject2 libgtk-3-0 libgdk-pixbuf2.0-0
+
       - name: Test on Linux
         run: xvfb-run -a pnpm -r test
 
@@ -118,7 +124,7 @@ jobs:
     env:
       release_npm: ${{ inputs.to_release == 'all' || inputs.to_release == 'npm' }}
       release_extension: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
-    runs-on: ubuntu-latest
+    runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -153,7 +159,7 @@ jobs:
           NPM_TOKEN: ${{ secrets.RSLINT_NPM_TOKEN }}
         run: |
           npm config set "//registry.npmjs.org/:_authToken" "${NPM_TOKEN}"
-          pnpm -r publish --dry-run --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
+          pnpm -r publish --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
 
       - name: Build and publish to Microsoft VS Code Marketplace
         if: false
@@ -184,22 +190,18 @@ jobs:
       matrix:
         include:
           - goos: darwin
-            runs_on: macos-13
             goarch: amd64
             node_arch: x64
             node_os: darwin
           - goos: darwin
-            runs_on: macos-latest
             goarch: arm64
             node_arch: arm64
             node_os: darwin
           - goos: linux
             goarch: amd64
-            runs_on: ubuntu-latest
             node_arch: x64
             node_os: linux
           - goos: linux
-            runs_on: ubuntu-latest
             goarch: arm64
             node_arch: arm64
             node_os: linux
@@ -207,13 +209,11 @@ jobs:
             goarch: amd64
             node_arch: x64
             node_os: win32
-            runs_on: windows-latest
           - goos: windows
             goarch: arm64
             node_arch: arm64
             node_os: win32
-            runs_on: windows-latest
-    runs-on: ${{ matrix.runs_on }}
+    runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -240,14 +240,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Go Build packages
-        if: matrix.node_os != 'win32'
         run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint ./cmd/rslint
-
-      - name: Go Build Packages (windows)
-        if: matrix.node_os == 'win32'
-        run: |
-          $env:GOOS="${{ matrix.goos }}"; $env:GOARCH="${{ matrix.goarch }}"; go build -o ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint ./cmd/rslint
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
