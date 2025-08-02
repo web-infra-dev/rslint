@@ -389,12 +389,11 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 				if modifiers != nil {
 					for _, mod := range modifiers.NodeList.Nodes {
 						if mod.Kind == ast.KindPublicKeyword {
-							keywordRange, _ := findPublicKeywordRange(ctx, node)
 							message := rule.RuleMessage{
 								Id:          "unwantedPublicAccessibility",
 								Description: fmt.Sprintf("Public accessibility modifier on %s %s.", nodeType, methodName),
 							}
-							ctx.ReportRange(keywordRange, message)
+							ctx.ReportNode(mod, message)
 							return
 						}
 					}
@@ -427,12 +426,11 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 				if prop.Modifiers() != nil {
 					for _, mod := range prop.Modifiers().NodeList.Nodes {
 						if mod.Kind == ast.KindPublicKeyword {
-							keywordRange, _ := findPublicKeywordRange(ctx, node)
 							message := rule.RuleMessage{
 								Id:          "unwantedPublicAccessibility",
 								Description: fmt.Sprintf("Public accessibility modifier on %s %s.", nodeType, propertyName),
 							}
-							ctx.ReportRange(keywordRange, message)
+							ctx.ReportNode(mod, message)
 							return
 						}
 					}
@@ -527,12 +525,11 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 					if param.Modifiers() != nil {
 						for _, mod := range param.Modifiers().NodeList.Nodes {
 							if mod.Kind == ast.KindPublicKeyword {
-								keywordRange, _ := findPublicKeywordRange(ctx, node)
 								message := rule.RuleMessage{
 									Id:          "unwantedPublicAccessibility",
 									Description: fmt.Sprintf("Public accessibility modifier on %s %s.", nodeType, nodeName),
 								}
-								ctx.ReportRange(keywordRange, message)
+								ctx.ReportNode(mod, message)
 								return
 							}
 						}

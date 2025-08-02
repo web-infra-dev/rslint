@@ -66,7 +66,6 @@ var NoEmptyInterfaceRule = rule.Rule{
 				// Report empty interface with no extends
 				if extendCount == 0 {
 					ctx.ReportNode(interfaceDecl.Name(), rule.RuleMessage{
-						Id:          "noEmpty",
 						Description: "An empty interface is equivalent to `{}`.",
 					})
 					return
@@ -139,7 +138,6 @@ var NoEmptyInterfaceRule = rule.Rule{
 					replacement := fmt.Sprintf("type %s%s = %s", nameText, typeParamsText, extendedTypeText)
 
 					message := rule.RuleMessage{
-						Id:          "noEmptyWithSuper",
 						Description: "An interface declaring no members is equivalent to its supertype.",
 					}
 

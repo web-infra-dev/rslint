@@ -523,14 +523,7 @@ var NoUnnecessaryTypeParametersRule = rule.Rule{
 				// Debug: print usage count for debugging
 				// fmt.Printf("Type parameter %s has %d usages\n", typeParamName, usageCount)
 
-				// For valid usage, we need at least 2 meaningful uses
-				// Exception: if used in constraints (like K extends keyof T), that counts as meaningful
-				if usageCount > 1 {
-					continue
-				}
-
-				// Special case: check if type parameter is used in constraints of other type parameters
-				// or if this type parameter has a meaningful constraint itself
+				// Check constraints first
 				isUsedInConstraints := false
 				hasConstraint := false
 
@@ -565,9 +558,49 @@ var NoUnnecessaryTypeParametersRule = rule.Rule{
 					}
 				}
 
-				// If used in constraints and has at least one other usage, it's valid
-				// Or if this type parameter has a meaningful constraint and is used, it's valid
-				if (isUsedInConstraints && usageCount >= 1) || (hasConstraint && usageCount >= 1) {
+				// For valid usage, we need either:
+				// 1. Multiple uses (2 or more), OR
+				// 2. Single use in a meaningful context (classes, complex types, etc.)
+				
+				// Check if single usage is in a meaningful context
+				isMeaningfulSingleUsage := false
+				if usageCount == 1 {
+					// Functions: single usage in return type of complex types (Map, Array, etc.) is meaningful
+					// Or usage with constraints involving other type parameters
+					if hasConstraint || isUsedInConstraints {
+						isMeaningfulSingleUsage = true
+					}
+					
+					// For declare functions, check if used in complex generic types
+					if descriptor == "function" {
+						nodeText := string(ctx.SourceFile.Text()[node.Pos():node.End()])
+						// Check if used in Map<K, V> style patterns where multiple type parameters 
+						// are used together in a complex type
+						if strings.Contains(nodeText, "Map<") {
+							// For Map<K, V> pattern, both K and V are meaningful even with single usage
+							isMeaningfulSingleUsage = true
+						} else if strings.Contains(nodeText, "Array<" + typeParamName + ">") ||
+								  strings.Contains(nodeText, "Set<" + typeParamName + ">") ||
+								  strings.Contains(nodeText, "Promise<" + typeParamName + ">") ||
+								  strings.Contains(nodeText, "ReadonlyArray<" + typeParamName + ">") {
+							isMeaningfulSingleUsage = true
+						}
+					}
+					
+					// Classes: check if single usage is in a meaningful array/generic context
+					if descriptor == "class" {
+						nodeText := string(ctx.SourceFile.Text()[node.Pos():node.End()])
+						// T[] usage is meaningful even if single usage
+						if strings.Contains(nodeText, typeParamName + "[]") {
+							isMeaningfulSingleUsage = true
+						} else {
+							// Other single usages in classes are not meaningful
+							isMeaningfulSingleUsage = false
+						}
+					}
+				}
+				
+				if usageCount > 1 || isMeaningfulSingleUsage {
 					continue
 				}
 

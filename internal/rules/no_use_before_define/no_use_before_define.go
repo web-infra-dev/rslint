@@ -373,10 +373,53 @@ func (sm *ScopeManager) findVariable(identifier *ast.Node, fromScope *Scope) *Va
 	return nil
 }
 
+func checkForEarlyReferences(scopeManager *ScopeManager, varName string, varPos int, ctx rule.RuleContext, config Config, defType DefinitionType) {
+	// Look through all scopes for references to this variable that occur before its definition
+	for _, scope := range scopeManager.scopes {
+		for _, ref := range scope.References {
+			if ref.Identifier.AsIdentifier().Text == varName && ref.Identifier.Pos() < varPos && !ref.Init {
+				// Check configuration to see if this type of violation should be reported
+				shouldReport := true
+				if defType == DefTypeVariable && !config.Variables {
+					shouldReport = false
+				}
+				if defType == DefTypeFunctionName && !config.Functions {
+					shouldReport = false
+				}
+				if defType == DefTypeClassName && !config.Classes {
+					shouldReport = false
+				}
+				if defType == DefTypeTSEnumName && !config.Enums {
+					shouldReport = false
+				}
+				if defType == DefTypeType && !config.Typedefs {
+					shouldReport = false
+				}
+				
+				// Check if it's a type reference and should be ignored
+				if config.IgnoreTypeReferences && isTypeReference(ref) {
+					shouldReport = false
+				}
+				
+				// Check if it's a named export and should be allowed
+				if config.AllowNamedExports && isNamedExports(ref) {
+					shouldReport = false
+				}
+				
+				if shouldReport {
+					ctx.ReportNode(ref.Identifier, rule.RuleMessage{
+						Id:          "noUseBeforeDefine",
+						Description: fmt.Sprintf("'%s' was used before it was defined.", varName),
+					})
+				}
+			}
+		}
+	}
+}
+
 var NoUseBeforeDefineRule = rule.Rule{
 	Name: "no-use-before-define",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		// fmt.Printf("DEBUG: no-use-before-define rule is running\n")
 		config := parseOptions(options)
 		scopeManager := newScopeManager()
 
@@ -491,7 +534,7 @@ var NoUseBeforeDefineRule = rule.Rule{
 		return rule.RuleListeners{
 			// Scope creators
 			ast.KindSourceFile: func(node *ast.Node) {
-				scopeManager.globalScope.Node = node
+					scopeManager.globalScope.Node = node
 			},
 			ast.KindBlock: func(node *ast.Node) {
 				scopeManager.pushScope(node, ScopeTypeBlock)
@@ -499,7 +542,11 @@ var NoUseBeforeDefineRule = rule.Rule{
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
 				funcDecl := node.AsFunctionDeclaration()
 				if funcDecl.Name() != nil && ast.IsIdentifier(funcDecl.Name()) {
-					scopeManager.addVariable(funcDecl.Name().AsIdentifier().Text, funcDecl.Name(), DefTypeFunctionName)
+					funcName := funcDecl.Name().AsIdentifier().Text
+					scopeManager.addVariable(funcName, funcDecl.Name(), DefTypeFunctionName)
+					
+					// Check if this function was referenced before being defined
+					checkForEarlyReferences(scopeManager, funcName, funcDecl.Name().Pos(), ctx, config, DefTypeFunctionName)
 				}
 				scopeManager.pushScope(node, ScopeTypeFunction)
 			},
@@ -516,7 +563,11 @@ var NoUseBeforeDefineRule = rule.Rule{
 			ast.KindClassDeclaration: func(node *ast.Node) {
 				classDecl := node.AsClassDeclaration()
 				if classDecl.Name() != nil && ast.IsIdentifier(classDecl.Name()) {
-					scopeManager.addVariable(classDecl.Name().AsIdentifier().Text, node, DefTypeClassName)
+					className := classDecl.Name().AsIdentifier().Text
+					scopeManager.addVariable(className, node, DefTypeClassName)
+					
+					// Check if this class was referenced before being defined
+					checkForEarlyReferences(scopeManager, className, classDecl.Name().Pos(), ctx, config, DefTypeClassName)
 				}
 				scopeManager.pushScope(node, ScopeTypeClass)
 			},
@@ -530,7 +581,11 @@ var NoUseBeforeDefineRule = rule.Rule{
 			ast.KindEnumDeclaration: func(node *ast.Node) {
 				enumDecl := node.AsEnumDeclaration()
 				if ast.IsIdentifier(enumDecl.Name()) {
-					scopeManager.addVariable(enumDecl.Name().AsIdentifier().Text, node, DefTypeTSEnumName)
+					enumName := enumDecl.Name().AsIdentifier().Text
+					scopeManager.addVariable(enumName, node, DefTypeTSEnumName)
+					
+					// Check if this enum was referenced before being defined
+					checkForEarlyReferences(scopeManager, enumName, enumDecl.Name().Pos(), ctx, config, DefTypeTSEnumName)
 				}
 				scopeManager.pushScope(node, ScopeTypeEnum)
 			},
@@ -572,7 +627,11 @@ var NoUseBeforeDefineRule = rule.Rule{
 					for _, decl := range declList.Declarations.Nodes {
 						varDecl := decl.AsVariableDeclaration()
 						if ast.IsIdentifier(varDecl.Name()) {
-							scopeManager.addVariable(varDecl.Name().AsIdentifier().Text, varDecl.Name(), DefTypeVariable)
+							varName := varDecl.Name().AsIdentifier().Text
+							scopeManager.addVariable(varName, varDecl.Name(), DefTypeVariable)
+							
+							// Check if this variable was referenced before being defined
+							checkForEarlyReferences(scopeManager, varName, varDecl.Name().Pos(), ctx, config, DefTypeVariable)
 						}
 					}
 				}
@@ -580,7 +639,10 @@ var NoUseBeforeDefineRule = rule.Rule{
 			ast.KindVariableDeclaration: func(node *ast.Node) {
 				varDecl := node.AsVariableDeclaration()
 				if ast.IsIdentifier(varDecl.Name()) {
-					scopeManager.addVariable(varDecl.Name().AsIdentifier().Text, varDecl.Name(), DefTypeVariable)
+					varName := varDecl.Name().AsIdentifier().Text
+					scopeManager.addVariable(varName, varDecl.Name(), DefTypeVariable)
+					
+					// Don't check here since KindVariableStatement already handles it
 				}
 			},
 			ast.KindParameter: func(node *ast.Node) {
@@ -604,7 +666,6 @@ var NoUseBeforeDefineRule = rule.Rule{
 
 			// Identifier references
 			ast.KindIdentifier: func(node *ast.Node) {
-				// fmt.Printf("DEBUG: Found identifier %s at pos %d\n", node.AsIdentifier().Text, node.Pos())
 				// Skip if this is a declaration
 				parent := node.Parent
 				if parent != nil {
@@ -795,6 +856,7 @@ var NoUseBeforeDefineRule = rule.Rule{
 			rule.ListenerOnExit(ast.KindSourceFile): func(node *ast.Node) {
 				// Resolve all references
 				scopeManager.resolveReferences()
+
 
 				// Check all scopes for violations
 				var checkAllScopes func(scope *Scope)

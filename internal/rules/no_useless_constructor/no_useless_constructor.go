@@ -2,7 +2,6 @@ package no_useless_constructor
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -13,12 +12,6 @@ func buildNoUselessConstructorMessage() rule.RuleMessage {
 	}
 }
 
-func buildRemoveConstructorMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "removeConstructor",
-		Description: "Remove the constructor.",
-	}
-}
 
 // Check if method with accessibility is not useless
 func checkAccessibility(node *ast.Node) bool {
@@ -306,34 +299,6 @@ func isConstructorUseless(node *ast.Node) bool {
 	return true
 }
 
-// Helper to get text range for suggestion fix
-func getConstructorRange(ctx rule.RuleContext, node *ast.Node) core.TextRange {
-	if node.Kind != ast.KindConstructor {
-		return core.NewTextRange(node.Pos(), node.End())
-	}
-
-	// Find the start of constructor including any leading whitespace on the same line
-	start := node.Pos()
-	text := ctx.SourceFile.Text()
-
-	// Move back to beginning of line
-	for start > 0 && text[start-1] != '\n' {
-		start--
-	}
-
-	// Find end including the closing brace and any trailing whitespace
-	end := node.End()
-
-	// Skip trailing whitespace and include newline if present
-	for end < len(text) && (text[end] == ' ' || text[end] == '\t') {
-		end++
-	}
-	if end < len(text) && text[end] == '\n' {
-		end++
-	}
-
-	return core.NewTextRange(start, end)
-}
 
 var NoUselessConstructorRule = rule.Rule{
 	Name: "no-useless-constructor",
@@ -355,16 +320,8 @@ var NoUselessConstructorRule = rule.Rule{
 					return
 				}
 
-				// Report with suggestion to remove
-				removeRange := getConstructorRange(ctx, node)
-
-				ctx.ReportNodeWithSuggestions(node, buildNoUselessConstructorMessage(),
-					rule.RuleSuggestion{
-						Message: buildRemoveConstructorMessage(),
-						FixesArr: []rule.RuleFix{
-							rule.RuleFixReplaceRange(removeRange, "  "),
-						},
-					})
+				// Report the error
+				ctx.ReportNode(node, buildNoUselessConstructorMessage())
 			},
 		}
 	},

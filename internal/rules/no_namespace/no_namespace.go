@@ -80,8 +80,12 @@ var NoNamespaceRule = rule.Rule{
 					return
 				}
 
-				// Note: This implementation reports all namespace declarations, including both parts of dotted namespaces
-				// This behavior aligns with the updated test expectations
+				// For dotted namespaces like "namespace Foo.Bar {}", TypeScript creates nested ModuleDeclarations
+				// We should only report on the outermost one to match TypeScript-ESLint behavior
+				if node.Parent != nil && node.Parent.Kind == ast.KindModuleDeclaration {
+					// This is an inner part of a dotted namespace, skip it
+					return
+				}
 
 				// Check if allowed by options
 				if opts.AllowDefinitionFiles && strings.HasSuffix(ctx.SourceFile.FileName(), ".d.ts") {
@@ -92,20 +96,11 @@ var NoNamespaceRule = rule.Rule{
 					return
 				}
 
-				// Report the error - for export namespace, report on the namespace keyword, not the export
-				// This matches TypeScript-ESLint behavior
-				if moduleDecl.Name() != nil {
-					// Report on the module name instead of the entire declaration to match column expectations
-					ctx.ReportNode(moduleDecl.Name(), rule.RuleMessage{
-						Id:          "moduleSyntaxIsPreferred",
-						Description: "ES2015 module syntax is preferred over namespaces.",
-					})
-				} else {
-					ctx.ReportNode(node, rule.RuleMessage{
-						Id:          "moduleSyntaxIsPreferred",
-						Description: "ES2015 module syntax is preferred over namespaces.",
-					})
-				}
+				// Report the error on the entire node to match column 1 expectations
+				ctx.ReportNode(node, rule.RuleMessage{
+					Id:          "moduleSyntaxIsPreferred",
+					Description: "ES2015 module syntax is preferred over namespaces.",
+				})
 			},
 		}
 	},

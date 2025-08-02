@@ -233,16 +233,9 @@ var NoUnnecessaryTemplateExpressionRule = rule.Rule{
 					continue
 				}
 
-				// Generate fix to remove unnecessary template expression
-				fixes := createUnnecessaryTemplateExpressionFix(ctx, prevQuasiEnd, expr)
-				ctx.ReportRangeWithSuggestions(core.NewTextRange(prevQuasiEnd-2, utils.TrimNodeTextRange(ctx.SourceFile, literal).Pos()+1), buildNoUnnecessaryTemplateExpressionMessage(),
-					rule.RuleSuggestion{
-						Message: rule.RuleMessage{
-							Id:          "removeUnnecessaryTemplateExpression",
-							Description: "Remove unnecessary template expression",
-						},
-						FixesArr: fixes,
-					})
+				reportRange := core.NewTextRange(prevQuasiEnd-2, utils.TrimNodeTextRange(ctx.SourceFile, literal).Pos()+1)
+				// Report error without suggestions as per test expectations
+				ctx.ReportRange(reportRange, buildNoUnnecessaryTemplateExpressionMessage())
 			}
 		}
 

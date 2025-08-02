@@ -111,6 +111,10 @@ func getParameters(node *ast.Node) []*ast.Node {
 		return node.AsSetAccessorDeclaration().Parameters.Nodes
 	case ast.KindFunctionType:
 		return node.AsFunctionTypeNode().Parameters.Nodes
+	case ast.KindCallSignature:
+		return node.AsCallSignatureDeclaration().Parameters.Nodes
+	case ast.KindConstructSignature:
+		return node.AsConstructSignatureDeclaration().Parameters.Nodes
 	default:
 		return nil
 	}
@@ -125,28 +129,40 @@ var MaxParamsRule = rule.Rule{
 		}
 
 		if options != nil {
-			if optsSlice, ok := options.([]interface{}); ok && len(optsSlice) > 0 {
+			var optsMap map[string]interface{}
+			
+			// Handle both direct map format and array format
+			if directMap, ok := options.(map[string]interface{}); ok {
+				optsMap = directMap
+			} else if optsSlice, ok := options.([]interface{}); ok && len(optsSlice) > 0 {
 				// Handle array format like ["error", {max: 4}]
 				if len(optsSlice) > 0 {
-					if optsMap, ok := optsSlice[0].(map[string]interface{}); ok {
-						if maxVal, ok := optsMap["max"].(float64); ok {
-							opts.Max = int(maxVal)
-						}
-						if maximumVal, ok := optsMap["maximum"].(float64); ok {
-							opts.Max = int(maximumVal) // maximum is deprecated alias for max
-						}
-						if countVoidThis, ok := optsMap["countVoidThis"].(bool); ok {
-							opts.CountVoidThis = countVoidThis
-						}
+					if arrayMap, ok := optsSlice[0].(map[string]interface{}); ok {
+						optsMap = arrayMap
 					}
 				}
-			} else if optsMap, ok := options.(map[string]interface{}); ok {
-				if maxVal, ok := optsMap["max"].(float64); ok {
-					opts.Max = int(maxVal)
+			}
+			
+			if optsMap != nil {
+				// Parse max option (support both int and float64)
+				if maxVal, ok := optsMap["max"]; ok {
+					switch v := maxVal.(type) {
+					case float64:
+						opts.Max = int(v)
+					case int:
+						opts.Max = v
+					}
 				}
-				if maximumVal, ok := optsMap["maximum"].(float64); ok {
-					opts.Max = int(maximumVal) // maximum is deprecated alias for max
+				// Parse maximum option (deprecated alias)
+				if maximumVal, ok := optsMap["maximum"]; ok {
+					switch v := maximumVal.(type) {
+					case float64:
+						opts.Max = int(v)
+					case int:
+						opts.Max = v
+					}
 				}
+				// Parse countVoidThis option
 				if countVoidThis, ok := optsMap["countVoidThis"].(bool); ok {
 					opts.CountVoidThis = countVoidThis
 				}
@@ -172,14 +188,16 @@ var MaxParamsRule = rule.Rule{
 		}
 
 		return rule.RuleListeners{
-			ast.KindFunctionDeclaration: checkFunction,
-			ast.KindFunctionExpression:  checkFunction,
-			ast.KindArrowFunction:       checkFunction,
-			ast.KindMethodDeclaration:   checkFunction,
-			ast.KindConstructor:         checkFunction,
-			ast.KindGetAccessor:         checkFunction,
-			ast.KindSetAccessor:         checkFunction,
-			ast.KindFunctionType:        checkFunction,
+			ast.KindFunctionDeclaration:   checkFunction,
+			ast.KindFunctionExpression:    checkFunction,
+			ast.KindArrowFunction:         checkFunction,
+			ast.KindMethodDeclaration:     checkFunction,
+			ast.KindConstructor:           checkFunction,
+			ast.KindGetAccessor:           checkFunction,
+			ast.KindSetAccessor:           checkFunction,
+			ast.KindFunctionType:          checkFunction,
+			ast.KindCallSignature:         checkFunction,
+			ast.KindConstructSignature:    checkFunction,
 		}
 	},
 }

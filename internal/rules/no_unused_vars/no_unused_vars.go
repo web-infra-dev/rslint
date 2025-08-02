@@ -110,44 +110,323 @@ var NoUnusedVarsRule = rule.Rule{
 			}
 		}
 
+		// Use global state to collect all variables and usages
+		variables := make(map[string]*VariableInfo)
+		usages := make(map[string][]*ast.Node)
+		processed := false
+
 		return rule.RuleListeners{
-			// Process everything in the source file visitor
-			ast.KindSourceFile: func(node *ast.Node) {
-				variables := make(map[string]*VariableInfo)
-				usages := make(map[string][]*ast.Node)
-
-				// Collect declarations and usages
-				collectAllNodes(node, variables, usages)
-
-				// Mark variables as used based on usages
-				for varName, usageNodes := range usages {
-					if varInfo, exists := variables[varName]; exists {
-						varInfo.References = usageNodes
-						for _, usage := range usageNodes {
-							if !isTypeOnlyUsage(usage) {
-								varInfo.Used = true
-								break
-							} else {
-								varInfo.OnlyUsedAsType = true
-							}
+			// Collect variable declarations and process immediately
+			ast.KindVariableDeclaration: func(node *ast.Node) {
+				varDecl := node.AsVariableDeclaration()
+				if ast.IsIdentifier(varDecl.Name()) {
+					nameNode := varDecl.Name()
+					name := nameNode.AsIdentifier().Text
+					variables[name] = &VariableInfo{
+						Variable:       nameNode,
+						Used:           false,
+						OnlyUsedAsType: false,
+						References:     []*ast.Node{},
+						Definition:     node,
+					}
+					
+					// Process immediately after adding the variable
+					if !processed {
+						processed = true
+						processUnusedVariables(ctx, opts, variables, usages)
+					}
+				}
+			},
+			
+			// Collect function declarations and process
+			ast.KindFunctionDeclaration: func(node *ast.Node) {
+				funcDecl := node.AsFunctionDeclaration()
+				if funcDecl.Name() != nil && ast.IsIdentifier(funcDecl.Name()) {
+					nameNode := funcDecl.Name()
+					name := nameNode.AsIdentifier().Text
+					variables[name] = &VariableInfo{
+						Variable:       nameNode,
+						Used:           false,
+						OnlyUsedAsType: false,
+						References:     []*ast.Node{},
+						Definition:     node,
+					}
+				}
+				
+				// Process after function declarations too (for standalone functions)
+				if !processed && len(variables) > 0 {
+					processed = true
+					processUnusedVariables(ctx, opts, variables, usages)
+				}
+			},
+			
+			// Collect parameter declarations
+			ast.KindParameter: func(node *ast.Node) {
+				paramDecl := node.AsParameterDeclaration()
+				if ast.IsIdentifier(paramDecl.Name()) {
+					nameNode := paramDecl.Name()
+					name := nameNode.AsIdentifier().Text
+					variables[name] = &VariableInfo{
+						Variable:       nameNode,
+						Used:           false,
+						OnlyUsedAsType: false,
+						References:     []*ast.Node{},
+						Definition:     node,
+					}
+				}
+			},
+			
+			// Collect catch clause variables and process
+			ast.KindCatchClause: func(node *ast.Node) {
+				catchClause := node.AsCatchClause()
+				if catchClause.VariableDeclaration != nil {
+					nameDecl := catchClause.VariableDeclaration
+					if ast.IsIdentifier(nameDecl.Name()) {
+						nameNode := nameDecl.Name()
+						name := nameNode.AsIdentifier().Text
+						variables[name] = &VariableInfo{
+							Variable:       nameNode,
+							Used:           false,
+							OnlyUsedAsType: false,
+							References:     []*ast.Node{},
+							Definition:     nameDecl,
 						}
 					}
 				}
-
-				// Report unused variables
-				for _, varInfo := range variables {
-					if shouldReportVariable(ctx, opts, varInfo, variables) {
-						reportUnusedVariable(ctx, opts, varInfo)
-					}
+			},
+			
+			// Collect identifier usages
+			ast.KindIdentifier: func(node *ast.Node) {
+				// Skip identifiers that are part of declarations
+				if !isPartOfDeclaration(node) {
+					name := node.AsIdentifier().Text
+					usages[name] = append(usages[name], node)
+				}
+			},
+			
+			// Also trigger processing in blocks for cases like try/catch
+			ast.KindBlock: func(node *ast.Node) {
+				if !processed && len(variables) > 0 {
+					processed = true
+					processUnusedVariables(ctx, opts, variables, usages)
+				}
+			},
+			
+			// Process on try statements for catch clauses
+			ast.KindTryStatement: func(node *ast.Node) {
+				if !processed && len(variables) > 0 {
+					processed = true
+					processUnusedVariables(ctx, opts, variables, usages)
 				}
 			},
 		}
 	},
 }
 
-func collectAllNodes(node *ast.Node, variables map[string]*VariableInfo, usages map[string][]*ast.Node) {
-	visited := make(map[*ast.Node]bool)
-	collectAllNodesHelper(node, variables, usages, visited)
+func processUnusedVariables(ctx rule.RuleContext, opts TranslatedOptions, variables map[string]*VariableInfo, usages map[string][]*ast.Node) {
+	// Mark variables as used based on usages
+	for varName, usageNodes := range usages {
+		if varInfo, exists := variables[varName]; exists {
+			varInfo.References = usageNodes
+			for _, usage := range usageNodes {
+				if !isTypeOnlyUsage(usage) {
+					varInfo.Used = true
+					break
+				} else {
+					varInfo.OnlyUsedAsType = true
+				}
+			}
+		}
+	}
+
+	// Report unused variables
+	for _, varInfo := range variables {
+		if shouldReportVariable(ctx, opts, varInfo, variables) {
+			reportUnusedVariable(ctx, opts, varInfo)
+		}
+	}
+}
+
+func collectAllNodesRecursive(node *ast.Node, variables map[string]*VariableInfo, usages map[string][]*ast.Node) {
+	if node == nil {
+		return
+	}
+
+	// Collect declarations
+	switch node.Kind {
+	case ast.KindVariableDeclaration:
+		varDecl := node.AsVariableDeclaration()
+		if ast.IsIdentifier(varDecl.Name()) {
+			nameNode := varDecl.Name()
+			name := nameNode.AsIdentifier().Text
+			variables[name] = &VariableInfo{
+				Variable:       nameNode,
+				Used:           false,
+				OnlyUsedAsType: false,
+				References:     []*ast.Node{},
+				Definition:     node,
+			}
+		}
+	case ast.KindFunctionDeclaration:
+		funcDecl := node.AsFunctionDeclaration()
+		if funcDecl.Name() != nil && ast.IsIdentifier(funcDecl.Name()) {
+			nameNode := funcDecl.Name()
+			name := nameNode.AsIdentifier().Text
+			variables[name] = &VariableInfo{
+				Variable:       nameNode,
+				Used:           false,
+				OnlyUsedAsType: false,
+				References:     []*ast.Node{},
+				Definition:     node,
+			}
+		}
+	case ast.KindParameter:
+		paramDecl := node.AsParameterDeclaration()
+		if ast.IsIdentifier(paramDecl.Name()) {
+			nameNode := paramDecl.Name()
+			name := nameNode.AsIdentifier().Text
+			variables[name] = &VariableInfo{
+				Variable:       nameNode,
+				Used:           false,
+				OnlyUsedAsType: false,
+				References:     []*ast.Node{},
+				Definition:     node,
+			}
+		}
+	case ast.KindCatchClause:
+		catchClause := node.AsCatchClause()
+		if catchClause.VariableDeclaration != nil {
+			nameDecl := catchClause.VariableDeclaration
+			if ast.IsIdentifier(nameDecl.Name()) {
+				nameNode := nameDecl.Name()
+				name := nameNode.AsIdentifier().Text
+				variables[name] = &VariableInfo{
+					Variable:       nameNode,
+					Used:           false,
+					OnlyUsedAsType: false,
+					References:     []*ast.Node{},
+					Definition:     nameDecl,
+				}
+			}
+		}
+	case ast.KindIdentifier:
+		// Collect usage
+		if !isPartOfDeclaration(node) {
+			name := node.AsIdentifier().Text
+			usages[name] = append(usages[name], node)
+		}
+	}
+
+	// Recursively traverse all children 
+	traverseAllChildren(node, func(child *ast.Node) {
+		collectAllNodesRecursive(child, variables, usages)
+	})
+}
+
+func traverseAllChildren(node *ast.Node, callback func(*ast.Node)) {
+	if node == nil {
+		return
+	}
+
+	// Traverse all possible child nodes based on the node type
+	switch node.Kind {
+	case ast.KindSourceFile:
+		sourceFile := node.AsSourceFile()
+		for _, stmt := range sourceFile.Statements.Nodes {
+			callback(stmt)
+		}
+	case ast.KindVariableStatement:
+		varStmt := node.AsVariableStatement()
+		if varStmt.DeclarationList != nil {
+			callback(varStmt.DeclarationList)
+		}
+	case ast.KindVariableDeclarationList:
+		declList := node.AsVariableDeclarationList()
+		for _, decl := range declList.Declarations.Nodes {
+			callback(decl)
+		}
+	case ast.KindVariableDeclaration:
+		varDecl := node.AsVariableDeclaration()
+		if varDecl.Name() != nil {
+			callback(varDecl.Name())
+		}
+		if varDecl.Initializer != nil {
+			callback(varDecl.Initializer)
+		}
+	case ast.KindFunctionDeclaration:
+		funcDecl := node.AsFunctionDeclaration()
+		if funcDecl.Name() != nil {
+			callback(funcDecl.Name())
+		}
+		if funcDecl.Parameters != nil {
+			for _, param := range funcDecl.Parameters.Nodes {
+				callback(param)
+			}
+		}
+		if funcDecl.Body != nil {
+			callback(funcDecl.Body)
+		}
+	case ast.KindParameter:
+		paramDecl := node.AsParameterDeclaration()
+		if paramDecl.Name() != nil {
+			callback(paramDecl.Name())
+		}
+	case ast.KindBlock:
+		block := node.AsBlock()
+		for _, stmt := range block.Statements.Nodes {
+			callback(stmt)
+		}
+	case ast.KindExpressionStatement:
+		exprStmt := node.AsExpressionStatement()
+		if exprStmt.Expression != nil {
+			callback(exprStmt.Expression)
+		}
+	case ast.KindCallExpression:
+		callExpr := node.AsCallExpression()
+		if callExpr.Expression != nil {
+			callback(callExpr.Expression)
+		}
+		if callExpr.Arguments != nil {
+			for _, arg := range callExpr.Arguments.Nodes {
+				callback(arg)
+			}
+		}
+	case ast.KindPropertyAccessExpression:
+		propAccess := node.AsPropertyAccessExpression()
+		if propAccess.Expression != nil {
+			callback(propAccess.Expression)
+		}
+		if propAccess.Name() != nil {
+			callback(propAccess.Name())
+		}
+	case ast.KindTryStatement:
+		tryStmt := node.AsTryStatement()
+		if tryStmt.TryBlock != nil {
+			callback(tryStmt.TryBlock)
+		}
+		if tryStmt.CatchClause != nil {
+			callback(tryStmt.CatchClause)
+		}
+		if tryStmt.FinallyBlock != nil {
+			callback(tryStmt.FinallyBlock)
+		}
+	case ast.KindCatchClause:
+		catchClause := node.AsCatchClause()
+		if catchClause.VariableDeclaration != nil {
+			callback(catchClause.VariableDeclaration)
+		}
+		if catchClause.Block != nil {
+			callback(catchClause.Block)
+		}
+	case ast.KindBinaryExpression:
+		binExpr := node.AsBinaryExpression()
+		if binExpr.Left != nil {
+			callback(binExpr.Left)
+		}
+		if binExpr.Right != nil {
+			callback(binExpr.Right)
+		}
+	}
 }
 
 func collectAllNodesHelper(node *ast.Node, variables map[string]*VariableInfo, usages map[string][]*ast.Node, visited map[*ast.Node]bool) {
