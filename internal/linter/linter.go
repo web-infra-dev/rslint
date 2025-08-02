@@ -2,6 +2,8 @@ package linter
 
 import (
 	"context"
+	"strings"
+	"sync/atomic"
 
 	"github.com/typescript-eslint/rslint/internal/rule"
 	"github.com/typescript-eslint/rslint/internal/utils"
@@ -17,170 +19,191 @@ type ConfiguredRule struct {
 	Run      func(ctx rule.RuleContext) rule.RuleListeners
 }
 
-func RunLinter(programs []*compiler.Program, singleThreaded bool, files []*ast.SourceFile, getRulesForFile func(sourceFile *ast.SourceFile) []ConfiguredRule, onDiagnostic func(diagnostic rule.RuleDiagnostic)) error {
-
-	queue := make(chan *ast.SourceFile, len(files))
-	for _, file := range files {
-		queue <- file
-	}
-	close(queue)
+// when allowedFiles is passed as nil which means all files are allowed
+// when allowedFiles is passed as slice, only files in the slice are allowed
+func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []*ast.SourceFile, getRulesForFile func(sourceFile *ast.SourceFile) []ConfiguredRule, onDiagnostic func(diagnostic rule.RuleDiagnostic)) (int32, error) {
 
 	wg := core.NewWorkGroup(singleThreaded)
+
+	var lintedFileCount atomic.Int32
 	for _, program := range programs {
-		checkers, done := program.GetTypeCheckers(context.Background())
+		checker, done := program.GetTypeChecker(context.Background())
 		defer done()
-		for _, checker := range checkers {
+		{
+
 			wg.Queue(func() {
-				registeredListeners := make(map[ast.Kind][](func(node *ast.Node)), 20)
+				for _, file := range program.GetSourceFiles() {
 
-				for file := range queue {
-					rules := getRulesForFile(file)
-					for _, r := range rules {
-						ctx := rule.RuleContext{
-							SourceFile:  file,
-							Program:     program,
-							TypeChecker: checker,
-							ReportRange: func(textRange core.TextRange, msg rule.RuleMessage) {
-								onDiagnostic(rule.RuleDiagnostic{
-									RuleName:   r.Name,
-									Range:      textRange,
-									Message:    msg,
-									SourceFile: file,
-									Severity:   r.Severity,
-								})
-							},
-							ReportRangeWithSuggestions: func(textRange core.TextRange, msg rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
-								onDiagnostic(rule.RuleDiagnostic{
-									RuleName:    r.Name,
-									Range:       textRange,
-									Message:     msg,
-									Suggestions: &suggestions,
-									SourceFile:  file,
-									Severity:    r.Severity,
-								})
-							},
-							ReportNode: func(node *ast.Node, msg rule.RuleMessage) {
-								onDiagnostic(rule.RuleDiagnostic{
-									RuleName:   r.Name,
-									Range:      utils.TrimNodeTextRange(file, node),
-									Message:    msg,
-									SourceFile: file,
-									Severity:   r.Severity,
-								})
-							},
-							ReportNodeWithFixes: func(node *ast.Node, msg rule.RuleMessage, fixes ...rule.RuleFix) {
-								onDiagnostic(rule.RuleDiagnostic{
-									RuleName:   r.Name,
-									Range:      utils.TrimNodeTextRange(file, node),
-									Message:    msg,
-									FixesPtr:   &fixes,
-									SourceFile: file,
-									Severity:   r.Severity,
-								})
-							},
-
-							ReportNodeWithSuggestions: func(node *ast.Node, msg rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
-								onDiagnostic(rule.RuleDiagnostic{
-									RuleName:    r.Name,
-									Range:       utils.TrimNodeTextRange(file, node),
-									Message:     msg,
-									Suggestions: &suggestions,
-									SourceFile:  file,
-									Severity:    r.Severity,
-								})
-							},
-						}
-
-						for kind, listener := range r.Run(ctx) {
-							listeners, ok := registeredListeners[kind]
-							if !ok {
-								listeners = make([](func(node *ast.Node)), 0, len(rules))
+					p := string(file.Path())
+					// skip lint node_modules and bundled files
+					// FIXME: we may have better api to tell whether a file is a bundled file or not
+					if strings.Contains(p, "/node_modules/") || strings.Contains(p, "bundled:") {
+						continue
+					}
+					// only lint allowedFiles if allowedFiles is not empty
+					if allowFiles != nil {
+						found := false
+						for _, f := range allowFiles {
+							if f.Path() == file.Path() {
+								found = true
+								break
 							}
-							registeredListeners[kind] = append(listeners, listener)
+						}
+						if !found {
+							continue
 						}
 					}
+					lintedFileCount.Add(1)
+					registeredListeners := make(map[ast.Kind][](func(node *ast.Node)), 20)
+					{
+						rules := getRulesForFile(file)
+						for _, r := range rules {
+							ctx := rule.RuleContext{
+								SourceFile:  file,
+								Program:     program,
+								TypeChecker: checker,
+								ReportRange: func(textRange core.TextRange, msg rule.RuleMessage) {
+									onDiagnostic(rule.RuleDiagnostic{
+										RuleName:   r.Name,
+										Range:      textRange,
+										Message:    msg,
+										SourceFile: file,
+										Severity:   r.Severity,
+									})
+								},
+								ReportRangeWithSuggestions: func(textRange core.TextRange, msg rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
+									onDiagnostic(rule.RuleDiagnostic{
+										RuleName:    r.Name,
+										Range:       textRange,
+										Message:     msg,
+										Suggestions: &suggestions,
+										SourceFile:  file,
+										Severity:    r.Severity,
+									})
+								},
+								ReportNode: func(node *ast.Node, msg rule.RuleMessage) {
+									onDiagnostic(rule.RuleDiagnostic{
+										RuleName:   r.Name,
+										Range:      utils.TrimNodeTextRange(file, node),
+										Message:    msg,
+										SourceFile: file,
+										Severity:   r.Severity,
+									})
+								},
+								ReportNodeWithFixes: func(node *ast.Node, msg rule.RuleMessage, fixes ...rule.RuleFix) {
+									onDiagnostic(rule.RuleDiagnostic{
+										RuleName:   r.Name,
+										Range:      utils.TrimNodeTextRange(file, node),
+										Message:    msg,
+										FixesPtr:   &fixes,
+										SourceFile: file,
+										Severity:   r.Severity,
+									})
+								},
 
-					runListeners := func(kind ast.Kind, node *ast.Node) {
-						if listeners, ok := registeredListeners[kind]; ok {
-							for _, listener := range listeners {
-								listener(node)
+								ReportNodeWithSuggestions: func(node *ast.Node, msg rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
+									onDiagnostic(rule.RuleDiagnostic{
+										RuleName:    r.Name,
+										Range:       utils.TrimNodeTextRange(file, node),
+										Message:     msg,
+										Suggestions: &suggestions,
+										SourceFile:  file,
+										Severity:    r.Severity,
+									})
+								},
+							}
+
+							for kind, listener := range r.Run(ctx) {
+								listeners, ok := registeredListeners[kind]
+								if !ok {
+									listeners = make([](func(node *ast.Node)), 0, len(rules))
+								}
+								registeredListeners[kind] = append(listeners, listener)
 							}
 						}
-					}
 
-					/* convert.ts -> allowPattern:
-					catch name
-					variabledeclaration name
-					forinstatement initializer
-					forofstatement initializer
-					(propagation) allowPattern > arrayliteralexpression elements
-					(propagation) allowPattern > objectliteralexpression properties
-					(propagation) allowPattern > spreadassignment,spreadelement expression
-					(propagation) allowPattern > propertyassignment value
-					arraybindingpattern elements
-					objectbindingpattern elements
-					(init) binaryexpression(with '=' operator') left
-					*/
-
-					var childVisitor ast.Visitor
-					var patternVisitor func(node *ast.Node)
-					patternVisitor = func(node *ast.Node) {
-						runListeners(node.Kind, node)
-						kind := rule.ListenerOnAllowPattern(node.Kind)
-						runListeners(kind, node)
-
-						switch node.Kind {
-						case ast.KindArrayLiteralExpression:
-							for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
-								patternVisitor(element)
+						runListeners := func(kind ast.Kind, node *ast.Node) {
+							if listeners, ok := registeredListeners[kind]; ok {
+								for _, listener := range listeners {
+									listener(node)
+								}
 							}
-						case ast.KindObjectLiteralExpression:
-							for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
-								patternVisitor(property)
-							}
-						case ast.KindSpreadElement, ast.KindSpreadAssignment:
-							patternVisitor(node.Expression())
-						case ast.KindPropertyAssignment:
-							patternVisitor(node.Initializer())
-						default:
-							node.ForEachChild(childVisitor)
 						}
 
-						runListeners(rule.ListenerOnExit(kind), node)
-						runListeners(rule.ListenerOnExit(node.Kind), node)
-					}
-					childVisitor = func(node *ast.Node) bool {
-						runListeners(node.Kind, node)
+						/* convert.ts -> allowPattern:
+						catch name
+						variabledeclaration name
+						forinstatement initializer
+						forofstatement initializer
+						(propagation) allowPattern > arrayliteralexpression elements
+						(propagation) allowPattern > objectliteralexpression properties
+						(propagation) allowPattern > spreadassignment,spreadelement expression
+						(propagation) allowPattern > propertyassignment value
+						arraybindingpattern elements
+						objectbindingpattern elements
+						(init) binaryexpression(with '=' operator') left
+						*/
 
-						switch node.Kind {
-						case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
-							kind := rule.ListenerOnNotAllowPattern(node.Kind)
+						var childVisitor ast.Visitor
+						var patternVisitor func(node *ast.Node)
+						patternVisitor = func(node *ast.Node) {
+							runListeners(node.Kind, node)
+							kind := rule.ListenerOnAllowPattern(node.Kind)
 							runListeners(kind, node)
-							node.ForEachChild(childVisitor)
-							runListeners(rule.ListenerOnExit(kind), node)
-						default:
-							if ast.IsAssignmentExpression(node, true) {
-								expr := node.AsBinaryExpression()
-								patternVisitor(expr.Left)
-								childVisitor(expr.OperatorToken)
-								childVisitor(expr.Right)
-							} else {
+
+							switch node.Kind {
+							case ast.KindArrayLiteralExpression:
+								for _, element := range node.AsArrayLiteralExpression().Elements.Nodes {
+									patternVisitor(element)
+								}
+							case ast.KindObjectLiteralExpression:
+								for _, property := range node.AsObjectLiteralExpression().Properties.Nodes {
+									patternVisitor(property)
+								}
+							case ast.KindSpreadElement, ast.KindSpreadAssignment:
+								patternVisitor(node.Expression())
+							case ast.KindPropertyAssignment:
+								patternVisitor(node.Initializer())
+							default:
 								node.ForEachChild(childVisitor)
 							}
+
+							runListeners(rule.ListenerOnExit(kind), node)
+							runListeners(rule.ListenerOnExit(node.Kind), node)
 						}
+						childVisitor = func(node *ast.Node) bool {
+							runListeners(node.Kind, node)
 
-						runListeners(rule.ListenerOnExit(node.Kind), node)
+							switch node.Kind {
+							case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression:
+								kind := rule.ListenerOnNotAllowPattern(node.Kind)
+								runListeners(kind, node)
+								node.ForEachChild(childVisitor)
+								runListeners(rule.ListenerOnExit(kind), node)
+							default:
+								if ast.IsAssignmentExpression(node, true) {
+									expr := node.AsBinaryExpression()
+									patternVisitor(expr.Left)
+									childVisitor(expr.OperatorToken)
+									childVisitor(expr.Right)
+								} else {
+									node.ForEachChild(childVisitor)
+								}
+							}
 
-						return false
+							runListeners(rule.ListenerOnExit(node.Kind), node)
+
+							return false
+						}
+						file.Node.ForEachChild(childVisitor)
+						clear(registeredListeners)
 					}
-					// Visit the SourceFile node itself first
-					childVisitor(&file.Node)
-					clear(registeredListeners)
+
 				}
 			})
 		}
 
 	}
 	wg.RunAndWait()
-	return nil
+	return lintedFileCount.Load(), nil
 }
