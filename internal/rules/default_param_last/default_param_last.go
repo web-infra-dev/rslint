@@ -28,7 +28,7 @@ func isDefaultParam(node *ast.Node) bool {
 	if node == nil || !ast.IsParameter(node) {
 		return false
 	}
-	
+
 	param := node.AsParameterDeclaration()
 	return param.Initializer != nil
 }
@@ -89,7 +89,7 @@ func checkDefaultParamLast(ctx rule.RuleContext, functionNode *ast.Node) {
 
 	hasSeenPlainParam := false
 	var violatingParams []*ast.Node
-	
+
 	// Iterate through parameters from right to left to find violations
 	for i := len(params) - 1; i >= 0; i-- {
 		current := params[i]
@@ -106,7 +106,7 @@ func checkDefaultParamLast(ctx rule.RuleContext, functionNode *ast.Node) {
 			violatingParams = append(violatingParams, current)
 		}
 	}
-	
+
 	// Report violations in forward order (left to right)
 	for i := len(violatingParams) - 1; i >= 0; i-- {
 		ctx.ReportNode(violatingParams[i], shouldBeLastMessage())

@@ -33,7 +33,7 @@ var NoLossOfPrecisionRule = rule.Rule{
 				// Remove underscores (numeric separators)
 				cleanText := strings.ReplaceAll(text, "_", "")
 
-				// Parse the numeric value - since TypeScript has already converted 
+				// Parse the numeric value - since TypeScript has already converted
 				// hex/binary/octal to decimal in the text, just parse as float
 				value, err := strconv.ParseFloat(cleanText, 64)
 				if err != nil {
@@ -58,17 +58,17 @@ func isLossOfPrecision(value float64, originalText string, tokenFlags ast.TokenF
 	}
 
 	const maxSafeInteger = 9007199254740991 // 2^53 - 1
-	
+
 	// Remove underscores for parsing
 	cleanText := strings.ReplaceAll(originalText, "_", "")
-	
+
 	// Since TypeScript has already converted the literal to decimal format in the text,
 	// we can directly check if the value exceeds MAX_SAFE_INTEGER for integer literals
 	// or use other precision loss detection methods
-	
+
 	if tokenFlags&ast.TokenFlagsScientific != 0 || strings.Contains(cleanText, "e") || strings.Contains(cleanText, "E") {
 		// Scientific notation
-		
+
 		// If the tokenFlags indicate scientific notation was in the original source,
 		// check if it represents a precise integer that exceeds MAX_SAFE_INTEGER
 		if tokenFlags&ast.TokenFlagsScientific != 0 {
@@ -94,6 +94,6 @@ func isLossOfPrecision(value float64, originalText string, tokenFlags ast.TokenF
 			}
 		}
 	}
-	
+
 	return false
 }

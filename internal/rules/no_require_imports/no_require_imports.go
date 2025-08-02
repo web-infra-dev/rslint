@@ -44,7 +44,7 @@ func isGlobalRequire(ctx rule.RuleContext, node *ast.Node) bool {
 	if sourceFile == nil {
 		return true
 	}
-	
+
 	// Check if 'require' is defined anywhere in the current scope context
 	return !isRequireLocallyDefined(sourceFile, node)
 }
@@ -53,7 +53,7 @@ func isGlobalRequire(ctx rule.RuleContext, node *ast.Node) bool {
 func isRequireLocallyDefined(sourceFile *ast.SourceFile, callNode *ast.Node) bool {
 	// Start from the call node and walk up through containing scopes
 	currentNode := callNode
-	
+
 	for currentNode != nil {
 		// Check the immediate parent context for local require definitions
 		if hasLocalRequireInContext(currentNode) {
@@ -61,7 +61,7 @@ func isRequireLocallyDefined(sourceFile *ast.SourceFile, callNode *ast.Node) boo
 		}
 		currentNode = currentNode.Parent
 	}
-	
+
 	// Also check the top-level statements
 	return hasLocalRequireInStatements(sourceFile.Statements)
 }
@@ -71,9 +71,9 @@ func hasLocalRequireInContext(node *ast.Node) bool {
 	if node == nil || node.Parent == nil {
 		return false
 	}
-	
+
 	parent := node.Parent
-	
+
 	// Check for variable statements that declare 'require'
 	switch parent.Kind {
 	case ast.KindVariableStatement:
@@ -96,7 +96,7 @@ func hasLocalRequireInContext(node *ast.Node) bool {
 		sourceFile := parent.AsSourceFile()
 		return hasLocalRequireInStatements(sourceFile.Statements)
 	}
-	
+
 	return false
 }
 
@@ -105,7 +105,7 @@ func hasLocalRequireInStatements(statements *ast.NodeList) bool {
 	if statements == nil {
 		return false
 	}
-	
+
 	for _, stmt := range statements.Nodes {
 		if hasRequireDeclaration(stmt) {
 			return true
@@ -142,12 +142,12 @@ var NoRequireImportsRule = rule.Rule{
 			Allow:         []string{},
 			AllowAsImport: false,
 		}
-		
+
 		// Parse options with dual-format support (handles both array and object formats)
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -155,7 +155,7 @@ var NoRequireImportsRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if allow, ok := optsMap["allow"].([]interface{}); ok {
 					for _, pattern := range allow {
@@ -190,10 +190,10 @@ var NoRequireImportsRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				callExpr := node.AsCallExpression()
-				
+
 				// Check if this is a require call or require?.() call
 				var isRequireCall bool
-				
+
 				if ast.IsIdentifier(callExpr.Expression) {
 					identifier := callExpr.Expression.AsIdentifier()
 					if identifier.Text == "require" {
@@ -209,16 +209,16 @@ var NoRequireImportsRule = rule.Rule{
 						}
 					}
 				}
-				
+
 				if !isRequireCall {
 					return
 				}
-				
+
 				// Check if it's the global require
 				if !isGlobalRequire(ctx, node) {
 					return
 				}
-				
+
 				// Check if first argument matches allowed patterns
 				if len(callExpr.Arguments.Nodes) > 0 && isStringOrTemplateLiteral(callExpr.Arguments.Nodes[0]) {
 					if argValue, ok := getStaticStringValue(callExpr.Arguments.Nodes[0]); ok {
@@ -227,17 +227,17 @@ var NoRequireImportsRule = rule.Rule{
 						}
 					}
 				}
-				
+
 				// Report the error
 				ctx.ReportNode(node, rule.RuleMessage{
 					Id:          "noRequireImports",
 					Description: "A `require()` style import is forbidden.",
 				})
 			},
-			
+
 			ast.KindExternalModuleReference: func(node *ast.Node) {
 				extModRef := node.AsExternalModuleReference()
-				
+
 				// Check if expression matches allowed patterns
 				if isStringOrTemplateLiteral(extModRef.Expression) {
 					if argValue, ok := getStaticStringValue(extModRef.Expression); ok {
@@ -246,13 +246,13 @@ var NoRequireImportsRule = rule.Rule{
 						}
 					}
 				}
-				
+
 				// Check if allowAsImport is true and parent is TSImportEqualsDeclaration
 				if opts.AllowAsImport && node.Parent != nil &&
 					node.Parent.Kind == ast.KindImportEqualsDeclaration {
 					return
 				}
-				
+
 				// Report the error
 				ctx.ReportNode(node, rule.RuleMessage{
 					Id:          "noRequireImports",

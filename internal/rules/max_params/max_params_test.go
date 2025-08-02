@@ -45,21 +45,21 @@ class Foo {
 
 	invalidTestCases := []rule_tester.InvalidTestCase{
 		{
-			Code: "function foo(a, b, c, d) {}",
+			Code:   "function foo(a, b, c, d) {}",
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Line: 1, Column: 1}},
 		},
 		{
-			Code: "const foo = function (a, b, c, d) {};",
+			Code:   "const foo = function (a, b, c, d) {};",
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Line: 1, Column: 13}},
 		},
 		{
-			Code: "const foo = (a, b, c, d) => {};",
+			Code:   "const foo = (a, b, c, d) => {};",
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Line: 1, Column: 13}},
 		},
 		{
-			Code: "const foo = a => {};",
+			Code:    "const foo = a => {};",
 			Options: map[string]interface{}{"max": 0},
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Line: 1, Column: 13}},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Line: 1, Column: 13}},
 		},
 		{
 			Code: `
@@ -74,7 +74,7 @@ class Foo {
   method(this: void, a) {}
 }`,
 			Options: map[string]interface{}{"countVoidThis": true, "max": 1},
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Line: 3, Column: 3}},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Line: 3, Column: 3}},
 		},
 		{
 			Code: `
@@ -84,14 +84,14 @@ class Foo {
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Line: 3, Column: 3}},
 		},
 		{
-			Code: `declare function makeDate(m: number, d: number, y: number): Date;`,
+			Code:    `declare function makeDate(m: number, d: number, y: number): Date;`,
 			Options: map[string]interface{}{"max": 1},
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Line: 1, Column: 1}},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Line: 1, Column: 1}},
 		},
 		{
-			Code: `type sum = (a: number, b: number) => number;`,
+			Code:    `type sum = (a: number, b: number) => number;`,
 			Options: map[string]interface{}{"max": 1},
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Line: 1, Column: 12}},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "exceed", Line: 1, Column: 12}},
 		},
 	}
 

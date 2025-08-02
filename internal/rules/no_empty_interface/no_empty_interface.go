@@ -23,7 +23,7 @@ var NoEmptyInterfaceRule = rule.Rule{
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -31,7 +31,7 @@ var NoEmptyInterfaceRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if allowSingleExtends, ok := optsMap["allowSingleExtends"].(bool); ok {
 					opts.AllowSingleExtends = allowSingleExtends
@@ -42,7 +42,7 @@ var NoEmptyInterfaceRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindInterfaceDeclaration: func(node *ast.Node) {
 				interfaceDecl := node.AsInterfaceDeclaration()
-				
+
 				// Check if interface has members
 				if interfaceDecl.Members != nil && len(interfaceDecl.Members.Nodes) > 0 {
 					// interface contains members --> Nothing to report
@@ -98,13 +98,13 @@ var NoEmptyInterfaceRule = rule.Rule{
 							if parent.Kind == ast.KindModuleDeclaration {
 								moduleDecl := parent.AsModuleDeclaration()
 								modifiers := moduleDecl.Modifiers()
-							if modifiers != nil {
-								for _, modifier := range modifiers.Nodes {
-									if modifier.Kind == ast.KindDeclareKeyword {
-										isInAmbientDeclaration = true
-										break
+								if modifiers != nil {
+									for _, modifier := range modifiers.Nodes {
+										if modifier.Kind == ast.KindDeclareKeyword {
+											isInAmbientDeclaration = true
+											break
+										}
 									}
-								}
 								}
 							}
 							if isInAmbientDeclaration {
@@ -118,20 +118,20 @@ var NoEmptyInterfaceRule = rule.Rule{
 					// Extract interface name
 					nameRange := utils.TrimNodeTextRange(ctx.SourceFile, interfaceDecl.Name())
 					nameText := string(ctx.SourceFile.Text()[nameRange.Pos():nameRange.End()])
-					
+
 					// Extract type parameters if present
-			var typeParamsText string
-			if interfaceDecl.TypeParameters != nil && len(interfaceDecl.TypeParameters.Nodes) > 0 {
-				// Create text range for the entire type parameters list
-				firstParam := interfaceDecl.TypeParameters.Nodes[0]
-				lastParam := interfaceDecl.TypeParameters.Nodes[len(interfaceDecl.TypeParameters.Nodes)-1]
-				firstRange := utils.TrimNodeTextRange(ctx.SourceFile, firstParam)
-				lastRange := utils.TrimNodeTextRange(ctx.SourceFile, lastParam)
-				typeParamsRange := firstRange.WithEnd(lastRange.End())
-				// Include the angle brackets
-				typeParamsRange = typeParamsRange.WithPos(typeParamsRange.Pos() - 1).WithEnd(typeParamsRange.End() + 1)
-				typeParamsText = string(ctx.SourceFile.Text()[typeParamsRange.Pos():typeParamsRange.End()])
-			}
+					var typeParamsText string
+					if interfaceDecl.TypeParameters != nil && len(interfaceDecl.TypeParameters.Nodes) > 0 {
+						// Create text range for the entire type parameters list
+						firstParam := interfaceDecl.TypeParameters.Nodes[0]
+						lastParam := interfaceDecl.TypeParameters.Nodes[len(interfaceDecl.TypeParameters.Nodes)-1]
+						firstRange := utils.TrimNodeTextRange(ctx.SourceFile, firstParam)
+						lastRange := utils.TrimNodeTextRange(ctx.SourceFile, lastParam)
+						typeParamsRange := firstRange.WithEnd(lastRange.End())
+						// Include the angle brackets
+						typeParamsRange = typeParamsRange.WithPos(typeParamsRange.Pos() - 1).WithEnd(typeParamsRange.End() + 1)
+						typeParamsText = string(ctx.SourceFile.Text()[typeParamsRange.Pos():typeParamsRange.End()])
+					}
 
 					extendedTypeRange := utils.TrimNodeTextRange(ctx.SourceFile, extendClause.Types.Nodes[0])
 					extendedTypeText := string(ctx.SourceFile.Text()[extendedTypeRange.Pos():extendedTypeRange.End()])

@@ -34,7 +34,7 @@ var DotNotationRule = rule.Rule{
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -42,7 +42,7 @@ var DotNotationRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if v, ok := optsMap["allowKeywords"].(bool); ok {
 					opts.AllowKeywords = v
@@ -169,40 +169,40 @@ func checkPropertyAccessKeywords(ctx rule.RuleContext, node *ast.Node) {
 
 func shouldAllowBracketNotation(ctx rule.RuleContext, node *ast.Node, propertyName string, opts DotNotationOptions, allowIndexSignaturePropertyAccess bool) bool {
 	// Enhanced implementation using TypeScript type checker for accurate property analysis
-	
+
 	// Get the object being accessed
 	elementAccess := node.AsElementAccessExpression()
 	if elementAccess == nil || elementAccess.Expression == nil {
 		return false
 	}
-	
+
 	// Get the type of the object being accessed
 	objectType := ctx.TypeChecker.GetTypeAtLocation(elementAccess.Expression)
 	if objectType == nil {
 		return false
 	}
-	
+
 	// If allowPrivateClassPropertyAccess is true, check for actual private properties
 	if opts.AllowPrivateClassPropertyAccess {
 		if isPrivateProperty(ctx, objectType, propertyName) {
 			return true
 		}
 	}
-	
-	// If allowProtectedClassPropertyAccess is true, check for actual protected properties  
+
+	// If allowProtectedClassPropertyAccess is true, check for actual protected properties
 	if opts.AllowProtectedClassPropertyAccess {
 		if isProtectedProperty(ctx, objectType, propertyName) {
 			return true
 		}
 	}
-	
+
 	// If allowIndexSignaturePropertyAccess is true, check for actual index signatures
 	if allowIndexSignaturePropertyAccess {
 		if hasIndexSignature(ctx, objectType) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -211,13 +211,13 @@ func isPrivateProperty(ctx rule.RuleContext, objectType *checker.Type, propertyN
 	if objectType == nil {
 		return false
 	}
-	
+
 	// Get the property symbol from the type
 	symbol := ctx.TypeChecker.GetPropertyOfType(objectType, propertyName)
 	if symbol == nil {
 		return false
 	}
-	
+
 	// Check if any of the symbol's declarations have private modifier
 	if symbol.Declarations != nil {
 		for _, decl := range symbol.Declarations {
@@ -226,7 +226,7 @@ func isPrivateProperty(ctx rule.RuleContext, objectType *checker.Type, propertyN
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -235,13 +235,13 @@ func isProtectedProperty(ctx rule.RuleContext, objectType *checker.Type, propert
 	if objectType == nil {
 		return false
 	}
-	
+
 	// Get the property symbol from the type
 	symbol := ctx.TypeChecker.GetPropertyOfType(objectType, propertyName)
 	if symbol == nil {
 		return false
 	}
-	
+
 	// Check if any of the symbol's declarations have protected modifier
 	if symbol.Declarations != nil {
 		for _, decl := range symbol.Declarations {
@@ -250,7 +250,7 @@ func isProtectedProperty(ctx rule.RuleContext, objectType *checker.Type, propert
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -259,13 +259,13 @@ func hasIndexSignature(ctx rule.RuleContext, objectType *checker.Type) bool {
 	if objectType == nil {
 		return false
 	}
-	
+
 	// Check for string index signature
 	stringIndexType := ctx.TypeChecker.GetStringIndexType(objectType)
 	if stringIndexType != nil {
 		return true
 	}
-	
+
 	// Check for number index signature
 	numberIndexType := ctx.TypeChecker.GetNumberIndexType(objectType)
 	return numberIndexType != nil
@@ -273,11 +273,11 @@ func hasIndexSignature(ctx rule.RuleContext, objectType *checker.Type) bool {
 
 func createFix(ctx rule.RuleContext, node *ast.Node, propertyName string) rule.RuleFix {
 	elementAccess := node.AsElementAccessExpression()
-	
+
 	// Check for comments that would prevent fixing
 	start := elementAccess.Expression.End()
 	end := node.End()
-	
+
 	commentRange := core.NewTextRange(start, end)
 	if utils.HasCommentsInRange(ctx.SourceFile, commentRange) {
 		return rule.RuleFix{}
@@ -285,20 +285,20 @@ func createFix(ctx rule.RuleContext, node *ast.Node, propertyName string) rule.R
 
 	// Create the fix text
 	fixText := "." + propertyName
-	
+
 	return rule.RuleFix{
 		Range: core.NewTextRange(elementAccess.Expression.End(), node.End()),
-		Text: fixText,
+		Text:  fixText,
 	}
 }
 
 func createBracketFix(ctx rule.RuleContext, node *ast.Node, propertyName string) rule.RuleFix {
 	propertyAccess := node.AsPropertyAccessExpression()
-	
+
 	// Check for comments that would prevent fixing
 	start := propertyAccess.Expression.End()
 	end := node.End()
-	
+
 	commentRange := core.NewTextRange(start, end)
 	if utils.HasCommentsInRange(ctx.SourceFile, commentRange) {
 		return rule.RuleFix{}
@@ -312,10 +312,10 @@ func createBracketFix(ctx rule.RuleContext, node *ast.Node, propertyName string)
 
 	// Create the bracket notation fix
 	fixText := fmt.Sprintf(`["%s"]`, propertyName)
-	
+
 	return rule.RuleFix{
 		Range: core.NewTextRange(propertyAccess.Expression.End(), node.End()),
-		Text: fixText,
+		Text:  fixText,
 	}
 }
 
@@ -351,53 +351,53 @@ func isValidIdentifierName(name string) bool {
 func isReservedWord(word string) bool {
 	// ES reserved words
 	reservedWords := map[string]bool{
-		"break":       true,
-		"case":        true,
-		"catch":       true,
-		"class":       true,
-		"const":       true,
-		"continue":    true,
-		"debugger":    true,
-		"default":     true,
-		"delete":      true,
-		"do":          true,
-		"else":        true,
-		"enum":        true,
-		"export":      true,
-		"extends":     true,
-		"false":       true,
-		"finally":     true,
-		"for":         true,
-		"function":    true,
-		"if":          true,
-		"import":      true,
-		"in":          true,
-		"instanceof":  true,
-		"new":         true,
-		"null":        true,
-		"return":      true,
-		"super":       true,
-		"switch":      true,
-		"this":        true,
-		"throw":       true,
-		"true":        true,
-		"try":         true,
-		"typeof":      true,
-		"var":         true,
-		"void":        true,
-		"while":       true,
-		"with":        true,
-		"yield":       true,
+		"break":      true,
+		"case":       true,
+		"catch":      true,
+		"class":      true,
+		"const":      true,
+		"continue":   true,
+		"debugger":   true,
+		"default":    true,
+		"delete":     true,
+		"do":         true,
+		"else":       true,
+		"enum":       true,
+		"export":     true,
+		"extends":    true,
+		"false":      true,
+		"finally":    true,
+		"for":        true,
+		"function":   true,
+		"if":         true,
+		"import":     true,
+		"in":         true,
+		"instanceof": true,
+		"new":        true,
+		"null":       true,
+		"return":     true,
+		"super":      true,
+		"switch":     true,
+		"this":       true,
+		"throw":      true,
+		"true":       true,
+		"try":        true,
+		"typeof":     true,
+		"var":        true,
+		"void":       true,
+		"while":      true,
+		"with":       true,
+		"yield":      true,
 		// Future reserved
-		"await":       true,
-		"implements":  true,
-		"interface":   true,
-		"let":         true,
-		"package":     true,
-		"private":     true,
-		"protected":   true,
-		"public":      true,
-		"static":      true,
+		"await":      true,
+		"implements": true,
+		"interface":  true,
+		"let":        true,
+		"package":    true,
+		"private":    true,
+		"protected":  true,
+		"public":     true,
+		"static":     true,
 		// Contextual keywords
 		"abstract":    true,
 		"as":          true,

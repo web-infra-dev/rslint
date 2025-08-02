@@ -12,7 +12,7 @@ func TestNoNamespaceRule(t *testing.T) {
 		// Global declarations
 		{Code: `declare global {}`},
 		{Code: `declare module 'foo' {}`},
-		
+
 		// With allowDeclarations option
 		{
 			Code:    `declare module foo {}`,

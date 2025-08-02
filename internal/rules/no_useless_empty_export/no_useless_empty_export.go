@@ -19,7 +19,7 @@ func isEmptyExport(node *ast.Node) bool {
 	if exportDecl.ModuleSpecifier != nil {
 		return false
 	}
-	
+
 	// Check if it's specifically an empty export {}
 	// For export {}, ExportClause might be a NamedExports with zero elements
 	if exportDecl.ExportClause == nil {
@@ -28,13 +28,13 @@ func isEmptyExport(node *ast.Node) bool {
 		// These are NOT empty exports
 		return false
 	}
-	
+
 	// If there's an export clause, check if it's empty
 	if exportDecl.ExportClause.Kind == ast.KindNamedExports {
 		namedExports := exportDecl.ExportClause.AsNamedExports()
 		return len(namedExports.Elements.Nodes) == 0
 	}
-	
+
 	return false
 }
 
@@ -234,7 +234,7 @@ func isExportOrImportStatement(node *ast.Node) bool {
 		return false
 	case ast.KindExportAssignment:
 		// This covers export = and possibly export default
-		return true 
+		return true
 	case ast.KindImportDeclaration:
 		importDecl := node.AsImportDeclaration()
 		// Skip type-only imports
@@ -296,7 +296,7 @@ var NoUselessEmptyExportRule = rule.Rule{
 		// First pass: collect all statements to check for exports
 		var emptyExports []*ast.Node
 		hasOtherExports := false
-		
+
 		// Check all statements upfront
 		for _, statement := range ctx.SourceFile.Statements.Nodes {
 			if isEmptyExport(statement) {
@@ -305,17 +305,17 @@ var NoUselessEmptyExportRule = rule.Rule{
 				hasOtherExports = true
 			}
 		}
-		
+
 		// If there are other exports, report the empty exports as useless
 		if hasOtherExports {
 			for _, emptyExport := range emptyExports {
 				ctx.ReportNodeWithFixes(emptyExport, rule.RuleMessage{
-					Id:          "uselessExport", 
+					Id:          "uselessExport",
 					Description: "Empty export does nothing and can be removed.",
 				}, rule.RuleFixRemove(ctx.SourceFile, emptyExport))
 			}
 		}
-		
+
 		// Return empty listeners since we already processed everything
 		return rule.RuleListeners{}
 	},

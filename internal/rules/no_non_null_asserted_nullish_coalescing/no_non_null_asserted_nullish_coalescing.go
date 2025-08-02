@@ -2,7 +2,7 @@ package no_non_null_asserted_nullish_coalescing
 
 import (
 	"strings"
-	
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -56,20 +56,20 @@ var NoNonNullAssertedNullishCoalescingRule = rule.Rule{
 			sourceFile := ctx.SourceFile
 			sourceText := sourceFile.Text()
 			nodeStart := node.Pos()
-			
+
 			// Look for assignment patterns like "x = " before this node
 			varName := identifier.Text
 			beforeCode := sourceText[:nodeStart]
-			
+
 			// Simple regex-like check for assignment pattern
 			// Look for patterns like "varName =" or "varName=" in the code before this node
 			assignmentPattern := varName + " ="
 			assignmentPattern2 := varName + "="
-			
+
 			if strings.Contains(beforeCode, assignmentPattern) || strings.Contains(beforeCode, assignmentPattern2) {
 				return true
 			}
-			
+
 			return false
 		}
 
@@ -80,7 +80,7 @@ var NoNonNullAssertedNullishCoalescingRule = rule.Rule{
 				}
 
 				binaryExpr := node.AsBinaryExpression()
-				
+
 				// Check if it's a nullish coalescing operator
 				if binaryExpr.OperatorToken.Kind != ast.KindQuestionQuestionToken {
 					return
@@ -93,7 +93,7 @@ var NoNonNullAssertedNullishCoalescingRule = rule.Rule{
 				}
 
 				nonNullExpr := leftOperand.AsNonNullExpression()
-				
+
 				// Special case: if the expression is an identifier, check if it has been assigned
 				// Only skip the rule for uninitialized identifiers
 				if ast.IsIdentifier(nonNullExpr.Expression) {
@@ -109,11 +109,11 @@ var NoNonNullAssertedNullishCoalescingRule = rule.Rule{
 				sourceText := ctx.SourceFile.Text()
 				exprEnd := nonNullExpr.Expression.End()
 				leftEnd := leftOperand.End()
-				
+
 				// Find the '!' character position by scanning from the expression end
 				exclamationStart := exprEnd
 				exclamationEnd := leftEnd
-				
+
 				// Scan to find the actual '!' character (skip whitespace)
 				for i := exprEnd; i < leftEnd; i++ {
 					if sourceText[i] == '!' {
@@ -122,7 +122,7 @@ var NoNonNullAssertedNullishCoalescingRule = rule.Rule{
 						break
 					}
 				}
-				
+
 				exclamationRange := core.NewTextRange(exclamationStart, exclamationEnd)
 
 				// Report the issue with a suggestion

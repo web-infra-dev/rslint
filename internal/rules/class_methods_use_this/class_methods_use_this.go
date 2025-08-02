@@ -9,10 +9,10 @@ import (
 )
 
 type Options struct {
-	EnforceForClassFields                     *bool
-	ExceptMethods                            []string
-	IgnoreClassesThatImplementAnInterface    interface{} // can be bool or string "public-fields"
-	IgnoreOverrideMethods                    *bool
+	EnforceForClassFields                 *bool
+	ExceptMethods                         []string
+	IgnoreClassesThatImplementAnInterface interface{} // can be bool or string "public-fields"
+	IgnoreOverrideMethods                 *bool
 }
 
 type StackInfo struct {
@@ -324,15 +324,15 @@ var ClassMethodsUseThisRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		// Parse options
 		opts := &Options{
-			EnforceForClassFields: func() *bool { b := true; return &b }(),
-			ExceptMethods:         []string{},
+			EnforceForClassFields:                 func() *bool { b := true; return &b }(),
+			ExceptMethods:                         []string{},
 			IgnoreClassesThatImplementAnInterface: false,
-			IgnoreOverrideMethods: func() *bool { b := false; return &b }(),
+			IgnoreOverrideMethods:                 func() *bool { b := false; return &b }(),
 		}
 
 		if options != nil {
 			var optMap map[string]interface{}
-			
+
 			// Handle both direct map and array of maps
 			if m, ok := options.(map[string]interface{}); ok {
 				optMap = m
@@ -341,7 +341,7 @@ var ClassMethodsUseThisRule = rule.Rule{
 					optMap = m
 				}
 			}
-			
+
 			if optMap != nil {
 				if val, exists := optMap["enforceForClassFields"]; exists {
 					if b, ok := val.(bool); ok {
@@ -424,7 +424,7 @@ var ClassMethodsUseThisRule = rule.Rule{
 						pushContext(parent)
 						return
 					}
-				// Note: AccessorProperty doesn't exist in current AST, handled via PropertyDeclaration with accessor modifier
+					// Note: AccessorProperty doesn't exist in current AST, handled via PropertyDeclaration with accessor modifier
 				}
 			}
 			// If not a direct child of a class member, push nil context
@@ -571,7 +571,6 @@ var ClassMethodsUseThisRule = rule.Rule{
 				}
 			},
 
-
 			// Static blocks have their own `this` context
 			ast.KindClassStaticBlockDeclaration: func(node *ast.Node) {
 				pushContext(nil)
@@ -627,11 +626,11 @@ var ClassMethodsUseThisRule = rule.Rule{
 				if property.Initializer != nil && property.Initializer.Kind == ast.KindArrowFunction {
 					// Exit the context for property with arrow function
 					stackContext := popContext()
-					
+
 					if shouldIgnoreMethod(stackContext, opts) {
 						return
 					}
-					
+
 					if stackContext.Member != nil && isIncludedInstanceMethod(ctx, stackContext.Member, opts) {
 						// Report the error on the arrow function for better positioning
 						var reportNode *ast.Node
@@ -656,37 +655,37 @@ var ClassMethodsUseThisRule = rule.Rule{
 			existingEnterListener := listeners[ast.KindPropertyDeclaration]
 			listeners[ast.KindPropertyDeclaration] = func(node *ast.Node) {
 				property := node.AsPropertyDeclaration()
-				
+
 				// Handle arrow function initializers first
 				if existingEnterListener != nil {
 					existingEnterListener(node)
 				}
-				
+
 				// Also handle accessor properties
 				if ast.HasAccessorModifier(node) && property.Initializer == nil {
 					// This is an accessor property without initializer - treat it like a method
 					pushContext(node)
 				}
 			}
-			
+
 			existingExitListener := listeners[rule.ListenerOnExit(ast.KindPropertyDeclaration)]
 			listeners[rule.ListenerOnExit(ast.KindPropertyDeclaration)] = func(node *ast.Node) {
 				property := node.AsPropertyDeclaration()
-				
+
 				// Handle arrow function initializers first
 				if existingExitListener != nil {
 					existingExitListener(node)
 				}
-				
+
 				// Also handle accessor properties
 				if ast.HasAccessorModifier(node) && property.Initializer == nil {
 					// Exit the context for accessor property
 					stackContext := popContext()
-					
+
 					if shouldIgnoreMethod(stackContext, opts) {
 						return
 					}
-					
+
 					if stackContext.Member != nil && isIncludedInstanceMethod(ctx, stackContext.Member, opts) {
 						// Report the error on the property name
 						var reportNode *ast.Node

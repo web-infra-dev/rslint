@@ -225,7 +225,6 @@ class Foo {
 				"ignore": []interface{}{-7e-8},
 			},
 		},
-
 	}
 
 	invalidTestCases := []rule_tester.InvalidTestCase{

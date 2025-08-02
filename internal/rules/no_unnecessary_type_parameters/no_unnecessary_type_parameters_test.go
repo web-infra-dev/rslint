@@ -61,8 +61,8 @@ func TestNoUnnecessaryTypeParametersRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "sole",
-					Line: 1,
-					Column: 15,
+					Line:      1,
+					Column:    15,
 				},
 			},
 		},
@@ -71,8 +71,8 @@ func TestNoUnnecessaryTypeParametersRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "sole",
-					Line: 1,
-					Column: 13,
+					Line:      1,
+					Column:    13,
 				},
 			},
 		},
@@ -83,13 +83,13 @@ func TestNoUnnecessaryTypeParametersRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "sole",
-					Line: 1,
-					Column: 16,
+					Line:      1,
+					Column:    16,
 				},
 				{
 					MessageId: "sole",
-					Line: 1,
-					Column: 18,
+					Line:      1,
+					Column:    18,
 				},
 			},
 		},
@@ -102,8 +102,8 @@ func TestNoUnnecessaryTypeParametersRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "sole",
-					Line: 1,
-					Column: 14,
+					Line:      1,
+					Column:    14,
 				},
 			},
 		},
@@ -112,8 +112,8 @@ func TestNoUnnecessaryTypeParametersRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "sole",
-					Line: 1,
-					Column: 22,
+					Line:      1,
+					Column:    22,
 				},
 			},
 		},
@@ -122,8 +122,8 @@ func TestNoUnnecessaryTypeParametersRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "sole",
-					Line: 1,
-					Column: 23,
+					Line:      1,
+					Column:    23,
 				},
 			},
 		},
@@ -132,8 +132,8 @@ func TestNoUnnecessaryTypeParametersRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "sole",
-					Line: 1,
-					Column: 12,
+					Line:      1,
+					Column:    12,
 				},
 			},
 		},

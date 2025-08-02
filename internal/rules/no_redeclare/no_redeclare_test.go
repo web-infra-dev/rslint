@@ -30,7 +30,7 @@ if (true) {
 }`,
 		},
 		{
-			Code: `var Object = 0;`,
+			Code:    `var Object = 0;`,
 			Options: map[string]interface{}{"builtinGlobals": false},
 		},
 		{
@@ -193,7 +193,7 @@ var a = 15;`,
 			},
 		},
 		{
-			Code: `var Object = 0;`,
+			Code:    `var Object = 0;`,
 			Options: map[string]interface{}{"builtinGlobals": true},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{

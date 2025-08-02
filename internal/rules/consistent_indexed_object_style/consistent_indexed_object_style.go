@@ -85,7 +85,7 @@ func checkTypeReference(ctx rule.RuleContext, node *ast.Node) {
 		prevChar := ctx.SourceFile.Text()[startPos-1]
 		if prevChar == ' ' {
 			// Don't include the space in the fix range
-			startPos = startPos
+			// startPos remains unchanged
 		} else if prevChar == '=' || prevChar == ':' {
 			// Add a space if there wasn't one
 			fixText = " " + fixText
@@ -101,7 +101,7 @@ func checkTypeReference(ctx rule.RuleContext, node *ast.Node) {
 			Text:  fixText,
 		})
 	} else {
-		// For complex key types, just report without fix/suggestion 
+		// For complex key types, just report without fix/suggestion
 		// (test framework doesn't support suggestions)
 		ctx.ReportNode(node, rule.RuleMessage{
 			Id:          "preferIndexSignature",
@@ -119,7 +119,7 @@ func checkInterfaceDeclaration(ctx rule.RuleContext, node *ast.Node) {
 	// Check if this interface has ONLY index signatures (no other members)
 	var indexSignatures []*ast.Node
 	hasOtherMembers := false
-	
+
 	for _, member := range interfaceDecl.Members.Nodes {
 		if member.Kind == ast.KindIndexSignature {
 			indexSignatures = append(indexSignatures, member)
@@ -127,7 +127,7 @@ func checkInterfaceDeclaration(ctx rule.RuleContext, node *ast.Node) {
 			hasOtherMembers = true
 		}
 	}
-	
+
 	// Only convert if there's exactly one index signature and no other members
 	if len(indexSignatures) != 1 || hasOtherMembers {
 		return
@@ -161,13 +161,13 @@ func checkInterfaceDeclaration(ctx rule.RuleContext, node *ast.Node) {
 	if interfaceDecl.Name() != nil && ast.IsIdentifier(interfaceDecl.Name()) {
 		interfaceName = interfaceDecl.Name().AsIdentifier().Text
 	}
-	
+
 	// Check if the interface references itself or is part of a circular chain
 	// ANY reference to self (direct or nested) should NOT be converted to Record
 	// This matches TypeScript-ESLint behavior
 	// Examples:
 	// - interface Foo { [key: string]: Foo } - Don't convert
-	// - interface Foo { [key: string]: Foo[] } - Don't convert  
+	// - interface Foo { [key: string]: Foo[] } - Don't convert
 	// - interface Foo { [key: string]: { x: Foo } } - Don't convert
 	// - interface Foo1 { [key: string]: Foo2 } interface Foo2 { [key: string]: Foo1 } - Don't convert
 	if interfaceName != "" {
@@ -299,12 +299,12 @@ func checkTypeLiteral(ctx rule.RuleContext, node *ast.Node) {
 				parentName = interfaceDecl.Name().AsIdentifier().Text
 			}
 		}
-		
+
 		// For type Foo = { [key: string]: { [key: string]: Foo } };
 		// The outer type literal contains Foo in its nested structure, so it shouldn't be converted
 		// The inner type literal directly references Foo but should still be converted
 		// Only block if this type literal would create the circular reference at the top level
-		
+
 		if parentName != "" {
 			// Only block conversion if this type literal is the direct type of the type alias
 			// and contains a self-reference that would create a circular dependency
@@ -318,7 +318,7 @@ func checkTypeLiteral(ctx rule.RuleContext, node *ast.Node) {
 				}
 			}
 			// For nested type literals, allow conversion even if they reference the parent type
-			
+
 			// Check if this type alias is part of a circular chain (but skip for nested cases)
 			if node.Parent != nil && node.Parent.Kind == ast.KindTypeAliasDeclaration {
 				if isPartOfUnifiedCircularChain(ctx, parentName) {
@@ -345,13 +345,13 @@ func checkTypeLiteral(ctx rule.RuleContext, node *ast.Node) {
 		prevChar := ctx.SourceFile.Text()[startPos-1]
 		if prevChar == ' ' {
 			// Don't include the space in the fix range
-			startPos = startPos
+			// startPos remains unchanged
 		} else if prevChar == '=' || prevChar == ':' {
 			// Add a space if there wasn't one
 			fixText = " " + recordText
 		}
 	}
-	
+
 	ctx.ReportNodeWithFixes(node, rule.RuleMessage{
 		Id:          "preferRecord",
 		Description: "A record is preferred over an index signature.",
@@ -372,7 +372,6 @@ func checkMappedType(ctx rule.RuleContext, node *ast.Node) {
 	if keyType == nil {
 		return
 	}
-	
 
 	valueType := mappedType.Type
 	var valueText string
@@ -399,7 +398,7 @@ func checkMappedType(ctx rule.RuleContext, node *ast.Node) {
 				parentName = interfaceDecl.Name().AsIdentifier().Text
 			}
 		}
-		
+
 		if parentName != "" {
 			// For any mapped type that references its parent type, don't convert
 			// This includes direct references and references in unions
@@ -407,7 +406,7 @@ func checkMappedType(ctx rule.RuleContext, node *ast.Node) {
 			if valueType != nil && containsTypeReferenceWithVisited(valueType, parentName, make(map[string]bool)) {
 				return // Contains self-reference - don't convert
 			}
-			
+
 			// Check if this type alias is part of a circular chain
 			if isPartOfUnifiedCircularChain(ctx, parentName) {
 				return // Part of a circular chain - don't convert
@@ -416,7 +415,7 @@ func checkMappedType(ctx rule.RuleContext, node *ast.Node) {
 	}
 
 	keyText := strings.TrimSpace(ctx.SourceFile.Text()[keyType.Pos():keyType.End()])
-	
+
 	var recordText string
 	if ast.HasSyntacticModifier(node, ast.ModifierFlagsReadonly) {
 		recordText = fmt.Sprintf("Readonly<Record<%s, %s>>", keyText, valueText)
@@ -425,12 +424,12 @@ func checkMappedType(ctx rule.RuleContext, node *ast.Node) {
 	}
 
 	// For mapped types, we need to replace the parent type (the whole type alias)
-	// because the mapped type is the direct value of the type alias  
+	// because the mapped type is the direct value of the type alias
 	if parentDecl != nil && parentDecl.Kind == ast.KindTypeAliasDeclaration {
 		typeAlias := parentDecl.AsTypeAliasDeclaration()
 		if typeAlias.Name() != nil && ast.IsIdentifier(typeAlias.Name()) {
 			typeName := typeAlias.Name().AsIdentifier().Text
-			
+
 			// Build the full replacement for the type alias
 			var genericTypes string
 			if typeAlias.TypeParameters != nil && len(typeAlias.TypeParameters.Nodes) > 0 {
@@ -440,9 +439,9 @@ func checkMappedType(ctx rule.RuleContext, node *ast.Node) {
 				}
 				genericTypes = "<" + strings.Join(paramTexts, ", ") + ">"
 			}
-			
+
 			replacement := fmt.Sprintf("type %s%s = %s;", typeName, genericTypes, recordText)
-			
+
 			ctx.ReportNodeWithFixes(node, rule.RuleMessage{
 				Id:          "preferRecord",
 				Description: "A record is preferred over an index signature.",
@@ -453,7 +452,7 @@ func checkMappedType(ctx rule.RuleContext, node *ast.Node) {
 			return
 		}
 	}
-	
+
 	// Fallback for standalone mapped types (though this shouldn't happen normally)
 	startPos := node.Pos()
 	fixText := recordText
@@ -461,13 +460,13 @@ func checkMappedType(ctx rule.RuleContext, node *ast.Node) {
 		prevChar := ctx.SourceFile.Text()[startPos-1]
 		if prevChar == ' ' {
 			// Don't include the space in the fix range
-			startPos = startPos
+			// startPos remains unchanged
 		} else if prevChar == '=' || prevChar == ':' {
 			// Add a space if there wasn't one
 			fixText = " " + recordText
 		}
 	}
-	
+
 	ctx.ReportNodeWithFixes(node, rule.RuleMessage{
 		Id:          "preferRecord",
 		Description: "A record is preferred over an index signature.",
@@ -476,7 +475,6 @@ func checkMappedType(ctx rule.RuleContext, node *ast.Node) {
 		Text:  fixText,
 	})
 }
-
 
 func findParentDeclaration(node *ast.Node) *ast.Node {
 	parent := node.Parent
@@ -489,7 +487,6 @@ func findParentDeclaration(node *ast.Node) *ast.Node {
 	return nil
 }
 
-
 // Check if type contains any reference to the given type name that would cause circular dependency
 func containsTypeReference(typeNode *ast.Node, typeName string) bool {
 	return containsTypeReferenceWithVisited(typeNode, typeName, make(map[string]bool))
@@ -500,8 +497,7 @@ func containsTypeReferenceWithVisited(typeNode *ast.Node, typeName string, visit
 	if typeNode == nil || typeName == "" {
 		return false
 	}
-	
-	
+
 	switch typeNode.Kind {
 	case ast.KindTypeReference:
 		typeRef := typeNode.AsTypeReferenceNode()
@@ -623,7 +619,7 @@ func containsTypeReferenceWithVisited(typeNode *ast.Node, typeName string, visit
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -631,7 +627,7 @@ func containsTypeReferenceWithVisited(typeNode *ast.Node, typeName string, visit
 func isInterfaceWithIndexSignature(ctx rule.RuleContext, typeName string) bool {
 	// Walk through the source file to find the interface
 	var hasIndexSignature bool
-	
+
 	var checkNode ast.Visitor
 	checkNode = func(node *ast.Node) bool {
 		if node.Kind == ast.KindInterfaceDeclaration {
@@ -651,12 +647,12 @@ func isInterfaceWithIndexSignature(ctx rule.RuleContext, typeName string) bool {
 				}
 			}
 		}
-		
+
 		// Continue traversal
 		node.ForEachChild(checkNode)
 		return false
 	}
-	
+
 	ctx.SourceFile.ForEachChild(checkNode)
 	return hasIndexSignature
 }
@@ -664,7 +660,7 @@ func isInterfaceWithIndexSignature(ctx rule.RuleContext, typeName string) bool {
 // Check if an interface references a specific type in its index signature
 func interfaceReferencesType(ctx rule.RuleContext, interfaceName string, targetType string) bool {
 	var found bool
-	
+
 	var checkNode ast.Visitor
 	checkNode = func(node *ast.Node) bool {
 		if node.Kind == ast.KindInterfaceDeclaration {
@@ -686,12 +682,12 @@ func interfaceReferencesType(ctx rule.RuleContext, interfaceName string, targetT
 				}
 			}
 		}
-		
+
 		// Continue traversal
 		node.ForEachChild(checkNode)
 		return false
 	}
-	
+
 	ctx.SourceFile.ForEachChild(checkNode)
 	return found
 }
@@ -701,13 +697,13 @@ func extractReferencedInterface(typeNode *ast.Node) string {
 	if typeNode == nil {
 		return ""
 	}
-	
+
 	if typeNode.Kind == ast.KindTypeReference {
 		typeRef := typeNode.AsTypeReferenceNode()
 		if typeRef.TypeName != nil && ast.IsIdentifier(typeRef.TypeName) {
 			// Check if it's a Record type
-			if typeRef.TypeName.AsIdentifier().Text == "Record" && 
-			   typeRef.TypeArguments != nil && len(typeRef.TypeArguments.Nodes) >= 2 {
+			if typeRef.TypeName.AsIdentifier().Text == "Record" &&
+				typeRef.TypeArguments != nil && len(typeRef.TypeArguments.Nodes) >= 2 {
 				// For Record<K, V>, check if V is an interface reference
 				valueType := typeRef.TypeArguments.Nodes[1]
 				if valueType.Kind == ast.KindTypeReference {
@@ -722,21 +718,21 @@ func extractReferencedInterface(typeNode *ast.Node) string {
 			}
 		}
 	}
-	
+
 	return ""
 }
 
 // Check if a type alias is part of a circular reference chain
 func isPartOfTypeAliasCircularChain(ctx rule.RuleContext, typeAliasName string) bool {
 	visited := make(map[string]bool)
-	
+
 	var checkCircular func(currentTypeAlias string, targetTypeAlias string) bool
 	checkCircular = func(currentTypeAlias string, targetTypeAlias string) bool {
 		if visited[currentTypeAlias] {
 			return currentTypeAlias == targetTypeAlias
 		}
 		visited[currentTypeAlias] = true
-		
+
 		// Find the type alias and check what it references
 		var referencedType string
 		var checkNode ast.Visitor
@@ -767,23 +763,23 @@ func isPartOfTypeAliasCircularChain(ctx rule.RuleContext, typeAliasName string) 
 			node.ForEachChild(checkNode)
 			return false
 		}
-		
+
 		ctx.SourceFile.ForEachChild(checkNode)
-		
+
 		if referencedType != "" && isTypeAliasWithIndexSignature(ctx, referencedType) {
 			return checkCircular(referencedType, targetTypeAlias)
 		}
-		
+
 		return false
 	}
-	
+
 	return checkCircular(typeAliasName, typeAliasName)
 }
 
 // Check if a type alias has a type literal with an index signature
 func isTypeAliasWithIndexSignature(ctx rule.RuleContext, typeName string) bool {
 	var hasIndexSignature bool
-	
+
 	var checkNode ast.Visitor
 	checkNode = func(node *ast.Node) bool {
 		if node.Kind == ast.KindTypeAliasDeclaration {
@@ -810,7 +806,7 @@ func isTypeAliasWithIndexSignature(ctx rule.RuleContext, typeName string) bool {
 		node.ForEachChild(checkNode)
 		return false
 	}
-	
+
 	ctx.SourceFile.ForEachChild(checkNode)
 	return hasIndexSignature
 }
@@ -819,7 +815,7 @@ func isTypeAliasWithIndexSignature(ctx rule.RuleContext, typeName string) bool {
 func isPartOfCircularChain(ctx rule.RuleContext, interfaceName string) bool {
 	// Build a map of all interfaces and what they reference
 	interfaceRefs := make(map[string]string)
-	
+
 	var checkNode ast.Visitor
 	checkNode = func(node *ast.Node) bool {
 		if node.Kind == ast.KindInterfaceDeclaration {
@@ -846,27 +842,27 @@ func isPartOfCircularChain(ctx rule.RuleContext, interfaceName string) bool {
 		node.ForEachChild(checkNode)
 		return false
 	}
-	
+
 	ctx.SourceFile.ForEachChild(checkNode)
-	
+
 	// Now check if there's a circular chain starting from interfaceName
 	visited := make(map[string]bool)
 	current := interfaceName
-	
+
 	for {
 		if visited[current] {
 			// We've seen this before - there's a cycle
 			return true
 		}
 		visited[current] = true
-		
+
 		// Check what this interface references
 		next, exists := interfaceRefs[current]
 		if !exists || next == "" {
 			// No reference or references something else
 			return false
 		}
-		
+
 		current = next
 	}
 }
@@ -876,7 +872,7 @@ func extractDirectTypeReference(typeNode *ast.Node) string {
 	if typeNode == nil {
 		return ""
 	}
-	
+
 	if typeNode.Kind == ast.KindTypeReference {
 		typeRef := typeNode.AsTypeReferenceNode()
 		if typeRef.TypeName != nil && ast.IsIdentifier(typeRef.TypeName) {
@@ -890,7 +886,7 @@ func extractDirectTypeReference(typeNode *ast.Node) string {
 			return typeName
 		}
 	}
-	
+
 	return ""
 }
 
@@ -1001,7 +997,7 @@ func isDirectSelfReference(valueType *ast.Node, typeName string) bool {
 	if valueType == nil || typeName == "" {
 		return false
 	}
-	
+
 	// Check if it's a direct type reference to self
 	if valueType.Kind == ast.KindTypeReference {
 		typeRef := valueType.AsTypeReferenceNode()
@@ -1009,7 +1005,7 @@ func isDirectSelfReference(valueType *ast.Node, typeName string) bool {
 			return typeRef.TypeName.AsIdentifier().Text == typeName
 		}
 	}
-	
+
 	return false
 }
 
@@ -1018,7 +1014,7 @@ func isDirectSelfReference(valueType *ast.Node, typeName string) bool {
 func isPartOfUnifiedCircularChain(ctx rule.RuleContext, typeName string) bool {
 	// Build a map of all types (interfaces and type aliases) and what they reference
 	typeRefs := make(map[string]string)
-	
+
 	var checkNode ast.Visitor
 	checkNode = func(node *ast.Node) bool {
 		switch node.Kind {
@@ -1082,27 +1078,27 @@ func isPartOfUnifiedCircularChain(ctx rule.RuleContext, typeName string) bool {
 		node.ForEachChild(checkNode)
 		return false
 	}
-	
+
 	ctx.SourceFile.ForEachChild(checkNode)
-	
+
 	// Now check if there's a circular chain starting from typeName
-	visited := make(map[string]bool) 
+	visited := make(map[string]bool)
 	current := typeName
-	
+
 	for {
 		if visited[current] {
 			// We've seen this before - there's a cycle
 			return true
 		}
 		visited[current] = true
-		
+
 		// Check what this type references
 		next, exists := typeRefs[current]
 		if !exists || next == "" {
 			// No reference or references something else
 			return false
 		}
-		
+
 		current = next
 	}
 }
@@ -1126,11 +1122,11 @@ func containsTypeReferenceInTypeAliasWithVisited(sourceNode *ast.Node, typeAlias
 		}
 		current = current.Parent
 	}
-	
+
 	if sourceFile == nil {
 		return false
 	}
-	
+
 	// Look for the type alias declaration
 	var found bool
 	var checkNode ast.Visitor
@@ -1151,7 +1147,7 @@ func containsTypeReferenceInTypeAliasWithVisited(sourceNode *ast.Node, typeAlias
 		node.ForEachChild(checkNode)
 		return false
 	}
-	
+
 	sourceFile.ForEachChild(checkNode)
 	return found
 }

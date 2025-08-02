@@ -73,11 +73,11 @@ var NoMisusedNewRule = rule.Rule{
 	Name: "no-misused-new",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		return rule.RuleListeners{
-			
+
 			// Check for class methods named 'new'
 			ast.KindMethodDeclaration: func(node *ast.Node) {
 				methodDecl := node.AsMethodDeclaration()
-				
+
 				// Check if the method name is 'new' - use direct approach like method signatures
 				if methodDecl.Name() == nil || methodDecl.Name().Kind != ast.KindIdentifier {
 					return
@@ -101,7 +101,7 @@ var NoMisusedNewRule = rule.Rule{
 						if methodDecl.Type != nil {
 							returnType = methodDecl.Type
 						}
-						
+
 						if isMatchingParentType(parent, returnType) {
 							ctx.ReportNode(node, buildErrorMessageClassMessage())
 						}
@@ -116,7 +116,7 @@ var NoMisusedNewRule = rule.Rule{
 							if methodDecl.Type != nil {
 								returnType = methodDecl.Type
 							}
-							
+
 							if isMatchingParentType(parent, returnType) {
 								ctx.ReportNode(node, buildErrorMessageClassMessage())
 							}
@@ -160,7 +160,7 @@ var NoMisusedNewRule = rule.Rule{
 				// Get the name directly from the method signature's name property
 				if methodSig.Name() != nil && methodSig.Name().Kind == ast.KindIdentifier {
 					methodName := methodSig.Name().AsIdentifier().Text
-					
+
 					if methodName == "constructor" {
 						// Always flag any method signature named 'constructor' in interfaces/types
 						ctx.ReportNode(node, buildErrorMessageInterfaceMessage())
@@ -175,7 +175,7 @@ var NoMisusedNewRule = rule.Rule{
 								if methodSig.Type != nil {
 									returnType = methodSig.Type
 								}
-								
+
 								if isMatchingParentType(parent, returnType) {
 									ctx.ReportNode(node, buildErrorMessageClassMessage())
 								}
@@ -200,7 +200,6 @@ var NoMisusedNewRule = rule.Rule{
 					}
 				}
 			},
-
 		}
 	},
 }

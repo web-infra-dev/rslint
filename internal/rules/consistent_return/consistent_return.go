@@ -31,23 +31,23 @@ func buildUnexpectedReturnValueMessage(name string) rule.RuleMessage {
 }
 
 type functionInfo struct {
-	node            *ast.Node
-	hasReturn       bool
-	hasReturnValue  bool
+	node             *ast.Node
+	hasReturn        bool
+	hasReturnValue   bool
 	hasNoReturnValue bool
-	isAsync         bool
-	functionName    string
+	isAsync          bool
+	functionName     string
 }
 
 var ConsistentReturnRule = rule.Rule{
 	Name: "consistent-return",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		treatUndefinedAsUnspecified := false
-		
+
 		// Parse options with dual-format support
 		if options != nil {
 			var optionsMap map[string]interface{}
-			
+
 			// Handle array format [{ ... }] from TypeScript tests
 			if optionsArray, ok := options.([]interface{}); ok && len(optionsArray) > 0 {
 				if firstOption, ok := optionsArray[0].(map[string]interface{}); ok {
@@ -57,7 +57,7 @@ var ConsistentReturnRule = rule.Rule{
 				// Handle direct object format { ... } from Go tests
 				optionsMap = directMap
 			}
-			
+
 			if optionsMap != nil {
 				if val, exists := optionsMap["treatUndefinedAsUnspecified"]; exists {
 					if boolVal, ok := val.(bool); ok {
@@ -157,23 +157,23 @@ var ConsistentReturnRule = rule.Rule{
 			if !utils.IsThenableType(ctx.TypeChecker, node, t) {
 				return false
 			}
-			
+
 			// Check if it's a type reference (Promise<T>, etc.)
 			if !utils.IsObjectType(t) {
 				return false
 			}
-			
+
 			// Get type arguments
 			typeArgs := checker.Checker_getTypeArguments(ctx.TypeChecker, t)
 			if len(typeArgs) == 0 {
 				return false
 			}
-			
+
 			awaitedType := typeArgs[0]
 			if utils.IsTypeFlagSet(awaitedType, checker.TypeFlagsVoid) {
 				return true
 			}
-			
+
 			// Recursively check nested Promise types
 			return isPromiseVoid(node, awaitedType)
 		}
@@ -228,13 +228,13 @@ var ConsistentReturnRule = rule.Rule{
 		getReturnPolicy := func(funcNode *ast.Node) int {
 			t := ctx.TypeChecker.GetTypeAtLocation(funcNode)
 			signatures := utils.GetCallSignatures(ctx.TypeChecker, t)
-			
+
 			for _, signature := range signatures {
 				returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
-				
+
 				// Check if function is async
 				isAsync := utils.IncludesModifier(funcNode, ast.KindAsyncKeyword)
-				
+
 				if isAsync {
 					// For async functions, check the Promise resolution deeply
 					if isPromiseVoid(funcNode, returnType) {
@@ -259,7 +259,7 @@ var ConsistentReturnRule = rule.Rule{
 					}
 				}
 			}
-			
+
 			return 0 // Strict consistency required
 		}
 
@@ -267,10 +267,10 @@ var ConsistentReturnRule = rule.Rule{
 		// isReturnUnionWithVoid := func(funcNode *ast.Node) bool {
 		//	t := ctx.TypeChecker.GetTypeAtLocation(funcNode)
 		//	signatures := utils.GetCallSignatures(ctx.TypeChecker, t)
-		//	
+		//
 		//	for _, signature := range signatures {
 		//		returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
-		//		
+		//
 		//		// For sync functions, check if return type is a union that includes void
 		//		if utils.IsUnionType(returnType) {
 		//			for _, unionMember := range returnType.Types() {
@@ -280,7 +280,7 @@ var ConsistentReturnRule = rule.Rule{
 		//			}
 		//		}
 		//	}
-		//	
+		//
 		//	return false
 		// }
 
@@ -331,7 +331,6 @@ var ConsistentReturnRule = rule.Rule{
 				if funcInfo == nil {
 					return
 				}
-				
 
 				returnStmt := node.AsReturnStatement()
 				hasArgument := returnStmt.Expression != nil
@@ -357,7 +356,7 @@ var ConsistentReturnRule = rule.Rule{
 							hasArgument = false
 						}
 					}
-					
+
 					// Also check the type of the expression
 					if hasArgument { // Only check if we haven't already determined it's undefined
 						returnType := ctx.TypeChecker.GetTypeAtLocation(returnStmt.Expression)

@@ -153,7 +153,7 @@ interface Derived extends Base {}
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "replaceEmptyInterfaceWithSuper",
-							Output:    `
+							Output: `
 interface Base {
   props: string;
 }
@@ -371,13 +371,13 @@ let value: {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "replaceEmptyObjectType",
-							Output:    `
+							Output: `
 let value: object;
 `,
 						},
 						{
 							MessageId: "replaceEmptyObjectType",
-							Output:    `
+							Output: `
 let value: unknown;
 `,
 						},

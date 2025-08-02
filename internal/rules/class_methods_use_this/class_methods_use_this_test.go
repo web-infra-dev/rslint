@@ -466,7 +466,7 @@ class A {
 				{
 					MessageId: "missingThis",
 					Line:      5,
-					Column:      7,
+					Column:    7,
 				},
 			},
 		},

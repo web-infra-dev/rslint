@@ -38,7 +38,7 @@ var NoEmptyObjectTypeRule = rule.Rule{
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -46,7 +46,7 @@ var NoEmptyObjectTypeRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if allowInterfaces, ok := optsMap["allowInterfaces"].(string); ok {
 					opts.AllowInterfaces = allowInterfaces
@@ -71,7 +71,7 @@ var NoEmptyObjectTypeRule = rule.Rule{
 		if opts.AllowInterfaces != "always" {
 			listeners[ast.KindInterfaceDeclaration] = func(node *ast.Node) {
 				interfaceDecl := node.AsInterfaceDeclaration()
-				
+
 				// Check allowWithName
 				if allowWithNameRegex != nil {
 					nameText := ""
@@ -187,11 +187,11 @@ var NoEmptyObjectTypeRule = rule.Rule{
 		if opts.AllowObjectTypes != "always" {
 			listeners[ast.KindTypeLiteral] = func(node *ast.Node) {
 				typeLiteral := node.AsTypeLiteralNode()
-			
-			// Check if it has members
-			if typeLiteral.Members != nil && len(typeLiteral.Members.Nodes) > 0 {
-				return
-			}
+
+				// Check if it has members
+				if typeLiteral.Members != nil && len(typeLiteral.Members.Nodes) > 0 {
+					return
+				}
 
 				// Don't report if part of intersection type
 				if node.Parent != nil && ast.IsIntersectionTypeNode(node.Parent) {
@@ -278,7 +278,7 @@ func buildTypeAliasReplacement(ctx rule.RuleContext, interfaceDecl *ast.Interfac
 	if interfaceDecl.Name() != nil {
 		nameText = getNodeText(ctx, interfaceDecl.Name())
 	}
-	
+
 	// Get type parameters if any
 	typeParamsText := ""
 	if interfaceDecl.TypeParameters != nil {

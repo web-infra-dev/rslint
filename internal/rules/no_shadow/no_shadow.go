@@ -18,13 +18,13 @@ type NoShadowOptions struct {
 }
 
 type Variable struct {
-	Name        string
-	Node        *ast.Node
-	IsType      bool
-	IsValue     bool
-	IsBuiltin   bool
-	DeclaredAt  *ast.Node
-	Scope       *Scope
+	Name       string
+	Node       *ast.Node
+	IsType     bool
+	IsValue    bool
+	IsBuiltin  bool
+	DeclaredAt *ast.Node
+	Scope      *Scope
 }
 
 type Scope struct {
@@ -50,13 +50,13 @@ const (
 )
 
 var allowedFunctionVariableDefTypes = map[ast.Kind]bool{
-	ast.KindCallSignature:               true,
-	ast.KindFunctionType:                true,
-	ast.KindMethodSignature:             true,
-	ast.KindEmptyStatement:              true, // TSEmptyBodyFunctionExpression
-	ast.KindFunctionDeclaration:         true, // TSDeclareFunction
-	ast.KindConstructSignature:          true,
-	ast.KindConstructorType:             true,
+	ast.KindCallSignature:       true,
+	ast.KindFunctionType:        true,
+	ast.KindMethodSignature:     true,
+	ast.KindEmptyStatement:      true, // TSEmptyBodyFunctionExpression
+	ast.KindFunctionDeclaration: true, // TSDeclareFunction
+	ast.KindConstructSignature:  true,
+	ast.KindConstructorType:     true,
 }
 
 var functionsHoistedNodes = map[ast.Kind]bool{
@@ -72,9 +72,9 @@ var NoShadowRule = rule.Rule{
 	Name: "no-shadow",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := NoShadowOptions{
-			Allow:                                      []string{},
-			BuiltinGlobals:                             false,
-			Hoist:                                      "functions-and-types",
+			Allow:          []string{},
+			BuiltinGlobals: false,
+			Hoist:          "functions-and-types",
 			IgnoreFunctionTypeParameterNameValueShadow: true,
 			IgnoreOnInitialization:                     false,
 			IgnoreTypeValueShadow:                      true,
@@ -84,7 +84,7 @@ var NoShadowRule = rule.Rule{
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -92,7 +92,7 @@ var NoShadowRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if val, ok := optsMap["allow"].([]interface{}); ok {
 					opts.Allow = make([]string, len(val))
@@ -122,18 +122,18 @@ var NoShadowRule = rule.Rule{
 
 		// Built-in globals
 		// Nodes that are hoisted
-	functionsHoistedNodes := map[ast.Kind]bool{
-		ast.KindFunctionDeclaration: true,
-	}
-	
-	typesHoistedNodes := map[ast.Kind]bool{
-		ast.KindInterfaceDeclaration: true,
-		ast.KindTypeAliasDeclaration: true,
-		ast.KindEnumDeclaration:      true,
-		ast.KindClassDeclaration:     true,
-	}
+		functionsHoistedNodes := map[ast.Kind]bool{
+			ast.KindFunctionDeclaration: true,
+		}
 
-	builtinGlobals := map[string]bool{
+		typesHoistedNodes := map[ast.Kind]bool{
+			ast.KindInterfaceDeclaration: true,
+			ast.KindTypeAliasDeclaration: true,
+			ast.KindEnumDeclaration:      true,
+			ast.KindClassDeclaration:     true,
+		}
+
+		builtinGlobals := map[string]bool{
 			"Array": true, "ArrayBuffer": true, "Atomics": true, "BigInt": true, "BigInt64Array": true,
 			"BigUint64Array": true, "Boolean": true, "DataView": true, "Date": true, "Error": true,
 			"EvalError": true, "Float32Array": true, "Float64Array": true, "Function": true,
@@ -194,7 +194,7 @@ var NoShadowRule = rule.Rule{
 
 		// Forward declare checkVariable
 		var checkVariable func(variable *Variable)
-		
+
 		// Check for function type parameter name value shadow
 		isFunctionTypeParameterNameValueShadow := func(variable *Variable, shadowed *Variable) bool {
 			if !opts.IgnoreFunctionTypeParameterNameValueShadow {
@@ -210,46 +210,46 @@ var NoShadowRule = rule.Rule{
 				return false
 			}
 
-			// Simple check: if the parameter's parent is an arrow function or function type, 
+			// Simple check: if the parameter's parent is an arrow function or function type,
 			// and that's ultimately part of a type alias, interface, or other type context,
 			// then ignore the shadow.
 			node := variable.Node
 			parent := node.Parent
-			
+
 			// Skip if no parent
 			if parent == nil {
 				return false
 			}
-			
+
 			// Check if the immediate parent or grandparent indicates a type context
 			for depth := 0; depth < 10 && parent != nil; depth++ {
 				switch parent.Kind {
 				case ast.KindFunctionType,
-					 ast.KindCallSignature,
-					 ast.KindMethodSignature,
-					 ast.KindConstructSignature,
-					 ast.KindConstructorType:
+					ast.KindCallSignature,
+					ast.KindMethodSignature,
+					ast.KindConstructSignature,
+					ast.KindConstructorType:
 					// Direct function type contexts - definitely ignore
 					return true
-					
+
 				case ast.KindTypeAliasDeclaration,
-					 ast.KindInterfaceDeclaration:
+					ast.KindInterfaceDeclaration:
 					// Type declaration contexts - ignore parameters in these
 					return true
-					
+
 				case ast.KindFunctionDeclaration,
-					 ast.KindMethodDeclaration,
-					 ast.KindFunctionExpression,
-					 ast.KindConstructor,
-					 ast.KindGetAccessor,
-					 ast.KindSetAccessor:
+					ast.KindMethodDeclaration,
+					ast.KindFunctionExpression,
+					ast.KindConstructor,
+					ast.KindGetAccessor,
+					ast.KindSetAccessor:
 					// Actual function implementations - don't ignore
 					return false
 				}
-				
+
 				parent = parent.Parent
 			}
-			
+
 			return false
 		}
 
@@ -270,7 +270,7 @@ var NoShadowRule = rule.Rule{
 							DeclaredAt: node,
 							Scope:      scope,
 						}
-						
+
 						if isFunctionTypeParameterNameValueShadow(tempVariable, v) {
 							// Don't report the error, just update the existing variable
 							if isType {
@@ -282,13 +282,13 @@ var NoShadowRule = rule.Rule{
 							return
 						}
 					}
-					
+
 					// Same scope redeclaration - report as shadowing
 					line, character := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile, v.Node.Pos())
 					ctx.ReportNode(node, rule.RuleMessage{
-						Id:          "noShadow",
-						Description: fmt.Sprintf("'%s' is already declared in the upper scope on line %d column %d.", 
-							name, int(line + 1), int(character + 1)),
+						Id: "noShadow",
+						Description: fmt.Sprintf("'%s' is already declared in the upper scope on line %d column %d.",
+							name, int(line+1), int(character+1)),
 					})
 				}
 				// Update existing variable
@@ -405,13 +405,12 @@ var NoShadowRule = rule.Rule{
 			}
 		}
 
-
 		// Get location info for error reporting
 		getDeclaredLocation := func(variable *Variable) (line int, column int, isGlobal bool) {
 			if variable.IsBuiltin {
 				return 0, 0, true
 			}
-			
+
 			line, character := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile, variable.Node.Pos())
 			return int(line + 1), int(character + 1), false
 		}
@@ -486,7 +485,7 @@ var NoShadowRule = rule.Rule{
 		// Check variable for shadowing
 		checkVariable = func(variable *Variable) {
 			// Skip certain variables
-			if isThisParam(variable) || isDuplicatedClassNameVariable(variable) || 
+			if isThisParam(variable) || isDuplicatedClassNameVariable(variable) ||
 				isDuplicatedEnumNameVariable(variable) || isAllowed(variable.Name) {
 				return
 			}
@@ -502,9 +501,9 @@ var NoShadowRule = rule.Rule{
 					// Same scope redeclaration - always report as shadowing
 					line, character := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile, v.Node.Pos())
 					ctx.ReportNode(variable.Node, rule.RuleMessage{
-						Id:          "noShadow",
-						Description: fmt.Sprintf("'%s' is already declared in the upper scope on line %d column %d.", 
-							variable.Name, int(line + 1), int(character + 1)),
+						Id: "noShadow",
+						Description: fmt.Sprintf("'%s' is already declared in the upper scope on line %d column %d.",
+							variable.Name, int(line+1), int(character+1)),
 					})
 					return
 				}
@@ -515,17 +514,16 @@ var NoShadowRule = rule.Rule{
 			if shadowed == nil {
 				return
 			}
-			
-			
+
 			// Check various ignore conditions
-			if isTypeValueShadow(variable, shadowed) || 
+			if isTypeValueShadow(variable, shadowed) ||
 				isFunctionTypeParameterNameValueShadow(variable, shadowed) {
 				return
 			}
 
 			// Handle hoisting behavior
 			shadowedIsHoisted := isHoisted(shadowed.DeclaredAt)
-			
+
 			// Handle temporal dead zone and hoisting behavior
 			if !shadowed.IsBuiltin {
 				if opts.Hoist == "never" {
@@ -553,7 +551,7 @@ var NoShadowRule = rule.Rule{
 
 			// Report the error
 			line, column, isGlobal := getDeclaredLocation(shadowed)
-			
+
 			if isGlobal {
 				ctx.ReportNode(variable.Node, rule.RuleMessage{
 					Id:          "noShadowGlobal",
@@ -561,13 +559,12 @@ var NoShadowRule = rule.Rule{
 				})
 			} else {
 				ctx.ReportNode(variable.Node, rule.RuleMessage{
-					Id:          "noShadow",
-					Description: fmt.Sprintf("'%s' is already declared in the upper scope on line %d column %d.", 
+					Id: "noShadow",
+					Description: fmt.Sprintf("'%s' is already declared in the upper scope on line %d column %d.",
 						variable.Name, line, column),
 				})
 			}
 		}
-
 
 		return rule.RuleListeners{
 			// Scope creators
@@ -647,8 +644,8 @@ var NoShadowRule = rule.Rule{
 			},
 
 			// Variable declarations
-			ast.KindVariableDeclaration: processVariableDeclaration,
-			ast.KindParameter: processParameter,
+			ast.KindVariableDeclaration:  processVariableDeclaration,
+			ast.KindParameter:            processParameter,
 			ast.KindInterfaceDeclaration: processInterfaceDeclaration,
 			ast.KindTypeAliasDeclaration: processTypeAliasDeclaration,
 

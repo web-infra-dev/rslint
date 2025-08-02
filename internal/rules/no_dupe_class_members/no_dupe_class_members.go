@@ -19,10 +19,10 @@ var NoDupeClassMembersRule = rule.Rule{
 	Name: "no-dupe-class-members",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		type MemberInfo struct {
-			node         *ast.Node
-			isStatic     bool
-			kind         string // "method", "property", "getter", "setter"
-			isOverload   bool   // true if this is a method overload (no body)
+			node       *ast.Node
+			isStatic   bool
+			kind       string // "method", "property", "getter", "setter"
+			isOverload bool   // true if this is a method overload (no body)
 		}
 
 		// Track class members: map[className][memberName][static/instance] -> []MemberInfo
@@ -52,11 +52,11 @@ var NoDupeClassMembersRule = rule.Rule{
 			case ast.IsSetAccessorDeclaration(node):
 				nameNode = node.AsSetAccessorDeclaration().Name()
 			}
-			
+
 			if nameNode == nil {
 				return ""
 			}
-			
+
 			// Check if it's a numeric literal and evaluate it
 			if nameNode.Kind == ast.KindNumericLiteral {
 				numLit := nameNode.AsNumericLiteral()
@@ -66,7 +66,7 @@ var NoDupeClassMembersRule = rule.Rule{
 				fmt.Sscanf(numLit.Text, "%g", &val)
 				return fmt.Sprintf("%g", val)
 			}
-			
+
 			// For string literals, return the unquoted value for error messages
 			if nameNode.Kind == ast.KindStringLiteral {
 				strLit := nameNode.AsStringLiteral()
@@ -77,7 +77,7 @@ var NoDupeClassMembersRule = rule.Rule{
 				}
 				return text
 			}
-			
+
 			// Use the robust utility function for getting member names
 			memberName, _ := utils.GetNameFromMember(ctx.SourceFile, nameNode)
 			return memberName
@@ -154,7 +154,7 @@ var NoDupeClassMembersRule = rule.Rule{
 			if memberName == "" {
 				return
 			}
-			
+
 			memberIsStatic := isStatic(memberNode)
 			memberKind := getMemberKind(memberNode)
 			memberIsOverload := isMethodOverload(memberNode)
@@ -169,7 +169,7 @@ var NoDupeClassMembersRule = rule.Rule{
 
 			// Check for duplicates in the same static/instance scope
 			existingMembers := classMembersMap[classNode][memberName][memberIsStatic]
-			
+
 			// Handle duplicate detection based on member types
 			for _, existing := range existingMembers {
 				if memberKind == "getter" || memberKind == "setter" {

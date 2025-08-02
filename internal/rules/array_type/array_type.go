@@ -90,7 +90,7 @@ func isParenthesized(node *ast.Node) bool {
 	if parent == nil {
 		return false
 	}
-	
+
 	// Simple check - if the parent is a parenthesized type expression
 	return ast.IsParenthesizedTypeNode(parent)
 }
@@ -147,7 +147,7 @@ var ArrayTypeRule = rule.Rule{
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -155,7 +155,7 @@ var ArrayTypeRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if defaultVal, ok := optsMap["default"].(string); ok {
 					opts.Default = defaultVal
@@ -183,7 +183,7 @@ var ArrayTypeRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindArrayType: func(node *ast.Node) {
 				arrayType := node.AsArrayTypeNode()
-				
+
 				isReadonly := node.Parent != nil &&
 					node.Parent.Kind == ast.KindTypeOperator &&
 					node.Parent.AsTypeOperatorNode().Operator == ast.KindReadonlyKeyword
@@ -228,7 +228,7 @@ var ArrayTypeRule = rule.Rule{
 				// Get the exact text of the element type to preserve formatting
 				elementTypeRange := utils.TrimNodeTextRange(ctx.SourceFile, arrayType.ElementType)
 				elementTypeText := string(ctx.SourceFile.Text()[elementTypeRange.Pos():elementTypeRange.End()])
-				
+
 				// When converting T[] -> Array<T>, remove unnecessary parentheses
 				if ast.IsParenthesizedTypeNode(arrayType.ElementType) {
 					// For parenthesized types, get the inner type to avoid double parentheses
@@ -236,7 +236,7 @@ var ArrayTypeRule = rule.Rule{
 					innerTypeRange := utils.TrimNodeTextRange(ctx.SourceFile, innerType)
 					elementTypeText = string(ctx.SourceFile.Text()[innerTypeRange.Pos():innerTypeRange.End()])
 				}
-				
+
 				newText := fmt.Sprintf("%s<%s>", className, elementTypeText)
 				ctx.ReportNodeWithFixes(errorNode, message,
 					rule.RuleFixReplace(ctx.SourceFile, errorNode, newText))
@@ -244,14 +244,14 @@ var ArrayTypeRule = rule.Rule{
 
 			ast.KindTypeReference: func(node *ast.Node) {
 				typeRef := node.AsTypeReference()
-				
+
 				if !ast.IsIdentifier(typeRef.TypeName) {
 					return
 				}
 
 				identifier := typeRef.TypeName.AsIdentifier()
 				typeName := identifier.Text
-				
+
 				if !(typeName == "Array" || typeName == "ReadonlyArray" || typeName == "Readonly") {
 					return
 				}
@@ -278,7 +278,6 @@ var ArrayTypeRule = rule.Rule{
 					currentOption = readonlyOption
 				}
 
-
 				if currentOption == "generic" {
 					return
 				}
@@ -299,14 +298,14 @@ var ArrayTypeRule = rule.Rule{
 				} else if currentOption == "array-simple" {
 					// For array-simple mode, determine if we have type parameters to check
 					// 'any' (no type params) is considered simple
-					isSimple := typeParams == nil || len(typeParams.Nodes) == 0 || 
+					isSimple := typeParams == nil || len(typeParams.Nodes) == 0 ||
 						(len(typeParams.Nodes) == 1 && isSimpleType(typeParams.Nodes[0]))
-					
+
 					// For array-simple mode, only report errors if the type is simple
 					if !isSimple {
 						return
 					}
-					
+
 					if isReadonlyArrayType && typeName != "ReadonlyArray" {
 						messageId = "errorStringArraySimpleReadonly"
 					} else {
@@ -343,12 +342,12 @@ var ArrayTypeRule = rule.Rule{
 				}
 
 				typeParam := typeParams.Nodes[0]
-				
+
 				// Only add parentheses when converting Array<T> -> T[] if T needs them
 				// Never add parentheses when converting T[] -> Array<T>
 				var typeParens bool
 				var parentParens bool
-				
+
 				if currentOption == "array" || currentOption == "array-simple" {
 					// Converting Array<T> -> T[] - may need parentheses
 					typeParens = typeNeedsParentheses(typeParam)
@@ -411,7 +410,7 @@ var ArrayTypeRule = rule.Rule{
 				}
 
 				ctx.ReportNodeWithFixes(node, message,
-					rule.RuleFixReplace(ctx.SourceFile, node, start + typeParamText + end))
+					rule.RuleFixReplace(ctx.SourceFile, node, start+typeParamText+end))
 			},
 		}
 	},

@@ -145,14 +145,14 @@ var NoEmptyFunctionRule = rule.Rule{
 			sourceText := ctx.SourceFile.Text()
 			nodeStart := node.Pos()
 			bodyStart := body.Pos()
-			
+
 			// Search for the opening brace between node start and body start
 			for i := nodeStart; i <= bodyStart && i < len(sourceText); i++ {
 				if sourceText[i] == '{' {
 					return core.TextRange{}.WithPos(i).WithEnd(i + 1), true
 				}
 			}
-			
+
 			// Fallback: use the body's start position
 			return core.TextRange{}.WithPos(bodyStart).WithEnd(bodyStart + 1), true
 		}
@@ -295,7 +295,7 @@ var NoEmptyFunctionRule = rule.Rule{
 			if node.Kind == ast.KindArrowFunction && isAllowed("arrowFunctions") {
 				return
 			}
-			
+
 			// Check for async/generator functions early
 			if isAsync && isAllowed("asyncFunctions") {
 				return

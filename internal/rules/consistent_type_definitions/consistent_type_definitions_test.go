@@ -24,7 +24,7 @@ type Record<T, U> = {
   [K in T]: U;
 };
 		`},
-		
+
 		// Valid with 'type' option
 		{Code: "type T = { x: number };", Options: []interface{}{"type"}},
 		{Code: "type A = { x: number } & B & C;", Options: []interface{}{"type"}},
@@ -37,7 +37,7 @@ export type W<T> = {
 	}, []rule_tester.InvalidTestCase{
 		// Interface option violations (type -> interface)
 		{
-			Code: "type T = { x: number; };",
+			Code:    "type T = { x: number; };",
 			Options: []interface{}{"interface"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -49,7 +49,7 @@ export type W<T> = {
 			Output: []string{"interface T { x: number; }"},
 		},
 		{
-			Code: "type T={ x: number; };",
+			Code:    "type T={ x: number; };",
 			Options: []interface{}{"interface"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -61,7 +61,7 @@ export type W<T> = {
 			Output: []string{"interface T { x: number; }"},
 		},
 		{
-			Code: "type T=                         { x: number; };",
+			Code:    "type T=                         { x: number; };",
 			Options: []interface{}{"interface"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -73,7 +73,7 @@ export type W<T> = {
 			Output: []string{"interface T { x: number; }"},
 		},
 		{
-			Code: "type T /* comment */={ x: number; };",
+			Code:    "type T /* comment */={ x: number; };",
 			Options: []interface{}{"interface"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -104,10 +104,10 @@ export interface W<T> {
 }
 			`},
 		},
-		
+
 		// Type option violations (interface -> type)
 		{
-			Code: "interface T { x: number; }",
+			Code:    "interface T { x: number; }",
 			Options: []interface{}{"type"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -119,7 +119,7 @@ export interface W<T> {
 			Output: []string{"type T = { x: number; }"},
 		},
 		{
-			Code: "interface T{ x: number; }",
+			Code:    "interface T{ x: number; }",
 			Options: []interface{}{"type"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -131,7 +131,7 @@ export interface W<T> {
 			Output: []string{"type T = { x: number; }"},
 		},
 		{
-			Code: "interface T                          { x: number; }",
+			Code:    "interface T                          { x: number; }",
 			Options: []interface{}{"type"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -143,7 +143,7 @@ export interface W<T> {
 			Output: []string{"type T = { x: number; }"},
 		},
 		{
-			Code: "interface A extends B, C { x: number; };",
+			Code:    "interface A extends B, C { x: number; };",
 			Options: []interface{}{"type"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
@@ -155,7 +155,7 @@ export interface W<T> {
 			Output: []string{"type A = { x: number; } & B & C;"},
 		},
 		{
-			Code: "interface A extends B<T1>, C<T2> { x: number; };",
+			Code:    "interface A extends B<T1>, C<T2> { x: number; };",
 			Options: []interface{}{"type"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{

@@ -12,10 +12,10 @@ var NoNonNullAssertionRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindNonNullExpression: func(node *ast.Node) {
 				nonNullExpr := node.AsNonNullExpression()
-				
+
 				// Build suggestions based on the parent context
 				suggestions := buildSuggestions(ctx, node, nonNullExpr)
-				
+
 				ctx.ReportNodeWithSuggestions(node, rule.RuleMessage{
 					Id:          "noNonNull",
 					Description: "Forbidden non-null assertion.",
@@ -27,48 +27,48 @@ var NoNonNullAssertionRule = rule.Rule{
 
 func buildSuggestions(ctx rule.RuleContext, node *ast.Node, nonNullExpr *ast.NonNullExpression) []rule.RuleSuggestion {
 	var suggestions []rule.RuleSuggestion
-	
+
 	parent := node.Parent
 	if parent == nil {
 		return suggestions
 	}
-	
+
 	// Only provide suggestions if this non-null assertion is immediately followed by a chaining operation
 	// This means the non-null assertion should be the direct expression of the parent access/call
 	shouldProvideSuggestions := false
-	
+
 	switch parent.Kind {
 	case ast.KindPropertyAccessExpression:
 		propAccess := parent.AsPropertyAccessExpression()
 		shouldProvideSuggestions = propAccess.Expression == node
-		
+
 	case ast.KindElementAccessExpression:
 		elemAccess := parent.AsElementAccessExpression()
 		shouldProvideSuggestions = elemAccess.Expression == node
-		
+
 	case ast.KindCallExpression:
 		callExpr := parent.AsCallExpression()
 		shouldProvideSuggestions = callExpr.Expression == node
 	}
-	
+
 	if !shouldProvideSuggestions {
 		return suggestions
 	}
-	
+
 	// Calculate the position of the '!' to remove it
 	// The '!' is at the end of the non-null expression
 	nonNullEnd := node.End()
 	exclamationStart := nonNullEnd - 1
-	
+
 	// Helper function to create suggestion for removing '!'
 	removeExclamation := func() rule.RuleFix {
 		exclamationRange := core.NewTextRange(exclamationStart, nonNullEnd)
 		return rule.RuleFixRemoveRange(exclamationRange)
 	}
-	
+
 	// Helper function to create suggestion for replacing '!' with '?.'
 	// For property access (x!.y), we replace '!' with '?' to get x?.y
-	// For element access (x![y]), we replace '!' with '?.' to get x?.[y]  
+	// For element access (x![y]), we replace '!' with '?.' to get x?.[y]
 	// For call expressions (x!()), we replace '!' with '?.' to get x?.()
 	replaceWithOptional := func() rule.RuleFix {
 		exclamationRange := core.NewTextRange(exclamationStart, nonNullEnd)
@@ -81,7 +81,7 @@ func buildSuggestions(ctx rule.RuleContext, node *ast.Node, nonNullExpr *ast.Non
 			return rule.RuleFixReplaceRange(exclamationRange, "?.")
 		}
 	}
-	
+
 	switch parent.Kind {
 	case ast.KindPropertyAccessExpression:
 		// x!.y or x!?.y
@@ -107,7 +107,7 @@ func buildSuggestions(ctx rule.RuleContext, node *ast.Node, nonNullExpr *ast.Non
 				FixesArr: []rule.RuleFix{removeExclamation()},
 			})
 		}
-		
+
 	case ast.KindElementAccessExpression:
 		// x![y] or x!?.[y]
 		elemAccess := parent.AsElementAccessExpression()
@@ -130,7 +130,7 @@ func buildSuggestions(ctx rule.RuleContext, node *ast.Node, nonNullExpr *ast.Non
 				FixesArr: []rule.RuleFix{removeExclamation()},
 			})
 		}
-		
+
 	case ast.KindCallExpression:
 		// x!() or x!?.()
 		callExpr := parent.AsCallExpression()
@@ -154,6 +154,6 @@ func buildSuggestions(ctx rule.RuleContext, node *ast.Node, nonNullExpr *ast.Non
 			})
 		}
 	}
-	
+
 	return suggestions
 }

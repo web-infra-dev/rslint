@@ -23,7 +23,7 @@ func GetCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) iter
 		// Simple approach: get all comments from position 0 and filter
 		// This is less efficient but more reliable than trying to optimize the start position
 		seenComments := make(map[string]bool)
-		
+
 		// Get all leading comments from the beginning of the file
 		for commentRange := range scanner.GetLeadingCommentRanges(nodeFactory, sourceFile.Text(), 0) {
 			// Check if comment overlaps with our range (more flexible)
@@ -37,7 +37,7 @@ func GetCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) iter
 				}
 			}
 		}
-		
+
 		// Get all trailing comments from the beginning of the file
 		for commentRange := range scanner.GetTrailingCommentRanges(nodeFactory, sourceFile.Text(), 0) {
 			// Check if comment overlaps with our range (more flexible)
@@ -59,7 +59,7 @@ func HasCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) bool
 	for range GetCommentsInRange(sourceFile, inRange) {
 		return true
 	}
-	
+
 	// Fallback: directly check the source text for comment patterns
 	sourceText := sourceFile.Text()
 	if inRange.Pos() >= 0 && inRange.End() <= len(sourceText) {
@@ -69,7 +69,7 @@ func HasCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) bool
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -241,7 +241,7 @@ func GetFunctionHeadLoc(node *ast.Node, sourceFile *ast.SourceFile) core.TextRan
 	case ast.KindFunctionDeclaration:
 		funcDecl := node.AsFunctionDeclaration()
 		start := node.Pos()
-		
+
 		// Find the end position after the parameter list
 		if len(funcDecl.Parameters.Nodes) > 0 {
 			lastParam := funcDecl.Parameters.Nodes[len(funcDecl.Parameters.Nodes)-1]
@@ -254,14 +254,14 @@ func GetFunctionHeadLoc(node *ast.Node, sourceFile *ast.SourceFile) core.TextRan
 				return core.NewTextRange(start, s.TokenEnd())
 			}
 		}
-		
+
 		// Fallback: find the opening brace and go back
 		return findFunctionHeadEnd(sourceFile, start, funcDecl.Body)
 
 	case ast.KindFunctionExpression:
 		funcExpr := node.AsFunctionExpression()
 		start := node.Pos()
-		
+
 		if len(funcExpr.Parameters.Nodes) > 0 {
 			lastParam := funcExpr.Parameters.Nodes[len(funcExpr.Parameters.Nodes)-1]
 			s := scanner.GetScannerForSourceFile(sourceFile, lastParam.End())
@@ -272,20 +272,20 @@ func GetFunctionHeadLoc(node *ast.Node, sourceFile *ast.SourceFile) core.TextRan
 				return core.NewTextRange(start, s.TokenEnd())
 			}
 		}
-		
+
 		return findFunctionHeadEnd(sourceFile, start, funcExpr.Body)
 
 	case ast.KindArrowFunction:
 		arrowFunc := node.AsArrowFunction()
 		start := node.Pos()
-		
+
 		// For arrow functions, we need to find the '=>' token
 		searchStart := start
 		if len(arrowFunc.Parameters.Nodes) > 0 {
 			lastParam := arrowFunc.Parameters.Nodes[len(arrowFunc.Parameters.Nodes)-1]
 			searchStart = lastParam.End()
 		}
-		
+
 		// Find the '=>' token
 		s := scanner.GetScannerForSourceFile(sourceFile, searchStart)
 		for s.Token() != ast.KindEqualsGreaterThanToken && s.Token() != ast.KindEndOfFile {
@@ -294,14 +294,14 @@ func GetFunctionHeadLoc(node *ast.Node, sourceFile *ast.SourceFile) core.TextRan
 		if s.Token() == ast.KindEqualsGreaterThanToken {
 			return core.NewTextRange(start, s.TokenEnd())
 		}
-		
+
 		// Fallback
 		return findFunctionHeadEnd(sourceFile, start, arrowFunc.Body)
 
 	case ast.KindMethodDeclaration:
 		methodDecl := node.AsMethodDeclaration()
 		start := node.Pos()
-		
+
 		if len(methodDecl.Parameters.Nodes) > 0 {
 			lastParam := methodDecl.Parameters.Nodes[len(methodDecl.Parameters.Nodes)-1]
 			s := scanner.GetScannerForSourceFile(sourceFile, lastParam.End())
@@ -312,13 +312,13 @@ func GetFunctionHeadLoc(node *ast.Node, sourceFile *ast.SourceFile) core.TextRan
 				return core.NewTextRange(start, s.TokenEnd())
 			}
 		}
-		
+
 		return findFunctionHeadEnd(sourceFile, start, methodDecl.Body)
 
 	case ast.KindGetAccessor:
 		accessor := node.AsGetAccessorDeclaration()
 		start := node.Pos()
-		
+
 		if len(accessor.Parameters.Nodes) > 0 {
 			lastParam := accessor.Parameters.Nodes[len(accessor.Parameters.Nodes)-1]
 			s := scanner.GetScannerForSourceFile(sourceFile, lastParam.End())
@@ -329,13 +329,13 @@ func GetFunctionHeadLoc(node *ast.Node, sourceFile *ast.SourceFile) core.TextRan
 				return core.NewTextRange(start, s.TokenEnd())
 			}
 		}
-		
+
 		return findFunctionHeadEnd(sourceFile, start, accessor.Body)
 
 	case ast.KindSetAccessor:
 		accessor := node.AsSetAccessorDeclaration()
 		start := node.Pos()
-		
+
 		if len(accessor.Parameters.Nodes) > 0 {
 			lastParam := accessor.Parameters.Nodes[len(accessor.Parameters.Nodes)-1]
 			s := scanner.GetScannerForSourceFile(sourceFile, lastParam.End())
@@ -346,7 +346,7 @@ func GetFunctionHeadLoc(node *ast.Node, sourceFile *ast.SourceFile) core.TextRan
 				return core.NewTextRange(start, s.TokenEnd())
 			}
 		}
-		
+
 		return findFunctionHeadEnd(sourceFile, start, accessor.Body)
 
 	default:
@@ -361,19 +361,19 @@ func findFunctionHeadEnd(sourceFile *ast.SourceFile, start int, body *ast.Node) 
 		// No body, use the entire node
 		return core.NewTextRange(start, start)
 	}
-	
+
 	// Find the opening brace of the function body
 	s := scanner.GetScannerForSourceFile(sourceFile, body.Pos())
 	for s.Token() != ast.KindOpenBraceToken && s.Token() != ast.KindEndOfFile && s.TokenStart() >= body.Pos() {
 		s.Scan()
 	}
-	
+
 	if s.Token() == ast.KindOpenBraceToken {
 		// Go back to find the last non-whitespace token before the brace
 		end := s.TokenStart()
 		return core.NewTextRange(start, end)
 	}
-	
+
 	// Fallback: use the start of the body
 	return core.NewTextRange(start, body.Pos())
 }

@@ -290,7 +290,7 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 					// For regular identifiers, just get the text
 					nameText = nameNode.Text()
 				}
-				
+
 				valueText := strings.TrimSpace(string(ctx.SourceFile.Text()[returnStmt.Expression.Pos():returnStmt.Expression.End()]))
 
 				var fixText string
@@ -355,7 +355,7 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 						// For regular identifiers, just get the text
 						nameText = nameNode.Text()
 					}
-					
+
 					valueText := strings.TrimSpace(string(ctx.SourceFile.Text()[property.Initializer.Pos():property.Initializer.End()]))
 
 					var fixText string
@@ -408,7 +408,7 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 
 				memberExpr := node.Parent
 				var propName string
-				
+
 				if ast.IsPropertyAccessExpression(memberExpr) {
 					propAccess := memberExpr.AsPropertyAccessExpression()
 					propName = extractPropertyName(ctx, propAccess.Name())

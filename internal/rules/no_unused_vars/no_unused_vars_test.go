@@ -23,39 +23,39 @@ func TestNoUnusedVarsRule(t *testing.T) {
 
 	invalidTestCases := []rule_tester.InvalidTestCase{
 		{
-			Code: `const foo = 5;`,
+			Code:   `const foo = 5;`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 7}},
 		},
 		{
-			Code: `function foo() {}`,
+			Code:   `function foo() {}`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 10}},
 		},
 		{
-			Code: `function foo(bar) {}`,
+			Code:   `function foo(bar) {}`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 14}},
 		},
 		{
-			Code: `try {} catch (e) {}`,
+			Code:   `try {} catch (e) {}`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 15}},
 		},
 		{
-			Code: `let foo = 5; foo = 10;`,
+			Code:   `let foo = 5; foo = 10;`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 5}},
 		},
 		{
-			Code: `const foo = 1; type Bar = typeof foo;`,
+			Code:    `const foo = 1; type Bar = typeof foo;`,
 			Options: map[string]interface{}{"vars": "all"},
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "usedOnlyAsType", Line: 1, Column: 7}},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedOnlyAsType", Line: 1, Column: 7}},
 		},
 		{
-			Code: `const foo = 1;`,
+			Code:    `const foo = 1;`,
 			Options: map[string]interface{}{"varsIgnorePattern": "^_"},
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 7}},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 7}},
 		},
 		{
-			Code: `const _foo = 1; console.log(_foo);`,
+			Code:    `const _foo = 1; console.log(_foo);`,
 			Options: map[string]interface{}{"varsIgnorePattern": "^_", "reportUsedIgnorePattern": true},
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "usedIgnoredVar", Line: 1, Column: 7}},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedIgnoredVar", Line: 1, Column: 7}},
 		},
 	}
 

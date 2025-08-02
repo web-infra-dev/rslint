@@ -17,12 +17,12 @@ var NoInferrableTypesRule = rule.Rule{
 			IgnoreParameters: false,
 			IgnoreProperties: false,
 		}
-		
+
 		// Parse options with dual-format support (handles both array and object formats)
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -30,7 +30,7 @@ var NoInferrableTypesRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if ignoreParams, ok := optsMap["ignoreParameters"].(bool); ok {
 					opts.IgnoreParameters = ignoreParams
@@ -59,7 +59,7 @@ var NoInferrableTypesRule = rule.Rule{
 					return node
 				}
 				visited[node] = true
-				
+
 				switch node.Kind {
 				case ast.KindParenthesizedExpression:
 					node = node.AsParenthesizedExpression().Expression
@@ -76,7 +76,7 @@ var NoInferrableTypesRule = rule.Rule{
 			if init.Kind != ast.KindIdentifier {
 				return false
 			}
-			
+
 			text := init.AsIdentifier().Text
 			for _, name := range names {
 				if text == name {
@@ -92,14 +92,14 @@ var NoInferrableTypesRule = rule.Rule{
 			if node == nil || node.Kind != ast.KindCallExpression {
 				return false
 			}
-			
+
 			callExpr := node.AsCallExpression()
 			// For calls like BigInt?.(10), the expression is still an identifier "BigInt"
 			// The optional chaining token is stored separately
 			if callExpr.Expression.Kind == ast.KindIdentifier {
 				return callExpr.Expression.AsIdentifier().Text == callName
 			}
-			
+
 			return false
 		}
 
@@ -126,7 +126,7 @@ var NoInferrableTypesRule = rule.Rule{
 			if init.Kind != ast.KindPrefixUnaryExpression {
 				return false
 			}
-			
+
 			unary := init.AsPrefixUnaryExpression()
 			op := ""
 			switch unary.Operator {
@@ -139,7 +139,7 @@ var NoInferrableTypesRule = rule.Rule{
 			case ast.KindVoidKeyword:
 				op = "void"
 			}
-			
+
 			for _, operator := range operators {
 				if op == operator {
 					return true
@@ -162,8 +162,8 @@ var NoInferrableTypesRule = rule.Rule{
 				return isFunctionCall(unwrappedInit, "BigInt") || unwrappedInit.Kind == ast.KindBigIntLiteral
 
 			case ast.KindBooleanKeyword:
-				return hasUnaryPrefix(init, "!") || 
-					isFunctionCall(init, "Boolean") || 
+				return hasUnaryPrefix(init, "!") ||
+					isFunctionCall(init, "Boolean") ||
 					isLiteral(init, "boolean")
 
 			case ast.KindNumberKeyword:
@@ -191,15 +191,15 @@ var NoInferrableTypesRule = rule.Rule{
 				typeRef := annotation.AsTypeReference()
 				if typeRef.TypeName.Kind == ast.KindIdentifier &&
 					typeRef.TypeName.AsIdentifier().Text == "RegExp" {
-					
+
 					isRegExpLiteral := init.Kind == ast.KindRegularExpressionLiteral
-					
+
 					isRegExpNewCall := init.Kind == ast.KindNewExpression &&
 						init.AsNewExpression().Expression.Kind == ast.KindIdentifier &&
 						init.AsNewExpression().Expression.AsIdentifier().Text == "RegExp"
-					
+
 					isRegExpCall := isFunctionCall(init, "RegExp")
-					
+
 					return isRegExpLiteral || isRegExpCall || isRegExpNewCall
 				}
 				return false
@@ -335,21 +335,21 @@ var NoInferrableTypesRule = rule.Rule{
 				propSig := node.AsPropertySignatureDeclaration()
 				typeAnnotation = propSig.Type
 				value = propSig.Initializer
-				
+
 			}
 
 			reportInferrableType(node, typeAnnotation, value, nil)
 		}
 
 		return rule.RuleListeners{
-			ast.KindVariableDeclaration:  inferrableVariableVisitor,
-			ast.KindArrowFunction:        inferrableParameterVisitor,
-			ast.KindFunctionDeclaration:  inferrableParameterVisitor,
-			ast.KindFunctionExpression:   inferrableParameterVisitor,
-			ast.KindConstructor:          inferrableParameterVisitor,
-			ast.KindMethodDeclaration:    inferrableParameterVisitor,
-			ast.KindPropertyDeclaration:  inferrablePropertyVisitor,
-			ast.KindPropertySignature:    inferrablePropertyVisitor,
+			ast.KindVariableDeclaration: inferrableVariableVisitor,
+			ast.KindArrowFunction:       inferrableParameterVisitor,
+			ast.KindFunctionDeclaration: inferrableParameterVisitor,
+			ast.KindFunctionExpression:  inferrableParameterVisitor,
+			ast.KindConstructor:         inferrableParameterVisitor,
+			ast.KindMethodDeclaration:   inferrableParameterVisitor,
+			ast.KindPropertyDeclaration: inferrablePropertyVisitor,
+			ast.KindPropertySignature:   inferrablePropertyVisitor,
 		}
 	},
 }

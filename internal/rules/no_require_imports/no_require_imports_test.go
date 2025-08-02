@@ -17,14 +17,14 @@ func TestNoRequireImportsRule(t *testing.T) {
 		{Code: "import lib9 = lib2.anotherSubImport;"},
 		{Code: "import lib10 from 'lib10';"},
 		{Code: "var lib3 = load?.('not_an_import');"},
-		
+
 		// Local require should be allowed
 		{Code: `
 import { createRequire } from 'module';
 const require = createRequire();
 require('remark-preset-prettier');
 		`},
-		
+
 		// Allow patterns
 		{
 			Code:    "const pkg = require('./package.json');",
@@ -54,7 +54,7 @@ require('remark-preset-prettier');
 			Code:    "import pkg = require('some-package');",
 			Options: map[string]interface{}{"allow": []interface{}{"^some-package$"}},
 		},
-		
+
 		// AllowAsImport option
 		{
 			Code:    "import foo = require('foo');",
@@ -158,7 +158,7 @@ var lib5 = require('lib5'),
 				},
 			},
 		},
-		
+
 		// import = require() style
 		{
 			Code: "import lib8 = require('lib8');",
@@ -170,7 +170,7 @@ var lib5 = require('lib5'),
 				},
 			},
 		},
-		
+
 		// Optional chaining
 		{
 			Code: "var lib = require?.('lib');",
@@ -210,7 +210,7 @@ var lib5 = require?.('lib5'),
 				},
 			},
 		},
-		
+
 		// Disallowed even with allow patterns that don't match
 		{
 			Code: "const pkg = require('./package.json');",
@@ -276,7 +276,7 @@ var lib5 = require?.('lib5'),
 				},
 			},
 		},
-		
+
 		// With allowAsImport but not import = require
 		{
 			Code:    "var foo = require?.('foo');",

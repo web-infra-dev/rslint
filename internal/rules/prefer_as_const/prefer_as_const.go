@@ -32,7 +32,7 @@ func buildVariableSuggestMessage() rule.RuleMessage {
 var PreferAsConstRule = rule.Rule{
 	Name: "prefer-as-const",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		
+
 		compareTypes := func(valueNode *ast.Node, typeNode *ast.Node, canFix bool) {
 			if valueNode == nil || typeNode == nil {
 				return
@@ -62,7 +62,7 @@ var PreferAsConstRule = rule.Rule{
 			if !ast.IsLiteralExpression(literalNode) {
 				return
 			}
-			
+
 			// Skip template literal types - they are different from regular literal types
 			if literalNode.Kind == ast.KindNoSubstitutionTemplateLiteral {
 				return
@@ -93,7 +93,7 @@ var PreferAsConstRule = rule.Rule{
 							}
 							s.Scan()
 						}
-						
+
 						if colonStart != -1 {
 							ctx.ReportNodeWithSuggestions(literalNode, buildVariableConstAssertionMessage(),
 								rule.RuleSuggestion{

@@ -46,7 +46,7 @@ var ConsistentTypeImportsRule = rule.Rule{
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -54,7 +54,7 @@ var ConsistentTypeImportsRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if val, ok := optsMap["disallowTypeAnnotations"].(bool); ok {
 					opts.DisallowTypeAnnotations = val
@@ -86,7 +86,7 @@ var ConsistentTypeImportsRule = rule.Rule{
 		// Check for decorator metadata compatibility
 		emitDecoratorMetadata := false
 		experimentalDecorators := false
-		
+
 		// Get compiler options from program
 		if ctx.Program != nil {
 			compilerOpts := ctx.Program.Options()
@@ -206,7 +206,7 @@ var ConsistentTypeImportsRule = rule.Rule{
 							break
 						}
 						processed++
-						
+
 						if ast.IsVariableDeclaration(decl) {
 							variableDeclaration := decl.AsVariableDeclaration()
 							// Track local declarations
@@ -335,7 +335,7 @@ var ConsistentTypeImportsRule = rule.Rule{
 							break
 						}
 						processed++
-						
+
 						if ast.IsExportSpecifier(element) {
 							exportSpec := element.AsExportSpecifier()
 							if exportSpec.PropertyName != nil {
@@ -375,7 +375,7 @@ var ConsistentTypeImportsRule = rule.Rule{
 				}
 			}
 		}
-		
+
 		// Handle ES6 export default
 		// TODO: Find the correct way to handle export default
 		// Currently commented out as KindExportDefault doesn't exist
@@ -389,8 +389,6 @@ var ConsistentTypeImportsRule = rule.Rule{
 		// 		}
 		// 	}
 		// }
-
-
 
 		// Track property access as value usage
 		listeners[ast.KindPropertyAccessExpression] = func(node *ast.Node) {
@@ -420,13 +418,13 @@ var ConsistentTypeImportsRule = rule.Rule{
 			// Limit processing to prevent performance issues
 			maxImportsToProcess := 50
 			processed := 0
-			
+
 			for _, importNode := range importDeclarations {
 				if processed >= maxImportsToProcess {
 					break // Stop processing after limit to prevent timeout
 				}
 				processed++
-				
+
 				importDecl := importNode.AsImportDeclaration()
 				if importDecl.ModuleSpecifier == nil || !ast.IsStringLiteral(importDecl.ModuleSpecifier) {
 					continue
@@ -522,7 +520,7 @@ var ConsistentTypeImportsRule = rule.Rule{
 							Description: message,
 						}, rule.RuleSuggestion{
 							Message: rule.RuleMessage{
-								Id:          "fixMixedImports", 
+								Id:          "fixMixedImports",
 								Description: "Fix mixed imports.",
 							},
 							FixesArr: fixToTypeImportDeclaration(ctx.SourceFile, report, sourceImports, opts.FixStyle),
@@ -604,13 +602,13 @@ func classifyImportSpecifiers(ctx rule.RuleContext, importDecl *ast.ImportDeclar
 				// Limit the number of named imports we process
 				maxNamedImports := 20
 				processed := 0
-				
+
 				for _, element := range namedImports.Elements.Nodes {
 					if processed >= maxNamedImports {
 						break // Prevent timeout from too many named imports
 					}
 					processed++
-					
+
 					importSpecifier := element.AsImportSpecifier()
 
 					if importSpecifier.IsTypeOnly {
@@ -642,7 +640,7 @@ func classifyImportSpecifiers(ctx rule.RuleContext, importDecl *ast.ImportDeclar
 		} else if ast.IsNamespaceImport(namedBindings) {
 			namespaceImport := namedBindings.AsNamespaceImport()
 			identifierName := namespaceImport.Name().AsIdentifier().Text
-			
+
 			// Check if this identifier is referenced at all or shadowed by local declarations
 			if !allReferencedIdentifiers[identifierName] || shadowedIdentifiers[identifierName] {
 				// Not referenced anywhere or shadowed by local declarations - it's unused
@@ -664,7 +662,6 @@ func classifyImportSpecifiers(ctx rule.RuleContext, importDecl *ast.ImportDeclar
 	}
 }
 
-
 // areAllReferencesTypeParameterShadowed checks if all references to an identifier
 // are shadowed by type parameters in their respective scopes
 func areAllReferencesTypeParameterShadowed(identifierName string, allReferencedNodes map[string][]*ast.Node) bool {
@@ -676,7 +673,7 @@ func areAllReferencesTypeParameterShadowed(identifierName string, allReferencedN
 	// Limit checking to prevent performance issues - reduced further
 	maxChecks := 3
 	checked := 0
-	
+
 	// Check if all references are shadowed by type parameters
 	for _, ref := range references {
 		if checked >= maxChecks {
@@ -684,7 +681,7 @@ func areAllReferencesTypeParameterShadowed(identifierName string, allReferencedN
 			return false
 		}
 		checked++
-		
+
 		if !isIdentifierShadowedByTypeParameter(ref, identifierName) {
 			// Found a reference that is not shadowed by a type parameter
 			return false
@@ -694,8 +691,6 @@ func areAllReferencesTypeParameterShadowed(identifierName string, allReferencedN
 	// All references are shadowed by type parameters
 	return true
 }
-
-
 
 func getImportSpecifierName(node *ast.Node) string {
 	if ast.IsImportSpecifier(node) {
@@ -827,7 +822,7 @@ func fixToTypeImportDeclaration(sourceFile *ast.SourceFile, report ReportValueIm
 
 	// Mixed imports - need to separate or inline type imports
 	if fixStyle == "inline-type-imports" {
-		// Add type keywords to type specifiers  
+		// Add type keywords to type specifiers
 		for _, specifier := range report.TypeSpecifiers {
 			if ast.IsImportSpecifier(specifier) {
 				fixes = append(fixes, rule.RuleFixReplaceRange(
@@ -840,16 +835,16 @@ func fixToTypeImportDeclaration(sourceFile *ast.SourceFile, report ReportValueIm
 		// Separate type imports - handle different import types
 		if importDecl.ImportClause != nil {
 			importClause := importDecl.ImportClause.AsImportClause()
-			
+
 			// Categorize the import specifiers
 			var defaultImport *ast.Node
 			var namespaceImport *ast.Node
 			var namedImports []*ast.Node
-			
+
 			if importClause.Name() != nil {
 				defaultImport = importClause.Name()
 			}
-			
+
 			if importClause.NamedBindings != nil {
 				if ast.IsNamespaceImport(importClause.NamedBindings) {
 					namespaceImport = importClause.NamedBindings
@@ -860,15 +855,15 @@ func fixToTypeImportDeclaration(sourceFile *ast.SourceFile, report ReportValueIm
 					}
 				}
 			}
-			
+
 			// Check which parts are type-only
 			defaultIsType := defaultImport != nil && isInSpecifierList(defaultImport, report.TypeSpecifiers)
 			namespaceIsType := namespaceImport != nil && isInSpecifierList(namespaceImport, report.TypeSpecifiers)
-			
+
 			// Collect type and value named imports
 			var typeNamedImports []string
 			var valueNamedImports []string
-			
+
 			for _, namedImport := range namedImports {
 				if isInSpecifierList(namedImport, report.TypeSpecifiers) {
 					typeNamedImports = append(typeNamedImports, getImportSpecifierText(sourceFile, namedImport))
@@ -876,11 +871,11 @@ func fixToTypeImportDeclaration(sourceFile *ast.SourceFile, report ReportValueIm
 					valueNamedImports = append(valueNamedImports, getImportSpecifierText(sourceFile, namedImport))
 				}
 			}
-			
+
 			// Generate new import statements
 			moduleSpecifier := sourceText[int(importDecl.ModuleSpecifier.Pos()):int(importDecl.ModuleSpecifier.End())]
 			var newImports []string
-			
+
 			// Add type imports
 			if len(typeNamedImports) > 0 {
 				if sourceImports.TypeOnlyNamedImport != nil {
@@ -890,17 +885,17 @@ func fixToTypeImportDeclaration(sourceFile *ast.SourceFile, report ReportValueIm
 					newImports = append(newImports, fmt.Sprintf("import type { %s } from %s;", strings.Join(typeNamedImports, ", "), moduleSpecifier))
 				}
 			}
-			
+
 			if defaultIsType {
 				defaultText := sourceText[int(defaultImport.Pos()):int(defaultImport.End())]
 				newImports = append(newImports, fmt.Sprintf("import type %s from %s;", defaultText, moduleSpecifier))
 			}
-			
+
 			if namespaceIsType {
 				namespaceText := sourceText[int(namespaceImport.Pos()):int(namespaceImport.End())]
 				newImports = append(newImports, fmt.Sprintf("import type %s from %s;", namespaceText, moduleSpecifier))
 			}
-			
+
 			// Add new imports before the current import
 			if len(newImports) > 0 {
 				newImportText := strings.Join(newImports, "\n") + "\n"
@@ -909,16 +904,16 @@ func fixToTypeImportDeclaration(sourceFile *ast.SourceFile, report ReportValueIm
 					newImportText,
 				))
 			}
-			
+
 			// Generate the remaining value import
 			if len(report.ValueSpecifiers) > 0 || len(report.UnusedSpecifiers) > 0 {
 				// Need to reconstruct the import with only value specifiers
 				var remainingParts []string
-				
+
 				if defaultImport != nil && !defaultIsType {
 					remainingParts = append(remainingParts, sourceText[int(defaultImport.Pos()):int(defaultImport.End())])
 				}
-				
+
 				if namespaceImport != nil && !namespaceIsType {
 					namespaceText := sourceText[int(namespaceImport.Pos()):int(namespaceImport.End())]
 					if len(remainingParts) > 0 {
@@ -927,7 +922,7 @@ func fixToTypeImportDeclaration(sourceFile *ast.SourceFile, report ReportValueIm
 						remainingParts = append(remainingParts, namespaceText)
 					}
 				}
-				
+
 				if len(valueNamedImports) > 0 {
 					namedPart := "{ " + strings.Join(valueNamedImports, ", ") + " }"
 					if len(remainingParts) > 0 {
@@ -936,7 +931,7 @@ func fixToTypeImportDeclaration(sourceFile *ast.SourceFile, report ReportValueIm
 						remainingParts = append(remainingParts, namedPart)
 					}
 				}
-				
+
 				if len(remainingParts) > 0 {
 					newImport := fmt.Sprintf("import %s from %s;", strings.Join(remainingParts, ""), moduleSpecifier)
 					fixes = append(fixes, rule.RuleFixReplaceRange(
@@ -953,7 +948,7 @@ func fixToTypeImportDeclaration(sourceFile *ast.SourceFile, report ReportValueIm
 			} else {
 				// All specifiers are type-only, remove the original import
 				fixes = append(fixes, rule.RuleFixReplaceRange(
-					core.NewTextRange(int(report.Node.Pos()), int(report.Node.End())+1), // +1 to include newline  
+					core.NewTextRange(int(report.Node.Pos()), int(report.Node.End())+1), // +1 to include newline
 					"",
 				))
 			}
@@ -991,7 +986,7 @@ func getImportSpecifierText(sourceFile *ast.SourceFile, node *ast.Node) string {
 
 func mergeIntoExistingTypeImport(sourceFile *ast.SourceFile, existingImport *ast.Node, newSpecifiers []string) []rule.RuleFix {
 	var fixes []rule.RuleFix
-	
+
 	// Find the closing brace of the existing import
 	importDecl := existingImport.AsImportDeclaration()
 	if importDecl.ImportClause != nil {
@@ -1007,7 +1002,7 @@ func mergeIntoExistingTypeImport(sourceFile *ast.SourceFile, existingImport *ast
 			))
 		}
 	}
-	
+
 	return fixes
 }
 
@@ -1018,16 +1013,16 @@ func isIdentifierShadowedByTypeParameter(node *ast.Node, identifierName string) 
 	// Add a safety limit to prevent infinite loops
 	maxDepth := 5
 	depth := 0
-	
+
 	for current != nil && depth < maxDepth {
 		depth++
-		
+
 		// Break early if we reach the source file or module
 		switch current.Kind {
 		case ast.KindSourceFile, ast.KindModuleBlock:
 			return false
 		}
-		
+
 		// Check for type parameters in different contexts
 		var typeParameters *ast.TypeParameterList
 
@@ -1053,7 +1048,7 @@ func isIdentifierShadowedByTypeParameter(node *ast.Node, identifierName string) 
 					break
 				}
 				checked++
-				
+
 				if ast.IsTypeParameterDeclaration(typeParam) {
 					typeParamDecl := typeParam.AsTypeParameter()
 					if typeParamDecl.Name() != nil && ast.IsIdentifier(typeParamDecl.Name()) {
@@ -1067,7 +1062,7 @@ func isIdentifierShadowedByTypeParameter(node *ast.Node, identifierName string) 
 
 		current = current.Parent
 	}
-	
+
 	return false
 }
 
@@ -1076,7 +1071,7 @@ func analyzeShadowing(importDecl *ast.ImportDeclaration, localDeclarations map[s
 	if importDecl.ImportClause == nil {
 		return
 	}
-	
+
 	importClause := importDecl.ImportClause.AsImportClause()
 
 	// Check default import
@@ -1140,8 +1135,8 @@ func isDeclarationShadowingImport(importDecl *ast.ImportDeclaration, decl *ast.N
 	// Check if the declaration is a module-level declaration that would shadow the import
 	switch decl.Kind {
 	case ast.KindVariableStatement, ast.KindFunctionDeclaration, ast.KindClassDeclaration,
-		 ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration, ast.KindEnumDeclaration,
-		 ast.KindModuleDeclaration:
+		ast.KindInterfaceDeclaration, ast.KindTypeAliasDeclaration, ast.KindEnumDeclaration,
+		ast.KindModuleDeclaration:
 		// These are module-level declarations that can shadow imports
 		// We're simplifying by assuming all such declarations are at module scope
 		// which is typically true for these node types
@@ -1151,6 +1146,3 @@ func isDeclarationShadowingImport(importDecl *ast.ImportDeclaration, decl *ast.N
 		return false
 	}
 }
-
-
-

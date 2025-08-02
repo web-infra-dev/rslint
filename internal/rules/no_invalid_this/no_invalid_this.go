@@ -39,7 +39,7 @@ func (ct *contextTracker) isCurrentValid() bool {
 // Check if a function has a 'this' parameter (TypeScript feature)
 func hasThisParameter(node *ast.Node) bool {
 	var params []*ast.Node
-	
+
 	switch node.Kind {
 	case ast.KindFunctionDeclaration:
 		funcDecl := node.AsFunctionDeclaration()
@@ -59,7 +59,7 @@ func hasThisParameter(node *ast.Node) bool {
 	default:
 		return false
 	}
-	
+
 	// Check all parameters for TypeScript 'this' parameter
 	for _, param := range params {
 		if param.Kind == ast.KindParameter {
@@ -71,7 +71,7 @@ func hasThisParameter(node *ast.Node) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -80,9 +80,9 @@ func isConstructor(node *ast.Node, capIsConstructor bool) bool {
 	if !capIsConstructor {
 		return false
 	}
-	
+
 	var name string
-	
+
 	switch node.Kind {
 	case ast.KindFunctionDeclaration:
 		funcDecl := node.AsFunctionDeclaration()
@@ -97,12 +97,12 @@ func isConstructor(node *ast.Node, capIsConstructor bool) bool {
 			name = nameNode.AsIdentifier().Text
 		}
 	}
-	
+
 	if name != "" && len(name) > 0 {
 		// Check if first character is uppercase
 		return strings.ToUpper(name[:1]) == name[:1]
 	}
-	
+
 	// Check if this is being assigned to a capitalized variable
 	if node.Parent != nil {
 		switch node.Parent.Kind {
@@ -137,7 +137,7 @@ func isConstructor(node *ast.Node, capIsConstructor bool) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -145,8 +145,7 @@ func isConstructor(node *ast.Node, capIsConstructor bool) bool {
 func hasThisJSDocTag(node *ast.Node, sourceFile *ast.SourceFile) bool {
 	text := string(sourceFile.Text())
 	nodeStart := int(node.Pos())
-	
-	
+
 	// For function expressions, check different patterns
 	if node.Kind == ast.KindFunctionExpression {
 		// Pattern 1: foo(/* @this Obj */ function () {})
@@ -154,7 +153,7 @@ func hasThisJSDocTag(node *ast.Node, sourceFile *ast.SourceFile) bool {
 		// First check within the node itself (comment may be included in node range)
 		nodeEnd := int(node.End())
 		nodeText := text[nodeStart:nodeEnd]
-		
+
 		// Find the function keyword position within the node
 		funcKeywordPos := strings.Index(nodeText, "function")
 		if funcKeywordPos != -1 {
@@ -166,7 +165,7 @@ func hasThisJSDocTag(node *ast.Node, sourceFile *ast.SourceFile) bool {
 				if lastThisIdx != -1 {
 					beforeThis := beforeFuncText[:lastThisIdx]
 					afterThis := beforeFuncText[lastThisIdx:]
-					
+
 					// Check if it's in a block comment /* @this ... */
 					blockStart := strings.LastIndex(beforeThis, "/*")
 					if blockStart != -1 {
@@ -189,11 +188,11 @@ func hasThisJSDocTag(node *ast.Node, sourceFile *ast.SourceFile) bool {
 				}
 			}
 		}
-		
+
 		// Also check before the node (original logic)
 		searchStart := max(0, nodeStart-200)
 		searchText := text[searchStart:nodeStart]
-		
+
 		// Look for @this that's immediately before the function keyword
 		if strings.Contains(searchText, "@this") {
 			// Find the last @this before the function
@@ -201,7 +200,7 @@ func hasThisJSDocTag(node *ast.Node, sourceFile *ast.SourceFile) bool {
 			if lastThisIdx != -1 {
 				beforeThis := searchText[:lastThisIdx]
 				afterThis := searchText[lastThisIdx:]
-				
+
 				// Check if it's in a block comment /* @this ... */
 				blockStart := strings.LastIndex(beforeThis, "/*")
 				if blockStart != -1 {
@@ -223,14 +222,14 @@ func hasThisJSDocTag(node *ast.Node, sourceFile *ast.SourceFile) bool {
 				}
 			}
 		}
-		
+
 		// Pattern 2: return /** @this Obj */ function bar() {}
 		// Check if we're in a return statement context with @this comment
 		if node.Parent != nil && node.Parent.Kind == ast.KindReturnStatement {
 			returnStmtStart := int(node.Parent.Pos())
 			returnStmtEnd := int(node.Parent.End())
 			returnText := text[returnStmtStart:returnStmtEnd]
-			
+
 			// Check if there's @this comment in the return statement before the function
 			if strings.Contains(returnText, "@this") {
 				thisIdx := strings.Index(returnText, "@this")
@@ -239,7 +238,7 @@ func hasThisJSDocTag(node *ast.Node, sourceFile *ast.SourceFile) bool {
 					// Check if @this is in a comment
 					beforeThis := returnText[:thisIdx]
 					afterThis := returnText[thisIdx:]
-					
+
 					// Check for JSDoc comment /** @this ... */
 					jsdocStart := strings.LastIndex(beforeThis, "/**")
 					if jsdocStart != -1 {
@@ -251,7 +250,7 @@ func hasThisJSDocTag(node *ast.Node, sourceFile *ast.SourceFile) bool {
 							}
 						}
 					}
-					
+
 					// Check for block comment /* @this ... */
 					blockStart := strings.LastIndex(beforeThis, "/*")
 					if blockStart != -1 {
@@ -266,22 +265,22 @@ func hasThisJSDocTag(node *ast.Node, sourceFile *ast.SourceFile) bool {
 				}
 			}
 		}
-		
+
 		return false
 	}
-	
+
 	// For function declarations, check for JSDoc comments before the function
 	if node.Kind == ast.KindFunctionDeclaration {
 		// The function node may include leading JSDoc comments, so check the entire node range
 		nodeEnd := int(node.End())
 		nodeText := text[nodeStart:nodeEnd]
-		
+
 		// Find the position of the actual "function" keyword within the node
 		funcKeywordPos := strings.Index(nodeText, "function")
 		if funcKeywordPos == -1 {
 			return false
 		}
-		
+
 		// Search the text before the function keyword for @this
 		searchText := nodeText[:funcKeywordPos]
 		if strings.Contains(searchText, "@this") {
@@ -296,13 +295,13 @@ func hasThisJSDocTag(node *ast.Node, sourceFile *ast.SourceFile) bool {
 				thisIndices = append(thisIndices, searchIndex+idx)
 				searchIndex += idx + 5
 			}
-			
+
 			// Check each @this occurrence (starting from the last one)
 			for i := len(thisIndices) - 1; i >= 0; i-- {
 				thisIdx := thisIndices[i]
 				beforeThis := searchText[:thisIdx]
 				afterThis := searchText[thisIdx:]
-				
+
 				// Check for JSDoc comment /** ... @this ... */
 				jsdocStart := strings.LastIndex(beforeThis, "/**")
 				if jsdocStart != -1 {
@@ -321,7 +320,7 @@ func hasThisJSDocTag(node *ast.Node, sourceFile *ast.SourceFile) bool {
 						}
 					}
 				}
-				
+
 				// Check for multiline JSDoc with * @this pattern
 				lineStartIdx := strings.LastIndex(beforeThis, "\n")
 				if lineStartIdx != -1 {
@@ -338,7 +337,7 @@ func hasThisJSDocTag(node *ast.Node, sourceFile *ast.SourceFile) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -355,12 +354,12 @@ func isFunctionArgument(node *ast.Node) bool {
 	if parent == nil {
 		return false
 	}
-	
+
 	// If parent is a call expression, this function is likely an argument
 	if parent.Kind == ast.KindCallExpression {
 		return true
 	}
-	
+
 	// Check if parent is an argument list, which means we're in a call
 	current := parent
 	for current != nil {
@@ -369,10 +368,9 @@ func isFunctionArgument(node *ast.Node) bool {
 		}
 		current = current.Parent
 	}
-	
+
 	return false
 }
-
 
 func isWhitespace(ch byte) bool {
 	return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'
@@ -383,7 +381,7 @@ func isNullOrUndefined(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	
+
 	switch node.Kind {
 	case ast.KindNullKeyword:
 		return true
@@ -392,12 +390,12 @@ func isNullOrUndefined(node *ast.Node) bool {
 	case ast.KindVoidExpression:
 		return true
 	}
-	
+
 	if ast.IsIdentifier(node) {
 		text := node.AsIdentifier().Text
 		return text == "undefined" || text == "null"
 	}
-	
+
 	return false
 }
 
@@ -407,7 +405,7 @@ func isValidMethodContext(node *ast.Node) bool {
 	if parent == nil {
 		return false
 	}
-	
+
 	switch parent.Kind {
 	case ast.KindPropertyAssignment:
 		// Direct object method assignment
@@ -441,7 +439,7 @@ func isValidMethodContext(node *ast.Node) bool {
 		// Check function passed to certain methods
 		return isValidCallContext(parent, node)
 	}
-	
+
 	// Check if nested in object definition patterns or other valid contexts
 	return false
 }
@@ -452,17 +450,17 @@ func isValidAssignmentContext(parent *ast.Node, funcNode *ast.Node) bool {
 	if binExpr.OperatorToken.Kind != ast.KindEqualsToken {
 		return false
 	}
-	
+
 	// Direct property assignment (obj.foo = function)
 	if ast.IsPropertyAccessExpression(binExpr.Left) {
 		return true
 	}
-	
+
 	// Check if the function is the direct assignment value
 	if binExpr.Right == funcNode {
 		return ast.IsPropertyAccessExpression(binExpr.Left)
 	}
-	
+
 	// Check if in conditional/logical assignment
 	return isNestedInValidAssignment(binExpr.Right, funcNode)
 }
@@ -472,7 +470,7 @@ func isNestedInValidAssignment(node *ast.Node, target *ast.Node) bool {
 	if node == target {
 		return true
 	}
-	
+
 	switch node.Kind {
 	case ast.KindConditionalExpression:
 		cond := node.AsConditionalExpression()
@@ -497,7 +495,7 @@ func isNestedInValidAssignment(node *ast.Node, target *ast.Node) bool {
 		arrow := node.AsArrowFunction()
 		return arrow.Body == target || isNestedInValidAssignment(arrow.Body, target)
 	}
-	
+
 	return false
 }
 
@@ -506,14 +504,14 @@ func containsTargetFunction(container *ast.Node, target *ast.Node) bool {
 	if container == target {
 		return true
 	}
-	
+
 	if ast.IsFunctionExpression(container) {
 		funcExpr := container.AsFunctionExpression()
 		if funcExpr.Body != nil {
 			return findFunctionInBody(funcExpr.Body, target)
 		}
 	}
-	
+
 	return false
 }
 
@@ -522,7 +520,7 @@ func findFunctionInBody(body *ast.Node, target *ast.Node) bool {
 	if body == target {
 		return true
 	}
-	
+
 	if body.Kind == ast.KindBlock {
 		block := body.AsBlock()
 		for _, stmt := range block.Statements.Nodes {
@@ -534,7 +532,7 @@ func findFunctionInBody(body *ast.Node, target *ast.Node) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -545,7 +543,7 @@ func isValidConditionalContext(parent *ast.Node, funcNode *ast.Node) bool {
 	if grandParent == nil {
 		return false
 	}
-	
+
 	switch grandParent.Kind {
 	case ast.KindBinaryExpression:
 		return isValidAssignmentContext(grandParent, parent)
@@ -556,7 +554,7 @@ func isValidConditionalContext(parent *ast.Node, funcNode *ast.Node) bool {
 		// nested conditional: a ? (b ? func1 : func2) : func3
 		return isValidConditionalContext(grandParent, parent)
 	}
-	
+
 	return false
 }
 
@@ -605,7 +603,7 @@ func isInObjectLiteralContext(node *ast.Node) bool {
 func isValidCallContext(parent *ast.Node, funcNode *ast.Node) bool {
 	callExpr := parent.AsCallExpression()
 	args := callExpr.Arguments.Nodes
-	
+
 	// Find the position of the function in arguments
 	funcArgIndex := -1
 	for i, arg := range args {
@@ -614,11 +612,11 @@ func isValidCallContext(parent *ast.Node, funcNode *ast.Node) bool {
 			break
 		}
 	}
-	
+
 	if funcArgIndex == -1 {
 		return false
 	}
-	
+
 	// Only consider property access expressions (like obj.method())
 	// Plain identifier calls like foo() should not be valid contexts
 	if ast.IsPropertyAccessExpression(callExpr.Expression) {
@@ -644,14 +642,14 @@ func isValidCallContext(parent *ast.Node, funcNode *ast.Node) bool {
 			}
 		}
 	}
-	
+
 	// Check Array.from(iterable, mapFn, thisArg)
 	if ast.IsPropertyAccessExpression(callExpr.Expression) {
 		propAccess := callExpr.Expression.AsPropertyAccessExpression()
 		nameNode := propAccess.Name()
 		if ast.IsIdentifier(propAccess.Expression) && ast.IsIdentifier(nameNode) {
-			if propAccess.Expression.AsIdentifier().Text == "Array" && 
-			   nameNode.AsIdentifier().Text == "from" {
+			if propAccess.Expression.AsIdentifier().Text == "Array" &&
+				nameNode.AsIdentifier().Text == "from" {
 				if funcArgIndex == 1 && len(args) > 2 {
 					return !isNullOrUndefined(args[2])
 				}
@@ -661,21 +659,21 @@ func isValidCallContext(parent *ast.Node, funcNode *ast.Node) bool {
 			}
 		}
 	}
-	
+
 	// Check Reflect.apply(target, thisArgument, argumentsList)
 	if ast.IsPropertyAccessExpression(callExpr.Expression) {
 		propAccess := callExpr.Expression.AsPropertyAccessExpression()
 		nameNode := propAccess.Name()
 		if ast.IsIdentifier(propAccess.Expression) && ast.IsIdentifier(nameNode) {
-			if propAccess.Expression.AsIdentifier().Text == "Reflect" && 
-			   nameNode.AsIdentifier().Text == "apply" {
+			if propAccess.Expression.AsIdentifier().Text == "Reflect" &&
+				nameNode.AsIdentifier().Text == "apply" {
 				if funcArgIndex == 0 && len(args) > 1 {
 					return !isNullOrUndefined(args[1])
 				}
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -709,7 +707,7 @@ func isInFunctionBinding(node *ast.Node) bool {
 				for targetNode != nil && targetNode.Kind == ast.KindParenthesizedExpression {
 					targetNode = targetNode.AsParenthesizedExpression().Expression
 				}
-				
+
 				if targetNode == node {
 					nameNode := propAccess.Name()
 					if ast.IsIdentifier(nameNode) {
@@ -735,10 +733,10 @@ func isReturnedFromIIFE(node *ast.Node) bool {
 	// Two cases to handle:
 	// 1. Explicit return statement: return function() {}
 	// 2. Arrow function implicit return: () => function() {}
-	
+
 	parent := node.Parent
 	var containingFunc *ast.Node
-	
+
 	if parent != nil && parent.Kind == ast.KindReturnStatement {
 		// Case 1: Explicit return statement
 		// Walk up to find the containing function
@@ -762,11 +760,11 @@ func isReturnedFromIIFE(node *ast.Node) bool {
 			containingFunc = parent
 		}
 	}
-	
+
 	if containingFunc == nil {
 		return false
 	}
-	
+
 	// Check if the containing function is an IIFE
 	funcParent := containingFunc.Parent
 	// Handle direct call without parentheses (for arrow functions)
@@ -813,7 +811,7 @@ func isReturnedFromIIFE(node *ast.Node) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -827,7 +825,7 @@ var NoInvalidThisRule = rule.Rule{
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -835,18 +833,18 @@ var NoInvalidThisRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if capIsConstructor, ok := optsMap["capIsConstructor"].(bool); ok {
 					opts.CapIsConstructor = capIsConstructor
 				}
 			}
 		}
-		
+
 		tracker := &contextTracker{
 			stack: []bool{false}, // Start with global scope (invalid)
 		}
-		
+
 		return rule.RuleListeners{
 			// Class contexts
 			ast.KindClassDeclaration: func(node *ast.Node) {
@@ -861,7 +859,7 @@ var NoInvalidThisRule = rule.Rule{
 			rule.ListenerOnExit(ast.KindClassExpression): func(node *ast.Node) {
 				tracker.pop()
 			},
-			
+
 			// Property definitions (class properties)
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
 				tracker.pushValid()
@@ -869,9 +867,9 @@ var NoInvalidThisRule = rule.Rule{
 			rule.ListenerOnExit(ast.KindPropertyDeclaration): func(node *ast.Node) {
 				tracker.pop()
 			},
-			
+
 			// Note: TypeScript accessor properties are handled as PropertyDeclaration with modifiers
-			
+
 			// Constructor
 			ast.KindConstructor: func(node *ast.Node) {
 				tracker.pushValid()
@@ -879,7 +877,7 @@ var NoInvalidThisRule = rule.Rule{
 			rule.ListenerOnExit(ast.KindConstructor): func(node *ast.Node) {
 				tracker.pop()
 			},
-			
+
 			// Methods
 			ast.KindMethodDeclaration: func(node *ast.Node) {
 				tracker.pushValid()
@@ -887,7 +885,7 @@ var NoInvalidThisRule = rule.Rule{
 			rule.ListenerOnExit(ast.KindMethodDeclaration): func(node *ast.Node) {
 				tracker.pop()
 			},
-			
+
 			// Getter/Setter
 			ast.KindGetAccessor: func(node *ast.Node) {
 				tracker.pushValid()
@@ -901,7 +899,7 @@ var NoInvalidThisRule = rule.Rule{
 			rule.ListenerOnExit(ast.KindSetAccessor): func(node *ast.Node) {
 				tracker.pop()
 			},
-			
+
 			// Function declarations
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
 				valid := false
@@ -915,7 +913,7 @@ var NoInvalidThisRule = rule.Rule{
 				} else if isInClassContext(node) {
 					valid = true
 				}
-				
+
 				if valid {
 					tracker.pushValid()
 				} else {
@@ -925,7 +923,7 @@ var NoInvalidThisRule = rule.Rule{
 			rule.ListenerOnExit(ast.KindFunctionDeclaration): func(node *ast.Node) {
 				tracker.pop()
 			},
-			
+
 			// Function expressions
 			ast.KindFunctionExpression: func(node *ast.Node) {
 				valid := false
@@ -957,7 +955,7 @@ var NoInvalidThisRule = rule.Rule{
 						}
 					}
 				}
-				
+
 				if valid {
 					tracker.pushValid()
 				} else {
@@ -967,13 +965,13 @@ var NoInvalidThisRule = rule.Rule{
 			rule.ListenerOnExit(ast.KindFunctionExpression): func(node *ast.Node) {
 				tracker.pop()
 			},
-			
+
 			// Arrow functions
 			ast.KindArrowFunction: func(node *ast.Node) {
 				// Arrow functions inherit 'this' from parent scope
 				// Don't change the stack
 			},
-			
+
 			// ThisExpression - the actual check
 			ast.KindThisKeyword: func(node *ast.Node) {
 				if !tracker.isCurrentValid() {

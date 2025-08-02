@@ -12,19 +12,19 @@ import (
 )
 
 type typeParameterInfo struct {
-	node      *ast.Node
-	count     int
+	node            *ast.Node
+	count           int
 	assumedMultiple bool
 }
 
 type typeParameterCounter struct {
-	checker           *checker.Checker
-	typeParameters    map[*ast.Node]*typeParameterInfo
-	visitedTypes      map[uintptr]int
+	checker            *checker.Checker
+	typeParameters     map[*ast.Node]*typeParameterInfo
+	visitedTypes       map[uintptr]int
 	visitedSymbolLists map[uintptr]bool
 	visitedConstraints map[*ast.Node]bool
-	visitedDefault    bool
-	fromClass         bool
+	visitedDefault     bool
+	fromClass          bool
 }
 
 func newTypeParameterCounter(checker *checker.Checker, fromClass bool) *typeParameterCounter {
@@ -44,7 +44,7 @@ func (c *typeParameterCounter) incrementTypeParameter(node *ast.Node, assumeMult
 		info = &typeParameterInfo{node: node}
 		c.typeParameters[node] = info
 	}
-	
+
 	increment := 1
 	if assumeMultiple {
 		increment = 2
@@ -88,7 +88,7 @@ func (c *typeParameterCounter) visitType(t *checker.Type, assumeMultipleUses, is
 			return
 		}
 	}
-	
+
 	// Handle array-like types and their element types
 	if c.checker.IsArrayLikeType(t) {
 		// Visit the element type of arrays
@@ -97,19 +97,19 @@ func (c *typeParameterCounter) visitType(t *checker.Type, assumeMultipleUses, is
 		}
 		return
 	}
-	
+
 	// Get properties if it's an object type
 	properties := c.checker.GetPropertiesOfType(t)
 	if len(properties) > 0 {
 		c.visitSymbolsListOnce(properties, false)
 	}
-	
+
 	// Get signatures if available
 	callSigs := c.checker.GetSignaturesOfType(t, checker.SignatureKindCall)
 	for _, sig := range callSigs {
 		c.visitSignature(sig)
 	}
-	
+
 	constructSigs := c.checker.GetSignaturesOfType(t, checker.SignatureKindConstruct)
 	for _, sig := range constructSigs {
 		c.visitSignature(sig)
@@ -120,7 +120,7 @@ func (c *typeParameterCounter) visitSignature(sig *checker.Signature) {
 	if sig == nil {
 		return
 	}
-	
+
 	// Enhanced signature traversal using available checker methods
 	// Visit parameter types
 	params := sig.Parameters()
@@ -132,13 +132,13 @@ func (c *typeParameterCounter) visitSignature(sig *checker.Signature) {
 			}
 		}
 	}
-	
+
 	// Visit return type
 	returnType := c.checker.GetReturnTypeOfSignature(sig)
 	if returnType != nil {
 		c.visitType(returnType, false, false)
 	}
-	
+
 	// Visit declaration if available
 	if sig.Declaration() != nil {
 		decl := sig.Declaration()
@@ -164,15 +164,15 @@ func (c *typeParameterCounter) visitSymbolsListOnce(symbols []*ast.Symbol, assum
 		// to get a unique identifier for the symbol list
 		key = uintptr(len(symbols))
 	}
-	
+
 	if key != 0 && c.visitedSymbolLists[key] {
 		return
 	}
-	
+
 	if key != 0 {
 		c.visitedSymbolLists[key] = true
 	}
-	
+
 	for _, sym := range symbols {
 		c.visitType(c.checker.GetTypeOfSymbol(sym), assumeMultipleUses, false)
 	}
@@ -183,7 +183,7 @@ func isMappedType(t *checker.Type) bool {
 	if t == nil {
 		return false
 	}
-	
+
 	// Check if this type has mapped type characteristics
 	flags := t.Flags()
 	// Mapped types are typically object types with specific flags
@@ -205,40 +205,40 @@ func isOperatorType(t *checker.Type) bool {
 	if t == nil {
 		return false
 	}
-	
+
 	// Check for union and intersection types which are common operator types
 	flags := t.Flags()
-	return flags&checker.TypeFlagsUnion != 0 || 
-		   flags&checker.TypeFlagsIntersection != 0 ||
-		   flags&checker.TypeFlagsIndex != 0 ||
-		   flags&checker.TypeFlagsIndexedAccess != 0
+	return flags&checker.TypeFlagsUnion != 0 ||
+		flags&checker.TypeFlagsIntersection != 0 ||
+		flags&checker.TypeFlagsIndex != 0 ||
+		flags&checker.TypeFlagsIndexedAccess != 0
 }
 
 // Scope functionality not available in this rule system - simplified for now
 func isTypeParameterRepeatedInAST(typeParam *ast.Node, references []*ast.Node, startOfBody int) bool {
 	count := 0
 	typeParamName := typeParam.AsTypeParameter().Name().Text()
-	
+
 	for _, ref := range references {
 		// Skip references inside the type parameter's definition
 		if ref.Pos() < typeParam.End() && ref.End() > typeParam.Pos() {
 			continue
 		}
-		
+
 		// Skip references outside the declaring signature
 		if startOfBody > 0 && ref.Pos() > startOfBody {
 			continue
 		}
-		
+
 		// Check if reference is to the same type parameter
 		if !isTypeReference(ref, typeParamName) {
 			continue
 		}
-		
+
 		// Check if used as type argument
 		if ref.Parent != nil && ref.Parent.Kind == ast.KindTypeReference {
 			grandparent := skipConstituentsUpward(ref.Parent.Parent)
-			
+
 			if grandparent != nil && grandparent.Kind == ast.KindExpressionWithTypeArguments {
 				typeRef := grandparent.Parent
 				if typeRef != nil && typeRef.Kind == ast.KindTypeReference {
@@ -252,13 +252,13 @@ func isTypeParameterRepeatedInAST(typeParam *ast.Node, references []*ast.Node, s
 				}
 			}
 		}
-		
+
 		count++
 		if count >= 2 {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -266,18 +266,18 @@ func isTypeReference(node *ast.Node, name string) bool {
 	if !ast.IsIdentifier(node) {
 		return false
 	}
-	
+
 	identifier := node.AsIdentifier()
 	if identifier.Text != name {
 		return false
 	}
-	
+
 	// Check if it's a type reference (simplified check)
 	parent := node.Parent
 	if parent == nil {
 		return false
 	}
-	
+
 	// Common patterns for type references
 	switch parent.Kind {
 	case ast.KindTypeReference,
@@ -293,7 +293,7 @@ func isTypeReference(node *ast.Node, name string) bool {
 		ast.KindTypePredicate:
 		return true
 	}
-	
+
 	return false
 }
 
@@ -301,7 +301,7 @@ func skipConstituentsUpward(node *ast.Node) *ast.Node {
 	if node == nil {
 		return nil
 	}
-	
+
 	switch node.Kind {
 	case ast.KindIntersectionType, ast.KindUnionType:
 		return skipConstituentsUpward(node.Parent)
@@ -328,12 +328,12 @@ func getBodyStart(node *ast.Node) int {
 			return method.Body.Pos()
 		}
 	}
-	
+
 	// For signatures without body, use return type end position
 	if returnType := getReturnType(node); returnType != nil {
 		return returnType.End()
 	}
-	
+
 	return -1
 }
 
@@ -378,7 +378,7 @@ func getConstraintText(ctx rule.RuleContext, constraint *ast.Node) string {
 	if constraint == nil || constraint.Kind == ast.KindAnyKeyword {
 		return "unknown"
 	}
-	
+
 	// Simplified text extraction
 	text := string(ctx.SourceFile.Text()[constraint.Pos():constraint.End()])
 	return text
@@ -387,23 +387,23 @@ func getConstraintText(ctx rule.RuleContext, constraint *ast.Node) string {
 func countTypeParameterUsages(ctx rule.RuleContext, node *ast.Node, typeParamName string, typeParamNode *ast.Node) int {
 	// Simplified approach: count all meaningful occurrences of the type parameter
 	nodeText := string(ctx.SourceFile.Text()[node.Pos():node.End()])
-	
+
 	count := 0
 	start := 0
-	
+
 	// Get the type parameter declaration range to exclude it
 	typeParamStart := typeParamNode.Pos() - node.Pos()
 	typeParamEnd := typeParamNode.End() - node.Pos()
-	
+
 	// Count all occurrences of the type parameter name
 	for {
 		index := strings.Index(nodeText[start:], typeParamName)
 		if index == -1 {
 			break
 		}
-		
+
 		actualIndex := start + index
-		
+
 		// Check if this is a whole word (not part of another identifier)
 		isWholeWord := true
 		if actualIndex > 0 {
@@ -418,14 +418,14 @@ func countTypeParameterUsages(ctx rule.RuleContext, node *ast.Node, typeParamNam
 				isWholeWord = false
 			}
 		}
-		
+
 		if isWholeWord {
 			// Skip if this occurrence is within the type parameter declaration itself
 			if actualIndex >= typeParamStart && actualIndex < typeParamEnd {
 				start = actualIndex + 1
 				continue
 			}
-			
+
 			// Skip if this is in a constraint - constraints don't count as usage
 			isInConstraint := false
 			if node.TypeParameters() != nil {
@@ -441,33 +441,33 @@ func countTypeParameterUsages(ctx rule.RuleContext, node *ast.Node, typeParamNam
 					}
 				}
 			}
-			
+
 			// Count valid occurrences
 			if !isInConstraint {
 				count++
 			}
 		}
-		
+
 		start = actualIndex + 1
 	}
-	
+
 	// Special case handling for specific patterns
 	if count == 1 {
 		// Pattern 1: Class with method returning property (Box<T> pattern)
 		if (node.Kind == ast.KindClassDeclaration || node.Kind == ast.KindClassExpression) && strings.Contains(nodeText, "return this.") {
 			count++
 		}
-		
+
 		// Pattern 2: Declare class method with parameter and return type using same type param
 		// Example: getProp<T>(this: Record<'prop', T>): T;
 		if strings.Contains(nodeText, "declare class") && strings.Contains(nodeText, "Record<") && strings.Contains(nodeText, "): "+typeParamName) {
 			count++
 		}
 	}
-	
+
 	// Debug output
 	// fmt.Printf("Type parameter %s: count=%d\n", typeParamName, count)
-		
+
 	return count
 }
 
@@ -478,22 +478,22 @@ var NoUnnecessaryTypeParametersRule = rule.Rule{
 		if checker == nil {
 			return rule.RuleListeners{}
 		}
-		
+
 		checkNode := func(node *ast.Node, descriptor string) {
 			if node.TypeParameters() == nil || len(node.TypeParameters()) == 0 {
 				return
 			}
-			
+
 			// Scope functionality not available - simplified implementation
 			counter := newTypeParameterCounter(checker, descriptor == "class")
-			
+
 			// Count type parameter usage
 			if descriptor == "class" {
 				// For classes, check all type parameters and members
 				for _, typeParam := range node.TypeParameters() {
 					counter.visitType(checker.GetTypeAtLocation(typeParam), false, false)
 				}
-				
+
 				// Check class members
 				var members []*ast.Node
 				switch node.Kind {
@@ -502,7 +502,7 @@ var NoUnnecessaryTypeParametersRule = rule.Rule{
 				case ast.KindClassExpression:
 					members = node.AsClassExpression().Members.Nodes
 				}
-				
+
 				for _, member := range members {
 					counter.visitType(ctx.TypeChecker.GetTypeAtLocation(member), false, false)
 				}
@@ -511,29 +511,29 @@ var NoUnnecessaryTypeParametersRule = rule.Rule{
 				// Note: GetSignatureFromDeclaration not accessible, using simplified approach
 				// Signature checking skipped for now
 			}
-			
+
 			// Check each type parameter
 			for _, typeParam := range node.TypeParameters() {
 				typeParamDecl := typeParam.AsTypeParameter()
 				typeParamName := typeParamDecl.Name().Text()
-				
+
 				// Count type parameter usages
 				usageCount := countTypeParameterUsages(ctx, node, typeParamName, typeParam)
-				
+
 				// Debug: print usage count for debugging
 				// fmt.Printf("Type parameter %s has %d usages\n", typeParamName, usageCount)
-				
+
 				// For valid usage, we need at least 2 meaningful uses
 				// Exception: if used in constraints (like K extends keyof T), that counts as meaningful
 				if usageCount > 1 {
 					continue
 				}
-				
+
 				// Special case: check if type parameter is used in constraints of other type parameters
 				// or if this type parameter has a meaningful constraint itself
 				isUsedInConstraints := false
 				hasConstraint := false
-				
+
 				// Check if this type parameter has a constraint
 				if typeParamDecl.Constraint != nil {
 					constraintText := string(ctx.SourceFile.Text()[typeParamDecl.Constraint.Pos():typeParamDecl.Constraint.End()])
@@ -549,7 +549,7 @@ var NoUnnecessaryTypeParametersRule = rule.Rule{
 						}
 					}
 				}
-				
+
 				// Check if this type parameter is used in constraints of other type parameters
 				for _, otherTypeParam := range node.TypeParameters() {
 					if otherTypeParam == typeParam {
@@ -564,29 +564,29 @@ var NoUnnecessaryTypeParametersRule = rule.Rule{
 						}
 					}
 				}
-				
+
 				// If used in constraints and has at least one other usage, it's valid
 				// Or if this type parameter has a meaningful constraint and is used, it's valid
 				if (isUsedInConstraints && usageCount >= 1) || (hasConstraint && usageCount >= 1) {
 					continue
 				}
-				
+
 				// Report the issue
 				uses := "never used"
 				if usageCount == 1 {
 					uses = "used only once"
 				}
-				
+
 				message := rule.RuleMessage{
-					Id: "sole",
+					Id:          "sole",
 					Description: fmt.Sprintf("Type parameter %s is %s in the %s signature.", typeParamName, uses, descriptor),
 				}
-				
+
 				// Report without suggestions to match test expectations
 				// Use the full type parameter position instead of just the name
 				startPos := typeParam.Pos()
 				endPos := typeParam.End()
-				
+
 				// For better precision, try to find the actual identifier position within the type parameter
 				nameNode := typeParamDecl.Name()
 				if nameNode != nil {
@@ -594,14 +594,14 @@ var NoUnnecessaryTypeParametersRule = rule.Rule{
 					startPos = nameNode.Pos()
 					endPos = nameNode.End()
 				}
-				
+
 				ctx.ReportRange(
 					core.NewTextRange(startPos, endPos),
 					message,
 				)
 			}
 		}
-		
+
 		return rule.RuleListeners{
 			ast.KindArrowFunction: func(node *ast.Node) {
 				if node.TypeParameters() != nil {
@@ -656,24 +656,24 @@ var NoUnnecessaryTypeParametersRule = rule.Rule{
 
 func createFixes(ctx rule.RuleContext, node *ast.Node, typeParam *ast.Node, typeParamName, constraintText string, references []*ast.Node) []rule.RuleFix {
 	var fixes []rule.RuleFix
-	
+
 	// Replace all usages with constraint
 	for _, ref := range references {
 		if ref.Parent != nil && isTypeReference(ref, typeParamName) {
 			needsParens := shouldWrapConstraint(typeParam.AsTypeParameter().Constraint, ref.Parent)
-			
+
 			replacement := constraintText
 			if needsParens && constraintText != "unknown" {
 				replacement = "(" + constraintText + ")"
 			}
-			
+
 			fixes = append(fixes, rule.RuleFix{
 				Range: core.NewTextRange(ref.Pos(), ref.End()),
 				Text:  replacement,
 			})
 		}
 	}
-	
+
 	// Remove type parameter from declaration
 	typeParams := node.TypeParameters()
 	if typeParams != nil && len(typeParams) > 0 {
@@ -693,11 +693,11 @@ func createFixes(ctx rule.RuleContext, node *ast.Node, typeParam *ast.Node, type
 					break
 				}
 			}
-			
+
 			if index >= 0 {
 				start := typeParam.Pos()
 				end := typeParam.End()
-				
+
 				if index == 0 {
 					// First parameter - remove up to next comma
 					if index+1 < len(typeParams) {
@@ -722,7 +722,7 @@ func createFixes(ctx rule.RuleContext, node *ast.Node, typeParam *ast.Node, type
 						start = prevParam.End() + commaIndex
 					}
 				}
-				
+
 				fixes = append(fixes, rule.RuleFix{
 					Range: core.NewTextRange(start, end),
 					Text:  "",
@@ -730,7 +730,7 @@ func createFixes(ctx rule.RuleContext, node *ast.Node, typeParam *ast.Node, type
 			}
 		}
 	}
-	
+
 	return fixes
 }
 
@@ -738,17 +738,17 @@ func shouldWrapConstraint(constraint *ast.Node, parentNode *ast.Node) bool {
 	if constraint == nil {
 		return false
 	}
-	
+
 	isComplexType := false
 	switch constraint.Kind {
 	case ast.KindUnionType, ast.KindIntersectionType, ast.KindConditionalType:
 		isComplexType = true
 	}
-	
+
 	if !isComplexType {
 		return false
 	}
-	
+
 	// Check if parent requires wrapping
 	if parentNode != nil && parentNode.Parent != nil {
 		switch parentNode.Parent.Kind {
@@ -756,6 +756,6 @@ func shouldWrapConstraint(constraint *ast.Node, parentNode *ast.Node) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }

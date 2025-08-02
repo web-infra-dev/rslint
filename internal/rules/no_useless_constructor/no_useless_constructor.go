@@ -38,20 +38,20 @@ func checkAccessibility(node *ast.Node) bool {
 				// protected or private constructors are not useless
 				return false
 			case ast.KindPublicKeyword:
-					// public constructors in classes with superClass are not useless
-					if classNode != nil && ast.IsClassDeclaration(classNode) {
-						classDecl := classNode.AsClassDeclaration()
-						if classDecl.HeritageClauses != nil {
-							for _, clause := range classDecl.HeritageClauses.Nodes {
-								if clause.AsHeritageClause().Token == ast.KindExtendsKeyword {
-									return false
-								}
+				// public constructors in classes with superClass are not useless
+				if classNode != nil && ast.IsClassDeclaration(classNode) {
+					classDecl := classNode.AsClassDeclaration()
+					if classDecl.HeritageClauses != nil {
+						for _, clause := range classDecl.HeritageClauses.Nodes {
+							if clause.AsHeritageClause().Token == ast.KindExtendsKeyword {
+								return false
 							}
 						}
 					}
 				}
 			}
 		}
+	}
 
 	return true
 }
@@ -177,8 +177,8 @@ func isConstructorUseless(node *ast.Node) bool {
 		arg := superArgs.Nodes[0]
 		if arg.Kind == ast.KindSpreadElement {
 			spreadExpr := arg.AsSpreadElement().Expression
-			if spreadExpr.Kind == ast.KindIdentifier && 
-			   spreadExpr.AsIdentifier().Text == "arguments" {
+			if spreadExpr.Kind == ast.KindIdentifier &&
+				spreadExpr.AsIdentifier().Text == "arguments" {
 				// Check if any parameter has complex pattern (destructuring, default values)
 				// If so, the constructor is not useless even with super(...arguments)
 				for _, param := range ctorParams.Nodes {
@@ -225,7 +225,7 @@ func isConstructorUseless(node *ast.Node) bool {
 
 	// If we have rest parameters, check for spread in super call
 	if restParam != nil {
-		// Check if last argument is spread of rest parameter  
+		// Check if last argument is spread of rest parameter
 		if len(superArgs.Nodes) == 0 {
 			return false
 		}
@@ -269,8 +269,8 @@ func isConstructorUseless(node *ast.Node) bool {
 				arg := superArgs.Nodes[0]
 				if arg.Kind == ast.KindSpreadElement {
 					spreadExpr := arg.AsSpreadElement().Expression
-					if spreadExpr.Kind == ast.KindIdentifier && 
-					   spreadExpr.AsIdentifier().Text == "arguments" {
+					if spreadExpr.Kind == ast.KindIdentifier &&
+						spreadExpr.AsIdentifier().Text == "arguments" {
 						return true
 					}
 				}
@@ -315,7 +315,7 @@ func getConstructorRange(ctx rule.RuleContext, node *ast.Node) core.TextRange {
 	// Find the start of constructor including any leading whitespace on the same line
 	start := node.Pos()
 	text := ctx.SourceFile.Text()
-	
+
 	// Move back to beginning of line
 	for start > 0 && text[start-1] != '\n' {
 		start--
@@ -323,7 +323,7 @@ func getConstructorRange(ctx rule.RuleContext, node *ast.Node) core.TextRange {
 
 	// Find end including the closing brace and any trailing whitespace
 	end := node.End()
-	
+
 	// Skip trailing whitespace and include newline if present
 	for end < len(text) && (text[end] == ' ' || text[end] == '\t') {
 		end++
@@ -331,7 +331,7 @@ func getConstructorRange(ctx rule.RuleContext, node *ast.Node) core.TextRange {
 	if end < len(text) && text[end] == '\n' {
 		end++
 	}
-	
+
 	return core.NewTextRange(start, end)
 }
 
@@ -357,7 +357,7 @@ var NoUselessConstructorRule = rule.Rule{
 
 				// Report with suggestion to remove
 				removeRange := getConstructorRange(ctx, node)
-				
+
 				ctx.ReportNodeWithSuggestions(node, buildNoUselessConstructorMessage(),
 					rule.RuleSuggestion{
 						Message: buildRemoveConstructorMessage(),

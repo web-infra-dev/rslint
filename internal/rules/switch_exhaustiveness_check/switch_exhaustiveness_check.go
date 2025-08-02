@@ -166,7 +166,7 @@ var SwitchExhaustivenessCheckRule = rule.Rule{
 						}
 					}
 				}
-				
+
 				missingBranchesText := "unknown"
 				if len(missingBranches) > 0 {
 					missingBranchesText = fmt.Sprintf("%s", missingBranches[0])
@@ -221,11 +221,11 @@ func createMissingCaseSuggestions(ctx rule.RuleContext, switchNode *ast.SwitchSt
 	if len(missingBranches) == 0 {
 		return nil
 	}
-	
+
 	// Find the position to insert new cases (before the closing brace or default case)
 	caseBlock := switchNode.CaseBlock.AsCaseBlock()
 	var insertPos int
-	
+
 	if len(caseBlock.Clauses.Nodes) > 0 {
 		lastClause := caseBlock.Clauses.Nodes[len(caseBlock.Clauses.Nodes)-1]
 		insertPos = lastClause.End()
@@ -233,16 +233,16 @@ func createMissingCaseSuggestions(ctx rule.RuleContext, switchNode *ast.SwitchSt
 		// No existing cases, insert after opening brace
 		insertPos = caseBlock.Pos() + 1
 	}
-	
+
 	var suggestions []rule.RuleSuggestion
-	
+
 	// Create suggestion to add all missing cases
 	if len(missingBranches) <= 5 { // Only suggest if not too many cases
 		casesText := ""
 		for _, branch := range missingBranches {
 			casesText += fmt.Sprintf("\n\t\tcase %s:\n\t\t\tthrow new Error('Not implemented');\n", branch)
 		}
-		
+
 		suggestions = append(suggestions, rule.RuleSuggestion{
 			Message: rule.RuleMessage{
 				Id:          "addMissingCases",
@@ -253,7 +253,7 @@ func createMissingCaseSuggestions(ctx rule.RuleContext, switchNode *ast.SwitchSt
 			},
 		})
 	}
-	
+
 	return suggestions
 }
 
@@ -261,7 +261,7 @@ func createDefaultCaseSuggestion(ctx rule.RuleContext, switchNode *ast.SwitchSta
 	// Find the position to insert default case (at the end of case block)
 	caseBlock := switchNode.CaseBlock.AsCaseBlock()
 	var insertPos int
-	
+
 	if len(caseBlock.Clauses.Nodes) > 0 {
 		lastClause := caseBlock.Clauses.Nodes[len(caseBlock.Clauses.Nodes)-1]
 		insertPos = lastClause.End()
@@ -269,9 +269,9 @@ func createDefaultCaseSuggestion(ctx rule.RuleContext, switchNode *ast.SwitchSta
 		// No existing cases, insert after opening brace
 		insertPos = caseBlock.Pos() + 1
 	}
-	
+
 	defaultCaseText := "\n\t\tdefault:\n\t\t\tthrow new Error('Unexpected case');\n"
-	
+
 	return rule.RuleSuggestion{
 		Message: rule.RuleMessage{
 			Id:          "addDefaultCase",

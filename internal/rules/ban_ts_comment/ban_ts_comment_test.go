@@ -83,7 +83,7 @@ const a = 1;
 				Code:    "// @ts-expect-error 👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦\nconst a = 1;",
 				Options: map[string]interface{}{"ts-expect-error": "allow-with-description"},
 			},
-			
+
 			// ts-ignore valid cases
 			{Code: "// just a comment containing @ts-ignore somewhere\nconst a = 1;"},
 			{
@@ -167,7 +167,7 @@ const a = 1;
 				`,
 				Options: map[string]interface{}{"minimumDescriptionLength": 10, "ts-ignore": map[string]interface{}{"descriptionFormat": "^: TS\\d+ because .+"}},
 			},
-			
+
 			// ts-nocheck valid cases
 			{Code: "// just a comment containing @ts-nocheck somewhere\nconst a = 1;"},
 			{
@@ -218,7 +218,7 @@ const a = 1;
 // TS error is not actually suppressed
 const b: string = a;
 			`},
-			
+
 			// ts-check valid cases
 			{Code: "// just a comment containing @ts-check somewhere\nconst a = 1;"},
 			{Code: `
@@ -277,7 +277,7 @@ const a = 1;
 		[]rule_tester.InvalidTestCase{
 			// ts-expect-error invalid cases
 			{
-				Code: "// @ts-expect-error\nconst a = 1;",
+				Code:    "// @ts-expect-error\nconst a = 1;",
 				Options: map[string]interface{}{"ts-expect-error": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -288,7 +288,7 @@ const a = 1;
 				},
 			},
 			{
-				Code: "/* @ts-expect-error */\nconst a = 1;",
+				Code:    "/* @ts-expect-error */\nconst a = 1;",
 				Options: map[string]interface{}{"ts-expect-error": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -419,7 +419,7 @@ const a = 1;
 				},
 			},
 			{
-				Code: "/** @ts-expect-error */\nconst a = 1;",
+				Code:    "/** @ts-expect-error */\nconst a = 1;",
 				Options: map[string]interface{}{"ts-expect-error": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -430,7 +430,7 @@ const a = 1;
 				},
 			},
 			{
-				Code: "// @ts-expect-error: Suppress next line\nconst a = 1;",
+				Code:    "// @ts-expect-error: Suppress next line\nconst a = 1;",
 				Options: map[string]interface{}{"ts-expect-error": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -441,7 +441,7 @@ const a = 1;
 				},
 			},
 			{
-				Code: "/////@ts-expect-error: Suppress next line\nconst a = 1;",
+				Code:    "/////@ts-expect-error: Suppress next line\nconst a = 1;",
 				Options: map[string]interface{}{"ts-expect-error": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -468,7 +468,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-expect-error\nconst a = 1;",
+				Code:    "// @ts-expect-error\nconst a = 1;",
 				Options: map[string]interface{}{"ts-expect-error": "allow-with-description"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -479,7 +479,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-expect-error: TODO\nconst a = 1;",
+				Code:    "// @ts-expect-error: TODO\nconst a = 1;",
 				Options: map[string]interface{}{"minimumDescriptionLength": 10, "ts-expect-error": "allow-with-description"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -490,7 +490,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-expect-error: TS1234 because xyz\nconst a = 1;",
+				Code:    "// @ts-expect-error: TS1234 because xyz\nconst a = 1;",
 				Options: map[string]interface{}{"minimumDescriptionLength": 25, "ts-expect-error": map[string]interface{}{"descriptionFormat": "^: TS\\d+ because .+"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -501,7 +501,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-expect-error: TS1234\nconst a = 1;",
+				Code:    "// @ts-expect-error: TS1234\nconst a = 1;",
 				Options: map[string]interface{}{"ts-expect-error": map[string]interface{}{"descriptionFormat": "^: TS\\d+ because .+"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -512,7 +512,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-expect-error    : TS1234 because xyz\nconst a = 1;",
+				Code:    "// @ts-expect-error    : TS1234 because xyz\nconst a = 1;",
 				Options: map[string]interface{}{"ts-expect-error": map[string]interface{}{"descriptionFormat": "^: TS\\d+ because .+"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -523,7 +523,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-expect-error 👨‍👩‍👧‍👦\nconst a = 1;",
+				Code:    "// @ts-expect-error 👨‍👩‍👧‍👦\nconst a = 1;",
 				Options: map[string]interface{}{"ts-expect-error": "allow-with-description"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -536,7 +536,7 @@ if (false) {
 
 			// ts-ignore invalid cases
 			{
-				Code: "// @ts-ignore\nconst a = 1;",
+				Code:    "// @ts-ignore\nconst a = 1;",
 				Options: map[string]interface{}{"ts-expect-error": true, "ts-ignore": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -553,7 +553,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-ignore\nconst a = 1;",
+				Code:    "// @ts-ignore\nconst a = 1;",
 				Options: map[string]interface{}{"ts-expect-error": "allow-with-description", "ts-ignore": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -586,7 +586,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "/* @ts-ignore */\nconst a = 1;",
+				Code:    "/* @ts-ignore */\nconst a = 1;",
 				Options: map[string]interface{}{"ts-ignore": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -678,7 +678,7 @@ const a = 1;
 				},
 			},
 			{
-				Code: "/** @ts-ignore */\nconst a = 1;",
+				Code:    "/** @ts-ignore */\nconst a = 1;",
 				Options: map[string]interface{}{"ts-expect-error": false, "ts-ignore": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -803,7 +803,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-ignore\nconst a = 1;",
+				Code:    "// @ts-ignore\nconst a = 1;",
 				Options: map[string]interface{}{"ts-ignore": "allow-with-description"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -814,7 +814,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-ignore    .\nconst a = 1;",
+				Code:    "// @ts-ignore    .\nconst a = 1;",
 				Options: map[string]interface{}{"ts-ignore": "allow-with-description"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -825,7 +825,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-ignore: TS1234 because xyz\nconst a = 1;",
+				Code:    "// @ts-ignore: TS1234 because xyz\nconst a = 1;",
 				Options: map[string]interface{}{"minimumDescriptionLength": 25, "ts-ignore": map[string]interface{}{"descriptionFormat": "^: TS\\d+ because .+"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -836,7 +836,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-ignore: TS1234\nconst a = 1;",
+				Code:    "// @ts-ignore: TS1234\nconst a = 1;",
 				Options: map[string]interface{}{"ts-ignore": map[string]interface{}{"descriptionFormat": "^: TS\\d+ because .+"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -847,7 +847,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-ignore    : TS1234 because xyz\nconst a = 1;",
+				Code:    "// @ts-ignore    : TS1234 because xyz\nconst a = 1;",
 				Options: map[string]interface{}{"ts-ignore": map[string]interface{}{"descriptionFormat": "^: TS\\d+ because .+"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -858,7 +858,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-ignore 👨‍👩‍👧‍👦\nconst a = 1;",
+				Code:    "// @ts-ignore 👨‍👩‍👧‍👦\nconst a = 1;",
 				Options: map[string]interface{}{"ts-ignore": "allow-with-description"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -871,7 +871,7 @@ if (false) {
 
 			// ts-nocheck invalid cases
 			{
-				Code: "// @ts-nocheck\nconst a = 1;",
+				Code:    "// @ts-nocheck\nconst a = 1;",
 				Options: map[string]interface{}{"ts-nocheck": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -902,7 +902,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-nocheck\nconst a = 1;",
+				Code:    "// @ts-nocheck\nconst a = 1;",
 				Options: map[string]interface{}{"ts-nocheck": "allow-with-description"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -913,7 +913,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-nocheck: TS1234 because xyz\nconst a = 1;",
+				Code:    "// @ts-nocheck: TS1234 because xyz\nconst a = 1;",
 				Options: map[string]interface{}{"minimumDescriptionLength": 25, "ts-nocheck": map[string]interface{}{"descriptionFormat": "^: TS\\d+ because .+"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -924,7 +924,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-nocheck: TS1234\nconst a = 1;",
+				Code:    "// @ts-nocheck: TS1234\nconst a = 1;",
 				Options: map[string]interface{}{"ts-nocheck": map[string]interface{}{"descriptionFormat": "^: TS\\d+ because .+"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -935,7 +935,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-nocheck    : TS1234 because xyz\nconst a = 1;",
+				Code:    "// @ts-nocheck    : TS1234 because xyz\nconst a = 1;",
 				Options: map[string]interface{}{"ts-nocheck": map[string]interface{}{"descriptionFormat": "^: TS\\d+ because .+"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -946,7 +946,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-nocheck 👨‍👩‍👧‍👦\nconst a = 1;",
+				Code:    "// @ts-nocheck 👨‍👩‍👧‍👦\nconst a = 1;",
 				Options: map[string]interface{}{"ts-nocheck": "allow-with-description"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -972,7 +972,7 @@ const a: true = false;
 
 			// ts-check invalid cases
 			{
-				Code: "// @ts-check\nconst a = 1;",
+				Code:    "// @ts-check\nconst a = 1;",
 				Options: map[string]interface{}{"ts-check": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -983,7 +983,7 @@ const a: true = false;
 				},
 			},
 			{
-				Code: "// @ts-check: Suppress next line\nconst a = 1;",
+				Code:    "// @ts-check: Suppress next line\nconst a = 1;",
 				Options: map[string]interface{}{"ts-check": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -1010,7 +1010,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-check\nconst a = 1;",
+				Code:    "// @ts-check\nconst a = 1;",
 				Options: map[string]interface{}{"ts-check": "allow-with-description"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -1021,7 +1021,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-check: TS1234 because xyz\nconst a = 1;",
+				Code:    "// @ts-check: TS1234 because xyz\nconst a = 1;",
 				Options: map[string]interface{}{"minimumDescriptionLength": 25, "ts-check": map[string]interface{}{"descriptionFormat": "^: TS\\d+ because .+"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -1032,7 +1032,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-check: TS1234\nconst a = 1;",
+				Code:    "// @ts-check: TS1234\nconst a = 1;",
 				Options: map[string]interface{}{"ts-check": map[string]interface{}{"descriptionFormat": "^: TS\\d+ because .+"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -1043,7 +1043,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-check    : TS1234 because xyz\nconst a = 1;",
+				Code:    "// @ts-check    : TS1234 because xyz\nconst a = 1;",
 				Options: map[string]interface{}{"ts-check": map[string]interface{}{"descriptionFormat": "^: TS\\d+ because .+"}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -1054,7 +1054,7 @@ if (false) {
 				},
 			},
 			{
-				Code: "// @ts-check 👨‍👩‍👧‍👦\nconst a = 1;",
+				Code:    "// @ts-check 👨‍👩‍👧‍👦\nconst a = 1;",
 				Options: map[string]interface{}{"ts-check": "allow-with-description"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{

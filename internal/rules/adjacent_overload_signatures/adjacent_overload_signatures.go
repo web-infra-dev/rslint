@@ -97,8 +97,8 @@ func getMemberMethod(ctx rule.RuleContext, member *ast.Node) *Method {
 }
 
 func hasStaticModifier(modifiers []ast.ModifierLike) bool {
-	for _, modifier := range modifiers {
-		if modifier.Kind == ast.KindStaticKeyword {
+	for i := range modifiers {
+		if modifiers[i].Kind == ast.KindStaticKeyword {
 			return true
 		}
 	}

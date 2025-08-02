@@ -8,9 +8,9 @@ import (
 )
 
 type MaxParamsOptions struct {
-	Max              int  `json:"max"`
-	Maximum          int  `json:"maximum"`          // Deprecated alias for max
-	CountVoidThis    bool `json:"countVoidThis"`
+	Max           int  `json:"max"`
+	Maximum       int  `json:"maximum"` // Deprecated alias for max
+	CountVoidThis bool `json:"countVoidThis"`
 }
 
 func buildExceedMessage(name string, count int, max int) rule.RuleMessage {
@@ -25,22 +25,22 @@ func isVoidThisParam(param *ast.Node) bool {
 	if param == nil || param.Kind != ast.KindParameter {
 		return false
 	}
-	
+
 	paramNode := param.AsParameterDeclaration()
 	if paramNode.Name() == nil || !ast.IsIdentifier(paramNode.Name()) {
 		return false
 	}
-	
+
 	identifier := paramNode.Name().AsIdentifier()
 	if identifier.Text != "this" {
 		return false
 	}
-	
+
 	// Check if it has a void type annotation
 	if paramNode.Type == nil {
 		return false
 	}
-	
+
 	return paramNode.Type.Kind == ast.KindVoidKeyword
 }
 
@@ -120,10 +120,10 @@ var MaxParamsRule = rule.Rule{
 	Name: "max-params",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := MaxParamsOptions{
-			Max: 3,
+			Max:           3,
 			CountVoidThis: false,
 		}
-		
+
 		if options != nil {
 			if optsSlice, ok := options.([]interface{}); ok && len(optsSlice) > 0 {
 				// Handle array format like ["error", {max: 4}]

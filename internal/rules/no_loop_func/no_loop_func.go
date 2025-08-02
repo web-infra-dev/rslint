@@ -101,7 +101,7 @@ func isSafe(loopNode *ast.Node, reference *ast.Symbol, variable *ast.Symbol, ctx
 	}
 
 	declaration := variable.Declarations[0]
-	
+
 	// Check if this is a declaration from a library file (lib.*.d.ts)
 	// These are global/built-in declarations and should be considered safe
 	sourceFile := ast.GetSourceFileOfNode(declaration)
@@ -111,12 +111,12 @@ func isSafe(loopNode *ast.Node, reference *ast.Symbol, variable *ast.Symbol, ctx
 			return true
 		}
 		// Also check for node_modules/@types or similar built-in type definitions
-		if strings.Contains(fileName, "node_modules/@types") || 
-		   strings.Contains(fileName, "typescript/lib/") {
+		if strings.Contains(fileName, "node_modules/@types") ||
+			strings.Contains(fileName, "typescript/lib/") {
 			return true
 		}
 	}
-	
+
 	// Get the kind of variable declaration
 	kind := ""
 	if declaration.Parent != nil && declaration.Parent.Kind == ast.KindVariableDeclaration {
@@ -157,24 +157,24 @@ func isSafe(loopNode *ast.Node, reference *ast.Symbol, variable *ast.Symbol, ctx
 			switch parent.Kind {
 			case ast.KindForStatement:
 				forStmt := parent.AsForStatement()
-				if forStmt.Initializer != nil && 
-					(declaration.Pos() >= forStmt.Initializer.Pos() && 
-					 declaration.End() <= forStmt.Initializer.End()) {
+				if forStmt.Initializer != nil &&
+					(declaration.Pos() >= forStmt.Initializer.Pos() &&
+						declaration.End() <= forStmt.Initializer.End()) {
 					// This is a loop control variable - unsafe
 					return false
 				}
 			case ast.KindForInStatement, ast.KindForOfStatement:
 				forInOf := parent.AsForInOrOfStatement()
 				if forInOf.Initializer != nil &&
-					(declaration.Pos() >= forInOf.Initializer.Pos() && 
-					 declaration.End() <= forInOf.Initializer.End()) {
+					(declaration.Pos() >= forInOf.Initializer.Pos() &&
+						declaration.End() <= forInOf.Initializer.End()) {
 					// This is a loop control variable - unsafe
 					return false
 				}
 			}
 			parent = parent.Parent
 		}
-		
+
 		// If it's a 'var' but not a loop control variable, it might still be unsafe
 		// if it's modified within the loop. For now, we'll be conservative.
 		return false
@@ -200,7 +200,7 @@ func getUnsafeRefs(node *ast.Node, loopNode *ast.Node, ctx rule.RuleContext) []s
 		if n.Kind == ast.KindIdentifier {
 			identifier := n.AsIdentifier()
 			varName := identifier.Text
-			
+
 			// Skip if we've already checked this variable
 			if seenVars[varName] {
 				return
@@ -287,7 +287,7 @@ var NoLoopFuncRule = rule.Rule{
 
 			// Check if this is an IIFE
 			isGenerator := false
-			
+
 			switch node.Kind {
 			case ast.KindFunctionDeclaration:
 				fn := node.AsFunctionDeclaration()

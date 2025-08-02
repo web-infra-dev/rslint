@@ -18,70 +18,70 @@ func TestConsistentTypeAssertionsRule(t *testing.T) {
 			{
 				Code: "const x = new Generic<int>() as Foo;",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = b as A;",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = [1] as readonly number[];",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = 'string' as a | b;",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = !'string' as A;",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = (a as A) + b;",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = new Generic<string>() as Foo;",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = () => ({ bar: 5 }) as Foo;",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = () => bar as Foo;",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = { key: 'value' } as const;",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
@@ -90,70 +90,70 @@ func TestConsistentTypeAssertionsRule(t *testing.T) {
 			{
 				Code: "const x = <Foo>new Generic<int>();",
 				Options: map[string]any{
-					"assertionStyle":               "angle-bracket",
+					"assertionStyle":              "angle-bracket",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = <A>b;",
 				Options: map[string]any{
-					"assertionStyle":               "angle-bracket",
+					"assertionStyle":              "angle-bracket",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = <readonly number[]>[1];",
 				Options: map[string]any{
-					"assertionStyle":               "angle-bracket",
+					"assertionStyle":              "angle-bracket",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = <a | b>'string';",
 				Options: map[string]any{
-					"assertionStyle":               "angle-bracket",
+					"assertionStyle":              "angle-bracket",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = <A>!'string';",
 				Options: map[string]any{
-					"assertionStyle":               "angle-bracket",
+					"assertionStyle":              "angle-bracket",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = <A>a + b;",
 				Options: map[string]any{
-					"assertionStyle":               "angle-bracket",
+					"assertionStyle":              "angle-bracket",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = <Foo>new Generic<string>();",
 				Options: map[string]any{
-					"assertionStyle":               "angle-bracket",
+					"assertionStyle":              "angle-bracket",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = () => <Foo>{ bar: 5 };",
 				Options: map[string]any{
-					"assertionStyle":               "angle-bracket",
+					"assertionStyle":              "angle-bracket",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = () => <Foo>bar;",
 				Options: map[string]any{
-					"assertionStyle":               "angle-bracket",
+					"assertionStyle":              "angle-bracket",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = <const>{ key: 'value' };",
 				Options: map[string]any{
-					"assertionStyle":               "angle-bracket",
+					"assertionStyle":              "angle-bracket",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
@@ -162,28 +162,28 @@ func TestConsistentTypeAssertionsRule(t *testing.T) {
 			{
 				Code: "const x = {} as Foo<int>;",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "const x = {} as a | b;",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "print({ bar: 5 } as Foo);",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
 			{
 				Code: "new print({ bar: 5 } as Foo);",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "allow",
 				},
 			},
@@ -192,14 +192,14 @@ func TestConsistentTypeAssertionsRule(t *testing.T) {
 			{
 				Code: "print({ bar: 5 } as Foo);",
 				Options: map[string]any{
-					"assertionStyle":                "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "allow-as-parameter",
 				},
 			},
 			{
 				Code: "new print({ bar: 5 } as Foo);",
 				Options: map[string]any{
-					"assertionStyle":                "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "allow-as-parameter",
 				},
 			},
@@ -209,7 +209,7 @@ function foo() {
   throw { bar: 5 } as Foo;
 }`,
 				Options: map[string]any{
-					"assertionStyle":                "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "allow-as-parameter",
 				},
 			},
@@ -245,7 +245,7 @@ function foo() {
 				Code: "print([5] as Foo);",
 				Options: map[string]any{
 					"arrayLiteralTypeAssertions": "allow-as-parameter",
-					"assertionStyle":              "as",
+					"assertionStyle":             "as",
 				},
 			},
 			{
@@ -255,14 +255,14 @@ function foo() {
 }`,
 				Options: map[string]any{
 					"arrayLiteralTypeAssertions": "allow-as-parameter",
-					"assertionStyle":              "as",
+					"assertionStyle":             "as",
 				},
 			},
 			{
 				Code: "new Print([5] as Foo);",
 				Options: map[string]any{
 					"arrayLiteralTypeAssertions": "allow-as-parameter",
-					"assertionStyle":              "as",
+					"assertionStyle":             "as",
 				},
 			},
 
@@ -284,14 +284,14 @@ function foo() {
 			{
 				Code: "const x = { key: 'value' } as any;",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "never",
 				},
 			},
 			{
 				Code: "const x = { key: 'value' } as unknown;",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "never",
 				},
 			},
@@ -411,7 +411,7 @@ function foo() {
 			{
 				Code: "const x = {} as Foo<int>;",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "never",
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -435,7 +435,7 @@ function foo() {
 			{
 				Code: "const x = {} as a | b;",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "never",
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -459,7 +459,7 @@ function foo() {
 			{
 				Code: "print({ bar: 5 } as Foo);",
 				Options: map[string]any{
-					"assertionStyle":               "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "never",
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -481,7 +481,7 @@ function foo() {
 			{
 				Code: "const x = {} as Foo<int>;",
 				Options: map[string]any{
-					"assertionStyle":                "as",
+					"assertionStyle":              "as",
 					"objectLiteralTypeAssertions": "allow-as-parameter",
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
@@ -508,7 +508,7 @@ function foo() {
 				Code: "const x = [] as string[];",
 				Options: map[string]any{
 					"arrayLiteralTypeAssertions": "never",
-					"assertionStyle":              "as",
+					"assertionStyle":             "as",
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -532,7 +532,7 @@ function foo() {
 				Code: "const x = <string[]>[];",
 				Options: map[string]any{
 					"arrayLiteralTypeAssertions": "never",
-					"assertionStyle":              "angle-bracket",
+					"assertionStyle":             "angle-bracket",
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -558,7 +558,7 @@ function foo() {
 				Code: "const foo = () => [5] as Foo;",
 				Options: map[string]any{
 					"arrayLiteralTypeAssertions": "allow-as-parameter",
-					"assertionStyle":              "as",
+					"assertionStyle":             "as",
 				},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{

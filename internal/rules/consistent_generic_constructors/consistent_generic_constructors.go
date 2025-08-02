@@ -188,7 +188,7 @@ func hasParenthesesAfter(ctx rule.RuleContext, node *ast.Node) bool {
 func getIDToAttachAnnotation(ctx rule.RuleContext, node *ast.Node, lhsName *ast.Node) *ast.Node {
 	if node.Kind == ast.KindPropertyDeclaration {
 		propDecl := node.AsPropertyDeclaration()
-		
+
 		if propDecl != nil && propDecl.Name() != nil {
 			// Check if property is computed (e.g., [key]: type)
 			if propDecl.Name().Kind == ast.KindComputedPropertyName {
@@ -201,7 +201,7 @@ func getIDToAttachAnnotation(ctx rule.RuleContext, node *ast.Node, lhsName *ast.
 						if s.Token() == ast.KindCloseBracketToken {
 							// For now, use the computed property node
 							// TODO: Better position handling for after closing bracket
-							return computed.AsNode() 
+							return computed.AsNode()
 						}
 						if s.Token() != ast.KindWhitespaceTrivia && s.Token() != ast.KindNewLineTrivia {
 							break
@@ -306,7 +306,7 @@ var ConsistentGenericConstructorsRule = rule.Rule{
 				if node.Kind == ast.KindBindingElement && lhsTypeAnnotation == nil {
 					return
 				}
-				
+
 				if (lhsTypeAnnotation == nil || lhsTypeArgs == nil) && rhsTypeArgs != nil {
 					// No type annotation or no type args in annotation but constructor has type args - move to type annotation
 					calleeText := getNodeText(ctx, callee)

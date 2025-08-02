@@ -12,16 +12,16 @@ import (
 )
 
 type NoMagicNumbersOptions struct {
-	DetectObjects                bool        `json:"detectObjects"`
-	EnforceConst                 bool        `json:"enforceConst"`
-	Ignore                       []any       `json:"ignore"`
-	IgnoreArrayIndexes           bool        `json:"ignoreArrayIndexes"`
-	IgnoreDefaultValues          bool        `json:"ignoreDefaultValues"`
-	IgnoreClassFieldInitialValues bool       `json:"ignoreClassFieldInitialValues"`
-	IgnoreEnums                  bool        `json:"ignoreEnums"`
-	IgnoreNumericLiteralTypes    bool        `json:"ignoreNumericLiteralTypes"`
-	IgnoreReadonlyClassProperties bool       `json:"ignoreReadonlyClassProperties"`
-	IgnoreTypeIndexes            bool        `json:"ignoreTypeIndexes"`
+	DetectObjects                 bool  `json:"detectObjects"`
+	EnforceConst                  bool  `json:"enforceConst"`
+	Ignore                        []any `json:"ignore"`
+	IgnoreArrayIndexes            bool  `json:"ignoreArrayIndexes"`
+	IgnoreDefaultValues           bool  `json:"ignoreDefaultValues"`
+	IgnoreClassFieldInitialValues bool  `json:"ignoreClassFieldInitialValues"`
+	IgnoreEnums                   bool  `json:"ignoreEnums"`
+	IgnoreNumericLiteralTypes     bool  `json:"ignoreNumericLiteralTypes"`
+	IgnoreReadonlyClassProperties bool  `json:"ignoreReadonlyClassProperties"`
+	IgnoreTypeIndexes             bool  `json:"ignoreTypeIndexes"`
 }
 
 // normalizeIgnoreValue converts string bigint values to actual numeric values
@@ -44,7 +44,7 @@ func normalizeLiteralValue(node *ast.Node) any {
 	if node.Kind == ast.KindNumericLiteral {
 		numLit := node.AsNumericLiteral()
 		val := parseNumericValue(numLit.Text)
-		
+
 		// Check if parent is unary expression with - operator
 		if node.Parent != nil && node.Parent.Kind == ast.KindPrefixUnaryExpression {
 			unary := node.Parent.AsPrefixUnaryExpression()
@@ -68,7 +68,7 @@ func normalizeLiteralValue(node *ast.Node) any {
 			text = text[:len(text)-1]
 		}
 		bigInt, _ := new(big.Int).SetString(text, 10)
-		
+
 		// Check if parent is unary expression with - operator
 		if node.Parent != nil && node.Parent.Kind == ast.KindPrefixUnaryExpression {
 			unary := node.Parent.AsPrefixUnaryExpression()
@@ -131,7 +131,7 @@ func valuesEqual(a, b any) bool {
 		}
 		return false
 	}
-	
+
 	if bBig, ok := b.(*big.Int); ok {
 		if aFloat, ok := a.(float64); ok && aFloat == math.Trunc(aFloat) {
 			aBig := big.NewInt(int64(aFloat))
@@ -143,7 +143,7 @@ func valuesEqual(a, b any) bool {
 		}
 		return false
 	}
-	
+
 	// Handle numeric type conversions
 	if aFloat, ok := a.(float64); ok {
 		if bFloat, ok := b.(float64); ok {
@@ -156,7 +156,7 @@ func valuesEqual(a, b any) bool {
 			return aFloat == float64(bIntInterface)
 		}
 	}
-	
+
 	if aInt, ok := a.(int64); ok {
 		if bFloat, ok := b.(float64); ok {
 			return float64(aInt) == bFloat
@@ -168,7 +168,7 @@ func valuesEqual(a, b any) bool {
 			return aInt == int64(bIntInterface)
 		}
 	}
-	
+
 	// Handle int interface from JSON
 	if aIntInterface, ok := a.(int); ok {
 		if bFloat, ok := b.(float64); ok {
@@ -181,7 +181,7 @@ func valuesEqual(a, b any) bool {
 			return aIntInterface == bIntInterface
 		}
 	}
-	
+
 	// Regular comparison
 	return a == b
 }
@@ -226,7 +226,7 @@ func isParentTSLiteralType(node *ast.Node) bool {
 // isTSNumericLiteralType checks if the node is a valid TypeScript numeric literal type
 func isTSNumericLiteralType(node *ast.Node) bool {
 	actualNode := node
-	
+
 	// For negative numbers, use the parent node
 	if node.Parent != nil && node.Parent.Kind == ast.KindPrefixUnaryExpression {
 		unary := node.Parent.AsPrefixUnaryExpression()
@@ -234,29 +234,29 @@ func isTSNumericLiteralType(node *ast.Node) bool {
 			actualNode = node.Parent
 		}
 	}
-	
+
 	// If the parent node is not a TSLiteralType, early return
 	if !isParentTSLiteralType(actualNode) {
 		return false
 	}
-	
+
 	// If the grandparent is a TSTypeAliasDeclaration, ignore
 	if isGrandparentTSTypeAliasDeclaration(actualNode) {
 		return true
 	}
-	
+
 	// If the grandparent is a TSUnionType and it's parent is a TSTypeAliasDeclaration, ignore
 	if isGrandparentTSUnionType(actualNode) {
 		return true
 	}
-	
+
 	return false
 }
 
 // isParentTSReadonlyPropertyDefinition checks if the node parent is a readonly class property
 func isParentTSReadonlyPropertyDefinition(node *ast.Node) bool {
 	parent := getLiteralParent(node)
-	
+
 	if parent != nil && parent.Kind == ast.KindPropertyDeclaration {
 		propDecl := parent.AsPropertyDeclaration()
 		// Check if property has readonly modifier
@@ -268,7 +268,7 @@ func isParentTSReadonlyPropertyDefinition(node *ast.Node) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -276,7 +276,7 @@ func isParentTSReadonlyPropertyDefinition(node *ast.Node) bool {
 func isAncestorTSIndexedAccessType(node *ast.Node) bool {
 	// Handle unary expressions (eg. -4)
 	ancestor := getLiteralParent(node)
-	
+
 	// Go up through any nesting of union/intersection types and parentheses
 	for ancestor != nil && ancestor.Parent != nil {
 		switch ancestor.Parent.Kind {
@@ -288,7 +288,7 @@ func isAncestorTSIndexedAccessType(node *ast.Node) bool {
 			return false
 		}
 	}
-	
+
 	return false
 }
 
@@ -305,15 +305,15 @@ func isDefaultValue(node *ast.Node) bool {
 	if parent == nil {
 		return false
 	}
-	
+
 	// Check for default parameter values
 	if parent.Kind == ast.KindParameter {
 		param := parent.AsParameterDeclaration()
 		return param.Initializer == node
 	}
-	
+
 	// Check for default property values (handled by ignoreClassFieldInitialValues)
-	
+
 	return false
 }
 
@@ -323,13 +323,13 @@ func isClassFieldInitialValue(node *ast.Node) bool {
 	if parent == nil {
 		return false
 	}
-	
+
 	// Check for class property initializers
 	if parent.Kind == ast.KindPropertyDeclaration {
 		propDecl := parent.AsPropertyDeclaration()
 		return propDecl.Initializer == node
 	}
-	
+
 	return false
 }
 
@@ -345,13 +345,13 @@ func checkNode(ctx rule.RuleContext, node *ast.Node, opts NoMagicNumbersOptions,
 	// It will be `false` if we're not configured to ignore this case
 	// It will remain unset if this is not one of our exception cases
 	var isAllowed *bool
-	
+
 	// Get the numeric value
 	value := normalizeLiteralValue(node)
 	if value == nil {
 		return
 	}
-	
+
 	// Check if the node is ignored by value
 	for _, ignoreVal := range opts.Ignore {
 		normalized := normalizeIgnoreValue(ignoreVal)
@@ -361,76 +361,76 @@ func checkNode(ctx rule.RuleContext, node *ast.Node, opts NoMagicNumbersOptions,
 			break
 		}
 	}
-	
+
 	// Check if the node is a TypeScript enum declaration
 	if isAllowed == nil && isParentTSEnumDeclaration(node) {
 		allowed := opts.IgnoreEnums
 		isAllowed = &allowed
 	}
-	
+
 	// Check TypeScript specific nodes for Numeric Literal
 	if isAllowed == nil && isTSNumericLiteralType(node) {
 		allowed := opts.IgnoreNumericLiteralTypes
 		isAllowed = &allowed
 	}
-	
+
 	// Check if the node is a type index
 	if isAllowed == nil && isAncestorTSIndexedAccessType(node) {
 		allowed := opts.IgnoreTypeIndexes
 		isAllowed = &allowed
 	}
-	
+
 	// Check if the node is a readonly class property
 	if isAllowed == nil && isParentTSReadonlyPropertyDefinition(node) {
 		allowed := opts.IgnoreReadonlyClassProperties
 		isAllowed = &allowed
 	}
-	
+
 	// Check if the node is an array index
 	if isAllowed == nil && opts.IgnoreArrayIndexes && isArrayIndex(node) {
 		allowed := true
 		isAllowed = &allowed
 	}
-	
+
 	// Check if the node is a default value
 	if isAllowed == nil && opts.IgnoreDefaultValues && isDefaultValue(node) {
 		allowed := true
 		isAllowed = &allowed
 	}
-	
+
 	// Check if the node is a class field initial value
 	if isAllowed == nil && opts.IgnoreClassFieldInitialValues && isClassFieldInitialValue(node) {
 		allowed := true
 		isAllowed = &allowed
 	}
-	
+
 	// Check if the node is an object property and detectObjects is false
 	if isAllowed == nil && !opts.DetectObjects && isObjectProperty(node) {
 		allowed := true
 		isAllowed = &allowed
 	}
-	
+
 	// If we've hit a case where the ignore option is true we can return now
 	if isAllowed != nil && *isAllowed {
 		return
 	}
-	
+
 	// Report the error
 	fullNumberNode := node
 	raw := ""
-	
+
 	if node.Kind == ast.KindNumericLiteral {
 		raw = node.AsNumericLiteral().Text
 	} else if node.Kind == ast.KindBigIntLiteral {
 		raw = node.AsBigIntLiteral().Text
 	}
-	
+
 	// Handle negative numbers - report on the unary expression but use original raw for negative hex
 	if node.Parent != nil && node.Parent.Kind == ast.KindPrefixUnaryExpression {
 		unary := node.Parent.AsPrefixUnaryExpression()
 		if unary.Operator == ast.KindMinusToken {
 			fullNumberNode = node.Parent
-			// For hex numbers, preserve the original format in the error message  
+			// For hex numbers, preserve the original format in the error message
 			if strings.HasPrefix(raw, "0x") || strings.HasPrefix(raw, "0X") {
 				raw = fmt.Sprintf("-%s", raw)
 			} else {
@@ -438,12 +438,12 @@ func checkNode(ctx rule.RuleContext, node *ast.Node, opts NoMagicNumbersOptions,
 			}
 		}
 	}
-	
+
 	message := rule.RuleMessage{
 		Id:          "noMagic",
 		Description: fmt.Sprintf("No magic number: %s.", raw),
 	}
-	
+
 	// Check if enforceConst is enabled and suggest const declaration
 	if opts.EnforceConst {
 		// For now, just report without suggestions
@@ -470,12 +470,12 @@ var NoMagicNumbersRule = rule.Rule{
 			IgnoreReadonlyClassProperties: false,
 			IgnoreTypeIndexes:             false,
 		}
-		
+
 		// Parse options with dual-format support (handles both array and object formats)
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -483,7 +483,7 @@ var NoMagicNumbersRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if val, ok := optsMap["detectObjects"].(bool); ok {
 					opts.DetectObjects = val
@@ -519,10 +519,10 @@ var NoMagicNumbersRule = rule.Rule{
 				}
 			}
 		}
-		
+
 		// Create a map for faster ignore lookups
 		ignored := make(map[string]bool)
-		
+
 		return rule.RuleListeners{
 			ast.KindNumericLiteral: func(node *ast.Node) {
 				checkNode(ctx, node, opts, ignored)

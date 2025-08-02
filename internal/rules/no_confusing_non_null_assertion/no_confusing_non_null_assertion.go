@@ -8,19 +8,19 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-var confusingOperators = map[ast.Kind]bool {
-	ast.KindEqualsToken:               true, // =
-	ast.KindEqualsEqualsToken:         true, // ==
-	ast.KindEqualsEqualsEqualsToken:   true, // ===
-	ast.KindInKeyword:                 true, // in
-	ast.KindInstanceOfKeyword:         true, // instanceof
+var confusingOperators = map[ast.Kind]bool{
+	ast.KindEqualsToken:             true, // =
+	ast.KindEqualsEqualsToken:       true, // ==
+	ast.KindEqualsEqualsEqualsToken: true, // ===
+	ast.KindInKeyword:               true, // in
+	ast.KindInstanceOfKeyword:       true, // instanceof
 }
 
 var NoConfusingNonNullAssertionRule = rule.Rule{
 	Name: "no-confusing-non-null-assertion",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		sourceFile := ctx.SourceFile
-		
+
 		// Helper function to check if a node ends with a non-null assertion
 		var endsWithNonNull func(node *ast.Node) (*ast.Node, bool)
 		endsWithNonNull = func(node *ast.Node) (*ast.Node, bool) {
@@ -34,7 +34,7 @@ var NoConfusingNonNullAssertionRule = rule.Rule{
 				return endsWithNonNull(binaryExpr.Right)
 			case ast.KindPropertyAccessExpression:
 				// Check if accessing a property that ends with non-null
-				propAccess := node.AsPropertyAccessExpression()  
+				propAccess := node.AsPropertyAccessExpression()
 				return endsWithNonNull(propAccess.Expression)
 			case ast.KindElementAccessExpression:
 				// Check if accessing an element that ends with non-null
@@ -47,46 +47,46 @@ var NoConfusingNonNullAssertionRule = rule.Rule{
 			}
 			return nil, false
 		}
-		
+
 		checkNode := func(node *ast.Node) {
 			var operator ast.Kind
 			var left *ast.Node
 			var operatorToken ast.Kind
-			
+
 			// For Go's TypeScript AST, both binary expressions and assignments are KindBinaryExpression
 			if node.Kind != ast.KindBinaryExpression {
 				return
 			}
-			
+
 			binaryExpr := node.AsBinaryExpression()
 			operator = binaryExpr.OperatorToken.Kind
 			left = binaryExpr.Left
 			operatorToken = binaryExpr.OperatorToken.Kind
-			
+
 			// Check if it's a confusing operator
 			if !confusingOperators[operator] {
 				return
 			}
-			
+
 			// Check if the left side ends with a non-null expression
 			_, hasNonNull := endsWithNonNull(left)
 			if !hasNonNull {
 				return
 			}
-			
+
 			// Get the last token of the left side
 			leftRange := utils.TrimNodeTextRange(sourceFile, left)
-			
+
 			// Check if the left side ends with an exclamation mark
 			// Get the text of the left side to check for exclamation mark
 			leftText := string(sourceFile.Text()[leftRange.Pos():leftRange.End()])
 			if !strings.HasSuffix(leftText, "!") {
 				return
 			}
-			
+
 			// Find the position of the exclamation mark
 			exclamationPos := leftRange.End() - 1
-			
+
 			// Check if we should skip reporting
 			// Only skip if there's another ! before !, like a!!
 			if exclamationPos > 0 {
@@ -95,13 +95,13 @@ var NoConfusingNonNullAssertionRule = rule.Rule{
 					return
 				}
 			}
-			
+
 			// Determine message and suggestions based on operator
 			var message rule.RuleMessage
 			var suggestions []rule.RuleSuggestion
-			
+
 			operatorStr := getOperatorString(operatorToken)
-			
+
 			switch operator {
 			case ast.KindEqualsToken:
 				message = rule.RuleMessage{
@@ -117,7 +117,7 @@ var NoConfusingNonNullAssertionRule = rule.Rule{
 						FixesArr: wrapUpLeftFixes(sourceFile, left, exclamationPos),
 					},
 				}
-				
+
 			case ast.KindEqualsEqualsToken, ast.KindEqualsEqualsEqualsToken:
 				message = rule.RuleMessage{
 					Id:          "confusingEqual",
@@ -132,7 +132,7 @@ var NoConfusingNonNullAssertionRule = rule.Rule{
 						FixesArr: wrapUpLeftFixes(sourceFile, left, exclamationPos),
 					},
 				}
-				
+
 			case ast.KindInKeyword, ast.KindInstanceOfKeyword:
 				message = rule.RuleMessage{
 					Id:          "confusingOperator",
@@ -148,10 +148,10 @@ var NoConfusingNonNullAssertionRule = rule.Rule{
 					},
 				}
 			}
-			
+
 			ctx.ReportNodeWithSuggestions(node, message, suggestions...)
 		}
-		
+
 		return rule.RuleListeners{
 			ast.KindBinaryExpression: checkNode,
 		}

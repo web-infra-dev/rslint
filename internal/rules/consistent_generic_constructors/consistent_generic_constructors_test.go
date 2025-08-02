@@ -398,7 +398,7 @@ const a = function (a = new Foo<string>()) {};
 				`},
 			},
 			{
-				Code: "const a = new Foo<string>();",
+				Code:    "const a = new Foo<string>();",
 				Options: []interface{}{"type-annotation"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -410,7 +410,7 @@ const a = function (a = new Foo<string>()) {};
 				Output: []string{"const a: Foo<string> = new Foo();"},
 			},
 			{
-				Code: "const a = new Map<string, number>();",
+				Code:    "const a = new Map<string, number>();",
 				Options: []interface{}{"type-annotation"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -422,7 +422,7 @@ const a = function (a = new Foo<string>()) {};
 				Output: []string{"const a: Map<string, number> = new Map();"},
 			},
 			{
-				Code: "const a = new Map <string, number> ();",
+				Code:    "const a = new Map <string, number> ();",
 				Options: []interface{}{"type-annotation"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{
@@ -434,7 +434,7 @@ const a = function (a = new Foo<string>()) {};
 				Output: []string{"const a: Map<string, number> = new Map  ();"},
 			},
 			{
-				Code: "const a = new Map< string, number >();",
+				Code:    "const a = new Map< string, number >();",
 				Options: []interface{}{"type-annotation"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{

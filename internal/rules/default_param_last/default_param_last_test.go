@@ -3,8 +3,8 @@ package default_param_last
 import (
 	"testing"
 
-	"github.com/web-infra-dev/rslint/internal/rules/fixtures"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/rules/fixtures"
 )
 
 func TestDefaultParamLastRule(t *testing.T) {

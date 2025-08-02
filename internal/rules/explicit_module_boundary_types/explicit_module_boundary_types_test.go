@@ -112,7 +112,7 @@ export var fn = function () {
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingReturnType", Line: 2, Column: 17}},
 		},
 		{
-			Code: `export var arrowFn = () => 'test';`,
+			Code:   `export var arrowFn = () => 'test';`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingReturnType", Line: 1, Column: 25}},
 		},
 		{

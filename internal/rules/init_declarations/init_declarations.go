@@ -10,7 +10,7 @@ import (
 )
 
 type InitDeclarationsOptions struct {
-	Mode               string `json:"mode"`
+	Mode              string `json:"mode"`
 	IgnoreForLoopInit bool   `json:"ignoreForLoopInit"`
 }
 
@@ -19,7 +19,7 @@ var InitDeclarationsRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		// Default options - default to "always" mode like ESLint
 		opts := InitDeclarationsOptions{
-			Mode:               "always",
+			Mode:              "always",
 			IgnoreForLoopInit: false,
 		}
 
@@ -27,7 +27,7 @@ var InitDeclarationsRule = rule.Rule{
 		if options != nil {
 			var optsMap map[string]interface{}
 			var mode string
-			
+
 			// Handle array format: ["always", {"ignoreForLoopInit": true}] or ["never"]
 			if optsArray, ok := options.([]interface{}); ok {
 				if len(optsArray) > 0 {
@@ -47,12 +47,12 @@ var InitDeclarationsRule = rule.Rule{
 				// Handle string format: "always" or "never"
 				mode = modeStr
 			}
-			
+
 			// Apply mode if provided
 			if mode != "" {
 				opts.Mode = mode
 			}
-			
+
 			// Apply object options if provided
 			if optsMap != nil {
 				if ignoreForLoopInit, ok := optsMap["ignoreForLoopInit"].(bool); ok {
@@ -80,7 +80,7 @@ var InitDeclarationsRule = rule.Rule{
 		isInForLoopInit := func(node *ast.Node) bool {
 			// node could be either a VariableDeclarationList or its parent node
 			varDeclList := node
-			
+
 			// If node is not a VariableDeclarationList, check if it contains one
 			if node.Kind != ast.KindVariableDeclarationList {
 				// For VariableStatement, the declaration list is a child
@@ -93,7 +93,7 @@ var InitDeclarationsRule = rule.Rule{
 					return false
 				}
 			}
-			
+
 			// Check if the parent is a for loop and this is the initializer
 			parent := varDeclList.Parent
 			if parent != nil {
@@ -109,7 +109,7 @@ var InitDeclarationsRule = rule.Rule{
 					return forOfStmt.Initializer == varDeclList
 				}
 			}
-			
+
 			return false
 		}
 
@@ -118,12 +118,12 @@ var InitDeclarationsRule = rule.Rule{
 			if parentNode == nil {
 				return false
 			}
-			
+
 			switch parentNode.Kind {
 			case ast.KindForInStatement, ast.KindForOfStatement:
 				return true
 			}
-			
+
 			// Check if the parent of parentNode is for-in/for-of (for VariableDeclarationList case)
 			if parentNode.Parent != nil {
 				switch parentNode.Parent.Kind {
@@ -152,12 +152,12 @@ var InitDeclarationsRule = rule.Rule{
 			// Skip if ignoreForLoopInit is true and this is in a for loop
 			// This applies to both "always" and "never" modes
 			isForLoopInit := isInForLoopInit(parentNode)
-			
+
 			// Debug info
 			// if varDeclList.Parent != nil && varDeclList.Parent.Kind == ast.KindForStatement {
 			//	fmt.Printf("DEBUG: In for loop, ignoreForLoopInit=%v, isForLoopInit=%v, mode=%s\n", opts.IgnoreForLoopInit, isForLoopInit, opts.Mode)
 			// }
-			
+
 			if opts.IgnoreForLoopInit && isForLoopInit {
 				return
 			}
@@ -225,14 +225,14 @@ var InitDeclarationsRule = rule.Rule{
 					})
 				} else if opts.Mode == "never" {
 					// const declarations MUST be initialized by language spec
-					// so we don't report them in "never" mode  
+					// so we don't report them in "never" mode
 					if isConst {
 						continue
 					}
 
 					// In "never" mode, report variables with explicit initializers
 					shouldReport := hasInit
-					
+
 					// Also report for-in/for-of loop variables (they are effectively initialized by the loop)
 					// BUT only if they are not for-in/for-of variables themselves
 					if !hasInit && isInForInOrOfLoop(parentNode) {
@@ -275,7 +275,7 @@ var InitDeclarationsRule = rule.Rule{
 				varDeclList := varStmt.DeclarationList.AsVariableDeclarationList()
 				handleVarDeclList(varDeclList, node)
 			},
-			
+
 			// Handle variable declarations in for loops that are not wrapped in VariableStatement
 			ast.KindVariableDeclarationList: func(node *ast.Node) {
 				// Only process if this is not already handled by VariableStatement

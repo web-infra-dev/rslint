@@ -67,11 +67,11 @@ func TestNoNonNullAssertedNullishCoalescingRule(t *testing.T) {
 			Code: `foo! ?? bar;`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:    "noNonNullAssertedNullishCoalescing",
-					Line:         1,
-					Column:       1,
-					EndLine:      1,
-					EndColumn:    5,
+					MessageId: "noNonNullAssertedNullishCoalescing",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 5,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "suggestRemovingNonNull",
@@ -85,11 +85,11 @@ func TestNoNonNullAssertedNullishCoalescingRule(t *testing.T) {
 			Code: `foo! ?? bar!;`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:    "noNonNullAssertedNullishCoalescing",
-					Line:         1,
-					Column:       1,
-					EndLine:      1,
-					EndColumn:    5,
+					MessageId: "noNonNullAssertedNullishCoalescing",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 5,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "suggestRemovingNonNull",
@@ -103,11 +103,11 @@ func TestNoNonNullAssertedNullishCoalescingRule(t *testing.T) {
 			Code: `foo.bazz! ?? bar;`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:    "noNonNullAssertedNullishCoalescing",
-					Line:         1,
-					Column:       1,
-					EndLine:      1,
-					EndColumn:    10,
+					MessageId: "noNonNullAssertedNullishCoalescing",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 10,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "suggestRemovingNonNull",
@@ -121,11 +121,11 @@ func TestNoNonNullAssertedNullishCoalescingRule(t *testing.T) {
 			Code: `foo.bazz! ?? bar!;`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:    "noNonNullAssertedNullishCoalescing",
-					Line:         1,
-					Column:       1,
-					EndLine:      1,
-					EndColumn:    10,
+					MessageId: "noNonNullAssertedNullishCoalescing",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 10,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "suggestRemovingNonNull",
@@ -139,11 +139,11 @@ func TestNoNonNullAssertedNullishCoalescingRule(t *testing.T) {
 			Code: `foo!.bazz! ?? bar;`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:    "noNonNullAssertedNullishCoalescing",
-					Line:         1,
-					Column:       1,
-					EndLine:      1,
-					EndColumn:    11,
+					MessageId: "noNonNullAssertedNullishCoalescing",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 11,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "suggestRemovingNonNull",
@@ -157,11 +157,11 @@ func TestNoNonNullAssertedNullishCoalescingRule(t *testing.T) {
 			Code: `foo!.bazz! ?? bar!;`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:    "noNonNullAssertedNullishCoalescing",
-					Line:         1,
-					Column:       1,
-					EndLine:      1,
-					EndColumn:    11,
+					MessageId: "noNonNullAssertedNullishCoalescing",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 11,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "suggestRemovingNonNull",
@@ -175,11 +175,11 @@ func TestNoNonNullAssertedNullishCoalescingRule(t *testing.T) {
 			Code: `foo()! ?? bar;`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:    "noNonNullAssertedNullishCoalescing",
-					Line:         1,
-					Column:       1,
-					EndLine:      1,
-					EndColumn:    7,
+					MessageId: "noNonNullAssertedNullishCoalescing",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 7,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "suggestRemovingNonNull",
@@ -193,11 +193,11 @@ func TestNoNonNullAssertedNullishCoalescingRule(t *testing.T) {
 			Code: `foo()! ?? bar!;`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:    "noNonNullAssertedNullishCoalescing",
-					Line:         1,
-					Column:       1,
-					EndLine:      1,
-					EndColumn:    7,
+					MessageId: "noNonNullAssertedNullishCoalescing",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 7,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "suggestRemovingNonNull",
@@ -214,11 +214,11 @@ x! ?? '';
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:    "noNonNullAssertedNullishCoalescing",
-					Line:         3,
-					Column:       1,
-					EndLine:      3,
-					EndColumn:    3,
+					MessageId: "noNonNullAssertedNullishCoalescing",
+					Line:      3,
+					Column:    1,
+					EndLine:   3,
+					EndColumn: 3,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "suggestRemovingNonNull",
@@ -239,11 +239,11 @@ x! ?? '';
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:    "noNonNullAssertedNullishCoalescing",
-					Line:         4,
-					Column:       1,
-					EndLine:      4,
-					EndColumn:    3,
+					MessageId: "noNonNullAssertedNullishCoalescing",
+					Line:      4,
+					Column:    1,
+					EndLine:   4,
+					EndColumn: 3,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "suggestRemovingNonNull",
@@ -266,11 +266,11 @@ x = foo();
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:    "noNonNullAssertedNullishCoalescing",
-					Line:         4,
-					Column:       1,
-					EndLine:      4,
-					EndColumn:    3,
+					MessageId: "noNonNullAssertedNullishCoalescing",
+					Line:      4,
+					Column:    1,
+					EndLine:   4,
+					EndColumn: 3,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "suggestRemovingNonNull",
@@ -292,11 +292,11 @@ x! ?? '';
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:    "noNonNullAssertedNullishCoalescing",
-					Line:         3,
-					Column:       1,
-					EndLine:      3,
-					EndColumn:    3,
+					MessageId: "noNonNullAssertedNullishCoalescing",
+					Line:      3,
+					Column:    1,
+					EndLine:   3,
+					EndColumn: 3,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "suggestRemovingNonNull",
@@ -318,11 +318,11 @@ function foo() {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:    "noNonNullAssertedNullishCoalescing",
-					Line:         4,
-					Column:       10,
-					EndLine:      4,
-					EndColumn:    12,
+					MessageId: "noNonNullAssertedNullishCoalescing",
+					Line:      4,
+					Column:    10,
+					EndLine:   4,
+					EndColumn: 12,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "suggestRemovingNonNull",
@@ -346,11 +346,11 @@ function foo() {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:    "noNonNullAssertedNullishCoalescing",
-					Line:         4,
-					Column:       10,
-					EndLine:      4,
-					EndColumn:    12,
+					MessageId: "noNonNullAssertedNullishCoalescing",
+					Line:      4,
+					Column:    10,
+					EndLine:   4,
+					EndColumn: 12,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "suggestRemovingNonNull",
@@ -372,11 +372,11 @@ x  ! ?? '';
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:    "noNonNullAssertedNullishCoalescing",
-					Line:         3,
-					Column:       1,
-					EndLine:      3,
-					EndColumn:    5,
+					MessageId: "noNonNullAssertedNullishCoalescing",
+					Line:      3,
+					Column:    1,
+					EndLine:   3,
+					EndColumn: 5,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "suggestRemovingNonNull",

@@ -79,19 +79,19 @@ func parsePathRestriction(item interface{}) (*PathRestriction, error) {
 	// Object format
 	if obj, ok := item.(map[string]interface{}); ok {
 		pr := &PathRestriction{}
-		
+
 		if name, ok := obj["name"].(string); ok {
 			pr.Name = name
 		}
-		
+
 		if message, ok := obj["message"].(string); ok {
 			pr.Message = message
 		}
-		
+
 		if allowTypeImports, ok := obj["allowTypeImports"].(bool); ok {
 			pr.AllowTypeImports = allowTypeImports
 		}
-		
+
 		if importNames, ok := obj["importNames"].([]interface{}); ok {
 			for _, name := range importNames {
 				if str, ok := name.(string); ok {
@@ -99,7 +99,7 @@ func parsePathRestriction(item interface{}) (*PathRestriction, error) {
 				}
 			}
 		}
-		
+
 		return pr, nil
 	}
 
@@ -116,7 +116,7 @@ func parsePatternRestriction(item interface{}) (*PatternRestriction, error) {
 	// Object format
 	if obj, ok := item.(map[string]interface{}); ok {
 		pr := &PatternRestriction{CaseSensitive: true} // Default case sensitive
-		
+
 		if group, ok := obj["group"].([]interface{}); ok {
 			for _, g := range group {
 				if str, ok := g.(string); ok {
@@ -124,23 +124,23 @@ func parsePatternRestriction(item interface{}) (*PatternRestriction, error) {
 				}
 			}
 		}
-		
+
 		if regex, ok := obj["regex"].(string); ok {
 			pr.Regex = regex
 		}
-		
+
 		if message, ok := obj["message"].(string); ok {
 			pr.Message = message
 		}
-		
+
 		if caseSensitive, ok := obj["caseSensitive"].(bool); ok {
 			pr.CaseSensitive = caseSensitive
 		}
-		
+
 		if allowTypeImports, ok := obj["allowTypeImports"].(bool); ok {
 			pr.AllowTypeImports = allowTypeImports
 		}
-		
+
 		if importNames, ok := obj["importNames"].([]interface{}); ok {
 			for _, name := range importNames {
 				if str, ok := name.(string); ok {
@@ -148,7 +148,7 @@ func parsePatternRestriction(item interface{}) (*PatternRestriction, error) {
 				}
 			}
 		}
-		
+
 		return pr, nil
 	}
 
@@ -164,26 +164,26 @@ type GlobMatcher struct {
 // NewGlobMatcher creates a new glob matcher from patterns
 func NewGlobMatcher(patterns []string, caseSensitive bool) (*GlobMatcher, error) {
 	matcher := &GlobMatcher{}
-	
+
 	for _, pattern := range patterns {
 		isExclude := strings.HasPrefix(pattern, "!")
 		if isExclude {
 			pattern = pattern[1:] // Remove the !
 		}
-		
+
 		// Compile the glob pattern
 		g, err := glob.Compile(pattern, '/')
 		if err != nil {
 			return nil, err
 		}
-		
+
 		if isExclude {
 			matcher.excludes = append(matcher.excludes, g)
 		} else {
 			matcher.patterns = append(matcher.patterns, g)
 		}
 	}
-	
+
 	return matcher, nil
 }
 
@@ -195,14 +195,14 @@ func (m *GlobMatcher) Matches(str string) bool {
 			return false
 		}
 	}
-	
+
 	// Check if any include pattern matches
 	for _, pattern := range m.patterns {
 		if pattern.Match(str) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -210,7 +210,7 @@ var NoRestrictedImportsRule = rule.Rule{
 	Name: "no-restricted-imports",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		paths, patterns := parseOptions(options)
-		
+
 		// Return empty listeners if no restrictions configured
 		if len(paths) == 0 && len(patterns) == 0 {
 			return rule.RuleListeners{}
@@ -219,31 +219,31 @@ var NoRestrictedImportsRule = rule.Rule{
 		// Parse path restrictions
 		var pathRestrictions []*PathRestriction
 		allowedTypeImportPaths := make(map[string]bool)
-		
+
 		for _, item := range paths {
 			pr, err := parsePathRestriction(item)
 			if err != nil {
 				continue
 			}
 			pathRestrictions = append(pathRestrictions, pr)
-			
+
 			if pr.AllowTypeImports {
 				allowedTypeImportPaths[pr.Name] = true
 			}
 		}
 
-		// Parse pattern restrictions  
+		// Parse pattern restrictions
 		var patternRestrictions []*PatternRestriction
 		var typeImportMatchers []*GlobMatcher
 		var typeImportRegexes []*regexp.Regexp
-		
+
 		for _, item := range patterns {
 			pr, err := parsePatternRestriction(item)
 			if err != nil {
 				continue
 			}
 			patternRestrictions = append(patternRestrictions, pr)
-			
+
 			if pr.AllowTypeImports {
 				if len(pr.Group) > 0 {
 					matcher, err := NewGlobMatcher(pr.Group, pr.CaseSensitive)
@@ -251,7 +251,7 @@ var NoRestrictedImportsRule = rule.Rule{
 						typeImportMatchers = append(typeImportMatchers, matcher)
 					}
 				}
-				
+
 				if pr.Regex != "" {
 					flags := "(?s)" // s flag for . to match newlines
 					if !pr.CaseSensitive {
@@ -271,20 +271,20 @@ var NoRestrictedImportsRule = rule.Rule{
 			if allowedTypeImportPaths[importSource] {
 				return true
 			}
-			
+
 			// Check patterns
 			for _, matcher := range typeImportMatchers {
 				if matcher.Matches(importSource) {
 					return true
 				}
 			}
-			
+
 			for _, re := range typeImportRegexes {
 				if re.MatchString(importSource) {
 					return true
 				}
 			}
-			
+
 			return false
 		}
 
@@ -294,7 +294,7 @@ var NoRestrictedImportsRule = rule.Rule{
 				if pr.Name != importSource {
 					continue
 				}
-				
+
 				// Check if specific import names are restricted
 				if len(pr.ImportNames) > 0 && len(importedNames) > 0 {
 					for _, importedName := range importedNames {
@@ -335,7 +335,7 @@ var NoRestrictedImportsRule = rule.Rule{
 		checkPatternRestrictions := func(node *ast.Node, importSource string) {
 			for _, pr := range patternRestrictions {
 				matched := false
-				
+
 				// Check glob patterns
 				if len(pr.Group) > 0 {
 					matcher, err := NewGlobMatcher(pr.Group, pr.CaseSensitive)
@@ -343,7 +343,7 @@ var NoRestrictedImportsRule = rule.Rule{
 						matched = true
 					}
 				}
-				
+
 				// Check regex
 				if pr.Regex != "" && !matched {
 					flags := "(?s)"
@@ -355,7 +355,7 @@ var NoRestrictedImportsRule = rule.Rule{
 						matched = true
 					}
 				}
-				
+
 				if matched {
 					msg := pr.Message
 					if msg == "" {
@@ -382,12 +382,12 @@ var NoRestrictedImportsRule = rule.Rule{
 				if importDecl.ImportClause == nil {
 					return false
 				}
-				
+
 				importClause := importDecl.ImportClause.AsImportClause()
 				if importClause.IsTypeOnly {
 					return true
 				}
-				
+
 				// Check if all specifiers are type-only
 				if importClause.NamedBindings != nil && ast.IsNamedImports(importClause.NamedBindings) {
 					namedImports := importClause.NamedBindings.AsNamedImports()
@@ -402,13 +402,13 @@ var NoRestrictedImportsRule = rule.Rule{
 						return allTypeOnly
 					}
 				}
-				
+
 			case ast.KindExportDeclaration:
 				exportDecl := node.AsExportDeclaration()
 				if exportDecl.IsTypeOnly {
 					return true
 				}
-				
+
 				// Check if all specifiers are type-only
 				if exportDecl.ExportClause != nil && ast.IsNamedExports(exportDecl.ExportClause) {
 					namedExports := exportDecl.ExportClause.AsNamedExports()
@@ -423,33 +423,33 @@ var NoRestrictedImportsRule = rule.Rule{
 						return allTypeOnly
 					}
 				}
-				
+
 			case ast.KindImportEqualsDeclaration:
 				importEqualsDecl := node.AsImportEqualsDeclaration()
 				return importEqualsDecl.IsTypeOnly
 			}
-			
+
 			return false
 		}
 
 		// Helper to get imported names from import declaration
 		getImportedNames := func(node *ast.Node) []string {
 			var names []string
-			
+
 			switch node.Kind {
 			case ast.KindImportDeclaration:
 				importDecl := node.AsImportDeclaration()
 				if importDecl.ImportClause == nil {
 					return names
 				}
-				
+
 				importClause := importDecl.ImportClause.AsImportClause()
-				
+
 				// Default import
 				if importClause.Name() != nil {
 					names = append(names, importClause.Name().AsIdentifier().Text)
 				}
-				
+
 				// Named imports
 				if importClause.NamedBindings != nil {
 					if ast.IsNamedImports(importClause.NamedBindings) {
@@ -471,7 +471,7 @@ var NoRestrictedImportsRule = rule.Rule{
 						// Namespace imports don't have individual names
 					}
 				}
-				
+
 			case ast.KindExportDeclaration:
 				exportDecl := node.AsExportDeclaration()
 				if exportDecl.ExportClause != nil && ast.IsNamedExports(exportDecl.ExportClause) {
@@ -490,14 +490,14 @@ var NoRestrictedImportsRule = rule.Rule{
 						}
 					}
 				}
-				
+
 			case ast.KindImportEqualsDeclaration:
 				importEqualsDecl := node.AsImportEqualsDeclaration()
 				if importEqualsDecl.Name() != nil {
 					names = append(names, importEqualsDecl.Name().AsIdentifier().Text)
 				}
 			}
-			
+
 			return names
 		}
 
@@ -505,59 +505,59 @@ var NoRestrictedImportsRule = rule.Rule{
 			ast.KindImportDeclaration: func(node *ast.Node) {
 				importDecl := node.AsImportDeclaration()
 				importSource := strings.Trim(importDecl.ModuleSpecifier.AsStringLiteral().Text, "\"'`")
-				
+
 				// Skip if type-only import and allowed
 				if isTypeOnlyImportExport(node) && isAllowedTypeImport(importSource) {
 					return
 				}
-				
+
 				importedNames := getImportedNames(node)
-				
+
 				// Check path restrictions
 				checkPathRestrictions(node, importSource, importedNames)
-				
+
 				// Check pattern restrictions
 				checkPatternRestrictions(node, importSource)
 			},
-			
+
 			ast.KindExportDeclaration: func(node *ast.Node) {
 				exportDecl := node.AsExportDeclaration()
 				if exportDecl.ModuleSpecifier == nil {
 					return
 				}
-				
+
 				importSource := strings.Trim(exportDecl.ModuleSpecifier.AsStringLiteral().Text, "\"'`")
-				
+
 				// Skip if type-only export and allowed
 				if isTypeOnlyImportExport(node) && isAllowedTypeImport(importSource) {
 					return
 				}
-				
+
 				// Get exported names for restriction checking
 				exportedNames := getImportedNames(node)
 				checkPathRestrictions(node, importSource, exportedNames)
 				checkPatternRestrictions(node, importSource)
 			},
-			
+
 			ast.KindImportEqualsDeclaration: func(node *ast.Node) {
 				tsImportEquals := node.AsImportEqualsDeclaration()
-				
+
 				// Only handle external module references
 				if tsImportEquals.ModuleReference.Kind != ast.KindExternalModuleReference {
 					return
 				}
-				
+
 				externalRef := tsImportEquals.ModuleReference.AsExternalModuleReference()
 				importSource := strings.Trim(externalRef.Expression.AsStringLiteral().Text, "\"'`")
-				
+
 				// Skip if type-only import and allowed
 				if isTypeOnlyImportExport(node) && isAllowedTypeImport(importSource) {
 					return
 				}
-				
+
 				// Get the imported name
 				importedNames := getImportedNames(node)
-				
+
 				checkPathRestrictions(node, importSource, importedNames)
 				checkPatternRestrictions(node, importSource)
 			},

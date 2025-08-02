@@ -12,24 +12,24 @@ var NoDynamicDeleteRule = rule.Rule{
 			ast.KindDeleteExpression: func(node *ast.Node) {
 				deleteExpr := node.AsDeleteExpression()
 				expression := deleteExpr.Expression
-				
+
 				// Check if the expression is a MemberExpression with computed property
 				if !ast.IsElementAccessExpression(expression) {
 					return
 				}
-				
+
 				elementAccess := expression.AsElementAccessExpression()
 				argumentExpression := elementAccess.ArgumentExpression
-				
+
 				if argumentExpression == nil {
 					return
 				}
-				
+
 				// Check if the index expression is acceptable
 				if isAcceptableIndexExpression(argumentExpression) {
 					return
 				}
-				
+
 				// Report the error on the property/index expression
 				ctx.ReportNode(argumentExpression, rule.RuleMessage{
 					Id:          "dynamicDelete",

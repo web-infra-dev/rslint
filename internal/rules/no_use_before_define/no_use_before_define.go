@@ -9,44 +9,44 @@ import (
 )
 
 type Config struct {
-	AllowNamedExports                          bool     `json:"allowNamedExports"`
-	Classes                                    bool     `json:"classes"`
-	Enums                                      bool     `json:"enums"`
-	Functions                                  bool     `json:"functions"`
-	IgnoreTypeReferences                       bool     `json:"ignoreTypeReferences"`
-	Typedefs                                   bool     `json:"typedefs"`
-	Variables                                  bool     `json:"variables"`
+	AllowNamedExports    bool `json:"allowNamedExports"`
+	Classes              bool `json:"classes"`
+	Enums                bool `json:"enums"`
+	Functions            bool `json:"functions"`
+	IgnoreTypeReferences bool `json:"ignoreTypeReferences"`
+	Typedefs             bool `json:"typedefs"`
+	Variables            bool `json:"variables"`
 }
 
 var sentinelTypeRegex = regexp.MustCompile(`^(?:(?:Function|Class)(?:Declaration|Expression)|ArrowFunctionExpression|CatchClause|ImportDeclaration|ExportNamedDeclaration)$`)
 
 // Variable represents a variable declaration in the scope
 type Variable struct {
-	Name         string
-	Node         *ast.Node
-	Identifiers  []*ast.Node
-	References   []*Reference
-	DefType      DefinitionType
-	Scope        *Scope
+	Name        string
+	Node        *ast.Node
+	Identifiers []*ast.Node
+	References  []*Reference
+	DefType     DefinitionType
+	Scope       *Scope
 }
 
 // Reference represents a reference to a variable
 type Reference struct {
-	Identifier      *ast.Node
-	IsTypeReference bool
+	Identifier       *ast.Node
+	IsTypeReference  bool
 	IsValueReference bool
-	From            *Scope
-	Init            bool
+	From             *Scope
+	Init             bool
 }
 
 // Scope represents a lexical scope
 type Scope struct {
-	Node         *ast.Node
-	Parent       *Scope
-	Children     []*Scope
-	Variables    []*Variable
-	References   []*Reference
-	Type         ScopeType
+	Node          *ast.Node
+	Parent        *Scope
+	Children      []*Scope
+	Variables     []*Variable
+	References    []*Reference
+	Type          ScopeType
 	VariableScope *Scope // The function or global scope
 }
 
@@ -237,12 +237,12 @@ func isInInitializer(variable *Variable, reference *Reference) bool {
 			}
 			if node.Parent != nil && node.Parent.Parent != nil {
 				grandParent := node.Parent.Parent
-				if (grandParent.Kind == ast.KindForInStatement || grandParent.Kind == ast.KindForOfStatement) {
+				if grandParent.Kind == ast.KindForInStatement || grandParent.Kind == ast.KindForOfStatement {
 					if grandParent.Kind == ast.KindForInStatement {
-					forIn := grandParent.AsForInOrOfStatement()
-					if isInRange(forIn.Expression, location) {
-						return true
-					}
+						forIn := grandParent.AsForInOrOfStatement()
+						if isInRange(forIn.Expression, location) {
+							return true
+						}
 					} else {
 						forOf := grandParent.AsForInOrOfStatement()
 						if isInRange(forOf.Expression, location) {
@@ -268,9 +268,9 @@ func isInInitializer(variable *Variable, reference *Reference) bool {
 
 // ScopeManager manages scopes and variables
 type ScopeManager struct {
-	globalScope   *Scope
-	currentScope  *Scope
-	scopes        []*Scope
+	globalScope  *Scope
+	currentScope *Scope
+	scopes       []*Scope
 }
 
 func newScopeManager() *ScopeManager {
@@ -282,7 +282,7 @@ func newScopeManager() *ScopeManager {
 		VariableScope: nil,
 	}
 	globalScope.VariableScope = globalScope
-	
+
 	return &ScopeManager{
 		globalScope:  globalScope,
 		currentScope: globalScope,
@@ -335,8 +335,8 @@ func (sm *ScopeManager) addReference(identifier *ast.Node, isTypeRef bool, isIni
 		Identifier:       identifier,
 		IsTypeReference:  isTypeRef,
 		IsValueReference: !isTypeRef,
-		From:            sm.currentScope,
-		Init:            isInit,
+		From:             sm.currentScope,
+		Init:             isInit,
 	}
 	sm.currentScope.References = append(sm.currentScope.References, ref)
 }
@@ -357,10 +357,10 @@ func (sm *ScopeManager) findVariable(identifier *ast.Node, fromScope *Scope) *Va
 	if !ast.IsIdentifier(identifier) {
 		return nil
 	}
-	
+
 	name := identifier.AsIdentifier().Text
 	scope := fromScope
-	
+
 	for scope != nil {
 		for _, variable := range scope.Variables {
 			if variable.Name == name {
@@ -369,7 +369,7 @@ func (sm *ScopeManager) findVariable(identifier *ast.Node, fromScope *Scope) *Va
 		}
 		scope = scope.Parent
 	}
-	
+
 	return nil
 }
 
@@ -723,7 +723,7 @@ var NoUseBeforeDefineRule = rule.Rule{
 
 				// Check if it's a type reference
 				isTypeRef := isInTypeContext(node)
-				
+
 				// Check if it's an initialization
 				isInit := false
 				if parent != nil {
@@ -795,7 +795,7 @@ var NoUseBeforeDefineRule = rule.Rule{
 			rule.ListenerOnExit(ast.KindSourceFile): func(node *ast.Node) {
 				// Resolve all references
 				scopeManager.resolveReferences()
-				
+
 				// Check all scopes for violations
 				var checkAllScopes func(scope *Scope)
 				checkAllScopes = func(scope *Scope) {

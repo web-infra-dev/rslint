@@ -10,9 +10,9 @@ import (
 
 // Options for the no-unused-vars rule
 type Options struct {
-	Vars                           string `json:"vars,omitempty"`                           // "all" | "local"
-	Args                           string `json:"args,omitempty"`                           // "all" | "after-used" | "none"
-	CaughtErrors                   string `json:"caughtErrors,omitempty"`                   // "all" | "none"
+	Vars                           string `json:"vars,omitempty"`         // "all" | "local"
+	Args                           string `json:"args,omitempty"`         // "all" | "after-used" | "none"
+	CaughtErrors                   string `json:"caughtErrors,omitempty"` // "all" | "none"
 	VarsIgnorePattern              string `json:"varsIgnorePattern,omitempty"`
 	ArgsIgnorePattern              string `json:"argsIgnorePattern,omitempty"`
 	CaughtErrorsIgnorePattern      string `json:"caughtErrorsIgnorePattern,omitempty"`
@@ -48,11 +48,11 @@ const (
 
 // VariableInfo holds information about a variable
 type VariableInfo struct {
-	Variable    *ast.Node
-	Used        bool
+	Variable       *ast.Node
+	Used           bool
 	OnlyUsedAsType bool
-	References  []*ast.Node
-	Definition  *ast.Node
+	References     []*ast.Node
+	Definition     *ast.Node
 }
 
 var NoUnusedVarsRule = rule.Rule{
@@ -115,10 +115,10 @@ var NoUnusedVarsRule = rule.Rule{
 			ast.KindSourceFile: func(node *ast.Node) {
 				variables := make(map[string]*VariableInfo)
 				usages := make(map[string][]*ast.Node)
-				
+
 				// Collect declarations and usages
 				collectAllNodes(node, variables, usages)
-				
+
 				// Mark variables as used based on usages
 				for varName, usageNodes := range usages {
 					if varInfo, exists := variables[varName]; exists {
@@ -133,7 +133,7 @@ var NoUnusedVarsRule = rule.Rule{
 						}
 					}
 				}
-				
+
 				// Report unused variables
 				for _, varInfo := range variables {
 					if shouldReportVariable(ctx, opts, varInfo, variables) {
@@ -164,11 +164,11 @@ func collectAllNodesHelper(node *ast.Node, variables map[string]*VariableInfo, u
 			nameNode := varDecl.Name()
 			name := nameNode.AsIdentifier().Text
 			variables[name] = &VariableInfo{
-				Variable:   nameNode,
-				Used:       false,
+				Variable:       nameNode,
+				Used:           false,
 				OnlyUsedAsType: false,
-				References: []*ast.Node{},
-				Definition: node,
+				References:     []*ast.Node{},
+				Definition:     node,
 			}
 		}
 	case ast.KindFunctionDeclaration:
@@ -177,11 +177,11 @@ func collectAllNodesHelper(node *ast.Node, variables map[string]*VariableInfo, u
 			nameNode := funcDecl.Name()
 			name := nameNode.AsIdentifier().Text
 			variables[name] = &VariableInfo{
-				Variable:   nameNode,
-				Used:       false,
+				Variable:       nameNode,
+				Used:           false,
 				OnlyUsedAsType: false,
-				References: []*ast.Node{},
-				Definition: node,
+				References:     []*ast.Node{},
+				Definition:     node,
 			}
 		}
 	case ast.KindParameter:
@@ -190,11 +190,11 @@ func collectAllNodesHelper(node *ast.Node, variables map[string]*VariableInfo, u
 			nameNode := paramDecl.Name()
 			name := nameNode.AsIdentifier().Text
 			variables[name] = &VariableInfo{
-				Variable:   nameNode,
-				Used:       false,
+				Variable:       nameNode,
+				Used:           false,
 				OnlyUsedAsType: false,
-				References: []*ast.Node{},
-				Definition: node,
+				References:     []*ast.Node{},
+				Definition:     node,
 			}
 		}
 	case ast.KindCatchClause:
@@ -205,11 +205,11 @@ func collectAllNodesHelper(node *ast.Node, variables map[string]*VariableInfo, u
 				nameNode := nameDecl.Name()
 				name := nameNode.AsIdentifier().Text
 				variables[name] = &VariableInfo{
-					Variable:   nameNode,
-					Used:       false,
+					Variable:       nameNode,
+					Used:           false,
 					OnlyUsedAsType: false,
-					References: []*ast.Node{},
-					Definition: nameDecl,
+					References:     []*ast.Node{},
+					Definition:     nameDecl,
 				}
 			}
 		}
@@ -336,11 +336,11 @@ func collectDeclarations(node *ast.Node, variables map[string]*VariableInfo) {
 					nameNode := varDecl.Name()
 					name := nameNode.AsIdentifier().Text
 					variables[name] = &VariableInfo{
-						Variable:   nameNode,
-						Used:       false,
+						Variable:       nameNode,
+						Used:           false,
 						OnlyUsedAsType: false,
-						References: []*ast.Node{},
-						Definition: decl,
+						References:     []*ast.Node{},
+						Definition:     decl,
 					}
 				}
 			}
@@ -351,11 +351,11 @@ func collectDeclarations(node *ast.Node, variables map[string]*VariableInfo) {
 			nameNode := funcDecl.Name()
 			name := nameNode.AsIdentifier().Text
 			variables[name] = &VariableInfo{
-				Variable:   nameNode,
-				Used:       false,
+				Variable:       nameNode,
+				Used:           false,
 				OnlyUsedAsType: false,
-				References: []*ast.Node{},
-				Definition: node,
+				References:     []*ast.Node{},
+				Definition:     node,
 			}
 		}
 		// Handle parameters
@@ -366,11 +366,11 @@ func collectDeclarations(node *ast.Node, variables map[string]*VariableInfo) {
 					nameNode := paramDecl.Name()
 					name := nameNode.AsIdentifier().Text
 					variables[name] = &VariableInfo{
-						Variable:   nameNode,
-						Used:       false,
+						Variable:       nameNode,
+						Used:           false,
 						OnlyUsedAsType: false,
-						References: []*ast.Node{},
-						Definition: param,
+						References:     []*ast.Node{},
+						Definition:     param,
 					}
 				}
 			}
@@ -383,11 +383,11 @@ func collectDeclarations(node *ast.Node, variables map[string]*VariableInfo) {
 				nameNode := nameDecl.Name()
 				name := nameNode.AsIdentifier().Text
 				variables[name] = &VariableInfo{
-					Variable:   nameNode,
-					Used:       false,
+					Variable:       nameNode,
+					Used:           false,
 					OnlyUsedAsType: false,
-					References: []*ast.Node{},
-					Definition: nameDecl,
+					References:     []*ast.Node{},
+					Definition:     nameDecl,
 				}
 			}
 		}
@@ -601,7 +601,6 @@ func isPartOfDeclaration(node *ast.Node) bool {
 	return false
 }
 
-
 func isTypeOnlyUsage(node *ast.Node) bool {
 	parent := node.Parent
 	if parent == nil {
@@ -652,7 +651,7 @@ func shouldReportVariable(ctx rule.RuleContext, opts TranslatedOptions, varInfo 
 
 	// Apply ignore patterns
 	name := getVariableName(varInfo)
-	
+
 	switch varType {
 	case VariableTypeArrayDestructure:
 		if opts.DestructuredArrayIgnorePattern != nil && opts.DestructuredArrayIgnorePattern.MatchString(name) {
@@ -726,7 +725,7 @@ func getVariableName(varInfo *VariableInfo) string {
 	if varInfo.Variable != nil && ast.IsIdentifier(varInfo.Variable) {
 		return varInfo.Variable.AsIdentifier().Text
 	}
-	
+
 	// Try to get name from definition
 	if varInfo.Definition != nil {
 		switch varInfo.Definition.Kind {
@@ -747,7 +746,7 @@ func getVariableName(varInfo *VariableInfo) string {
 			}
 		}
 	}
-	
+
 	return ""
 }
 
@@ -756,7 +755,7 @@ func isGlobalVariable(varInfo *VariableInfo) bool {
 	if varInfo.Definition == nil {
 		return false
 	}
-	
+
 	// Check if the definition is at the top level of a source file
 	parent := varInfo.Definition.Parent
 	for parent != nil {
@@ -768,7 +767,7 @@ func isGlobalVariable(varInfo *VariableInfo) bool {
 		}
 		parent = parent.Parent
 	}
-	
+
 	return false
 }
 
@@ -776,7 +775,7 @@ func isImportDeclaration(definition *ast.Node) bool {
 	if definition == nil {
 		return false
 	}
-	
+
 	parent := definition.Parent
 	for parent != nil {
 		if parent.Kind == ast.KindImportDeclaration {
@@ -784,7 +783,7 @@ func isImportDeclaration(definition *ast.Node) bool {
 		}
 		parent = parent.Parent
 	}
-	
+
 	return false
 }
 
@@ -894,14 +893,14 @@ func hasRestSibling(varInfo *VariableInfo) bool {
 	if varInfo.Definition == nil {
 		return false
 	}
-	
+
 	parent := varInfo.Definition.Parent
 	if parent != nil && parent.Kind == ast.KindObjectBindingPattern {
 		// Check if there's a rest element in the pattern
 		// This is simplified - would need proper implementation
 		return false
 	}
-	
+
 	return false
 }
 
@@ -909,7 +908,7 @@ func isClassWithStaticInitBlock(definition *ast.Node) bool {
 	if definition == nil || definition.Kind != ast.KindClassDeclaration {
 		return false
 	}
-	
+
 	classDecl := definition.AsClassDeclaration()
 	if classDecl.Members != nil {
 		for _, member := range classDecl.Members.Nodes {
@@ -920,18 +919,18 @@ func isClassWithStaticInitBlock(definition *ast.Node) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
 
 func reportUnusedVariable(ctx rule.RuleContext, opts TranslatedOptions, varInfo *VariableInfo) {
 	varName := getVariableName(varInfo)
 	varType := getVariableType(varInfo.Definition)
-	
+
 	// Determine message ID and data
 	messageId := "unusedVar"
 	action := "defined"
-	
+
 	// Check if variable was assigned
 	if len(varInfo.References) > 0 {
 		for _, ref := range varInfo.References {
@@ -941,20 +940,20 @@ func reportUnusedVariable(ctx rule.RuleContext, opts TranslatedOptions, varInfo 
 			}
 		}
 	}
-	
+
 	// Check if only used as type
 	if varInfo.OnlyUsedAsType {
 		messageId = "usedOnlyAsType"
 	}
-	
+
 	// Check if used but matches ignore pattern
 	if varInfo.Used && opts.ReportUsedIgnorePattern {
 		messageId = "usedIgnoredVar"
 	}
-	
+
 	// Build additional message for ignore patterns
 	additional := getAdditionalMessage(opts, varType)
-	
+
 	// Find the location to report
 	var reportNode *ast.Node
 	if len(varInfo.References) > 0 {
@@ -969,11 +968,11 @@ func reportUnusedVariable(ctx rule.RuleContext, opts TranslatedOptions, varInfo 
 	if reportNode == nil && varInfo.Definition != nil {
 		reportNode = getNameNodeFromDefinition(varInfo.Definition)
 	}
-	
+
 	if reportNode == nil {
 		return
 	}
-	
+
 	// Report the issue
 	message := buildMessage(messageId, varName, action, additional)
 	ctx.ReportNode(reportNode, message)
@@ -984,7 +983,7 @@ func isWriteReference(node *ast.Node) bool {
 	if parent == nil {
 		return false
 	}
-	
+
 	// Check if this is a write reference
 	if ast.IsBinaryExpression(parent) {
 		binExpr := parent.AsBinaryExpression()
@@ -992,7 +991,7 @@ func isWriteReference(node *ast.Node) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -1026,14 +1025,14 @@ func getNameNodeFromDefinition(definition *ast.Node) *ast.Node {
 	case ast.KindClassDeclaration:
 		return definition.AsClassDeclaration().Name()
 	}
-	
+
 	return definition
 }
 
 func getAdditionalMessage(opts TranslatedOptions, varType VariableType) string {
 	pattern := ""
 	description := ""
-	
+
 	switch varType {
 	case VariableTypeArrayDestructure:
 		if opts.DestructuredArrayIgnorePattern != nil {
@@ -1056,14 +1055,14 @@ func getAdditionalMessage(opts TranslatedOptions, varType VariableType) string {
 			description = "vars"
 		}
 	}
-	
+
 	if pattern != "" && description != "" {
 		if opts.ReportUsedIgnorePattern {
 			return fmt.Sprintf(". Used %s must not match %s", description, pattern)
 		}
 		return fmt.Sprintf(". Allowed unused %s must match %s", description, pattern)
 	}
-	
+
 	return ""
 }
 
@@ -1119,7 +1118,7 @@ func collectReferencesInNode(node *ast.Node, refs map[string]bool) {
 
 func buildMessage(messageId, varName, action, additional string) rule.RuleMessage {
 	var description string
-	
+
 	switch messageId {
 	case "unusedVar":
 		description = fmt.Sprintf("'%s' is %s but never used%s.", varName, action, additional)
@@ -1128,7 +1127,7 @@ func buildMessage(messageId, varName, action, additional string) rule.RuleMessag
 	case "usedOnlyAsType":
 		description = fmt.Sprintf("'%s' is %s but only used as a type%s.", varName, action, additional)
 	}
-	
+
 	return rule.RuleMessage{
 		Id:          messageId,
 		Description: description,

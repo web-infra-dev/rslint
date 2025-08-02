@@ -64,8 +64,8 @@ func isWithinDeclareGlobalModule(ctx rule.RuleContext, node *ast.Node) bool {
 			moduleDecl := current.AsModuleDeclaration()
 			// Check if this is a global module declaration with declare modifier
 			if moduleDecl.Name() != nil &&
-			   ast.IsIdentifier(moduleDecl.Name()) &&
-			   moduleDecl.Name().AsIdentifier().Text == "global" {
+				ast.IsIdentifier(moduleDecl.Name()) &&
+				moduleDecl.Name().AsIdentifier().Text == "global" {
 				// Check for declare modifier
 				if moduleDecl.Modifiers() != nil {
 					for _, modifier := range moduleDecl.Modifiers().Nodes {
@@ -102,7 +102,7 @@ func convertTypeToInterface(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix
 		if i+4 <= len(text) && text[i:i+4] == "type" {
 			// Make sure it's a word boundary
 			if (i == 0 || !isIdentifierChar(text[i-1])) &&
-			   (i+4 >= len(text) || !isIdentifierChar(text[i+4])) {
+				(i+4 >= len(text) || !isIdentifierChar(text[i+4])) {
 				typeKeywordStart = i
 				break
 			}
@@ -185,7 +185,7 @@ func convertInterfaceToType(ctx rule.RuleContext, node *ast.Node) []rule.RuleFix
 		if i+9 <= len(text) && text[i:i+9] == "interface" {
 			// Make sure it's a word boundary
 			if (i == 0 || !isIdentifierChar(text[i-1])) &&
-			   (i+9 >= len(text) || !isIdentifierChar(text[i+9])) {
+				(i+9 >= len(text) || !isIdentifierChar(text[i+9])) {
 				interfaceKeywordStart = i
 				break
 			}

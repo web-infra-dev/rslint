@@ -121,7 +121,7 @@ var NoRestrictedTypesRule = rule.Rule{
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -129,7 +129,7 @@ var NoRestrictedTypesRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if types, ok := optsMap["types"].(map[string]interface{}); ok {
 					// Build a map of normalized type names to their configurations
@@ -212,15 +212,15 @@ var NoRestrictedTypesRule = rule.Rule{
 		// Check type references
 		listeners[ast.KindTypeReference] = func(node *ast.Node) {
 			typeRef := node.AsTypeReference()
-			
+
 			// First check the type name itself
 			typeName := stringifyNode(typeRef.TypeName, ctx.SourceFile)
-			
+
 			// Check if just the type name is banned
 			if _, exists := opts.Types[removeSpaces(typeName)]; exists {
 				checkBannedTypes(typeRef.TypeName, typeName)
 			}
-			
+
 			// If the type has type arguments, also check the full type reference
 			if typeRef.TypeArguments != nil && len(typeRef.TypeArguments.Nodes) > 0 {
 				fullTypeName := stringifyNode(node, ctx.SourceFile)

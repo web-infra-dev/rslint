@@ -12,15 +12,15 @@ import (
 type AccessibilityLevel string
 
 const (
-	AccessibilityExplicit  AccessibilityLevel = "explicit"
-	AccessibilityNoPublic  AccessibilityLevel = "no-public"
-	AccessibilityOff       AccessibilityLevel = "off"
+	AccessibilityExplicit AccessibilityLevel = "explicit"
+	AccessibilityNoPublic AccessibilityLevel = "no-public"
+	AccessibilityOff      AccessibilityLevel = "off"
 )
 
 type Config struct {
-	Accessibility       AccessibilityLevel `json:"accessibility,omitempty"`
-	IgnoredMethodNames  []string           `json:"ignoredMethodNames,omitempty"`
-	Overrides           *Overrides         `json:"overrides,omitempty"`
+	Accessibility      AccessibilityLevel `json:"accessibility,omitempty"`
+	IgnoredMethodNames []string           `json:"ignoredMethodNames,omitempty"`
+	Overrides          *Overrides         `json:"overrides,omitempty"`
 }
 
 type Overrides struct {
@@ -157,7 +157,7 @@ func findPublicKeywordRange(ctx rule.RuleContext, node *ast.Node) (core.TextRang
 	for i, mod := range modifiers.NodeList.Nodes {
 		if mod.Kind == ast.KindPublicKeyword {
 			keywordRange := core.NewTextRange(mod.Pos(), mod.End())
-			
+
 			// Calculate range to remove (including following whitespace)
 			removeEnd := mod.End()
 			if i+1 < len(modifiers.NodeList.Nodes) {
@@ -169,7 +169,7 @@ func findPublicKeywordRange(ctx rule.RuleContext, node *ast.Node) (core.TextRang
 					removeEnd++
 				}
 			}
-			
+
 			removeRange := core.NewTextRange(mod.Pos(), removeEnd)
 			return keywordRange, removeRange
 		}
@@ -194,11 +194,11 @@ func getMemberName(node *ast.Node, ctx rule.RuleContext) string {
 	default:
 		nameNode = node
 	}
-	
+
 	if nameNode == nil {
 		return ""
 	}
-	
+
 	name, _ := utils.GetNameFromMember(ctx.SourceFile, nameNode)
 	return name
 }
@@ -279,7 +279,7 @@ func isAccessorProperty(node *ast.Node) bool {
 	if node.Kind != ast.KindPropertyDeclaration {
 		return false
 	}
-	
+
 	prop := node.AsPropertyDeclaration()
 	if prop.Modifiers() != nil {
 		for _, mod := range prop.Modifiers().NodeList.Nodes {
@@ -295,12 +295,12 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 	Name: "explicit-member-accessibility",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		config := parseOptions(options)
-		
+
 		baseCheck := config.Accessibility
 		overrides := config.Overrides
-		
+
 		var ctorCheck, accessorCheck, methodCheck, propCheck, paramPropCheck AccessibilityLevel
-		
+
 		if overrides != nil {
 			if overrides.Constructors != "" {
 				ctorCheck = overrides.Constructors
@@ -365,7 +365,7 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 			}
 
 			methodName := getMemberName(node, ctx)
-			
+
 			if check == AccessibilityOff || ignoredMethodNames[methodName] {
 				return
 			}
@@ -423,7 +423,7 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 				case ast.KindSetAccessor:
 					nameNode = node.AsSetAccessorDeclaration().Name()
 				}
-				
+
 				if nameNode != nil && nameNode.Kind == ast.KindIdentifier {
 					// Report just on the method name
 					ctx.ReportNode(nameNode, rule.RuleMessage{
@@ -507,7 +507,7 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 			}
 
 			param := node.AsParameterDeclaration()
-			
+
 			// Check if it's a parameter property (has modifiers)
 			if param.Modifiers() == nil {
 				return
@@ -552,7 +552,7 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 			}
 
 			accessibility := getAccessibilityModifier(node)
-			
+
 			// Debug: Skip parameter property checking if paramPropCheck is off
 			if paramPropCheck == AccessibilityOff {
 				return
@@ -570,7 +570,7 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 						// Report the entire parameter name
 						reportRange = core.NewTextRange(node.Pos(), name.End())
 					}
-					
+
 					suggestions := getParameterPropertyAccessibilitySuggestions(node, ctx)
 					ctx.ReportRangeWithSuggestions(reportRange, rule.RuleMessage{
 						Id:          "missingAccessibility",
@@ -611,12 +611,12 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 		}
 
 		return rule.RuleListeners{
-			ast.KindMethodDeclaration: checkMethodAccessibilityModifier,
-			ast.KindConstructor: checkMethodAccessibilityModifier,
-			ast.KindGetAccessor: checkMethodAccessibilityModifier,
-			ast.KindSetAccessor: checkMethodAccessibilityModifier,
+			ast.KindMethodDeclaration:   checkMethodAccessibilityModifier,
+			ast.KindConstructor:         checkMethodAccessibilityModifier,
+			ast.KindGetAccessor:         checkMethodAccessibilityModifier,
+			ast.KindSetAccessor:         checkMethodAccessibilityModifier,
 			ast.KindPropertyDeclaration: checkPropertyAccessibilityModifier,
-			ast.KindParameter: checkParameterPropertyAccessibilityModifier,
+			ast.KindParameter:           checkParameterPropertyAccessibilityModifier,
 		}
 	},
 }
@@ -644,7 +644,7 @@ func getMissingAccessibilitySuggestions(node *ast.Node, ctx rule.RuleContext) []
 			case ast.KindPropertyDeclaration:
 				modifiers = node.AsPropertyDeclaration().Modifiers()
 			}
-			
+
 			if modifiers != nil {
 				for _, mod := range modifiers.NodeList.Nodes {
 					if mod.Kind == ast.KindAbstractKeyword {

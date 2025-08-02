@@ -11,12 +11,12 @@ import (
 type ExplicitFunctionReturnTypeOptions struct {
 	AllowConciseArrowFunctionExpressionsStartingWithVoid bool     `json:"allowConciseArrowFunctionExpressionsStartingWithVoid"`
 	AllowDirectConstAssertionInArrowFunctions            bool     `json:"allowDirectConstAssertionInArrowFunctions"`
-	AllowedNames                                          []string `json:"allowedNames"`
-	AllowExpressions                                      bool     `json:"allowExpressions"`
-	AllowFunctionsWithoutTypeParameters                   bool     `json:"allowFunctionsWithoutTypeParameters"`
-	AllowHigherOrderFunctions                             bool     `json:"allowHigherOrderFunctions"`
-	AllowIIFEs                                            bool     `json:"allowIIFEs"`
-	AllowTypedFunctionExpressions                         bool     `json:"allowTypedFunctionExpressions"`
+	AllowedNames                                         []string `json:"allowedNames"`
+	AllowExpressions                                     bool     `json:"allowExpressions"`
+	AllowFunctionsWithoutTypeParameters                  bool     `json:"allowFunctionsWithoutTypeParameters"`
+	AllowHigherOrderFunctions                            bool     `json:"allowHigherOrderFunctions"`
+	AllowIIFEs                                           bool     `json:"allowIIFEs"`
+	AllowTypedFunctionExpressions                        bool     `json:"allowTypedFunctionExpressions"`
 }
 
 type functionInfo struct {
@@ -57,7 +57,7 @@ func startsWithVoid(node *ast.Node) bool {
 	if node.Kind != ast.KindArrowFunction {
 		return false
 	}
-	
+
 	arrowFunc := node.AsArrowFunction()
 	if arrowFunc.Body == nil || arrowFunc.Body.Kind != ast.KindBlock {
 		// Check if it's a concise arrow function with void expression
@@ -75,12 +75,12 @@ func hasDirectConstAssertion(node *ast.Node, ctx rule.RuleContext) bool {
 	if node.Kind != ast.KindArrowFunction {
 		return false
 	}
-	
+
 	arrowFunc := node.AsArrowFunction()
 	if arrowFunc.Body == nil || arrowFunc.Body.Kind == ast.KindBlock {
 		return false
 	}
-	
+
 	// Check for as const expression
 	body := arrowFunc.Body
 	if body.Kind == ast.KindAsExpression {
@@ -93,7 +93,7 @@ func hasDirectConstAssertion(node *ast.Node, ctx rule.RuleContext) bool {
 			}
 		}
 	}
-	
+
 	// Check for satisfies ... as const pattern
 	if body.Kind == ast.KindSatisfiesExpression {
 		satisfiesExpr := body.AsSatisfiesExpression()
@@ -112,7 +112,7 @@ func hasDirectConstAssertion(node *ast.Node, ctx rule.RuleContext) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -131,13 +131,13 @@ func getFunctionName(node *ast.Node, ctx rule.RuleContext) string {
 			return funcExpr.Name().Text()
 		}
 	}
-	
+
 	// Check parent context for name
 	parent := node.Parent
 	if parent == nil {
 		return ""
 	}
-	
+
 	switch parent.Kind {
 	case ast.KindVariableDeclaration:
 		varDecl := parent.AsVariableDeclaration()
@@ -150,7 +150,7 @@ func getFunctionName(node *ast.Node, ctx rule.RuleContext) string {
 			return name
 		}
 	}
-	
+
 	return ""
 }
 
@@ -171,18 +171,18 @@ func isAllowedFunction(node *ast.Node, opts ExplicitFunctionReturnTypeOptions) b
 			return true
 		}
 	}
-	
+
 	// Check allowIIFEs
 	if opts.AllowIIFEs && isIIFE(node) {
 		return true
 	}
-	
+
 	// Check allowedNames
 	if len(opts.AllowedNames) > 0 {
 		// Note: This would need context to get function name properly
 		// For now, skip this check as it requires refactoring
 	}
-	
+
 	return false
 }
 
@@ -191,22 +191,22 @@ func isValidFunctionExpressionReturnType(node *ast.Node, opts ExplicitFunctionRe
 	if !opts.AllowTypedFunctionExpressions {
 		return false
 	}
-	
+
 	// Already has return type
 	if hasReturnType(node) {
 		return true
 	}
-	
+
 	parent := node.Parent
 	if parent == nil {
 		return false
 	}
-	
+
 	checker := ctx.TypeChecker
 	if checker == nil {
 		return false
 	}
-	
+
 	// Check various parent contexts for type information
 	switch parent.Kind {
 	case ast.KindVariableDeclaration:
@@ -219,7 +219,7 @@ func isValidFunctionExpressionReturnType(node *ast.Node, opts ExplicitFunctionRe
 		if varDecl.Initializer != nil && (varDecl.Initializer.Kind == ast.KindAsExpression || varDecl.Initializer.Kind == ast.KindTypeAssertionExpression) {
 			return true
 		}
-		
+
 	case ast.KindPropertyDeclaration, ast.KindPropertyAssignment:
 		// Check if property has type annotation
 		if parent.Kind == ast.KindPropertyDeclaration {
@@ -228,7 +228,7 @@ func isValidFunctionExpressionReturnType(node *ast.Node, opts ExplicitFunctionRe
 				return true
 			}
 		}
-		
+
 		// Check if parent object has type
 		grandParent := parent.Parent
 		if grandParent != nil {
@@ -250,29 +250,29 @@ func isValidFunctionExpressionReturnType(node *ast.Node, opts ExplicitFunctionRe
 				}
 			}
 		}
-		
+
 	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
 		return true
-		
+
 	case ast.KindCallExpression:
 		// Check if it's a typed function parameter
 		return isTypedFunctionParameter(node, parent, checker)
-		
+
 	case ast.KindArrayLiteralExpression:
 		// Check if array is in typed context
 		return isInTypedContext(parent, checker)
-		
+
 	case ast.KindJsxElement, ast.KindJsxSelfClosingElement:
 		// JSX props are typed
 		return true
-		
+
 	case ast.KindJsxExpression:
 		// JSX expression container
 		if parent.Parent != nil && (parent.Parent.Kind == ast.KindJsxElement || parent.Parent.Kind == ast.KindJsxSelfClosingElement) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -285,7 +285,7 @@ func isInTypedContext(node *ast.Node, checker *checker.Checker) bool {
 // Check if function is a parameter to a typed call
 func isTypedFunctionParameter(funcNode, callNode *ast.Node, checker *checker.Checker) bool {
 	call := callNode.AsCallExpression()
-	
+
 	// Find which argument position this function is in
 	argIndex := -1
 	for i, arg := range call.Arguments.Nodes {
@@ -294,17 +294,17 @@ func isTypedFunctionParameter(funcNode, callNode *ast.Node, checker *checker.Che
 			break
 		}
 	}
-	
+
 	if argIndex == -1 {
 		return false
 	}
-	
+
 	// Get the signature of the called function
 	signature := checker.GetResolvedSignature(callNode)
 	if signature == nil {
 		return false
 	}
-	
+
 	// Check if the parameter at this position expects a function type
 	params := signature.Parameters()
 	if argIndex < len(params) {
@@ -317,15 +317,15 @@ func isTypedFunctionParameter(funcNode, callNode *ast.Node, checker *checker.Che
 				// This parameter expects a function - return type information is available
 				return true
 			}
-			
-			// Check if it's a constructor type  
+
+			// Check if it's a constructor type
 			constructSignatures := checker.GetSignaturesOfType(paramType, 1) // SignatureKindConstruct = 1
 			if len(constructSignatures) > 0 {
 				return true
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -365,17 +365,17 @@ func isHigherOrderFunction(info *functionInfo) bool {
 	if len(info.returns) != 1 {
 		return false
 	}
-	
+
 	returnStmt := info.returns[0]
 	if returnStmt.Kind != ast.KindReturnStatement {
 		return false
 	}
-	
+
 	returnNode := returnStmt.AsReturnStatement()
 	if returnNode.Expression == nil {
 		return false
 	}
-	
+
 	// Check if return expression is a function
 	expr := returnNode.Expression
 	return expr.Kind == ast.KindArrowFunction ||
@@ -392,7 +392,7 @@ func getReportLocation(node *ast.Node, ctx rule.RuleContext) (int, int) {
 			return node.Pos(), funcDecl.Name().Pos()
 		}
 		return node.Pos(), node.Pos() + 8 // "function" length
-		
+
 	case ast.KindFunctionExpression:
 		// Report at "function" keyword
 		funcExpr := node.AsFunctionExpression()
@@ -400,7 +400,7 @@ func getReportLocation(node *ast.Node, ctx rule.RuleContext) (int, int) {
 			return node.Pos(), funcExpr.Name().End()
 		}
 		return node.Pos(), node.Pos() + 8 // "function" length
-		
+
 	case ast.KindArrowFunction:
 		// Report at arrow
 		arrow := node.AsArrowFunction()
@@ -420,7 +420,7 @@ func getReportLocation(node *ast.Node, ctx rule.RuleContext) (int, int) {
 		// Fallback to node position
 		return node.Pos(), node.Pos() + 2
 	}
-	
+
 	return node.Pos(), node.End()
 }
 
@@ -431,19 +431,19 @@ var ExplicitFunctionReturnTypeRule = rule.Rule{
 		opts := ExplicitFunctionReturnTypeOptions{
 			AllowConciseArrowFunctionExpressionsStartingWithVoid: false,
 			AllowDirectConstAssertionInArrowFunctions:            true,
-			AllowedNames:                                          []string{},
-			AllowExpressions:                                      false,
-			AllowFunctionsWithoutTypeParameters:                   false,
-			AllowHigherOrderFunctions:                             true,
-			AllowIIFEs:                                            false,
-			AllowTypedFunctionExpressions:                         true,
+			AllowedNames:                        []string{},
+			AllowExpressions:                    false,
+			AllowFunctionsWithoutTypeParameters: false,
+			AllowHigherOrderFunctions:           true,
+			AllowIIFEs:                          false,
+			AllowTypedFunctionExpressions:       true,
 		}
-		
+
 		// Parse options with dual-format support (handles both array and object formats)
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -451,7 +451,7 @@ var ExplicitFunctionReturnTypeRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if val, ok := optsMap["allowConciseArrowFunctionExpressionsStartingWithVoid"].(bool); ok {
 					opts.AllowConciseArrowFunctionExpressionsStartingWithVoid = val
@@ -484,10 +484,10 @@ var ExplicitFunctionReturnTypeRule = rule.Rule{
 				}
 			}
 		}
-		
+
 		// Stack to track function information
 		functionStack := make([]*functionInfo, 0)
-		
+
 		// Helper to push function onto stack
 		enterFunction := func(node *ast.Node) {
 			functionStack = append(functionStack, &functionInfo{
@@ -495,7 +495,7 @@ var ExplicitFunctionReturnTypeRule = rule.Rule{
 				returns: make([]*ast.Node, 0),
 			})
 		}
-		
+
 		// Helper to pop function from stack
 		exitFunction := func() *functionInfo {
 			if len(functionStack) == 0 {
@@ -505,7 +505,7 @@ var ExplicitFunctionReturnTypeRule = rule.Rule{
 			functionStack = functionStack[:len(functionStack)-1]
 			return info
 		}
-		
+
 		// Helper to get current function info
 		currentFunction := func() *functionInfo {
 			if len(functionStack) == 0 {
@@ -513,40 +513,40 @@ var ExplicitFunctionReturnTypeRule = rule.Rule{
 			}
 			return functionStack[len(functionStack)-1]
 		}
-		
+
 		// Check function expression (arrow or function expression)
 		checkFunctionExpression := func(node *ast.Node) {
 			info := exitFunction()
 			if info == nil {
 				return
 			}
-			
+
 			// Special case: arrow function with void
 			if opts.AllowConciseArrowFunctionExpressionsStartingWithVoid && startsWithVoid(node) {
 				return
 			}
-			
+
 			// Special case: arrow function with as const
 			if opts.AllowDirectConstAssertionInArrowFunctions && hasDirectConstAssertion(node, ctx) {
 				return
 			}
-			
+
 			// Check if function is allowed
 			if isAllowedFunction(node, opts) {
 				return
 			}
-			
+
 			// Check if it's a typed function expression
 			if opts.AllowTypedFunctionExpressions &&
 				(isValidFunctionExpressionReturnType(node, opts, ctx) || ancestorHasReturnType(node)) {
 				return
 			}
-			
+
 			// Check if it's a higher-order function
 			if opts.AllowHigherOrderFunctions && isHigherOrderFunction(info) {
 				return
 			}
-			
+
 			// Check if expressions are allowed
 			if opts.AllowExpressions {
 				parent := node.Parent
@@ -560,39 +560,39 @@ var ExplicitFunctionReturnTypeRule = rule.Rule{
 					}
 				}
 			}
-			
+
 			// Report missing return type
 			start, end := getReportLocation(node, ctx)
 			ctx.ReportRange(core.NewTextRange(start, end), buildMissingReturnTypeMessage())
 		}
-		
+
 		// Check function declaration
 		checkFunctionDeclaration := func(node *ast.Node) {
 			info := exitFunction()
 			if info == nil {
 				return
 			}
-			
+
 			// Check if function is allowed
 			if isAllowedFunction(node, opts) {
 				return
 			}
-			
+
 			// Function declarations with return type are always ok
 			if hasReturnType(node) {
 				return
 			}
-			
+
 			// Check if typed function expressions are allowed (for consistency)
 			if opts.AllowTypedFunctionExpressions && hasReturnType(node) {
 				return
 			}
-			
+
 			// Check if it's a higher-order function
 			if opts.AllowHigherOrderFunctions && isHigherOrderFunction(info) {
 				return
 			}
-			
+
 			// Check if expressions are allowed (export default)
 			if opts.AllowExpressions {
 				parent := node.Parent
@@ -600,21 +600,21 @@ var ExplicitFunctionReturnTypeRule = rule.Rule{
 					return
 				}
 			}
-			
+
 			// Report missing return type
 			start, end := getReportLocation(node, ctx)
 			ctx.ReportRange(core.NewTextRange(start, end), buildMissingReturnTypeMessage())
 		}
-		
+
 		return rule.RuleListeners{
-			ast.KindArrowFunction: enterFunction,
+			ast.KindArrowFunction:       enterFunction,
 			ast.KindFunctionDeclaration: enterFunction,
-			ast.KindFunctionExpression: enterFunction,
-			
-			rule.ListenerOnExit(ast.KindArrowFunction): checkFunctionExpression,
-			rule.ListenerOnExit(ast.KindFunctionExpression): checkFunctionExpression,
+			ast.KindFunctionExpression:  enterFunction,
+
+			rule.ListenerOnExit(ast.KindArrowFunction):       checkFunctionExpression,
+			rule.ListenerOnExit(ast.KindFunctionExpression):  checkFunctionExpression,
 			rule.ListenerOnExit(ast.KindFunctionDeclaration): checkFunctionDeclaration,
-			
+
 			ast.KindReturnStatement: func(node *ast.Node) {
 				if info := currentFunction(); info != nil {
 					info.returns = append(info.returns, node)

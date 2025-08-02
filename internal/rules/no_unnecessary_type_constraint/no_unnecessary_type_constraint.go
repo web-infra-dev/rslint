@@ -42,10 +42,10 @@ func shouldAddTrailingComma(node *ast.Node, inArrowFunction bool, requiresDisamb
 		// Check if current node has TypeParameters method
 		switch current.Kind {
 		case ast.KindArrowFunction, ast.KindFunctionDeclaration, ast.KindFunctionExpression,
-			 ast.KindMethodDeclaration, ast.KindClassDeclaration, ast.KindInterfaceDeclaration,
-			 ast.KindTypeAliasDeclaration, ast.KindCallSignature, ast.KindConstructSignature,
-			 ast.KindMethodSignature, ast.KindConstructorType, ast.KindFunctionType:
-			
+			ast.KindMethodDeclaration, ast.KindClassDeclaration, ast.KindInterfaceDeclaration,
+			ast.KindTypeAliasDeclaration, ast.KindCallSignature, ast.KindConstructSignature,
+			ast.KindMethodSignature, ast.KindConstructorType, ast.KindFunctionType:
+
 			typeParams := current.TypeParameters()
 			if typeParams != nil && len(typeParams) == 1 {
 				// Check if there's already a trailing comma
@@ -77,7 +77,7 @@ var NoUnnecessaryTypeConstraintRule = rule.Rule{
 
 		checkNode := func(node *ast.Node, inArrowFunction bool) {
 			typeParam := node.AsTypeParameter()
-			
+
 			// At this point we know there's a constraint and it's unnecessary
 			constraint, found := unnecessaryConstraints[typeParam.Constraint.Kind]
 			if !found {
@@ -117,7 +117,7 @@ var NoUnnecessaryTypeConstraintRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindTypeParameter: func(node *ast.Node) {
 				typeParam := node.AsTypeParameter()
-				
+
 				// Only check type parameters that have constraints
 				if typeParam.Constraint == nil {
 					return
@@ -132,7 +132,7 @@ var NoUnnecessaryTypeConstraintRule = rule.Rule{
 				// Check if this is in an arrow function
 				parent := node.Parent
 				inArrowFunction := false
-				
+
 				// Walk up the tree to find if we're in an arrow function
 				current := parent
 				for current != nil {

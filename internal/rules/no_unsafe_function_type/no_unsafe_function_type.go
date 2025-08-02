@@ -30,22 +30,21 @@ func isReferenceToGlobalFunction(ctx rule.RuleContext, node *ast.Node) bool {
 		if declaration == nil {
 			continue
 		}
-		
+
 		sourceFile := ast.GetSourceFileOfNode(declaration)
 		if sourceFile == nil {
 			continue
 		}
-		
+
 		// If any declaration is NOT from the default library, this is user-defined
 		if !utils.IsSourceFileDefaultLibrary(ctx.Program, sourceFile) {
 			return false
 		}
 	}
-	
+
 	// If we have declarations and they're all from the default library, this is the global Function
 	return len(symbol.Declarations) > 0
 }
-
 
 var NoUnsafeFunctionTypeRule = rule.Rule{
 	Name: "no-unsafe-function-type",
@@ -66,7 +65,7 @@ var NoUnsafeFunctionTypeRule = rule.Rule{
 			// Check class implements clauses like: class Foo implements Function {}
 			ast.KindHeritageClause: func(node *ast.Node) {
 				heritageClause := node.AsHeritageClause()
-				
+
 				// Only check implements and extends clauses
 				if heritageClause.Token != ast.KindImplementsKeyword && heritageClause.Token != ast.KindExtendsKeyword {
 					return

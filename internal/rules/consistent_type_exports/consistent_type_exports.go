@@ -17,9 +17,9 @@ type ConsistentTypeExportsOptions struct {
 }
 
 type SourceExports struct {
-	ReportValueExports  []ReportValueExport
-	Source              string
-	TypeOnlyNamedExport *ast.Node
+	ReportValueExports   []ReportValueExport
+	Source               string
+	TypeOnlyNamedExport  *ast.Node
 	ValueOnlyNamedExport *ast.Node
 }
 
@@ -46,7 +46,7 @@ var ConsistentTypeExportsRule = rule.Rule{
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -54,7 +54,7 @@ var ConsistentTypeExportsRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if val, ok := optsMap["fixMixedExportsWithInlineTypeSpecifier"].(bool); ok {
 					opts.FixMixedExportsWithInlineTypeSpecifier = val
@@ -78,9 +78,9 @@ var ConsistentTypeExportsRule = rule.Rule{
 						fileName := sourceFile.FileName()
 						// Skip external modules completely
 						if strings.Contains(fileName, "node_modules") ||
-						   strings.HasPrefix(fileName, "/usr/") ||
-						   strings.HasPrefix(fileName, "C:\\") ||
-						   !strings.HasSuffix(fileName, ".ts") && !strings.HasSuffix(fileName, ".tsx") && !strings.HasSuffix(fileName, ".js") && !strings.HasSuffix(fileName, ".jsx") {
+							strings.HasPrefix(fileName, "/usr/") ||
+							strings.HasPrefix(fileName, "C:\\") ||
+							!strings.HasSuffix(fileName, ".ts") && !strings.HasSuffix(fileName, ".tsx") && !strings.HasSuffix(fileName, ".js") && !strings.HasSuffix(fileName, ".jsx") {
 							return false, false
 						}
 					}
@@ -108,7 +108,7 @@ var ConsistentTypeExportsRule = rule.Rule{
 				if sourceExports == nil || len(sourceExports.ReportValueExports) == 0 {
 					continue
 				}
-				
+
 				// Additional safety check to prevent processing problematic sources
 				if source == "" {
 					continue
@@ -285,7 +285,7 @@ func getExportSpecifierName(specifier *ast.ExportSpecifier) string {
 	if specifier == nil {
 		return ""
 	}
-	
+
 	// In TypeScript AST:
 	// - Name returns the exported name (what shows up after 'as' or the identifier if no 'as')
 	// - PropertyName returns the local name (what appears before 'as', if present)
@@ -300,7 +300,7 @@ func getExportSpecifierName(specifier *ast.ExportSpecifier) string {
 
 	exportedName := getIdentifierName(exported)
 	localName := getIdentifierName(local)
-	
+
 	// Handle empty names
 	if localName == "" || exportedName == "" {
 		return getIdentifierName(exported)
@@ -345,22 +345,22 @@ func shouldConvertExportAllToTypeOnly(ctx rule.RuleContext, node *ast.Node, sour
 	if source == "" || strings.Contains(source, "node_modules") {
 		return false
 	}
-	
+
 	// Use simple heuristic: only convert if source path explicitly indicates type-only exports
 	// This matches the test fixture structure where:
 	// - './consistent-type-exports/type-only-exports' should be converted (types only)
-	// - './consistent-type-exports/type-only-reexport' should be converted (types only)  
+	// - './consistent-type-exports/type-only-reexport' should be converted (types only)
 	// - './consistent-type-exports' should NOT be converted (mixed types and values)
 	if strings.Contains(source, "/type-only-exports") || strings.Contains(source, "/type-only-reexport") {
 		return true
 	}
-	
+
 	return false
 }
 
 func fixExportAllInsertType(sourceFile *ast.SourceFile, node *ast.Node) []rule.RuleFix {
 	var fixes []rule.RuleFix
-	
+
 	// Insert "type" after "export"
 	sourceText := string(sourceFile.Text())
 	nodeStart := int(node.Pos())
@@ -470,7 +470,7 @@ func fixSeparateNamedExports(sourceFile *ast.SourceFile, report ReportValueExpor
 
 		// Replace the content between braces with value specifiers only
 		openBrace := int(namedExports.Pos()) + 1  // After '{'
-		closeBrace := int(namedExports.End()) - 1   // Before '}'
+		closeBrace := int(namedExports.End()) - 1 // Before '}'
 
 		valueContent := " " + strings.Join(valueSpecifierNames, ", ") + " "
 		fixes = append(fixes, rule.RuleFixReplaceRange(

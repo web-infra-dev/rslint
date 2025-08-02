@@ -42,7 +42,7 @@ var NoRedeclareRule = rule.Rule{
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -50,7 +50,7 @@ var NoRedeclareRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if val, ok := optsMap["builtinGlobals"].(bool); ok {
 					opts.BuiltinGlobals = val
@@ -111,7 +111,6 @@ var NoRedeclareRule = rule.Rule{
 		// Track which scopes we've processed
 		processedScopes := make(map[*ast.Node]bool)
 
-
 		// Helper to enter a new scope
 		enterScope := func(node *ast.Node) {
 			if _, processed := processedScopes[node]; processed {
@@ -145,13 +144,11 @@ var NoRedeclareRule = rule.Rule{
 			return ""
 		}
 
-
 		// Helper to add declaration
 		addDeclaration := func(name string, nameNode *ast.Node, declType string, declNode *ast.Node) {
 			if name == "" {
 				return
 			}
-			
 
 			varInfo, exists := currentScope.Variables[name]
 			if !exists {
@@ -163,11 +160,11 @@ var NoRedeclareRule = rule.Rule{
 			}
 
 			varInfo.Declarations = append(varInfo.Declarations, DeclarationInfo{
-				Node:     nameNode,  // Use nameNode for reporting location
+				Node:     nameNode, // Use nameNode for reporting location
 				DeclType: declType,
-				Kind:     declNode.Kind,  // Use declNode.Kind for merging logic
+				Kind:     declNode.Kind, // Use declNode.Kind for merging logic
 			})
-			
+
 			// Check for redeclaration immediately
 			if len(varInfo.Declarations) > 1 {
 				if opts.IgnoreDeclarationMerge {
@@ -178,7 +175,7 @@ var NoRedeclareRule = rule.Rule{
 					namespaceCounts := 0
 					interfaceCounts := 0
 					otherCounts := 0
-					
+
 					for _, decl := range varInfo.Declarations {
 						switch decl.Kind {
 						case ast.KindClassDeclaration:
@@ -195,10 +192,10 @@ var NoRedeclareRule = rule.Rule{
 							otherCounts++
 						}
 					}
-					
+
 					currentKind := declNode.Kind
 					shouldReport := false
-					
+
 					// Check if this combination is allowed for declaration merging
 					// If there are any non-mergeable types (like variables), report conflict
 					if otherCounts > 0 {
@@ -219,7 +216,7 @@ var NoRedeclareRule = rule.Rule{
 						case ast.KindModuleDeclaration:
 							// Namespaces can merge with classes/functions/enums
 							if classCounts > 1 || functionCounts > 1 || enumCounts > 1 {
-								// If there are already duplicate classes/functions/enums, 
+								// If there are already duplicate classes/functions/enums,
 								// don't report on the namespace
 								shouldReport = false
 							} else if namespaceCounts > 1 && classCounts == 0 && functionCounts == 0 && enumCounts == 0 && interfaceCounts == 0 {
@@ -242,7 +239,7 @@ var NoRedeclareRule = rule.Rule{
 							shouldReport = true
 						}
 					}
-					
+
 					if shouldReport {
 						// Check if this is a builtin global conflict
 						firstDecl := varInfo.Declarations[0]
@@ -273,7 +270,7 @@ var NoRedeclareRule = rule.Rule{
 				} else {
 					// When declaration merging is disabled, report all redeclarations
 					firstDecl := varInfo.Declarations[0]
-					
+
 					var messageId string
 					if firstDecl.DeclType == "builtin" {
 						messageId = "redeclaredAsBuiltin"
@@ -319,7 +316,6 @@ var NoRedeclareRule = rule.Rule{
 				}
 			}
 		}
-		
 
 		return rule.RuleListeners{
 			// Variable statements (containing variable declarations)
@@ -369,7 +365,7 @@ var NoRedeclareRule = rule.Rule{
 				enterScope(node)
 			},
 
-			// Function expressions  
+			// Function expressions
 			ast.KindFunctionExpression: func(node *ast.Node) {
 				enterScope(node)
 			},
@@ -482,7 +478,6 @@ var NoRedeclareRule = rule.Rule{
 			rule.ListenerOnExit(ast.KindSwitchStatement): func(node *ast.Node) {
 				exitScope()
 			},
-
 		}
 	},
 }

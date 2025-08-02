@@ -10,12 +10,12 @@ import (
 )
 
 type ExplicitModuleBoundaryTypesOptions struct {
-	AllowArgumentsExplicitlyTypedAsAny           bool     `json:"allowArgumentsExplicitlyTypedAsAny"`
-	AllowDirectConstAssertionInArrowFunctions    bool     `json:"allowDirectConstAssertionInArrowFunctions"`
-	AllowedNames                                 []string `json:"allowedNames"`
-	AllowHigherOrderFunctions                    bool     `json:"allowHigherOrderFunctions"`
-	AllowTypedFunctionExpressions                bool     `json:"allowTypedFunctionExpressions"`
-	AllowOverloadFunctions                       bool     `json:"allowOverloadFunctions"`
+	AllowArgumentsExplicitlyTypedAsAny        bool     `json:"allowArgumentsExplicitlyTypedAsAny"`
+	AllowDirectConstAssertionInArrowFunctions bool     `json:"allowDirectConstAssertionInArrowFunctions"`
+	AllowedNames                              []string `json:"allowedNames"`
+	AllowHigherOrderFunctions                 bool     `json:"allowHigherOrderFunctions"`
+	AllowTypedFunctionExpressions             bool     `json:"allowTypedFunctionExpressions"`
+	AllowOverloadFunctions                    bool     `json:"allowOverloadFunctions"`
 }
 
 type functionInfo struct {
@@ -96,12 +96,12 @@ func hasDirectConstAssertion(node *ast.Node) bool {
 	if node.Kind != ast.KindArrowFunction {
 		return false
 	}
-	
+
 	arrowFunc := node.AsArrowFunction()
 	if arrowFunc.Body == nil || arrowFunc.Body.Kind == ast.KindBlock {
 		return false
 	}
-	
+
 	// Check for as const expression
 	body := arrowFunc.Body
 	if body.Kind == ast.KindAsExpression {
@@ -114,7 +114,7 @@ func hasDirectConstAssertion(node *ast.Node) bool {
 			}
 		}
 	}
-	
+
 	// Check for satisfies ... as const pattern
 	if body.Kind == ast.KindSatisfiesExpression {
 		satisfiesExpr := body.AsSatisfiesExpression()
@@ -131,7 +131,7 @@ func hasDirectConstAssertion(node *ast.Node) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -139,7 +139,7 @@ func hasDirectConstAssertion(node *ast.Node) bool {
 func doesImmediatelyReturnFunctionExpression(info functionInfo) bool {
 	node := info.node
 	returns := info.returns
-	
+
 	// For arrow functions, check if body is directly a function
 	if node.Kind == ast.KindArrowFunction {
 		arrowFunc := node.AsArrowFunction()
@@ -148,18 +148,18 @@ func doesImmediatelyReturnFunctionExpression(info functionInfo) bool {
 			return isFunction(arrowFunc.Body)
 		}
 	}
-	
+
 	// For regular functions or arrow functions with block bodies, check return statements
 	// Should have exactly one return statement
 	if len(returns) != 1 {
 		return false
 	}
-	
+
 	returnStatement := returns[0]
 	if returnStatement.AsReturnStatement().Expression == nil {
 		return false
 	}
-	
+
 	expr := returnStatement.AsReturnStatement().Expression
 	return isFunction(expr)
 }
@@ -183,23 +183,23 @@ func isTypedFunctionExpression(node *ast.Node, options ExplicitModuleBoundaryTyp
 	if !options.AllowTypedFunctionExpressions {
 		return false
 	}
-	
+
 	parent := node.Parent
 	if parent == nil {
 		return false
 	}
-	
+
 	// Variable declarator with type annotation
 	if parent.Kind == ast.KindVariableDeclaration {
 		varDecl := parent.AsVariableDeclaration()
 		return varDecl.Type != nil
 	}
-	
+
 	// As expression
 	if parent.Kind == ast.KindAsExpression {
 		return true
 	}
-	
+
 	// Property with type annotation
 	if parent.Kind == ast.KindPropertyAssignment || parent.Kind == ast.KindPropertyDeclaration {
 		// Check if the parent object/class has a type
@@ -220,18 +220,18 @@ func isTypedFunctionExpression(node *ast.Node, options ExplicitModuleBoundaryTyp
 			}
 		}
 	}
-	
+
 	// Property/method declaration with explicit type
 	if parent.Kind == ast.KindPropertyDeclaration {
 		propDecl := parent.AsPropertyDeclaration()
 		return propDecl.Type != nil
 	}
-	
+
 	if parent.Kind == ast.KindMethodDeclaration {
 		methodDecl := parent.AsMethodDeclaration()
 		return methodDecl.Type != nil
 	}
-	
+
 	return false
 }
 
@@ -243,7 +243,7 @@ func hasOverloadSignatures(node *ast.Node, ctx rule.RuleContext) bool {
 		if funcDecl.Name() == nil {
 			return false
 		}
-		
+
 		// Check parent (usually SourceFile or Block) for other functions with same name
 		parent := node.Parent
 		if parent != nil {
@@ -253,7 +253,7 @@ func hasOverloadSignatures(node *ast.Node, ctx rule.RuleContext) bool {
 			}
 			funcName := funcDecl.Name().AsIdentifier().Text
 			overloadCount := 0
-			
+
 			for _, sibling := range siblings {
 				if sibling.Kind == ast.KindFunctionDeclaration {
 					siblingFunc := sibling.AsFunctionDeclaration()
@@ -267,11 +267,11 @@ func hasOverloadSignatures(node *ast.Node, ctx rule.RuleContext) bool {
 			}
 		}
 	}
-	
+
 	// For method declarations, check class body
 	if node.Kind == ast.KindMethodDeclaration {
 		methodDecl := node.AsMethodDeclaration()
-		
+
 		// Get method name
 		var methodName string
 		if ast.IsIdentifier(methodDecl.Name()) {
@@ -279,7 +279,7 @@ func hasOverloadSignatures(node *ast.Node, ctx rule.RuleContext) bool {
 		} else {
 			return false
 		}
-		
+
 		// Check class body for other methods with same name
 		classBody := node.Parent
 		if classBody != nil && classBody.Kind == ast.KindClassStaticBlockDeclaration {
@@ -287,7 +287,7 @@ func hasOverloadSignatures(node *ast.Node, ctx rule.RuleContext) bool {
 			if classDecl != nil && (classDecl.Kind == ast.KindClassDeclaration || classDecl.Kind == ast.KindClassExpression) {
 				members := classDecl.Members()
 				overloadCount := 0
-				
+
 				for _, member := range members {
 					if member.Kind == ast.KindMethodDeclaration {
 						memberMethod := member.AsMethodDeclaration()
@@ -302,7 +302,7 @@ func hasOverloadSignatures(node *ast.Node, ctx rule.RuleContext) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -311,28 +311,28 @@ func isAllowedName(node *ast.Node, options ExplicitModuleBoundaryTypesOptions, s
 	if len(options.AllowedNames) == 0 {
 		return false
 	}
-	
+
 	var name string
-	
+
 	switch node.Kind {
 	case ast.KindVariableDeclaration:
 		varDecl := node.AsVariableDeclaration()
 		if varDecl.Name() != nil && ast.IsIdentifier(varDecl.Name()) {
 			name = varDecl.Name().AsIdentifier().Text
 		}
-		
+
 	case ast.KindFunctionDeclaration:
 		funcDecl := node.AsFunctionDeclaration()
 		if funcDecl.Name() != nil && ast.IsIdentifier(funcDecl.Name()) {
 			name = funcDecl.Name().AsIdentifier().Text
 		}
-		
+
 	case ast.KindMethodDeclaration:
 		methodDecl := node.AsMethodDeclaration()
 		if ast.IsIdentifier(methodDecl.Name()) {
 			name = methodDecl.Name().AsIdentifier().Text
 		}
-		
+
 	case ast.KindPropertyDeclaration, ast.KindPropertyAssignment:
 		var memberName *ast.Node
 		if node.Kind == ast.KindPropertyDeclaration {
@@ -344,7 +344,7 @@ func isAllowedName(node *ast.Node, options ExplicitModuleBoundaryTypesOptions, s
 			propertyName, _ := utils.GetNameFromMember(sourceFile, memberName)
 			name = propertyName
 		}
-		
+
 	case ast.KindGetAccessor, ast.KindSetAccessor:
 		// For accessors, check the name
 		var accessorName *ast.Node
@@ -357,7 +357,7 @@ func isAllowedName(node *ast.Node, options ExplicitModuleBoundaryTypesOptions, s
 			name = accessorName.AsIdentifier().Text
 		}
 	}
-	
+
 	return name != "" && slices.Contains(options.AllowedNames, name)
 }
 
@@ -389,17 +389,17 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 		opts := ExplicitModuleBoundaryTypesOptions{
 			AllowArgumentsExplicitlyTypedAsAny:        false,
 			AllowDirectConstAssertionInArrowFunctions: true,
-			AllowedNames:                              []string{},
-			AllowHigherOrderFunctions:                 true,
-			AllowTypedFunctionExpressions:             true,
-			AllowOverloadFunctions:                    false,
+			AllowedNames:                  []string{},
+			AllowHigherOrderFunctions:     true,
+			AllowTypedFunctionExpressions: true,
+			AllowOverloadFunctions:        false,
 		}
-		
+
 		// Parse options with dual-format support (handles both array and object formats)
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -407,7 +407,7 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if val, exists := optsMap["allowArgumentsExplicitlyTypedAsAny"]; exists {
 					if boolVal, ok := val.(bool); ok {
@@ -446,11 +446,11 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 				}
 			}
 		}
-		
+
 		// Track return statements for functions
 		functionReturnsMap := make(map[*ast.Node][]*ast.Node)
 		functionStack := []*ast.Node{}
-		
+
 		// Helper to check if a node is exported
 		isExported := func(node *ast.Node) bool {
 			// Direct export function
@@ -464,7 +464,7 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 					}
 				}
 			}
-			
+
 			// Check if it's in an export statement - limit depth to avoid infinite loops
 			parent := node.Parent
 			depth := 0
@@ -476,19 +476,19 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 				parent = parent.Parent
 				depth++
 			}
-			
+
 			return false
 		}
-		
+
 		// Removed unused checkParameters function
-		
+
 		// Check if function should be allowed
 		checkFunction := func(node *ast.Node) {
 			// Only check exported functions
 			if !isExported(node) {
 				return
 			}
-			
+
 			// Simple check for return type
 			if !hasReturnType(node) {
 				if node.Kind == ast.KindFunctionDeclaration {
@@ -502,7 +502,7 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 					ctx.ReportNode(node, buildMissingReturnTypeMessage())
 				}
 			}
-			
+
 			// Simple parameter check
 			var params []*ast.Node
 			switch node.Kind {
@@ -513,7 +513,7 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 			case ast.KindFunctionExpression:
 				params = node.AsFunctionExpression().Parameters.Nodes
 			}
-			
+
 			for _, param := range params {
 				if param.Kind == ast.KindParameter {
 					paramNode := param.AsParameterDeclaration()
@@ -526,7 +526,7 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 				}
 			}
 		}
-		
+
 		return rule.RuleListeners{
 			// Track function enters for return statement collection
 			ast.KindArrowFunction: func(node *ast.Node) {
@@ -545,7 +545,7 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 				functionStack = append(functionStack, node)
 				functionReturnsMap[node] = []*ast.Node{}
 			},
-			
+
 			// Track return statements
 			ast.KindReturnStatement: func(node *ast.Node) {
 				if len(functionStack) > 0 {
@@ -555,7 +555,7 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 					}
 				}
 			},
-			
+
 			// Check functions on exit
 			rule.ListenerOnExit(ast.KindArrowFunction): func(node *ast.Node) {
 				checkFunction(node)

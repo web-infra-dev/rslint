@@ -55,7 +55,7 @@ var NoUnsafeDeclarationMergingRule = rule.Rule{
 				if interfaceName == nil {
 					return
 				}
-				
+
 				// Get the symbol for this interface name
 				symbol := ctx.TypeChecker.GetSymbolAtLocation(interfaceName)
 				if symbol == nil {

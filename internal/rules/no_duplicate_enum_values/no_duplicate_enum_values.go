@@ -18,7 +18,7 @@ var NoDuplicateEnumValuesRule = rule.Rule{
 
 				for _, member := range enumDecl.Members.Nodes {
 					enumMember := member.AsEnumMember()
-					
+
 					// Skip members without initializers
 					if enumMember.Initializer == nil {
 						continue

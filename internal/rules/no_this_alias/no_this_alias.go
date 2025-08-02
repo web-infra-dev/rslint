@@ -21,7 +21,7 @@ var NoThisAliasRule = rule.Rule{
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -29,7 +29,7 @@ var NoThisAliasRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if allowDestructuring, ok := optsMap["allowDestructuring"].(bool); ok {
 					opts.AllowDestructuring = allowDestructuring

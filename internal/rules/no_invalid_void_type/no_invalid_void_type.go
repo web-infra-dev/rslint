@@ -26,7 +26,7 @@ var NoInvalidVoidTypeRule = rule.Rule{
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -34,7 +34,7 @@ var NoInvalidVoidTypeRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if allowAsThisParam, ok := optsMap["allowAsThisParameter"].(bool); ok {
 					opts.AllowAsThisParameter = allowAsThisParam
@@ -85,7 +85,7 @@ var NoInvalidVoidTypeRule = rule.Rule{
 			if !opts.AllowAsThisParameter {
 				return false
 			}
-			
+
 			current := node
 			for current != nil && current.Parent != nil {
 				if current.Parent.Kind == ast.KindParameter {
@@ -107,10 +107,10 @@ var NoInvalidVoidTypeRule = rule.Rule{
 			if node.Parent == nil || node.Parent.Kind != ast.KindUnionType {
 				return false
 			}
-			
+
 			unionType := node.Parent.AsUnionTypeNode()
 			types := unionType.Types.Nodes
-			
+
 			// Check if this union contains 'never' alongside void
 			hasNever := false
 			for _, t := range types {
@@ -119,30 +119,30 @@ var NoInvalidVoidTypeRule = rule.Rule{
 					break
 				}
 			}
-			
+
 			return hasNever
 		}
 
-		// Helper function to check if we're in a valid overload context  
+		// Helper function to check if we're in a valid overload context
 		isValidOverloadUnion := func(node *ast.Node) bool {
 			if node.Parent == nil || node.Parent.Kind != ast.KindUnionType {
 				return false
 			}
-			
+
 			// Allow void | never unions
 			if isValidUnionWithNever(node) {
 				return true
 			}
-			
+
 			// Allow void | Promise<T> and similar patterns where the other type is a generic with void
 			unionType := node.Parent.AsUnionTypeNode()
 			types := unionType.Types.Nodes
-			
+
 			for _, t := range types {
 				if t == node {
 					continue // Skip the void node itself
 				}
-				
+
 				// Check if the other type is a generic that might contain void (like Promise<void>)
 				if t.Kind == ast.KindTypeReference {
 					typeRef := t.AsTypeReference()
@@ -157,7 +157,7 @@ var NoInvalidVoidTypeRule = rule.Rule{
 					}
 				}
 			}
-			
+
 			return false
 		}
 
@@ -220,7 +220,7 @@ var NoInvalidVoidTypeRule = rule.Rule{
 					if allowGeneric, ok := opts.AllowInGenericTypeArguments.(bool); ok && allowGeneric {
 						return
 					}
-					
+
 					// Default case - if allowInGenericTypeArguments is not explicitly set, default to true
 					return
 				}
@@ -243,7 +243,7 @@ func isNodeInSubtree(root *ast.Node, target *ast.Node) bool {
 	if root == target {
 		return true
 	}
-	
+
 	current := target
 	for current != nil {
 		if current == root {
@@ -301,7 +301,6 @@ func getInvalidVoidMessageId(node *ast.Node, opts Options) string {
 		allowInGeneric = true
 	}
 
-
 	// Check if we're in a union type (only show union-specific message when generics are allowed)
 	// When allowInGenericTypeArguments is false, we should use the basic invalidVoidNotReturn message instead
 	if node.Parent != nil && node.Parent.Kind == ast.KindUnionType && allowInGeneric {
@@ -315,19 +314,19 @@ func getInvalidVoidMessageId(node *ast.Node, opts Options) string {
 	} else if opts.AllowAsThisParameter {
 		return "invalidVoidNotReturnOrThisParam"
 	}
-	
+
 	return "invalidVoidNotReturn"
 }
 
 // Helper function to build messages
 func buildMessage(messageId string, generic string) rule.RuleMessage {
 	messages := map[string]string{
-		"invalidVoidForGeneric":                       fmt.Sprintf("%s may not have void as a type argument.", generic),
-		"invalidVoidNotReturn":                        "void is only valid as a return type.",
-		"invalidVoidNotReturnOrGeneric":               "void is only valid as a return type or generic type argument.",
-		"invalidVoidNotReturnOrThisParam":             "void is only valid as return type or type of `this` parameter.",
-		"invalidVoidNotReturnOrThisParamOrGeneric":    "void is only valid as a return type or generic type argument or the type of a `this` parameter.",
-		"invalidVoidUnionConstituent":                 "void is not valid as a constituent in a union type",
+		"invalidVoidForGeneric":                    fmt.Sprintf("%s may not have void as a type argument.", generic),
+		"invalidVoidNotReturn":                     "void is only valid as a return type.",
+		"invalidVoidNotReturnOrGeneric":            "void is only valid as a return type or generic type argument.",
+		"invalidVoidNotReturnOrThisParam":          "void is only valid as return type or type of `this` parameter.",
+		"invalidVoidNotReturnOrThisParamOrGeneric": "void is only valid as a return type or generic type argument or the type of a `this` parameter.",
+		"invalidVoidUnionConstituent":              "void is not valid as a constituent in a union type",
 	}
 
 	return rule.RuleMessage{

@@ -55,10 +55,10 @@ class Bar {}
 			Code: "interface Foo {}",
 			Errors: []rule_tester.ExpectedDiagnostic{
 				{
-					Message:  "An empty interface is equivalent to `{}`.",
-					Line:     1,
-					Column:   11,
-					EndLine:  1,
+					Message:   "An empty interface is equivalent to `{}`.",
+					Line:      1,
+					Column:    11,
+					EndLine:   1,
 					EndColumn: 14,
 				},
 			},
@@ -67,10 +67,10 @@ class Bar {}
 			Code: `interface Foo extends {}`,
 			Errors: []rule_tester.ExpectedDiagnostic{
 				{
-					Message:  "An empty interface is equivalent to `{}`.",
-					Line:     1,
-					Column:   11,
-					EndLine:  1,
+					Message:   "An empty interface is equivalent to `{}`.",
+					Line:      1,
+					Column:    11,
+					EndLine:   1,
 					EndColumn: 14,
 				},
 			},
@@ -87,10 +87,10 @@ class Baz {}
 `,
 			Errors: []rule_tester.ExpectedDiagnostic{
 				{
-					Message:  "An interface declaring no members is equivalent to its supertype.",
-					Line:     6,
-					Column:   11,
-					EndLine:  6,
+					Message:   "An interface declaring no members is equivalent to its supertype.",
+					Line:      6,
+					Column:    11,
+					EndLine:   6,
 					EndColumn: 14,
 				},
 			},
@@ -117,10 +117,10 @@ class Bar {}
 `,
 			Errors: []rule_tester.ExpectedDiagnostic{
 				{
-					Message:  "An interface declaring no members is equivalent to its supertype.",
-					Line:     6,
-					Column:   11,
-					EndLine:  6,
+					Message:   "An interface declaring no members is equivalent to its supertype.",
+					Line:      6,
+					Column:    11,
+					EndLine:   6,
 					EndColumn: 14,
 				},
 			},
@@ -139,10 +139,10 @@ const bar = class Bar {};
 `,
 			Errors: []rule_tester.ExpectedDiagnostic{
 				{
-					Message:  "An interface declaring no members is equivalent to its supertype.",
-					Line:     6,
-					Column:   11,
-					EndLine:  6,
+					Message:   "An interface declaring no members is equivalent to its supertype.",
+					Line:      6,
+					Column:    11,
+					EndLine:   6,
 					EndColumn: 14,
 				},
 			},
@@ -167,10 +167,10 @@ interface Bar extends Foo {}
 `,
 			Errors: []rule_tester.ExpectedDiagnostic{
 				{
-					Message:  "An interface declaring no members is equivalent to its supertype.",
-					Line:     6,
-					Column:   11,
-					EndLine:  6,
+					Message:   "An interface declaring no members is equivalent to its supertype.",
+					Line:      6,
+					Column:    11,
+					EndLine:   6,
 					EndColumn: 14,
 				},
 			},
@@ -187,10 +187,10 @@ type Bar = Foo
 			Code: "interface Foo extends Array<number> {}",
 			Errors: []rule_tester.ExpectedDiagnostic{
 				{
-					Message:  "An interface declaring no members is equivalent to its supertype.",
-					Line:     1,
-					Column:   11,
-					EndLine:  1,
+					Message:   "An interface declaring no members is equivalent to its supertype.",
+					Line:      1,
+					Column:    11,
+					EndLine:   1,
 					EndColumn: 14,
 				},
 			},
@@ -200,10 +200,10 @@ type Bar = Foo
 			Code: "interface Foo extends Array<number | {}> {}",
 			Errors: []rule_tester.ExpectedDiagnostic{
 				{
-					Message:  "An interface declaring no members is equivalent to its supertype.",
-					Line:     1,
-					Column:   11,
-					EndLine:  1,
+					Message:   "An interface declaring no members is equivalent to its supertype.",
+					Line:      1,
+					Column:    11,
+					EndLine:   1,
 					EndColumn: 14,
 				},
 			},
@@ -218,10 +218,10 @@ interface Foo extends Array<Bar> {}
 `,
 			Errors: []rule_tester.ExpectedDiagnostic{
 				{
-					Message:  "An interface declaring no members is equivalent to its supertype.",
-					Line:     5,
-					Column:   11,
-					EndLine:  5,
+					Message:   "An interface declaring no members is equivalent to its supertype.",
+					Line:      5,
+					Column:    11,
+					EndLine:   5,
 					EndColumn: 14,
 				},
 			},
@@ -239,10 +239,10 @@ interface Foo extends R {}
 `,
 			Errors: []rule_tester.ExpectedDiagnostic{
 				{
-					Message:  "An interface declaring no members is equivalent to its supertype.",
-					Line:     3,
-					Column:   11,
-					EndLine:  3,
+					Message:   "An interface declaring no members is equivalent to its supertype.",
+					Line:      3,
+					Column:    11,
+					EndLine:   3,
 					EndColumn: 14,
 				},
 			},
@@ -257,10 +257,10 @@ interface Foo<T> extends Bar<T> {}
 `,
 			Errors: []rule_tester.ExpectedDiagnostic{
 				{
-					Message:  "An interface declaring no members is equivalent to its supertype.",
-					Line:     2,
-					Column:   11,
-					EndLine:  2,
+					Message:   "An interface declaring no members is equivalent to its supertype.",
+					Line:      2,
+					Column:    11,
+					EndLine:   2,
 					EndColumn: 14,
 				},
 			},
@@ -283,10 +283,10 @@ declare module FooBar {
 `,
 			Errors: []rule_tester.ExpectedDiagnostic{
 				{
-					Message:  "An interface declaring no members is equivalent to its supertype.",
-					Line:     4,
-					Column:   20,
-					EndLine:  4,
+					Message:   "An interface declaring no members is equivalent to its supertype.",
+					Line:      4,
+					Column:    20,
+					EndLine:   4,
 					EndColumn: 23,
 				},
 			},

@@ -26,7 +26,7 @@ type MethodSignatureStyleOptions struct {
 func getMethodKey(ctx rule.RuleContext, node *ast.Node) string {
 	var name string
 	var optional bool
-	
+
 	if node.Kind == ast.KindPropertySignature {
 		propSig := node.AsPropertySignatureDeclaration()
 		if propSig.Name() != nil {
@@ -40,18 +40,18 @@ func getMethodKey(ctx rule.RuleContext, node *ast.Node) string {
 			optional = methodSig.PostfixToken != nil && methodSig.PostfixToken.Kind == ast.KindQuestionToken
 		}
 	}
-	
+
 	if optional {
 		name = fmt.Sprintf("%s?", name)
 	}
-	
+
 	return name
 }
 
 func getMethodParams(ctx rule.RuleContext, node *ast.Node) string {
 	var params []*ast.Node
 	var typeParams *ast.NodeList
-	
+
 	if node.Kind == ast.KindMethodSignature {
 		methodSig := node.AsMethodSignatureDeclaration()
 		params = methodSig.Parameters.Nodes
@@ -61,14 +61,14 @@ func getMethodParams(ctx rule.RuleContext, node *ast.Node) string {
 		params = funcType.Parameters.Nodes
 		typeParams = funcType.TypeParameters
 	}
-	
+
 	paramsStr := "()"
 	if len(params) > 0 {
 		// Find opening and closing parentheses
 		s := scanner.GetScannerForSourceFile(ctx.SourceFile, node.Pos())
 		openParenPos := -1
 		closeParenPos := -1
-		
+
 		// Find opening paren before first parameter
 		for s.TokenStart() < params[0].Pos() {
 			if s.Token() == ast.KindOpenParenToken {
@@ -76,7 +76,7 @@ func getMethodParams(ctx rule.RuleContext, node *ast.Node) string {
 			}
 			s.Scan()
 		}
-		
+
 		// Find closing paren after last parameter
 		lastParam := params[len(params)-1]
 		s = scanner.GetScannerForSourceFile(ctx.SourceFile, lastParam.End())
@@ -87,12 +87,12 @@ func getMethodParams(ctx rule.RuleContext, node *ast.Node) string {
 			}
 			s.Scan()
 		}
-		
+
 		if openParenPos != -1 && closeParenPos != -1 {
 			paramsStr = string(ctx.SourceFile.Text()[openParenPos:closeParenPos])
 		}
 	}
-	
+
 	if typeParams != nil && len(typeParams.Nodes) > 0 {
 		typeParamsText := string(ctx.SourceFile.Text()[typeParams.Pos():typeParams.End()])
 		// Extract just the type parameters part
@@ -102,13 +102,13 @@ func getMethodParams(ctx rule.RuleContext, node *ast.Node) string {
 			paramsStr = typeParamsText[start:end+1] + paramsStr
 		}
 	}
-	
+
 	return paramsStr
 }
 
 func getMethodReturnType(ctx rule.RuleContext, node *ast.Node) string {
 	var typeNode *ast.Node
-	
+
 	if node.Kind == ast.KindMethodSignature {
 		methodSig := node.AsMethodSignatureDeclaration()
 		typeNode = methodSig.Type
@@ -116,11 +116,11 @@ func getMethodReturnType(ctx rule.RuleContext, node *ast.Node) string {
 		funcType := node.AsFunctionTypeNode()
 		typeNode = funcType.Type
 	}
-	
+
 	if typeNode == nil {
 		return "any"
 	}
-	
+
 	typeRange := utils.TrimNodeTextRange(ctx.SourceFile, typeNode)
 	return string(ctx.SourceFile.Text()[typeRange.Pos():typeRange.End()])
 }
@@ -129,11 +129,11 @@ func getDelimiter(ctx rule.RuleContext, node *ast.Node) string {
 	// Find the last token of the node
 	s := scanner.GetScannerForSourceFile(ctx.SourceFile, node.End()-1)
 	s.Scan()
-	
+
 	if s.Token() == ast.KindSemicolonToken || s.Token() == ast.KindCommaToken {
 		return string(ctx.SourceFile.Text()[s.TokenStart():s.TokenEnd()])
 	}
-	
+
 	return ""
 }
 
@@ -157,7 +157,7 @@ var MethodSignatureStyleRule = rule.Rule{
 		opts := MethodSignatureStyleOptions{
 			Mode: "property", // default
 		}
-		
+
 		if options != nil {
 			switch v := options.(type) {
 			case string:
@@ -170,44 +170,44 @@ var MethodSignatureStyleRule = rule.Rule{
 				}
 			}
 		}
-		
+
 		listeners := rule.RuleListeners{}
-		
+
 		if opts.Mode == "property" {
 			listeners[ast.KindMethodSignature] = func(node *ast.Node) {
 				methodNode := node.AsMethodSignatureDeclaration()
-			if methodNode.Name() == nil {
-				return
-			}
-				
-				// Skip getters and setters
-			nameText := ""
-			if methodNode.Name() != nil {
-				if methodNode.Name().Kind == ast.KindIdentifier {
-					nameText = methodNode.Name().AsIdentifier().Text
-				} else if methodNode.Name().Kind == ast.KindStringLiteral {
-					nameText = methodNode.Name().AsStringLiteral().Text
+				if methodNode.Name() == nil {
+					return
 				}
-			}
-			if nameText == "get" || nameText == "set" {
-				return
-			}
-				
+
+				// Skip getters and setters
+				nameText := ""
+				if methodNode.Name() != nil {
+					if methodNode.Name().Kind == ast.KindIdentifier {
+						nameText = methodNode.Name().AsIdentifier().Text
+					} else if methodNode.Name().Kind == ast.KindStringLiteral {
+						nameText = methodNode.Name().AsStringLiteral().Text
+					}
+				}
+				if nameText == "get" || nameText == "set" {
+					return
+				}
+
 				parent := node.Parent
 				var members []*ast.Node
-				
+
 				if parent.Kind == ast.KindInterfaceDeclaration {
-				interfaceDecl := parent.AsInterfaceDeclaration()
-				members = interfaceDecl.Members.Nodes
-			} else if parent.Kind == ast.KindTypeLiteral {
-				typeLit := parent.AsTypeLiteralNode()
-				members = typeLit.Members.Nodes
-			}
-				
+					interfaceDecl := parent.AsInterfaceDeclaration()
+					members = interfaceDecl.Members.Nodes
+				} else if parent.Kind == ast.KindTypeLiteral {
+					typeLit := parent.AsTypeLiteralNode()
+					members = typeLit.Members.Nodes
+				}
+
 				// Find duplicate method signatures
 				key := getMethodKey(ctx, node)
 				var duplicates []*ast.Node
-				
+
 				for _, member := range members {
 					if member == node || member.Kind != ast.KindMethodSignature {
 						continue
@@ -216,9 +216,9 @@ var MethodSignatureStyleRule = rule.Rule{
 						duplicates = append(duplicates, member)
 					}
 				}
-				
+
 				isParentModule := isNodeParentModuleDeclaration(node)
-				
+
 				if len(duplicates) > 0 {
 					if isParentModule {
 						ctx.ReportNode(node, rule.RuleMessage{
@@ -228,7 +228,7 @@ var MethodSignatureStyleRule = rule.Rule{
 					} else {
 						// Combine all overloads into intersection type
 						allMethods := append([]*ast.Node{node}, duplicates...)
-						
+
 						// Sort by position
 						for i := 0; i < len(allMethods); i++ {
 							for j := i + 1; j < len(allMethods); j++ {
@@ -237,35 +237,35 @@ var MethodSignatureStyleRule = rule.Rule{
 								}
 							}
 						}
-						
+
 						var typeStrings []string
 						for _, method := range allMethods {
 							params := getMethodParams(ctx, method)
 							returnType := getMethodReturnType(ctx, method)
 							typeStrings = append(typeStrings, fmt.Sprintf("(%s => %s)", params, returnType))
 						}
-						
+
 						typeString := strings.Join(typeStrings, " & ")
 						delimiter := getDelimiter(ctx, node)
-						
+
 						fixes := []rule.RuleFix{
 							rule.RuleFixReplace(ctx.SourceFile, node, fmt.Sprintf("%s: %s%s", key, typeString, delimiter)),
 						}
-						
+
 						// Remove duplicate methods
 						for _, dup := range duplicates {
 							// Find any whitespace/comments between this node and the next
 							nextNode := findNextMember(members, dup)
 							if nextNode != nil {
 								fixes = append(fixes, rule.RuleFixReplaceRange(
-							core.NewTextRange(dup.Pos(), nextNode.Pos()),
-							"",
-						))
+									core.NewTextRange(dup.Pos(), nextNode.Pos()),
+									"",
+								))
 							} else {
 								fixes = append(fixes, rule.RuleFixReplace(ctx.SourceFile, dup, ""))
 							}
 						}
-						
+
 						ctx.ReportNodeWithFixes(node, rule.RuleMessage{
 							Id:          "errorMethod",
 							Description: "Shorthand method signature is forbidden. Use a function property instead.",
@@ -273,7 +273,7 @@ var MethodSignatureStyleRule = rule.Rule{
 					}
 					return
 				}
-				
+
 				// Single method signature
 				if isParentModule {
 					ctx.ReportNode(node, rule.RuleMessage{
@@ -285,7 +285,7 @@ var MethodSignatureStyleRule = rule.Rule{
 					params := getMethodParams(ctx, node)
 					returnType := getMethodReturnType(ctx, node)
 					delimiter := getDelimiter(ctx, node)
-					
+
 					ctx.ReportNodeWithFixes(node, rule.RuleMessage{
 						Id:          "errorMethod",
 						Description: "Shorthand method signature is forbidden. Use a function property instead.",
@@ -293,25 +293,25 @@ var MethodSignatureStyleRule = rule.Rule{
 				}
 			}
 		}
-		
+
 		if opts.Mode == "method" {
 			listeners[ast.KindPropertySignature] = func(node *ast.Node) {
 				propNode := node.AsPropertySignatureDeclaration()
 				if propNode.Type == nil || propNode.Type.Kind != ast.KindTypeReference {
 					return
 				}
-				
+
 				typeRef := propNode.Type.AsTypeReference()
 				if typeRef.TypeName == nil || typeRef.TypeName.Kind != ast.KindFunctionType {
 					// Check if the type reference points to a function type
 					if propNode.Type.Kind == ast.KindFunctionType {
 						funcType := propNode.Type.AsFunctionTypeNode()
-						
+
 						key := getMethodKey(ctx, node)
-				params := getMethodParams(ctx, funcType.AsNode())
-				returnType := getMethodReturnType(ctx, funcType.AsNode())
+						params := getMethodParams(ctx, funcType.AsNode())
+						returnType := getMethodReturnType(ctx, funcType.AsNode())
 						delimiter := getDelimiter(ctx, node)
-						
+
 						ctx.ReportNodeWithFixes(node, rule.RuleMessage{
 							Id:          "errorProperty",
 							Description: "Function property signature is forbidden. Use a method shorthand instead.",
@@ -320,7 +320,7 @@ var MethodSignatureStyleRule = rule.Rule{
 				}
 			}
 		}
-		
+
 		return listeners
 	},
 }

@@ -264,7 +264,7 @@ class Mx {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferFieldStyleSuggestion",
-							Output:    `
+							Output: `
 class Mx {
   readonly p1 = 'hello world';
 }
@@ -290,7 +290,7 @@ class Mx {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferFieldStyleSuggestion",
-							Output:    `
+							Output: `
 class Mx {
   readonly p1 = ` + "`hello world`" + `;
 }
@@ -316,7 +316,7 @@ class Mx {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferFieldStyleSuggestion",
-							Output:    `
+							Output: `
 class Mx {
   static readonly p1 = 'hello world';
 }
@@ -342,7 +342,7 @@ class Mx {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferFieldStyleSuggestion",
-							Output:    `
+							Output: `
 class Mx {
   public static readonly foo = 1;
 }
@@ -368,7 +368,7 @@ class Mx {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferFieldStyleSuggestion",
-							Output:    `
+							Output: `
 class Mx {
   public readonly [myValue] = 'a literal value';
 }
@@ -394,7 +394,7 @@ class Mx {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferFieldStyleSuggestion",
-							Output:    `
+							Output: `
 class Mx {
   public readonly [myValue] = 12345n;
 }
@@ -419,7 +419,7 @@ class Mx {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferGetterStyleSuggestion",
-							Output:    `
+							Output: `
 class Mx {
   public get [myValue]() { return 'a literal value'; }
 }
@@ -444,7 +444,7 @@ class Mx {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferGetterStyleSuggestion",
-							Output:    `
+							Output: `
 class Mx {
   get p1() { return 'hello world'; }
 }
@@ -469,7 +469,7 @@ class Mx {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferGetterStyleSuggestion",
-							Output:    `
+							Output: `
 class Mx {
   get p1() { return ` + "`hello world`" + `; }
 }
@@ -494,7 +494,7 @@ class Mx {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferGetterStyleSuggestion",
-							Output:    `
+							Output: `
 class Mx {
   static get p1() { return 'hello world'; }
 }
@@ -521,7 +521,7 @@ class Mx {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferFieldStyleSuggestion",
-							Output:    `
+							Output: `
 class Mx {
   protected readonly p1 = 'hello world';
 }
@@ -546,7 +546,7 @@ class Mx {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferGetterStyleSuggestion",
-							Output:    `
+							Output: `
 class Mx {
   protected get p1() { return 'hello world'; }
 }
@@ -572,7 +572,7 @@ class Mx {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferFieldStyleSuggestion",
-							Output:    `
+							Output: `
 class Mx {
   public static readonly p1 = 'hello world';
 }
@@ -597,7 +597,7 @@ class Mx {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferGetterStyleSuggestion",
-							Output:    `
+							Output: `
 class Mx {
   public static get p1() { return 'hello world'; }
 }
@@ -623,7 +623,7 @@ class Mx {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferFieldStyleSuggestion",
-							Output:    `
+							Output: `
 class Mx {
   public readonly myValue = gql` + "`\n      {\n        user(id: 5) {\n          firstName\n          lastName\n        }\n      }\n    `" + `;
 }
@@ -648,7 +648,7 @@ class Mx {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferGetterStyleSuggestion",
-							Output:    `
+							Output: `
 class Mx {
   public get myValue() { return gql` + "`\n    {\n      user(id: 5) {\n        firstName\n        lastName\n      }\n    }\n  `" + `; }
 }
@@ -681,7 +681,7 @@ class A {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferGetterStyleSuggestion",
-							Output:    `
+							Output: `
 class A {
   private get foo() { return 'bar'; }
   constructor(foo: string) {
@@ -724,7 +724,7 @@ class A {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferGetterStyleSuggestion",
-							Output:    `
+							Output: `
 class A {
   private readonly ['foo']: string = 'bar';
   constructor(foo: string) {
@@ -764,7 +764,7 @@ class A {
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 						{
 							MessageId: "preferGetterStyleSuggestion",
-							Output:    `
+							Output: `
 class A {
   private get foo() { return 'bar'; }
   constructor(foo: string) {

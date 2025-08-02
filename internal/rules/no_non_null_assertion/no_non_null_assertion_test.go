@@ -21,7 +21,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNonNull"}},
 		},
 		{
-			Code:   "x!.y;",
+			Code: "x!.y;",
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNonNull",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
@@ -35,7 +35,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "noNonNull"}},
 		},
 		{
-			Code:   "!x!.y;",
+			Code: "!x!.y;",
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNonNull",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
@@ -45,7 +45,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 			}},
 		},
 		{
-			Code:   "x!.y?.z;",
+			Code: "x!.y?.z;",
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNonNull",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
@@ -55,7 +55,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 			}},
 		},
 		{
-			Code:   "x![y];",
+			Code: "x![y];",
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNonNull",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
@@ -65,7 +65,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 			}},
 		},
 		{
-			Code:   "x![y]?.z;",
+			Code: "x![y]?.z;",
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNonNull",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
@@ -75,7 +75,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 			}},
 		},
 		{
-			Code:   "x.y.z!();",
+			Code: "x.y.z!();",
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNonNull",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
@@ -85,7 +85,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 			}},
 		},
 		{
-			Code:   "x.y?.z!();",
+			Code: "x.y?.z!();",
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNonNull",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
@@ -96,7 +96,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 		},
 		// Multiple non-null assertions
 		{
-			Code:   "x!!!;",
+			Code: "x!!!;",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "noNonNull"},
 				{MessageId: "noNonNull"},
@@ -104,7 +104,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 			},
 		},
 		{
-			Code:   "x!!.y;",
+			Code: "x!!.y;",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noNonNull",
@@ -117,14 +117,14 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 			},
 		},
 		{
-			Code:   "x.y!!;",
+			Code: "x.y!!;",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "noNonNull"},
 				{MessageId: "noNonNull"},
 			},
 		},
 		{
-			Code:   "x.y.z!!();",
+			Code: "x.y.z!!();",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noNonNull",
@@ -138,7 +138,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 		},
 		// Optional chaining with non-null assertion
 		{
-			Code:   "x!?.[y].z;",
+			Code: "x!?.[y].z;",
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNonNull",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
@@ -148,7 +148,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 			}},
 		},
 		{
-			Code:   "x!?.y.z;",
+			Code: "x!?.y.z;",
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNonNull",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
@@ -158,7 +158,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 			}},
 		},
 		{
-			Code:   "x.y.z!?.();",
+			Code: "x.y.z!?.();",
 			Errors: []rule_tester.InvalidTestCaseError{{
 				MessageId: "noNonNull",
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{

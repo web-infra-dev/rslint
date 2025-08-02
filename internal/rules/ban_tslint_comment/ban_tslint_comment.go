@@ -33,10 +33,10 @@ var BanTslintCommentRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		sourceFile := ctx.SourceFile
 		sourceText := string(sourceFile.Text())
-		
+
 		// Track processed positions to avoid duplicates
 		processed := make(map[int]bool)
-		
+
 		// Process all tslint comments immediately
 		pos := 0
 		for {
@@ -45,11 +45,11 @@ var BanTslintCommentRule = rule.Rule{
 				break
 			}
 			tslintPos += pos
-			
+
 			// Find the start of the comment
 			commentStart := -1
 			isBlockComment := false
-			
+
 			// Look for line comment start
 			lineCommentStart := strings.LastIndex(sourceText[:tslintPos], "//")
 			if lineCommentStart != -1 {
@@ -58,7 +58,7 @@ var BanTslintCommentRule = rule.Rule{
 					commentStart = lineCommentStart
 				}
 			}
-			
+
 			// Look for block comment start
 			blockCommentStart := strings.LastIndex(sourceText[:tslintPos], "/*")
 			if blockCommentStart != -1 {
@@ -71,15 +71,15 @@ var BanTslintCommentRule = rule.Rule{
 					}
 				}
 			}
-			
+
 			if commentStart == -1 || processed[commentStart] {
 				pos = tslintPos + 7
 				continue
 			}
-			
+
 			// Mark this comment as processed
 			processed[commentStart] = true
-			
+
 			// Find the end of the comment
 			var commentEnd int
 			if isBlockComment {
@@ -97,27 +97,27 @@ var BanTslintCommentRule = rule.Rule{
 					commentEnd = commentStart + endMarker
 				}
 			}
-			
+
 			// Extract the comment value
 			var commentValue string
 			if isBlockComment {
 				// Remove /* and */ from block comments
-				if commentEnd > commentStart + 4 {
+				if commentEnd > commentStart+4 {
 					commentValue = sourceText[commentStart+2 : commentEnd-2]
 				}
 			} else {
 				// Remove // from line comments
-				if commentEnd > commentStart + 2 {
+				if commentEnd > commentStart+2 {
 					commentValue = sourceText[commentStart+2 : commentEnd]
 				}
 			}
-			
+
 			// Test if this matches the tslint regex
 			if enableDisableRegex.MatchString(commentValue) {
 				// Calculate the proper range for removal
 				removeStart := commentStart
 				removeEnd := commentEnd
-				
+
 				// For line comments, check if we need to include preceding whitespace
 				if !isBlockComment {
 					// Check if there's code before the comment on the same line
@@ -127,14 +127,14 @@ var BanTslintCommentRule = rule.Rule{
 					} else {
 						lineStart++ // Move past the newline
 					}
-					
+
 					// Check if there's non-whitespace content before the comment
 					lineContent := sourceText[lineStart:commentStart]
 					hasCodeBefore := strings.TrimSpace(lineContent) != ""
-					
+
 					if hasCodeBefore {
 						// There's code before the comment, so we need to include preceding spaces
-						// Find the start of whitespace before the comment  
+						// Find the start of whitespace before the comment
 						spaceStart := commentStart
 						for spaceStart > lineStart && sourceText[spaceStart-1] == ' ' {
 							spaceStart--
@@ -148,12 +148,12 @@ var BanTslintCommentRule = rule.Rule{
 						}
 					}
 				}
-				
+
 				// Create text ranges - one for reporting position, one for fixing
 				reportRange := utils.TrimNodeTextRange(sourceFile, sourceFile.AsNode()).WithPos(commentStart).WithEnd(commentEnd)
 				fixRange := utils.TrimNodeTextRange(sourceFile, sourceFile.AsNode()).WithPos(removeStart).WithEnd(removeEnd)
 				commentText := toText(strings.TrimSpace(commentValue), isBlockComment)
-				
+
 				ctx.ReportRangeWithSuggestions(reportRange, buildCommentDetectedMessage(commentText),
 					rule.RuleSuggestion{
 						Message: rule.RuleMessage{
@@ -166,10 +166,10 @@ var BanTslintCommentRule = rule.Rule{
 					},
 				)
 			}
-			
+
 			pos = tslintPos + 7
 		}
-		
+
 		// Return empty listeners since we've already processed everything
 		return rule.RuleListeners{}
 	},

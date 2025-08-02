@@ -9,70 +9,70 @@ import (
 
 func TestDotNotationRule(t *testing.T) {
 	validTestCases := []rule_tester.ValidTestCase{
-					// Base rule
-					{Code: "a.b;"},
-					{Code: "a.b.c;"},
-					{Code: "a['12'];"},
-					{Code: "a[b];"},
-					{Code: "a[0];"},
-					{
-						Code: "a.b.c;",
-						Options: map[string]interface{}{
-							"allowKeywords": false,
-						},
-					},
-					{
-						Code: "a.arguments;",
-						Options: map[string]interface{}{
-							"allowKeywords": false,
-						},
-					},
-			{
-						Code: "a['while'];",
-						Options: map[string]interface{}{
-							"allowKeywords": false,
-						},
-					},
-					{
-						Code: "a['true'];",
-						Options: map[string]interface{}{
-							"allowKeywords": false,
-						},
-					},
-					{
-						Code: "a.true;",
-						Options: map[string]interface{}{
-							"allowKeywords": true,
-						},
-					},
-					{
-						Code: "a.null;",
-						Options: map[string]interface{}{
-							"allowKeywords": true,
-						},
-					},
-					{
-						Code: "a['snake_case'];",
-						Options: map[string]interface{}{
-							"allowPattern": "^[a-z]+(_[a-z]+)+$",
-						},
-					},
-					{
-						Code: "a['lots_of_snake_case'];",
-						Options: map[string]interface{}{
-							"allowPattern": "^[a-z]+(_[a-z]+)+$",
-						},
-					},
-					{Code: "a[`time${range}`];"},
-					{Code: "a[`time range`];"},
-					{Code: "a.true;"},
-					{Code: "a.null;"},
-					{Code: "a[undefined];"},
-					{Code: "a[void 0];"},
-					{Code: "a[b()];"},
-					// TypeScript specific
-					{
-						Code: `
+		// Base rule
+		{Code: "a.b;"},
+		{Code: "a.b.c;"},
+		{Code: "a['12'];"},
+		{Code: "a[b];"},
+		{Code: "a[0];"},
+		{
+			Code: "a.b.c;",
+			Options: map[string]interface{}{
+				"allowKeywords": false,
+			},
+		},
+		{
+			Code: "a.arguments;",
+			Options: map[string]interface{}{
+				"allowKeywords": false,
+			},
+		},
+		{
+			Code: "a['while'];",
+			Options: map[string]interface{}{
+				"allowKeywords": false,
+			},
+		},
+		{
+			Code: "a['true'];",
+			Options: map[string]interface{}{
+				"allowKeywords": false,
+			},
+		},
+		{
+			Code: "a.true;",
+			Options: map[string]interface{}{
+				"allowKeywords": true,
+			},
+		},
+		{
+			Code: "a.null;",
+			Options: map[string]interface{}{
+				"allowKeywords": true,
+			},
+		},
+		{
+			Code: "a['snake_case'];",
+			Options: map[string]interface{}{
+				"allowPattern": "^[a-z]+(_[a-z]+)+$",
+			},
+		},
+		{
+			Code: "a['lots_of_snake_case'];",
+			Options: map[string]interface{}{
+				"allowPattern": "^[a-z]+(_[a-z]+)+$",
+			},
+		},
+		{Code: "a[`time${range}`];"},
+		{Code: "a[`time range`];"},
+		{Code: "a.true;"},
+		{Code: "a.null;"},
+		{Code: "a[undefined];"},
+		{Code: "a[void 0];"},
+		{Code: "a[b()];"},
+		// TypeScript specific
+		{
+			Code: `
 class X {
   private priv_prop = 123;
 }
@@ -80,12 +80,12 @@ class X {
 const x = new X();
 x['priv_prop'] = 123;
 						`,
-						Options: map[string]interface{}{
-							"allowPrivateClassPropertyAccess": true,
-						},
-					},
-					{
-						Code: `
+			Options: map[string]interface{}{
+				"allowPrivateClassPropertyAccess": true,
+			},
+		},
+		{
+			Code: `
 class X {
   protected protected_prop = 123;
 }
@@ -93,12 +93,12 @@ class X {
 const x = new X();
 x['protected_prop'] = 123;
 						`,
-						Options: map[string]interface{}{
-							"allowProtectedClassPropertyAccess": true,
-						},
-					},
-					{
-						Code: `
+			Options: map[string]interface{}{
+				"allowProtectedClassPropertyAccess": true,
+			},
+		},
+		{
+			Code: `
 class X {
   prop: string;
   [key: string]: number;
@@ -107,9 +107,9 @@ class X {
 const x = new X();
 x['hello'] = 3;
 						`,
-						Options: map[string]interface{}{
-					"allowIndexSignaturePropertyAccess": true,
-				},
+			Options: map[string]interface{}{
+				"allowIndexSignaturePropertyAccess": true,
+			},
 		},
 	}
 
@@ -117,11 +117,11 @@ x['hello'] = 3;
 		{
 			Code: "a['true'];",
 			Errors: []rule_tester.InvalidTestCaseError{
-					{
-						MessageId: "useDot",
-					},
+				{
+					MessageId: "useDot",
 				},
-				Output: []string{"a.true;"},
+			},
+			Output: []string{"a.true;"},
 		},
 		{
 			Code: "a['b'];",

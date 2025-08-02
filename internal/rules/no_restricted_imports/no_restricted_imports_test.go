@@ -15,13 +15,13 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 		{Code: "import 'foo';"},
 		{Code: "export { foo } from 'foo';"},
 		{Code: "export * from 'foo';"},
-		
+
 		// Empty options
 		{Code: "import foo from 'foo';", Options: []interface{}{}},
 		{Code: "import foo from 'foo';", Options: map[string]interface{}{"paths": []interface{}{}}},
 		{Code: "import foo from 'foo';", Options: map[string]interface{}{"patterns": []interface{}{}}},
 		{Code: "import foo from 'foo';", Options: map[string]interface{}{"paths": []interface{}{}, "patterns": []interface{}{}}},
-		
+
 		// Valid imports with restrictions on other modules
 		{
 			Code:    "import foo from 'foo';",
@@ -47,7 +47,7 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 			Code:    "import 'foo';",
 			Options: []interface{}{"import1", "import2"},
 		},
-		
+
 		// Pattern-based restrictions
 		{
 			Code: "import foo from 'foo';",
@@ -63,7 +63,7 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 				"patterns": []interface{}{"import1/private/*", "import2/*", "!import2/good"},
 			},
 		},
-		
+
 		// Custom message paths
 		{
 			Code: "import foo from 'foo';",
@@ -95,7 +95,7 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 				},
 			},
 		},
-		
+
 		// Import names restrictions
 		{
 			Code: "import foo from 'foo';",
@@ -121,7 +121,7 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 				},
 			},
 		},
-		
+
 		// Pattern groups with messages
 		{
 			Code: "import foo from 'foo';",
@@ -153,7 +153,7 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 				},
 			},
 		},
-		
+
 		// Type imports with allowTypeImports
 		{
 			Code: "import type foo from 'import-foo';",
@@ -229,7 +229,7 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 				},
 			},
 		},
-		
+
 		// Mixed type imports
 		{
 			Code: "import { type Bar } from 'import-foo';",
@@ -257,7 +257,7 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 				},
 			},
 		},
-		
+
 		// Regex patterns
 		{
 			Code: "import type { foo } from 'import1/private/bar';",
@@ -341,7 +341,7 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 				},
 			},
 		},
-		
+
 		// Pattern-based errors
 		{
 			Code: "import foo from 'import1/private/foo';",
@@ -371,7 +371,7 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 				},
 			},
 		},
-		
+
 		// Custom message errors
 		{
 			Code: "import foo from 'import-foo';",
@@ -417,7 +417,7 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 				},
 			},
 		},
-		
+
 		// Import names errors
 		{
 			Code: "import { Bar } from 'import-foo';",
@@ -457,7 +457,7 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 				},
 			},
 		},
-		
+
 		// Pattern group errors
 		{
 			Code: "import foo from 'import1/private/foo';",
@@ -503,7 +503,7 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 				},
 			},
 		},
-		
+
 		// Side-effect imports
 		{
 			Code: "import 'import-foo';",
@@ -540,7 +540,7 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 				},
 			},
 		},
-		
+
 		// Type imports not allowed
 		{
 			Code: "import foo from 'import-foo';",
@@ -658,7 +658,7 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 				},
 			},
 		},
-		
+
 		// Export all
 		{
 			Code:    "export * from 'import1';",
@@ -671,7 +671,7 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 				},
 			},
 		},
-		
+
 		// Regex patterns
 		{
 			Code: "export { foo } from 'import1/private/bar';",
@@ -712,7 +712,7 @@ func TestNoRestrictedImportsRule(t *testing.T) {
 				},
 			},
 		},
-		
+
 		// Mixed type imports - both Bar and Baz restricted
 		{
 			Code: "import { Bar, type Baz } from 'import-foo';",

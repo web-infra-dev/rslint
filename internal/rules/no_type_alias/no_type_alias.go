@@ -20,11 +20,11 @@ type NoTypeAliasOptions struct {
 
 // Default values for options
 const (
-	ValueAlways                    = "always"
-	ValueNever                     = "never"
-	ValueInUnions                  = "in-unions"
-	ValueInIntersections           = "in-intersections"
-	ValueInUnionsAndIntersections  = "in-unions-and-intersections"
+	ValueAlways                   = "always"
+	ValueNever                    = "never"
+	ValueInUnions                 = "in-unions"
+	ValueInIntersections          = "in-intersections"
+	ValueInUnionsAndIntersections = "in-unions-and-intersections"
 )
 
 // CompositionType represents the type of composition (union or intersection)
@@ -88,11 +88,11 @@ func isSupportedComposition(isTopLevel bool, compositionType CompositionType, al
 // isValidTupleType checks if the type is a valid tuple type
 func isValidTupleType(typeWithLabel TypeWithLabel) bool {
 	node := typeWithLabel.Node
-	
+
 	if node.Kind == ast.KindTupleType {
 		return true
 	}
-	
+
 	if node.Kind == ast.KindTypeOperator {
 		typeOp := node.AsTypeOperatorNode()
 		if (typeOp.Operator == ast.KindKeyOfKeyword || typeOp.Operator == ast.KindReadonlyKeyword) &&
@@ -100,7 +100,7 @@ func isValidTupleType(typeWithLabel TypeWithLabel) bool {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -120,23 +120,23 @@ func getTypes(node *ast.Node, compositionType CompositionType) []TypeWithLabel {
 		} else {
 			newCompositionType = CompositionTypeIntersection
 		}
-		
+
 		var types []TypeWithLabel
 		var nodes []*ast.Node
-		
+
 		if node.Kind == ast.KindUnionType {
 			nodes = node.AsUnionTypeNode().Types.Nodes
 		} else {
 			nodes = node.AsIntersectionTypeNode().Types.Nodes
 		}
-		
+
 		for _, typeNode := range nodes {
 			types = append(types, getTypes(typeNode, newCompositionType)...)
 		}
-		
+
 		return types
 	}
-	
+
 	return []TypeWithLabel{{Node: node, CompositionType: compositionType}}
 }
 
@@ -192,7 +192,7 @@ var NoTypeAliasRule = rule.Rule{
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -200,7 +200,7 @@ var NoTypeAliasRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if val, ok := optsMap["allowAliases"].(string); ok {
 					opts.AllowAliases = val
@@ -317,7 +317,7 @@ var NoTypeAliasRule = rule.Rule{
 			ast.KindTypeAliasDeclaration: func(node *ast.Node) {
 				typeAlias := node.AsTypeAliasDeclaration()
 				types := getTypes(typeAlias.Type, "")
-				
+
 				if len(types) == 1 {
 					// is a top level type annotation
 					validateTypeAliases(types[0], true)

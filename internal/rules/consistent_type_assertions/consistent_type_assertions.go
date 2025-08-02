@@ -10,9 +10,9 @@ import (
 
 // Options represents the rule configuration
 type Options struct {
-	AssertionStyle               string `json:"assertionStyle"`
-	ObjectLiteralTypeAssertions  string `json:"objectLiteralTypeAssertions,omitempty"`
-	ArrayLiteralTypeAssertions   string `json:"arrayLiteralTypeAssertions,omitempty"`
+	AssertionStyle              string `json:"assertionStyle"`
+	ObjectLiteralTypeAssertions string `json:"objectLiteralTypeAssertions,omitempty"`
+	ArrayLiteralTypeAssertions  string `json:"arrayLiteralTypeAssertions,omitempty"`
 }
 
 // Default options - when no options are provided, both styles are allowed
@@ -94,7 +94,7 @@ func buildUnexpectedArrayTypeAssertionMessage() rule.RuleMessage {
 
 func buildUnexpectedObjectTypeAssertionMessage() rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "object-literal-assertion", 
+		Id:          "object-literal-assertion",
 		Description: "Always prefer const x: T = { ... }.",
 	}
 }
@@ -108,12 +108,12 @@ func isConst(node *ast.Node) bool {
 	if typeRef == nil {
 		return false
 	}
-	
+
 	typeName := typeRef.TypeName
 	if typeName == nil {
 		return false
 	}
-	
+
 	return ast.IsIdentifier(typeName) && typeName.Text() == "const"
 }
 
@@ -121,7 +121,7 @@ func checkType(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	
+
 	switch node.Kind {
 	case ast.KindAnyKeyword, ast.KindUnknownKeyword:
 		return false
@@ -145,7 +145,7 @@ func isAsParameter(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	
+
 	parent := node.Parent
 	if parent == nil {
 		return false
@@ -192,7 +192,7 @@ func isAsParameter(node *ast.Node) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
 
@@ -231,7 +231,7 @@ func getSuggestions(ctx rule.RuleContext, node *ast.Node, isAsExpression bool, a
 	if node == nil {
 		return suggestions
 	}
-	
+
 	var typeAnnotation *ast.Node
 	var expression *ast.Node
 
@@ -256,7 +256,7 @@ func getSuggestions(ctx rule.RuleContext, node *ast.Node, isAsExpression bool, a
 	}
 
 	cast := getTypeAnnotationText(ctx, typeAnnotation)
-	
+
 	// Check if this is a variable declarator that can have type annotation
 	parent := node.Parent
 	if parent != nil && parent.Kind == ast.KindVariableDeclaration {
@@ -272,7 +272,7 @@ func getSuggestions(ctx rule.RuleContext, node *ast.Node, isAsExpression bool, a
 			} else if annotationMessageId == "replaceArrayTypeAssertionWithAnnotation" {
 				annotationMsg = buildReplaceArrayTypeAssertionWithAnnotationMessage(cast)
 			}
-			
+
 			suggestions = append(suggestions, rule.RuleSuggestion{
 				Message: annotationMsg,
 				FixesArr: []rule.RuleFix{
@@ -293,7 +293,7 @@ func getSuggestions(ctx rule.RuleContext, node *ast.Node, isAsExpression bool, a
 	} else if satisfiesMessageId == "replaceArrayTypeAssertionWithSatisfies" {
 		satisfiesMsg = buildReplaceArrayTypeAssertionWithSatisfiesMessage(cast)
 	}
-	
+
 	suggestions = append(suggestions, rule.RuleSuggestion{
 		Message: satisfiesMsg,
 		FixesArr: []rule.RuleFix{
@@ -309,7 +309,7 @@ func reportIncorrectAssertionType(ctx rule.RuleContext, node *ast.Node, options 
 	if node == nil {
 		return
 	}
-	
+
 	var typeAnnotation *ast.Node
 	if isAsExpression {
 		asExpr := node.AsAsExpression()
@@ -352,7 +352,7 @@ func checkExpressionForObjectAssertion(ctx rule.RuleContext, node *ast.Node, opt
 
 	var expression *ast.Node
 	var typeAnnotation *ast.Node
-	
+
 	if isAsExpression {
 		asExpr := node.AsAsExpression()
 		if asExpr == nil {
@@ -378,7 +378,7 @@ func checkExpressionForObjectAssertion(ctx rule.RuleContext, node *ast.Node, opt
 	}
 
 	if checkType(typeAnnotation) {
-		suggestions := getSuggestions(ctx, node, isAsExpression, 
+		suggestions := getSuggestions(ctx, node, isAsExpression,
 			"replaceObjectTypeAssertionWithAnnotation",
 			"replaceObjectTypeAssertionWithSatisfies")
 
@@ -394,7 +394,7 @@ func checkExpressionForArrayAssertion(ctx rule.RuleContext, node *ast.Node, opti
 
 	var expression *ast.Node
 	var typeAnnotation *ast.Node
-	
+
 	if isAsExpression {
 		asExpr := node.AsAsExpression()
 		if asExpr == nil {
@@ -421,7 +421,7 @@ func checkExpressionForArrayAssertion(ctx rule.RuleContext, node *ast.Node, opti
 
 	if checkType(typeAnnotation) {
 		suggestions := getSuggestions(ctx, node, isAsExpression,
-			"replaceArrayTypeAssertionWithAnnotation", 
+			"replaceArrayTypeAssertionWithAnnotation",
 			"replaceArrayTypeAssertionWithSatisfies")
 
 		ctx.ReportNodeWithSuggestions(node, buildUnexpectedArrayTypeAssertionMessage(), suggestions...)
@@ -432,12 +432,12 @@ var ConsistentTypeAssertionsRule = rule.Rule{
 	Name: "consistent-type-assertions",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := defaultOptions
-		
+
 		// Parse options with dual-format support (handles both array and object formats)
 		if options != nil {
 			var optsMap map[string]interface{}
 			var ok bool
-			
+
 			// Handle array format: [{ option: value }]
 			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
 				optsMap, ok = optArray[0].(map[string]interface{})
@@ -445,7 +445,7 @@ var ConsistentTypeAssertionsRule = rule.Rule{
 				// Handle direct object format: { option: value }
 				optsMap, ok = options.(map[string]interface{})
 			}
-			
+
 			if ok {
 				if val, ok := optsMap["assertionStyle"].(string); ok {
 					opts.AssertionStyle = val
