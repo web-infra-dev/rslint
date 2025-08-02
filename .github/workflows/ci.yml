@@ -70,7 +70,7 @@ jobs:
         run: pnpm typecheck
 
       - name: Install xvfb and dependencies
-        if: runner.os == 'Linux'
+        if: ${{ runner.os == 'Linux' && runner.environment == 'self-hosted' }}
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb libxss1 libgtk-3-0 libgconf-2-4 libnss3 libxrandr2 libasound2 libpangocairo-1.0-0 libatk1.0-0 libcairo-gobject2 libgtk-3-0 libgdk-pixbuf2.0-0
