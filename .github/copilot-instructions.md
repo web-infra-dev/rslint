@@ -136,7 +136,7 @@ typescript-go/         # TypeScript compiler Go port
 package my_rule
 
 import (
-    "github.com/typescript-eslint/rslint/internal/rule"
+    "github.com/web-infra-dev/rslint/internal/rule"
     // other imports
 )
 

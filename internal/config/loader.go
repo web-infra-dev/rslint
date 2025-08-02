@@ -6,7 +6,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // ConfigLoader handles loading and parsing of rslint and tsconfig files

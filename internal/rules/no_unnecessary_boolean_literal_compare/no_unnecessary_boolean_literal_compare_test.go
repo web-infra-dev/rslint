@@ -3,9 +3,9 @@ package no_unnecessary_boolean_literal_compare
 import (
 	"testing"
 
-	"github.com/typescript-eslint/rslint/internal/rule_tester"
-	"github.com/typescript-eslint/rslint/internal/rules/fixtures"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func TestNoUnnecessaryBooleanLiteralCompareRule(t *testing.T) {

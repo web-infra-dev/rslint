@@ -16,9 +16,9 @@ import (
 	"unicode"
 
 	"github.com/fatih/color"
-	"github.com/typescript-eslint/rslint/internal/linter"
-	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
@@ -27,7 +27,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
-	rslintconfig "github.com/typescript-eslint/rslint/internal/config"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
 const spaces = "                                                                                                    "
