@@ -81,7 +81,7 @@ jobs:
           path: packages/vscode-extension/.vscode-test
           key: 'vscode-test'
           restore-keys: |
-            - 'vscode-test'
+            - 'vscode-test-'
 
       - name: Test on Linux
         if: runner.os == 'Linux'
