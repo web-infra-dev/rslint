@@ -62,7 +62,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os:
+          [
+            rspack-ubuntu-22.04-large,
+            rspack-darwin-14-medium,
+            rspack-windows-2022-large,
+          ]
         go-version: ['1.24.1']
     steps:
       - name: Checkout code
