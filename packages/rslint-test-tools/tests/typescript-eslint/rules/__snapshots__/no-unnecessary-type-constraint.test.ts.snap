@@ -134,7 +134,7 @@ exports[`no-unnecessary-type-constraint > invalid 6`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
+      "filePath": "file.mts",
       "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
       "messageId": "unnecessaryConstraint",
       "range": {
@@ -160,7 +160,7 @@ exports[`no-unnecessary-type-constraint > invalid 7`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
+      "filePath": "file.cts",
       "message": "Constraining the generic type \`T\` to \`any\` does nothing and is unnecessary.",
       "messageId": "unnecessaryConstraint",
       "range": {

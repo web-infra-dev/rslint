@@ -1,6 +1,15 @@
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
 import { getFixturesRootDir } from '../RuleTester.ts';
 
+// Define AST_NODE_TYPES and AST_TOKEN_TYPES for test compatibility
+const AST_NODE_TYPES = {
+  Identifier: 'Identifier',
+} as const;
+
+const AST_TOKEN_TYPES = {
+  Identifier: 'Identifier',
+} as const;
+
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
@@ -10,6 +19,8 @@ const ruleTester = new RuleTester({
       // @ts-ignore
       ecmaVersion: 6,
       sourceType: 'script',
+      project: './tsconfig.json',
+      tsconfigRootDir: rootPath,
     },
   },
 });

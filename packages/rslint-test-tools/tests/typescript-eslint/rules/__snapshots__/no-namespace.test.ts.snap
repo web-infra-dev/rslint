@@ -264,7 +264,7 @@ exports[`no-namespace > invalid 11`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
+      "filePath": "test.d.ts",
       "message": "ES2015 module syntax is preferred over namespaces.",
       "messageId": "moduleSyntaxIsPreferred",
       "range": {
@@ -290,7 +290,7 @@ exports[`no-namespace > invalid 12`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
+      "filePath": "test.d.ts",
       "message": "ES2015 module syntax is preferred over namespaces.",
       "messageId": "moduleSyntaxIsPreferred",
       "range": {
@@ -316,7 +316,7 @@ exports[`no-namespace > invalid 13`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
+      "filePath": "test.d.ts",
       "message": "ES2015 module syntax is preferred over namespaces.",
       "messageId": "moduleSyntaxIsPreferred",
       "range": {
@@ -342,7 +342,7 @@ exports[`no-namespace > invalid 14`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
+      "filePath": "test.d.ts",
       "message": "ES2015 module syntax is preferred over namespaces.",
       "messageId": "moduleSyntaxIsPreferred",
       "range": {
@@ -383,300 +383,18 @@ exports[`no-namespace > invalid 15`] = `
       },
       "ruleName": "no-namespace",
     },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-namespace > invalid 16`] = `
-{
-  "diagnostics": [
     {
       "filePath": "src/virtual.ts",
       "message": "ES2015 module syntax is preferred over namespaces.",
       "messageId": "moduleSyntaxIsPreferred",
       "range": {
         "end": {
-          "column": 2,
-          "line": 6,
+          "column": 21,
+          "line": 1,
         },
         "start": {
-          "column": 1,
-          "line": 2,
-        },
-      },
-      "ruleName": "no-namespace",
-    },
-    {
-      "filePath": "src/virtual.ts",
-      "message": "ES2015 module syntax is preferred over namespaces.",
-      "messageId": "moduleSyntaxIsPreferred",
-      "range": {
-        "end": {
-          "column": 4,
-          "line": 5,
-        },
-        "start": {
-          "column": 3,
-          "line": 3,
-        },
-      },
-      "ruleName": "no-namespace",
-    },
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-namespace > invalid 17`] = `
-{
-  "diagnostics": [
-    {
-      "filePath": "src/virtual.ts",
-      "message": "ES2015 module syntax is preferred over namespaces.",
-      "messageId": "moduleSyntaxIsPreferred",
-      "range": {
-        "end": {
-          "column": 2,
-          "line": 6,
-        },
-        "start": {
-          "column": 1,
-          "line": 2,
-        },
-      },
-      "ruleName": "no-namespace",
-    },
-    {
-      "filePath": "src/virtual.ts",
-      "message": "ES2015 module syntax is preferred over namespaces.",
-      "messageId": "moduleSyntaxIsPreferred",
-      "range": {
-        "end": {
-          "column": 4,
-          "line": 5,
-        },
-        "start": {
-          "column": 3,
-          "line": 3,
-        },
-      },
-      "ruleName": "no-namespace",
-    },
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-namespace > invalid 18`] = `
-{
-  "diagnostics": [
-    {
-      "filePath": "src/virtual.ts",
-      "message": "ES2015 module syntax is preferred over namespaces.",
-      "messageId": "moduleSyntaxIsPreferred",
-      "range": {
-        "end": {
-          "column": 2,
-          "line": 6,
-        },
-        "start": {
-          "column": 1,
-          "line": 2,
-        },
-      },
-      "ruleName": "no-namespace",
-    },
-    {
-      "filePath": "src/virtual.ts",
-      "message": "ES2015 module syntax is preferred over namespaces.",
-      "messageId": "moduleSyntaxIsPreferred",
-      "range": {
-        "end": {
-          "column": 4,
-          "line": 5,
-        },
-        "start": {
-          "column": 3,
-          "line": 3,
-        },
-      },
-      "ruleName": "no-namespace",
-    },
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-namespace > invalid 19`] = `
-{
-  "diagnostics": [
-    {
-      "filePath": "src/virtual.ts",
-      "message": "ES2015 module syntax is preferred over namespaces.",
-      "messageId": "moduleSyntaxIsPreferred",
-      "range": {
-        "end": {
-          "column": 2,
-          "line": 6,
-        },
-        "start": {
-          "column": 1,
-          "line": 2,
-        },
-      },
-      "ruleName": "no-namespace",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-namespace > invalid 20`] = `
-{
-  "diagnostics": [
-    {
-      "filePath": "src/virtual.ts",
-      "message": "ES2015 module syntax is preferred over namespaces.",
-      "messageId": "moduleSyntaxIsPreferred",
-      "range": {
-        "end": {
-          "column": 2,
-          "line": 6,
-        },
-        "start": {
-          "column": 1,
-          "line": 2,
-        },
-      },
-      "ruleName": "no-namespace",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-namespace > invalid 21`] = `
-{
-  "diagnostics": [
-    {
-      "filePath": "src/virtual.ts",
-      "message": "ES2015 module syntax is preferred over namespaces.",
-      "messageId": "moduleSyntaxIsPreferred",
-      "range": {
-        "end": {
-          "column": 2,
-          "line": 6,
-        },
-        "start": {
-          "column": 1,
-          "line": 2,
-        },
-      },
-      "ruleName": "no-namespace",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-namespace > invalid 22`] = `
-{
-  "diagnostics": [
-    {
-      "filePath": "src/virtual.ts",
-      "message": "ES2015 module syntax is preferred over namespaces.",
-      "messageId": "moduleSyntaxIsPreferred",
-      "range": {
-        "end": {
-          "column": 2,
-          "line": 6,
-        },
-        "start": {
-          "column": 1,
-          "line": 2,
-        },
-      },
-      "ruleName": "no-namespace",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-namespace > invalid 23`] = `
-{
-  "diagnostics": [
-    {
-      "filePath": "src/virtual.ts",
-      "message": "ES2015 module syntax is preferred over namespaces.",
-      "messageId": "moduleSyntaxIsPreferred",
-      "range": {
-        "end": {
-          "column": 2,
-          "line": 6,
-        },
-        "start": {
-          "column": 1,
-          "line": 2,
-        },
-      },
-      "ruleName": "no-namespace",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-namespace > invalid 24`] = `
-{
-  "diagnostics": [
-    {
-      "filePath": "src/virtual.ts",
-      "message": "ES2015 module syntax is preferred over namespaces.",
-      "messageId": "moduleSyntaxIsPreferred",
-      "range": {
-        "end": {
-          "column": 2,
-          "line": 6,
-        },
-        "start": {
-          "column": 1,
-          "line": 2,
-        },
-      },
-      "ruleName": "no-namespace",
-    },
-    {
-      "filePath": "src/virtual.ts",
-      "message": "ES2015 module syntax is preferred over namespaces.",
-      "messageId": "moduleSyntaxIsPreferred",
-      "range": {
-        "end": {
-          "column": 4,
-          "line": 5,
-        },
-        "start": {
-          "column": 3,
-          "line": 3,
+          "column": 15,
+          "line": 1,
         },
       },
       "ruleName": "no-namespace",

@@ -4,14 +4,12 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 const rootPath = getFixturesRootDir();
 /* eslint-disable @typescript-eslint/internal/plugin-test-formatting -- Prettier doesn't yet support TS 5.6 string literal module identifiers */
 
-const rootDir = getFixturesRootDir();
-
 const ruleTester = new RuleTester({
   // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
-      tsconfigRootDir: rootDir,
+      tsconfigRootDir: rootPath,
     },
   },
 });

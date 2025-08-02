@@ -1,7 +1,17 @@
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
 import { getFixturesRootDir } from '../RuleTester.ts';
 
-const ruleTester = new RuleTester({});
+const rootPath = getFixturesRootDir();
+
+const ruleTester = new RuleTester({
+  // @ts-ignore
+  languageOptions: {
+    parserOptions: {
+      project: './tsconfig.json',
+      tsconfigRootDir: rootPath,
+    },
+  },
+});
 
 ruleTester.run('ban-ts-comment (ts-expect-error)', {
   valid: [

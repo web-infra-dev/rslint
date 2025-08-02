@@ -1,37 +1,105 @@
 // Rstest Snapshot v1
 
-exports[`allowAsThisParameter: true > invalid 1`] = `
+exports[`no-invalid-void-type > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "DEBUG: void parent kind is KindTypeReference",
+      "messageId": "debug",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-void-type",
+    },
+  ],
+  "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 0,
+  "ruleCount": 1,
 }
 `;
 
-exports[`allowInGenericTypeArguments: false > invalid 1`] = `
+exports[`no-invalid-void-type > invalid 2`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "DEBUG: void parent kind is KindParameter",
+      "messageId": "debug",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-void-type",
+    },
+  ],
+  "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 0,
+  "ruleCount": 1,
 }
 `;
 
-exports[`allowInGenericTypeArguments: true > invalid 1`] = `
+exports[`no-invalid-void-type > invalid 3`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "DEBUG: void parent kind is KindTypeReference",
+      "messageId": "debug",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-void-type",
+    },
+  ],
+  "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 0,
+  "ruleCount": 1,
 }
 `;
 
-exports[`allowInGenericTypeArguments: whitelist > invalid 1`] = `
+exports[`no-invalid-void-type > invalid 4`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "DEBUG: void parent kind is KindTypeAliasDeclaration",
+      "messageId": "debug",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-void-type",
+    },
+  ],
+  "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 0,
+  "ruleCount": 1,
 }
 `;

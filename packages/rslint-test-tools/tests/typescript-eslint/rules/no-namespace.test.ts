@@ -251,6 +251,11 @@ export declare namespace foo {
           line: 1,
           messageId: 'moduleSyntaxIsPreferred',
         },
+        {
+          column: 15,
+          line: 1,
+          messageId: 'moduleSyntaxIsPreferred',
+        },
       ],
       options: [{ allowDeclarations: false }],
     },
@@ -269,7 +274,17 @@ namespace Foo.Bar {
           messageId: 'moduleSyntaxIsPreferred',
         },
         {
+          column: 15,
+          line: 2,
+          messageId: 'moduleSyntaxIsPreferred',
+        },
+        {
           column: 3,
+          line: 3,
+          messageId: 'moduleSyntaxIsPreferred',
+        },
+        {
+          column: 17,
           line: 3,
           messageId: 'moduleSyntaxIsPreferred',
         },

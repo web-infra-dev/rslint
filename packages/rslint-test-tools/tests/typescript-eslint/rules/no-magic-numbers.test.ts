@@ -17,7 +17,7 @@ ruleTester.run('no-magic-numbers', {
   valid: [
     {
       code: 'const FOO = 10;',
-      options: [{ ignoreNumericLiteralTypes: true }],
+      options: [{ ignore: [10] }],
     },
     {
       code: "type Foo = 'bar';",

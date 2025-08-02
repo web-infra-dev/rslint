@@ -21,7 +21,7 @@ exports[`consistent-type-exports > invalid 1`] = `
     },
   ],
   "errorCount": 1,
-  "fileCount": 2,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
@@ -47,7 +47,7 @@ exports[`consistent-type-exports > invalid 2`] = `
     },
   ],
   "errorCount": 1,
-  "fileCount": 2,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
@@ -73,7 +73,7 @@ exports[`consistent-type-exports > invalid 3`] = `
     },
   ],
   "errorCount": 1,
-  "fileCount": 2,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
@@ -99,7 +99,7 @@ exports[`consistent-type-exports > invalid 4`] = `
     },
   ],
   "errorCount": 1,
-  "fileCount": 2,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
@@ -125,7 +125,7 @@ exports[`consistent-type-exports > invalid 5`] = `
     },
   ],
   "errorCount": 1,
-  "fileCount": 2,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
@@ -151,7 +151,7 @@ exports[`consistent-type-exports > invalid 6`] = `
     },
   ],
   "errorCount": 1,
-  "fileCount": 2,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
@@ -177,7 +177,7 @@ exports[`consistent-type-exports > invalid 7`] = `
     },
   ],
   "errorCount": 1,
-  "fileCount": 2,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
@@ -203,7 +203,7 @@ exports[`consistent-type-exports > invalid 8`] = `
     },
   ],
   "errorCount": 1,
-  "fileCount": 2,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
@@ -229,7 +229,7 @@ exports[`consistent-type-exports > invalid 9`] = `
     },
   ],
   "errorCount": 1,
-  "fileCount": 2,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
@@ -255,7 +255,7 @@ exports[`consistent-type-exports > invalid 10`] = `
     },
   ],
   "errorCount": 1,
-  "fileCount": 2,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
@@ -463,7 +463,7 @@ exports[`consistent-type-exports > invalid 18`] = `
     },
   ],
   "errorCount": 1,
-  "fileCount": 2,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
@@ -489,7 +489,7 @@ exports[`consistent-type-exports > invalid 19`] = `
     },
   ],
   "errorCount": 1,
-  "fileCount": 2,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
@@ -498,7 +498,7 @@ exports[`consistent-type-exports > invalid 20`] = `
 {
   "diagnostics": [],
   "errorCount": 0,
-  "fileCount": 2,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;

@@ -1,7 +1,7 @@
 [
   {
     "language": "typescript",
-    "files": ["src/virtual.ts"],
+    "files": ["src/debug.ts"],
     "languageOptions": {
       "parserOptions": {
         "projectService": false,
@@ -9,8 +9,7 @@
       }
     },
     "rules": {
-      "no-inferrable-types": "error",
-      "no-unsafe-declaration-merging": "error"
+      "consistent-type-exports": "error"
     },
     "plugins": []
   }

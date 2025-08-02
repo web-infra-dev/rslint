@@ -9,6 +9,7 @@ const ruleTester = new RuleTester({
     parserOptions: {
       // @ts-ignore
       ecmaVersion: 6,
+      tsconfigRootDir: rootPath,
     },
   },
 });

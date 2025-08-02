@@ -3,14 +3,14 @@ import { getFixturesRootDir } from '../RuleTester.ts';
 
 const rootPath = getFixturesRootDir();
 
-const rootDir = getFixturesRootDir();
+const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({
   // @ts-ignore
   languageOptions: {
     parserOptions: {
       project: './tsconfig.json',
-      tsconfigRootDir: rootDir,
+      tsconfigRootDir: rootPath,
     },
   },
 });

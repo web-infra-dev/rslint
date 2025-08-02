@@ -1,6 +1,14 @@
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
 import { getFixturesRootDir } from '../RuleTester.ts';
 
+// Define AST_NODE_TYPES for test compatibility
+const AST_NODE_TYPES = {
+  FunctionExpression: 'FunctionExpression',
+  FunctionDeclaration: 'FunctionDeclaration',
+  ArrowFunctionExpression: 'ArrowFunctionExpression',
+  Identifier: 'Identifier',
+} as const;
+
 const rootPath = getFixturesRootDir();
 
 const ruleTester = new RuleTester({

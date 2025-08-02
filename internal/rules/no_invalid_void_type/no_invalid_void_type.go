@@ -45,200 +45,278 @@ var NoInvalidVoidTypeRule = rule.Rule{
 			}
 		}
 
-		// Valid parent node types for void
-		validParents := []ast.Kind{}
-		
-		// Invalid grandparent node types
-		invalidGrandParents := []ast.Kind{
-			ast.KindPropertySignature,
-			ast.KindCallExpression,
-			ast.KindPropertyDeclaration,
-			ast.KindPropertyDeclaration, // No accessor property declaration kind, using PropertyDeclaration
-			ast.KindIdentifier,
-		}
-
-		// Valid union member types (void can be in unions with these)
-		// Currently unused due to API limitations
-		_ = []ast.Kind{
-			ast.KindVoidKeyword,
-			ast.KindNeverKeyword,
-		}
-
-		// If allowInGenericTypeArguments is true, add to valid parents
-		if allowGeneric, ok := opts.AllowInGenericTypeArguments.(bool); ok && allowGeneric {
-			validParents = append(validParents, ast.KindExpressionWithTypeArguments)
-		}
-
-		// Check if the given void keyword is used as a valid generic type
-		checkGenericTypeArgument := func(node *ast.Node) {
-			// Only matches T<..., void, ...>
-			if node.Parent == nil || node.Parent.Kind != ast.KindExpressionWithTypeArguments ||
-				node.Parent.Parent == nil || node.Parent.Parent.Kind != ast.KindTypeReference {
-				return
-			}
-
-			// Check allowlist if it's an array
-			if allowlist, ok := opts.AllowInGenericTypeArguments.([]interface{}); ok {
-				typeRef := node.Parent.Parent.AsTypeReference()
-				fullyQualifiedName := getTypeReferenceName(ctx, typeRef)
-				fullyQualifiedName = strings.ReplaceAll(fullyQualifiedName, " ", "")
-
-				allowed := false
-				for _, allow := range allowlist {
-					if allowStr, ok := allow.(string); ok {
-						allowStr = strings.ReplaceAll(allowStr, " ", "")
-						if allowStr == fullyQualifiedName {
-							allowed = true
-							break
-						}
+		// Helper function to check if node is a return type
+		isReturnType := func(node *ast.Node) bool {
+			current := node
+			for current != nil && current.Parent != nil {
+				parent := current.Parent
+				switch parent.Kind {
+				case ast.KindFunctionDeclaration:
+					funcDecl := parent.AsFunctionDeclaration()
+					if funcDecl.Type != nil && isNodeInSubtree(funcDecl.Type, node) {
+						return true
 					}
+				case ast.KindMethodDeclaration:
+					methodDecl := parent.AsMethodDeclaration()
+					if methodDecl.Type != nil && isNodeInSubtree(methodDecl.Type, node) {
+						return true
+					}
+				case ast.KindArrowFunction:
+					arrowFunc := parent.AsArrowFunction()
+					if arrowFunc.Type != nil && isNodeInSubtree(arrowFunc.Type, node) {
+						return true
+					}
+				case ast.KindFunctionExpression:
+					funcExpr := parent.AsFunctionExpression()
+					if funcExpr.Type != nil && isNodeInSubtree(funcExpr.Type, node) {
+						return true
+					}
+				case ast.KindConstructSignature, ast.KindCallSignature, ast.KindMethodSignature:
+					// These should also allow void return types
+					return true
 				}
-
-				if !allowed {
-					ctx.ReportNode(node, rule.RuleMessage{
-						Id:          "invalidVoidForGeneric",
-						Description: fmt.Sprintf("%s may not have void as a type argument.", fullyQualifiedName),
-					})
-				}
-				return
+				current = parent
 			}
+			return false
+		}
 
-			// If allowInGenericTypeArguments is false
-			if allowGeneric, ok := opts.AllowInGenericTypeArguments.(bool); ok && !allowGeneric {
-				messageId := "invalidVoidNotReturn"
-				if opts.AllowAsThisParameter {
-					messageId = "invalidVoidNotReturnOrThisParam"
-				}
-				ctx.ReportNode(node, buildMessage(messageId, ""))
+		// Helper function to check if node is a this parameter
+		isThisParameter := func(node *ast.Node) bool {
+			if !opts.AllowAsThisParameter {
+				return false
 			}
-		}
-
-		// Check if generic type parameter defaults to void
-		// TODO: Reimplement when TypeParameterDeclaration API is clarified
-		_ = func(node *ast.Node, parentNode *ast.TypeParameterDeclaration) {
-			// Skip check for now
-		}
-
-		// Check if a union containing void is valid
-		// TODO: Reimplement when UnionType API is clarified
-		_ = func(node *ast.UnionType) bool {
-			// Simplified check - just return true for now
-			// The Types() method is not available in current API
-			return true
-		}
-
-		// Get parent function declaration node (currently unused)
-		_ = func(node *ast.Node) *ast.Node {
-			current := node.Parent
-			for current != nil {
-				if current.Kind == ast.KindFunctionDeclaration {
-					return current
-				}
-				if current.Kind == ast.KindMethodDeclaration {
-					methodDecl := current.AsMethodDeclaration()
-					if methodDecl.Body != nil {
-						return current
+			
+			current := node
+			for current != nil && current.Parent != nil {
+				if current.Parent.Kind == ast.KindParameter {
+					param := current.Parent.AsParameterDeclaration()
+					if param.Name() != nil {
+						paramNameNode := param.Name().AsNode()
+						textRange := utils.TrimNodeTextRange(ctx.SourceFile, paramNameNode)
+						text := string(ctx.SourceFile.Text()[textRange.Pos():textRange.End()])
+						return text == "this"
 					}
 				}
 				current = current.Parent
 			}
-			return nil
+			return false
+		}
+
+		// Helper function to check if void is in union with never (which is allowed)
+		isValidUnionWithNever := func(node *ast.Node) bool {
+			if node.Parent == nil || node.Parent.Kind != ast.KindUnionType {
+				return false
+			}
+			
+			unionType := node.Parent.AsUnionTypeNode()
+			types := unionType.Types.Nodes
+			
+			// Check if this union contains 'never' alongside void
+			hasNever := false
+			for _, t := range types {
+				if t.Kind == ast.KindNeverKeyword {
+					hasNever = true
+					break
+				}
+			}
+			
+			return hasNever
+		}
+
+		// Helper function to check if we're in a valid overload context  
+		isValidOverloadUnion := func(node *ast.Node) bool {
+			if node.Parent == nil || node.Parent.Kind != ast.KindUnionType {
+				return false
+			}
+			
+			// Allow void | never unions
+			if isValidUnionWithNever(node) {
+				return true
+			}
+			
+			// Allow void | Promise<T> and similar patterns where the other type is a generic with void
+			unionType := node.Parent.AsUnionTypeNode()
+			types := unionType.Types.Nodes
+			
+			for _, t := range types {
+				if t == node {
+					continue // Skip the void node itself
+				}
+				
+				// Check if the other type is a generic that might contain void (like Promise<void>)
+				if t.Kind == ast.KindTypeReference {
+					typeRef := t.AsTypeReference()
+					if typeRef.TypeArguments != nil {
+						// This is a generic type, check if it uses void as type argument
+						for _, arg := range typeRef.TypeArguments.Nodes {
+							if arg.Kind == ast.KindVoidKeyword {
+								// This union contains void and a generic with void - likely valid (e.g., void | Promise<void>)
+								return true
+							}
+						}
+					}
+				}
+			}
+			
+			return false
 		}
 
 		return rule.RuleListeners{
 			ast.KindVoidKeyword: func(node *ast.Node) {
-				// Check T<..., void, ...> against allowInGenericArguments option
-				if node.Parent != nil &&
-					node.Parent.Kind == ast.KindExpressionWithTypeArguments &&
-					node.Parent.Parent != nil &&
-					node.Parent.Parent.Kind == ast.KindTypeReference {
-					checkGenericTypeArgument(node)
+				// Check for return types first (always allowed)
+				if isReturnType(node) {
 					return
 				}
 
-				// Allow <T = void> if allowInGenericTypeArguments is specified
-				// TODO: Reimplement when TypeParameter API is clarified
-				if allowGeneric, ok := opts.AllowInGenericTypeArguments.(bool); ok && allowGeneric {
-					if node.Parent != nil && node.Parent.Kind == ast.KindTypeParameter {
-						// Skip check for now - Default() method not available
+				// Check for this parameter (allowed if enabled)
+				if isThisParameter(node) {
+					return
+				}
+
+				// Check if it's a valid union with never
+				if isValidUnionWithNever(node) {
+					return
+				}
+
+				// Handle generic type arguments
+				if isInGenericTypeArgument(node) {
+					// Check allowlist if it's an array
+					if allowlist, ok := opts.AllowInGenericTypeArguments.([]interface{}); ok {
+						typeRefName := getGenericTypeName(ctx, node)
+						if typeRefName != "" {
+							allowed := false
+							for _, allow := range allowlist {
+								if allowStr, ok := allow.(string); ok {
+									allowStr = strings.ReplaceAll(allowStr, " ", "")
+									if allowStr == typeRefName {
+										allowed = true
+										break
+									}
+								}
+							}
+
+							if !allowed {
+								ctx.ReportNode(node, rule.RuleMessage{
+									Id:          "invalidVoidForGeneric",
+									Description: fmt.Sprintf("%s may not have void as a type argument.", typeRefName),
+								})
+								return
+							}
+						}
 						return
 					}
-				}
 
-				// Union with void must contain types from validUnionMembers
-				if node.Parent != nil && node.Parent.Kind == ast.KindUnionType {
-					// Skip detailed union check for now - just allow it
+					// If allowInGenericTypeArguments is false, report error
+					if allowGeneric, ok := opts.AllowInGenericTypeArguments.(bool); ok && !allowGeneric {
+						messageId := "invalidVoidNotReturn"
+						if opts.AllowAsThisParameter {
+							messageId = "invalidVoidNotReturnOrThisParam"
+						}
+						ctx.ReportNode(node, buildMessage(messageId, ""))
+						return
+					}
+
+					// If allowInGenericTypeArguments is true (default), allow it
+					if allowGeneric, ok := opts.AllowInGenericTypeArguments.(bool); ok && allowGeneric {
+						return
+					}
+					
+					// Default case - if allowInGenericTypeArguments is not explicitly set, default to true
 					return
 				}
 
-				// Using void as part of function overloading implementation
-				// Skip overload check for now as HasOverloadSignatures is not available
-				// TODO: Reimplement overload signature detection
-
-				// This parameter is ok to be void
-				// Skip this parameter check for now - needs proper type node detection
-				// TODO: Reimplement this parameter void check
-
-				// Default cases - check if parent is valid
-				parentValid := false
-				if node.Parent != nil {
-					for _, validParent := range validParents {
-						if node.Parent.Kind == validParent {
-							parentValid = true
-							break
-						}
-					}
+				// Check for valid overload unions (like void | string in overloads)
+				if isValidOverloadUnion(node) {
+					return
 				}
 
-				grandParentInvalid := false
-				if parentValid && node.Parent != nil && node.Parent.Parent != nil {
-					for _, invalidGrandParent := range invalidGrandParents {
-						if node.Parent.Parent.Kind == invalidGrandParent {
-							grandParentInvalid = true
-							break
-						}
-					}
-				}
-
-				if !parentValid || grandParentInvalid {
-					// Determine message ID based on options
-					messageId := "invalidVoidNotReturn"
-					
-					allowInGeneric := false
-					if allowGenericBool, ok := opts.AllowInGenericTypeArguments.(bool); ok {
-						allowInGeneric = allowGenericBool
-					} else if _, ok := opts.AllowInGenericTypeArguments.([]interface{}); ok {
-						allowInGeneric = true
-					}
-
-					if allowInGeneric && opts.AllowAsThisParameter {
-						messageId = "invalidVoidNotReturnOrThisParamOrGeneric"
-					} else if allowInGeneric {
-						messageId = getNotReturnOrGenericMessageId(node, opts)
-					} else if opts.AllowAsThisParameter {
-						messageId = "invalidVoidNotReturnOrThisParam"
-					}
-
-					ctx.ReportNode(node, buildMessage(messageId, ""))
-				}
+				// For all other cases, report as invalid
+				messageId := getInvalidVoidMessageId(node, opts)
+				ctx.ReportNode(node, buildMessage(messageId, ""))
 			},
 		}
 	},
 }
 
-// Helper function to get type reference name
-func getTypeReferenceName(ctx rule.RuleContext, typeRef *ast.TypeReferenceNode) string {
-	// Get the type name from the type reference
-	textRange := utils.TrimNodeTextRange(ctx.SourceFile, typeRef.TypeName)
-	return string(ctx.SourceFile.Text()[textRange.Pos():textRange.End()])
+// Helper function to check if a node is within a subtree of another node
+func isNodeInSubtree(root *ast.Node, target *ast.Node) bool {
+	if root == target {
+		return true
+	}
+	
+	current := target
+	for current != nil {
+		if current == root {
+			return true
+		}
+		current = current.Parent
+	}
+	return false
 }
 
-// Helper function to determine message ID for unions
-func getNotReturnOrGenericMessageId(node *ast.Node, opts Options) string {
-	if node.Parent != nil && node.Parent.Kind == ast.KindUnionType {
+// Helper function to check if node is in a generic type argument
+func isInGenericTypeArgument(node *ast.Node) bool {
+	current := node
+	for current != nil && current.Parent != nil {
+		parent := current.Parent
+		if parent.Kind == ast.KindTypeReference {
+			typeRef := parent.AsTypeReference()
+			if typeRef.TypeArguments != nil {
+				// Check if the current node is within the type arguments
+				for _, arg := range typeRef.TypeArguments.Nodes {
+					if isNodeInSubtree(arg, node) {
+						return true
+					}
+				}
+			}
+		}
+		current = parent
+	}
+	return false
+}
+
+// Helper function to get the generic type name for allowlist checking
+func getGenericTypeName(ctx rule.RuleContext, node *ast.Node) string {
+	current := node
+	for current != nil && current.Parent != nil {
+		parent := current.Parent
+		if parent.Kind == ast.KindTypeReference {
+			typeRef := parent.AsTypeReference()
+			textRange := utils.TrimNodeTextRange(ctx.SourceFile, typeRef.TypeName)
+			name := string(ctx.SourceFile.Text()[textRange.Pos():textRange.End()])
+			return strings.ReplaceAll(name, " ", "")
+		}
+		current = parent
+	}
+	return ""
+}
+
+// Helper function to determine message ID based on context
+func getInvalidVoidMessageId(node *ast.Node, opts Options) string {
+	// Determine base message based on allowed options first
+	allowInGeneric := false
+	if allowGenericBool, ok := opts.AllowInGenericTypeArguments.(bool); ok {
+		allowInGeneric = allowGenericBool
+	} else if _, ok := opts.AllowInGenericTypeArguments.([]interface{}); ok {
+		allowInGeneric = true
+	}
+
+
+	// Check if we're in a union type (only show union-specific message when generics are allowed)
+	// When allowInGenericTypeArguments is false, we should use the basic invalidVoidNotReturn message instead
+	if node.Parent != nil && node.Parent.Kind == ast.KindUnionType && allowInGeneric {
 		return "invalidVoidUnionConstituent"
 	}
-	return "invalidVoidNotReturnOrGeneric"
+
+	if allowInGeneric && opts.AllowAsThisParameter {
+		return "invalidVoidNotReturnOrThisParamOrGeneric"
+	} else if allowInGeneric {
+		return "invalidVoidNotReturnOrGeneric"
+	} else if opts.AllowAsThisParameter {
+		return "invalidVoidNotReturnOrThisParam"
+	}
+	
+	return "invalidVoidNotReturn"
 }
 
 // Helper function to build messages

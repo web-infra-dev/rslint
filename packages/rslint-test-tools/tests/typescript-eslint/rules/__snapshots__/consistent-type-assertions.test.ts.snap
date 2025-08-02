@@ -6,7 +6,7 @@ exports[`consistent-type-assertions > invalid 1`] = `
     {
       "filePath": "src/virtual.ts",
       "message": "Use '<Foo>' instead of 'as Foo'.",
-      "messageId": "as-assertion",
+      "messageId": "angle-bracket",
       "range": {
         "end": {
           "column": 36,

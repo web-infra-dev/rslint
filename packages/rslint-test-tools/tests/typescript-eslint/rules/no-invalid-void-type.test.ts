@@ -13,7 +13,7 @@ const ruleTester = new RuleTester({
   },
 });
 
-ruleTester.run('allowInGenericTypeArguments: false', {
+ruleTester.run('no-invalid-void-type', {
   valid: [
     {
       code: 'type Generic<T> = [T];',
@@ -106,7 +106,7 @@ function foo(): void | never {
   ],
 });
 
-ruleTester.run('allowInGenericTypeArguments: true', {
+ruleTester.run('no-invalid-void-type', {
   valid: [
     'function func(): void {}',
     'type NormalType = () => void;',
@@ -696,7 +696,7 @@ class SomeClass {
   ],
 });
 
-ruleTester.run('allowInGenericTypeArguments: whitelist', {
+ruleTester.run('no-invalid-void-type', {
   valid: [
     'type Allowed<T> = [T];',
     'type Banned<T> = [T];',
@@ -787,7 +787,7 @@ async function foo(bar: () => void | Promise<void>) {
   ],
 });
 
-ruleTester.run('allowAsThisParameter: true', {
+ruleTester.run('no-invalid-void-type', {
   valid: [
     {
       code: 'function f(this: void) {}',

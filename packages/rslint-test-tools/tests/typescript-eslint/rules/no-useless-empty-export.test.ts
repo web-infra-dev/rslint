@@ -12,6 +12,8 @@ const ruleTester = new RuleTester({
       // @ts-ignore
       ecmaVersion: 2020,
       sourceType: 'module',
+      project: './tsconfig.json',
+      tsconfigRootDir: rootPath,
     },
   },
 });

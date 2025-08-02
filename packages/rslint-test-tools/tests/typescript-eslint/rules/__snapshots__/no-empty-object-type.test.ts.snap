@@ -315,7 +315,7 @@ exports[`no-empty-object-type > invalid 12`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
+      "filePath": "test.d.ts",
       "message": "An interface declaring no members is equivalent to its supertype.",
       "messageId": "noEmptyInterfaceWithSuper",
       "range": {
