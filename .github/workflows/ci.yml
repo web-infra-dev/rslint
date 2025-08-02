@@ -70,7 +70,8 @@ jobs:
         run: pnpm typecheck
       - name: Install xvfb
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb && sudo apt-get install libatk1.0-0
+
       - name: Test on Linux
         if: runner.os == 'Linux'
         run: xvfb-run -a pnpm -r test
