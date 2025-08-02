@@ -306,24 +306,11 @@ func checkTypeLiteral(ctx rule.RuleContext, node *ast.Node) {
 		// Only block if this type literal would create the circular reference at the top level
 
 		if parentName != "" {
-			// Only block conversion if this type literal is the direct type of the type alias
-			// and contains a self-reference that would create a circular dependency
-			if node.Parent != nil && node.Parent.Kind == ast.KindTypeAliasDeclaration {
-				// This is the direct type of a type alias
-				// Check if converting this would make it reference itself directly
-				// e.g., type Foo = { [key: string]: Foo } should NOT be converted
-				//       but type Foo = { [key: string]: { [key: string]: Foo } } the inner one SHOULD be converted
-				if valueType != nil && isDirectSelfReference(valueType, parentName) {
-					return // Direct self-reference at top level - don't convert
-				}
-			}
-			// For nested type literals, allow conversion even if they reference the parent type
-
-			// Check if this type alias is part of a circular chain (but skip for nested cases)
-			if node.Parent != nil && node.Parent.Kind == ast.KindTypeAliasDeclaration {
-				if isPartOfUnifiedCircularChain(ctx, parentName) {
-					return // Part of a circular chain - don't convert
-				}
+			// Check if this type literal creates a circular dependency when converted to Record
+			// Following TypeScript-ESLint logic: check if converting THIS type literal would
+			// result in a circular Record type that can't be expressed
+			if wouldCreateCircularRecord(node, parentName) {
+				return // Would create circular dependency - don't convert
 			}
 		}
 	}
@@ -1151,3 +1138,52 @@ func containsTypeReferenceInTypeAliasWithVisited(sourceNode *ast.Node, typeAlias
 	sourceFile.ForEachChild(checkNode)
 	return found
 }
+
+// wouldCreateCircularRecord checks if converting this type literal to Record would create
+// a circular reference that can't be expressed in TypeScript Record types
+func wouldCreateCircularRecord(typeLiteral *ast.Node, parentTypeName string) bool {
+	if typeLiteral == nil || typeLiteral.Kind != ast.KindTypeLiteral {
+		return false
+	}
+
+	// Get the parent type alias declaration
+	parentDecl := findParentDeclaration(typeLiteral)
+	if parentDecl == nil {
+		return false
+	}
+
+	// Check if this type literal is directly part of the parent type alias
+	// (not nested within other type literals)
+	current := typeLiteral.Parent
+	isDirectChild := false
+	
+	for current != nil {
+		if current == parentDecl {
+			isDirectChild = true
+			break
+		}
+		// If we encounter another type literal, we're nested
+		if current.Kind == ast.KindTypeLiteral && current != typeLiteral {
+			break
+		}
+		// Allow transparent types (union, intersection, parentheses)
+		if current.Kind != ast.KindUnionType && 
+		   current.Kind != ast.KindIntersectionType && 
+		   current.Kind != ast.KindParenthesizedType {
+			// Some other type - if it's not the type alias, we're nested
+			if current.Kind != ast.KindTypeAliasDeclaration {
+				break
+			}
+		}
+		current = current.Parent
+	}
+
+	// Only apply circular check for direct children of the type alias
+	if !isDirectChild {
+		return false
+	}
+
+	// Check if this type literal deeply references the parent type
+	return isDeeplyReferencingType(typeLiteral, parentTypeName, make(map[*ast.Node]bool))
+}
+
