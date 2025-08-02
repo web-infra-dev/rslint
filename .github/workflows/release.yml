@@ -233,14 +233,8 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Go Build packages
-        if: matrix.node_os != 'win32'
         run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint ./cmd/rslint
-
-      - name: Go Build Packages (windows)
-        if: matrix.node_os == 'win32'
-        run: |
-          $env:GOOS="${{ matrix.goos }}"; $env:GOARCH="${{ matrix.goarch }}"; go build -o ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint ./cmd/rslint
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
