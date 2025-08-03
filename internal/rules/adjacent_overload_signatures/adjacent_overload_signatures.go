@@ -8,13 +8,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func buildAdjacentSignatureMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "adjacentSignature",
-		Description: "All {{name}} signatures should be adjacent.",
-	}
-}
-
 type Method struct {
 	CallSignature bool
 	Name          string
@@ -96,25 +89,6 @@ func getMemberMethod(ctx rule.RuleContext, member *ast.Node) *Method {
 	return nil
 }
 
-func hasStaticModifier(modifiers []ast.ModifierLike) bool {
-	for i := range modifiers {
-		if modifiers[i].Kind == ast.KindStaticKeyword {
-			return true
-		}
-	}
-	return false
-}
-
-func isSameMethod(method1 *Method, method2 *Method) bool {
-	if method2 == nil {
-		return false
-	}
-	return method1.Name == method2.Name &&
-		method1.Static == method2.Static &&
-		method1.CallSignature == method2.CallSignature &&
-		method1.NameType == method2.NameType
-}
-
 func getMembers(node *ast.Node) []*ast.Node {
 	switch node.Kind {
 	case ast.KindClassDeclaration:
@@ -186,7 +160,7 @@ var AdjacentOverloadSignaturesRule = rule.Rule{
 	Name: "adjacent-overload-signatures",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		// Check the source file at the beginning
-		checkBodyForOverloadMethods(ctx, &ctx.SourceFile.NodeBase.Node)
+		checkBodyForOverloadMethods(ctx, &ctx.SourceFile.Node)
 
 		return rule.RuleListeners{
 			ast.KindBlock: func(node *ast.Node) {

@@ -45,17 +45,11 @@ func isSimpleType(node *ast.Node) bool {
 					return isSimpleType(typeRef.TypeArguments.Nodes[0])
 				}
 			} else {
-				if typeRef.TypeArguments != nil {
-					return false
-				}
-				return true
+				return typeRef.TypeArguments == nil
 			}
 		} else if ast.IsQualifiedName(typeRef.TypeName) {
 			// TypeReference with a QualifiedName (e.g., fooName.BarType) is simple if it has no type arguments
-			if typeRef.TypeArguments != nil {
-				return false
-			}
-			return true
+			return typeRef.TypeArguments == nil
 		}
 		return false
 	default:
@@ -175,7 +169,7 @@ var ArrayTypeRule = rule.Rule{
 		getMessageType := func(node *ast.Node) string {
 			if isSimpleType(node) {
 				nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
-				return string(ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()])
+				return ctx.SourceFile.Text()[nodeRange.Pos():nodeRange.End()]
 			}
 			return "T"
 		}
@@ -227,14 +221,14 @@ var ArrayTypeRule = rule.Rule{
 
 				// Get the exact text of the element type to preserve formatting
 				elementTypeRange := utils.TrimNodeTextRange(ctx.SourceFile, arrayType.ElementType)
-				elementTypeText := string(ctx.SourceFile.Text()[elementTypeRange.Pos():elementTypeRange.End()])
+				elementTypeText := ctx.SourceFile.Text()[elementTypeRange.Pos():elementTypeRange.End()]
 
 				// When converting T[] -> Array<T>, remove unnecessary parentheses
 				if ast.IsParenthesizedTypeNode(arrayType.ElementType) {
 					// For parenthesized types, get the inner type to avoid double parentheses
 					innerType := arrayType.ElementType.AsParenthesizedTypeNode().Type
 					innerTypeRange := utils.TrimNodeTextRange(ctx.SourceFile, innerType)
-					elementTypeText = string(ctx.SourceFile.Text()[innerTypeRange.Pos():innerTypeRange.End()])
+					elementTypeText = ctx.SourceFile.Text()[innerTypeRange.Pos():innerTypeRange.End()]
 				}
 
 				newText := fmt.Sprintf("%s<%s>", className, elementTypeText)
@@ -252,7 +246,7 @@ var ArrayTypeRule = rule.Rule{
 				identifier := typeRef.TypeName.AsIdentifier()
 				typeName := identifier.Text
 
-				if !(typeName == "Array" || typeName == "ReadonlyArray" || typeName == "Readonly") {
+				if typeName != "Array" && typeName != "ReadonlyArray" && typeName != "Readonly" {
 					return
 				}
 
@@ -289,13 +283,14 @@ var ArrayTypeRule = rule.Rule{
 
 				typeParams := typeRef.TypeArguments
 				var messageId string
-				if currentOption == "array" {
+				switch currentOption {
+				case "array":
 					if isReadonlyWithGenericArrayType {
 						messageId = "errorStringArrayReadonly"
 					} else {
 						messageId = "errorStringArray"
 					}
-				} else if currentOption == "array-simple" {
+				case "array-simple":
 					// For array-simple mode, determine if we have type parameters to check
 					// 'any' (no type params) is considered simple
 					isSimple := typeParams == nil || len(typeParams.Nodes) == 0 ||
@@ -333,7 +328,7 @@ var ArrayTypeRule = rule.Rule{
 					}
 
 					ctx.ReportNodeWithFixes(node, message,
-						rule.RuleFixReplace(ctx.SourceFile, node, fmt.Sprintf("%sany[]", readonlyPrefix)))
+						rule.RuleFixReplace(ctx.SourceFile, node, readonlyPrefix+"any[]"))
 					return
 				}
 
@@ -398,7 +393,7 @@ var ArrayTypeRule = rule.Rule{
 
 				// Get the exact text of the type parameter to preserve formatting
 				typeParamRange := utils.TrimNodeTextRange(ctx.SourceFile, typeParam)
-				typeParamText := string(ctx.SourceFile.Text()[typeParamRange.Pos():typeParamRange.End()])
+				typeParamText := ctx.SourceFile.Text()[typeParamRange.Pos():typeParamRange.End()]
 
 				// When converting from array-simple mode, we're converting T[] -> Array<T>
 				// In this case, if T is a parenthesized type, we should remove the parentheses
@@ -406,7 +401,7 @@ var ArrayTypeRule = rule.Rule{
 					// For parenthesized types, get the inner type to avoid double parentheses
 					innerType := typeParam.AsParenthesizedTypeNode().Type
 					innerTypeRange := utils.TrimNodeTextRange(ctx.SourceFile, innerType)
-					typeParamText = string(ctx.SourceFile.Text()[innerTypeRange.Pos():innerTypeRange.End()])
+					typeParamText = ctx.SourceFile.Text()[innerTypeRange.Pos():innerTypeRange.End()]
 				}
 
 				ctx.ReportNodeWithFixes(node, message,

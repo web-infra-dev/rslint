@@ -172,24 +172,6 @@ func isStaticMemberAccessOfValue(ctx rule.RuleContext, node *ast.Node, name stri
 	return getStaticMemberAccessValue(ctx, node) == name
 }
 
-func isAssignee(node *ast.Node) bool {
-	if node == nil || node.Parent == nil {
-		return false
-	}
-
-	parent := node.Parent
-
-	// Check if this is the left side of an assignment
-	if ast.IsBinaryExpression(parent) {
-		binary := parent.AsBinaryExpression()
-		if binary.OperatorToken.Kind == ast.KindEqualsToken {
-			return binary.Left == node
-		}
-	}
-
-	return false
-}
-
 func isFunction(node *ast.Node) bool {
 	if node == nil {
 		return false
@@ -270,11 +252,9 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 				// Check if there's a corresponding setter
 				if name != "" && node.Parent != nil {
 					members := node.Parent.Members()
-					if members != nil {
-						for _, member := range members {
-							if ast.IsSetAccessorDeclaration(member) && isStaticMemberAccessOfValue(ctx, member, name) {
-								return // Skip if there's a setter with the same name
-							}
+					for _, member := range members {
+						if ast.IsSetAccessorDeclaration(member) && isStaticMemberAccessOfValue(ctx, member, name) {
+							return // Skip if there's a setter with the same name
 						}
 					}
 				}
@@ -285,13 +265,13 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 				var nameText string
 				if nameNode.Kind == ast.KindComputedPropertyName {
 					// For computed properties, get the full text including brackets
-					nameText = strings.TrimSpace(string(ctx.SourceFile.Text()[nameNode.Pos():nameNode.End()]))
+					nameText = strings.TrimSpace(ctx.SourceFile.Text()[nameNode.Pos():nameNode.End()])
 				} else {
 					// For regular identifiers, just get the text
 					nameText = nameNode.Text()
 				}
 
-				valueText := strings.TrimSpace(string(ctx.SourceFile.Text()[returnStmt.Expression.Pos():returnStmt.Expression.End()]))
+				valueText := strings.TrimSpace(ctx.SourceFile.Text()[returnStmt.Expression.Pos():returnStmt.Expression.End()])
 
 				var fixText string
 				fixText += printNodeModifiers(node, "readonly")
@@ -350,7 +330,7 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 					var nameText string
 					if nameNode.Kind == ast.KindComputedPropertyName {
 						// For computed properties, get the full text including brackets
-						nameText = strings.TrimSpace(string(ctx.SourceFile.Text()[nameNode.Pos():nameNode.End()]))
+						nameText = strings.TrimSpace(ctx.SourceFile.Text()[nameNode.Pos():nameNode.End()])
 					} else {
 						// For regular identifiers, just get the text
 						nameText = nameNode.Text()
