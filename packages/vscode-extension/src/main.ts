@@ -1,5 +1,5 @@
 import { ExtensionContext } from 'vscode';
-import { Extension } from './Extension';
+import { Extension } from './extension';
 
 let extension: Extension;
 

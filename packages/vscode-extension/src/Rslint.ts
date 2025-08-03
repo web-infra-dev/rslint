@@ -15,7 +15,7 @@ import {
   Trace,
 } from 'vscode-languageclient/node';
 import { Logger } from './logger';
-import type { Extension } from './Extension';
+import type { Extension } from './extension';
 import { fileExists, PLATFORM_BIN_REQUEST, RslintBinPath } from './utils';
 import { dirname } from 'node:path';
 

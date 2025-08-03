@@ -45,13 +45,16 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache-name: test-go
       - name: golangci-lint
+        if: ${{ runner.os == 'Linux' && runner.environment == 'self-hosted' }}
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.3.0
           args: --timeout=5m ./cmd/... ./internal/...
       - name: go vet
+        if: ${{ runner.os == 'Linux' && runner.environment == 'self-hosted' }}
         run: npm run lint:go
       - name: go fmt
+        if: ${{ runner.os == 'Linux' && runner.environment == 'self-hosted' }}
         run: npm run format:go
       - name: Unit Test
         run: |
