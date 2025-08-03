@@ -65,36 +65,16 @@ export class RSLintService {
   constructor(options: RSlintOptions = {}) {
     this.nextMessageId = 1;
     this.pendingMessages = new Map();
-    // Use the wrapper script which handles platform-specific binaries
-    const wrapperPath = path.join(import.meta.dirname, '../bin/rslint.cjs');
-    const directBinaryPath = path.join(import.meta.dirname, '../bin/rslint');
+    this.rslintPath =
+      options.rslintPath || path.join(import.meta.dirname, '../bin/rslint');
 
-    // Check if we should use the wrapper or direct binary
-    const useWrapper = options.rslintPath
-      ? false
-      : require('fs').existsSync(wrapperPath);
-
-    if (useWrapper) {
-      // Use node to run the wrapper script
-      this.rslintPath = wrapperPath;
-      this.process = spawn('node', [this.rslintPath, '--api'], {
-        stdio: ['pipe', 'pipe', 'inherit'],
-        cwd: options.workingDirectory || process.cwd(),
-        env: {
-          ...process.env,
-        },
-      });
-    } else {
-      // Use direct binary
-      this.rslintPath = options.rslintPath || directBinaryPath;
-      this.process = spawn(this.rslintPath, ['--api'], {
-        stdio: ['pipe', 'pipe', 'inherit'],
-        cwd: options.workingDirectory || process.cwd(),
-        env: {
-          ...process.env,
-        },
-      });
-    }
+    this.process = spawn(this.rslintPath, ['--api'], {
+      stdio: ['pipe', 'pipe', 'inherit'],
+      cwd: options.workingDirectory || process.cwd(),
+      env: {
+        ...process.env,
+      },
+    });
 
     // Set up binary message reading
     this.process.stdout!.on('data', data => {
