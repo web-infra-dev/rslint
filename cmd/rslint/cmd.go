@@ -449,9 +449,10 @@ func runCMD() int {
 		w := bufio.NewWriterSize(os.Stdout, 4096*100)
 		defer w.Flush()
 		for d := range diagnosticsChan {
-			if d.Severity == rule.SeverityError {
+			switch d.Severity {
+			case rule.SeverityError:
 				errorsCount++
-			} else if d.Severity == rule.SeverityWarning {
+			case rule.SeverityWarning:
 				warningsCount++
 			}
 
@@ -509,7 +510,7 @@ func runCMD() int {
 
 			if len(diagnosticsWithFixes) > 0 {
 				// Read the original file content
-				originalContent := string(diagnosticsWithFixes[0].SourceFile.Text())
+				originalContent := diagnosticsWithFixes[0].SourceFile.Text()
 
 				// Apply fixes
 				fixedContent, unapplied, wasFixed := linter.ApplyRuleFixes(originalContent, diagnosticsWithFixes)
@@ -600,10 +601,7 @@ func runCMD() int {
 		}
 	}
 
-	tooManyWarnings := false
-	if maxWarnings >= 0 && warningsCount > maxWarnings {
-		tooManyWarnings = true
-	}
+	tooManyWarnings := maxWarnings >= 0 && warningsCount > maxWarnings
 
 	if errorsCount == 0 && tooManyWarnings {
 		fmt.Fprintf(os.Stderr, "Rslint found too many warnings (maximum: %d).\n", maxWarnings)

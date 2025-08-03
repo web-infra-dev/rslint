@@ -1,0 +1,39 @@
+version: '2'
+linters:
+  enable:
+    - govet # Go vet examiner
+    - ineffassign # Detect ineffectual assignments
+
+    - unused # Check for unused constants, variables, functions and types
+    - misspell # Finds commonly misspelled English words
+    - unconvert # Remove unnecessary type conversions
+
+  disable:
+    - errcheck # Check for unchecked errors
+    - gosec # Inspects source code for security problems
+    - staticcheck # It's a set of rules from staticcheck
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  new: false
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
