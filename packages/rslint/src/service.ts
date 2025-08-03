@@ -83,10 +83,8 @@ export class RSLintService {
         // This resolves to the CJS wrapper
         const binPath = require.resolve('@rslint/core/bin');
         this.rslintPath = binPath; // Set for reference
-        // Use the CJS wrapper via node, like CLI tests do
-        // Use 'node' command directly for CI compatibility
-        const nodeExe = 'node';
-        this.process = spawn(nodeExe, [binPath, '--api'], {
+        // Spawn the CJS wrapper directly like CLI tests do
+        this.process = spawn(binPath, ['--api'], {
           stdio: ['pipe', 'pipe', 'inherit'],
           cwd: options.workingDirectory || process.cwd(),
           env: {
