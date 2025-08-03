@@ -1,5 +1,6 @@
 import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
+import fs from 'fs';
 
 /**
  * Types for rslint IPC protocol
@@ -65,10 +66,17 @@ export class RSLintService {
   constructor(options: RSlintOptions = {}) {
     this.nextMessageId = 1;
     this.pendingMessages = new Map();
-    this.rslintPath =
-      options.rslintPath || path.join(import.meta.dirname, '../bin/rslint');
 
-    this.process = spawn(this.rslintPath, ['--api'], {
+    // Resolve the binary path
+    if (options.rslintPath) {
+      this.rslintPath = options.rslintPath;
+    } else {
+      // Use the CJS wrapper instead of the binary directly
+      // This allows the wrapper to handle platform-specific binary resolution
+      this.rslintPath = path.join(import.meta.dirname, '../bin/rslint.cjs');
+    }
+
+    this.process = spawn('node', [this.rslintPath, '--api'], {
       stdio: ['pipe', 'pipe', 'inherit'],
       cwd: options.workingDirectory || process.cwd(),
       env: {
@@ -86,7 +94,7 @@ export class RSLintService {
 
     // Handle process errors
     this.process.on('error', err => {
-      console.error('RSLint process error:', err);
+      console.error('Failed to spawn RSLint process:', err);
       this.rejectAllPending(err);
     });
 
