@@ -8,7 +8,9 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules/adjacent_overload_signatures"
+	"github.com/web-infra-dev/rslint/internal/rules/array_type"
 	"github.com/web-infra-dev/rslint/internal/rules/await_thenable"
+	"github.com/web-infra-dev/rslint/internal/rules/class_literal_property_style"
 	"github.com/web-infra-dev/rslint/internal/rules/no_array_delete"
 	"github.com/web-infra-dev/rslint/internal/rules/no_base_to_string"
 	"github.com/web-infra-dev/rslint/internal/rules/no_confusing_void_expression"
@@ -81,6 +83,9 @@ type Rules map[string]interface{}
 // Alternative: If you want type-safe rule configurations
 type TypedRules struct {
 	// Example rule configurations - extend as needed
+	AdjacentOverloadSignatures         *RuleConfig `json:"@typescript-eslint/adjacent-overload-signatures,omitempty"`
+	ArrayType                          *RuleConfig `json:"@typescript-eslint/array-type,omitempty"`
+	ClassLiteralPropertyStyle          *RuleConfig `json:"@typescript-eslint/class-literal-property-style,omitempty"`
 	NoArrayDelete                      *RuleConfig `json:"@typescript-eslint/no-array-delete,omitempty"`
 	NoBaseToString                     *RuleConfig `json:"@typescript-eslint/no-base-to-string,omitempty"`
 	NoForInArray                       *RuleConfig `json:"@typescript-eslint/no-for-in-array,omitempty"`
@@ -256,7 +261,9 @@ func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConf
 // RegisterAllTypeSriptEslintPluginRules registers all available rules in the global registry
 func RegisterAllTypeSriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/adjacent-overload-signatures", adjacent_overload_signatures.AdjacentOverloadSignaturesRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/array-type", array_type.ArrayTypeRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/await-thenable", await_thenable.AwaitThenableRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/class-literal-property-style", class_literal_property_style.ClassLiteralPropertyStyleRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-array-delete", no_array_delete.NoArrayDeleteRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-base-to-string", no_base_to_string.NoBaseToStringRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-confusing-void-expression", no_confusing_void_expression.NoConfusingVoidExpressionRule)

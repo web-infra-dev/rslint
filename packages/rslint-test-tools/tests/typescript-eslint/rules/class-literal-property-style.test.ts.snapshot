@@ -1,0 +1,8 @@
+exports[`class-literal-property-style > invalid 1`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
