@@ -77,37 +77,31 @@ export class RSLintService {
     if (options.rslintPath) {
       this.rslintPath = options.rslintPath;
     } else {
-      // Try direct binary first
-      const directBinaryPath = path.join(import.meta.dirname, '../bin/rslint');
-      if (fs.existsSync(directBinaryPath)) {
-        this.rslintPath = directBinaryPath;
-      } else {
-        // If direct binary doesn't exist, try CJS wrapper approach
-        try {
-          const require = createRequire(import.meta.url);
-          // This resolves to the CJS wrapper
-          const binPath = require.resolve('@rslint/core/bin');
-          this.rslintPath = binPath; // Set for reference
-          // Use the CJS wrapper via node, like CLI tests do
-          // Try process.execPath first (current node), fallback to 'node' in PATH
-          const nodeExe =
-            process.execPath && fs.existsSync(process.execPath)
-              ? process.execPath
-              : 'node';
-          this.process = spawn(nodeExe, [binPath, '--api'], {
-            stdio: ['pipe', 'pipe', 'inherit'],
-            cwd: options.workingDirectory || process.cwd(),
-            env: {
-              ...process.env,
-            },
-          });
-          // Skip the normal spawn path
-          this.setupProcessHandlers();
-          return;
-        } catch (error) {
-          // Fall back to direct binary path even if it doesn't exist
-          this.rslintPath = directBinaryPath;
-        }
+      // Always use CJS wrapper approach (like CLI tests) for maximum compatibility
+      try {
+        const require = createRequire(import.meta.url);
+        // This resolves to the CJS wrapper
+        const binPath = require.resolve('@rslint/core/bin');
+        this.rslintPath = binPath; // Set for reference
+        // Use the CJS wrapper via node, like CLI tests do
+        // Try process.execPath first (current node), fallback to 'node' in PATH
+        const nodeExe =
+          process.execPath && fs.existsSync(process.execPath)
+            ? process.execPath
+            : 'node';
+        this.process = spawn(nodeExe, [binPath, '--api'], {
+          stdio: ['pipe', 'pipe', 'inherit'],
+          cwd: options.workingDirectory || process.cwd(),
+          env: {
+            ...process.env,
+          },
+        });
+        // Skip the normal spawn path
+        this.setupProcessHandlers();
+        return;
+      } catch (error) {
+        // Fall back to direct binary path if CJS resolution fails
+        this.rslintPath = path.join(import.meta.dirname, '../bin/rslint');
       }
     }
 
