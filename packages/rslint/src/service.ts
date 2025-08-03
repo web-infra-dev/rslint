@@ -65,54 +65,36 @@ export class RSLintService {
   constructor(options: RSlintOptions = {}) {
     this.nextMessageId = 1;
     this.pendingMessages = new Map();
-    this.rslintPath =
-      options.rslintPath || path.join(import.meta.dirname, '../bin/rslint');
+    // Use the wrapper script which handles platform-specific binaries
+    const wrapperPath = path.join(import.meta.dirname, '../bin/rslint.cjs');
+    const directBinaryPath = path.join(import.meta.dirname, '../bin/rslint');
 
-    // Debug: Log the binary path and check if it exists
-    console.error('RSLint binary path:', this.rslintPath);
-    console.error('import.meta.dirname:', import.meta.dirname);
-    console.error('Binary exists:', require('fs').existsSync(this.rslintPath));
-    if (require('fs').existsSync(this.rslintPath)) {
-      const stats = require('fs').statSync(this.rslintPath);
-      console.error('Binary stats:', {
-        size: stats.size,
-        mode: stats.mode.toString(8),
-        isFile: stats.isFile(),
-        isExecutable: (stats.mode & 0o111) !== 0,
+    // Check if we should use the wrapper or direct binary
+    const useWrapper = options.rslintPath
+      ? false
+      : require('fs').existsSync(wrapperPath);
+
+    if (useWrapper) {
+      // Use node to run the wrapper script
+      this.rslintPath = wrapperPath;
+      this.process = spawn('node', [this.rslintPath, '--api'], {
+        stdio: ['pipe', 'pipe', 'inherit'],
+        cwd: options.workingDirectory || process.cwd(),
+        env: {
+          ...process.env,
+        },
       });
-      // Try to check file type
-      try {
-        const { execSync } = require('child_process');
-        const fileType = execSync(`file "${this.rslintPath}"`)
-          .toString()
-          .trim();
-        console.error('File type:', fileType);
-      } catch (e) {
-        console.error('Failed to get file type');
-      }
     } else {
-      // Try to list what's in the directory
-      const binDir = path.join(import.meta.dirname, '../bin');
-      console.error('Bin directory:', binDir);
-      try {
-        console.error(
-          'Bin directory contents:',
-          require('fs').readdirSync(binDir),
-        );
-      } catch (e: any) {
-        console.error('Failed to read bin directory:', e.message);
-      }
+      // Use direct binary
+      this.rslintPath = options.rslintPath || directBinaryPath;
+      this.process = spawn(this.rslintPath, ['--api'], {
+        stdio: ['pipe', 'pipe', 'inherit'],
+        cwd: options.workingDirectory || process.cwd(),
+        env: {
+          ...process.env,
+        },
+      });
     }
-
-    // Try spawning with shell to see if that helps with ENOENT
-    this.process = spawn(this.rslintPath, ['--api'], {
-      stdio: ['pipe', 'pipe', 'inherit'],
-      cwd: options.workingDirectory || process.cwd(),
-      shell: true,
-      env: {
-        ...process.env,
-      },
-    });
 
     // Set up binary message reading
     this.process.stdout!.on('data', data => {
