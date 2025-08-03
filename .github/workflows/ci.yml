@@ -6,6 +6,11 @@ on:
   pull_request:
     types: [opened, synchronize]
   workflow_dispatch:
+permissions:
+  # Required: allow read access to the content for analysis.
+  contents: read
+  # Optional: allow read access to pull requests. Use with `only-new-issues` option.
+  pull-requests: read
 
 env:
   GO_VERSION: '1.24.1'
