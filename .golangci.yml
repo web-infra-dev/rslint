@@ -56,10 +56,10 @@ linters:
     # - gocritic
     # - gosec
     # - revive
-    # - staticcheck
+    - staticcheck
     # - testifylint
     # - unparam
-    # - unused
+    - unused
 
   settings:
     depguard:

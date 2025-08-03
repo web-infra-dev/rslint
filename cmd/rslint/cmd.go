@@ -141,8 +141,8 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 			Error string `json:"error"`
 		}
 		errorObject := ErrorObject{Error: fmt.Sprintf("Failed to marshal diagnostic: %s", err)}
-		
-		errorBytes,_ := json.Marshal(errorObject) //nolint:errchkjson
+
+		errorBytes, _ := json.Marshal(errorObject) //nolint:errchkjson
 		w.Write(errorBytes)
 		w.WriteByte('\n')
 		return
