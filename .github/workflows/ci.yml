@@ -72,7 +72,7 @@ jobs:
         run: pnpm format:check
 
       - name: Build
-        run: GOOS=linux GOARCH=amd64 pnpm build
+        run: pnpm build
 
       - name: TypeCheck
         run: pnpm typecheck
