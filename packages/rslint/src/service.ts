@@ -1,6 +1,5 @@
 import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
-import fs from 'fs';
 
 /**
  * Types for rslint IPC protocol
@@ -17,8 +16,8 @@ interface Range {
 
 export interface Diagnostic {
   ruleName: string;
-  messageId: string;
   message: string;
+  messageId: string;
   filePath: string;
   range: Range;
   severity?: string;
@@ -37,7 +36,7 @@ export interface LintOptions {
   files?: string[];
   config?: string; // Path to rslint.json config file
   workingDirectory?: string;
-  ruleOptions?: Record<string, any>;
+  ruleOptions?: Record<string, string>;
   fileContents?: Record<string, string>; // Map of file paths to their contents for VFS
 }
 
@@ -66,17 +65,10 @@ export class RSLintService {
   constructor(options: RSlintOptions = {}) {
     this.nextMessageId = 1;
     this.pendingMessages = new Map();
+    this.rslintPath =
+      options.rslintPath || path.join(import.meta.dirname, '../bin/rslint');
 
-    // Resolve the binary path
-    if (options.rslintPath) {
-      this.rslintPath = options.rslintPath;
-    } else {
-      // Use the CJS wrapper instead of the binary directly
-      // This allows the wrapper to handle platform-specific binary resolution
-      this.rslintPath = path.join(import.meta.dirname, '../bin/rslint.cjs');
-    }
-
-    this.process = spawn('node', [this.rslintPath, '--api'], {
+    this.process = spawn(this.rslintPath, ['--api'], {
       stdio: ['pipe', 'pipe', 'inherit'],
       cwd: options.workingDirectory || process.cwd(),
       env: {
@@ -91,27 +83,6 @@ export class RSLintService {
     this.chunks = [];
     this.chunkSize = 0;
     this.expectedSize = null;
-
-    // Handle process errors
-    this.process.on('error', err => {
-      console.error('Failed to spawn RSLint process:', err);
-      this.rejectAllPending(err);
-    });
-
-    this.process.on('exit', (code, signal) => {
-      const err = new Error(
-        `RSLint process exited with code ${code}, signal ${signal}`,
-      );
-      if (code !== 0) {
-        console.error(err.message);
-      }
-      this.rejectAllPending(err);
-    });
-
-    // Handle stdout/stderr close events
-    this.process.stdout!.on('close', () => {
-      this.rejectAllPending(new Error('RSLint process stdout closed'));
-    });
   }
 
   /**
@@ -119,52 +90,21 @@ export class RSLintService {
    */
   private async sendMessage(kind: string, data: any): Promise<any> {
     return new Promise((resolve, reject) => {
-      // Check if process is still alive
-      if (this.process.killed || this.process.exitCode !== null) {
-        reject(new Error('RSLint process is not running'));
-        return;
-      }
-
       const id = this.nextMessageId++;
       const message = { id, kind, data };
 
-      // Register promise callbacks with timeout
-      const timeoutId = setTimeout(() => {
-        this.pendingMessages.delete(id);
-        reject(new Error(`Message ${id} (${kind}) timed out after 30 seconds`));
-      }, 30000); // 30 second timeout
+      // Register promise callbacks
+      this.pendingMessages.set(id, { resolve, reject });
 
-      this.pendingMessages.set(id, {
-        resolve: result => {
-          clearTimeout(timeoutId);
-          resolve(result);
-        },
-        reject: error => {
-          clearTimeout(timeoutId);
-          reject(error);
-        },
-      });
+      // Write message length as 4 bytes in little endian
+      const json = JSON.stringify(message);
+      const length = Buffer.alloc(4);
+      length.writeUInt32LE(json.length, 0);
 
-      try {
-        // Write message length as 4 bytes in little endian
-        const json = JSON.stringify(message);
-        const jsonBuffer = Buffer.from(json, 'utf8');
-        const length = Buffer.alloc(4);
-        length.writeUInt32LE(jsonBuffer.length, 0); // Use byte length, not string length
-
-        // Send message
-        const success = this.process.stdin!.write(
-          Buffer.concat([length, jsonBuffer]),
-        );
-
-        if (!success) {
-          console.warn('Write buffer is full, may cause backpressure');
-        }
-      } catch (error) {
-        clearTimeout(timeoutId);
-        this.pendingMessages.delete(id);
-        reject(error);
-      }
+      // Send message
+      this.process.stdin!.write(
+        Buffer.concat([length, Buffer.from(json, 'utf8')]),
+      );
     });
   }
 
@@ -234,16 +174,6 @@ export class RSLintService {
   }
 
   /**
-   * Reject all pending messages
-   */
-  private rejectAllPending(error: Error): void {
-    for (const pending of this.pendingMessages.values()) {
-      pending.reject(error);
-    }
-    this.pendingMessages.clear();
-  }
-
-  /**
    * Run the linter on specified files
    */
   async lint(options: LintOptions = {}): Promise<LintResponse> {
@@ -268,60 +198,10 @@ export class RSLintService {
    */
   async close(): Promise<void> {
     return new Promise(resolve => {
-      // Set a timeout to force cleanup if the process doesn't respond
-      const timeout = setTimeout(() => {
-        console.warn(
-          'RSLint process did not respond to exit message, forcing cleanup',
-        );
-        this.forceCleanup();
+      this.sendMessage('exit', {}).finally(() => {
+        this.process.stdin!.end();
         resolve();
-      }, 5000); // 5 second timeout
-
-      this.sendMessage('exit', {})
-        .then(() => {
-          clearTimeout(timeout);
-          this.forceCleanup();
-          resolve();
-        })
-        .catch(() => {
-          clearTimeout(timeout);
-          this.forceCleanup();
-          resolve();
-        });
+      });
     });
-  }
-
-  /**
-   * Force cleanup of the process and resources
-   */
-  private forceCleanup(): void {
-    try {
-      // Reject all pending messages
-      this.rejectAllPending(new Error('Service shutting down'));
-
-      // Close stdin if it's still open
-      if (this.process.stdin && !this.process.stdin.destroyed) {
-        this.process.stdin.end();
-      }
-
-      // Kill the process if it's still running
-      if (!this.process.killed) {
-        this.process.kill('SIGTERM');
-
-        // Force kill after a short delay if SIGTERM doesn't work
-        setTimeout(() => {
-          if (!this.process.killed) {
-            this.process.kill('SIGKILL');
-          }
-        }, 1000);
-      }
-
-      // Clean up buffers
-      this.chunks = [];
-      this.chunkSize = 0;
-      this.expectedSize = null;
-    } catch (error) {
-      console.error('Error during force cleanup:', error);
-    }
   }
 }
