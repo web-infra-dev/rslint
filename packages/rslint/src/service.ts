@@ -1,5 +1,6 @@
 import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
+import { createRequire } from 'module';
 
 /**
  * Types for rslint IPC protocol
@@ -65,8 +66,38 @@ export class RSLintService {
   constructor(options: RSlintOptions = {}) {
     this.nextMessageId = 1;
     this.pendingMessages = new Map();
-    this.rslintPath =
-      options.rslintPath || path.join(import.meta.dirname, '../bin/rslint');
+
+    // Initialize these to satisfy TypeScript - they'll be properly set in setupProcessHandlers
+    this.chunks = [];
+    this.chunkSize = 0;
+    this.expectedSize = null;
+    this.rslintPath = ''; // Will be set below
+
+    if (options.rslintPath) {
+      this.rslintPath = options.rslintPath;
+    } else {
+      // Use the same resolution strategy as CLI tests
+      try {
+        const require = createRequire(import.meta.url);
+        // This resolves to the CJS wrapper
+        const binPath = require.resolve('@rslint/core/bin');
+        this.rslintPath = binPath; // Set for reference
+        // Use the CJS wrapper via node, like CLI tests do
+        this.process = spawn(process.execPath, [binPath, '--api'], {
+          stdio: ['pipe', 'pipe', 'inherit'],
+          cwd: options.workingDirectory || process.cwd(),
+          env: {
+            ...process.env,
+          },
+        });
+        // Skip the normal spawn path
+        this.setupProcessHandlers();
+        return;
+      } catch (error) {
+        // Fall back to direct binary path if resolution fails
+        this.rslintPath = path.join(import.meta.dirname, '../bin/rslint');
+      }
+    }
 
     this.process = spawn(this.rslintPath, ['--api'], {
       stdio: ['pipe', 'pipe', 'inherit'],
@@ -76,13 +107,19 @@ export class RSLintService {
       },
     });
 
+    this.setupProcessHandlers();
+  }
+
+  private setupProcessHandlers(): void {
+    // Initialize chunk processing state
+    this.chunks = [];
+    this.chunkSize = 0;
+    this.expectedSize = null;
+
     // Set up binary message reading
     this.process.stdout!.on('data', data => {
       this.handleChunk(data);
     });
-    this.chunks = [];
-    this.chunkSize = 0;
-    this.expectedSize = null;
   }
 
   /**
