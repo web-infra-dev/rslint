@@ -68,6 +68,24 @@ export class RSLintService {
     this.rslintPath =
       options.rslintPath || path.join(import.meta.dirname, '../bin/rslint');
 
+    // Debug: Log the binary path and check if it exists
+    console.error('RSLint binary path:', this.rslintPath);
+    console.error('import.meta.dirname:', import.meta.dirname);
+    console.error('Binary exists:', require('fs').existsSync(this.rslintPath));
+    if (!require('fs').existsSync(this.rslintPath)) {
+      // Try to list what's in the directory
+      const binDir = path.join(import.meta.dirname, '../bin');
+      console.error('Bin directory:', binDir);
+      try {
+        console.error(
+          'Bin directory contents:',
+          require('fs').readdirSync(binDir),
+        );
+      } catch (e) {
+        console.error('Failed to read bin directory:', e.message);
+      }
+    }
+
     this.process = spawn(this.rslintPath, ['--api'], {
       stdio: ['pipe', 'pipe', 'inherit'],
       cwd: options.workingDirectory || process.cwd(),
