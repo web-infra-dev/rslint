@@ -1,39 +1,84 @@
+# yaml-language-server: $schema=https://golangci-lint.run/jsonschema/golangci.jsonschema.json
+
 version: '2'
+
+run:
+  allow-parallel-runners: true
+
 linters:
-  enable:
-    - govet # Go vet examiner
-    - ineffassign # Detect ineffectual assignments
-
-    - unused # Check for unused constants, variables, functions and types
-    - misspell # Finds commonly misspelled English words
-    - unconvert # Remove unnecessary type conversions
-
+  default: none
   disable:
-    - errcheck # Check for unchecked errors
-    - gosec # Inspects source code for security problems
-    - staticcheck # It's a set of rules from staticcheck
+    - depguard
+    - errcheck
+    - paralleltest
+  enable:
+    # Enabled
+    - asasalint
+    - bidichk
+    - bodyclose
+    - canonicalheader
+    - copyloopvar
+    - depguard
+    - durationcheck
+    - errcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - fatcontext
+    - gocheckcompilerdirectives
+    - goprintffuncname
+    - govet
+    - grouper
+    - inamedparam
+    - ineffassign
+    - intrange
+    - makezero
+    - mirror
+    - misspell
+    - musttag
+    - nakedret
+    - nolintlint
+    - paralleltest
+    - perfsprint
+    - predeclared
+    - reassign
+    - testableexamples
+    - tparallel
+    - unconvert
+    - usestdlibvars
+    - usetesting
+
+    # Need to add headers
+    # - goheader
+
+    # Check
+    # - exhaustive
+    # - gocritic
+    # - gosec
+    # - revive
+    # - staticcheck
+    # - testifylint
+    # - unparam
+    # - unused
+
+  settings:
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: 'encoding/json$'
+              desc: 'Use "github.com/microsoft/typescript-go/internal/json" instead.'
+
   exclusions:
-    generated: lax
+    rules:
+      - path: internal/fourslash/tests/gen/
+        linters:
+          - misspell
+
     presets:
       - comments
-      - common-false-positives
-      - legacy
       - std-error-handling
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
+
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
-  new: false
-formatters:
-  enable:
-    - gofmt
-    - goimports
-  exclusions:
-    generated: lax
-    paths:
-      - third_party$
-      - builtin$
-      - examples$
