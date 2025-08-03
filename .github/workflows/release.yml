@@ -169,7 +169,7 @@ jobs:
           NPM_TOKEN: ${{ secrets.RSLINT_NPM_TOKEN }}
         run: |
           npm config set "//registry.npmjs.org/:_authToken" "${NPM_TOKEN}"
-          pnpm -r publish --no-git-checks --dry-run --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
+          pnpm -r publish --no-git-checks --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
 
       - name: Build and publish to Microsoft VS Code Marketplace
         if: false
