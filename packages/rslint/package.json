@@ -17,7 +17,9 @@
     "test:update": "rstest run -u"
   },
   "files": [
-    "bin/rslint.cjs"
+    "bin/rslint.cjs",
+    "bin/rslint",
+    "dist"
   ],
   "bin": {
     "rslint": "./bin/rslint.cjs"
