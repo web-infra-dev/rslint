@@ -1,6 +1,7 @@
 import { spawn, ChildProcess } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
 import { createRequire } from 'module';
 
 /**
@@ -76,20 +77,100 @@ export class RSLintService {
 
     if (options.rslintPath) {
       this.rslintPath = options.rslintPath;
+      this.process = spawn(this.rslintPath, ['--api'], {
+        stdio: ['pipe', 'pipe', 'inherit'],
+        cwd: options.workingDirectory || process.cwd(),
+        env: { ...process.env },
+      });
     } else {
-      // Try direct binary path first for CI compatibility
-      this.rslintPath = path.join(import.meta.dirname, '../bin/rslint');
+      // Robust binary resolution with multiple fallbacks for CI compatibility
+      this.process = this.spawnWithFallbacks(options);
     }
 
-    this.process = spawn(this.rslintPath, ['--api'], {
-      stdio: ['pipe', 'pipe', 'inherit'],
-      cwd: options.workingDirectory || process.cwd(),
-      env: {
-        ...process.env,
-      },
-    });
-
     this.setupProcessHandlers();
+  }
+
+  private spawnWithFallbacks(options: RSlintOptions): any {
+    const fallbacks = [
+      // Strategy 1: Use CJS wrapper (like CLI tests) - most robust
+      () => {
+        try {
+          const require = createRequire(import.meta.url);
+          const binPath = require.resolve('@rslint/core/bin');
+          console.debug(`[RSLint Service] Trying CJS wrapper: ${binPath}`);
+          if (fs.existsSync(binPath)) {
+            this.rslintPath = binPath;
+            return spawn(binPath, ['--api'], {
+              stdio: ['pipe', 'pipe', 'inherit'],
+              cwd: options.workingDirectory || process.cwd(),
+              env: { ...process.env },
+            });
+          }
+        } catch (error) {
+          console.debug(`[RSLint Service] CJS wrapper failed: ${error}`);
+        }
+        return null;
+      },
+
+      // Strategy 2: Direct binary path
+      () => {
+        try {
+          const binPath = path.join(import.meta.dirname, '../bin/rslint');
+          console.debug(`[RSLint Service] Trying direct binary: ${binPath}`);
+          if (fs.existsSync(binPath)) {
+            this.rslintPath = binPath;
+            return spawn(binPath, ['--api'], {
+              stdio: ['pipe', 'pipe', 'inherit'],
+              cwd: options.workingDirectory || process.cwd(),
+              env: { ...process.env },
+            });
+          }
+        } catch (error) {
+          console.debug(`[RSLint Service] Direct binary failed: ${error}`);
+        }
+        return null;
+      },
+
+      // Strategy 3: Try platform-specific package (fallback for released packages)
+      () => {
+        try {
+          const platformKey = `${process.platform}-${os.arch()}`;
+          const require = createRequire(import.meta.url);
+          const binPath = require.resolve(`@rslint/${platformKey}/rslint`);
+          console.debug(`[RSLint Service] Trying platform package: ${binPath}`);
+          if (fs.existsSync(binPath)) {
+            this.rslintPath = binPath;
+            return spawn(binPath, ['--api'], {
+              stdio: ['pipe', 'pipe', 'inherit'],
+              cwd: options.workingDirectory || process.cwd(),
+              env: { ...process.env },
+            });
+          }
+        } catch (error) {
+          console.debug(`[RSLint Service] Platform package failed: ${error}`);
+        }
+        return null;
+      },
+    ];
+
+    // Try each strategy until one works
+    for (const strategy of fallbacks) {
+      const process = strategy();
+      if (process) {
+        console.debug(
+          `[RSLint Service] Successfully spawned with strategy, binary: ${this.rslintPath}`,
+        );
+        return process;
+      }
+    }
+
+    // All strategies failed
+    throw new Error(`Failed to spawn RSLint binary. Tried:
+1. CJS wrapper via require.resolve('@rslint/core/bin')
+2. Direct binary at ${path.join(import.meta.dirname, '../bin/rslint')}  
+3. Platform-specific package @rslint/${process.platform}-${os.arch()}/rslint
+
+Check that RSLint is built correctly and the binary is accessible.`);
   }
 
   private setupProcessHandlers(): void {
