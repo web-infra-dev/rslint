@@ -72,12 +72,13 @@ func hasReturnType(node *ast.Node) bool {
 		return node.AsGetAccessorDeclaration().Type != nil
 	case ast.KindMethodDeclaration:
 		return node.AsMethodDeclaration().Type != nil
+	case ast.KindMethodSignature:
+		return node.AsMethodSignatureDeclaration().Type != nil
 	case ast.KindConstructor:
 		// Constructors don't need return type
 		return true
 	case ast.KindSetAccessor:
-		// Set accessors don't need return type
-		return true
+		return node.AsSetAccessorDeclaration().Type != nil
 	}
 	return false
 }
@@ -90,6 +91,8 @@ func isFunction(node *ast.Node) bool {
 	}
 	return false
 }
+
+
 
 // Check if arrow function directly returns as const
 func hasDirectConstAssertion(node *ast.Node) bool {
@@ -450,6 +453,9 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 		// Track return statements for functions
 		functionReturnsMap := make(map[*ast.Node][]*ast.Node)
 		functionStack := []*ast.Node{}
+		
+		// Track which functions have already been checked to avoid duplicates
+		checkedFunctions := make(map[*ast.Node]bool)
 
 		// Helper to check if a node is exported
 		isExported := func(node *ast.Node) bool {
@@ -506,15 +512,71 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 
 		// Check if function should be allowed
 		checkFunction := func(node *ast.Node) {
+			// Avoid checking the same function twice
+			if checkedFunctions[node] {
+				return
+			}
+			checkedFunctions[node] = true
+			
 			// Only check exported functions
 			if !isExported(node) {
 				return
 			}
 
-			// Skip private identifier methods/properties
-			if node.Kind == ast.KindMethodDeclaration {
-				method := node.AsMethodDeclaration()
-				if method.Name() != nil && method.Name().Kind == ast.KindPrivateIdentifier {
+			// Skip private methods and accessors
+			if node.Kind == ast.KindMethodDeclaration || node.Kind == ast.KindMethodSignature {
+				var modifiers *ast.ModifierList
+				if node.Kind == ast.KindMethodDeclaration {
+					method := node.AsMethodDeclaration()
+					modifiers = method.Modifiers()
+					// Skip private identifier methods
+					if method.Name() != nil && method.Name().Kind == ast.KindPrivateIdentifier {
+						return
+					}
+				} else {
+					methodSig := node.AsMethodSignatureDeclaration()
+					modifiers = methodSig.Modifiers()
+					// Skip private identifier methods
+					if methodSig.Name() != nil && methodSig.Name().Kind == ast.KindPrivateIdentifier {
+						return
+					}
+				}
+				
+				// Check for private modifier
+				if modifiers != nil {
+					for _, mod := range modifiers.Nodes {
+						if mod.Kind == ast.KindPrivateKeyword {
+							return
+						}
+					}
+				}
+			}
+
+			// Skip private accessors
+			if node.Kind == ast.KindGetAccessor {
+				accessor := node.AsGetAccessorDeclaration()
+				if accessor.Modifiers() != nil {
+					for _, mod := range accessor.Modifiers().Nodes {
+						if mod.Kind == ast.KindPrivateKeyword {
+							return
+						}
+					}
+				}
+				if accessor.Name() != nil && accessor.Name().Kind == ast.KindPrivateIdentifier {
+					return
+				}
+			}
+
+			if node.Kind == ast.KindSetAccessor {
+				accessor := node.AsSetAccessorDeclaration()
+				if accessor.Modifiers() != nil {
+					for _, mod := range accessor.Modifiers().Nodes {
+						if mod.Kind == ast.KindPrivateKeyword {
+							return
+						}
+					}
+				}
+				if accessor.Name() != nil && accessor.Name().Kind == ast.KindPrivateIdentifier {
 					return
 				}
 			}
@@ -548,78 +610,9 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 
 			// Simple check for return type
 			if !hasReturnType(node) {
-				// Report at specific sub-elements for better position accuracy
-				switch node.Kind {
-				case ast.KindFunctionDeclaration:
-					// For function declarations, report at the function name if available
-					funcDecl := node.AsFunctionDeclaration()
-					if funcDecl.Name() != nil {
-						ctx.ReportNode(funcDecl.Name(), buildMissingReturnTypeMessage())
-					} else {
-						ctx.ReportNode(node, buildMissingReturnTypeMessage())
-					}
-				case ast.KindFunctionExpression:
-					// For function expressions, try to find a good reporting position
-					// Check if it's in a variable declaration to report at the variable name
-					parent := node.Parent
-					if parent != nil && parent.Kind == ast.KindVariableDeclaration {
-						varDecl := parent.AsVariableDeclaration()
-						if varDecl.Name() != nil {
-							ctx.ReportNode(varDecl.Name(), buildMissingReturnTypeMessage())
-						} else {
-							ctx.ReportNode(node, buildMissingReturnTypeMessage())
-						}
-					} else {
-						ctx.ReportNode(node, buildMissingReturnTypeMessage())
-					}
-				case ast.KindArrowFunction:
-					// For arrow functions, report at the arrow function itself
-					// But check if it's in a variable or property assignment
-					parent := node.Parent
-					if parent != nil && parent.Kind == ast.KindVariableDeclaration {
-						varDecl := parent.AsVariableDeclaration()
-						if varDecl.Name() != nil {
-							ctx.ReportNode(varDecl.Name(), buildMissingReturnTypeMessage())
-						} else {
-							ctx.ReportNode(node, buildMissingReturnTypeMessage())
-						}
-					} else if parent != nil && parent.Kind == ast.KindPropertyAssignment {
-						propAssign := parent.AsPropertyAssignment()
-						if propAssign.Name() != nil {
-							ctx.ReportNode(propAssign.Name(), buildMissingReturnTypeMessage())
-						} else {
-							ctx.ReportNode(node, buildMissingReturnTypeMessage())
-						}
-					} else {
-						ctx.ReportNode(node, buildMissingReturnTypeMessage())
-					}
-				case ast.KindMethodDeclaration:
-					// For methods, report at the method name
-					method := node.AsMethodDeclaration()
-					if method.Name() != nil {
-						ctx.ReportNode(method.Name(), buildMissingReturnTypeMessage())
-					} else {
-						ctx.ReportNode(node, buildMissingReturnTypeMessage())
-					}
-				case ast.KindGetAccessor:
-					// For get accessors, report at the property name
-					accessor := node.AsGetAccessorDeclaration()
-					if accessor.Name() != nil {
-						ctx.ReportNode(accessor.Name(), buildMissingReturnTypeMessage())
-					} else {
-						ctx.ReportNode(node, buildMissingReturnTypeMessage())
-					}
-				case ast.KindSetAccessor:
-					// For set accessors, report at the property name
-					accessor := node.AsSetAccessorDeclaration()
-					if accessor.Name() != nil {
-						ctx.ReportNode(accessor.Name(), buildMissingReturnTypeMessage())
-					} else {
-						ctx.ReportNode(node, buildMissingReturnTypeMessage())
-					}
-				default:
-					ctx.ReportNode(node, buildMissingReturnTypeMessage())
-				}
+				// Use the same positioning logic as other rules that report on function heads
+				headRange := utils.GetFunctionHeadLoc(node, ctx.SourceFile)
+				ctx.ReportRange(headRange, buildMissingReturnTypeMessage())
 			}
 
 			// Simple parameter check
@@ -633,6 +626,8 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 				params = node.AsFunctionExpression().Parameters.Nodes
 			case ast.KindMethodDeclaration:
 				params = node.AsMethodDeclaration().Parameters.Nodes
+			case ast.KindMethodSignature:
+				params = node.AsMethodSignatureDeclaration().Parameters.Nodes
 			case ast.KindGetAccessor:
 				params = node.AsGetAccessorDeclaration().Parameters.Nodes
 			case ast.KindSetAccessor:
@@ -678,6 +673,10 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 				functionStack = append(functionStack, node)
 				functionReturnsMap[node] = []*ast.Node{}
 			},
+			ast.KindMethodSignature: func(node *ast.Node) {
+				functionStack = append(functionStack, node)
+				functionReturnsMap[node] = []*ast.Node{}
+			},
 
 			// Track return statements
 			ast.KindReturnStatement: func(node *ast.Node) {
@@ -709,60 +708,53 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 				}
 			},
 			rule.ListenerOnExit(ast.KindMethodDeclaration): func(node *ast.Node) {
-				// Only check public methods in exported classes
-				method := node.AsMethodDeclaration()
-				isPrivate := false
-				if method.Modifiers() != nil {
-					for _, mod := range method.Modifiers().Nodes {
-						if mod.Kind == ast.KindPrivateKeyword {
-							isPrivate = true
-							break
-						}
-					}
-				}
-				if !isPrivate {
-					checkFunction(node)
-				}
+				checkFunction(node)
 				if len(functionStack) > 0 {
 					functionStack = functionStack[:len(functionStack)-1]
 				}
 			},
 			rule.ListenerOnExit(ast.KindGetAccessor): func(node *ast.Node) {
-				// Only check public accessors in exported classes
-				accessor := node.AsGetAccessorDeclaration()
-				isPrivate := false
-				if accessor.Modifiers() != nil {
-					for _, mod := range accessor.Modifiers().Nodes {
-						if mod.Kind == ast.KindPrivateKeyword {
-							isPrivate = true
-							break
-						}
-					}
-				}
-				if !isPrivate {
-					checkFunction(node)
-				}
+				checkFunction(node)
 				if len(functionStack) > 0 {
 					functionStack = functionStack[:len(functionStack)-1]
 				}
 			},
 			rule.ListenerOnExit(ast.KindSetAccessor): func(node *ast.Node) {
-				// Only check public accessors in exported classes  
-				accessor := node.AsSetAccessorDeclaration()
+				checkFunction(node)
+				if len(functionStack) > 0 {
+					functionStack = functionStack[:len(functionStack)-1]
+				}
+			},
+			rule.ListenerOnExit(ast.KindMethodSignature): func(node *ast.Node) {
+				checkFunction(node)
+				if len(functionStack) > 0 {
+					functionStack = functionStack[:len(functionStack)-1]
+				}
+			},
+			
+			// Handle property declarations that might contain arrow functions
+			ast.KindPropertyDeclaration: func(node *ast.Node) {
+				propDecl := node.AsPropertyDeclaration()
+				
+				// Check if it's private
 				isPrivate := false
-				if accessor.Modifiers() != nil {
-					for _, mod := range accessor.Modifiers().Nodes {
+				if propDecl.Modifiers() != nil {
+					for _, mod := range propDecl.Modifiers().Nodes {
 						if mod.Kind == ast.KindPrivateKeyword {
 							isPrivate = true
 							break
 						}
 					}
 				}
-				if !isPrivate {
-					checkFunction(node)
+				
+				// Skip private properties
+				if isPrivate {
+					return
 				}
-				if len(functionStack) > 0 {
-					functionStack = functionStack[:len(functionStack)-1]
+				
+				// Check if the initializer is an arrow function
+				if propDecl.Initializer != nil && propDecl.Initializer.Kind == ast.KindArrowFunction {
+					checkFunction(propDecl.Initializer)
 				}
 			},
 		}

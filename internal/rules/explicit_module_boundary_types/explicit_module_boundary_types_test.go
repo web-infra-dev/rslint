@@ -95,25 +95,25 @@ export function test(): string {
 export function test(a: number, b: number) {
   return;
 }`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingReturnType", Line: 2, Column: 8}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingReturnType", Line: 1, Column: 1}},
 		},
 		{
 			Code: `
 export function test() {
   return;
 }`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingReturnType", Line: 2, Column: 8}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingReturnType", Line: 1, Column: 1}},
 		},
 		{
 			Code: `
 export var fn = function () {
   return 1;
 };`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingReturnType", Line: 2, Column: 17}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingReturnType", Line: 2, Column: 16}},
 		},
 		{
 			Code:   `export var arrowFn = () => 'test';`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingReturnType", Line: 1, Column: 25}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "missingReturnType", Line: 1, Column: 21}},
 		},
 		{
 			Code: `
@@ -133,12 +133,13 @@ export class Test {
   abstract abs(arg);
 }`,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "missingReturnType", Line: 4, Column: 3},
+				{MessageId: "missingReturnType", Line: 3, Column: 19},
+				{MessageId: "missingReturnType", Line: 6, Column: 4},
 				{MessageId: "missingArgType", Line: 7, Column: 12},
-				{MessageId: "missingReturnType", Line: 8, Column: 3},
-				{MessageId: "missingReturnType", Line: 11, Column: 3},
+				{MessageId: "missingReturnType", Line: 7, Column: 21},
+				{MessageId: "missingReturnType", Line: 11, Column: 10},
 				{MessageId: "missingArgType", Line: 11, Column: 11},
-				{MessageId: "missingReturnType", Line: 15, Column: 15},
+				{MessageId: "missingReturnType", Line: 14, Column: 4},
 				{MessageId: "missingArgType", Line: 15, Column: 16},
 			},
 		},
