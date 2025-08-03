@@ -847,3 +847,7 @@ func NewRule() rule.Rule {
 - Provide migration guides for ESLint users
 - Support TypeScript-ESLint configuration formats
 - Ensure backward compatibility in JavaScript APIs
+
+## Code Search Instructions
+
+**ALWAYS search the Go implementation thoroughly for any functions, methods, or patterns you think may be missing before assuming they don't exist.** The codebase is large and comprehensive - most functionality you expect likely exists somewhere. When in doubt, use grep extensively to verify if something exists before implementing from scratch. Always assume it exists somewhere and search for it first.
