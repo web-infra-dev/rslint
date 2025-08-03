@@ -12,51 +12,51 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
-	api "github.com/typescript-eslint/rslint/internal/api"
-	rslintconfig "github.com/typescript-eslint/rslint/internal/config"
-	"github.com/typescript-eslint/rslint/internal/linter"
-	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/rules/await_thenable"
-	"github.com/typescript-eslint/rslint/internal/rules/no_array_delete"
-	"github.com/typescript-eslint/rslint/internal/rules/no_base_to_string"
-	"github.com/typescript-eslint/rslint/internal/rules/no_confusing_void_expression"
-	"github.com/typescript-eslint/rslint/internal/rules/no_duplicate_type_constituents"
-	"github.com/typescript-eslint/rslint/internal/rules/no_floating_promises"
-	"github.com/typescript-eslint/rslint/internal/rules/no_for_in_array"
-	"github.com/typescript-eslint/rslint/internal/rules/no_implied_eval"
-	"github.com/typescript-eslint/rslint/internal/rules/no_meaningless_void_operator"
-	"github.com/typescript-eslint/rslint/internal/rules/no_misused_promises"
-	"github.com/typescript-eslint/rslint/internal/rules/no_misused_spread"
-	"github.com/typescript-eslint/rslint/internal/rules/no_mixed_enums"
-	"github.com/typescript-eslint/rslint/internal/rules/no_redundant_type_constituents"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_boolean_literal_compare"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_template_expression"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_type_arguments"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unnecessary_type_assertion"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_argument"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_assignment"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_call"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_enum_comparison"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_member_access"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_return"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_type_assertion"
-	"github.com/typescript-eslint/rslint/internal/rules/no_unsafe_unary_minus"
-	"github.com/typescript-eslint/rslint/internal/rules/non_nullable_type_assertion_style"
-	"github.com/typescript-eslint/rslint/internal/rules/only_throw_error"
-	"github.com/typescript-eslint/rslint/internal/rules/prefer_promise_reject_errors"
-	"github.com/typescript-eslint/rslint/internal/rules/prefer_reduce_type_parameter"
-	"github.com/typescript-eslint/rslint/internal/rules/prefer_return_this_type"
-	"github.com/typescript-eslint/rslint/internal/rules/promise_function_async"
-	"github.com/typescript-eslint/rslint/internal/rules/related_getter_setter_pairs"
-	"github.com/typescript-eslint/rslint/internal/rules/require_array_sort_compare"
-	"github.com/typescript-eslint/rslint/internal/rules/require_await"
-	"github.com/typescript-eslint/rslint/internal/rules/restrict_plus_operands"
-	"github.com/typescript-eslint/rslint/internal/rules/restrict_template_expressions"
-	"github.com/typescript-eslint/rslint/internal/rules/return_await"
-	"github.com/typescript-eslint/rslint/internal/rules/switch_exhaustiveness_check"
-	"github.com/typescript-eslint/rslint/internal/rules/unbound_method"
-	"github.com/typescript-eslint/rslint/internal/rules/use_unknown_in_catch_callback_variable"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	api "github.com/web-infra-dev/rslint/internal/api"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
+	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules/await_thenable"
+	"github.com/web-infra-dev/rslint/internal/rules/no_array_delete"
+	"github.com/web-infra-dev/rslint/internal/rules/no_base_to_string"
+	"github.com/web-infra-dev/rslint/internal/rules/no_confusing_void_expression"
+	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_type_constituents"
+	"github.com/web-infra-dev/rslint/internal/rules/no_floating_promises"
+	"github.com/web-infra-dev/rslint/internal/rules/no_for_in_array"
+	"github.com/web-infra-dev/rslint/internal/rules/no_implied_eval"
+	"github.com/web-infra-dev/rslint/internal/rules/no_meaningless_void_operator"
+	"github.com/web-infra-dev/rslint/internal/rules/no_misused_promises"
+	"github.com/web-infra-dev/rslint/internal/rules/no_misused_spread"
+	"github.com/web-infra-dev/rslint/internal/rules/no_mixed_enums"
+	"github.com/web-infra-dev/rslint/internal/rules/no_redundant_type_constituents"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unnecessary_boolean_literal_compare"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unnecessary_template_expression"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unnecessary_type_arguments"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unnecessary_type_assertion"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_argument"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_assignment"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_call"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_enum_comparison"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_member_access"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_return"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_type_assertion"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_unary_minus"
+	"github.com/web-infra-dev/rslint/internal/rules/non_nullable_type_assertion_style"
+	"github.com/web-infra-dev/rslint/internal/rules/only_throw_error"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_promise_reject_errors"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_reduce_type_parameter"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_return_this_type"
+	"github.com/web-infra-dev/rslint/internal/rules/promise_function_async"
+	"github.com/web-infra-dev/rslint/internal/rules/related_getter_setter_pairs"
+	"github.com/web-infra-dev/rslint/internal/rules/require_array_sort_compare"
+	"github.com/web-infra-dev/rslint/internal/rules/require_await"
+	"github.com/web-infra-dev/rslint/internal/rules/restrict_plus_operands"
+	"github.com/web-infra-dev/rslint/internal/rules/restrict_template_expressions"
+	"github.com/web-infra-dev/rslint/internal/rules/return_await"
+	"github.com/web-infra-dev/rslint/internal/rules/switch_exhaustiveness_check"
+	"github.com/web-infra-dev/rslint/internal/rules/unbound_method"
+	"github.com/web-infra-dev/rslint/internal/rules/use_unknown_in_catch_callback_variable"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // IPCHandler implements the ipc.Handler interface
@@ -78,7 +78,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	// Get current directory
 	currentDirectory, err := os.Getwd()
 	if err != nil {
-		return nil, fmt.Errorf("error getting current directory: %v", err)
+		return nil, fmt.Errorf("error getting current directory: %w", err)
 	}
 	currentDirectory = tspath.NormalizePath(currentDirectory)
 
@@ -167,7 +167,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	for _, configFileName := range tsConfigs {
 		program, err := utils.CreateProgram(false, fs, configDirectory, configFileName, host)
 		if err != nil {
-			return nil, fmt.Errorf("error creating TS program for %s: %v", configFileName, err)
+			return nil, fmt.Errorf("error creating TS program for %s: %w", configFileName, err)
 		}
 		programs = append(programs, program)
 	}
@@ -229,7 +229,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		diagnosticCollector,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error running linter: %v", err)
+		return nil, fmt.Errorf("error running linter: %w", err)
 	}
 
 	if diagnostics == nil {

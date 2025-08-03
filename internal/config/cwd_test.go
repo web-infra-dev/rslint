@@ -14,7 +14,7 @@ func TestCwdHandling(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unable to get current working directory: %v", err)
 	}
-	defer os.Chdir(originalCwd) // Restore after test completes
+	defer t.Chdir(originalCwd) // Restore after test completes
 
 	tests := []struct {
 		name         string

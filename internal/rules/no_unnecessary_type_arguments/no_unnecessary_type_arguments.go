@@ -7,8 +7,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
-	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func buildUnnecessaryTypeParameterMessage() rule.RuleMessage {
@@ -124,7 +124,7 @@ var NoUnnecessaryTypeArgumentsRule = rule.Rule{
 			if utils.IsIntrinsicErrorType(argType) {
 				return
 			}
-			if argType != paramType && (utils.IsTypeAnyType(argType) || utils.IsTypeAnyType(paramType) || !(checker.Checker_isTypeStrictSubtypeOf(ctx.TypeChecker, argType, paramType) && checker.Checker_isTypeStrictSubtypeOf(ctx.TypeChecker, paramType, argType))) {
+			if argType != paramType && (utils.IsTypeAnyType(argType) || utils.IsTypeAnyType(paramType) || (!checker.Checker_isTypeStrictSubtypeOf(ctx.TypeChecker, argType, paramType) || !checker.Checker_isTypeStrictSubtypeOf(ctx.TypeChecker, paramType, argType))) {
 				return
 			}
 

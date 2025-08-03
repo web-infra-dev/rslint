@@ -3,8 +3,8 @@ package return_await
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
-	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func buildDisallowedPromiseAwaitMessage() rule.RuleMessage {
@@ -125,17 +125,16 @@ var ReturnAwaitRule = rule.Rule{
 
 			for declarationScope := ast.GetEnclosingBlockScopeContainer(node); declarationScope != nil; declarationScope = ast.GetEnclosingBlockScopeContainer(declarationScope) {
 				locals := declarationScope.Locals()
-				if locals != nil {
-					for _, local := range locals {
-						decl := local.ValueDeclaration
-						// if it's a using/await using declaration, and it comes _before_ the
-						// node we're checking, it affects control flow for that node.
+				for _, local := range locals {
+					decl := local.ValueDeclaration
+					// if it's a using/await using declaration, and it comes _before_ the
+					// node we're checking, it affects control flow for that node.
 
-						if decl != nil && ast.IsVariableDeclaration(decl) && decl.Parent.Flags&ast.NodeFlagsUsing != 0 && decl.Pos() < node.Pos() {
-							return true
-						}
+					if decl != nil && ast.IsVariableDeclaration(decl) && decl.Parent.Flags&ast.NodeFlagsUsing != 0 && decl.Pos() < node.Pos() {
+						return true
 					}
 				}
+
 				if scope.owningFunc == declarationScope {
 					break
 				}
@@ -164,12 +163,12 @@ var ReturnAwaitRule = rule.Rule{
 				statement := ancestor.AsTryStatement()
 
 				var block containingTryStatementBlock
-				switch {
-				case child == statement.TryBlock:
+				switch child {
+				case statement.TryBlock:
 					block = containingTryStatementBlockTry
-				case child == statement.CatchClause:
+				case statement.CatchClause:
 					block = containingTryStatementBlockCatch
-				case child == statement.FinallyBlock:
+				case statement.FinallyBlock:
 					block = containingTryStatementBlockFinally
 				}
 

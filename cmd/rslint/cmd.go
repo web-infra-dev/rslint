@@ -16,9 +16,9 @@ import (
 	"unicode"
 
 	"github.com/fatih/color"
-	"github.com/typescript-eslint/rslint/internal/linter"
-	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
@@ -27,7 +27,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
-	rslintconfig "github.com/typescript-eslint/rslint/internal/config"
+	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
 const spaces = "                                                                                                    "
@@ -88,7 +88,7 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 	case "jsonline":
 		printDiagnosticJsonLine(d, w, comparePathOptions)
 	default:
-		panic(fmt.Sprintf("not supported format %s", format))
+		panic("not supported format " + format)
 	}
 }
 
@@ -141,7 +141,8 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 			Error string `json:"error"`
 		}
 		errorObject := ErrorObject{Error: fmt.Sprintf("Failed to marshal diagnostic: %s", err)}
-		errorBytes, _ := json.Marshal(errorObject) // Ignoring error since struct is simple
+
+		errorBytes, _ := json.Marshal(errorObject) //nolint:errchkjson
 		w.Write(errorBytes)
 		w.WriteByte('\n')
 		return
@@ -449,9 +450,10 @@ func runCMD() int {
 		w := bufio.NewWriterSize(os.Stdout, 4096*100)
 		defer w.Flush()
 		for d := range diagnosticsChan {
-			if d.Severity == rule.SeverityError {
+			switch d.Severity {
+			case rule.SeverityError:
 				errorsCount++
-			} else if d.Severity == rule.SeverityWarning {
+			case rule.SeverityWarning:
 				warningsCount++
 			}
 
@@ -509,7 +511,7 @@ func runCMD() int {
 
 			if len(diagnosticsWithFixes) > 0 {
 				// Read the original file content
-				originalContent := string(diagnosticsWithFixes[0].SourceFile.Text())
+				originalContent := diagnosticsWithFixes[0].SourceFile.Text()
 
 				// Apply fixes
 				fixedContent, unapplied, wasFixed := linter.ApplyRuleFixes(originalContent, diagnosticsWithFixes)
@@ -600,10 +602,7 @@ func runCMD() int {
 		}
 	}
 
-	tooManyWarnings := false
-	if maxWarnings >= 0 && warningsCount > maxWarnings {
-		tooManyWarnings = true
-	}
+	tooManyWarnings := maxWarnings >= 0 && warningsCount > maxWarnings
 
 	if errorsCount == 0 && tooManyWarnings {
 		fmt.Fprintf(os.Stderr, "Rslint found too many warnings (maximum: %d).\n", maxWarnings)

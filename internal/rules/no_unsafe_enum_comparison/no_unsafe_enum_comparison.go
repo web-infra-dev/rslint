@@ -5,8 +5,8 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func buildMismatchedCaseMessage() rule.RuleMessage {
@@ -21,6 +21,8 @@ func buildMismatchedConditionMessage() rule.RuleMessage {
 		Description: "The two values in this comparison do not have a shared enum type.",
 	}
 }
+
+//nolint:unused
 func buildReplaceValueWithEnumMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "replaceValueWithEnum",
@@ -132,7 +134,7 @@ var NoUnsafeEnumComparisonRule = rule.Rule{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				expr := node.AsBinaryExpression()
 				opKind := expr.OperatorToken.Kind
-				if !(opKind == ast.KindLessThanToken || opKind == ast.KindLessThanEqualsToken || opKind == ast.KindGreaterThanToken || opKind == ast.KindGreaterThanEqualsToken || opKind == ast.KindEqualsEqualsToken || opKind == ast.KindEqualsEqualsEqualsToken || opKind == ast.KindExclamationEqualsToken || opKind == ast.KindExclamationEqualsEqualsToken) {
+				if opKind != ast.KindLessThanToken && opKind != ast.KindLessThanEqualsToken && opKind != ast.KindGreaterThanToken && opKind != ast.KindGreaterThanEqualsToken && opKind != ast.KindEqualsEqualsToken && opKind != ast.KindEqualsEqualsEqualsToken && opKind != ast.KindExclamationEqualsToken && opKind != ast.KindExclamationEqualsEqualsToken {
 					return
 				}
 

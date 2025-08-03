@@ -1,15 +1,15 @@
 package switch_exhaustiveness_check
 
 import (
-	"fmt"
 	"slices"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//nolint:unused
 func buildAddMissingCasesMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "addMissingCases",
@@ -25,7 +25,7 @@ func buildDangerousDefaultCaseMessage() rule.RuleMessage {
 func buildSwitchIsNotExhaustiveMessage(missingBranches string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "switchIsNotExhaustive",
-		Description: fmt.Sprintf("Switch is not exhaustive"), // . Cases not matched: %v", missingBranches),
+		Description: "Switch is not exhaustive", // . Cases not matched: %v", missingBranches),
 	}
 }
 

@@ -3,8 +3,8 @@ package prefer_reduce_type_parameter
 import (
 	"testing"
 
-	"github.com/typescript-eslint/rslint/internal/rule_tester"
-	"github.com/typescript-eslint/rslint/internal/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/rules/fixtures"
 )
 
 func TestPreferReduceTypeParameterRule(t *testing.T) {

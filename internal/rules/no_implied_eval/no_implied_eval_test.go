@@ -3,8 +3,8 @@ package no_implied_eval
 import (
 	"testing"
 
-	"github.com/typescript-eslint/rslint/internal/rule_tester"
-	"github.com/typescript-eslint/rslint/internal/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
+	"github.com/web-infra-dev/rslint/internal/rules/fixtures"
 )
 
 func TestNoImpliedEvalRule(t *testing.T) {

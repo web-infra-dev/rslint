@@ -7,8 +7,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
-	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func buildDuplicateMessage(unionOrIntersection unionOrIntersection, previous string) rule.RuleMessage {
@@ -91,10 +91,8 @@ var NoDuplicateTypeConstituentsRule = rule.Rule{
 			prevStart := 0
 			bracketBeforeTokens := []core.TextRange{}
 
-			for {
-				if s.TokenStart() >= constituentNode.Pos() {
-					break
-				}
+			for s.TokenStart() < constituentNode.Pos() {
+
 				if s.Token() == ast.KindAmpersandToken || s.Token() == ast.KindBarToken {
 					foundBefore = true
 					prevStart = s.TokenStart()
@@ -238,13 +236,14 @@ var NoDuplicateTypeConstituentsRule = rule.Rule{
 
 			var unionOrIntersection unionOrIntersection
 			var types []*ast.Node
-			if node.Kind == ast.KindIntersectionType {
+			switch node.Kind {
+			case ast.KindIntersectionType:
 				unionOrIntersection = unionOrIntersection_Intersection
 				types = node.AsIntersectionTypeNode().Types.Nodes
-			} else if node.Kind == ast.KindUnionType {
+			case ast.KindUnionType:
 				unionOrIntersection = unionOrIntersection_Union
 				types = node.AsUnionTypeNode().Types.Nodes
-			} else {
+			default:
 				panic(fmt.Sprintf("expected union or intersection, got %v", node.Kind))
 			}
 
@@ -288,7 +287,6 @@ var NoDuplicateTypeConstituentsRule = rule.Rule{
 						report(true, unionOrIntersection_Union, buildUnnecessaryMessage(), constituentNode)
 					}
 				})
-				return
 			}
 		}
 

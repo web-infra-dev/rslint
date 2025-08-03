@@ -1,0 +1,84 @@
+# yaml-language-server: $schema=https://golangci-lint.run/jsonschema/golangci.jsonschema.json
+
+version: '2'
+
+run:
+  allow-parallel-runners: true
+
+linters:
+  default: none
+  disable:
+    - depguard
+    - errcheck
+    - paralleltest
+  enable:
+    # Enabled
+    - asasalint
+    - bidichk
+    - bodyclose
+    - canonicalheader
+    - copyloopvar
+    - depguard
+    - durationcheck
+    - errcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - fatcontext
+    - gocheckcompilerdirectives
+    - goprintffuncname
+    - govet
+    - grouper
+    - inamedparam
+    - ineffassign
+    - intrange
+    - makezero
+    - mirror
+    - misspell
+    - musttag
+    - nakedret
+    - nolintlint
+    - paralleltest
+    - perfsprint
+    - predeclared
+    - reassign
+    - testableexamples
+    - tparallel
+    - unconvert
+    - usestdlibvars
+    - usetesting
+
+    # Need to add headers
+    # - goheader
+
+    # Check
+    # - exhaustive
+    # - gocritic
+    # - gosec
+    # - revive
+    - staticcheck
+    # - testifylint
+    # - unparam
+    - unused
+
+  settings:
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: 'encoding/json$'
+              desc: 'Use "github.com/microsoft/typescript-go/internal/json" instead.'
+
+  exclusions:
+    rules:
+      - path: internal/fourslash/tests/gen/
+        linters:
+          - misspell
+
+    presets:
+      - comments
+      - std-error-handling
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

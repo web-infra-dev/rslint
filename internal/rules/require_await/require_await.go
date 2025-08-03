@@ -3,8 +3,8 @@ package require_await
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func buildMissingAwaitMessage() rule.RuleMessage {
@@ -13,6 +13,8 @@ func buildMissingAwaitMessage() rule.RuleMessage {
 		Description: "Function has no 'await' expression.",
 	}
 }
+
+//nolint:unused
 func buildRemoveAsyncMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "removeAsync",
@@ -47,7 +49,7 @@ var RequireAwaitRule = rule.Rule{
 		}
 
 		exitFunction := func(node *ast.Node) {
-			if currentScope.functionFlags&checker.FunctionFlagsAsync != 0 && !currentScope.hasAwait && !(currentScope.functionFlags&checker.FunctionFlagsGenerator != 0 && currentScope.isAsyncYield) {
+			if currentScope.functionFlags&checker.FunctionFlagsAsync != 0 && !currentScope.hasAwait && (currentScope.functionFlags&checker.FunctionFlagsGenerator == 0 || !currentScope.isAsyncYield) {
 				// TODO(port): implement suggestions
 				// // If the function belongs to a method definition or
 				// // property, then the function's range may not include the

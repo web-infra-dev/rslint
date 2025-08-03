@@ -5,8 +5,8 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func buildUnsafeArgumentMessage(sender string, receiver string) rule.RuleMessage {
@@ -66,7 +66,7 @@ func newFunctionSignature(
 	for i, param := range parameters {
 		t := typeChecker.GetTypeOfSymbolAtLocation(param, node)
 
-		if param.Declarations != nil && len(param.Declarations) != 0 {
+		if len(param.Declarations) != 0 {
 			decl := param.Declarations[0]
 			if utils.IsRestParameterDeclaration(decl) {
 				// is a rest param
@@ -240,7 +240,10 @@ var NoUnsafeArgumentRule = rule.Rule{
 							// all remaining arguments should be compared against the rest type (if one exists)
 							signature.consumeRemainingArguments()
 						}
-					} else {
+
+					} else
+					//nolint:staticcheck // FIXME: todo
+					{
 						// something that's iterable
 						// handling this will be pretty complex - so we ignore it for now
 						// TODO - handle generic iterable case

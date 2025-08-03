@@ -1,12 +1,13 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // ConfigLoader handles loading and parsing of rslint and tsconfig files
@@ -38,7 +39,7 @@ func (loader *ConfigLoader) LoadRslintConfig(configPath string) (RslintConfig, s
 	var config RslintConfig
 	// Use JSONC parser to support comments and trailing commas
 	if err := utils.ParseJSONC([]byte(data), &config); err != nil {
-		return nil, "", fmt.Errorf("error parsing rslint config file %q: %v", configFileName, err)
+		return nil, "", fmt.Errorf("error parsing rslint config file %q: %w", configFileName, err)
 	}
 
 	// Update current directory to the config file's directory
@@ -57,7 +58,7 @@ func (loader *ConfigLoader) LoadDefaultRslintConfig() (RslintConfig, string, err
 		}
 	}
 
-	return nil, "", fmt.Errorf("no rslint config file found. Expected rslint.json or rslint.jsonc")
+	return nil, "", errors.New("no rslint config file found. Expected rslint.json or rslint.jsonc")
 }
 
 // LoadTsConfigsFromRslintConfig extracts and validates TypeScript configuration paths from rslint config
@@ -81,7 +82,7 @@ func (loader *ConfigLoader) LoadTsConfigsFromRslintConfig(rslintConfig RslintCon
 	}
 
 	if len(tsConfigs) == 0 {
-		return nil, fmt.Errorf("no TypeScript configuration found in rslint config")
+		return nil, errors.New("no TypeScript configuration found in rslint config")
 	}
 
 	return tsConfigs, nil

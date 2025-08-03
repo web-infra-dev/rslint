@@ -5,8 +5,8 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func buildUseUnknownMessageBase(method string) string {
@@ -129,13 +129,14 @@ var UseUnknownInCatchCallbackVariableRule = rule.Rule{
 				var method string
 				var argIndexToCheck int
 
-				if propertyName == "catch" {
+				switch propertyName {
+				case "catch":
 					method = "`catch`"
 					argIndexToCheck = 0
-				} else if propertyName == "then" {
+				case "then":
 					method = "`then` rejection"
 					argIndexToCheck = 1
-				} else {
+				default:
 					return
 				}
 

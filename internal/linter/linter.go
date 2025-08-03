@@ -5,8 +5,8 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
@@ -21,7 +21,7 @@ type ConfiguredRule struct {
 
 // when allowedFiles is passed as nil which means all files are allowed
 // when allowedFiles is passed as slice, only files in the slice are allowed
-func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []*ast.SourceFile, getRulesForFile func(sourceFile *ast.SourceFile) []ConfiguredRule, onDiagnostic func(diagnostic rule.RuleDiagnostic)) (int32, error) {
+func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []string, getRulesForFile func(sourceFile *ast.SourceFile) []ConfiguredRule, onDiagnostic func(diagnostic rule.RuleDiagnostic)) (int32, error) {
 
 	wg := core.NewWorkGroup(singleThreaded)
 
@@ -33,7 +33,6 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []*
 
 			wg.Queue(func() {
 				for _, file := range program.GetSourceFiles() {
-
 					p := string(file.Path())
 					// skip lint node_modules and bundled files
 					// FIXME: we may have better api to tell whether a file is a bundled file or not
@@ -43,8 +42,9 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []*
 					// only lint allowedFiles if allowedFiles is not empty
 					if allowFiles != nil {
 						found := false
-						for _, f := range allowFiles {
-							if f.Path() == file.Path() {
+						for _, filePath := range allowFiles {
+
+							if filePath == file.FileName() {
 								found = true
 								break
 							}

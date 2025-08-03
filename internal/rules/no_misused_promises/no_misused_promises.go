@@ -6,8 +6,8 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func buildConditionalMessage() rule.RuleMessage {
@@ -25,7 +25,7 @@ func buildPredicateMessage() rule.RuleMessage {
 func buildSpreadMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "spread",
-		Description: "Expected a non-Promise value to be spreaded in an object.",
+		Description: "Expected a non-Promise value to be spread in an object.",
 	}
 }
 func buildVoidReturnArgumentMessage() rule.RuleMessage {
@@ -508,7 +508,7 @@ var NoMisusedPromisesRule = rule.Rule{
 					// signature here against its compatible index signatures in `heritageTypes`
 					continue
 				}
-				if !(ast.IsIdentifier(nodeMember.Name()) || ast.IsPrivateIdentifier(nodeMember.Name()) || ast.IsStringLiteral(nodeMember.Name()) || ast.IsNumericLiteral(nodeMember.Name()) || ast.IsBigIntLiteral(nodeMember.Name())) {
+				if !ast.IsIdentifier(nodeMember.Name()) && !ast.IsPrivateIdentifier(nodeMember.Name()) && !ast.IsStringLiteral(nodeMember.Name()) && !ast.IsNumericLiteral(nodeMember.Name()) && !ast.IsBigIntLiteral(nodeMember.Name()) {
 					continue
 				}
 				memberName := nodeMember.Name().Text()
@@ -593,7 +593,9 @@ var NoMisusedPromisesRule = rule.Rule{
 				)
 
 				if isVoidReturningFunctionType(node.Name(), contextualType) {
+					//nolint:staticcheck // FIXME: todo
 					if ast.IsMethodDeclaration(node) {
+
 					}
 
 					if node.Type() != nil {

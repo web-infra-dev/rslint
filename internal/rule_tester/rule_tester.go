@@ -10,9 +10,9 @@ import (
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/typescript-eslint/rslint/internal/linter"
-	"github.com/typescript-eslint/rslint/internal/rule"
-	"github.com/typescript-eslint/rslint/internal/utils"
+	"github.com/web-infra-dev/rslint/internal/linter"
+	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 	"gotest.tools/v3/assert"
 )
 
@@ -76,12 +76,13 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 		program, err := utils.CreateProgram(true, fs, rootDir, tsconfigPath, host)
 		assert.NilError(t, err, "couldn't create program. code: "+code)
 
-		files := []*ast.SourceFile{program.GetSourceFile(fileName)}
+		sourceFile := program.GetSourceFile(fileName)
+		allowedFiles := []string{string(sourceFile.Path())}
 
 		_, err = linter.RunLinter(
 			[]*compiler.Program{program},
 			true,
-			files,
+			allowedFiles,
 			func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 				return []linter.ConfiguredRule{
 					{

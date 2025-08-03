@@ -3,7 +3,7 @@ package prefer_return_this_type
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/typescript-eslint/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 func buildUseThisTypeMessage() rule.RuleMessage {
