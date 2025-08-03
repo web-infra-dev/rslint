@@ -77,27 +77,8 @@ export class RSLintService {
     if (options.rslintPath) {
       this.rslintPath = options.rslintPath;
     } else {
-      // Always use CJS wrapper approach (like CLI tests) for maximum compatibility
-      try {
-        const require = createRequire(import.meta.url);
-        // This resolves to the CJS wrapper
-        const binPath = require.resolve('@rslint/core/bin');
-        this.rslintPath = binPath; // Set for reference
-        // Spawn the CJS wrapper directly like CLI tests do
-        this.process = spawn(binPath, ['--api'], {
-          stdio: ['pipe', 'pipe', 'inherit'],
-          cwd: options.workingDirectory || process.cwd(),
-          env: {
-            ...process.env,
-          },
-        });
-        // Skip the normal spawn path
-        this.setupProcessHandlers();
-        return;
-      } catch (error) {
-        // Fall back to direct binary path if CJS resolution fails
-        this.rslintPath = path.join(import.meta.dirname, '../bin/rslint');
-      }
+      // Try direct binary path first for CI compatibility
+      this.rslintPath = path.join(import.meta.dirname, '../bin/rslint');
     }
 
     this.process = spawn(this.rslintPath, ['--api'], {
