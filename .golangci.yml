@@ -7,11 +7,12 @@ linters:
     - unused # Check for unused constants, variables, functions and types
     - misspell # Finds commonly misspelled English words
     - unconvert # Remove unnecessary type conversions
+    - staticcheck # It's a set of rules from staticcheck
 
   disable:
     - errcheck # Check for unchecked errors
     - gosec # Inspects source code for security problems
-    - staticcheck # It's a set of rules from staticcheck
+
   exclusions:
     generated: lax
     presets:
