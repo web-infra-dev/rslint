@@ -7,6 +7,7 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules/adjacent_overload_signatures"
 	"github.com/web-infra-dev/rslint/internal/rules/await_thenable"
 	"github.com/web-infra-dev/rslint/internal/rules/no_array_delete"
 	"github.com/web-infra-dev/rslint/internal/rules/no_base_to_string"
@@ -254,6 +255,7 @@ func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConf
 
 // RegisterAllTypeSriptEslintPluginRules registers all available rules in the global registry
 func RegisterAllTypeSriptEslintPluginRules() {
+	GlobalRuleRegistry.Register("@typescript-eslint/adjacent-overload-signatures", adjacent_overload_signatures.AdjacentOverloadSignaturesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/await-thenable", await_thenable.AwaitThenableRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-array-delete", no_array_delete.NoArrayDeleteRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-base-to-string", no_base_to_string.NoBaseToStringRule)
