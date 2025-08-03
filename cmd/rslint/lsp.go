@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -83,7 +84,7 @@ func (s *LSPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 		// Respond with method not found for unhandled methods
 		return nil, &jsonrpc2.Error{
 			Code:    jsonrpc2.CodeMethodNotFound,
-			Message: fmt.Sprintf("method not found: %s", req.Method),
+			Message: "method not found: " + req.Method,
 		}
 	}
 }
@@ -411,7 +412,7 @@ type LintResponse struct {
 
 func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, rslintConfig config.RslintConfig) ([]rule.RuleDiagnostic, error) {
 	if len(programs) == 0 {
-		return nil, fmt.Errorf("no programs provided")
+		return nil, errors.New("no programs provided")
 	}
 
 	// Initialize rule registry with all available rules
@@ -439,7 +440,7 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 		diagnosticCollector,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error running linter: %v", err)
+		return nil, fmt.Errorf("error running linter: %w", err)
 	}
 
 	if diagnostics == nil {
@@ -501,7 +502,7 @@ func createCodeActionFromRuleDiagnostic(ruleDiag rule.RuleDiagnostic, uri lsprot
 	}
 
 	return &lsproto.CodeAction{
-		Title:       fmt.Sprintf("Fix: %s", ruleDiag.Message.Description),
+		Title:       "Fix: " + ruleDiag.Message.Description,
 		Kind:        ptrTo(lsproto.CodeActionKind("quickfix")),
 		Edit:        workspaceEdit,
 		Diagnostics: &[]*lsproto.Diagnostic{lspDiagnostic},
@@ -554,7 +555,7 @@ func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rul
 	}
 
 	return &lsproto.CodeAction{
-		Title:       fmt.Sprintf("Suggestion: %s", suggestion.Message.Description),
+		Title:       "Suggestion: " + suggestion.Message.Description,
 		Kind:        ptrTo(lsproto.CodeActionKind("quickfix")),
 		Edit:        workspaceEdit,
 		Diagnostics: &[]*lsproto.Diagnostic{lspDiagnostic},

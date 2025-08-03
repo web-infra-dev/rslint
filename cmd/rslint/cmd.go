@@ -88,7 +88,7 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 	case "jsonline":
 		printDiagnosticJsonLine(d, w, comparePathOptions)
 	default:
-		panic(fmt.Sprintf("not supported format %s", format))
+		panic("not supported format " + format)
 	}
 }
 
@@ -141,7 +141,8 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 			Error string `json:"error"`
 		}
 		errorObject := ErrorObject{Error: fmt.Sprintf("Failed to marshal diagnostic: %s", err)}
-		errorBytes, _ := json.Marshal(errorObject) // Ignoring error since struct is simple
+		
+		errorBytes,_ := json.Marshal(errorObject) //nolint:errchkjson
 		w.Write(errorBytes)
 		w.WriteByte('\n')
 		return
