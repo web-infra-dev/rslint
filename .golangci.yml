@@ -59,7 +59,7 @@ linters:
     - staticcheck
     # - testifylint
     # - unparam
-    # - unused
+    - unused
 
   settings:
     depguard:
