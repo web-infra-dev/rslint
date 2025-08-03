@@ -81,7 +81,7 @@ export class RSLintService {
           'Bin directory contents:',
           require('fs').readdirSync(binDir),
         );
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to read bin directory:', e.message);
       }
     }
