@@ -1,0 +1,8 @@
+[
+  {
+    "language": "typescript",
+    "files": ["test_boundary.ts"],
+    "languageOptions": { "parserOptions": { "project": ["tsconfig.json"] } },
+    "rules": { "explicit-module-boundary-types": "error" }
+  }
+]

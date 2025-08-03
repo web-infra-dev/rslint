@@ -82,6 +82,7 @@ describe('CLI Configuration Tests', () => {
         {
           language: 'javascript',
           files: ['**/*.ts'],
+          // @ts-ignore
           languageOptions: {
             parserOptions: {
               projectService: false,
@@ -124,6 +125,7 @@ describe('CLI Configuration Tests', () => {
         {
           language: 'javascript',
           files: ['**/*.ts'],
+          // @ts-ignore
           languageOptions: {
             parserOptions: {
               projectService: false,
@@ -168,6 +170,7 @@ describe('CLI Configuration Tests', () => {
         {
           language: 'javascript',
           files: ['**/*.ts'],
+          // @ts-ignore
           languageOptions: {
             parserOptions: {
               projectService: false,
@@ -216,6 +219,7 @@ describe('CLI Configuration Tests', () => {
         {
           language: 'javascript',
           files: ['**/*.ts'],
+          // @ts-ignore
           languageOptions: {
             parserOptions: {
               projectService: false,
@@ -304,6 +308,7 @@ describe('CLI Configuration Tests', () => {
         {
           language: 'javascript',
           files: ['**/*.ts'],
+          // @ts-ignore
           languageOptions: {
             parserOptions: {
               projectService: false,
@@ -341,6 +346,7 @@ describe('CLI Configuration Tests', () => {
         {
           language: 'javascript',
           files: ['**/*.ts'],
+          // @ts-ignore
           languageOptions: {
             parserOptions: {
               projectService: false,
@@ -383,6 +389,7 @@ describe('CLI Configuration Tests', () => {
         {
           language: 'javascript',
           files: ['**/*.ts'],
+          // @ts-ignore
           languageOptions: {
             parserOptions: {
               projectService: false,

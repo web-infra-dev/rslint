@@ -1,0 +1,77 @@
+exports[`no-empty-function > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-empty-function",
+      "messageId": "unexpected",
+      "message": "Unexpected empty constructor.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 28
+        },
+        "end": {
+          "line": 3,
+          "column": 29
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-empty-function > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-empty-function",
+      "messageId": "unexpected",
+      "message": "Unexpected empty method 'otherMethod'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 28
+        },
+        "end": {
+          "line": 3,
+          "column": 29
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-empty-function > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-empty-function",
+      "messageId": "unexpected",
+      "message": "Unexpected empty constructor.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 24
+        },
+        "end": {
+          "line": 3,
+          "column": 25
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

@@ -1,0 +1,599 @@
+exports[`@typescript-eslint/no-non-null-assertion > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 3
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 5
+        }
+      }
+    },
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 4
+        }
+      }
+    },
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 3
+        }
+      }
+    }
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 4
+        }
+      }
+    },
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 3
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 6
+        }
+      }
+    },
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 5
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 8
+        }
+      }
+    },
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 7
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 3
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 3
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 7
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 3
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 3
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 3
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 3
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 3
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 5
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 2
+        },
+        "end": {
+          "line": 1,
+          "column": 4
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 3
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 3
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 3
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 7
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`@typescript-eslint/no-non-null-assertion > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-non-null-assertion",
+      "messageId": "noNonNull",
+      "message": "Forbidden non-null assertion.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 8
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

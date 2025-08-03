@@ -1,0 +1,223 @@
+exports[`no-useless-empty-export > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-useless-empty-export",
+      "messageId": "uselessExport",
+      "message": "Empty export does nothing and can be removed.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 11
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-useless-empty-export > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-useless-empty-export",
+      "messageId": "uselessExport",
+      "message": "Empty export does nothing and can be removed.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 11
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-useless-empty-export > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-useless-empty-export",
+      "messageId": "uselessExport",
+      "message": "Empty export does nothing and can be removed.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 11
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-useless-empty-export > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-useless-empty-export",
+      "messageId": "uselessExport",
+      "message": "Empty export does nothing and can be removed.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 11
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-useless-empty-export > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-useless-empty-export",
+      "messageId": "uselessExport",
+      "message": "Empty export does nothing and can be removed.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 11
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-useless-empty-export > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-useless-empty-export",
+      "messageId": "uselessExport",
+      "message": "Empty export does nothing and can be removed.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 11
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-useless-empty-export > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-useless-empty-export",
+      "messageId": "uselessExport",
+      "message": "Empty export does nothing and can be removed.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 11
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-useless-empty-export > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-useless-empty-export",
+      "messageId": "uselessExport",
+      "message": "Empty export does nothing and can be removed.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 11
+        }
+      }
+    },
+    {
+      "ruleName": "no-useless-empty-export",
+      "messageId": "uselessExport",
+      "message": "Empty export does nothing and can be removed.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 1
+        },
+        "end": {
+          "line": 4,
+          "column": 11
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

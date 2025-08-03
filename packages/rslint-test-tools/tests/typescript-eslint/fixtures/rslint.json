@@ -1,6 +1,6 @@
 [
   {
-    "language": "javascript",
+    "language": "typescript",
     "files": [],
     "languageOptions": {
       "parserOptions": {
@@ -8,7 +8,9 @@
         "project": ["./tsconfig.virtual.json"]
       }
     },
-    "rules": {},
+    "rules": {
+      "no-redeclare": "error"
+    },
     "plugins": []
   }
 ]

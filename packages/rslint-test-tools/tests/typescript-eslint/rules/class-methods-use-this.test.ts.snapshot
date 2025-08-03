@@ -1,0 +1,1039 @@
+exports[`class-methods-use-this > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 9
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 17
+        },
+        "end": {
+          "line": 3,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class getter '#getter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 7
+        },
+        "end": {
+          "line": 3,
+          "column": 14
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 7
+        },
+        "end": {
+          "line": 3,
+          "column": 13
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 15
+        },
+        "end": {
+          "line": 3,
+          "column": 21
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 17
+        },
+        "end": {
+          "line": 3,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class setter '#setter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 7
+        },
+        "end": {
+          "line": 3,
+          "column": 14
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 9
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class method '#method'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 10
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 11
+        },
+        "end": {
+          "line": 3,
+          "column": 17
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 13
+        },
+        "end": {
+          "line": 3,
+          "column": 19
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 11
+        },
+        "end": {
+          "line": 3,
+          "column": 17
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 7
+        },
+        "end": {
+          "line": 3,
+          "column": 13
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class getter '#getter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 7
+        },
+        "end": {
+          "line": 3,
+          "column": 14
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 22`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 15
+        },
+        "end": {
+          "line": 3,
+          "column": 21
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 23`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 17
+        },
+        "end": {
+          "line": 3,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 24`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 7
+        },
+        "end": {
+          "line": 3,
+          "column": 13
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 25`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class setter '#setter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 7
+        },
+        "end": {
+          "line": 3,
+          "column": 14
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 26`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 15
+        },
+        "end": {
+          "line": 3,
+          "column": 21
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 27`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 17
+        },
+        "end": {
+          "line": 3,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 28`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 12
+        },
+        "end": {
+          "line": 3,
+          "column": 18
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 29`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 16
+        },
+        "end": {
+          "line": 3,
+          "column": 22
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 13
+        },
+        "end": {
+          "line": 3,
+          "column": 19
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 30`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 16
+        },
+        "end": {
+          "line": 3,
+          "column": 22
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 31`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 12
+        },
+        "end": {
+          "line": 3,
+          "column": 18
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 32`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 16
+        },
+        "end": {
+          "line": 3,
+          "column": 22
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 33`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 16
+        },
+        "end": {
+          "line": 3,
+          "column": 22
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 34`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class property 'property'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 14
+        },
+        "end": {
+          "line": 3,
+          "column": 22
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 35`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class property '#property'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 15
+        },
+        "end": {
+          "line": 3,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 36`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class property 'property'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 23
+        },
+        "end": {
+          "line": 3,
+          "column": 31
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 37`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class property 'property'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 23
+        },
+        "end": {
+          "line": 3,
+          "column": 31
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 38`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class property 'property'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 22
+        },
+        "end": {
+          "line": 3,
+          "column": 30
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 39`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class property 'property'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 24
+        },
+        "end": {
+          "line": 3,
+          "column": 32
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class property 'method'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 21
+        },
+        "end": {
+          "line": 3,
+          "column": 29
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 40`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 6,
+          "column": 5
+        },
+        "end": {
+          "line": 6,
+          "column": 11
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class property 'method'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 29
+        },
+        "end": {
+          "line": 3,
+          "column": 37
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class property 'method'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 31
+        },
+        "end": {
+          "line": 3,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class method '#method'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 10
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 7
+        },
+        "end": {
+          "line": 3,
+          "column": 13
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`class-methods-use-this > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "class-methods-use-this",
+      "messageId": "missingThis",
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 15
+        },
+        "end": {
+          "line": 3,
+          "column": 21
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

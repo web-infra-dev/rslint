@@ -1,0 +1,285 @@
+exports[`no-confusing-non-null-assertion > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-confusing-non-null-assertion",
+      "messageId": "confusingEqual",
+      "message": "Confusing combination of non-null assertion and equality test like \`a! == b\`, which looks very similar to \`a !== b\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 8
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-confusing-non-null-assertion",
+      "messageId": "confusingOperator",
+      "message": "Confusing combination of non-null assertion and \`in\` operator like \`a! in b\`, which might be misinterpreted as \`!(a in b)\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 8
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-confusing-non-null-assertion",
+      "messageId": "confusingOperator",
+      "message": "Confusing combination of non-null assertion and \`instanceof\` operator like \`a! instanceof b\`, which might be misinterpreted as \`!(a instanceof b)\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 16
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-confusing-non-null-assertion",
+      "messageId": "confusingEqual",
+      "message": "Confusing combination of non-null assertion and equality test like \`a! == b\`, which looks very similar to \`a !== b\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 9
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-confusing-non-null-assertion",
+      "messageId": "confusingEqual",
+      "message": "Confusing combination of non-null assertion and equality test like \`a! == b\`, which looks very similar to \`a !== b\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 12
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-confusing-non-null-assertion",
+      "messageId": "confusingEqual",
+      "message": "Confusing combination of non-null assertion and equality test like \`a! == b\`, which looks very similar to \`a !== b\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 47
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-confusing-non-null-assertion",
+      "messageId": "confusingEqual",
+      "message": "Confusing combination of non-null assertion and equality test like \`a! == b\`, which looks very similar to \`a !== b\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 12
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-confusing-non-null-assertion",
+      "messageId": "confusingAssign",
+      "message": "Confusing combination of non-null assertion and assignment like \`a! = b\`, which looks very similar to \`a != b\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 7
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-confusing-non-null-assertion",
+      "messageId": "confusingAssign",
+      "message": "Confusing combination of non-null assertion and assignment like \`a! = b\`, which looks very similar to \`a != b\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 46
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-confusing-non-null-assertion",
+      "messageId": "confusingAssign",
+      "message": "Confusing combination of non-null assertion and assignment like \`a! = b\`, which looks very similar to \`a != b\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 10
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-confusing-non-null-assertion > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-confusing-non-null-assertion",
+      "messageId": "confusingOperator",
+      "message": "Confusing combination of non-null assertion and \`in\` operator like \`a! in b\`, which might be misinterpreted as \`!(a in b)\`.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 1,
+          "column": 8
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

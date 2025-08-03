@@ -1,0 +1,25 @@
+exports[`consistent-return > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-return",
+      "messageId": "missingReturnValue",
+      "message": "Function 'foo' expected a return value.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 16
+        },
+        "end": {
+          "line": 4,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

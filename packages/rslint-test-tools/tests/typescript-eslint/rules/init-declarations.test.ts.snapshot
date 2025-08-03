@@ -1,0 +1,755 @@
+exports[`init-declarations > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "initialized",
+      "message": "Variable 'foo' should be initialized at declaration.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 5
+        },
+        "end": {
+          "line": 1,
+          "column": 8
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "notInitialized",
+      "message": "Variable 'foo' should not be initialized.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 5
+        },
+        "end": {
+          "line": 1,
+          "column": 15
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "notInitialized",
+      "message": "Variable 'bar' should not be initialized.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 3
+        },
+        "end": {
+          "line": 3,
+          "column": 10
+        }
+      }
+    },
+    {
+      "ruleName": "init-declarations",
+      "messageId": "notInitialized",
+      "message": "Variable 'baz' should not be initialized.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 3
+        },
+        "end": {
+          "line": 4,
+          "column": 10
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "notInitialized",
+      "message": "Variable 'bar' should not be initialized.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 7
+        },
+        "end": {
+          "line": 4,
+          "column": 16
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "notInitialized",
+      "message": "Variable 'a' should not be initialized.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 5
+        },
+        "end": {
+          "line": 1,
+          "column": 10
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "notInitialized",
+      "message": "Variable 'a' should not be initialized.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 7
+        },
+        "end": {
+          "line": 3,
+          "column": 16
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "notInitialized",
+      "message": "Variable 'c' should not be initialized.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 7
+        },
+        "end": {
+          "line": 5,
+          "column": 12
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "notInitialized",
+      "message": "Variable 'i' should not be initialized.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 10
+        },
+        "end": {
+          "line": 1,
+          "column": 15
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "notInitialized",
+      "message": "Variable 'foo' should not be initialized.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 10
+        },
+        "end": {
+          "line": 2,
+          "column": 13
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "notInitialized",
+      "message": "Variable 'foo' should not be initialized.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 10
+        },
+        "end": {
+          "line": 2,
+          "column": 13
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "initialized",
+      "message": "Variable 'bar' should be initialized at declaration.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 7
+        },
+        "end": {
+          "line": 3,
+          "column": 10
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "initialized",
+      "message": "Variable 'foo' should be initialized at declaration.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 23
+        },
+        "end": {
+          "line": 1,
+          "column": 26
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "notInitialized",
+      "message": "Variable 'arr' should not be initialized.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 5
+        },
+        "end": {
+          "line": 1,
+          "column": 34
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "notInitialized",
+      "message": "Variable 'arr' should not be initialized.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 5
+        },
+        "end": {
+          "line": 1,
+          "column": 33
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 22`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "notInitialized",
+      "message": "Variable 'name1' should not be initialized.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 9
+        },
+        "end": {
+          "line": 4,
+          "column": 32
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 23`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "initialized",
+      "message": "Variable 'arr' should be initialized at declaration.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 5
+        },
+        "end": {
+          "line": 1,
+          "column": 8
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 24`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "initialized",
+      "message": "Variable 'numberOfGreetings' should be initialized at declaration.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 7
+        },
+        "end": {
+          "line": 3,
+          "column": 24
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 25`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "notInitialized",
+      "message": "Variable 'numberOfGreetings' should not be initialized.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 7
+        },
+        "end": {
+          "line": 3,
+          "column": 36
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 26`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "initialized",
+      "message": "Variable 'foo' should be initialized at declaration.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 9
+        },
+        "end": {
+          "line": 3,
+          "column": 12
+        }
+      }
+    },
+    {
+      "ruleName": "init-declarations",
+      "messageId": "initialized",
+      "message": "Variable 'bar' should be initialized at declaration.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 9
+        },
+        "end": {
+          "line": 5,
+          "column": 12
+        }
+      }
+    },
+    {
+      "ruleName": "init-declarations",
+      "messageId": "initialized",
+      "message": "Variable 'baz' should be initialized at declaration.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 7,
+          "column": 11
+        },
+        "end": {
+          "line": 7,
+          "column": 14
+        }
+      }
+    }
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "initialized",
+      "message": "Variable 'foo' should be initialized at declaration.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 5
+        },
+        "end": {
+          "line": 2,
+          "column": 8
+        }
+      }
+    },
+    {
+      "ruleName": "init-declarations",
+      "messageId": "initialized",
+      "message": "Variable 'baz' should be initialized at declaration.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 3
+        },
+        "end": {
+          "line": 4,
+          "column": 6
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "initialized",
+      "message": "Variable 'bar' should be initialized at declaration.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 7
+        },
+        "end": {
+          "line": 4,
+          "column": 10
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "initialized",
+      "message": "Variable 'foo' should be initialized at declaration.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 7
+        },
+        "end": {
+          "line": 3,
+          "column": 10
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "initialized",
+      "message": "Variable 'a' should be initialized at declaration.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 5
+        },
+        "end": {
+          "line": 1,
+          "column": 6
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "initialized",
+      "message": "Variable 'b' should be initialized at declaration.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 5
+        },
+        "end": {
+          "line": 4,
+          "column": 6
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "initialized",
+      "message": "Variable 'a' should be initialized at declaration.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 7
+        },
+        "end": {
+          "line": 3,
+          "column": 8
+        }
+      }
+    },
+    {
+      "ruleName": "init-declarations",
+      "messageId": "initialized",
+      "message": "Variable 'c' should be initialized at declaration.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 7
+        },
+        "end": {
+          "line": 5,
+          "column": 8
+        }
+      }
+    }
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`init-declarations > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "init-declarations",
+      "messageId": "notInitialized",
+      "message": "Variable 'foo' should not be initialized.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 5
+        },
+        "end": {
+          "line": 1,
+          "column": 20
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

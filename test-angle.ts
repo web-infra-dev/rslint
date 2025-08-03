@@ -1,0 +1,1 @@
+const angleTest = <const>'foo';

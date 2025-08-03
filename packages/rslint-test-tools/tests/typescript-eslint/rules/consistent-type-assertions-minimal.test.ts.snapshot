@@ -1,0 +1,51 @@
+exports[`consistent-type-assertions > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "angle-bracket",
+      "message": "Use '<Foo>' instead of 'as Foo'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 39
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`consistent-type-assertions > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "consistent-type-assertions",
+      "messageId": "angle-bracket",
+      "message": "Use '<A>' instead of 'as A'.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 11
+        },
+        "end": {
+          "line": 1,
+          "column": 17
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

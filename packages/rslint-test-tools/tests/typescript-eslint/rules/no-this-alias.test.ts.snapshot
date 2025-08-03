@@ -1,0 +1,283 @@
+exports[`no-this-alias > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-this-alias",
+      "messageId": "thisAssignment",
+      "message": "Unexpected aliasing of 'this' to local variable.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 7
+        },
+        "end": {
+          "line": 1,
+          "column": 11
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-this-alias > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-this-alias",
+      "messageId": "thisAssignment",
+      "message": "Unexpected aliasing of 'this' to local variable.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 7
+        },
+        "end": {
+          "line": 1,
+          "column": 11
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-this-alias > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-this-alias",
+      "messageId": "thisAssignment",
+      "message": "Unexpected aliasing of 'this' to local variable.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 3,
+          "column": 1
+        },
+        "end": {
+          "line": 3,
+          "column": 5
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-this-alias > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-this-alias",
+      "messageId": "thisDestructure",
+      "message": "Unexpected aliasing of members of 'this' to local variables.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 1,
+          "column": 7
+        },
+        "end": {
+          "line": 1,
+          "column": 23
+        }
+      }
+    }
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-this-alias > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-this-alias",
+      "messageId": "thisAssignment",
+      "message": "Unexpected aliasing of 'this' to local variable.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 2,
+          "column": 5
+        },
+        "end": {
+          "line": 2,
+          "column": 13
+        }
+      }
+    },
+    {
+      "ruleName": "no-this-alias",
+      "messageId": "thisAssignment",
+      "message": "Unexpected aliasing of 'this' to local variable.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 7
+        },
+        "end": {
+          "line": 5,
+          "column": 17
+        }
+      }
+    },
+    {
+      "ruleName": "no-this-alias",
+      "messageId": "thisAssignment",
+      "message": "Unexpected aliasing of 'this' to local variable.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 8,
+          "column": 9
+        },
+        "end": {
+          "line": 8,
+          "column": 17
+        }
+      }
+    }
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;
+
+exports[`no-this-alias > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "ruleName": "no-this-alias",
+      "messageId": "thisAssignment",
+      "message": "Unexpected aliasing of 'this' to local variable.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 4,
+          "column": 11
+        },
+        "end": {
+          "line": 4,
+          "column": 24
+        }
+      }
+    },
+    {
+      "ruleName": "no-this-alias",
+      "messageId": "thisAssignment",
+      "message": "Unexpected aliasing of 'this' to local variable.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 5,
+          "column": 11
+        },
+        "end": {
+          "line": 5,
+          "column": 17
+        }
+      }
+    },
+    {
+      "ruleName": "no-this-alias",
+      "messageId": "thisAssignment",
+      "message": "Unexpected aliasing of 'this' to local variable.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 13,
+          "column": 11
+        },
+        "end": {
+          "line": 13,
+          "column": 27
+        }
+      }
+    },
+    {
+      "ruleName": "no-this-alias",
+      "messageId": "thisDestructure",
+      "message": "Unexpected aliasing of members of 'this' to local variables.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 14,
+          "column": 11
+        },
+        "end": {
+          "line": 14,
+          "column": 18
+        }
+      }
+    },
+    {
+      "ruleName": "no-this-alias",
+      "messageId": "thisDestructure",
+      "message": "Unexpected aliasing of members of 'this' to local variables.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 15,
+          "column": 11
+        },
+        "end": {
+          "line": 15,
+          "column": 31
+        }
+      }
+    },
+    {
+      "ruleName": "no-this-alias",
+      "messageId": "thisDestructure",
+      "message": "Unexpected aliasing of members of 'this' to local variables.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 16,
+          "column": 11
+        },
+        "end": {
+          "line": 16,
+          "column": 16
+        }
+      }
+    },
+    {
+      "ruleName": "no-this-alias",
+      "messageId": "thisDestructure",
+      "message": "Unexpected aliasing of members of 'this' to local variables.",
+      "filePath": "src/virtual.ts",
+      "range": {
+        "start": {
+          "line": 17,
+          "column": 11
+        },
+        "end": {
+          "line": 17,
+          "column": 21
+        }
+      }
+    }
+  ],
+  "errorCount": 7,
+  "fileCount": 1,
+  "ruleCount": 1
+}
+`;

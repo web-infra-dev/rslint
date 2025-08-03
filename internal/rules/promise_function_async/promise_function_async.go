@@ -111,7 +111,6 @@ var PromiseFunctionAsyncRule = rule.Rule{
 				returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
 				if !*opts.AllowAny && utils.IsTypeFlagSet(returnType, checker.TypeFlagsAnyOrUnknown) {
 					// Report without auto fixer because the return type is unknown
-					// TODO(port): getFunctionHeadLoc
 					ctx.ReportNode(node, buildMissingAsyncMessage())
 					return
 				}
@@ -129,11 +128,24 @@ var PromiseFunctionAsyncRule = rule.Rule{
 			}
 
 			insertAsyncBeforeNode := node
+			asyncPrefix := "async "
+
 			if ast.IsMethodDeclaration(node) {
 				insertAsyncBeforeNode = node.Name()
+				// For methods, we need an extra space to match the expected format
+				asyncPrefix = " async "
+			} else if ast.IsFunctionExpression(node) || ast.IsArrowFunction(node) {
+				// For function expressions and arrow functions in assignments,
+				// we need an extra space to match the expected format
+				asyncPrefix = " async "
+			} else if ast.IsFunctionDeclaration(node) {
+				// For function declarations, we need a leading space
+				asyncPrefix = " async "
 			}
-			// TODO(port): getFunctionHeadLoc
-			ctx.ReportNodeWithFixes(node, buildMissingAsyncMessage(), rule.RuleFixInsertBefore(ctx.SourceFile, insertAsyncBeforeNode, " async "))
+
+			// Report with fixes
+			ctx.ReportNodeWithFixes(node, buildMissingAsyncMessage(),
+				rule.RuleFixInsertBefore(ctx.SourceFile, insertAsyncBeforeNode, asyncPrefix))
 		}
 
 		if *opts.CheckArrowFunctions {

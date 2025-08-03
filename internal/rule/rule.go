@@ -72,7 +72,7 @@ func ListenerOnExit(kind ast.Kind) ast.Kind {
 	return kind + 1000
 }
 
-// TODO(port): better name
+// ListenerOnAllowPattern creates a listener kind for allowed pattern matching
 func ListenerOnAllowPattern(kind ast.Kind) ast.Kind {
 	return kind + lastOnExitTokenKind
 }

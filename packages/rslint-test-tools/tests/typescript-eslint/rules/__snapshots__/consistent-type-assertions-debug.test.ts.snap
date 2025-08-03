@@ -1,0 +1,27 @@
+// Rstest Snapshot v1
+
+exports[`consistent-type-assertions > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Use 'as A' instead of '<A>'.",
+      "messageId": "as",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "consistent-type-assertions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

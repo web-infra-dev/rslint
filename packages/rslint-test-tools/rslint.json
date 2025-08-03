@@ -1,0 +1,17 @@
+[
+  {
+    "language": "typescript",
+    "files": ["src/virtual.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "projectService": false,
+        "project": ["./tests/typescript-eslint/fixtures/tsconfig.virtual.json"]
+      }
+    },
+    "rules": {
+      "no-inferrable-types": "error",
+      "no-unsafe-declaration-merging": "error"
+    },
+    "plugins": []
+  }
+]
