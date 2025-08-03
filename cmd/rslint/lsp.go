@@ -274,7 +274,6 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 
 	// Create multiple programs for all tsconfig files
 	var programs []*compiler.Program
-	var allSourceFiles []*ast.SourceFile
 	var targetFile *ast.SourceFile
 
 	for _, tsConfigPath := range tsConfigs {
@@ -287,7 +286,6 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 
 		// Check if the current file is in this program
 		sourceFiles := program.GetSourceFiles()
-		allSourceFiles = append(allSourceFiles, sourceFiles...)
 
 		if targetFile == nil {
 			for _, sf := range sourceFiles {
@@ -451,10 +449,13 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 
 // Helper function to check if two ranges overlap
 func rangesOverlap(a, b lsproto.Range) bool {
-	return !(a.End.Line < b.Start.Line ||
-		(a.End.Line == b.Start.Line && a.End.Character < b.Start.Character) ||
-		b.End.Line < a.Start.Line ||
-		(b.End.Line == a.Start.Line && b.End.Character < a.Start.Character))
+	// Ranges overlap if a starts before or at b's end AND b starts before or at a's end
+	aStartsBefore := a.Start.Line < b.End.Line ||
+		(a.Start.Line == b.End.Line && a.Start.Character <= b.End.Character)
+	bStartsBefore := b.Start.Line < a.End.Line ||
+		(b.Start.Line == a.End.Line && b.Start.Character <= a.End.Character)
+
+	return aStartsBefore && bStartsBefore
 }
 
 // Helper function to create a code action from a rule diagnostic

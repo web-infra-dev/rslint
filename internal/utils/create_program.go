@@ -43,7 +43,7 @@ func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath stri
 
 	diagnostics := program.GetSyntacticDiagnostics(context.Background(), nil)
 	if len(diagnostics) != 0 {
-		return nil, fmt.Errorf("found %v syntactic errors. Try running \"tsgo --noEmit\" first\n", len(diagnostics))
+		return nil, fmt.Errorf("found %v syntactic errors. Try running \"tsgo --noEmit\" first", len(diagnostics))
 	}
 
 	program.BindSourceFiles()

@@ -159,7 +159,7 @@ func IncludesModifier(node interface{ Modifiers() *ast.ModifierList }, modifier 
 	if modifiers == nil {
 		return false
 	}
-	return Some(modifiers.NodeList.Nodes, func(m *ast.Node) bool {
+	return Some(modifiers.Nodes, func(m *ast.Node) bool {
 		return m.Kind == modifier
 	})
 }

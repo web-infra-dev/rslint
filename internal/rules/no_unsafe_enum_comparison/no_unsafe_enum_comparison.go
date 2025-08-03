@@ -134,7 +134,7 @@ var NoUnsafeEnumComparisonRule = rule.Rule{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				expr := node.AsBinaryExpression()
 				opKind := expr.OperatorToken.Kind
-				if !(opKind == ast.KindLessThanToken || opKind == ast.KindLessThanEqualsToken || opKind == ast.KindGreaterThanToken || opKind == ast.KindGreaterThanEqualsToken || opKind == ast.KindEqualsEqualsToken || opKind == ast.KindEqualsEqualsEqualsToken || opKind == ast.KindExclamationEqualsToken || opKind == ast.KindExclamationEqualsEqualsToken) {
+				if opKind != ast.KindLessThanToken && opKind != ast.KindLessThanEqualsToken && opKind != ast.KindGreaterThanToken && opKind != ast.KindGreaterThanEqualsToken && opKind != ast.KindEqualsEqualsToken && opKind != ast.KindEqualsEqualsEqualsToken && opKind != ast.KindExclamationEqualsToken && opKind != ast.KindExclamationEqualsEqualsToken {
 					return
 				}
 

@@ -56,7 +56,7 @@ linters:
     # - gocritic
     # - gosec
     # - revive
-    # - staticcheck
+    - staticcheck
     # - testifylint
     # - unparam
     # - unused

@@ -305,11 +305,12 @@ var NoBaseToStringRule = rule.Rule{
 				if ast.IsPropertyAccessExpression(callExpr.Expression) {
 					memberExpr := callExpr.Expression.AsPropertyAccessExpression()
 					propertyName := memberExpr.Name().Text()
-					if propertyName == "join" {
+					switch propertyName {
+					case "join":
 						t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, memberExpr.Expression)
 						checkExpressionForArrayJoin(memberExpr.Expression, t)
 						return
-					} else if propertyName == "toLocaleString" || propertyName == "toString" {
+					case "toLocaleString", "toString":
 						checkExpression(memberExpr.Expression, nil)
 						return
 					}
