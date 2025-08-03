@@ -104,9 +104,11 @@ export class RSLintService {
       }
     }
 
+    // Try spawning with shell to see if that helps with ENOENT
     this.process = spawn(this.rslintPath, ['--api'], {
       stdio: ['pipe', 'pipe', 'inherit'],
       cwd: options.workingDirectory || process.cwd(),
+      shell: true,
       env: {
         ...process.env,
       },
