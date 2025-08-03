@@ -98,8 +98,12 @@ func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request)
 		}
 	}
 
-	if params.RootUri.DocumentUri != nil {
-		s.rootURI = uriToPath(string(*params.RootUri.DocumentUri))
+	// Set root URI from workspace folders if available, otherwise fall back to rootUri
+	if params.WorkspaceFolders != nil && len(*params.WorkspaceFolders.WorkspaceFolders) > 0 {
+		// Use the first workspace folder as the root
+		s.rootURI = uriToPath(string((*params.WorkspaceFolders.WorkspaceFolders)[0].Uri))
+	} else {
+		return nil, errors.New("No workspace folders provided in initialize params")
 	}
 
 	result := &lsproto.InitializeResult{
