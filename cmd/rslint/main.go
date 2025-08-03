@@ -25,5 +25,5 @@ func runMain() int {
 		}
 	}
 	// run in CLI mode for direct command line usage
-	return int(runCMD())
+	return runCMD()
 }

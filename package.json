@@ -25,8 +25,8 @@
     "test:go": "go test ./internal/...",
     "typecheck": "pnpm tsc -b tsconfig.json",
     "lint": "rslint",
-    "lint:go": "go vet ./cmd/... ./internal/...",
-    "format:go": "go fmt ./cmd/... ./internal/...",
+    "lint:go": "golangci-lint run ./cmd/... ./internal/...",
+    "format:go": "golangci-lint fmt ./cmd/... ./internal/...",
     "prepare": "husky"
   },
   "devDependencies": {

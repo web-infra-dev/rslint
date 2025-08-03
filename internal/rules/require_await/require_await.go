@@ -13,6 +13,8 @@ func buildMissingAwaitMessage() rule.RuleMessage {
 		Description: "Function has no 'await' expression.",
 	}
 }
+
+//nolint:unused
 func buildRemoveAsyncMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "removeAsync",

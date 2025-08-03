@@ -33,6 +33,11 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache-name: test-go
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+          args: --timeout=5m ./cmd/... ./internal/...
       - name: go vet
         run: npm run lint:go
       - name: go fmt

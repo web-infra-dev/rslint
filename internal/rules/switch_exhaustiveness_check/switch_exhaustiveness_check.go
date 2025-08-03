@@ -10,6 +10,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
+//nolint:unused
 func buildAddMissingCasesMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "addMissingCases",

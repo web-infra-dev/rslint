@@ -21,6 +21,8 @@ func buildMismatchedConditionMessage() rule.RuleMessage {
 		Description: "The two values in this comparison do not have a shared enum type.",
 	}
 }
+
+//nolint:unused
 func buildReplaceValueWithEnumMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "replaceValueWithEnum",
