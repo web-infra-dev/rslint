@@ -336,7 +336,7 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 						nameText = nameNode.Text()
 					}
 
-					valueText := strings.TrimSpace(string(ctx.SourceFile.Text()[property.Initializer.Pos():property.Initializer.End()]))
+					valueText := strings.TrimSpace(ctx.SourceFile.Text()[property.Initializer.Pos():property.Initializer.End()])
 
 					var fixText string
 					fixText += printNodeModifiers(node, "get")
