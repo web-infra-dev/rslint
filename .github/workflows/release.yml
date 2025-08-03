@@ -132,20 +132,30 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache-name: linux-x86
-
       - name: Install pnpm
         run: corepack enable
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Format code
-        run: pnpm format:check
+      - name: Download Artifact
+        uses: actions/download-artifact@v4.1.7
+        with:
+          path: binaries
+
+      - name: Move binaries
+        run: |
+          find ./binaries
+          for file in binaries/*/*-rslint; do
+            echo "Processing $file"
+            filename=$(basename "$file")
+            dirname="${filename%-rslint}"
+            target_dir="npm/$dirname"
+            mkdir -p "$target_dir"
+            echo "Copy $file to $target_dir/rslint"
+            cp "$file" "npm/$dirname/rslint"
+          done
+          find ./npm
 
       - name: Publish npm packages
         if: env.release_npm == 'true'
