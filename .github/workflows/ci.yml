@@ -34,7 +34,7 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache-name: test-go
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v8
         with:
           version: latest
           args: --timeout=5m ./cmd/... ./internal/...
