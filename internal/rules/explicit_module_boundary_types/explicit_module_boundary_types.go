@@ -92,8 +92,6 @@ func isFunction(node *ast.Node) bool {
 	return false
 }
 
-
-
 // Check if arrow function directly returns as const
 func hasDirectConstAssertion(node *ast.Node) bool {
 	if node.Kind != ast.KindArrowFunction {
@@ -453,7 +451,7 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 		// Track return statements for functions
 		functionReturnsMap := make(map[*ast.Node][]*ast.Node)
 		functionStack := []*ast.Node{}
-		
+
 		// Track which functions have already been checked to avoid duplicates
 		checkedFunctions := make(map[*ast.Node]bool)
 
@@ -517,7 +515,7 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 				return
 			}
 			checkedFunctions[node] = true
-			
+
 			// Only check exported functions
 			if !isExported(node) {
 				return
@@ -541,7 +539,7 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 						return
 					}
 				}
-				
+
 				// Check for private modifier
 				if modifiers != nil {
 					for _, mod := range modifiers.Nodes {
@@ -731,11 +729,11 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 					functionStack = functionStack[:len(functionStack)-1]
 				}
 			},
-			
+
 			// Handle property declarations that might contain arrow functions
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
 				propDecl := node.AsPropertyDeclaration()
-				
+
 				// Check if it's private
 				isPrivate := false
 				if propDecl.Modifiers() != nil {
@@ -746,12 +744,12 @@ var ExplicitModuleBoundaryTypesRule = rule.Rule{
 						}
 					}
 				}
-				
+
 				// Skip private properties
 				if isPrivate {
 					return
 				}
-				
+
 				// Check if the initializer is an arrow function
 				if propDecl.Initializer != nil && propDecl.Initializer.Kind == ast.KindArrowFunction {
 					checkFunction(propDecl.Initializer)

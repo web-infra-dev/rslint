@@ -12,7 +12,6 @@ func buildNoUselessConstructorMessage() rule.RuleMessage {
 	}
 }
 
-
 // Check if method with accessibility is not useless
 func checkAccessibility(node *ast.Node) bool {
 	if node.Kind != ast.KindConstructor {
@@ -298,7 +297,6 @@ func isConstructorUseless(node *ast.Node) bool {
 
 	return true
 }
-
 
 var NoUselessConstructorRule = rule.Rule{
 	Name: "no-useless-constructor",

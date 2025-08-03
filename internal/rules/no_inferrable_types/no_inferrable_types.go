@@ -332,13 +332,13 @@ var NoInferrableTypesRule = rule.Rule{
 
 			var typeAnnotation, value *ast.Node
 			var isReadonly, isOptional bool
-			
+
 			switch node.Kind {
 			case ast.KindPropertyDeclaration:
 				propDecl := node.AsPropertyDeclaration()
 				typeAnnotation = propDecl.Type
 				value = propDecl.Initializer
-				
+
 				// Check for readonly modifier
 				if propDecl.Modifiers() != nil {
 					for _, mod := range propDecl.Modifiers().Nodes {
@@ -348,18 +348,18 @@ var NoInferrableTypesRule = rule.Rule{
 						}
 					}
 				}
-				
+
 				// Check for optional property (PostfixToken with ?)
 				if propDecl.PostfixToken != nil && propDecl.PostfixToken.Kind == ast.KindQuestionToken {
 					isOptional = true
 				}
 				// Note: ExclamationToken (!) is definite assignment assertion, not optional, so we should still check it
-				
+
 			case ast.KindPropertySignature:
 				propSig := node.AsPropertySignatureDeclaration()
 				typeAnnotation = propSig.Type
 				value = propSig.Initializer
-				
+
 				// Check for readonly modifier
 				if propSig.Modifiers() != nil {
 					for _, mod := range propSig.Modifiers().Nodes {
@@ -369,7 +369,7 @@ var NoInferrableTypesRule = rule.Rule{
 						}
 					}
 				}
-				
+
 				// Check for optional property (PostfixToken with ?)
 				if propSig.PostfixToken != nil && propSig.PostfixToken.Kind == ast.KindQuestionToken {
 					isOptional = true

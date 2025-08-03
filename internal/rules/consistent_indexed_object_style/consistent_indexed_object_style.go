@@ -1156,7 +1156,7 @@ func wouldCreateCircularRecord(typeLiteral *ast.Node, parentTypeName string) boo
 	// (not nested within other type literals)
 	current := typeLiteral.Parent
 	isDirectChild := false
-	
+
 	for current != nil {
 		if current == parentDecl {
 			isDirectChild = true
@@ -1167,9 +1167,9 @@ func wouldCreateCircularRecord(typeLiteral *ast.Node, parentTypeName string) boo
 			break
 		}
 		// Allow transparent types (union, intersection, parentheses)
-		if current.Kind != ast.KindUnionType && 
-		   current.Kind != ast.KindIntersectionType && 
-		   current.Kind != ast.KindParenthesizedType {
+		if current.Kind != ast.KindUnionType &&
+			current.Kind != ast.KindIntersectionType &&
+			current.Kind != ast.KindParenthesizedType {
 			// Some other type - if it's not the type alias, we're nested
 			if current.Kind != ast.KindTypeAliasDeclaration {
 				break
@@ -1186,4 +1186,3 @@ func wouldCreateCircularRecord(typeLiteral *ast.Node, parentTypeName string) boo
 	// Check if this type literal deeply references the parent type
 	return isDeeplyReferencingType(typeLiteral, parentTypeName, make(map[*ast.Node]bool))
 }
-

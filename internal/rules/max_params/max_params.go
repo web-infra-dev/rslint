@@ -130,7 +130,7 @@ var MaxParamsRule = rule.Rule{
 
 		if options != nil {
 			var optsMap map[string]interface{}
-			
+
 			// Handle both direct map format and array format
 			if directMap, ok := options.(map[string]interface{}); ok {
 				optsMap = directMap
@@ -142,7 +142,7 @@ var MaxParamsRule = rule.Rule{
 					}
 				}
 			}
-			
+
 			if optsMap != nil {
 				// Parse max option (support both int and float64)
 				if maxVal, ok := optsMap["max"]; ok {
@@ -188,16 +188,16 @@ var MaxParamsRule = rule.Rule{
 		}
 
 		return rule.RuleListeners{
-			ast.KindFunctionDeclaration:   checkFunction,
-			ast.KindFunctionExpression:    checkFunction,
-			ast.KindArrowFunction:         checkFunction,
-			ast.KindMethodDeclaration:     checkFunction,
-			ast.KindConstructor:           checkFunction,
-			ast.KindGetAccessor:           checkFunction,
-			ast.KindSetAccessor:           checkFunction,
-			ast.KindFunctionType:          checkFunction,
-			ast.KindCallSignature:         checkFunction,
-			ast.KindConstructSignature:    checkFunction,
+			ast.KindFunctionDeclaration: checkFunction,
+			ast.KindFunctionExpression:  checkFunction,
+			ast.KindArrowFunction:       checkFunction,
+			ast.KindMethodDeclaration:   checkFunction,
+			ast.KindConstructor:         checkFunction,
+			ast.KindGetAccessor:         checkFunction,
+			ast.KindSetAccessor:         checkFunction,
+			ast.KindFunctionType:        checkFunction,
+			ast.KindCallSignature:       checkFunction,
+			ast.KindConstructSignature:  checkFunction,
 		}
 	},
 }

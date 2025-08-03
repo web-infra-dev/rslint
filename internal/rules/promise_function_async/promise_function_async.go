@@ -129,7 +129,7 @@ var PromiseFunctionAsyncRule = rule.Rule{
 
 			insertAsyncBeforeNode := node
 			asyncPrefix := "async "
-			
+
 			if ast.IsMethodDeclaration(node) {
 				insertAsyncBeforeNode = node.Name()
 				// For methods, we need an extra space to match the expected format
@@ -142,7 +142,7 @@ var PromiseFunctionAsyncRule = rule.Rule{
 				// For function declarations, we need a leading space
 				asyncPrefix = " async "
 			}
-			
+
 			// Report with fixes
 			ctx.ReportNodeWithFixes(node, buildMissingAsyncMessage(),
 				rule.RuleFixInsertBefore(ctx.SourceFile, insertAsyncBeforeNode, asyncPrefix))

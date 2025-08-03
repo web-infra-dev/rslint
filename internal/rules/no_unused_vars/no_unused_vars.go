@@ -9,14 +9,14 @@ import (
 )
 
 type Config struct {
-	Vars                     string `json:"vars"`
-	VarsIgnorePattern        string `json:"varsIgnorePattern"`
-	Args                     string `json:"args"`
-	ArgsIgnorePattern        string `json:"argsIgnorePattern"`
-	CaughtErrors             string `json:"caughtErrors"`
+	Vars                      string `json:"vars"`
+	VarsIgnorePattern         string `json:"varsIgnorePattern"`
+	Args                      string `json:"args"`
+	ArgsIgnorePattern         string `json:"argsIgnorePattern"`
+	CaughtErrors              string `json:"caughtErrors"`
 	CaughtErrorsIgnorePattern string `json:"caughtErrorsIgnorePattern"`
-	IgnoreRestSiblings       bool   `json:"ignoreRestSiblings"`
-	ReportUsedIgnorePattern  bool   `json:"reportUsedIgnorePattern"`
+	IgnoreRestSiblings        bool   `json:"ignoreRestSiblings"`
+	ReportUsedIgnorePattern   bool   `json:"reportUsedIgnorePattern"`
 }
 
 type VariableInfo struct {
@@ -29,14 +29,14 @@ type VariableInfo struct {
 
 func parseOptions(options interface{}) Config {
 	config := Config{
-		Vars:                     "all",
-		VarsIgnorePattern:        "",
-		Args:                     "after-used",
-		ArgsIgnorePattern:        "",
-		CaughtErrors:             "all",
+		Vars:                      "all",
+		VarsIgnorePattern:         "",
+		Args:                      "after-used",
+		ArgsIgnorePattern:         "",
+		CaughtErrors:              "all",
 		CaughtErrorsIgnorePattern: "",
-		IgnoreRestSiblings:       false,
-		ReportUsedIgnorePattern:  false,
+		IgnoreRestSiblings:        false,
+		ReportUsedIgnorePattern:   false,
 	}
 
 	if options == nil {
@@ -241,7 +241,7 @@ func isExported(varInfo *VariableInfo) bool {
 		if modifierFlags&ast.ModifierFlagsExport != 0 {
 			return true
 		}
-		
+
 		// Also check parent nodes for export modifiers
 		parent := varInfo.Definition.Parent
 		for parent != nil {
@@ -324,7 +324,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		References:     []*ast.Node{},
 		Definition:     definition,
 	}
-	
+
 	// Check if variable has a type annotation (makes it implicitly "used")
 	hasTypeAnnotation := false
 	if definition != nil && definition.Kind == ast.KindVariableDeclaration {
@@ -333,11 +333,11 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 			hasTypeAnnotation = true
 		}
 	}
-	
+
 	// Check if this variable is used
 	if usageNodes, exists := allUsages[name]; exists {
 		varInfo.References = usageNodes
-		
+
 		// Remove self-references (the declaration itself)
 		filteredUsages := []*ast.Node{}
 		for _, usage := range usageNodes {
@@ -359,13 +359,13 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 			varInfo.OnlyUsedAsType = onlyUsedAsType
 		}
 	}
-	
+
 	// If variable has type annotation, consider it used
 	if hasTypeAnnotation {
 		varInfo.Used = true
 		varInfo.OnlyUsedAsType = false
 	}
-	
+
 	// Check if we should report this variable
 	if shouldIgnoreVariable(name, varInfo, opts) {
 		return
@@ -375,7 +375,6 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 	if isExported(varInfo) {
 		return
 	}
-
 
 	// Special handling for function declarations: don't report function name if it has parameters
 	// The parameters will be handled separately
@@ -387,7 +386,7 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 			return
 		}
 	}
-	
+
 	// Report unused variables
 	if varInfo.OnlyUsedAsType && opts.Vars == "all" {
 		// Variable is only used in type contexts
@@ -413,7 +412,7 @@ var NoUnusedVarsRule = rule.Rule{
 		// We need to collect all variable usages once per source file
 		allUsages := make(map[string][]*ast.Node)
 		collected := false
-		
+
 		// Helper function to get root source file node
 		getRootSourceFile := func(node *ast.Node) *ast.Node {
 			current := node
@@ -430,68 +429,68 @@ var NoUnusedVarsRule = rule.Rule{
 				if ast.IsIdentifier(varDecl.Name()) {
 					nameNode := varDecl.Name()
 					name := nameNode.AsIdentifier().Text
-					
+
 					// Collect usages for the entire source file on first variable
 					if !collected {
 						sourceFile := getRootSourceFile(node)
 						collectVariableUsages(sourceFile, allUsages)
 						collected = true
 					}
-					
+
 					processVariable(ctx, nameNode, name, node, opts, allUsages)
 				}
 			},
-			
+
 			// Handle function declarations
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
 				funcDecl := node.AsFunctionDeclaration()
 				if funcDecl.Name() != nil && ast.IsIdentifier(funcDecl.Name()) {
 					nameNode := funcDecl.Name()
 					name := nameNode.AsIdentifier().Text
-					
+
 					// Collect usages for the entire source file on first variable
 					if !collected {
 						sourceFile := getRootSourceFile(node)
 						collectVariableUsages(sourceFile, allUsages)
 						collected = true
 					}
-					
+
 					processVariable(ctx, nameNode, name, node, opts, allUsages)
 				}
 			},
-			
+
 			// Handle function parameters
 			ast.KindParameter: func(node *ast.Node) {
 				paramDecl := node.AsParameterDeclaration()
 				if paramDecl.Name() != nil && ast.IsIdentifier(paramDecl.Name()) {
 					nameNode := paramDecl.Name()
 					name := nameNode.AsIdentifier().Text
-					
+
 					// Collect usages for the entire source file on first variable
 					if !collected {
 						sourceFile := getRootSourceFile(node)
 						collectVariableUsages(sourceFile, allUsages)
 						collected = true
 					}
-					
+
 					processVariable(ctx, nameNode, name, node, opts, allUsages)
 				}
 			},
-			
+
 			// Handle catch clauses
 			ast.KindCatchClause: func(node *ast.Node) {
 				catchClause := node.AsCatchClause()
 				if catchClause.VariableDeclaration != nil && ast.IsIdentifier(catchClause.VariableDeclaration) {
 					nameNode := catchClause.VariableDeclaration
 					name := nameNode.AsIdentifier().Text
-					
+
 					// Collect usages for the entire source file on first variable
 					if !collected {
 						sourceFile := getRootSourceFile(node)
 						collectVariableUsages(sourceFile, allUsages)
 						collected = true
 					}
-					
+
 					processVariable(ctx, nameNode, name, nameNode, opts, allUsages)
 				}
 			},

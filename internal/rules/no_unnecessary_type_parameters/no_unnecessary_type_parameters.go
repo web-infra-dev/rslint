@@ -561,7 +561,7 @@ var NoUnnecessaryTypeParametersRule = rule.Rule{
 				// For valid usage, we need either:
 				// 1. Multiple uses (2 or more), OR
 				// 2. Single use in a meaningful context (classes, complex types, etc.)
-				
+
 				// Check if single usage is in a meaningful context
 				isMeaningfulSingleUsage := false
 				if usageCount == 1 {
@@ -570,28 +570,28 @@ var NoUnnecessaryTypeParametersRule = rule.Rule{
 					if hasConstraint || isUsedInConstraints {
 						isMeaningfulSingleUsage = true
 					}
-					
+
 					// For declare functions, check if used in complex generic types
 					if descriptor == "function" {
 						nodeText := string(ctx.SourceFile.Text()[node.Pos():node.End()])
-						// Check if used in Map<K, V> style patterns where multiple type parameters 
+						// Check if used in Map<K, V> style patterns where multiple type parameters
 						// are used together in a complex type
 						if strings.Contains(nodeText, "Map<") {
 							// For Map<K, V> pattern, both K and V are meaningful even with single usage
 							isMeaningfulSingleUsage = true
-						} else if strings.Contains(nodeText, "Array<" + typeParamName + ">") ||
-								  strings.Contains(nodeText, "Set<" + typeParamName + ">") ||
-								  strings.Contains(nodeText, "Promise<" + typeParamName + ">") ||
-								  strings.Contains(nodeText, "ReadonlyArray<" + typeParamName + ">") {
+						} else if strings.Contains(nodeText, "Array<"+typeParamName+">") ||
+							strings.Contains(nodeText, "Set<"+typeParamName+">") ||
+							strings.Contains(nodeText, "Promise<"+typeParamName+">") ||
+							strings.Contains(nodeText, "ReadonlyArray<"+typeParamName+">") {
 							isMeaningfulSingleUsage = true
 						}
 					}
-					
+
 					// Classes: check if single usage is in a meaningful array/generic context
 					if descriptor == "class" {
 						nodeText := string(ctx.SourceFile.Text()[node.Pos():node.End()])
 						// T[] usage is meaningful even if single usage
-						if strings.Contains(nodeText, typeParamName + "[]") {
+						if strings.Contains(nodeText, typeParamName+"[]") {
 							isMeaningfulSingleUsage = true
 						} else {
 							// Other single usages in classes are not meaningful
@@ -599,7 +599,7 @@ var NoUnnecessaryTypeParametersRule = rule.Rule{
 						}
 					}
 				}
-				
+
 				if usageCount > 1 || isMeaningfulSingleUsage {
 					continue
 				}

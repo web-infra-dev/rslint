@@ -395,17 +395,17 @@ func checkForEarlyReferences(scopeManager *ScopeManager, varName string, varPos 
 				if defType == DefTypeType && !config.Typedefs {
 					shouldReport = false
 				}
-				
+
 				// Check if it's a type reference and should be ignored
 				if config.IgnoreTypeReferences && isTypeReference(ref) {
 					shouldReport = false
 				}
-				
+
 				// Check if it's a named export and should be allowed
 				if config.AllowNamedExports && isNamedExports(ref) {
 					shouldReport = false
 				}
-				
+
 				if shouldReport {
 					ctx.ReportNode(ref.Identifier, rule.RuleMessage{
 						Id:          "noUseBeforeDefine",
@@ -534,7 +534,7 @@ var NoUseBeforeDefineRule = rule.Rule{
 		return rule.RuleListeners{
 			// Scope creators
 			ast.KindSourceFile: func(node *ast.Node) {
-					scopeManager.globalScope.Node = node
+				scopeManager.globalScope.Node = node
 			},
 			ast.KindBlock: func(node *ast.Node) {
 				scopeManager.pushScope(node, ScopeTypeBlock)
@@ -544,7 +544,7 @@ var NoUseBeforeDefineRule = rule.Rule{
 				if funcDecl.Name() != nil && ast.IsIdentifier(funcDecl.Name()) {
 					funcName := funcDecl.Name().AsIdentifier().Text
 					scopeManager.addVariable(funcName, funcDecl.Name(), DefTypeFunctionName)
-					
+
 					// Check if this function was referenced before being defined
 					checkForEarlyReferences(scopeManager, funcName, funcDecl.Name().Pos(), ctx, config, DefTypeFunctionName)
 				}
@@ -565,7 +565,7 @@ var NoUseBeforeDefineRule = rule.Rule{
 				if classDecl.Name() != nil && ast.IsIdentifier(classDecl.Name()) {
 					className := classDecl.Name().AsIdentifier().Text
 					scopeManager.addVariable(className, node, DefTypeClassName)
-					
+
 					// Check if this class was referenced before being defined
 					checkForEarlyReferences(scopeManager, className, classDecl.Name().Pos(), ctx, config, DefTypeClassName)
 				}
@@ -583,7 +583,7 @@ var NoUseBeforeDefineRule = rule.Rule{
 				if ast.IsIdentifier(enumDecl.Name()) {
 					enumName := enumDecl.Name().AsIdentifier().Text
 					scopeManager.addVariable(enumName, node, DefTypeTSEnumName)
-					
+
 					// Check if this enum was referenced before being defined
 					checkForEarlyReferences(scopeManager, enumName, enumDecl.Name().Pos(), ctx, config, DefTypeTSEnumName)
 				}
@@ -629,7 +629,7 @@ var NoUseBeforeDefineRule = rule.Rule{
 						if ast.IsIdentifier(varDecl.Name()) {
 							varName := varDecl.Name().AsIdentifier().Text
 							scopeManager.addVariable(varName, varDecl.Name(), DefTypeVariable)
-							
+
 							// Check if this variable was referenced before being defined
 							checkForEarlyReferences(scopeManager, varName, varDecl.Name().Pos(), ctx, config, DefTypeVariable)
 						}
@@ -641,7 +641,7 @@ var NoUseBeforeDefineRule = rule.Rule{
 				if ast.IsIdentifier(varDecl.Name()) {
 					varName := varDecl.Name().AsIdentifier().Text
 					scopeManager.addVariable(varName, varDecl.Name(), DefTypeVariable)
-					
+
 					// Don't check here since KindVariableStatement already handles it
 				}
 			},
@@ -856,7 +856,6 @@ var NoUseBeforeDefineRule = rule.Rule{
 			rule.ListenerOnExit(ast.KindSourceFile): func(node *ast.Node) {
 				// Resolve all references
 				scopeManager.resolveReferences()
-
 
 				// Check all scopes for violations
 				var checkAllScopes func(scope *Scope)
