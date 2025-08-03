@@ -72,7 +72,25 @@ export class RSLintService {
     console.error('RSLint binary path:', this.rslintPath);
     console.error('import.meta.dirname:', import.meta.dirname);
     console.error('Binary exists:', require('fs').existsSync(this.rslintPath));
-    if (!require('fs').existsSync(this.rslintPath)) {
+    if (require('fs').existsSync(this.rslintPath)) {
+      const stats = require('fs').statSync(this.rslintPath);
+      console.error('Binary stats:', {
+        size: stats.size,
+        mode: stats.mode.toString(8),
+        isFile: stats.isFile(),
+        isExecutable: (stats.mode & 0o111) !== 0,
+      });
+      // Try to check file type
+      try {
+        const { execSync } = require('child_process');
+        const fileType = execSync(`file "${this.rslintPath}"`)
+          .toString()
+          .trim();
+        console.error('File type:', fileType);
+      } catch (e) {
+        console.error('Failed to get file type');
+      }
+    } else {
       // Try to list what's in the directory
       const binDir = path.join(import.meta.dirname, '../bin');
       console.error('Bin directory:', binDir);
