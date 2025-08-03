@@ -14,8 +14,9 @@
   "license": "MIT",
   "scripts": {
     "build": "pnpm -r build",
-    "build:npm": "zx scripts/build-npm.mjs",
     "check-spell": "pnpx cspell",
+    "build:npm:all": "zx scripts/build-npm.mjs all",
+    "build:npm:current": "zx scripts/build-npm.mjs current",
     "version": "zx scripts/version.mjs",
     "release": "pnpm publish -r --no-git-checks",
     "publish:vsce": "zx scripts/publish-marketplace.mjs",

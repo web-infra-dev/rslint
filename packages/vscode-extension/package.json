@@ -83,6 +83,12 @@
   },
   "devDependencies": {
     "@rslint/core": "workspace:*",
+    "@rslint/darwin-arm64": "workspace:*",
+    "@rslint/darwin-x64": "workspace:*",
+    "@rslint/linux-arm64": "workspace:*",
+    "@rslint/linux-x64": "workspace:*",
+    "@rslint/win32-arm64": "workspace:*",
+    "@rslint/win32-x64": "workspace:*",
     "@types/mocha": "10.0.9",
     "@types/node": "24.0.14",
     "@types/vscode": "^1.74.0",

@@ -2,6 +2,9 @@
   "name": "@rslint/darwin-x64",
   "version": "0.1.7",
   "license": "MIT",
+  "exports": {
+    "./bin": "./rslint"
+  },
   "description": "binary for rslint",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",
   "repository": {

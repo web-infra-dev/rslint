@@ -12,7 +12,7 @@
     "url": "https://github.com/web-infra-dev/rslint"
   },
   "scripts": {
-    "build:bin": "go build -v -o bin/rslint ../../cmd/rslint",
+    "build:bin": "zx ../../scripts/build-npm.mjs current",
     "build:debug": "GOEXPERIMENT=noregabi go build -v -gcflags='all=-N -l' -o  bin/rslint ../../cmd/rslint ",
     "build:js": "tsc -b tsconfig.build.json --force",
     "dev": "tsc -b tsconfig.build.json --force --watch",
