@@ -309,9 +309,14 @@ func RegisterAllTypeSriptEslintPluginRules() {
 func getAllTypeScriptEslintPluginRules() []rule.Rule {
 	allRules := GlobalRuleRegistry.GetAllRules()
 	var rules []rule.Rule
-	for _, rule := range allRules {
-		rule.Name = "@typescript-eslint/" + rule.Name
-		rules = append(rules, rule)
+	for _, r := range allRules {
+		// Create a copy to avoid modifying the original
+		ruleCopy := r
+		// Only add prefix if it doesn't already have it
+		if !strings.HasPrefix(ruleCopy.Name, "@typescript-eslint/") {
+			ruleCopy.Name = "@typescript-eslint/" + ruleCopy.Name
+		}
+		rules = append(rules, ruleCopy)
 	}
 	return rules
 }
