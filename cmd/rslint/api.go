@@ -46,6 +46,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_unary_minus"
 	"github.com/web-infra-dev/rslint/internal/rules/non_nullable_type_assertion_style"
 	"github.com/web-infra-dev/rslint/internal/rules/only_throw_error"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_as_const"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_promise_reject_errors"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_reduce_type_parameter"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_return_this_type"
@@ -130,6 +131,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		no_unsafe_unary_minus.NoUnsafeUnaryMinusRule,
 		non_nullable_type_assertion_style.NonNullableTypeAssertionStyleRule,
 		only_throw_error.OnlyThrowErrorRule,
+		prefer_as_const.PreferAsConstRule,
 		prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
 		prefer_reduce_type_parameter.PreferReduceTypeParameterRule,
 		prefer_return_this_type.PreferReturnThisTypeRule,
