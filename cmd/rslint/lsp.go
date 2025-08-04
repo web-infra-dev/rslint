@@ -46,6 +46,14 @@ func NewLSPServer() *LSPServer {
 
 func (s *LSPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 	s.conn = conn
+
+	requestJSON, err := json.MarshalIndent(req, "", "  ")
+	if err != nil {
+		log.Printf("Failed to marshal request: %v", err)
+		return nil, err
+	}
+
+	log.Printf("Received request: %s", string(requestJSON))
 	switch req.Method {
 	case "initialize":
 		return s.handleInitialize(ctx, req)
@@ -301,6 +309,9 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 	}
 
 	if !configFound {
+		// If no rslint.json found, skip diagnostics for now
+		// In a real implementation, you'd create a default config
+		log.Printf("No rslint.json found at %s", rslintConfigPath)
 		return
 	}
 
