@@ -5,7 +5,8 @@
     "ignores": [
       "node_modules/**",
       "./packages/rslint-test-tools/tests/**/*.test.ts",
-      "packages/rslint/fixtures/**"
+      "packages/rslint/fixtures/**",
+      "packages/rslint-test-tools/tests/**/*.test.ts"
     ],
     "languageOptions": {
       "parserOptions": {
