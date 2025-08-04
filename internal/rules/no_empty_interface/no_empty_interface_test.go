@@ -55,7 +55,7 @@ class Bar {}
 			Code: "interface Foo {}",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "noEmpty",
+					MessageId: "noEmpty",
 					Line:      1,
 					Column:    11,
 					EndLine:   1,
@@ -67,7 +67,7 @@ class Bar {}
 			Code: `interface Foo extends {}`,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "noEmpty",
+					MessageId: "noEmpty",
 					Line:      1,
 					Column:    11,
 					EndLine:   1,
@@ -87,7 +87,7 @@ class Baz {}
 `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "noEmptyWithSuper",
+					MessageId: "noEmptyWithSuper",
 					Line:      6,
 					Column:    11,
 					EndLine:   6,
@@ -117,7 +117,7 @@ class Bar {}
 `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "noEmptyWithSuper",
+					MessageId: "noEmptyWithSuper",
 					Line:      6,
 					Column:    11,
 					EndLine:   6,
@@ -139,7 +139,7 @@ const bar = class Bar {};
 `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "noEmptyWithSuper",
+					MessageId: "noEmptyWithSuper",
 					Line:      6,
 					Column:    11,
 					EndLine:   6,
@@ -167,7 +167,7 @@ interface Bar extends Foo {}
 `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "noEmptyWithSuper",
+					MessageId: "noEmptyWithSuper",
 					Line:      6,
 					Column:    11,
 					EndLine:   6,
@@ -187,7 +187,7 @@ type Bar = Foo
 			Code: "interface Foo extends Array<number> {}",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "noEmptyWithSuper",
+					MessageId: "noEmptyWithSuper",
 					Line:      1,
 					Column:    11,
 					EndLine:   1,
@@ -200,7 +200,7 @@ type Bar = Foo
 			Code: "interface Foo extends Array<number | {}> {}",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "noEmptyWithSuper",
+					MessageId: "noEmptyWithSuper",
 					Line:      1,
 					Column:    11,
 					EndLine:   1,
@@ -218,7 +218,7 @@ interface Foo extends Array<Bar> {}
 `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "noEmptyWithSuper",
+					MessageId: "noEmptyWithSuper",
 					Line:      5,
 					Column:    11,
 					EndLine:   5,
@@ -239,7 +239,7 @@ interface Foo extends R {}
 `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "noEmptyWithSuper",
+					MessageId: "noEmptyWithSuper",
 					Line:      3,
 					Column:    11,
 					EndLine:   3,
@@ -257,7 +257,7 @@ interface Foo<T> extends Bar<T> {}
 `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "noEmptyWithSuper",
+					MessageId: "noEmptyWithSuper",
 					Line:      2,
 					Column:    11,
 					EndLine:   2,
@@ -283,7 +283,7 @@ declare module FooBar {
 `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId:   "noEmptyWithSuper",
+					MessageId: "noEmptyWithSuper",
 					Line:      4,
 					Column:    20,
 					EndLine:   4,
