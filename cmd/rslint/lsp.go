@@ -306,7 +306,7 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 
 	// Load rslint configuration and extract tsconfig paths
 	loader := config.NewConfigLoader(vfs, workingDir)
-	rslintConfig, configDirectory, err := loader.LoadRslintConfig("rslint.json")
+	rslintConfig, configDirectory, err := loader.LoadRslintConfig(rslintConfigPath)
 	if err != nil {
 		log.Printf("Could not load rslint config: %v", err)
 		return
