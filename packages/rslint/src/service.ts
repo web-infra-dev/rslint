@@ -63,11 +63,11 @@ export class RSLintService {
   private expectedSize: number | null;
 
   constructor(options: RSlintOptions = {}) {
+    const defaultPath = `@rslint/${platform()}-${arch()}/bin`;
+
     this.nextMessageId = 1;
     this.pendingMessages = new Map();
-    this.rslintPath =
-      options.rslintPath ||
-      require.resolve(`@rslint/${platform()}-${arch()}/bin`);
+    this.rslintPath = options.rslintPath || require.resolve(defaultPath);
 
     this.process = spawn(this.rslintPath, ['--api'], {
       stdio: ['pipe', 'pipe', 'inherit'],
