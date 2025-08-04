@@ -186,7 +186,7 @@ func isFunction(node *ast.Node) bool {
 		ast.IsConstructorDeclaration(node)
 }
 
-var ClassLiteralPropertyStyleRule = rule.Rule{
+var ClassLiteralPropertyStyleRule = rule.CreateRule(rule.Rule{
 	Name: "class-literal-property-style",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		style := "fields" // default option
@@ -504,4 +504,4 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 
 		return listeners
 	},
-}
+})

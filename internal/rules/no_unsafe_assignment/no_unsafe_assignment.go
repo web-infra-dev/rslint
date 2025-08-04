@@ -65,7 +65,7 @@ const (
 	comparisonTypeContextual
 )
 
-var NoUnsafeAssignmentRule = rule.Rule{
+var NoUnsafeAssignmentRule = rule.CreateRule(rule.Rule{
 	Name: "no-unsafe-assignment",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		compilerOptions := ctx.Program.Options()
@@ -475,4 +475,4 @@ var NoUnsafeAssignmentRule = rule.Rule{
 			},
 		}
 	},
-}
+})

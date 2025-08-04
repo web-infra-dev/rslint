@@ -25,7 +25,7 @@ func buildNoImpliedEvalErrorMessage() rule.RuleMessage {
 var globalCandidates = []string{"global", "globalThis", "window"}
 var evalLikeFunctions = []string{"execScript", "setImmediate", "setInterval", "setTimeout"}
 
-var NoImpliedEvalRule = rule.Rule{
+var NoImpliedEvalRule = rule.CreateRule(rule.Rule{
 	Name: "no-implied-eval",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		getCalleeName := func(node *ast.Expression) string {
@@ -127,4 +127,4 @@ var NoImpliedEvalRule = rule.Rule{
 			ast.KindNewExpression:  checkImpliedEval,
 		}
 	},
-}
+})

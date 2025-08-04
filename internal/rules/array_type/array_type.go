@@ -143,7 +143,7 @@ func buildErrorStringGenericSimpleMessage(readonlyPrefix, typeStr, className str
 	}
 }
 
-var ArrayTypeRule = rule.Rule{
+var ArrayTypeRule = rule.CreateRule(rule.Rule{
 	Name: "array-type",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := ArrayTypeOptions{
@@ -438,4 +438,4 @@ var ArrayTypeRule = rule.Rule{
 			},
 		}
 	},
-}
+})

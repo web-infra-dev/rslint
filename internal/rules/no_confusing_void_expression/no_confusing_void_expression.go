@@ -63,7 +63,7 @@ type NoConfusingVoidExpressionOptions struct {
 	IgnoreVoidReturningFunctions bool
 }
 
-var NoConfusingVoidExpressionRule = rule.Rule{
+var NoConfusingVoidExpressionRule = rule.CreateRule(rule.Rule{
 	Name: "no-confusing-void-expression",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(NoConfusingVoidExpressionOptions)
@@ -293,4 +293,4 @@ var NoConfusingVoidExpressionRule = rule.Rule{
 			ast.KindTaggedTemplateExpression: checkExpression,
 		}
 	},
-}
+})

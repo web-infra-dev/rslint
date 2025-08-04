@@ -80,7 +80,7 @@ type NoMisusedPromisesOptions struct {
 	ChecksVoidReturnOpts *NoMisusedPromisesChecksVoidReturnOptions
 }
 
-var NoMisusedPromisesRule = rule.Rule{
+var NoMisusedPromisesRule = rule.CreateRule(rule.Rule{
 	Name: "no-misused-promises",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(NoMisusedPromisesOptions)
@@ -799,4 +799,4 @@ var NoMisusedPromisesRule = rule.Rule{
 		return listeners
 
 	},
-}
+})

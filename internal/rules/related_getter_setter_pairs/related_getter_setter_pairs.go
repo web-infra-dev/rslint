@@ -14,7 +14,7 @@ func buildMismatchMessage() rule.RuleMessage {
 	}
 }
 
-var RelatedGetterSetterPairsRule = rule.Rule{
+var RelatedGetterSetterPairsRule = rule.CreateRule(rule.Rule{
 	Name: "related-getter-setter-pairs",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		checkAccessorsPair := func(getter *ast.GetAccessorDeclaration, setter *ast.SetAccessorDeclaration) {
@@ -67,4 +67,4 @@ var RelatedGetterSetterPairsRule = rule.Rule{
 			ast.KindTypeLiteral:          checkMembers,
 		}
 	},
-}
+})

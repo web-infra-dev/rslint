@@ -42,7 +42,7 @@ func buildAwaitUsingOfNonAsyncDisposableMessage() rule.RuleMessage {
 	}
 }
 
-var AwaitThenableRule = rule.Rule{
+var AwaitThenableRule = rule.CreateRule(rule.Rule{
 	Name: "await-thenable",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		return rule.RuleListeners{
@@ -131,4 +131,4 @@ var AwaitThenableRule = rule.Rule{
 			},
 		}
 	},
-}
+})

@@ -96,6 +96,7 @@ export class RuleTester {
     },
   ) {
     describe(ruleName, () => {
+      ruleName = '@typescript-eslint/' + ruleName;
       let cwd =
         this.options.languageOptions?.parserOptions?.tsconfigRootDir ||
         process.cwd();
