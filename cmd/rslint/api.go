@@ -44,6 +44,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_type_assertion"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_unary_minus"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unused_vars"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var_requires"
 	"github.com/web-infra-dev/rslint/internal/rules/non_nullable_type_assertion_style"
 	"github.com/web-infra-dev/rslint/internal/rules/only_throw_error"
@@ -130,6 +131,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		no_unsafe_return.NoUnsafeReturnRule,
 		no_unsafe_type_assertion.NoUnsafeTypeAssertionRule,
 		no_unsafe_unary_minus.NoUnsafeUnaryMinusRule,
+		no_unused_vars.NoUnusedVarsRule,
 		no_var_requires.NoVarRequiresRule,
 		non_nullable_type_assertion_style.NonNullableTypeAssertionStyleRule,
 		only_throw_error.OnlyThrowErrorRule,
