@@ -35,14 +35,13 @@ async function publish_all() {
     await $`cp binaries/${os}-${arch}-rslint/${os}-${arch}-rslint ./packages/vscode-extension/dist/rslint`;
 
     await $`cd packages/vscode-extension && pnpm vsce package --target ${os}-${arch}`;
-    await $`ls -lR packages/vscode-extension/dist *.vsix`;
 
     // supports dry-run
     if (process.argv.includes('--dry-run')) {
       console.log(`Dry run: Skipping actual publish for ${os}-${arch}`);
       continue;
     }
-    await $`cd packages/vscode-extension && echo pnpm ${marketplace} publish --packagePath ./rslint-${os}-${arch}-${version}.vsix ${prerelease ? '--pre-release' : ''}`;
+    await $`cd packages/vscode-extension && pnpm ${marketplace} publish --packagePath ./rslint-${os}-${arch}-${version}.vsix ${prerelease ? '--pre-release' : ''}`;
     console.log(`Finish Publishing v${version} for ${os}-${arch}.`);
   }
 }
