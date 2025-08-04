@@ -13,7 +13,7 @@ async function publish_all() {
   ).version;
 
   const platforms = [
-    // { os: 'darwin', arch: 'amd64', 'node-arch': 'x64' },
+    { os: 'darwin', arch: 'amd64', 'node-arch': 'x64' },
     { os: 'darwin', arch: 'arm64', 'node-arch': 'arm64' },
     { os: 'linux', arch: 'amd64', 'node-arch': 'x64' },
     { os: 'linux', arch: 'arm64', 'node-arch': 'arm64' },
@@ -42,7 +42,7 @@ async function publish_all() {
       console.log(`Dry run: Skipping actual publish for ${os}-${arch}`);
       continue;
     }
-    await $`cd packages/vscode-extension && pnpm ${marketplace} publish --packagePath ./rslint-${os}-${arch}-${version}.vsix ${prereleaseFlag}`;
+    await $`cd packages/vscode-extension && pnpm ${marketplace} publish --target ${os}-${arch} --packagePath ./rslint-${os}-${arch}-${version}.vsix ${prereleaseFlag}`;
     console.log(`Finish Publishing v${version} for ${os}-${arch}.`);
   }
 }

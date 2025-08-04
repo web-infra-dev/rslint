@@ -120,6 +120,8 @@ jobs:
           fi
 
       - name: Build and publish to Open VSX Registry
+        # TODO fix the timeout problem while publish to Open VSX Registry
+        if: false
         env:
           OVSX_PAT: ${{ secrets.RSLINT_OVSX_PAT }}
         run: |
