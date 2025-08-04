@@ -41,7 +41,16 @@ var RuleNameRule = rule.Rule{
      GlobalRuleRegistry.Register("@typescript-eslint/rule-name", rule_name.RuleNameRule)
      ```
 
-4. **Add struct field to TypedRules if the rule needs configuration**
+4. **Add the rule to the API hardcoded list in `cmd/rslint/api.go`**:
+
+   - Add import: `"github.com/web-infra-dev/rslint/internal/rules/rule_name"`
+   - In the `origin_rules` slice (around line 100), add:
+     ```go
+     rule_name.RuleNameRule,
+     ```
+   - **IMPORTANT**: The API uses a hardcoded list for the test runner. If you don't add your rule here, tests will fail with "Expected diagnostics for invalid case" errors.
+
+5. **Add struct field to TypedRules if the rule needs configuration**
 
 ### Critical Safety Requirements
 
@@ -89,23 +98,41 @@ ctx.ReportNodeWithFixes(node, message,
 Create test file: `packages/rslint-test-tools/tests/typescript-eslint/rules/<rule-name>.test.ts`
 
 ```typescript
-import { describe } from 'vitest';
-import { createTester } from '../../utils';
+import { RuleTester } from '@typescript-eslint/rule-tester';
+import { getFixturesRootDir } from '../RuleTester.ts';
 
-describe('rule-name', () => {
-  const { testRule } = createTester({ options: [] });
+const rootDir = getFixturesRootDir();
 
-  testRule({
-    valid: ['valid code examples'],
-    invalid: [
-      {
-        code: 'invalid code',
-        errors: [{ messageId: 'messageId' }],
-      },
-    ],
-  });
+const ruleTester = new RuleTester({
+  languageOptions: {
+    parserOptions: {
+      project: './tsconfig.json',
+      tsconfigRootDir: rootDir,
+    },
+  },
+});
+
+// Use the rule name WITHOUT the @typescript-eslint/ prefix
+ruleTester.run('rule-name', {
+  valid: ['valid code examples'],
+  invalid: [
+    {
+      code: 'invalid code',
+      errors: [
+        {
+          messageId: 'messageId',
+          line: 1,
+          column: 1,
+          endLine: 1,
+          endColumn: 10,
+        },
+      ],
+    },
+  ],
 });
 ```
+
+**Important**: The test runner expects exact error positions. Always include line/column information in error expectations.
 
 ### Manual Testing
 
@@ -173,6 +200,22 @@ Your changes must pass:
 2. **Don't change** core infrastructure without understanding impacts
 3. **Always handle nil** from type assertions
 4. **Test with real TypeScript code** to ensure rule behaves correctly
+5. **Missing API registration** - Always add new rules to the hardcoded list in `cmd/rslint/api.go`
+6. **Test failures** - "Expected diagnostics for invalid case" usually means the rule isn't registered in the API
+7. **Wrong rule name in tests** - Use the short name without @typescript-eslint/ prefix in test files
+
+## Complete Checklist for Adding a New Rule
+
+1. [ ] Create rule implementation in `internal/rules/<rule_name>/<rule_name>.go`
+2. [ ] Add nil checks for all AST node type assertions
+3. [ ] Register in `internal/config/config.go` with full @typescript-eslint/ prefix
+4. [ ] Add to hardcoded list in `cmd/rslint/api.go`
+5. [ ] Create test file in `packages/rslint-test-tools/tests/typescript-eslint/rules/`
+6. [ ] Run `pnpm build` to compile everything
+7. [ ] Run `pnpm test` to verify tests pass
+8. [ ] Test manually with CLI: `cd packages/rslint/fixtures && ../bin/rslint src/test.ts`
+9. [ ] Update test snapshots if needed: `pnpm test -u <rule-name>`
+10. [ ] Ensure CI passes (Go fmt, lint, tests)
 
 ## When You're Done
 
