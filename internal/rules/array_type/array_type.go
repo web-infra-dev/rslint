@@ -35,8 +35,14 @@ func isSimpleType(node *ast.Node) bool {
 		return true
 	case ast.KindTypeReference:
 		typeRef := node.AsTypeReference()
+		if typeRef == nil {
+			return false
+		}
 		if ast.IsIdentifier(typeRef.TypeName) {
 			identifier := typeRef.TypeName.AsIdentifier()
+			if identifier == nil {
+				return false
+			}
 			if identifier.Text == "Array" {
 				if typeRef.TypeArguments == nil {
 					return true
@@ -62,6 +68,9 @@ func typeNeedsParentheses(node *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindTypeReference:
 		typeRef := node.AsTypeReference()
+		if typeRef == nil {
+			return false
+		}
 		return typeNeedsParentheses(typeRef.TypeName)
 	case ast.KindUnionType,
 		ast.KindFunctionType,
@@ -73,6 +82,9 @@ func typeNeedsParentheses(node *ast.Node) bool {
 		return true
 	case ast.KindIdentifier:
 		identifier := node.AsIdentifier()
+		if identifier == nil {
+			return false
+		}
 		return identifier.Text == "ReadonlyArray"
 	default:
 		return false
@@ -177,10 +189,17 @@ var ArrayTypeRule = rule.Rule{
 		return rule.RuleListeners{
 			ast.KindArrayType: func(node *ast.Node) {
 				arrayType := node.AsArrayTypeNode()
+				if arrayType == nil {
+					return
+				}
 
-				isReadonly := node.Parent != nil &&
-					node.Parent.Kind == ast.KindTypeOperator &&
-					node.Parent.AsTypeOperatorNode().Operator == ast.KindReadonlyKeyword
+				isReadonly := false
+				if node.Parent != nil && node.Parent.Kind == ast.KindTypeOperator {
+					typeOp := node.Parent.AsTypeOperatorNode()
+					if typeOp != nil {
+						isReadonly = typeOp.Operator == ast.KindReadonlyKeyword
+					}
+				}
 
 				currentOption := defaultOption
 				if isReadonly {
@@ -226,9 +245,11 @@ var ArrayTypeRule = rule.Rule{
 				// When converting T[] -> Array<T>, remove unnecessary parentheses
 				if ast.IsParenthesizedTypeNode(arrayType.ElementType) {
 					// For parenthesized types, get the inner type to avoid double parentheses
-					innerType := arrayType.ElementType.AsParenthesizedTypeNode().Type
-					innerTypeRange := utils.TrimNodeTextRange(ctx.SourceFile, innerType)
-					elementTypeText = ctx.SourceFile.Text()[innerTypeRange.Pos():innerTypeRange.End()]
+					parenType := arrayType.ElementType.AsParenthesizedTypeNode()
+					if parenType != nil && parenType.Type != nil {
+						innerTypeRange := utils.TrimNodeTextRange(ctx.SourceFile, parenType.Type)
+						elementTypeText = ctx.SourceFile.Text()[innerTypeRange.Pos():innerTypeRange.End()]
+					}
 				}
 
 				newText := fmt.Sprintf("%s<%s>", className, elementTypeText)
@@ -238,12 +259,18 @@ var ArrayTypeRule = rule.Rule{
 
 			ast.KindTypeReference: func(node *ast.Node) {
 				typeRef := node.AsTypeReference()
+				if typeRef == nil {
+					return
+				}
 
 				if !ast.IsIdentifier(typeRef.TypeName) {
 					return
 				}
 
 				identifier := typeRef.TypeName.AsIdentifier()
+				if identifier == nil {
+					return
+				}
 				typeName := identifier.Text
 
 				if typeName != "Array" && typeName != "ReadonlyArray" && typeName != "Readonly" {
@@ -399,9 +426,11 @@ var ArrayTypeRule = rule.Rule{
 				// In this case, if T is a parenthesized type, we should remove the parentheses
 				if (currentOption == "array-simple") && ast.IsParenthesizedTypeNode(typeParam) {
 					// For parenthesized types, get the inner type to avoid double parentheses
-					innerType := typeParam.AsParenthesizedTypeNode().Type
-					innerTypeRange := utils.TrimNodeTextRange(ctx.SourceFile, innerType)
-					typeParamText = ctx.SourceFile.Text()[innerTypeRange.Pos():innerTypeRange.End()]
+					parenType := typeParam.AsParenthesizedTypeNode()
+					if parenType != nil && parenType.Type != nil {
+						innerTypeRange := utils.TrimNodeTextRange(ctx.SourceFile, parenType.Type)
+						typeParamText = ctx.SourceFile.Text()[innerTypeRange.Pos():innerTypeRange.End()]
+					}
 				}
 
 				ctx.ReportNodeWithFixes(node, message,

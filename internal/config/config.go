@@ -307,16 +307,11 @@ func RegisterAllTypeSriptEslintPluginRules() {
 
 // getAllTypeScriptEslintPluginRules returns all registered rules (for backward compatibility when no config is provided)
 func getAllTypeScriptEslintPluginRules() []rule.Rule {
-	allRulesMap := GlobalRuleRegistry.GetAllRules()
+	allRules := GlobalRuleRegistry.GetAllRules()
 	var rules []rule.Rule
-	// Only include rules that are registered with the TypeScript-ESLint prefix
-	for registeredName, ruleImpl := range allRulesMap {
-		if strings.HasPrefix(registeredName, "@typescript-eslint/") {
-			// Create a copy of the rule with the correct name
-			ruleCopy := ruleImpl
-			ruleCopy.Name = registeredName
-			rules = append(rules, ruleCopy)
-		}
+	for _, rule := range allRules {
+		rule.Name = "@typescript-eslint/" + rule.Name
+		rules = append(rules, rule)
 	}
 	return rules
 }

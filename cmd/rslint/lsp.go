@@ -45,6 +45,8 @@ func NewLSPServer() *LSPServer {
 
 func (s *LSPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
 	s.conn = conn
+	
+	log.Printf("Received request method: %s", req.Method)
 
 	requestJSON, err := json.MarshalIndent(req, "", "  ")
 	if err != nil {
@@ -89,16 +91,39 @@ func (s *LSPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 }
 
 func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
-	var params lsproto.InitializeParams
-	if err := json.Unmarshal(*req.Params, &params); err != nil {
+	log.Printf("handleInitialize called")
+	
+	// Check if params is nil
+	if req.Params == nil {
+		log.Printf("Request params is nil")
 		return nil, &jsonrpc2.Error{
-			Code:    jsonrpc2.CodeParseError,
-			Message: "Failed to parse initialize params",
+			Code:    jsonrpc2.CodeInvalidParams,
+			Message: "Initialize params cannot be nil",
 		}
 	}
-
-	if params.RootUri.DocumentUri != nil {
-		s.rootURI = uriToPath(string(*params.RootUri.DocumentUri))
+	
+	// First try to parse as a generic map to extract the rootUri
+	var rawParams map[string]interface{}
+	log.Printf("Initialize params raw: %s", string(*req.Params))
+	if err := json.Unmarshal(*req.Params, &rawParams); err != nil {
+		log.Printf("Failed to unmarshal initialize params: %v", err)
+		log.Printf("Params type: %T", req.Params)
+		log.Printf("Params content: %+v", req.Params)
+		// Try to return success anyway with minimal setup
+		s.rootURI = "."
+		log.Printf("Proceeding with default rootURI")
+	} else {
+		log.Printf("Initialize params parsed successfully: %+v", rawParams)
+		
+		// Extract rootUri if present
+		if rootUri, ok := rawParams["rootUri"].(string); ok && rootUri != "" {
+			log.Printf("Setting rootURI to: %s", rootUri)
+			s.rootURI = uriToPath(rootUri)
+			log.Printf("Converted rootURI path: %s", s.rootURI)
+		} else {
+			log.Printf("No rootUri found in params, using default")
+			s.rootURI = "."
+		}
 	}
 
 	result := &lsproto.InitializeResult{
@@ -245,12 +270,14 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 
 	// Try to find rslint.json in the working directory
 	rslintConfigPath := workingDir + "/rslint.json"
+	log.Printf("Looking for rslint.json at: %s (workingDir: %s)", rslintConfigPath, workingDir)
 	if !vfs.FileExists(rslintConfigPath) {
 		// If no rslint.json found, skip diagnostics for now
 		// In a real implementation, you'd create a default config
 		log.Printf("No rslint.json found at %s", rslintConfigPath)
 		return
 	}
+	log.Printf("Found rslint.json at %s", rslintConfigPath)
 
 	// Load rslint configuration and extract tsconfig paths
 	loader := config.NewConfigLoader(vfs, workingDir)
@@ -374,6 +401,7 @@ func uriToPath(uri string) string {
 
 func runLSP() int {
 	log.SetOutput(os.Stderr) // Send logs to stderr so they don't interfere with LSP communication
+	log.Printf("Starting LSP server...")
 
 	server := NewLSPServer()
 

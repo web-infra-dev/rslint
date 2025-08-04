@@ -413,7 +413,7 @@ var ClassLiteralPropertyStyleRule = rule.Rule{
 				if parent != nil && parent.Parent != nil {
 					if ast.IsMethodDeclaration(parent.Parent) {
 						method := parent.Parent.AsMethodDeclaration()
-						if method.Kind == ast.KindConstructorKeyword {
+						if method != nil && method.Kind == ast.KindConstructorKeyword {
 							// We're in a constructor - exclude this property
 							if len(propertiesInfoStack) > 0 {
 								info := propertiesInfoStack[len(propertiesInfoStack)-1]

@@ -1,61 +1,182 @@
-# RSLint TypeScript-ESLint Rule Implementation Guide
+# RSLint Development Guide for AI Agents
 
-## Rule Naming Convention
+This guide helps AI agents understand and work with the RSLint codebase effectively.
 
-RSLint follows a specific convention for TypeScript-ESLint rules to maintain consistency across the codebase.
+## Core Concepts
 
-### Rule Implementation Names
+RSLint is a TypeScript/JavaScript linter written in Go that implements TypeScript-ESLint rules. It uses the TypeScript compiler API through a Go shim and provides diagnostics via CLI and Language Server Protocol (LSP).
 
-When implementing a TypeScript-ESLint rule, the rule's `Name` field should contain **only the base rule name without the `@typescript-eslint/` prefix**.
+## Rule Implementation Guide
+
+### Creating a New TypeScript-ESLint Rule
+
+1. **Create the rule file**: `internal/rules/<rule_name>/<rule_name>.go`
+2. **Define the rule structure**:
 
 ```go
-var MyRule = rule.Rule{
-    Name: "my-rule-name",  // ✅ Correct
-    // NOT: "@typescript-eslint/my-rule-name" ❌
+package rule_name
+
+import (
+    "github.com/microsoft/typescript-go/shim/ast"
+    "github.com/web-infra-dev/rslint/internal/rule"
+)
+
+var RuleNameRule = rule.Rule{
+    Name: "rule-name",  // Use short name WITHOUT @typescript-eslint/ prefix
+    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+        return rule.RuleListeners{
+            ast.KindSomeNode: func(node *ast.Node) {
+                // Rule logic here
+            },
+        }
+    },
 }
 ```
 
-### Rule Registration
+3. **Register the rule in `internal/config/config.go`**:
 
-Rules are registered in `internal/config/config.go` in the `RegisterAllTypeSriptEslintPluginRules` function. When registering, use the **full name including the `@typescript-eslint/` prefix**:
+   - Add import: `"github.com/web-infra-dev/rslint/internal/rules/rule_name"`
+   - In `RegisterAllTypeSriptEslintPluginRules()`, add:
+     ```go
+     GlobalRuleRegistry.Register("@typescript-eslint/rule-name", rule_name.RuleNameRule)
+     ```
 
-```go
-GlobalRuleRegistry.Register("@typescript-eslint/my-rule-name", my_rule.MyRule)
-```
+4. **Add struct field to TypedRules if the rule needs configuration**
 
-### Why This Pattern?
+### Critical Safety Requirements
 
-1. The rule implementation uses the short name for simplicity
-2. The registry key uses the full name to match ESLint convention
-3. The `getAllTypeScriptEslintPluginRules` function adds the prefix automatically when needed
-4. This allows the rules to work correctly with both the plugin system and direct rule references
-
-### Example
-
-For the `adjacent-overload-signatures` rule:
+**Always check for nil pointers** when working with AST nodes:
 
 ```go
-// In internal/rules/adjacent_overload_signatures/adjacent_overload_signatures.go
-var AdjacentOverloadSignaturesRule = rule.Rule{
-    Name: "adjacent-overload-signatures",  // Short name
-    // ...
+// ALWAYS do this:
+typeRef := node.AsTypeReference()
+if typeRef == nil {
+    return
 }
 
-// In internal/config/config.go
-GlobalRuleRegistry.Register("@typescript-eslint/adjacent-overload-signatures",
-    adjacent_overload_signatures.AdjacentOverloadSignaturesRule)
+// Check nested properties:
+if typeRef.TypeArguments != nil && len(typeRef.TypeArguments.Nodes) > 0 {
+    // safe to access
+}
 ```
 
-## Adding New TypeScript-ESLint Rules
+Common nil-check patterns:
 
-1. Create the rule implementation in `internal/rules/<rule_name>/<rule_name>.go`
-2. Use the short name (without prefix) in the rule's `Name` field
-3. Add the import to `internal/config/config.go`
-4. Register the rule with the full prefixed name in `RegisterAllTypeSriptEslintPluginRules`
-5. Add the struct field to `TypedRules` if needed for configuration
+- `node.AsXXX()` methods can return nil
+- `node.Parent` can be nil for root nodes
+- `nodeList.Nodes` - check nodeList isn't nil first
+- Check each level when accessing nested properties
 
-## Testing
+### Reporting Diagnostics
 
-- Rule tests go in `packages/rslint-test-tools/tests/typescript-eslint/rules/`
-- Use the rule tester with just the short name (the prefix is handled automatically)
-- Follow the existing test file patterns for consistency
+Use `ctx.ReportNode()` to emit diagnostics:
+
+```go
+ctx.ReportNode(node, rule.RuleMessage{
+    Id:          "messageId",
+    Description: "Clear description of the violation",
+})
+
+// With auto-fix:
+ctx.ReportNodeWithFixes(node, message,
+    rule.RuleFixReplace(ctx.SourceFile, node, "replacement text"))
+```
+
+## Testing Rules
+
+### Unit Tests
+
+Create test file: `packages/rslint-test-tools/tests/typescript-eslint/rules/<rule-name>.test.ts`
+
+```typescript
+import { describe } from 'vitest';
+import { createTester } from '../../utils';
+
+describe('rule-name', () => {
+  const { testRule } = createTester({ options: [] });
+
+  testRule({
+    valid: ['valid code examples'],
+    invalid: [
+      {
+        code: 'invalid code',
+        errors: [{ messageId: 'messageId' }],
+      },
+    ],
+  });
+});
+```
+
+### Manual Testing
+
+```bash
+# Build the project
+pnpm build
+
+# Test directly
+cd packages/rslint/fixtures
+../bin/rslint src/test.ts
+
+# Add rule to fixtures/rslint.json to enable it
+```
+
+## Important Implementation Details
+
+### Rule Naming Convention
+
+- **Rule implementation**: Use short name (e.g., `"array-type"`)
+- **Registration**: Use full name (e.g., `"@typescript-eslint/array-type"`)
+- **Configuration files**: Use full name with prefix
+
+### AST Navigation
+
+Use the TypeScript AST through the Go shim:
+
+- `ast.KindXXX` constants for node types
+- `node.AsXXX()` methods for type assertions (always check for nil)
+- `ast.IsXXX(node)` helper functions for type checking
+
+### Running Tests
+
+```bash
+# All tests
+pnpm test
+
+# Just Go tests
+go test ./...
+
+# Specific rule tests
+cd packages/rslint-test-tools
+pnpm test <rule-name>
+```
+
+### CI Requirements
+
+Your changes must pass:
+
+- `golangci-lint` - Go code quality
+- `go fmt` - Go formatting
+- `go vet` - Go static analysis
+- Unit tests
+- VSCode extension tests (may have timing issues, focus on Go tests)
+
+## Debugging Tips
+
+1. **Check rule registration**: Ensure the rule is in `RegisterAllTypeSriptEslintPluginRules()`
+2. **Verify configuration**: Rule must be in `rslint.json` to generate diagnostics
+3. **Test CLI directly**: Use `rslint` binary to verify rule works
+4. **Add logging**: Use `log.Printf()` in LSP code (outputs to stderr)
+
+## Common Pitfalls to Avoid
+
+1. **Don't modify** `getAllTypeScriptEslintPluginRules()` - it must match main branch
+2. **Don't change** core infrastructure without understanding impacts
+3. **Always handle nil** from type assertions
+4. **Test with real TypeScript code** to ensure rule behaves correctly
+
+## When You're Done
+
+1. Ensure all tests pass: `pnpm test`
+2. Verify no linting errors: `pnpm build`
+3. Test your rule manually with the CLI
+4. Document any special behavior or options in the rule implementation

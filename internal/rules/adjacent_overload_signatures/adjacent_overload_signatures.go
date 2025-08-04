@@ -30,7 +30,7 @@ func getMemberMethod(ctx rule.RuleContext, member *ast.Node) *Method {
 
 	case ast.KindFunctionDeclaration:
 		funcDecl := member.AsFunctionDeclaration()
-		if funcDecl.Name() == nil {
+		if funcDecl == nil || funcDecl.Name() == nil {
 			return nil
 		}
 		name := funcDecl.Name().Text()
@@ -43,6 +43,9 @@ func getMemberMethod(ctx rule.RuleContext, member *ast.Node) *Method {
 
 	case ast.KindMethodDeclaration:
 		methodDecl := member.AsMethodDeclaration()
+		if methodDecl == nil || methodDecl.Name() == nil {
+			return nil
+		}
 		name, nameType := utils.GetNameFromMember(ctx.SourceFile, methodDecl.Name())
 		return &Method{
 			Name:          name,
@@ -53,6 +56,9 @@ func getMemberMethod(ctx rule.RuleContext, member *ast.Node) *Method {
 
 	case ast.KindMethodSignature:
 		methodSig := member.AsMethodSignatureDeclaration()
+		if methodSig == nil || methodSig.Name() == nil {
+			return nil
+		}
 		name, nameType := utils.GetNameFromMember(ctx.SourceFile, methodSig.Name())
 		return &Method{
 			Name:          name,
@@ -93,21 +99,39 @@ func getMembers(node *ast.Node) []*ast.Node {
 	switch node.Kind {
 	case ast.KindClassDeclaration:
 		classDecl := node.AsClassDeclaration()
+		if classDecl == nil || classDecl.Members == nil {
+			return nil
+		}
 		return classDecl.Members.Nodes
 	case ast.KindSourceFile:
 		sourceFile := node.AsSourceFile()
+		if sourceFile == nil || sourceFile.Statements == nil {
+			return nil
+		}
 		return sourceFile.Statements.Nodes
 	case ast.KindModuleBlock:
 		moduleBlock := node.AsModuleBlock()
+		if moduleBlock == nil || moduleBlock.Statements == nil {
+			return nil
+		}
 		return moduleBlock.Statements.Nodes
 	case ast.KindInterfaceDeclaration:
 		interfaceDecl := node.AsInterfaceDeclaration()
+		if interfaceDecl == nil || interfaceDecl.Members == nil {
+			return nil
+		}
 		return interfaceDecl.Members.Nodes
 	case ast.KindBlock:
 		block := node.AsBlock()
+		if block == nil || block.Statements == nil {
+			return nil
+		}
 		return block.Statements.Nodes
 	case ast.KindTypeLiteral:
 		typeLiteral := node.AsTypeLiteralNode()
+		if typeLiteral == nil || typeLiteral.Members == nil {
+			return nil
+		}
 		return typeLiteral.Members.Nodes
 	}
 	return nil
