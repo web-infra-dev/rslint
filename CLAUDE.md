@@ -184,8 +184,10 @@ Your changes must pass:
 - `golangci-lint` - Go code quality
 - `go fmt` - Go formatting
 - `go vet` - Go static analysis
+- `go test -parallel 4 ./internal/...` - Go unit tests
 - `pnpm tsc -b tsconfig.json` - TypeScript type checking
-- Unit tests
+- `pnpm test` - TypeScript/JavaScript unit tests
+- `pnpm run lint` - ESLint and other linting checks
 - VSCode extension tests (may have timing issues, focus on Go tests)
 
 ## Debugging Tips
@@ -219,14 +221,19 @@ Your changes must pass:
 8. [ ] Test manually with CLI: `cd packages/rslint/fixtures && ../bin/rslint src/test.ts`
 9. [ ] Update test snapshots if needed: `pnpm test -u <rule-name>`
 10. [ ] Run Go quality checks: `go vet ./cmd/... ./internal/...` and `go fmt ./cmd/... ./internal/...`
-11. [ ] Run TypeScript type checking: `pnpm tsc -b tsconfig.json`
-12. [ ] Ensure CI passes (golangci-lint, all tests)
+11. [ ] Run Go unit tests: `go test -parallel 4 ./internal/...`
+12. [ ] Run TypeScript type checking: `pnpm tsc -b tsconfig.json`
+13. [ ] Run all tests: `pnpm test`
+14. [ ] Run linting checks: `pnpm run lint`
+15. [ ] Ensure CI passes (golangci-lint, all tests)
 
 ## When You're Done
 
 1. Ensure all tests pass: `pnpm test`
 2. Verify no linting errors: `pnpm build`
 3. Run Go quality checks: `go vet ./cmd/... ./internal/...` and `go fmt ./cmd/... ./internal/...`
-4. Run TypeScript type checking: `pnpm tsc -b tsconfig.json`
-5. Test your rule manually with the CLI
-6. Document any special behavior or options in the rule implementation
+4. Run Go unit tests: `go test -parallel 4 ./internal/...`
+5. Run TypeScript type checking: `pnpm tsc -b tsconfig.json`
+6. Run linting checks: `pnpm run lint`
+7. Test your rule manually with the CLI
+8. Document any special behavior or options in the rule implementation
