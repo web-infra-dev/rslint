@@ -1,1 +1,16 @@
-{ "rules": { "@typescript-eslint/no-var-requires": "error" } }
+[
+  {
+    "language": "javascript",
+    "files": ["**/*.js", "**/*.jsx", "**/*.ts", "**/*.tsx"],
+    "languageOptions": {
+      "parserOptions": {
+        "projectService": false,
+        "project": ["./tsconfig.json"]
+      }
+    },
+    "rules": {
+      "@typescript-eslint/no-var-requires": "error"
+    },
+    "plugins": ["@typescript-eslint"]
+  }
+]
