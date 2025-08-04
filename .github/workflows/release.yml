@@ -138,20 +138,30 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache-name: linux-x86
-
       - name: Install pnpm
         run: corepack enable
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Format code
-        run: pnpm format:check
+      - name: Download Artifact
+        uses: actions/download-artifact@v4.1.7
+        with:
+          path: binaries
+
+      - name: Move binaries
+        run: |
+          find ./binaries
+          for file in binaries/*/*-rslint; do
+            echo "Processing $file"
+            filename=$(basename "$file")
+            dirname="${filename%-rslint}"
+            target_dir="npm/$dirname"
+            mkdir -p "$target_dir"
+            echo "Copy $file to $target_dir/rslint"
+            cp "$file" "npm/$dirname/rslint"
+          done
+          find ./npm
 
       - name: Publish npm packages
         if: env.release_npm == 'true'
@@ -159,7 +169,7 @@ jobs:
           NPM_TOKEN: ${{ secrets.RSLINT_NPM_TOKEN }}
         run: |
           npm config set "//registry.npmjs.org/:_authToken" "${NPM_TOKEN}"
-          pnpm -r publish --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
+          pnpm -r publish --no-git-checks --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
 
       - name: Build and publish to Microsoft VS Code Marketplace
         if: false
