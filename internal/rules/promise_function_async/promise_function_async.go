@@ -24,7 +24,7 @@ type PromiseFunctionAsyncOptions struct {
 	CheckMethodDeclarations   *bool
 }
 
-var PromiseFunctionAsyncRule = rule.Rule{
+var PromiseFunctionAsyncRule = rule.CreateRule(rule.Rule{
 	Name: "promise-function-async",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(PromiseFunctionAsyncOptions)
@@ -160,4 +160,4 @@ var PromiseFunctionAsyncRule = rule.Rule{
 
 		return listeners
 	},
-}
+})

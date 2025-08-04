@@ -13,7 +13,7 @@ func buildUseThisTypeMessage() rule.RuleMessage {
 	}
 }
 
-var PreferReturnThisTypeRule = rule.Rule{
+var PreferReturnThisTypeRule = rule.CreateRule(rule.Rule{
 	Name: "prefer-return-this-type",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		var tryGetNameInTypeNode func(name string, node *ast.Node) *ast.Node
@@ -120,4 +120,4 @@ var PreferReturnThisTypeRule = rule.Rule{
 			},
 		}
 	},
-}
+})

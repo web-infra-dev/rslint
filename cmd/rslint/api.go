@@ -16,7 +16,10 @@ import (
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules/adjacent_overload_signatures"
+	"github.com/web-infra-dev/rslint/internal/rules/array_type"
 	"github.com/web-infra-dev/rslint/internal/rules/await_thenable"
+	"github.com/web-infra-dev/rslint/internal/rules/class_literal_property_style"
 	"github.com/web-infra-dev/rslint/internal/rules/no_array_delete"
 	"github.com/web-infra-dev/rslint/internal/rules/no_base_to_string"
 	"github.com/web-infra-dev/rslint/internal/rules/no_confusing_void_expression"
@@ -41,8 +44,12 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_type_assertion"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_unary_minus"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unused_vars"
+	"github.com/web-infra-dev/rslint/internal/rules/no_useless_empty_export"
+	"github.com/web-infra-dev/rslint/internal/rules/no_var_requires"
 	"github.com/web-infra-dev/rslint/internal/rules/non_nullable_type_assertion_style"
 	"github.com/web-infra-dev/rslint/internal/rules/only_throw_error"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_as_const"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_promise_reject_errors"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_reduce_type_parameter"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_return_this_type"
@@ -97,7 +104,10 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 
 	// Create rules
 	var origin_rules = []rule.Rule{
+		adjacent_overload_signatures.AdjacentOverloadSignaturesRule,
+		array_type.ArrayTypeRule,
 		await_thenable.AwaitThenableRule,
+		class_literal_property_style.ClassLiteralPropertyStyleRule,
 		no_array_delete.NoArrayDeleteRule,
 		no_base_to_string.NoBaseToStringRule,
 		no_confusing_void_expression.NoConfusingVoidExpressionRule,
@@ -122,8 +132,12 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		no_unsafe_return.NoUnsafeReturnRule,
 		no_unsafe_type_assertion.NoUnsafeTypeAssertionRule,
 		no_unsafe_unary_minus.NoUnsafeUnaryMinusRule,
+		no_unused_vars.NoUnusedVarsRule,
+		no_useless_empty_export.NoUselessEmptyExportRule,
+		no_var_requires.NoVarRequiresRule,
 		non_nullable_type_assertion_style.NonNullableTypeAssertionStyleRule,
 		only_throw_error.OnlyThrowErrorRule,
+		prefer_as_const.PreferAsConstRule,
 		prefer_promise_reject_errors.PreferPromiseRejectErrorsRule,
 		prefer_reduce_type_parameter.PreferReduceTypeParameterRule,
 		prefer_return_this_type.PreferReturnThisTypeRule,

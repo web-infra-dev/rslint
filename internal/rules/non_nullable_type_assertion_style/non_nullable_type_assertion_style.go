@@ -15,7 +15,7 @@ func buildPreferNonNullAssertionMessage() rule.RuleMessage {
 	}
 }
 
-var NonNullableTypeAssertionStyleRule = rule.Rule{
+var NonNullableTypeAssertionStyleRule = rule.CreateRule(rule.Rule{
 	Name: "non-nullable-type-assertion-style",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		getTypesIfNotLoose := func(node *ast.Node) []*checker.Type {
@@ -102,4 +102,4 @@ var NonNullableTypeAssertionStyleRule = rule.Rule{
 			ast.KindTypeAssertionExpression: checkAssertion,
 		}
 	},
-}
+})

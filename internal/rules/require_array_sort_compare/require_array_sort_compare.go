@@ -18,7 +18,7 @@ type RequireArraySortCompareOptions struct {
 	IgnoreStringArrays *bool
 }
 
-var RequireArraySortCompareRule = rule.Rule{
+var RequireArraySortCompareRule = rule.CreateRule(rule.Rule{
 	Name: "require-array-sort-compare",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(RequireArraySortCompareOptions)
@@ -63,4 +63,4 @@ var RequireArraySortCompareRule = rule.Rule{
 			},
 		}
 	},
-}
+})

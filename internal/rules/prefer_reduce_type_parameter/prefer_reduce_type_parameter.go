@@ -14,7 +14,7 @@ func buildPreferTypeParameterMessage() rule.RuleMessage {
 	}
 }
 
-var PreferReduceTypeParameterRule = rule.Rule{
+var PreferReduceTypeParameterRule = rule.CreateRule(rule.Rule{
 	Name: "prefer-reduce-type-parameter",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		return rule.RuleListeners{
@@ -72,4 +72,4 @@ var PreferReduceTypeParameterRule = rule.Rule{
 			},
 		}
 	},
-}
+})

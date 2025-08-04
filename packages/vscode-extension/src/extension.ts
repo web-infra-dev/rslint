@@ -10,6 +10,7 @@ import {
 let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
+  console.log('Rslint extension activating...');
   const binPathConfig = workspace
     .getConfiguration()
     .get('rslint.binPath') as string;
@@ -17,6 +18,7 @@ export function activate(context: ExtensionContext) {
     binPathConfig && binPathConfig.trim() !== ''
       ? binPathConfig
       : Uri.joinPath(context.extensionUri, 'dist', 'rslint').fsPath;
+  console.log('Rslint binary path:', binPath);
   const run: Executable = {
     command: binPath,
     args: ['--lsp'],
@@ -45,10 +47,23 @@ export function activate(context: ExtensionContext) {
     clientOptions,
   );
 
-  client.start();
+  client
+    .start()
+    .then(() => {
+      console.log('Rslint language client started successfully');
+    })
+    .catch((err: unknown) => {
+      console.error('Failed to start Rslint language client:', err);
+    });
 
   context.subscriptions.push(
     client.onDidChangeState(event => {
+      console.log(
+        'Rslint client state changed:',
+        event.oldState,
+        '->',
+        event.newState,
+      );
       if (event.newState === 2) {
         window.showInformationMessage('Rslint language server started');
       }

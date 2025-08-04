@@ -9,12 +9,33 @@ suite('rslint extension', function () {
   async function waitForDiagnostics(
     doc: vscode.TextDocument,
   ): Promise<vscode.Diagnostic[]> {
-    await new Promise(resolve => {
-      const disposable = vscode.languages.onDidChangeDiagnostics(() => {
-        disposable.dispose();
-        resolve(void 0);
+    // Try multiple times to get diagnostics
+    for (let i = 0; i < 10; i++) {
+      const diagnostics = vscode.languages.getDiagnostics(doc.uri);
+      if (diagnostics.length > 0) {
+        return diagnostics;
+      }
+
+      // Wait for diagnostics change event or timeout
+      await new Promise(resolve => {
+        const disposable = vscode.languages.onDidChangeDiagnostics(e => {
+          // Check if this event is for our document
+          for (const uri of e.uris) {
+            if (uri.toString() === doc.uri.toString()) {
+              disposable.dispose();
+              resolve(void 0);
+              return;
+            }
+          }
+        });
+        // Wait 1 second then check again
+        setTimeout(() => {
+          disposable.dispose();
+          resolve(void 0);
+        }, 1000);
       });
-    });
+    }
+
     return vscode.languages.getDiagnostics(doc.uri);
   }
 
@@ -35,7 +56,10 @@ suite('rslint extension', function () {
     await vscode.window.showTextDocument(doc);
 
     const diagnostics = await waitForDiagnostics(doc);
-    assert.ok(diagnostics.length > 0);
+    assert.ok(
+      diagnostics.length > 0,
+      `Expected diagnostics but got ${diagnostics.length}`,
+    );
   });
 
   test('code actions - auto fix', async () => {

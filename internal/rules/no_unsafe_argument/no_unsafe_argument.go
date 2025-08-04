@@ -150,7 +150,7 @@ func (s *functionSignature) getNextParameterType() *checker.Type {
 	return s.paramTypes[index]
 }
 
-var NoUnsafeArgumentRule = rule.Rule{
+var NoUnsafeArgumentRule = rule.CreateRule(rule.Rule{
 	Name: "no-unsafe-argument",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		describeType := func(t *checker.Type) string {
@@ -287,4 +287,4 @@ var NoUnsafeArgumentRule = rule.Rule{
 			},
 		}
 	},
-}
+})

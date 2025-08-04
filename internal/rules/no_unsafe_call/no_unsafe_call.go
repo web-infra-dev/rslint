@@ -35,7 +35,7 @@ func buildUnsafeTemplateTagMessage(t string) rule.RuleMessage {
 	}
 }
 
-var NoUnsafeCallRule = rule.Rule{
+var NoUnsafeCallRule = rule.CreateRule(rule.Rule{
 	Name: "no-unsafe-call",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		compilerOptions := ctx.Program.Options()
@@ -125,4 +125,4 @@ var NoUnsafeCallRule = rule.Rule{
 			},
 		}
 	},
-}
+})

@@ -27,7 +27,7 @@ func buildUndefMessage() rule.RuleMessage {
 	}
 }
 
-var OnlyThrowErrorRule = rule.Rule{
+var OnlyThrowErrorRule = rule.CreateRule(rule.Rule{
 	Name: "only-throw-error",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(OnlyThrowErrorOptions)
@@ -85,4 +85,4 @@ var OnlyThrowErrorRule = rule.Rule{
 			},
 		}
 	},
-}
+})

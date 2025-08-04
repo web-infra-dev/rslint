@@ -22,7 +22,7 @@ const (
 	allowedTypeUnknown
 )
 
-var NoMixedEnumsRule = rule.Rule{
+var NoMixedEnumsRule = rule.CreateRule(rule.Rule{
 	Name: "no-mixed-enums",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		getMemberType := func(node *ast.Node) allowedType {
@@ -86,4 +86,4 @@ var NoMixedEnumsRule = rule.Rule{
 			},
 		}
 	},
-}
+})

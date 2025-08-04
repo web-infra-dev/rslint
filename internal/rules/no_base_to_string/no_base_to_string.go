@@ -48,7 +48,7 @@ const (
 	usefulnessSometimes
 )
 
-var NoBaseToStringRule = rule.Rule{
+var NoBaseToStringRule = rule.CreateRule(rule.Rule{
 	Name: "no-base-to-string",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(NoBaseToStringOptions)
@@ -327,4 +327,4 @@ var NoBaseToStringRule = rule.Rule{
 			},
 		}
 	},
-}
+})

@@ -87,6 +87,13 @@ type Rule struct {
 	Run  func(ctx RuleContext, options any) RuleListeners
 }
 
+func CreateRule(r Rule) Rule {
+	return Rule{
+		Name: "@typescript-eslint/" + r.Name,
+		Run:  r.Run,
+	}
+}
+
 type RuleMessage struct {
 	Id          string
 	Description string
@@ -158,7 +165,7 @@ type RuleContext struct {
 	SourceFile                 *ast.SourceFile
 	Program                    *compiler.Program
 	TypeChecker                *checker.Checker
-	DisableManager            *DisableManager
+	DisableManager             *DisableManager
 	ReportRange                func(textRange core.TextRange, msg RuleMessage)
 	ReportRangeWithSuggestions func(textRange core.TextRange, msg RuleMessage, suggestions ...RuleSuggestion)
 	ReportNode                 func(node *ast.Node, msg RuleMessage)
