@@ -15,7 +15,7 @@ Rslint is a high-performance JavaScript and TypeScript linter written in Go. It 
 ## ✨ Goals
 
 - 🚀 **Lightning Fast**: Built with Go and typescript-go, delivering 20-40x faster linting performance compared to traditional ESLint setups.
-- ⚡ **Zero Configuration**: Typed linting enabled by default with minimal setup required — no complex configuration needed.
+- ⚡ **Minimal Configuration**: Typed linting enabled by default with minimal setup required — no complex configuration needed.
 - 📦 **Best Effort ESLint Compatible**: Compatible with most ESLint and TypeScript-ESLint configurations, significantly reducing migration costs.
 - 🎯 **TypeScript First**: Uses TypeScript Compiler semantics as the single source of truth, ensuring 100% consistency and eliminating edge-case bugs.
 - 🛠️ **Project-Level Analysis**: Performs cross-module analysis by default, enabling more powerful semantic analysis than file-level linting.
