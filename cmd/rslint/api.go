@@ -16,7 +16,10 @@ import (
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules/adjacent_overload_signatures"
+	"github.com/web-infra-dev/rslint/internal/rules/array_type"
 	"github.com/web-infra-dev/rslint/internal/rules/await_thenable"
+	"github.com/web-infra-dev/rslint/internal/rules/class_literal_property_style"
 	"github.com/web-infra-dev/rslint/internal/rules/no_array_delete"
 	"github.com/web-infra-dev/rslint/internal/rules/no_base_to_string"
 	"github.com/web-infra-dev/rslint/internal/rules/no_confusing_void_expression"
@@ -97,7 +100,10 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 
 	// Create rules
 	var origin_rules = []rule.Rule{
+		adjacent_overload_signatures.AdjacentOverloadSignaturesRule,
+		array_type.ArrayTypeRule,
 		await_thenable.AwaitThenableRule,
+		class_literal_property_style.ClassLiteralPropertyStyleRule,
 		no_array_delete.NoArrayDeleteRule,
 		no_base_to_string.NoBaseToStringRule,
 		no_confusing_void_expression.NoConfusingVoidExpressionRule,
