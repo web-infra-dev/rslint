@@ -15,6 +15,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_base_to_string"
 	"github.com/web-infra-dev/rslint/internal/rules/no_confusing_void_expression"
 	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_type_constituents"
+	"github.com/web-infra-dev/rslint/internal/rules/no_empty_interface"
 	"github.com/web-infra-dev/rslint/internal/rules/no_floating_promises"
 	"github.com/web-infra-dev/rslint/internal/rules/no_for_in_array"
 	"github.com/web-infra-dev/rslint/internal/rules/no_implied_eval"
@@ -272,6 +273,7 @@ func RegisterAllTypeSriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/no-base-to-string", no_base_to_string.NoBaseToStringRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-confusing-void-expression", no_confusing_void_expression.NoConfusingVoidExpressionRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-duplicate-type-constituents", no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-empty-interface", no_empty_interface.NoEmptyInterfaceRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-floating-promises", no_floating_promises.NoFloatingPromisesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-for-in-array", no_for_in_array.NoForInArrayRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-implied-eval", no_implied_eval.NoImpliedEvalRule)

@@ -24,6 +24,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_base_to_string"
 	"github.com/web-infra-dev/rslint/internal/rules/no_confusing_void_expression"
 	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_type_constituents"
+	"github.com/web-infra-dev/rslint/internal/rules/no_empty_interface"
 	"github.com/web-infra-dev/rslint/internal/rules/no_floating_promises"
 	"github.com/web-infra-dev/rslint/internal/rules/no_for_in_array"
 	"github.com/web-infra-dev/rslint/internal/rules/no_implied_eval"
@@ -112,6 +113,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		no_base_to_string.NoBaseToStringRule,
 		no_confusing_void_expression.NoConfusingVoidExpressionRule,
 		no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule,
+		no_empty_interface.NoEmptyInterfaceRule,
 		no_floating_promises.NoFloatingPromisesRule,
 		no_for_in_array.NoForInArrayRule,
 		no_implied_eval.NoImpliedEvalRule,
