@@ -57,12 +57,20 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []s
 					registeredListeners := make(map[ast.Kind][](func(node *ast.Node)), 20)
 					{
 						rules := getRulesForFile(file)
+						// Create disable manager for this file
+						disableManager := rule.NewDisableManager(file)
+						
 						for _, r := range rules {
 							ctx := rule.RuleContext{
-								SourceFile:  file,
-								Program:     program,
-								TypeChecker: checker,
+								SourceFile:     file,
+								Program:        program,
+								TypeChecker:    checker,
+								DisableManager: disableManager,
 								ReportRange: func(textRange core.TextRange, msg rule.RuleMessage) {
+									// Check if rule is disabled at this position
+									if disableManager.IsRuleDisabled(r.Name, textRange.Pos()) {
+										return
+									}
 									onDiagnostic(rule.RuleDiagnostic{
 										RuleName:   r.Name,
 										Range:      textRange,
@@ -72,6 +80,10 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []s
 									})
 								},
 								ReportRangeWithSuggestions: func(textRange core.TextRange, msg rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
+									// Check if rule is disabled at this position
+									if disableManager.IsRuleDisabled(r.Name, textRange.Pos()) {
+										return
+									}
 									onDiagnostic(rule.RuleDiagnostic{
 										RuleName:    r.Name,
 										Range:       textRange,
@@ -82,6 +94,10 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []s
 									})
 								},
 								ReportNode: func(node *ast.Node, msg rule.RuleMessage) {
+									// Check if rule is disabled at this position
+									if disableManager.IsRuleDisabled(r.Name, node.Pos()) {
+										return
+									}
 									onDiagnostic(rule.RuleDiagnostic{
 										RuleName:   r.Name,
 										Range:      utils.TrimNodeTextRange(file, node),
@@ -91,6 +107,10 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []s
 									})
 								},
 								ReportNodeWithFixes: func(node *ast.Node, msg rule.RuleMessage, fixes ...rule.RuleFix) {
+									// Check if rule is disabled at this position
+									if disableManager.IsRuleDisabled(r.Name, node.Pos()) {
+										return
+									}
 									onDiagnostic(rule.RuleDiagnostic{
 										RuleName:   r.Name,
 										Range:      utils.TrimNodeTextRange(file, node),
@@ -102,6 +122,10 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []s
 								},
 
 								ReportNodeWithSuggestions: func(node *ast.Node, msg rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
+									// Check if rule is disabled at this position
+									if disableManager.IsRuleDisabled(r.Name, node.Pos()) {
+										return
+									}
 									onDiagnostic(rule.RuleDiagnostic{
 										RuleName:    r.Name,
 										Range:       utils.TrimNodeTextRange(file, node),

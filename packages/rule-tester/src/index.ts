@@ -189,6 +189,7 @@ export class RuleTester {
             diags.diagnostics?.length > 0,
             `Expected diagnostics for invalid case`,
           );
+          // eslint-disable-next-line
           checkDiagnosticEqual(diags.diagnostics, errors);
         }
       });

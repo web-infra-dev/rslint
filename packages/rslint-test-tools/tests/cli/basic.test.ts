@@ -203,6 +203,7 @@ describe('CLI Configuration Tests', () => {
         .split('\n')
         .filter(line => line.trim());
       for (const line of lines) {
+        // eslint-disable-next-line
         expect(() => JSON.parse(line)).not.toThrow();
       }
     } finally {
