@@ -85,7 +85,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	// Get current directory
 	currentDirectory, err := os.Getwd()
 	if err != nil {
-		return nil, fmt.Errorf("error getting current directory: %v", err)
+		return nil, fmt.Errorf("error getting current directory: %w", err)
 	}
 	currentDirectory = tspath.NormalizePath(currentDirectory)
 
@@ -181,7 +181,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	for _, configFileName := range tsConfigs {
 		program, err := utils.CreateProgram(false, fs, configDirectory, configFileName, host)
 		if err != nil {
-			return nil, fmt.Errorf("error creating TS program for %s: %v", configFileName, err)
+			return nil, fmt.Errorf("error creating TS program for %s: %w", configFileName, err)
 		}
 		programs = append(programs, program)
 	}
@@ -243,7 +243,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		diagnosticCollector,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error running linter: %v", err)
+		return nil, fmt.Errorf("error running linter: %w", err)
 	}
 
 	if diagnostics == nil {

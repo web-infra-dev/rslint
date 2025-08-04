@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -75,7 +76,7 @@ func (s *LSPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 		// Respond with method not found for unhandled methods
 		return nil, &jsonrpc2.Error{
 			Code:    jsonrpc2.CodeMethodNotFound,
-			Message: fmt.Sprintf("method not found: %s", req.Method),
+			Message: "method not found: " + req.Method,
 		}
 	}
 }
@@ -338,7 +339,6 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 
 	// Create multiple programs for all tsconfig files
 	var programs []*compiler.Program
-	var allSourceFiles []*ast.SourceFile
 	var targetFile *ast.SourceFile
 
 	for _, tsConfigPath := range tsConfigs {
@@ -351,7 +351,6 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 
 		// Check if the current file is in this program
 		sourceFiles := program.GetSourceFiles()
-		allSourceFiles = append(allSourceFiles, sourceFiles...)
 
 		if targetFile == nil {
 			for _, sf := range sourceFiles {
@@ -484,7 +483,7 @@ type LintResponse struct {
 
 func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, rslintConfig config.RslintConfig) ([]rule.RuleDiagnostic, error) {
 	if len(programs) == 0 {
-		return nil, fmt.Errorf("no programs provided")
+		return nil, errors.New("no programs provided")
 	}
 
 	// Initialize rule registry with all available rules
@@ -500,11 +499,13 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 		defer diagnosticsLock.Unlock()
 		diagnostics = append(diagnostics, d)
 	}
+	filename := uriToPath(string(uri))
+
 	// Run linter with all programs using rule registry
 	_, err := linter.RunLinter(
 		programs,
 		false, // Don't use single-threaded mode for LSP
-		nil,
+		[]string{filename},
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
 			return activeRules
@@ -512,7 +513,7 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 		diagnosticCollector,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error running linter: %v", err)
+		return nil, fmt.Errorf("error running linter: %w", err)
 	}
 
 	if diagnostics == nil {
@@ -523,10 +524,13 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 
 // Helper function to check if two ranges overlap
 func rangesOverlap(a, b lsproto.Range) bool {
-	return !(a.End.Line < b.Start.Line ||
-		(a.End.Line == b.Start.Line && a.End.Character < b.Start.Character) ||
-		b.End.Line < a.Start.Line ||
-		(b.End.Line == a.Start.Line && b.End.Character < a.Start.Character))
+	// Ranges overlap if a starts before or at b's end AND b starts before or at a's end
+	aStartsBefore := a.Start.Line < b.End.Line ||
+		(a.Start.Line == b.End.Line && a.Start.Character <= b.End.Character)
+	bStartsBefore := b.Start.Line < a.End.Line ||
+		(b.Start.Line == a.End.Line && b.Start.Character <= a.End.Character)
+
+	return aStartsBefore && bStartsBefore
 }
 
 // Helper function to create a code action from a rule diagnostic
@@ -574,7 +578,7 @@ func createCodeActionFromRuleDiagnostic(ruleDiag rule.RuleDiagnostic, uri lsprot
 	}
 
 	return &lsproto.CodeAction{
-		Title:       fmt.Sprintf("Fix: %s", ruleDiag.Message.Description),
+		Title:       "Fix: " + ruleDiag.Message.Description,
 		Kind:        ptrTo(lsproto.CodeActionKind("quickfix")),
 		Edit:        workspaceEdit,
 		Diagnostics: &[]*lsproto.Diagnostic{lspDiagnostic},
@@ -627,7 +631,7 @@ func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rul
 	}
 
 	return &lsproto.CodeAction{
-		Title:       fmt.Sprintf("Suggestion: %s", suggestion.Message.Description),
+		Title:       "Suggestion: " + suggestion.Message.Description,
 		Kind:        ptrTo(lsproto.CodeActionKind("quickfix")),
 		Edit:        workspaceEdit,
 		Diagnostics: &[]*lsproto.Diagnostic{lspDiagnostic},

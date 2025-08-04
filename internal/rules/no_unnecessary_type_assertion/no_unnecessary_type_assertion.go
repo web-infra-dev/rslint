@@ -107,9 +107,7 @@ var NoUnnecessaryTypeAssertionRule = rule.Rule{
 				t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node)
 				if declarationType == t &&
 					// `declare`s are never narrowed, so never skip them
-					!(ast.IsVariableDeclarationList(declaration.Parent) &&
-						ast.IsVariableStatement(declaration.Parent.Parent) &&
-						utils.IncludesModifier(declaration.Parent.Parent.AsVariableStatement(), ast.KindDeclareKeyword)) {
+					(!ast.IsVariableDeclarationList(declaration.Parent) || !ast.IsVariableStatement(declaration.Parent.Parent) || !utils.IncludesModifier(declaration.Parent.Parent.AsVariableStatement(), ast.KindDeclareKeyword)) {
 					// possibly used before assigned, so just skip it
 					// better to false negative and skip it, than false positive and fix to compile erroring code
 					//

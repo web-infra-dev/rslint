@@ -49,7 +49,7 @@ var RequireAwaitRule = rule.Rule{
 		}
 
 		exitFunction := func(node *ast.Node) {
-			if currentScope.functionFlags&checker.FunctionFlagsAsync != 0 && !currentScope.hasAwait && !(currentScope.functionFlags&checker.FunctionFlagsGenerator != 0 && currentScope.isAsyncYield) {
+			if currentScope.functionFlags&checker.FunctionFlagsAsync != 0 && !currentScope.hasAwait && (currentScope.functionFlags&checker.FunctionFlagsGenerator == 0 || !currentScope.isAsyncYield) {
 				// TODO(port): implement suggestions
 				// // If the function belongs to a method definition or
 				// // property, then the function's range may not include the

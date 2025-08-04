@@ -124,7 +124,7 @@ var NoUnnecessaryTypeArgumentsRule = rule.Rule{
 			if utils.IsIntrinsicErrorType(argType) {
 				return
 			}
-			if argType != paramType && (utils.IsTypeAnyType(argType) || utils.IsTypeAnyType(paramType) || !(checker.Checker_isTypeStrictSubtypeOf(ctx.TypeChecker, argType, paramType) && checker.Checker_isTypeStrictSubtypeOf(ctx.TypeChecker, paramType, argType))) {
+			if argType != paramType && (utils.IsTypeAnyType(argType) || utils.IsTypeAnyType(paramType) || (!checker.Checker_isTypeStrictSubtypeOf(ctx.TypeChecker, argType, paramType) || !checker.Checker_isTypeStrictSubtypeOf(ctx.TypeChecker, paramType, argType))) {
 				return
 			}
 

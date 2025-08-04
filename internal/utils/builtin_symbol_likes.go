@@ -248,9 +248,10 @@ func IsBuiltinSymbolLikeRecurser(
 	}
 
 	predicateResult := predicate(t)
-	if predicateResult == builtinPredicateMatches_True {
+	switch predicateResult {
+	case builtinPredicateMatches_True:
 		return true
-	} else if predicateResult == builtinPredicateMatches_False {
+	case builtinPredicateMatches_False:
 		return false
 	}
 
