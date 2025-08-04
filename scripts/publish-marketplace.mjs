@@ -34,8 +34,8 @@ async function publish_all() {
     await $`rm -rf ./packages/vscode-extension/dist/rslint.exe`;
     await $`cp binaries/${os}-${arch}-rslint/${os}-${arch}-rslint ./packages/vscode-extension/dist/rslint`;
 
-    await $`cd packages/vscode-extension && pnpm ${marketplace} package --target ${os}-${arch}`;
-    await $`ls -R packages/vscode-extension`;
+    await $`cd packages/vscode-extension && pnpm vsce package --target ${os}-${arch}`;
+    await $`ls -lR packages/vscode-extension/dist *.vsix`;
 
     // supports dry-run
     if (process.argv.includes('--dry-run')) {
