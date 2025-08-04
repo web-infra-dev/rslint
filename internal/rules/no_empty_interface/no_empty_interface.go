@@ -138,7 +138,7 @@ var NoEmptyInterfaceRule = rule.Rule{
 
 					// Extract interface name
 					nameRange := utils.TrimNodeTextRange(ctx.SourceFile, interfaceDecl.Name())
-					nameText := string(ctx.SourceFile.Text()[nameRange.Pos():nameRange.End()])
+					nameText := ctx.SourceFile.Text()[nameRange.Pos():nameRange.End()]
 
 					// Extract type parameters if present
 					var typeParamsText string
@@ -151,11 +151,11 @@ var NoEmptyInterfaceRule = rule.Rule{
 						typeParamsRange := firstRange.WithEnd(lastRange.End())
 						// Include the angle brackets
 						typeParamsRange = typeParamsRange.WithPos(typeParamsRange.Pos() - 1).WithEnd(typeParamsRange.End() + 1)
-						typeParamsText = string(ctx.SourceFile.Text()[typeParamsRange.Pos():typeParamsRange.End()])
+						typeParamsText = ctx.SourceFile.Text()[typeParamsRange.Pos():typeParamsRange.End()]
 					}
 
 					extendedTypeRange := utils.TrimNodeTextRange(ctx.SourceFile, extendClause.Types.Nodes[0])
-					extendedTypeText := string(ctx.SourceFile.Text()[extendedTypeRange.Pos():extendedTypeRange.End()])
+					extendedTypeText := ctx.SourceFile.Text()[extendedTypeRange.Pos():extendedTypeRange.End()]
 
 					replacement := fmt.Sprintf("%stype %s%s = %s", exportText, nameText, typeParamsText, extendedTypeText)
 
