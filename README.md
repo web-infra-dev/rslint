@@ -55,7 +55,7 @@ Rstack is a unified JavaScript toolchain built around Rspack, with high performa
 
 Please read the [Contributing Guide](https://github.com/web-infra-dev/rslint/blob/main/CONTRIBUTING.md) and let's build Rslint together.
 
-### Code of conduct
+### Code of Conduct
 
 This repo has adopted the ByteDance Open Source Code of Conduct. Please check [Code of conduct](./CODE_OF_CONDUCT.md) for more details.
 
