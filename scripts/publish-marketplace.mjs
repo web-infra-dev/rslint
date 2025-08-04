@@ -13,7 +13,7 @@ async function publish_all() {
   ).version;
 
   const platforms = [
-    { os: 'darwin', arch: 'amd64', 'node-arch': 'x64' },
+    // { os: 'darwin', arch: 'amd64', 'node-arch': 'x64' },
     { os: 'darwin', arch: 'arm64', 'node-arch': 'arm64' },
     { os: 'linux', arch: 'amd64', 'node-arch': 'x64' },
     { os: 'linux', arch: 'arm64', 'node-arch': 'arm64' },
