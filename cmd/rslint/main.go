@@ -1,11 +1,13 @@
 package main
 
 import (
+	"log"
 	"os"
 	"time"
 )
 
 func main() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	os.Exit(runMain())
 }
 

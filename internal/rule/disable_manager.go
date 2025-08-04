@@ -55,8 +55,8 @@ func (dm *DisableManager) parseESLintDirectives() {
 	lines := strings.Split(text, "\n")
 
 	// Regular expressions to match ESLint directives
-	eslintDisableLineRe := regexp.MustCompile(`//\s*eslint-disable-line(?:\s+([^/\r\n]+))?`)
-	eslintDisableNextLineRe := regexp.MustCompile(`//\s*eslint-disable-next-line(?:\s+([^/\r\n]+))?`)
+	eslintDisableLineRe := regexp.MustCompile(`//\s*eslint-disable-line(?:\s+([^\r\n]+))?`)
+	eslintDisableNextLineRe := regexp.MustCompile(`//\s*eslint-disable-next-line(?:\s+([^\r\n]+))?`)
 	eslintDisableRe := regexp.MustCompile(`/\*\s*eslint-disable(?:\s+([^*]+))?\s*\*/`)
 	eslintEnableRe := regexp.MustCompile(`/\*\s*eslint-enable(?:\s+([^*]+))?\s*\*/`)
 
