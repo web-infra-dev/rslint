@@ -68,7 +68,7 @@ var NoVarRequiresRule = rule.Rule{
 			current := node
 			for current != nil {
 				if current.Kind == ast.KindVariableDeclaration ||
-				   current.Kind == ast.KindVariableDeclarationList {
+					current.Kind == ast.KindVariableDeclarationList {
 					return true
 				}
 				current = current.Parent
@@ -112,8 +112,8 @@ var NoVarRequiresRule = rule.Rule{
 						if stringLiteral != nil {
 							// Remove quotes from the text
 							text := stringLiteral.Text
-							if len(text) >= 2 && ((text[0] == '"' && text[len(text)-1] == '"') || 
-							                      (text[0] == '\'' && text[len(text)-1] == '\'')) {
+							if len(text) >= 2 && ((text[0] == '"' && text[len(text)-1] == '"') ||
+								(text[0] == '\'' && text[len(text)-1] == '\'')) {
 								argValue = text[1 : len(text)-1]
 							} else {
 								argValue = text
@@ -149,11 +149,11 @@ var NoVarRequiresRule = rule.Rule{
 
 				// Check if require is used in contexts that are not allowed
 				if isInVariableDeclaration(node) ||
-				   parent.Kind == ast.KindCallExpression ||
-				   parent.Kind == ast.KindPropertyAccessExpression ||
-				   parent.Kind == ast.KindNewExpression ||
-				   parent.Kind == ast.KindAsExpression ||
-				   parent.Kind == ast.KindTypeAssertionExpression {
+					parent.Kind == ast.KindCallExpression ||
+					parent.Kind == ast.KindPropertyAccessExpression ||
+					parent.Kind == ast.KindNewExpression ||
+					parent.Kind == ast.KindAsExpression ||
+					parent.Kind == ast.KindTypeAssertionExpression {
 					ctx.ReportNode(node, rule.RuleMessage{
 						Description: "Require statement not part of import statement.",
 						Id:          "noVarReqs",

@@ -77,7 +77,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 		assert.NilError(t, err, "couldn't create program. code: "+code)
 
 		sourceFile := program.GetSourceFile(fileName)
-		allowedFiles := []string{string(sourceFile.Path())}
+		allowedFiles := []string{sourceFile.FileName()}
 
 		_, err = linter.RunLinter(
 			[]*compiler.Program{program},

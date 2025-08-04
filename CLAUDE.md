@@ -237,3 +237,30 @@ Your changes must pass:
 6. Run linting checks: `pnpm run lint`
 7. Test your rule manually with the CLI
 8. Document any special behavior or options in the rule implementation
+
+## Go Test Infrastructure Notes
+
+### AST Node Kinds
+
+- CallExpression nodes use `ast.KindCallExpression` (value: 213)
+- Node kind definitions are in `typescript-go/internal/ast/kind.go`
+- The TypeScript Go shim properly maps all AST node types from the TypeScript compiler
+
+### Common Go Test Issues
+
+1. **File Path Comparison**: The test infrastructure uses `sourceFile.FileName()` for file paths. Ensure consistency between test and production code.
+2. **Options Handling**: Go tests may pass options as `map[string]interface{}` while TypeScript tests use arrays. Handle both formats:
+   ```go
+   // Handle array format: [{ option: value }]
+   if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
+       optsMap, ok = optArray[0].(map[string]interface{})
+   }
+   ```
+3. **Regex Patterns**: Go regex patterns differ from JavaScript. In Go, `/foo/` is literal, use `"foo"` for matching substrings.
+
+### AST Traversal
+
+- The linter uses a dual-visitor pattern: `childVisitor` for main traversal and `patternVisitor` for destructuring patterns
+- All nodes are visited via `ForEachChild` which respects TypeScript's AST structure
+- Listeners are registered by node kind and executed during traversal
+- Use `isInVariableDeclaration` helper to check if a node is within any variable declaration ancestor

@@ -15,10 +15,10 @@ func TestNoVarRequiresRule(t *testing.T) {
 		{Code: "import { bar } from 'foo';"},
 		{Code: "require('foo');"},
 		{Code: "require?.('foo');"},
-		{Code: "const foo = require('foo');", Options: &Options{Allow: []string{"/foo/"}}},
-		{Code: "const foo = require('./foo');", Options: &Options{Allow: []string{"/foo/"}}},
-		{Code: "const foo = require('../foo');", Options: &Options{Allow: []string{"/foo/"}}},
-		{Code: "const foo = require('foo/bar');", Options: &Options{Allow: []string{"/bar/"}}},
+		{Code: "const foo = require('foo');", Options: &Options{Allow: []string{"foo"}}},
+		{Code: "const foo = require('./foo');", Options: &Options{Allow: []string{"foo"}}},
+		{Code: "const foo = require('../foo');", Options: &Options{Allow: []string{"foo"}}},
+		{Code: "const foo = require('foo/bar');", Options: &Options{Allow: []string{"bar"}}},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: "var foo = require('foo');",
@@ -97,7 +97,7 @@ func TestNoVarRequiresRule(t *testing.T) {
 		},
 		{
 			Code:    "const foo = require('foo'), bar = require('bar');",
-			Options: &Options{Allow: []string{"/bar/"}},
+			Options: &Options{Allow: []string{"bar"}},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noVarReqs",
@@ -108,7 +108,7 @@ func TestNoVarRequiresRule(t *testing.T) {
 		},
 		{
 			Code:    "const foo = require('./foo');",
-			Options: &Options{Allow: []string{"/bar/"}},
+			Options: &Options{Allow: []string{"bar"}},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "noVarReqs",
