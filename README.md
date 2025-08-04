@@ -1,14 +1,14 @@
 # Rslint
 
-> [!NOTE]
-> Think of Rslint as Rust Clippy but for TypeScript — more like a TypeScript extension than an ESLint plugin.
-
 <p>
   <a href="https://discord.gg/YtTedhuq7N"><img src="https://img.shields.io/badge/chat-discord-blue?style=flat-square&logo=discord&colorA=564341&colorB=EDED91" alt="discord channel" /></a>
   <a href="https://npmjs.com/package/@rslint/core?activeTab=readme"><img src="https://img.shields.io/npm/v/@rslint/core?style=flat-square&colorA=564341&colorB=EDED91" alt="npm version" /></a>
   <a href="https://npmcharts.com/compare/@rslint/core?minimal=true"><img src="https://img.shields.io/npm/dm/@rslint/core.svg?style=flat-square&colorA=564341&colorB=EDED91" alt="downloads" /></a>
   <a href="https://github.com/web-infra-dev/rslint/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square&colorA=564341&colorB=EDED91" alt="license" /></a>
 </p>
+
+> [!NOTE]
+> Think of Rslint as Rust Clippy but for TypeScript — more like a TypeScript extension than an ESLint plugin.
 
 Rslint is a high-performance JavaScript and TypeScript linter written in Go. It offers strong compatibility with the ESLint and TypeScript-ESLint ecosystem, allowing for seamless replacement, and provides lightning-fast linting speeds.
 
