@@ -1,0 +1,20 @@
+name: Move Artifacts
+description: move artifacts to npm directory
+runs:
+  using: composite
+
+  steps:
+    - name: Move artifacts
+      shell: bash
+      run: |
+        find ./binaries
+        for file in binaries/*/*-rslint; do
+          echo "Processing $file"
+          filename=$(basename "$file")
+          dirname="${filename%-rslint}"
+          target_dir="npm/$dirname"
+          mkdir -p "$target_dir"
+          echo "Copy $file to $target_dir/rslint"
+          cp "$file" "npm/$dirname/rslint"
+        done
+        find ./npm
