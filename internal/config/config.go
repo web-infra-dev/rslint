@@ -7,7 +7,10 @@ import (
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/rules/adjacent_overload_signatures"
+	"github.com/web-infra-dev/rslint/internal/rules/array_type"
 	"github.com/web-infra-dev/rslint/internal/rules/await_thenable"
+	"github.com/web-infra-dev/rslint/internal/rules/class_literal_property_style"
 	"github.com/web-infra-dev/rslint/internal/rules/no_array_delete"
 	"github.com/web-infra-dev/rslint/internal/rules/no_base_to_string"
 	"github.com/web-infra-dev/rslint/internal/rules/no_confusing_void_expression"
@@ -32,8 +35,12 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_type_assertion"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_unary_minus"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unused_vars"
+	"github.com/web-infra-dev/rslint/internal/rules/no_useless_empty_export"
+	"github.com/web-infra-dev/rslint/internal/rules/no_var_requires"
 	"github.com/web-infra-dev/rslint/internal/rules/non_nullable_type_assertion_style"
 	"github.com/web-infra-dev/rslint/internal/rules/only_throw_error"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_as_const"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_promise_reject_errors"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_reduce_type_parameter"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_return_this_type"
@@ -80,6 +87,9 @@ type Rules map[string]interface{}
 // Alternative: If you want type-safe rule configurations
 type TypedRules struct {
 	// Example rule configurations - extend as needed
+	AdjacentOverloadSignatures         *RuleConfig `json:"@typescript-eslint/adjacent-overload-signatures,omitempty"`
+	ArrayType                          *RuleConfig `json:"@typescript-eslint/array-type,omitempty"`
+	ClassLiteralPropertyStyle          *RuleConfig `json:"@typescript-eslint/class-literal-property-style,omitempty"`
 	NoArrayDelete                      *RuleConfig `json:"@typescript-eslint/no-array-delete,omitempty"`
 	NoBaseToString                     *RuleConfig `json:"@typescript-eslint/no-base-to-string,omitempty"`
 	NoForInArray                       *RuleConfig `json:"@typescript-eslint/no-for-in-array,omitempty"`
@@ -254,7 +264,10 @@ func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConf
 
 // RegisterAllTypeSriptEslintPluginRules registers all available rules in the global registry
 func RegisterAllTypeSriptEslintPluginRules() {
+	GlobalRuleRegistry.Register("@typescript-eslint/adjacent-overload-signatures", adjacent_overload_signatures.AdjacentOverloadSignaturesRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/array-type", array_type.ArrayTypeRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/await-thenable", await_thenable.AwaitThenableRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/class-literal-property-style", class_literal_property_style.ClassLiteralPropertyStyleRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-array-delete", no_array_delete.NoArrayDeleteRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-base-to-string", no_base_to_string.NoBaseToStringRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-confusing-void-expression", no_confusing_void_expression.NoConfusingVoidExpressionRule)
@@ -279,8 +292,12 @@ func RegisterAllTypeSriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unsafe-return", no_unsafe_return.NoUnsafeReturnRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unsafe-type-assertion", no_unsafe_type_assertion.NoUnsafeTypeAssertionRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unsafe-unary-minus", no_unsafe_unary_minus.NoUnsafeUnaryMinusRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-unused-vars", no_unused_vars.NoUnusedVarsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-useless-empty-export", no_useless_empty_export.NoUselessEmptyExportRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-var-requires", no_var_requires.NoVarRequiresRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/non-nullable-type-assertion-style", non_nullable_type_assertion_style.NonNullableTypeAssertionStyleRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/only-throw-error", only_throw_error.OnlyThrowErrorRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/prefer-as-const", prefer_as_const.PreferAsConstRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-promise-reject-errors", prefer_promise_reject_errors.PreferPromiseRejectErrorsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-reduce-type-parameter", prefer_reduce_type_parameter.PreferReduceTypeParameterRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-return-this-type", prefer_return_this_type.PreferReturnThisTypeRule)
