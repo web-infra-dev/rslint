@@ -182,7 +182,7 @@ func (s *LSPServer) handleCodeAction(ctx context.Context, req *jsonrpc2.Request)
 		if content, err := os.ReadFile(filePath); err == nil {
 			s.documents[uri] = string(content)
 			s.runDiagnostics(ctx, uri, string(content))
-			
+
 			// Try to get diagnostics again after running them
 			ruleDiagnostics, exists = s.diagnostics[uri]
 			if !exists {
@@ -269,20 +269,20 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 	// Try to find rslint.json with multiple strategies
 	var rslintConfigPath string
 	var configFound bool
-	
+
 	// Strategy 1: Try in the working directory
 	rslintConfigPath = workingDir + "/rslint.json"
 	if vfs.FileExists(rslintConfigPath) {
 		configFound = true
 	}
-	
+
 	// Strategy 2: If not found, walk up the directory tree
 	if !configFound && filePath != "" {
 		dir := filePath
 		if idx := strings.LastIndex(dir, "/"); idx != -1 {
 			dir = dir[:idx]
 		}
-		
+
 		for i := 0; i < 5 && dir != "/" && dir != ""; i++ { // Limit search depth
 			testPath := dir + "/rslint.json"
 			if vfs.FileExists(testPath) {
@@ -299,7 +299,7 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 			}
 		}
 	}
-	
+
 	if !configFound {
 		return
 	}

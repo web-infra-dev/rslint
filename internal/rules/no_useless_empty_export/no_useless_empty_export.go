@@ -44,7 +44,6 @@ func isEmptyExport(node *ast.Node) bool {
 	return false
 }
 
-
 func hasExportModifier(node *ast.Node) bool {
 	switch node.Kind {
 	case ast.KindVariableStatement:
