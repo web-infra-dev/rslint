@@ -94,7 +94,7 @@ jobs:
           sudo apt install -y libasound2 libgbm1 libgtk-3-0 libnss3 xvfb
 
       - name: VSCode Test Cache
-        uses: actions/cache@v4.2.3
+        uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
         with:
           path: packages/vscode-extension/.vscode-test
           key: 'vscode-test'
