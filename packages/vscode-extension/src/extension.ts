@@ -52,7 +52,7 @@ export function activate(context: ExtensionContext) {
     .then(() => {
       console.log('Rslint language client started successfully');
     })
-    .catch(err => {
+    .catch((err: unknown) => {
       console.error('Failed to start Rslint language client:', err);
     });
 
