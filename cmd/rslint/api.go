@@ -33,6 +33,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_misused_spread"
 	"github.com/web-infra-dev/rslint/internal/rules/no_mixed_enums"
 	"github.com/web-infra-dev/rslint/internal/rules/no_redundant_type_constituents"
+	"github.com/web-infra-dev/rslint/internal/rules/no_require_imports"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unnecessary_boolean_literal_compare"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unnecessary_template_expression"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unnecessary_type_arguments"
@@ -122,6 +123,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		no_misused_spread.NoMisusedSpreadRule,
 		no_mixed_enums.NoMixedEnumsRule,
 		no_redundant_type_constituents.NoRedundantTypeConstituentsRule,
+		no_require_imports.NoRequireImportsRule,
 		no_unnecessary_boolean_literal_compare.NoUnnecessaryBooleanLiteralCompareRule,
 		no_unnecessary_template_expression.NoUnnecessaryTemplateExpressionRule,
 		no_unnecessary_type_arguments.NoUnnecessaryTypeArgumentsRule,
