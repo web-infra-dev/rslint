@@ -29,7 +29,7 @@ func buildVariableSuggestMessage() rule.RuleMessage {
 	}
 }
 
-var PreferAsConstRule = rule.Rule{
+var PreferAsConstRule = rule.CreateRule(rule.Rule{
 	Name: "prefer-as-const",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 
@@ -167,4 +167,4 @@ var PreferAsConstRule = rule.Rule{
 			},
 		}
 	},
-}
+})

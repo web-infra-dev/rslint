@@ -59,7 +59,7 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []s
 						rules := getRulesForFile(file)
 						// Create disable manager for this file
 						disableManager := rule.NewDisableManager(file)
-						
+
 						for _, r := range rules {
 							ctx := rule.RuleContext{
 								SourceFile:     file,

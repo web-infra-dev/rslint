@@ -26,7 +26,7 @@ func isInTypeContext(node *ast.Node) bool {
 	return ast.IsTypeReferenceNode(node) || ast.IsInterfaceDeclaration(node.Parent) || ast.IsTypeReferenceNode(node.Parent) || (ast.IsHeritageClause(node.Parent) && node.Parent.AsHeritageClause().Token == ast.KindImplementsKeyword)
 }
 
-var NoUnnecessaryTypeArgumentsRule = rule.Rule{
+var NoUnnecessaryTypeArgumentsRule = rule.CreateRule(rule.Rule{
 	Name: "no-unnecessary-type-arguments",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		getTypeParametersFromType := func(node *ast.Node, nodeName *ast.Node) []*ast.Node {
@@ -170,4 +170,4 @@ var NoUnnecessaryTypeArgumentsRule = rule.Rule{
 			},
 		}
 	},
-}
+})

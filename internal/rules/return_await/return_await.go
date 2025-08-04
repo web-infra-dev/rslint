@@ -94,7 +94,7 @@ func getWhetherToAwait(affectsErrorHandling bool, option ReturnAwaitOption) whet
 	}
 }
 
-var ReturnAwaitRule = rule.Rule{
+var ReturnAwaitRule = rule.CreateRule(rule.Rule{
 	Name: "return-await",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(ReturnAwaitOptions)
@@ -322,4 +322,4 @@ var ReturnAwaitRule = rule.Rule{
 			},
 		}
 	},
-}
+})

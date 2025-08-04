@@ -16,7 +16,7 @@ func buildUnaryMinusMessage(t string) rule.RuleMessage {
 	}
 }
 
-var NoUnsafeUnaryMinusRule = rule.Rule{
+var NoUnsafeUnaryMinusRule = rule.CreateRule(rule.Rule{
 	Name: "no-unsafe-unary-minus",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		return rule.RuleListeners{
@@ -38,4 +38,4 @@ var NoUnsafeUnaryMinusRule = rule.Rule{
 			},
 		}
 	},
-}
+})

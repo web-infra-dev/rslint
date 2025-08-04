@@ -29,7 +29,7 @@ type scopeInfo struct {
 	upper         *scopeInfo
 }
 
-var RequireAwaitRule = rule.Rule{
+var RequireAwaitRule = rule.CreateRule(rule.Rule{
 	Name: "require-await",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		var currentScope *scopeInfo
@@ -279,4 +279,4 @@ var RequireAwaitRule = rule.Rule{
 			},
 		}
 	},
-}
+})

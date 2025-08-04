@@ -77,7 +77,7 @@ func buildFloatingVoidMessage() rule.RuleMessage {
 	}
 }
 
-var NoFloatingPromisesRule = rule.Rule{
+var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 	Name: "no-floating-promises",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(NoFloatingPromisesOptions)
@@ -444,4 +444,4 @@ var NoFloatingPromisesRule = rule.Rule{
 			},
 		}
 	},
-}
+})

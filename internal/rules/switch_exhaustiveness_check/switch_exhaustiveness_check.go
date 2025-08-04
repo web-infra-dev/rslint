@@ -45,7 +45,7 @@ type SwitchMetadata struct {
 	// SymbolName string
 }
 
-var SwitchExhaustivenessCheckRule = rule.Rule{
+var SwitchExhaustivenessCheckRule = rule.CreateRule(rule.Rule{
 	Name: "switch-exhaustiveness-check",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(SwitchExhaustivenessCheckOptions)
@@ -197,4 +197,4 @@ var SwitchExhaustivenessCheckRule = rule.Rule{
 		}
 
 	},
-}
+})

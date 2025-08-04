@@ -27,9 +27,9 @@ const (
 // DisableManager tracks which rules are disabled at different locations in a file
 type DisableManager struct {
 	sourceFile            *ast.SourceFile
-	disabledRules         map[string]bool    // Rules disabled for the entire file
-	lineDisabledRules     map[int][]string   // Rules disabled for specific lines
-	nextLineDisabledRules map[int][]string   // Rules disabled for the next line
+	disabledRules         map[string]bool  // Rules disabled for the entire file
+	lineDisabledRules     map[int][]string // Rules disabled for specific lines
+	nextLineDisabledRules map[int][]string // Rules disabled for the next line
 }
 
 // NewDisableManager creates a new DisableManager for the given source file

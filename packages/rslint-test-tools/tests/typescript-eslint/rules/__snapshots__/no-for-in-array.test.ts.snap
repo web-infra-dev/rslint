@@ -17,7 +17,7 @@ exports[`no-for-in-array > invalid 1`] = `
           "line": 2,
         },
       },
-      "ruleName": "no-for-in-array",
+      "ruleName": "@typescript-eslint/no-for-in-array",
     },
   ],
   "errorCount": 1,

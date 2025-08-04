@@ -95,7 +95,7 @@ func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request)
 	if err := json.Unmarshal(*req.Params, &params); err != nil {
 		s.rootURI = "."
 	} else {
-		//nolint:staticcheck
+		//nolint
 		if params.RootUri.DocumentUri != nil {
 			s.rootURI = uriToPath(string(*params.RootUri.DocumentUri))
 		}

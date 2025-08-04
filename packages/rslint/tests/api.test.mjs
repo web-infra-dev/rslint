@@ -15,7 +15,7 @@ describe('lint api', async t => {
       config,
       workingDirectory: cwd,
       ruleOptions: {
-        'no-unsafe-member-access': 'error',
+        '@typescript-eslint/no-unsafe-member-access': 'error',
       },
       fileContents: {
         [virtual_entry]: `
@@ -33,7 +33,7 @@ describe('lint api', async t => {
       config,
       workingDirectory: cwd,
       ruleOptions: {
-        'no-unsafe-member-access': 'error',
+        '@typescript-eslint/no-unsafe-member-access': 'error',
       },
     });
     expect(diags).toMatchSnapshot();
