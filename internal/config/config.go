@@ -318,7 +318,6 @@ func getAllTypeScriptEslintPluginRules() []rule.Rule {
 	allRules := GlobalRuleRegistry.GetAllRules()
 	var rules []rule.Rule
 	for _, rule := range allRules {
-		rule.Name = "@typescript-eslint/" + rule.Name
 		rules = append(rules, rule)
 	}
 	return rules
