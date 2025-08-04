@@ -1,6 +1,7 @@
 package rule
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -35,6 +36,16 @@ func TestParseRuleNames(t *testing.T) {
 			name:     "whitespace only",
 			input:    "   ",
 			expected: nil,
+		},
+		{
+			name:     "typescript-eslint rule with slash",
+			input:    "@typescript-eslint/no-unsafe-member-access",
+			expected: []string{"@typescript-eslint/no-unsafe-member-access"},
+		},
+		{
+			name:     "mixed rules with typescript-eslint",
+			input:    "no-console, @typescript-eslint/no-unsafe-member-access, no-unused-vars",
+			expected: []string{"no-console", "@typescript-eslint/no-unsafe-member-access", "no-unused-vars"},
 		},
 	}
 
@@ -93,6 +104,24 @@ func TestESLintDirectiveRegexPatterns(t *testing.T) {
 			shouldMatch: "disable-line",
 			rules:       "",
 		},
+		{
+			name:        "eslint-disable-next-line with typescript-eslint rule",
+			line:        "// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access",
+			shouldMatch: "disable-next-line",
+			rules:       "@typescript-eslint/no-unsafe-member-access",
+		},
+		{
+			name:        "eslint-disable-line with multiple typescript-eslint rules",
+			line:        "// eslint-disable-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment",
+			shouldMatch: "disable-line",
+			rules:       "@typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment",
+		},
+		{
+			name:        "eslint-disable with scoped rule in block comment",
+			line:        "/* eslint-disable @typescript-eslint/no-floating-promises */",
+			shouldMatch: "disable",
+			rules:       "@typescript-eslint/no-floating-promises",
+		},
 	}
 
 	for _, tt := range tests {
@@ -148,5 +177,78 @@ func TestDisableManagerBasicFunctionality(t *testing.T) {
 
 	if len(dm.nextLineDisabledRules[10]) != 1 || dm.nextLineDisabledRules[10][0] != "no-debugger" {
 		t.Error("Expected no-debugger to be disabled for next line after 10")
+	}
+}
+
+func TestRegexPatternsForTypeScriptESLint(t *testing.T) {
+	// Test the actual regex patterns used in the disable manager
+	eslintDisableLineRe := regexp.MustCompile(`//\s*eslint-disable-line(?:\s+([^\r\n]+))?`)
+	eslintDisableNextLineRe := regexp.MustCompile(`//\s*eslint-disable-next-line(?:\s+([^\r\n]+))?`)
+
+	tests := []struct {
+		name     string
+		line     string
+		regex    *regexp.Regexp
+		expected string
+	}{
+		{
+			name:     "disable-line with typescript-eslint rule",
+			line:     "// eslint-disable-line @typescript-eslint/no-unsafe-member-access",
+			regex:    eslintDisableLineRe,
+			expected: "@typescript-eslint/no-unsafe-member-access",
+		},
+		{
+			name:     "disable-next-line with typescript-eslint rule",
+			line:     "// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access",
+			regex:    eslintDisableNextLineRe,
+			expected: "@typescript-eslint/no-unsafe-member-access",
+		},
+		{
+			name:     "disable-line with multiple typescript-eslint rules",
+			line:     "// eslint-disable-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment",
+			regex:    eslintDisableLineRe,
+			expected: "@typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment",
+		},
+		{
+			name:     "disable-next-line with mixed rules",
+			line:     "// eslint-disable-next-line no-console, @typescript-eslint/no-floating-promises",
+			regex:    eslintDisableNextLineRe,
+			expected: "no-console, @typescript-eslint/no-floating-promises",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			matches := tt.regex.FindStringSubmatch(tt.line)
+			if matches == nil {
+				t.Fatalf("Expected regex to match line: %s", tt.line)
+			}
+			if len(matches) < 2 {
+				t.Fatalf("Expected regex to capture group, got matches: %v", matches)
+			}
+			captured := strings.TrimSpace(matches[1])
+			expected := strings.TrimSpace(tt.expected)
+			if captured != expected {
+				t.Errorf("Expected captured group to be %q, got %q", expected, captured)
+			}
+
+			// Also test that parseRuleNames works with the captured content
+			rules := parseRuleNames(captured)
+			if len(rules) == 0 {
+				t.Errorf("parseRuleNames should have parsed rules from %q", captured)
+			}
+			
+			// Verify that rules contain the typescript-eslint rules
+			hasTypeScriptRule := false
+			for _, rule := range rules {
+				if strings.Contains(rule, "@typescript-eslint/") {
+					hasTypeScriptRule = true
+					break
+				}
+			}
+			if strings.Contains(tt.expected, "@typescript-eslint/") && !hasTypeScriptRule {
+				t.Errorf("Expected to find TypeScript-ESLint rule in parsed rules: %v", rules)
+			}
+		})
 	}
 }
