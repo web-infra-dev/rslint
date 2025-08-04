@@ -158,6 +158,7 @@ type RuleContext struct {
 	SourceFile                 *ast.SourceFile
 	Program                    *compiler.Program
 	TypeChecker                *checker.Checker
+	DisableManager            *DisableManager
 	ReportRange                func(textRange core.TextRange, msg RuleMessage)
 	ReportRangeWithSuggestions func(textRange core.TextRange, msg RuleMessage, suggestions ...RuleSuggestion)
 	ReportNode                 func(node *ast.Node, msg RuleMessage)
