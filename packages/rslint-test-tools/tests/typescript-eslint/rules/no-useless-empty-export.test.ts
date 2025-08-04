@@ -9,8 +9,6 @@ const rootPath = getFixturesRootDir();
 const ruleTester = new RuleTester({
   languageOptions: {
     parserOptions: {
-      ecmaVersion: 2020,
-      sourceType: 'module',
       project: './tsconfig.json',
       tsconfigRootDir: rootPath,
     },
