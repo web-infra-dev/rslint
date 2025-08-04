@@ -16,7 +16,19 @@ var NoVarRequiresRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := &Options{}
 		if options != nil {
-			if o, ok := options.(*Options); ok {
+			if optMap, ok := options.(map[string]interface{}); ok {
+				if allowList, exists := optMap["allow"]; exists {
+					if allowSlice, ok := allowList.([]interface{}); ok {
+						for _, item := range allowSlice {
+							if str, ok := item.(string); ok {
+								opts.Allow = append(opts.Allow, str)
+							}
+						}
+					} else if allowStrSlice, ok := allowList.([]string); ok {
+						opts.Allow = allowStrSlice
+					}
+				}
+			} else if o, ok := options.(*Options); ok {
 				opts = o
 			}
 		}
@@ -51,6 +63,19 @@ var NoVarRequiresRule = rule.Rule{
 			return false
 		}
 
+		// Helper to check if a node or any of its ancestors is a variable declaration
+		isInVariableDeclaration := func(node *ast.Node) bool {
+			current := node
+			for current != nil {
+				if current.Kind == ast.KindVariableDeclaration ||
+				   current.Kind == ast.KindVariableDeclarationList {
+					return true
+				}
+				current = current.Parent
+			}
+			return false
+		}
+
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
 				callExpr := node.AsCallExpression()
@@ -70,15 +95,10 @@ var NoVarRequiresRule = rule.Rule{
 				}
 
 				// Check if require is a local variable (not the global require)
-				// In RSLint, we check if the identifier has a symbol and if it's not the global require
 				symbol := identifier.Symbol()
-				if symbol != nil {
-					// If require has a symbol and it's not the global require, it's a local variable
-					// We need to check if the symbol is from a declaration (local variable)
-					if len(symbol.Declarations) > 0 {
-						// This is a local require variable, not the global one
-						return
-					}
+				if symbol != nil && len(symbol.Declarations) > 0 {
+					// This is a local require variable, not the global one
+					return
 				}
 
 				// Check arguments for allow patterns
@@ -90,7 +110,14 @@ var NoVarRequiresRule = rule.Rule{
 					if arg.Kind == ast.KindStringLiteral {
 						stringLiteral := arg.AsStringLiteral()
 						if stringLiteral != nil {
-							argValue = stringLiteral.Text
+							// Remove quotes from the text
+							text := stringLiteral.Text
+							if len(text) >= 2 && ((text[0] == '"' && text[len(text)-1] == '"') || 
+							                      (text[0] == '\'' && text[len(text)-1] == '\'')) {
+								argValue = text[1 : len(text)-1]
+							} else {
+								argValue = text
+							}
 						}
 					}
 					if argValue != "" && isImportPathAllowed(argValue) {
@@ -98,7 +125,7 @@ var NoVarRequiresRule = rule.Rule{
 					}
 				}
 
-				// Get the parent, handling ChainExpression
+				// Get the parent, handling optional chaining
 				parent := node.Parent
 				if parent != nil && parent.Kind == ast.KindPropertyAccessExpression {
 					// This handles optional chaining like require?.('foo')
@@ -121,27 +148,12 @@ var NoVarRequiresRule = rule.Rule{
 				}
 
 				// Check if require is used in contexts that are not allowed
-				invalidParentKinds := []ast.Kind{
-					ast.KindVariableDeclaration,
-					ast.KindCallExpression,
-					ast.KindPropertyAccessExpression,
-					ast.KindNewExpression,
-					ast.KindAsExpression,
-					ast.KindTypeAssertionExpression,
-				}
-
-				for _, kind := range invalidParentKinds {
-					if parent.Kind == kind {
-						ctx.ReportNode(node, rule.RuleMessage{
-							Description: "Require statement not part of import statement.",
-							Id:          "noVarReqs",
-						})
-						return
-					}
-				}
-
-				// For variable declarations, we need to check the parent's parent
-				if parent.Kind == ast.KindVariableDeclaration {
+				if isInVariableDeclaration(node) ||
+				   parent.Kind == ast.KindCallExpression ||
+				   parent.Kind == ast.KindPropertyAccessExpression ||
+				   parent.Kind == ast.KindNewExpression ||
+				   parent.Kind == ast.KindAsExpression ||
+				   parent.Kind == ast.KindTypeAssertionExpression {
 					ctx.ReportNode(node, rule.RuleMessage{
 						Description: "Require statement not part of import statement.",
 						Id:          "noVarReqs",
