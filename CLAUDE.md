@@ -1,10 +1,10 @@
-# RSLint Development Guide for AI Agents
+# Rslint Development Guide for AI Agents
 
-This guide helps AI agents understand and work with the RSLint codebase effectively.
+This guide helps AI agents understand and work with the Rslint codebase effectively.
 
 ## Core Concepts
 
-RSLint is a TypeScript/JavaScript linter written in Go that implements TypeScript-ESLint rules. It uses the TypeScript compiler API through a Go shim and provides diagnostics via CLI and Language Server Protocol (LSP).
+Rslint is a TypeScript/JavaScript linter written in Go that implements TypeScript-ESLint rules. It uses the TypeScript compiler API through a Go shim and provides diagnostics via CLI and Language Server Protocol (LSP).
 
 ## Rule Implementation Guide
 
