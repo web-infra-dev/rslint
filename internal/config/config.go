@@ -35,6 +35,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_type_assertion"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_unary_minus"
+	"github.com/web-infra-dev/rslint/internal/rules/no_var_requires"
 	"github.com/web-infra-dev/rslint/internal/rules/non_nullable_type_assertion_style"
 	"github.com/web-infra-dev/rslint/internal/rules/only_throw_error"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_as_const"
@@ -289,6 +290,7 @@ func RegisterAllTypeSriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unsafe-return", no_unsafe_return.NoUnsafeReturnRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unsafe-type-assertion", no_unsafe_type_assertion.NoUnsafeTypeAssertionRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unsafe-unary-minus", no_unsafe_unary_minus.NoUnsafeUnaryMinusRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-var-requires", no_var_requires.NoVarRequiresRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/non-nullable-type-assertion-style", non_nullable_type_assertion_style.NonNullableTypeAssertionStyleRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/only-throw-error", only_throw_error.OnlyThrowErrorRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-as-const", prefer_as_const.PreferAsConstRule)

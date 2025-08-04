@@ -192,7 +192,8 @@ Your changes must pass:
 1. **Check rule registration**: Ensure the rule is in `RegisterAllTypeSriptEslintPluginRules()`
 2. **Verify configuration**: Rule must be in `rslint.json` to generate diagnostics
 3. **Test CLI directly**: Use `rslint` binary to verify rule works
-4. **Add logging**: Use `log.Printf()` in LSP code (outputs to stderr)
+4. **VSCode extension tests**: If failing with "Expected diagnostics but got 0", this is usually due to missing rule registration (not LSP issues)
+5. **Add logging**: Use `log.Printf()` in LSP code (outputs to stderr)
 
 ## Common Pitfalls to Avoid
 
@@ -203,6 +204,7 @@ Your changes must pass:
 5. **Missing API registration** - Always add new rules to the hardcoded list in `cmd/rslint/api.go`
 6. **Test failures** - "Expected diagnostics for invalid case" usually means the rule isn't registered in the API
 7. **Wrong rule name in tests** - Use the short name without @typescript-eslint/ prefix in test files
+8. **VSCode test failures** - Diagnostic tests may fail initially due to LSP timing, but should pass consistently after proper rule registration
 
 ## Complete Checklist for Adding a New Rule
 

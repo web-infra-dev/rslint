@@ -53,16 +53,19 @@ var NoVarRequiresRule = rule.Rule{
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				callExpr := node
+				callExpr := node.AsCallExpression()
+				if callExpr == nil {
+					return
+				}
 
 				// Check if this is a require() call
-				callee := callExpr.AsCallExpression().Expression
-				if callee.Kind != ast.KindIdentifier {
+				callee := callExpr.Expression
+				if callee == nil || callee.Kind != ast.KindIdentifier {
 					return
 				}
 
 				identifier := callee.AsIdentifier()
-				if identifier.Text != "require" {
+				if identifier == nil || identifier.Text != "require" {
 					return
 				}
 
@@ -79,13 +82,16 @@ var NoVarRequiresRule = rule.Rule{
 				}
 
 				// Check arguments for allow patterns
-				args := callExpr.AsCallExpression().Arguments
-				if len(args.Nodes) > 0 && isStringOrTemplateLiteral(args.Nodes[0]) {
+				args := callExpr.Arguments
+				if args != nil && len(args.Nodes) > 0 && isStringOrTemplateLiteral(args.Nodes[0]) {
 					// Get string value from argument
 					arg := args.Nodes[0]
 					var argValue string
 					if arg.Kind == ast.KindStringLiteral {
-						argValue = arg.AsStringLiteral().Text
+						stringLiteral := arg.AsStringLiteral()
+						if stringLiteral != nil {
+							argValue = stringLiteral.Text
+						}
 					}
 					if argValue != "" && isImportPathAllowed(argValue) {
 						return

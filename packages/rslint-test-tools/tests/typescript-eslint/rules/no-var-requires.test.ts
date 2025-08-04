@@ -1,12 +1,20 @@
 import { describe, test, expect } from '@rstest/core';
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
-import { AST_NODE_TYPES } from '@typescript-eslint/utils';
 import { getFixturesRootDir } from '../RuleTester.ts';
+
+const rootPath = getFixturesRootDir();
+
+const ruleTester = new RuleTester({
+  languageOptions: {
+    parserOptions: {
+      project: './tsconfig.json',
+      tsconfigRootDir: rootPath,
+    },
+  },
+});
 
 describe('no-var-requires', () => {
   test('rule tests', () => {
-    const ruleTester = new RuleTester();
-
     ruleTester.run('no-var-requires', {
       valid: [
         "import foo = require('foo');",
