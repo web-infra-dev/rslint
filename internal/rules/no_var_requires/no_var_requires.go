@@ -11,7 +11,7 @@ type Options struct {
 	Allow []string `json:"allow"`
 }
 
-var NoVarRequiresRule = rule.Rule{
+var NoVarRequiresRule = rule.CreateRule(rule.Rule{
 	Name: "no-var-requires",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := &Options{}
@@ -162,4 +162,4 @@ var NoVarRequiresRule = rule.Rule{
 			},
 		}
 	},
-}
+})

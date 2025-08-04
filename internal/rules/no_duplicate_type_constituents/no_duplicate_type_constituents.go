@@ -42,7 +42,7 @@ type NoDuplicateTypeConstituentsOptions struct {
 	IgnoreUnions        bool
 }
 
-var NoDuplicateTypeConstituentsRule = rule.Rule{
+var NoDuplicateTypeConstituentsRule = rule.CreateRule(rule.Rule{
 	Name: "no-duplicate-type-constituents",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(NoDuplicateTypeConstituentsOptions)
@@ -292,4 +292,4 @@ var NoDuplicateTypeConstituentsRule = rule.Rule{
 
 		return ruleListeners
 	},
-}
+})

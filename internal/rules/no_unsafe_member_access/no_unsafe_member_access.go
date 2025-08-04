@@ -43,7 +43,7 @@ func createDataType(t *checker.Type) string {
 	return "`any`"
 }
 
-var NoUnsafeMemberAccessRule = rule.Rule{
+var NoUnsafeMemberAccessRule = rule.CreateRule(rule.Rule{
 	Name: "no-unsafe-member-access",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		compilerOptions := ctx.Program.Options()
@@ -159,4 +159,4 @@ var NoUnsafeMemberAccessRule = rule.Rule{
 			},
 		}
 	},
-}
+})

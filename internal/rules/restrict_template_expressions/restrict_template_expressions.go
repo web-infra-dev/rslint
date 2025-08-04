@@ -28,7 +28,7 @@ type RestrictTemplateExpressionsOptions struct {
 	AllowInline  []string
 }
 
-var RestrictTemplateExpressionsRule = rule.Rule{
+var RestrictTemplateExpressionsRule = rule.CreateRule(rule.Rule{
 	Name: "restrict-template-expressions",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(RestrictTemplateExpressionsOptions)
@@ -117,4 +117,4 @@ var RestrictTemplateExpressionsRule = rule.Rule{
 			},
 		}
 	},
-}
+})

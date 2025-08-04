@@ -38,7 +38,7 @@ type RestrictPlusOperandsOptions struct {
 	SkipCompoundAssignments *bool
 }
 
-var RestrictPlusOperandsRule = rule.Rule{
+var RestrictPlusOperandsRule = rule.CreateRule(rule.Rule{
 	Name: "restrict-plus-operands",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(RestrictPlusOperandsOptions)
@@ -198,4 +198,4 @@ var RestrictPlusOperandsRule = rule.Rule{
 			},
 		}
 	},
-}
+})

@@ -282,7 +282,7 @@ func isDefinitionFile(fileName string) bool {
 	return strings.HasSuffix(fileName, ".d.ts")
 }
 
-var NoUselessEmptyExportRule = rule.Rule{
+var NoUselessEmptyExportRule = rule.CreateRule(rule.Rule{
 	Name: "no-useless-empty-export",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		// In a definition file, export {} is necessary to make the module properly
@@ -317,4 +317,4 @@ var NoUselessEmptyExportRule = rule.Rule{
 		// Return empty listeners since we already processed everything
 		return rule.RuleListeners{}
 	},
-}
+})

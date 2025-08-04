@@ -20,7 +20,7 @@ type PreferPromiseRejectErrorsOptions struct {
 	AllowThrowingUnknown *bool
 }
 
-var PreferPromiseRejectErrorsRule = rule.Rule{
+var PreferPromiseRejectErrorsRule = rule.CreateRule(rule.Rule{
 	Name: "prefer-promise-reject-errors",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(PreferPromiseRejectErrorsOptions)
@@ -118,4 +118,4 @@ var PreferPromiseRejectErrorsRule = rule.Rule{
 			},
 		}
 	},
-}
+})

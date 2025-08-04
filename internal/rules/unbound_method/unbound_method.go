@@ -180,7 +180,7 @@ func checkIfMethod(symbol *ast.Symbol, ignoreStatic bool) ( /* dangerous */ bool
 	return false, false
 }
 
-var UnboundMethodRule = rule.Rule{
+var UnboundMethodRule = rule.CreateRule(rule.Rule{
 	Name: "unbound-method",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(UnboundMethodOptions)
@@ -312,4 +312,4 @@ var UnboundMethodRule = rule.Rule{
 			},
 		}
 	},
-}
+})

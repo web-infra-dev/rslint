@@ -26,7 +26,7 @@ type NoMeaninglessVoidOperatorOptions struct {
 	CheckNever *bool
 }
 
-var NoMeaninglessVoidOperatorRule = rule.Rule{
+var NoMeaninglessVoidOperatorRule = rule.CreateRule(rule.Rule{
 	Name: "no-meaningless-void-operator",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(NoMeaninglessVoidOperatorOptions)
@@ -63,4 +63,4 @@ var NoMeaninglessVoidOperatorRule = rule.Rule{
 			},
 		}
 	},
-}
+})
