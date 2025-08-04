@@ -89,29 +89,15 @@ func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request)
 			Message: "Initialize params cannot be nil",
 		}
 	}
-	
-	// First try to parse as a generic map to extract the rootUri
-	var rawParams map[string]interface{}
-	if err := json.Unmarshal(*req.Params, &rawParams); err != nil {
-		// Try to return success anyway with minimal setup
+
+	// Parse initialize params
+	var params lsproto.InitializeParams
+	if err := json.Unmarshal(*req.Params, &params); err != nil {
 		s.rootURI = "."
 	} else {
-		// Extract rootUri if present, also try workspaceFolders as fallback
-		if rootUri, ok := rawParams["rootUri"].(string); ok && rootUri != "" {
-			s.rootURI = uriToPath(rootUri)
-		} else if workspaceFolders, ok := rawParams["workspaceFolders"].([]interface{}); ok && len(workspaceFolders) > 0 {
-			// Fallback to first workspace folder
-			if folder, ok := workspaceFolders[0].(map[string]interface{}); ok {
-				if uri, ok := folder["uri"].(string); ok {
-					s.rootURI = uriToPath(uri)
-				} else {
-					s.rootURI = "."
-				}
-			} else {
-				s.rootURI = "."
-			}
-		} else {
-			s.rootURI = "."
+		//nolint:staticcheck
+		if params.RootUri.DocumentUri != nil {
+			s.rootURI = uriToPath(string(*params.RootUri.DocumentUri))
 		}
 	}
 
