@@ -6,5 +6,6 @@ export default defineConfig({
   include: [
     './tests/typescript-eslint/rules/await-thenable.test.ts',
     './tests/typescript-eslint/rules/no-array-delete.test.ts',
+    './tests/typescript-eslint/rules/no-for-in-array.test.ts',
   ],
 });
