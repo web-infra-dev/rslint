@@ -4,13 +4,17 @@ import {
   LanguageClient,
   LanguageClientOptions,
   ServerOptions,
-  TransportKind,
 } from 'vscode-languageclient/node';
+import { logger, LogLevel } from './logger';
 
 let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
-  console.log('Rslint extension activating...');
+  const isDevelopment = context.extensionMode === 1; // Development mode
+  logger.setLogLevel(isDevelopment ? LogLevel.DEBUG : LogLevel.INFO);
+
+  logger.info('Rslint extension activating...');
+
   const binPathConfig = workspace
     .getConfiguration()
     .get('rslint.binPath') as string;
@@ -18,7 +22,8 @@ export function activate(context: ExtensionContext) {
     binPathConfig && binPathConfig.trim() !== ''
       ? binPathConfig
       : Uri.joinPath(context.extensionUri, 'dist', 'rslint').fsPath;
-  console.log('Rslint binary path:', binPath);
+
+  logger.debug('Rslint binary path:', binPath);
   const run: Executable = {
     command: binPath,
     args: ['--lsp'],
@@ -36,7 +41,9 @@ export function activate(context: ExtensionContext) {
       { scheme: 'file', language: 'javascriptreact' },
     ],
     synchronize: {
-      fileEvents: workspace.createFileSystemWatcher('**/.clientrc'),
+      fileEvents: workspace.createFileSystemWatcher(
+        '**/{rslint.{json,jsonc},package-lock.json,pnpm-lock.yaml,yarn.lock}',
+      ),
     },
   };
 
@@ -50,30 +57,44 @@ export function activate(context: ExtensionContext) {
   client
     .start()
     .then(() => {
-      console.log('Rslint language client started successfully');
+      logger.info('Rslint language client started successfully');
     })
     .catch((err: unknown) => {
-      console.error('Failed to start Rslint language client:', err);
+      logger.error('Failed to start Rslint language client', err);
     });
 
   context.subscriptions.push(
     client.onDidChangeState(event => {
-      console.log(
+      logger.debug(
         'Rslint client state changed:',
         event.oldState,
         '->',
         event.newState,
       );
       if (event.newState === 2) {
-        window.showInformationMessage('Rslint language server started');
+        logger.info('Rslint language server started');
       }
     }),
   );
+
+  context.subscriptions.push({
+    dispose: () => logger.dispose(),
+  });
 }
 
 export function deactivate(): Thenable<void> | undefined {
+  logger.info('Rslint extension deactivating...');
+
   if (!client) {
     return undefined;
   }
-  return client.stop();
+
+  return client
+    .stop()
+    .then(() => {
+      logger.info('Rslint language client stopped');
+    })
+    .catch((err: unknown) => {
+      logger.error('Error stopping Rslint language client', err);
+    });
 }

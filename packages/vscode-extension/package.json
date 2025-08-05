@@ -66,7 +66,7 @@
     "@rslint/core": "workspace:*",
     "@types/mocha": "10.0.9",
     "@types/node": "24.0.14",
-    "@types/vscode": "^1.74.0",
+    "@types/vscode": "^1.100.0",
     "@vscode/test-cli": "0.0.11",
     "@vscode/test-electron": "2.4.1",
     "@vscode/vsce": "3.6.0",
