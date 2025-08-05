@@ -106,9 +106,24 @@ export type ValidTestCase<T = any> =
       languageOptions?: RuleTesterOptions['languageOptions'];
       name?: string;
     };
+
+function getTypescriptEslintFixturesRootDir(): string {
+  return path.resolve(
+    '../../packages/rslint-test-tools/tests/typescript-eslint/fixtures',
+  );
+}
+const rootDir: string = getTypescriptEslintFixturesRootDir();
+const defaultRuleTesterOptions: RuleTesterOptions = {
+  languageOptions: {
+    parserOptions: {
+      project: './tsconfig.json',
+      tsconfigRootDir: rootDir,
+    },
+  },
+};
 export class RuleTester {
   options: RuleTesterOptions;
-  constructor(options: RuleTesterOptions = {}) {
+  constructor(options: RuleTesterOptions = defaultRuleTesterOptions) {
     this.options = options;
   }
   public defineRule(
