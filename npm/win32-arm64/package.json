@@ -2,6 +2,9 @@
   "name": "@rslint/win32-arm64",
   "version": "0.1.4",
   "license": "MIT",
+  "exports": {
+    "./bin": "./rslint.exe"
+  },
   "description": "binary for rslint",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",
   "repository": {
@@ -15,7 +18,7 @@
     ]
   },
   "files": [
-    "rslint"
+    "rslint.exe"
   ],
   "os": [
     "win32"

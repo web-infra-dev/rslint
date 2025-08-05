@@ -1,5 +1,5 @@
 import { spawn, ChildProcess } from 'child_process';
-import path from 'path';
+import { platform, arch } from 'os';
 
 /**
  * Types for rslint IPC protocol
@@ -63,10 +63,11 @@ export class RSLintService {
   private expectedSize: number | null;
 
   constructor(options: RSlintOptions = {}) {
+    const defaultPath = `@rslint/${platform()}-${arch()}/bin`;
+
     this.nextMessageId = 1;
     this.pendingMessages = new Map();
-    this.rslintPath =
-      options.rslintPath || path.join(import.meta.dirname, '../bin/rslint');
+    this.rslintPath = options.rslintPath || require.resolve(defaultPath);
 
     this.process = spawn(this.rslintPath, ['--api'], {
       stdio: ['pipe', 'pipe', 'inherit'],

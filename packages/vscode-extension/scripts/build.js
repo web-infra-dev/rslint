@@ -1,6 +1,7 @@
 const esbuild = require('esbuild');
-const path = require('path');
-const fs = require('fs');
+const path = require('node:path');
+const os = require('node:os');
+const fs = require('node:fs');
 const isWatchMode = process.argv.includes('--watch');
 
 const config = {
@@ -20,17 +21,17 @@ const config = {
       name: 'copy-files',
       setup(build) {
         build.onStart(() => {
-          console.info('start rebuild');
+          console.log('📁 Copy file start');
         });
         build.onEnd(() => {
-          const binDir = path.resolve(
-            require.resolve('@rslint/core/package.json'),
-            '../bin',
+          const binPath = require.resolve(
+            `@rslint/${os.platform()}-${os.arch()}/bin`,
           );
-          fs.cpSync(binDir, path.join(__dirname, '../dist'), {
+          const binaryName = path.basename(binPath);
+          fs.cpSync(binPath, path.join(__dirname, `../dist/${binaryName}`), {
             recursive: true,
           });
-          console.log('rebuild done');
+          console.log('✅ Copy file done');
         });
       },
     },

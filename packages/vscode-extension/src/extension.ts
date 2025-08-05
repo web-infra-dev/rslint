@@ -6,6 +6,7 @@ import {
   ServerOptions,
   TransportKind,
 } from 'vscode-languageclient/node';
+import { platform } from 'os';
 
 let client: LanguageClient;
 
@@ -17,8 +18,13 @@ export function activate(context: ExtensionContext) {
   const binPath =
     binPathConfig && binPathConfig.trim() !== ''
       ? binPathConfig
-      : Uri.joinPath(context.extensionUri, 'dist', 'rslint').fsPath;
+      : Uri.joinPath(
+          context.extensionUri,
+          'dist',
+          `rslint${platform() === 'win32' ? '.exe' : ''}`,
+        ).fsPath;
   console.log('Rslint binary path:', binPath);
+
   const run: Executable = {
     command: binPath,
     args: ['--lsp'],
