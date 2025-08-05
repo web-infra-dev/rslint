@@ -1,0 +1,18 @@
+# AST-grep rules for migrating TypeScript-ESLint test files to Rslint format
+# Run with: ast-grep scan -r rule1.yml -r rule2.yml -r rule3.yml -r rule4.yml
+
+---
+# Rule 1: Remove rule import statements
+id: remove-rule-import
+language: typescript
+rule:
+  pattern: import rule from '$PATH';
+fix: ''
+
+---
+# Rule 3: Remove rule argument from ruleTester.run calls
+id: remove-rule-argument
+language: typescript
+rule:
+  pattern: ruleTester.run($RULE_NAME, rule, $CONFIG)
+fix: ruleTester.run($RULE_NAME, $CONFIG)

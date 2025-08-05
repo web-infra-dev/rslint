@@ -83,18 +83,130 @@ exports[`no-floating-promises > invalid 2`] = `
       "messageId": "floatingVoid",
       "range": {
         "end": {
-          "column": 12,
-          "line": 3,
+          "column": 20,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-floating-promises",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "messageId": "floatingVoid",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 12,
+        },
+        "start": {
+          "column": 3,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-floating-promises",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "messageId": "floatingVoid",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 13,
+        },
+        "start": {
+          "column": 3,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-floating-promises",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "messageId": "floatingVoid",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 14,
+        },
+        "start": {
+          "column": 3,
+          "line": 14,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-floating-promises",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "messageId": "floatingVoid",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 15,
+        },
+        "start": {
+          "column": 3,
+          "line": 15,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-floating-promises",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "messageId": "floatingVoid",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 16,
+        },
+        "start": {
+          "column": 3,
+          "line": 16,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-floating-promises",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "messageId": "floatingVoid",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 18,
+        },
+        "start": {
+          "column": 3,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-floating-promises",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "messageId": "floatingVoid",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 21,
         },
         "start": {
           "column": 1,
-          "line": 3,
+          "line": 21,
         },
       },
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
   ],
-  "errorCount": 1,
+  "errorCount": 8,
   "fileCount": 1,
   "ruleCount": 1,
 }
@@ -109,7 +221,7 @@ exports[`no-floating-promises > invalid 3`] = `
       "messageId": "floatingVoid",
       "range": {
         "end": {
-          "column": 27,
+          "column": 12,
           "line": 3,
         },
         "start": {
@@ -135,7 +247,7 @@ exports[`no-floating-promises > invalid 4`] = `
       "messageId": "floatingVoid",
       "range": {
         "end": {
-          "column": 30,
+          "column": 27,
           "line": 3,
         },
         "start": {
@@ -161,6 +273,32 @@ exports[`no-floating-promises > invalid 5`] = `
       "messageId": "floatingVoid",
       "range": {
         "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-floating-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-floating-promises > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "messageId": "floatingVoid",
+      "range": {
+        "end": {
           "column": 28,
           "line": 3,
         },
@@ -178,7 +316,7 @@ exports[`no-floating-promises > invalid 5`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 6`] = `
+exports[`no-floating-promises > invalid 7`] = `
 {
   "diagnostics": [
     {
@@ -252,7 +390,7 @@ exports[`no-floating-promises > invalid 6`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 7`] = `
+exports[`no-floating-promises > invalid 8`] = `
 {
   "diagnostics": [
     {
@@ -310,7 +448,7 @@ exports[`no-floating-promises > invalid 7`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 8`] = `
+exports[`no-floating-promises > invalid 9`] = `
 {
   "diagnostics": [
     {
@@ -384,7 +522,7 @@ exports[`no-floating-promises > invalid 8`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 9`] = `
+exports[`no-floating-promises > invalid 10`] = `
 {
   "diagnostics": [
     {
@@ -426,7 +564,7 @@ exports[`no-floating-promises > invalid 9`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 10`] = `
+exports[`no-floating-promises > invalid 11`] = `
 {
   "diagnostics": [
     {
@@ -484,7 +622,7 @@ exports[`no-floating-promises > invalid 10`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 11`] = `
+exports[`no-floating-promises > invalid 12`] = `
 {
   "diagnostics": [
     {
@@ -510,7 +648,7 @@ exports[`no-floating-promises > invalid 11`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 12`] = `
+exports[`no-floating-promises > invalid 13`] = `
 {
   "diagnostics": [
     {
@@ -536,7 +674,7 @@ exports[`no-floating-promises > invalid 12`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 13`] = `
+exports[`no-floating-promises > invalid 14`] = `
 {
   "diagnostics": [
     {
@@ -562,7 +700,7 @@ exports[`no-floating-promises > invalid 13`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 14`] = `
+exports[`no-floating-promises > invalid 15`] = `
 {
   "diagnostics": [
     {
@@ -588,7 +726,7 @@ exports[`no-floating-promises > invalid 14`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 15`] = `
+exports[`no-floating-promises > invalid 16`] = `
 {
   "diagnostics": [
     {
@@ -614,7 +752,7 @@ exports[`no-floating-promises > invalid 15`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 16`] = `
+exports[`no-floating-promises > invalid 17`] = `
 {
   "diagnostics": [
     {
@@ -640,7 +778,7 @@ exports[`no-floating-promises > invalid 16`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 17`] = `
+exports[`no-floating-promises > invalid 18`] = `
 {
   "diagnostics": [
     {
@@ -666,7 +804,7 @@ exports[`no-floating-promises > invalid 17`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 18`] = `
+exports[`no-floating-promises > invalid 19`] = `
 {
   "diagnostics": [
     {
@@ -692,7 +830,7 @@ exports[`no-floating-promises > invalid 18`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 19`] = `
+exports[`no-floating-promises > invalid 20`] = `
 {
   "diagnostics": [
     {
@@ -766,7 +904,7 @@ exports[`no-floating-promises > invalid 19`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 20`] = `
+exports[`no-floating-promises > invalid 21`] = `
 {
   "diagnostics": [
     {
@@ -792,7 +930,7 @@ exports[`no-floating-promises > invalid 20`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 21`] = `
+exports[`no-floating-promises > invalid 22`] = `
 {
   "diagnostics": [
     {
@@ -850,7 +988,7 @@ exports[`no-floating-promises > invalid 21`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 22`] = `
+exports[`no-floating-promises > invalid 23`] = `
 {
   "diagnostics": [
     {
@@ -924,7 +1062,7 @@ exports[`no-floating-promises > invalid 22`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 23`] = `
+exports[`no-floating-promises > invalid 24`] = `
 {
   "diagnostics": [
     {
@@ -966,7 +1104,7 @@ exports[`no-floating-promises > invalid 23`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 24`] = `
+exports[`no-floating-promises > invalid 25`] = `
 {
   "diagnostics": [
     {
@@ -1024,32 +1162,6 @@ exports[`no-floating-promises > invalid 24`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 25`] = `
-{
-  "diagnostics": [
-    {
-      "filePath": "src/virtual.ts",
-      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
-      "messageId": "floatingVoid",
-      "range": {
-        "end": {
-          "column": 14,
-          "line": 4,
-        },
-        "start": {
-          "column": 9,
-          "line": 2,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-floating-promises",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
 exports[`no-floating-promises > invalid 26`] = `
 {
   "diagnostics": [
@@ -1085,6 +1197,32 @@ exports[`no-floating-promises > invalid 27`] = `
       "messageId": "floatingVoid",
       "range": {
         "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-floating-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-floating-promises > invalid 28`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "messageId": "floatingVoid",
+      "range": {
+        "end": {
           "column": 29,
           "line": 1,
         },
@@ -1102,7 +1240,7 @@ exports[`no-floating-promises > invalid 27`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 28`] = `
+exports[`no-floating-promises > invalid 29`] = `
 {
   "diagnostics": [
     {
@@ -1128,7 +1266,7 @@ exports[`no-floating-promises > invalid 28`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 29`] = `
+exports[`no-floating-promises > invalid 30`] = `
 {
   "diagnostics": [
     {
@@ -1154,7 +1292,7 @@ exports[`no-floating-promises > invalid 29`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 30`] = `
+exports[`no-floating-promises > invalid 31`] = `
 {
   "diagnostics": [
     {
@@ -1180,7 +1318,7 @@ exports[`no-floating-promises > invalid 30`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 31`] = `
+exports[`no-floating-promises > invalid 32`] = `
 {
   "diagnostics": [
     {
@@ -1206,7 +1344,7 @@ exports[`no-floating-promises > invalid 31`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 32`] = `
+exports[`no-floating-promises > invalid 33`] = `
 {
   "diagnostics": [
     {
@@ -1280,7 +1418,7 @@ exports[`no-floating-promises > invalid 32`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 33`] = `
+exports[`no-floating-promises > invalid 34`] = `
 {
   "diagnostics": [
     {
@@ -1306,7 +1444,7 @@ exports[`no-floating-promises > invalid 33`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 34`] = `
+exports[`no-floating-promises > invalid 35`] = `
 {
   "diagnostics": [
     {
@@ -1316,32 +1454,6 @@ exports[`no-floating-promises > invalid 34`] = `
       "range": {
         "end": {
           "column": 36,
-          "line": 6,
-        },
-        "start": {
-          "column": 3,
-          "line": 6,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-floating-promises",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-floating-promises > invalid 35`] = `
-{
-  "diagnostics": [
-    {
-      "filePath": "src/virtual.ts",
-      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
-      "messageId": "floatingVoid",
-      "range": {
-        "end": {
-          "column": 28,
           "line": 6,
         },
         "start": {
@@ -1415,16 +1527,16 @@ exports[`no-floating-promises > invalid 38`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
-      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
-      "messageId": "floating",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "messageId": "floatingVoid",
       "range": {
         "end": {
-          "column": 26,
-          "line": 5,
+          "column": 28,
+          "line": 6,
         },
         "start": {
           "column": 3,
-          "line": 5,
+          "line": 6,
         },
       },
       "ruleName": "@typescript-eslint/no-floating-promises",
@@ -1493,6 +1605,32 @@ exports[`no-floating-promises > invalid 41`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
+      "messageId": "floating",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-floating-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-floating-promises > invalid 42`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1514,7 +1652,7 @@ exports[`no-floating-promises > invalid 41`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 42`] = `
+exports[`no-floating-promises > invalid 43`] = `
 {
   "diagnostics": [
     {
@@ -1652,7 +1790,7 @@ exports[`no-floating-promises > invalid 42`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 43`] = `
+exports[`no-floating-promises > invalid 44`] = `
 {
   "diagnostics": [
     {
@@ -1662,32 +1800,6 @@ exports[`no-floating-promises > invalid 43`] = `
       "range": {
         "end": {
           "column": 23,
-          "line": 2,
-        },
-        "start": {
-          "column": 1,
-          "line": 2,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-floating-promises",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-floating-promises > invalid 44`] = `
-{
-  "diagnostics": [
-    {
-      "filePath": "src/virtual.ts",
-      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
-      "messageId": "floatingUselessRejectionHandler",
-      "range": {
-        "end": {
-          "column": 50,
           "line": 2,
         },
         "start": {
@@ -1713,6 +1825,32 @@ exports[`no-floating-promises > invalid 45`] = `
       "messageId": "floatingUselessRejectionHandler",
       "range": {
         "end": {
+          "column": 50,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-floating-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-floating-promises > invalid 46`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
+      "messageId": "floatingUselessRejectionHandler",
+      "range": {
+        "end": {
           "column": 49,
           "line": 3,
         },
@@ -1730,7 +1868,7 @@ exports[`no-floating-promises > invalid 45`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 46`] = `
+exports[`no-floating-promises > invalid 47`] = `
 {
   "diagnostics": [
     {
@@ -1868,7 +2006,7 @@ exports[`no-floating-promises > invalid 46`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 47`] = `
+exports[`no-floating-promises > invalid 48`] = `
 {
   "diagnostics": [
     {
@@ -1894,7 +2032,7 @@ exports[`no-floating-promises > invalid 47`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 48`] = `
+exports[`no-floating-promises > invalid 49`] = `
 {
   "diagnostics": [
     {
@@ -1920,7 +2058,7 @@ exports[`no-floating-promises > invalid 48`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 49`] = `
+exports[`no-floating-promises > invalid 50`] = `
 {
   "diagnostics": [
     {
@@ -1946,7 +2084,7 @@ exports[`no-floating-promises > invalid 49`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 50`] = `
+exports[`no-floating-promises > invalid 51`] = `
 {
   "diagnostics": [
     {
@@ -1972,7 +2110,7 @@ exports[`no-floating-promises > invalid 50`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 51`] = `
+exports[`no-floating-promises > invalid 52`] = `
 {
   "diagnostics": [
     {
@@ -1998,7 +2136,7 @@ exports[`no-floating-promises > invalid 51`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 52`] = `
+exports[`no-floating-promises > invalid 53`] = `
 {
   "diagnostics": [
     {
@@ -2024,7 +2162,7 @@ exports[`no-floating-promises > invalid 52`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 53`] = `
+exports[`no-floating-promises > invalid 54`] = `
 {
   "diagnostics": [
     {
@@ -2050,7 +2188,7 @@ exports[`no-floating-promises > invalid 53`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 54`] = `
+exports[`no-floating-promises > invalid 55`] = `
 {
   "diagnostics": [
     {
@@ -2076,7 +2214,7 @@ exports[`no-floating-promises > invalid 54`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 55`] = `
+exports[`no-floating-promises > invalid 56`] = `
 {
   "diagnostics": [
     {
@@ -2102,7 +2240,7 @@ exports[`no-floating-promises > invalid 55`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 56`] = `
+exports[`no-floating-promises > invalid 57`] = `
 {
   "diagnostics": [
     {
@@ -2128,7 +2266,7 @@ exports[`no-floating-promises > invalid 56`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 57`] = `
+exports[`no-floating-promises > invalid 58`] = `
 {
   "diagnostics": [
     {
@@ -2154,7 +2292,7 @@ exports[`no-floating-promises > invalid 57`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 58`] = `
+exports[`no-floating-promises > invalid 59`] = `
 {
   "diagnostics": [
     {
@@ -2180,7 +2318,7 @@ exports[`no-floating-promises > invalid 58`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 59`] = `
+exports[`no-floating-promises > invalid 60`] = `
 {
   "diagnostics": [
     {
@@ -2206,7 +2344,7 @@ exports[`no-floating-promises > invalid 59`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 60`] = `
+exports[`no-floating-promises > invalid 61`] = `
 {
   "diagnostics": [
     {
@@ -2232,7 +2370,7 @@ exports[`no-floating-promises > invalid 60`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 61`] = `
+exports[`no-floating-promises > invalid 62`] = `
 {
   "diagnostics": [
     {
@@ -2258,32 +2396,6 @@ exports[`no-floating-promises > invalid 61`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 62`] = `
-{
-  "diagnostics": [
-    {
-      "filePath": "src/virtual.ts",
-      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
-      "messageId": "floatingPromiseArrayVoid",
-      "range": {
-        "end": {
-          "column": 29,
-          "line": 2,
-        },
-        "start": {
-          "column": 1,
-          "line": 2,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-floating-promises",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
 exports[`no-floating-promises > invalid 63`] = `
 {
   "diagnostics": [
@@ -2293,7 +2405,7 @@ exports[`no-floating-promises > invalid 63`] = `
       "messageId": "floatingPromiseArrayVoid",
       "range": {
         "end": {
-          "column": 45,
+          "column": 29,
           "line": 2,
         },
         "start": {
@@ -2319,6 +2431,32 @@ exports[`no-floating-promises > invalid 64`] = `
       "messageId": "floatingPromiseArrayVoid",
       "range": {
         "end": {
+          "column": 45,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-floating-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-floating-promises > invalid 65`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "messageId": "floatingPromiseArrayVoid",
+      "range": {
+        "end": {
           "column": 4,
           "line": 5,
         },
@@ -2336,7 +2474,7 @@ exports[`no-floating-promises > invalid 64`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 65`] = `
+exports[`no-floating-promises > invalid 66`] = `
 {
   "diagnostics": [
     {
@@ -2362,7 +2500,7 @@ exports[`no-floating-promises > invalid 65`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 66`] = `
+exports[`no-floating-promises > invalid 67`] = `
 {
   "diagnostics": [
     {
@@ -2388,7 +2526,7 @@ exports[`no-floating-promises > invalid 66`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 67`] = `
+exports[`no-floating-promises > invalid 68`] = `
 {
   "diagnostics": [
     {
@@ -2414,7 +2552,7 @@ exports[`no-floating-promises > invalid 67`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 68`] = `
+exports[`no-floating-promises > invalid 69`] = `
 {
   "diagnostics": [
     {
@@ -2440,7 +2578,7 @@ exports[`no-floating-promises > invalid 68`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 69`] = `
+exports[`no-floating-promises > invalid 70`] = `
 {
   "diagnostics": [
     {
@@ -2466,7 +2604,7 @@ exports[`no-floating-promises > invalid 69`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 70`] = `
+exports[`no-floating-promises > invalid 71`] = `
 {
   "diagnostics": [
     {
@@ -2492,7 +2630,7 @@ exports[`no-floating-promises > invalid 70`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 71`] = `
+exports[`no-floating-promises > invalid 72`] = `
 {
   "diagnostics": [
     {
@@ -2518,7 +2656,7 @@ exports[`no-floating-promises > invalid 71`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 72`] = `
+exports[`no-floating-promises > invalid 73`] = `
 {
   "diagnostics": [
     {
@@ -2544,7 +2682,7 @@ exports[`no-floating-promises > invalid 72`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 73`] = `
+exports[`no-floating-promises > invalid 74`] = `
 {
   "diagnostics": [
     {
@@ -2570,7 +2708,7 @@ exports[`no-floating-promises > invalid 73`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 74`] = `
+exports[`no-floating-promises > invalid 75`] = `
 {
   "diagnostics": [
     {
@@ -2596,32 +2734,6 @@ exports[`no-floating-promises > invalid 74`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 75`] = `
-{
-  "diagnostics": [
-    {
-      "filePath": "src/virtual.ts",
-      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
-      "messageId": "floatingVoid",
-      "range": {
-        "end": {
-          "column": 17,
-          "line": 4,
-        },
-        "start": {
-          "column": 1,
-          "line": 4,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-floating-promises",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
 exports[`no-floating-promises > invalid 76`] = `
 {
   "diagnostics": [
@@ -2631,7 +2743,7 @@ exports[`no-floating-promises > invalid 76`] = `
       "messageId": "floatingVoid",
       "range": {
         "end": {
-          "column": 21,
+          "column": 17,
           "line": 4,
         },
         "start": {
@@ -2657,7 +2769,7 @@ exports[`no-floating-promises > invalid 77`] = `
       "messageId": "floatingVoid",
       "range": {
         "end": {
-          "column": 25,
+          "column": 21,
           "line": 4,
         },
         "start": {
@@ -2683,7 +2795,7 @@ exports[`no-floating-promises > invalid 78`] = `
       "messageId": "floatingVoid",
       "range": {
         "end": {
-          "column": 27,
+          "column": 25,
           "line": 4,
         },
         "start": {
@@ -2705,11 +2817,11 @@ exports[`no-floating-promises > invalid 79`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
-      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
-      "messageId": "floatingPromiseArrayVoid",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "messageId": "floatingVoid",
       "range": {
         "end": {
-          "column": 21,
+          "column": 27,
           "line": 4,
         },
         "start": {
@@ -2735,6 +2847,32 @@ exports[`no-floating-promises > invalid 80`] = `
       "messageId": "floatingPromiseArrayVoid",
       "range": {
         "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-floating-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-floating-promises > invalid 81`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
+      "messageId": "floatingPromiseArrayVoid",
+      "range": {
+        "end": {
           "column": 5,
           "line": 5,
         },
@@ -2752,7 +2890,7 @@ exports[`no-floating-promises > invalid 80`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 81`] = `
+exports[`no-floating-promises > invalid 82`] = `
 {
   "diagnostics": [
     {
@@ -2778,7 +2916,7 @@ exports[`no-floating-promises > invalid 81`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 82`] = `
+exports[`no-floating-promises > invalid 83`] = `
 {
   "diagnostics": [
     {
@@ -2804,32 +2942,6 @@ exports[`no-floating-promises > invalid 82`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 83`] = `
-{
-  "diagnostics": [
-    {
-      "filePath": "src/virtual.ts",
-      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
-      "messageId": "floatingVoid",
-      "range": {
-        "end": {
-          "column": 33,
-          "line": 4,
-        },
-        "start": {
-          "column": 9,
-          "line": 4,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-floating-promises",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
 exports[`no-floating-promises > invalid 84`] = `
 {
   "diagnostics": [
@@ -2839,7 +2951,7 @@ exports[`no-floating-promises > invalid 84`] = `
       "messageId": "floatingVoid",
       "range": {
         "end": {
-          "column": 44,
+          "column": 33,
           "line": 4,
         },
         "start": {
@@ -2865,7 +2977,7 @@ exports[`no-floating-promises > invalid 85`] = `
       "messageId": "floatingVoid",
       "range": {
         "end": {
-          "column": 47,
+          "column": 44,
           "line": 4,
         },
         "start": {
@@ -2891,6 +3003,32 @@ exports[`no-floating-promises > invalid 86`] = `
       "messageId": "floatingVoid",
       "range": {
         "end": {
+          "column": 47,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-floating-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-floating-promises > invalid 87`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "messageId": "floatingVoid",
+      "range": {
+        "end": {
           "column": 17,
           "line": 3,
         },
@@ -2908,7 +3046,7 @@ exports[`no-floating-promises > invalid 86`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 87`] = `
+exports[`no-floating-promises > invalid 88`] = `
 {
   "diagnostics": [
     {
@@ -2934,7 +3072,7 @@ exports[`no-floating-promises > invalid 87`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 88`] = `
+exports[`no-floating-promises > invalid 89`] = `
 {
   "diagnostics": [
     {
@@ -2960,32 +3098,6 @@ exports[`no-floating-promises > invalid 88`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 89`] = `
-{
-  "diagnostics": [
-    {
-      "filePath": "src/virtual.ts",
-      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
-      "messageId": "floatingVoid",
-      "range": {
-        "end": {
-          "column": 19,
-          "line": 4,
-        },
-        "start": {
-          "column": 1,
-          "line": 4,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-floating-promises",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
 exports[`no-floating-promises > invalid 90`] = `
 {
   "diagnostics": [
@@ -2996,11 +3108,11 @@ exports[`no-floating-promises > invalid 90`] = `
       "range": {
         "end": {
           "column": 19,
-          "line": 6,
+          "line": 4,
         },
         "start": {
           "column": 1,
-          "line": 6,
+          "line": 4,
         },
       },
       "ruleName": "@typescript-eslint/no-floating-promises",
@@ -3013,6 +3125,32 @@ exports[`no-floating-promises > invalid 90`] = `
 `;
 
 exports[`no-floating-promises > invalid 91`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
+      "messageId": "floatingVoid",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 6,
+        },
+        "start": {
+          "column": 1,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-floating-promises",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-floating-promises > invalid 92`] = `
 {
   "diagnostics": [
     {
@@ -3038,7 +3176,7 @@ exports[`no-floating-promises > invalid 91`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 92`] = `
+exports[`no-floating-promises > invalid 93`] = `
 {
   "diagnostics": [
     {
@@ -3064,7 +3202,7 @@ exports[`no-floating-promises > invalid 92`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 93`] = `
+exports[`no-floating-promises > invalid 94`] = `
 {
   "diagnostics": [
     {
@@ -3090,7 +3228,7 @@ exports[`no-floating-promises > invalid 93`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 94`] = `
+exports[`no-floating-promises > invalid 95`] = `
 {
   "diagnostics": [
     {
@@ -3116,7 +3254,7 @@ exports[`no-floating-promises > invalid 94`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 95`] = `
+exports[`no-floating-promises > invalid 96`] = `
 {
   "diagnostics": [
     {
@@ -3142,7 +3280,7 @@ exports[`no-floating-promises > invalid 95`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 96`] = `
+exports[`no-floating-promises > invalid 97`] = `
 {
   "diagnostics": [
     {
@@ -3168,7 +3306,7 @@ exports[`no-floating-promises > invalid 96`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 97`] = `
+exports[`no-floating-promises > invalid 98`] = `
 {
   "diagnostics": [
     {
@@ -3194,7 +3332,7 @@ exports[`no-floating-promises > invalid 97`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 98`] = `
+exports[`no-floating-promises > invalid 99`] = `
 {
   "diagnostics": [
     {
@@ -3220,7 +3358,7 @@ exports[`no-floating-promises > invalid 98`] = `
 }
 `;
 
-exports[`no-floating-promises > invalid 99`] = `
+exports[`no-floating-promises > invalid 100`] = `
 {
   "diagnostics": [
     {
@@ -3241,6 +3379,15 @@ exports[`no-floating-promises > invalid 99`] = `
     },
   ],
   "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-floating-promises > invalid 101`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
   "fileCount": 1,
   "ruleCount": 1,
 }

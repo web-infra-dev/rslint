@@ -1,0 +1,1 @@
+This is an internal package and a temporary fork of [@typescript-eslint/utils](https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/utils/README.md) to make test working, we may remove this package in the future.

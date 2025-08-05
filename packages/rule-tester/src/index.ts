@@ -6,12 +6,14 @@ import { lint, type Diagnostic } from '@rslint/core';
 import assert from 'node:assert';
 
 interface TsDiagnostic {
-  line: number;
-  column: number;
-  endLine: number;
-  endColumn: number;
-  messageId: string;
-  suggestions: any[];
+  line?: number;
+  column?: number;
+  endLine?: number;
+  endColumn?: number;
+  messageId?: string;
+  suggestions?: any[] | null;
+  data?: any;
+  type?: any;
 }
 function toCamelCase(name: string): string {
   return name.replace(/-([a-z])/g, g => g[1].toUpperCase());
@@ -65,34 +67,78 @@ function checkDiagnosticEqual(
 
 interface RuleTesterOptions {
   languageOptions?: {
+    globals?: any;
+    parser?: any;
     parserOptions?: {
       project?: string;
       tsconfigRootDir?: string;
       projectService?: boolean;
+      ecmaFeatures?: any;
+      ecmaVersion?: number;
+      sourceType?: 'module' | 'script';
+      jsxPragma?: string | null;
+      jsxFragmentName?: string;
+      emitDecoratorMetadata?: boolean;
+      isolatedDeclarations?: boolean;
+      experimentalDecorators?: boolean;
+      lib?: string[];
     };
   };
 }
+export type InvalidTestCase<T = any, U = any> = {
+  code: string;
+  filename?: string;
+  errors: TsDiagnostic[];
+  options?: any;
+  only?: boolean;
+  skip?: boolean;
+  output?: string | string[] | null;
+  languageOptions?: RuleTesterOptions['languageOptions'];
+};
+export type ValidTestCase<T = any> =
+  | string
+  | {
+      filename?: string;
+      code: string;
+      options?: any;
+      only?: boolean;
+      skip?: boolean;
+      languageOptions?: RuleTesterOptions['languageOptions'];
+      name?: string;
+    };
+
+function getTypescriptEslintFixturesRootDir(): string {
+  return path.resolve(
+    '../../packages/rslint-test-tools/tests/typescript-eslint/fixtures',
+  );
+}
+const rootDir: string = getTypescriptEslintFixturesRootDir();
+const defaultRuleTesterOptions: RuleTesterOptions = {
+  languageOptions: {
+    parserOptions: {
+      project: './tsconfig.json',
+      tsconfigRootDir: rootDir,
+    },
+  },
+};
 export class RuleTester {
   options: RuleTesterOptions;
-  constructor(options: RuleTesterOptions) {
+  constructor(options: RuleTesterOptions = defaultRuleTesterOptions) {
     this.options = options;
   }
+  public defineRule(
+    rule: string,
+    options: {
+      create: (context: any) => void;
+      meta: any;
+      defaultOptions?: any;
+    },
+  ) {}
   public run(
     ruleName: string,
     cases: {
-      valid: (
-        | string
-        | { code: string; options?: any; only?: boolean; skip?: boolean }
-      )[];
-      invalid: {
-        code: string;
-        errors: any[];
-        options?: any;
-        only?: boolean;
-        skip?: boolean;
-        output?: string | string[];
-        languageOptions?: RuleTesterOptions['languageOptions'];
-      }[];
+      valid: ValidTestCase[];
+      invalid: InvalidTestCase[];
     },
   ) {
     describe(ruleName, () => {
@@ -205,3 +251,7 @@ export class RuleTester {
 export function noFormat(raw: TemplateStringsArray, ...keys: string[]): string {
   return String.raw({ raw }, ...keys);
 }
+
+export type RunTests<T, U> = any;
+
+export type TestCaseError<T> = any;
