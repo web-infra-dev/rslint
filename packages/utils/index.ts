@@ -8,4 +8,10 @@ export namespace TSESTree {
   export type Program = any;
   export type Node = any;
 }
-export const TSESLint: any = {};
+export namespace TSESLint {
+  export class Linter {
+    constructor(options: { configType: string }) {}
+    defineParser(name: string, parser: any) {}
+    verifyAndFix(code: string, options: any, options2: any): any {}
+  }
+}
