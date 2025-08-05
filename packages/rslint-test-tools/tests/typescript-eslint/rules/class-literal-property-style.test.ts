@@ -1,16 +1,8 @@
-import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
-import { getFixturesRootDir } from '../RuleTester.ts';
+import { RuleTester } from '@typescript-eslint/rule-tester';
 
-const rootDir = getFixturesRootDir();
 
-const ruleTester = new RuleTester({
-  languageOptions: {
-    parserOptions: {
-      project: './tsconfig.json',
-      tsconfigRootDir: rootDir,
-    },
-  },
-});
+
+const ruleTester = new RuleTester();
 
 ruleTester.run('class-literal-property-style', {
   valid: [

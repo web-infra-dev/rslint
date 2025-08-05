@@ -1,5 +1,6 @@
 import { RuleTester } from '@typescript-eslint/rule-tester';
 
+
 import { getFixturesRootDir } from '../RuleTester';
 
 const rootPath = getFixturesRootDir();
@@ -229,7 +230,6 @@ type T = Record<string, A | B>;
     },
     {
       code: 'type T = { a: string } | { a: string };',
-      skip: true, // FIXME: this is also skipped in go ports tests
       errors: [
         {
           data: {
@@ -243,7 +243,6 @@ type T = Record<string, A | B>;
     },
     {
       code: 'type T = { a: string; b: number } | { a: string; b: number };',
-      skip: true, // FIXME: also skipped in go ports
       errors: [
         {
           data: {
@@ -898,5 +897,3 @@ type T = Record<string, A  >;
     },
   ],
 });
-
-type T = { a: string } | { a: string };

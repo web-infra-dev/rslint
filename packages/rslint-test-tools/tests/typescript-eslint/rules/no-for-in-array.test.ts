@@ -1,5 +1,6 @@
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
 
+
 import { getFixturesRootDir } from '../RuleTester';
 
 const rootDir = getFixturesRootDir();
@@ -45,7 +46,6 @@ for (const key in obj) {
 
   invalid: [
     {
-      only: true,
       code: `
 for (const x in [3, 4, 5]) {
   console.log(x);
