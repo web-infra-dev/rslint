@@ -50,19 +50,20 @@ var NoEmptyFunctionRule = rule.Rule{
 
 		// Check if the function body is empty
 		isBodyEmpty := func(node *ast.Node) bool {
-			if node.Kind == ast.KindFunctionDeclaration {
+			switch node.Kind {
+			case ast.KindFunctionDeclaration:
 				fn := node.AsFunctionDeclaration()
 				if fn == nil || fn.Body == nil {
 					return false
 				}
 				return len(fn.Body.Statements()) == 0
-			} else if node.Kind == ast.KindFunctionExpression {
+			case ast.KindFunctionExpression:
 				fn := node.AsFunctionExpression()
 				if fn == nil || fn.Body == nil {
 					return false
 				}
 				return len(fn.Body.Statements()) == 0
-			} else if node.Kind == ast.KindArrowFunction {
+			case ast.KindArrowFunction:
 				fn := node.AsArrowFunction()
 				if fn == nil || fn.Body == nil {
 					return false
@@ -76,53 +77,55 @@ var NoEmptyFunctionRule = rule.Rule{
 					return false
 				}
 				return len(block.Statements.Nodes) == 0
-			} else if node.Kind == ast.KindConstructor {
+			case ast.KindConstructor:
 				constructor := node.AsConstructorDeclaration()
 				if constructor == nil || constructor.Body == nil {
 					return false
 				}
 				return len(constructor.Body.Statements()) == 0
-			} else if node.Kind == ast.KindMethodDeclaration {
+			case ast.KindMethodDeclaration:
 				method := node.AsMethodDeclaration()
 				if method == nil || method.Body == nil {
 					return false
 				}
 				return len(method.Body.Statements()) == 0
-			} else if node.Kind == ast.KindGetAccessor {
+			case ast.KindGetAccessor:
 				accessor := node.AsGetAccessorDeclaration()
 				if accessor == nil || accessor.Body == nil {
 					return false
 				}
 				return len(accessor.Body.Statements()) == 0
-			} else if node.Kind == ast.KindSetAccessor {
+			case ast.KindSetAccessor:
 				accessor := node.AsSetAccessorDeclaration()
 				if accessor == nil || accessor.Body == nil {
 					return false
 				}
 				return len(accessor.Body.Statements()) == 0
+			default:
+				return false
 			}
-			return false
 		}
 
 		// Check if function has parameter properties (TypeScript constructor feature)
 		hasParameterProperties := func(node *ast.Node) bool {
 			var params []*ast.Node
-			if node.Kind == ast.KindFunctionDeclaration {
+			switch node.Kind {
+			case ast.KindFunctionDeclaration:
 				fn := node.AsFunctionDeclaration()
 				if fn != nil && fn.Parameters != nil {
 					params = fn.Parameters.Nodes
 				}
-			} else if node.Kind == ast.KindFunctionExpression {
+			case ast.KindFunctionExpression:
 				fn := node.AsFunctionExpression()
 				if fn != nil && fn.Parameters != nil {
 					params = fn.Parameters.Nodes
 				}
-			} else if node.Kind == ast.KindArrowFunction {
+			case ast.KindArrowFunction:
 				fn := node.AsArrowFunction()
 				if fn != nil && fn.Parameters != nil {
 					params = fn.Parameters.Nodes
 				}
-			} else if node.Kind == ast.KindConstructor {
+			case ast.KindConstructor:
 				constructor := node.AsConstructorDeclaration()
 				if constructor != nil && constructor.Parameters != nil {
 					params = constructor.Parameters.Nodes
@@ -143,37 +146,38 @@ var NoEmptyFunctionRule = rule.Rule{
 		// Get the opening brace position of a function body
 		getOpenBracePosition := func(node *ast.Node) (core.TextRange, bool) {
 			var body *ast.Node
-			if node.Kind == ast.KindFunctionDeclaration {
+			switch node.Kind {
+			case ast.KindFunctionDeclaration:
 				fn := node.AsFunctionDeclaration()
 				if fn != nil {
 					body = fn.Body
 				}
-			} else if node.Kind == ast.KindFunctionExpression {
+			case ast.KindFunctionExpression:
 				fn := node.AsFunctionExpression()
 				if fn != nil {
 					body = fn.Body
 				}
-			} else if node.Kind == ast.KindArrowFunction {
+			case ast.KindArrowFunction:
 				fn := node.AsArrowFunction()
 				if fn != nil && fn.Body != nil && fn.Body.Kind == ast.KindBlock {
 					body = fn.Body
 				}
-			} else if node.Kind == ast.KindConstructor {
+			case ast.KindConstructor:
 				constructor := node.AsConstructorDeclaration()
 				if constructor != nil {
 					body = constructor.Body
 				}
-			} else if node.Kind == ast.KindMethodDeclaration {
+			case ast.KindMethodDeclaration:
 				method := node.AsMethodDeclaration()
 				if method != nil {
 					body = method.Body
 				}
-			} else if node.Kind == ast.KindGetAccessor {
+			case ast.KindGetAccessor:
 				accessor := node.AsGetAccessorDeclaration()
 				if accessor != nil {
 					body = accessor.Body
 				}
-			} else if node.Kind == ast.KindSetAccessor {
+			case ast.KindSetAccessor:
 				accessor := node.AsSetAccessorDeclaration()
 				if accessor != nil {
 					body = accessor.Body
@@ -202,7 +206,8 @@ var NoEmptyFunctionRule = rule.Rule{
 
 		// Get the function name for error message
 		getFunctionName := func(node *ast.Node) string {
-			if node.Kind == ast.KindFunctionDeclaration {
+			switch node.Kind {
+			case ast.KindFunctionDeclaration:
 				fn := node.AsFunctionDeclaration()
 				if fn != nil && fn.Name() != nil && fn.Name().Kind == ast.KindIdentifier {
 					ident := fn.Name().AsIdentifier()
@@ -211,33 +216,34 @@ var NoEmptyFunctionRule = rule.Rule{
 					}
 				}
 				return "function"
-			} else if node.Kind == ast.KindConstructor {
+			case ast.KindConstructor:
 				return "constructor"
-			} else if node.Kind == ast.KindMethodDeclaration {
+			case ast.KindMethodDeclaration:
 				method := node.AsMethodDeclaration()
 				if method != nil && method.Name() != nil {
 					name, _ := utils.GetNameFromMember(ctx.SourceFile, method.Name())
 					return "method '" + name + "'"
 				}
 				return "method"
-			} else if node.Kind == ast.KindGetAccessor {
+			case ast.KindGetAccessor:
 				accessor := node.AsGetAccessorDeclaration()
 				if accessor != nil && accessor.Name() != nil {
 					name, _ := utils.GetNameFromMember(ctx.SourceFile, accessor.Name())
 					return "getter '" + name + "'"
 				}
 				return "getter"
-			} else if node.Kind == ast.KindSetAccessor {
+			case ast.KindSetAccessor:
 				accessor := node.AsSetAccessorDeclaration()
 				if accessor != nil && accessor.Name() != nil {
 					name, _ := utils.GetNameFromMember(ctx.SourceFile, accessor.Name())
 					return "setter '" + name + "'"
 				}
 				return "setter"
-			} else if node.Kind == ast.KindFunctionExpression {
+			case ast.KindFunctionExpression:
 				parent := node.Parent
 				if parent != nil {
-					if parent.Kind == ast.KindMethodDeclaration {
+					switch parent.Kind {
+					case ast.KindMethodDeclaration:
 						method := parent.AsMethodDeclaration()
 						if method != nil && method.Name() != nil {
 							name, _ := utils.GetNameFromMember(ctx.SourceFile, method.Name())
@@ -249,24 +255,23 @@ var NoEmptyFunctionRule = rule.Rule{
 							}
 							return "method '" + name + "'"
 						}
-					} else if parent.Kind == ast.KindPropertyDeclaration || parent.Kind == ast.KindPropertyAssignment {
-						// Check for variable declaration or property assignment
-						var name string
-						if parent.Kind == ast.KindPropertyDeclaration {
-							prop := parent.AsPropertyDeclaration()
-							if prop != nil && prop.Name() != nil {
-								name, _ = utils.GetNameFromMember(ctx.SourceFile, prop.Name())
-							}
-						} else if parent.Kind == ast.KindPropertyAssignment {
-							prop := parent.AsPropertyAssignment()
-							if prop != nil && prop.Name() != nil {
-								name, _ = utils.GetNameFromMember(ctx.SourceFile, prop.Name())
+					case ast.KindPropertyDeclaration:
+						prop := parent.AsPropertyDeclaration()
+						if prop != nil && prop.Name() != nil {
+							name, _ := utils.GetNameFromMember(ctx.SourceFile, prop.Name())
+							if name != "" {
+								return "function '" + name + "'"
 							}
 						}
-						if name != "" {
-							return "function '" + name + "'"
+					case ast.KindPropertyAssignment:
+						prop := parent.AsPropertyAssignment()
+						if prop != nil && prop.Name() != nil {
+							name, _ := utils.GetNameFromMember(ctx.SourceFile, prop.Name())
+							if name != "" {
+								return "function '" + name + "'"
+							}
 						}
-					} else if parent.Kind == ast.KindVariableDeclaration {
+					case ast.KindVariableDeclaration:
 						decl := parent.AsVariableDeclaration()
 						if decl != nil && decl.Name() != nil && decl.Name().Kind == ast.KindIdentifier {
 							ident := decl.Name().AsIdentifier()
@@ -304,31 +309,32 @@ var NoEmptyFunctionRule = rule.Rule{
 			isGenerator := false
 
 			// Detect async and generator functions
-			if node.Kind == ast.KindFunctionDeclaration {
+			switch node.Kind {
+			case ast.KindFunctionDeclaration:
 				fn := node.AsFunctionDeclaration()
 				if fn != nil {
 					isAsync = ast.HasSyntacticModifier(node, ast.ModifierFlagsAsync)
 					isGenerator = fn.AsteriskToken != nil
 				}
-			} else if node.Kind == ast.KindFunctionExpression {
+			case ast.KindFunctionExpression:
 				fn := node.AsFunctionExpression()
 				if fn != nil {
 					isAsync = ast.HasSyntacticModifier(node, ast.ModifierFlagsAsync)
 					isGenerator = fn.AsteriskToken != nil
 				}
-			} else if node.Kind == ast.KindArrowFunction {
+			case ast.KindArrowFunction:
 				isAsync = ast.HasSyntacticModifier(node, ast.ModifierFlagsAsync)
-			} else if node.Kind == ast.KindMethodDeclaration {
+			case ast.KindMethodDeclaration:
 				method := node.AsMethodDeclaration()
 				if method != nil {
 					isAsync = ast.HasSyntacticModifier(node, ast.ModifierFlagsAsync)
 					isGenerator = method.AsteriskToken != nil
 				}
-			} else if node.Kind == ast.KindGetAccessor {
+			case ast.KindGetAccessor:
 				isAsync = ast.HasSyntacticModifier(node, ast.ModifierFlagsAsync)
-			} else if node.Kind == ast.KindSetAccessor {
+			case ast.KindSetAccessor:
 				isAsync = ast.HasSyntacticModifier(node, ast.ModifierFlagsAsync)
-			} else if node.Kind == ast.KindConstructor {
+			case ast.KindConstructor:
 				// Check accessibility modifiers for constructors
 				hasPrivate := ast.HasSyntacticModifier(node, ast.ModifierFlagsPrivate)
 				hasProtected := ast.HasSyntacticModifier(node, ast.ModifierFlagsProtected)
