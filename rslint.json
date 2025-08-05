@@ -8,7 +8,9 @@
       "packages/rslint/fixtures/**",
       "packages/rslint-test-tools/tests/**/*.test.ts",
       "packages/rslint-test-tools/tests/typescript-eslint/rules/prefer-optional-chain/base-cases.ts",
-      "packages/rslint-test-tools/tests/typescript-eslint/rules/naming-convention/cases/createTestCases.ts"
+      "packages/rslint-test-tools/tests/typescript-eslint/rules/naming-convention/cases/createTestCases.ts",
+      "packages/rslint-test-tools/tests/typescript-eslint/areOptionsValid.ts",
+      "packages/rule-tester/src/index.ts"
     ],
     "languageOptions": {
       "parserOptions": {
