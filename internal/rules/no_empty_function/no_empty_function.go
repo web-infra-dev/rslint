@@ -282,7 +282,7 @@ var NoEmptyFunctionRule = rule.Rule{
 					}
 				}
 				return "function"
-			} else if node.Kind == ast.KindArrowFunction {
+			case ast.KindArrowFunction:
 				parent := node.Parent
 				if parent != nil && parent.Kind == ast.KindVariableDeclaration {
 					decl := parent.AsVariableDeclaration()
@@ -294,8 +294,9 @@ var NoEmptyFunctionRule = rule.Rule{
 					}
 				}
 				return "arrow function"
+			default:
+				return "function"
 			}
-			return "function"
 		}
 
 		// Main check function for all function types
