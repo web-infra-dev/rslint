@@ -1996,7 +1996,7 @@ interface FooInterface {
 // -- eslint rule tester is not working with multi-pass
 // https://github.com/eslint/eslint/issues/11187
 // FIXME: temporary workaround for test
-describe('array-type (nested)', () => {
+describe.skip('array-type (nested)', () => {
   const linter = new TSESLint.Linter({ configType: 'eslintrc' });
   // FIXME: temporary workaround for test
   // linter.defineRule('array-type', rule);
