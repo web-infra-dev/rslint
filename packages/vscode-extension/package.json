@@ -22,7 +22,7 @@
   "engines": {
     "vscode": "^1.74.0"
   },
-  "main": "./dist/extension.js",
+  "main": "./dist/main.js",
   "activationEvents": [
     "onLanguage:typescript",
     "onLanguage:typescriptreact",

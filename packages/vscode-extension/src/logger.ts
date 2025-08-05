@@ -9,19 +9,11 @@ export enum LogLevel {
 }
 
 export class Logger {
-  private static instance: Logger;
   private outputChannel: OutputChannel;
   private logLevel: LogLevel = LogLevel.INFO;
 
-  private constructor() {
-    this.outputChannel = window.createOutputChannel('Rslint');
-  }
-
-  public static getInstance(): Logger {
-    if (!Logger.instance) {
-      Logger.instance = new Logger();
-    }
-    return Logger.instance;
+  public constructor(name: string) {
+    this.outputChannel = window.createOutputChannel(name);
   }
 
   public setLogLevel(level: LogLevel): void {
@@ -103,6 +95,3 @@ export class Logger {
     return `${message} ${formattedArgs.join(' ')}`;
   }
 }
-
-// Export a default instance for convenience
-export const logger = Logger.getInstance();
