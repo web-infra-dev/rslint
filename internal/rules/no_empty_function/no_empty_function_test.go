@@ -83,22 +83,22 @@ class Foo extends Base {
       `,
 			Options: map[string]interface{}{"allow": []interface{}{"overrideMethods"}},
 		},
-		
+
 		// Additional comprehensive test cases
 		{
-			Code: `const foo = () => {};`,
+			Code:    `const foo = () => {};`,
 			Options: map[string]interface{}{"allow": []interface{}{"arrowFunctions"}},
 		},
 		{
-			Code: `function foo() {}`,
+			Code:    `function foo() {}`,
 			Options: map[string]interface{}{"allow": []interface{}{"functions"}},
 		},
 		{
-			Code: `async function foo() {}`,
+			Code:    `async function foo() {}`,
 			Options: map[string]interface{}{"allow": []interface{}{"asyncFunctions"}},
 		},
 		{
-			Code: `function* foo() {}`,
+			Code:    `function* foo() {}`,
 			Options: map[string]interface{}{"allow": []interface{}{"generatorFunctions"}},
 		},
 		{
@@ -228,7 +228,7 @@ class Foo extends Base {
 				},
 			},
 		},
-		
+
 		// Additional invalid cases for comprehensive coverage
 		{
 			Code: `const foo = () => {};`,
