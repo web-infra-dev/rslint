@@ -1,6 +1,7 @@
+import { RuleTester } from '@typescript-eslint/rule-tester';
 import * as path from 'node:path';
 
-import { RuleTester } from '@typescript-eslint/rule-tester';
+
 import { getFixturesRootDir } from '../RuleTester';
 
 const rootDir = getFixturesRootDir();
@@ -835,7 +836,6 @@ promise().then(() => {});
           ],
         },
       ],
-      skip: true, // FIXME: this is a bad case, but we need to fix the test runner first
     },
     {
       code: `
@@ -994,7 +994,6 @@ async function test() {
       ],
     },
     {
-      skip: true,
       code: `
 const doSomething = async (
   obj1: { a?: { b?: { c?: () => Promise<void> } } },
@@ -5571,7 +5570,6 @@ await Promise.reject('foo').finally(...[], () => {});
       ],
     },
     {
-      skip: true, // FIXME: not supported yet
       code: `
 Promise.reject('foo').then(...[], () => {});
       `,

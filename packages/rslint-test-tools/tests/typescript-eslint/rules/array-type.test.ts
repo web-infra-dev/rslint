@@ -1,16 +1,13 @@
-import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
-import { getFixturesRootDir } from '../RuleTester.ts';
+import * as parser from '@typescript-eslint/parser';
+import { RuleTester } from '@typescript-eslint/rule-tester';
+import { TSESLint } from '@typescript-eslint/utils';
 
-const rootDir = getFixturesRootDir();
+import type { OptionString } from '../../src/rules/array-type';
 
-const ruleTester = new RuleTester({
-  languageOptions: {
-    parserOptions: {
-      project: './tsconfig.json',
-      tsconfigRootDir: rootDir,
-    },
-  },
-});
+
+import { areOptionsValid } from '../areOptionsValid';
+
+const ruleTester = new RuleTester();
 
 ruleTester.run('array-type', {
   valid: [
@@ -1286,11 +1283,7 @@ function bazFunction(baz: Arr<ArrayClass<String>>) {
       errors: [
         {
           column: 8,
-          data: {
-            className: 'Array',
-            readonlyPrefix: '',
-            type: 'undefined',
-          },
+          data: { className: 'Array', readonlyPrefix: '', type: 'undefined' },
           line: 1,
           messageId: 'errorStringArraySimple',
         },
@@ -1491,11 +1484,7 @@ function barFunction(bar: Array<ArrayClass<String>>) {
       errors: [
         {
           column: 8,
-          data: {
-            className: 'Array',
-            readonlyPrefix: '',
-            type: 'undefined',
-          },
+          data: { className: 'Array', readonlyPrefix: '', type: 'undefined' },
           line: 1,
           messageId: 'errorStringArray',
         },
@@ -2002,4 +1991,257 @@ interface FooInterface {
         'type Conditional<T> = Array<T extends string ? string : number>;',
     },
   ],
+});
+
+// -- eslint rule tester is not working with multi-pass
+// https://github.com/eslint/eslint/issues/11187
+// FIXME: temporary workaround for test
+describe('array-type (nested)', () => {
+  const linter = new TSESLint.Linter({ configType: 'eslintrc' });
+  // FIXME: temporary workaround for test
+  // linter.defineRule('array-type', rule);
+  linter.defineParser('@typescript-eslint/parser', parser);
+
+  describe('should deeply fix correctly', () => {
+    function testOutput(
+      defaultOption: OptionString,
+      code: string,
+      output: string,
+      readonlyOption?: OptionString,
+    ): void {
+      it(code, () => {
+        const result = linter.verifyAndFix(
+          code,
+          {
+            parser: '@typescript-eslint/parser',
+            rules: {
+              'array-type': [
+                2,
+                { default: defaultOption, readonly: readonlyOption },
+              ],
+            },
+          },
+          {
+            fix: true,
+          },
+        );
+
+        expect(result.messages).toHaveLength(0);
+        expect(result.output).toBe(output);
+      });
+    }
+
+    testOutput(
+      'array',
+      'let a: ({ foo: Array<Array<Bar> | Array<any>> })[] = []',
+      'let a: ({ foo: (Bar[] | any[])[] })[] = []',
+    );
+    testOutput(
+      'array',
+      `
+class Foo<T = Array<Array<Bar>>> extends Bar<T, Array<T>> implements Baz<Array<T>> {
+    private s: Array<T>
+
+    constructor (p: Array<T>) {
+        return new Array()
+    }
+}
+      `,
+      `
+class Foo<T = Bar[][]> extends Bar<T, T[]> implements Baz<T[]> {
+    private s: T[]
+
+    constructor (p: T[]) {
+        return new Array()
+    }
+}
+      `,
+    );
+    testOutput(
+      'array',
+      `
+interface WorkingArray {
+  outerProperty: Array<
+    { innerPropertyOne: string } & { innerPropertyTwo: string }
+  >;
+}
+
+interface BrokenArray {
+  outerProperty: Array<
+    ({ innerPropertyOne: string } & { innerPropertyTwo: string })
+  >;
+}
+      `,
+      `
+interface WorkingArray {
+  outerProperty: ({ innerPropertyOne: string } & { innerPropertyTwo: string })[];
+}
+
+interface BrokenArray {
+  outerProperty: ({ innerPropertyOne: string } & { innerPropertyTwo: string })[];
+}
+      `,
+    );
+    testOutput(
+      'array',
+      `
+type WorkingArray = {
+  outerProperty: Array<
+    { innerPropertyOne: string } & { innerPropertyTwo: string }
+  >;
+}
+
+type BrokenArray = {
+  outerProperty: Array<
+    ({ innerPropertyOne: string } & { innerPropertyTwo: string })
+  >;
+}
+      `,
+      `
+type WorkingArray = {
+  outerProperty: ({ innerPropertyOne: string } & { innerPropertyTwo: string })[];
+}
+
+type BrokenArray = {
+  outerProperty: ({ innerPropertyOne: string } & { innerPropertyTwo: string })[];
+}
+      `,
+    );
+    testOutput(
+      'array',
+      'const a: Array<(string|number)>;',
+      'const a: (string|number)[];',
+    );
+    testOutput(
+      'array-simple',
+      'let xx: Array<Array<number>> = [[1, 2], [3]];',
+      'let xx: number[][] = [[1, 2], [3]];',
+    );
+    testOutput(
+      'array',
+      'let xx: Array<Array<number>> = [[1, 2], [3]];',
+      'let xx: number[][] = [[1, 2], [3]];',
+    );
+    testOutput(
+      'generic',
+      'let yy: number[][] = [[4, 5], [6]];',
+      'let yy: Array<Array<number>> = [[4, 5], [6]];',
+    );
+    testOutput('array', 'let a: Array<>[] = [];', 'let a: any[][] = [];');
+    testOutput('array', 'let a: Array<any[]> = [];', 'let a: any[][] = [];');
+    testOutput(
+      'array',
+      'let a: Array<any[]>[] = [];',
+      'let a: any[][][] = [];',
+    );
+
+    testOutput(
+      'generic',
+      'let a: Array<>[] = [];',
+      'let a: Array<Array<>> = [];',
+    );
+    testOutput(
+      'generic',
+      'let a: Array<any[]> = [];',
+      'let a: Array<Array<any>> = [];',
+    );
+    testOutput(
+      'generic',
+      'let a: Array<any[]>[] = [];',
+      'let a: Array<Array<Array<any>>> = [];',
+    );
+    testOutput(
+      'generic',
+      'let a: Array<Array>[] = [];',
+      'let a: Array<Array<Array>> = [];',
+    );
+    testOutput(
+      'generic',
+      'let a: Array<Array[]>[] = [];',
+      'let a: Array<Array<Array<Array>>> = [];',
+    );
+
+    // readonly
+    testOutput(
+      'generic',
+      'let x: readonly number[][]',
+      'let x: ReadonlyArray<Array<number>>',
+    );
+    testOutput(
+      'generic',
+      'let x: readonly (readonly number[])[]',
+      'let x: ReadonlyArray<ReadonlyArray<number>>',
+    );
+    testOutput(
+      'array',
+      'let x: ReadonlyArray<Array<number>>',
+      'let x: readonly number[][]',
+    );
+    testOutput(
+      'array',
+      'let x: ReadonlyArray<ReadonlyArray<number>>',
+      'let x: readonly (readonly number[])[]',
+    );
+    testOutput(
+      'array',
+      'let x: ReadonlyArray<readonly number[]>',
+      'let x: readonly (readonly number[])[]',
+    );
+    testOutput(
+      'array',
+      'let a: readonly number[][] = []',
+      'let a: ReadonlyArray<number[]> = []',
+      'generic',
+    );
+    testOutput(
+      'generic',
+      'let a: readonly number[][] = []',
+      'let a: readonly Array<number>[] = []',
+      'array',
+    );
+    testOutput(
+      'generic',
+      'type T = readonly(string)[]',
+      'type T = ReadonlyArray<string>',
+      'generic',
+    );
+    testOutput(
+      'generic',
+      'let a: readonly(readonly string[])[] = []',
+      'let a: ReadonlyArray<ReadonlyArray<string>> = []',
+      'generic',
+    );
+    testOutput(
+      'generic',
+      'type T = readonly(readonly string[])[]',
+      'type T = ReadonlyArray<ReadonlyArray<string>>',
+      'generic',
+    );
+    testOutput(
+      'generic',
+      'type T = readonly (readonly string[])[]',
+      'type T = ReadonlyArray<ReadonlyArray<string>>',
+      'generic',
+    );
+    testOutput(
+      'generic',
+      'type T = readonly    (readonly string[])[]',
+      'type T = ReadonlyArray<ReadonlyArray<string>>',
+      'generic',
+    );
+  });
+});
+// FIXME: temporary workaround for test
+describe.skip('schema validation', () => {
+  // https://github.com/typescript-eslint/typescript-eslint/issues/6852
+  test("array-type does not accept 'simple-array' option", () => {
+    // FIXME: temporarily disabled due to
+   // expect(areOptionsValid(rule, [{ default: 'simple-array' }])).toBe(false);
+  });
+
+  // https://github.com/typescript-eslint/typescript-eslint/issues/6892
+  test('array-type does not accept non object option', () => {
+    // FIXME: temporarily disabled due to
+    // expect(areOptionsValid(rule, ['array'])).toBe(false);
+  });
 });

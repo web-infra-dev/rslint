@@ -1,16 +1,8 @@
 import { RuleTester } from '@typescript-eslint/rule-tester';
-import { getFixturesRootDir } from '../RuleTester.ts';
 
-const rootDir = getFixturesRootDir();
 
-const ruleTester = new RuleTester({
-  languageOptions: {
-    parserOptions: {
-      project: './tsconfig.json',
-      tsconfigRootDir: rootDir,
-    },
-  },
-});
+
+const ruleTester = new RuleTester();
 
 ruleTester.run('adjacent-overload-signatures', {
   valid: [
@@ -21,7 +13,7 @@ function error(b: number);
 function error(ab: string | number) {}
 export { error };
       `,
-      // languageOptions: { parserOptions: { sourceType: 'module' } },
+      languageOptions: { parserOptions: { sourceType: 'module' } },
     },
     {
       code: `
@@ -33,7 +25,7 @@ function mapStateToProps() {}
 function mapDispatchToProps() {}
 export default connect(mapStateToProps, mapDispatchToProps)(ErrorMessage);
       `,
-      // languageOptions: { parserOptions: { sourceType: 'module' } },
+      languageOptions: { parserOptions: { sourceType: 'module' } },
     },
     `
 export const foo = 'a',

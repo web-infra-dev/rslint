@@ -27,7 +27,8 @@
     "lint": "rslint",
     "lint:go": "golangci-lint run ./cmd/... ./internal/...",
     "format:go": "golangci-lint fmt ./cmd/... ./internal/...",
-    "prepare": "husky"
+    "prepare": "husky",
+    "migrate:tests": "sg scan -r ast-grep-rule.yml ./packages/rslint-test-tools/tests/typescript-eslint/rules/**/*.test.ts --update-all"
   },
   "devDependencies": {
     "@rslint/core": "workspace:*",
