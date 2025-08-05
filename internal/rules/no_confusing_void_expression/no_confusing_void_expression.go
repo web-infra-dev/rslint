@@ -1,6 +1,7 @@
 package no_confusing_void_expression
 
 import (
+	"encoding/json"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -58,17 +59,29 @@ func buildVoidExprWrapVoidMessage() rule.RuleMessage {
 }
 
 type NoConfusingVoidExpressionOptions struct {
-	IgnoreArrowShorthand         bool
-	IgnoreVoidOperator           bool
-	IgnoreVoidReturningFunctions bool
+	IgnoreArrowShorthand         bool `json:"ignoreArrowShorthand,omitempty"`
+	IgnoreVoidOperator           bool `json:"ignoreVoidOperator,omitempty"`
+	IgnoreVoidReturningFunctions bool `json:"ignoreVoidReturningFunctions,omitempty"`
 }
 
 var NoConfusingVoidExpressionRule = rule.CreateRule(rule.Rule{
 	Name: "no-confusing-void-expression",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(NoConfusingVoidExpressionOptions)
+
 		if !ok {
+			// try convert options to JSON and back to struct
 			opts = NoConfusingVoidExpressionOptions{}
+			// get first element of options
+			options_array, _ := options.([]interface{})
+			// if options_array has at least one element, try to unmarshal it
+			if len(options_array) > 0 {
+				optsJSON, err := json.Marshal(options_array[0])
+				if err == nil {
+					json.Unmarshal(optsJSON, &opts)
+				}
+
+			}
 		}
 
 		canFix := func(node *ast.Node) bool {

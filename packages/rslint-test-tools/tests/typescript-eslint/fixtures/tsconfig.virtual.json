@@ -1,6 +1,9 @@
 {
   "compilerOptions": {
-    "strictNullChecks": true
+    "strictNullChecks": true,
+    "jsx": "preserve"
   },
-  "include": ["src/virtual.ts"]
+  "include": [
+    "src/virtual.ts"
+  ]
 }
