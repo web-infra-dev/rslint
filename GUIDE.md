@@ -39,7 +39,7 @@ rslint --help
 ```json
 [
   {
-    // ignore files and folder for linting
+    // ignore files and folders for linting
     "ignores": ["./files-not-want-lint.ts", "./tests/**/fixtures/**.ts"],
     "languageOptions": {
       "parserOptions": {
