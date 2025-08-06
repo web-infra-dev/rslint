@@ -298,8 +298,6 @@ const test: Foo = () => console.log('foo');
     },
     {
       code: 'const foo = <button onClick={() => console.log()} />;',
-      // FIXME: it seems jsx is not supported in tsgo yet
-      skip: true, 
       languageOptions: {
         parserOptions: {
           ecmaFeatures: {

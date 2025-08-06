@@ -51,5 +51,8 @@
   "engines": {
     "pnpm": ">=10"
   },
-  "files": []
+  "files": [],
+  "dependencies": {
+    "@types/react": "^19.1.9"
+  }
 }
