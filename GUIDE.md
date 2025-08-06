@@ -12,7 +12,7 @@ npm install @rslint/core
 pnpm add @rslint/core
 
 # Install via yarn
-yarn global @rslint/core
+yarn add @rslint/core
 ```
 
 ## Basic Usage
