@@ -93,52 +93,52 @@ ctx.ReportNodeWithFixes(node, message,
 
 ## Testing Rules
 
-### Unit Tests
+### Primary Focus: Go Tests
 
-Create test file: `packages/rslint-test-tools/tests/typescript-eslint/rules/<rule-name>.test.ts`
+**IMPORTANT**: TypeScript test files are maintained from the main branch and should NOT be modified. Focus on Go implementation and Go tests.
 
-```typescript
-import { RuleTester } from '@typescript-eslint/rule-tester';
-import { getFixturesRootDir } from '../RuleTester.ts';
+### Go Unit Tests
 
-const rootDir = getFixturesRootDir();
+Write comprehensive Go tests in `internal/rules/<rule_name>/<rule_name>_test.go`:
 
-const ruleTester = new RuleTester({
-  languageOptions: {
-    parserOptions: {
-      project: './tsconfig.json',
-      tsconfigRootDir: rootDir,
-    },
-  },
-});
+```go
+package rule_name
 
-// Use the rule name WITHOUT the @typescript-eslint/ prefix
-ruleTester.run('rule-name', {
-  valid: ['valid code examples'],
-  invalid: [
-    {
-      code: 'invalid code',
-      errors: [
+import (
+    "testing"
+    "github.com/web-infra-dev/rslint/internal/rule"
+)
+
+func TestRuleNameRule(t *testing.T) {
+    rule.RunTest(t, RuleNameRule, []rule.TestCase{
+        // Valid cases
         {
-          messageId: 'messageId',
-          line: 1,
-          column: 1,
-          endLine: 1,
-          endColumn: 10,
+            Code: "valid code example",
         },
-      ],
-    },
-  ],
-});
+        // Invalid cases
+        {
+            Code: "invalid code example",
+            Errors: []rule.ExpectedError{
+                {
+                    MessageId: "messageId",
+                    Line:      1,
+                    Column:    1,
+                },
+            },
+        },
+    })
+}
 ```
 
-**Important**: The test runner expects exact error positions. Always include line/column information in error expectations.
+### TypeScript Test Files
+
+**DO NOT CREATE OR MODIFY** TypeScript test files. They exist in `packages/rslint-test-tools/tests/typescript-eslint/rules/` and are maintained from the main branch. If a TypeScript test file exists for your rule, it should work automatically once your Go implementation is complete and registered properly.
 
 ### Manual Testing
 
 ```bash
-# Build the project
-pnpm build
+# Build the Go binary
+go build ./cmd/rslint
 
 # Test directly
 cd packages/rslint/fixtures
@@ -166,15 +166,18 @@ Use the TypeScript AST through the Go shim:
 ### Running Tests
 
 ```bash
-# All tests
-pnpm test
+# Go tests (primary focus)
+go test ./internal/rules/<rule_name>/
 
-# Just Go tests
+# All Go tests
 go test ./...
 
-# Specific rule tests
+# TypeScript integration tests (after Go implementation is complete)
 cd packages/rslint-test-tools
 pnpm test <rule-name>
+
+# All tests (run this before finalizing)
+pnpm test
 ```
 
 ### CI Requirements
@@ -201,42 +204,54 @@ Your changes must pass:
 ## Common Pitfalls to Avoid
 
 1. **Don't modify** `getAllTypeScriptEslintPluginRules()` - it must match main branch
-2. **Don't change** core infrastructure without understanding impacts
-3. **Always handle nil** from type assertions
-4. **Test with real TypeScript code** to ensure rule behaves correctly
-5. **Missing API registration** - Always add new rules to the hardcoded list in `cmd/rslint/api.go`
-6. **Test failures** - "Expected diagnostics for invalid case" usually means the rule isn't registered in the API
-7. **Wrong rule name in tests** - Use the short name without @typescript-eslint/ prefix in test files
-8. **VSCode test failures** - Diagnostic tests may fail initially due to LSP timing, but should pass consistently after proper rule registration
+2. **Don't create or modify TypeScript test files** - they are maintained from main branch
+3. **Don't change** core infrastructure without understanding impacts
+4. **Always handle nil** from type assertions
+5. **Focus on Go tests first** - ensure your Go implementation passes before running TypeScript tests
+6. **Missing API registration** - Always add new rules to the hardcoded list in `cmd/rslint/api.go`
+7. **Test failures** - "Expected diagnostics for invalid case" usually means the rule isn't registered in the API
+8. **Column position mismatches** - TypeScript-ESLint and Go implementation may calculate positions differently, focus on Go test compatibility
 
 ## Complete Checklist for Adding a New Rule
 
+### Core Implementation (Primary Focus)
+
 1. [ ] Create rule implementation in `internal/rules/<rule_name>/<rule_name>.go`
 2. [ ] Add nil checks for all AST node type assertions
-3. [ ] Register in `internal/config/config.go` with full @typescript-eslint/ prefix
-4. [ ] Add to hardcoded list in `cmd/rslint/api.go`
-5. [ ] Create test file in `packages/rslint-test-tools/tests/typescript-eslint/rules/`
-6. [ ] Run `pnpm build` to compile everything
-7. [ ] Run `pnpm test` to verify tests pass
-8. [ ] Test manually with CLI: `cd packages/rslint/fixtures && ../bin/rslint src/test.ts`
-9. [ ] Update test snapshots if needed: `pnpm test -u <rule-name>`
-10. [ ] Run Go quality checks: `go vet ./cmd/... ./internal/...` and `go fmt ./cmd/... ./internal/...`
-11. [ ] Run Go unit tests: `go test -parallel 4 ./internal/...`
-12. [ ] Run TypeScript type checking: `pnpm tsc -b tsconfig.json`
-13. [ ] Run all tests: `pnpm test`
-14. [ ] Run linting checks: `pnpm run lint`
-15. [ ] Ensure CI passes (golangci-lint, all tests)
+3. [ ] Create comprehensive Go tests in `internal/rules/<rule_name>/<rule_name>_test.go`
+4. [ ] Register in `internal/config/config.go` with full @typescript-eslint/ prefix
+5. [ ] Add to hardcoded list in `cmd/rslint/api.go`
+
+### Testing & Validation
+
+6. [ ] Run Go tests: `go test ./internal/rules/<rule_name>/` - **MUST PASS**
+7. [ ] Run Go quality checks: `go vet ./cmd/... ./internal/...` and `go fmt ./cmd/... ./internal/...`
+8. [ ] Build binary: `go build ./cmd/rslint`
+9. [ ] Test manually with CLI: `cd packages/rslint/fixtures && ../bin/rslint src/test.ts`
+10. [ ] Run all Go tests: `go test -parallel 4 ./internal/...`
+
+### Integration Testing (After Go Implementation Complete)
+
+11. [ ] **DO NOT** create/modify TypeScript test files - they exist from main branch
+12. [ ] Run TypeScript integration test: `cd packages/rslint-test-tools && pnpm test <rule-name>`
+13. [ ] If TypeScript tests fail due to position mismatches, prioritize Go test compatibility
+14. [ ] Run TypeScript type checking: `pnpm tsc -b tsconfig.json`
+15. [ ] Run linting checks: `pnpm run lint`
+16. [ ] Run all tests: `pnpm test`
+17. [ ] Ensure CI passes (focus on Go tests, golangci-lint)
 
 ## When You're Done
 
-1. Ensure all tests pass: `pnpm test`
-2. Verify no linting errors: `pnpm build`
-3. Run Go quality checks: `go vet ./cmd/... ./internal/...` and `go fmt ./cmd/... ./internal/...`
-4. Run Go unit tests: `go test -parallel 4 ./internal/...`
-5. Run TypeScript type checking: `pnpm tsc -b tsconfig.json`
-6. Run linting checks: `pnpm run lint`
-7. Test your rule manually with the CLI
-8. Document any special behavior or options in the rule implementation
+**Primary Validation (Must Pass)**:
+
+1. Go tests pass: `go test ./internal/rules/<rule_name>/`
+2. Go quality checks: `go vet ./cmd/... ./internal/...` and `go fmt ./cmd/... ./internal/...`
+3. All Go tests pass: `go test -parallel 4 ./internal/...`
+4. Manual CLI testing works
+
+**Secondary Validation**: 5. TypeScript type checking: `pnpm tsc -b tsconfig.json` 6. Linting checks: `pnpm run lint` 7. Integration tests: `pnpm test` (note: some TypeScript test position mismatches are acceptable if Go tests pass) 8. Document any special behavior or options in the rule implementation
+
+**Key Principle**: Go implementation and tests are the source of truth. TypeScript tests are integration tests that may have minor position differences.
 
 ## Go Test Infrastructure Notes
 
