@@ -1,0 +1,1499 @@
+// Rstest Snapshot v1
+
+exports[`no-confusing-void-expression > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+      "messageId": "invalidVoidExpr",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 2,
+        },
+        "start": {
+          "column": 19,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+      "messageId": "invalidVoidExpr",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 19,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+      "messageId": "invalidVoidExpr",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+      "messageId": "invalidVoidExpr",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 10,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+      "messageId": "invalidVoidExpr",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 2,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+      "messageId": "invalidVoidExpr",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 2,
+        },
+        "start": {
+          "column": 14,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+      "messageId": "invalidVoidExpr",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 2,
+        },
+        "start": {
+          "column": 9,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+      "messageId": "invalidVoidExpr",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 10,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+      "messageId": "invalidVoidExpr",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 2,
+        },
+        "start": {
+          "column": 18,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+      "messageId": "invalidVoidExpr",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 10,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
+      "messageId": "invalidVoidExpr",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please move it before the \`return\` statement.",
+      "messageId": "invalidVoidExprReturn",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please move it before the \`return\` statement.",
+      "messageId": "invalidVoidExprReturn",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 4,
+        },
+        "start": {
+          "column": 18,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
+      "messageId": "invalidVoidExprReturnLast",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 4,
+        },
+        "start": {
+          "column": 18,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 22`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
+      "messageId": "invalidVoidExprReturnLast",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 4,
+        },
+        "start": {
+          "column": 18,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 23`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please move it before the \`return\` statement.",
+      "messageId": "invalidVoidExprReturn",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 4,
+        },
+        "start": {
+          "column": 20,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 24`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please move it before the \`return\` statement.",
+      "messageId": "invalidVoidExprReturn",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 3,
+        },
+        "start": {
+          "column": 28,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 25`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
+      "messageId": "invalidVoidExprReturnLast",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 4,
+        },
+        "start": {
+          "column": 24,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 26`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
+      "messageId": "invalidVoidExprReturnLast",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 4,
+        },
+        "start": {
+          "column": 26,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 27`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
+      "messageId": "invalidVoidExprReturnLast",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 28`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
+      "messageId": "invalidVoidExprReturnLast",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 29`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 3,
+        },
+        "start": {
+          "column": 34,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 30`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 3,
+        },
+        "start": {
+          "column": 34,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 31`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Void expressions returned from a function must be marked explicitly with the \`void\` operator.",
+      "messageId": "invalidVoidExprReturnWrapVoid",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 32`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Void expressions used inside another expression must be moved to its own statement or marked explicitly with the \`void\` operator.",
+      "messageId": "invalidVoidExprWrapVoid",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 33`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Void expressions used inside another expression must be moved to its own statement or marked explicitly with the \`void\` operator.",
+      "messageId": "invalidVoidExprWrapVoid",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 34`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Void expressions used inside another expression must be moved to its own statement or marked explicitly with the \`void\` operator.",
+      "messageId": "invalidVoidExprWrapVoid",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 35`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Void expressions returned from an arrow function shorthand must be marked explicitly with the \`void\` operator.",
+      "messageId": "invalidVoidExprArrowWrapVoid",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 36`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Void expressions used inside another expression must be moved to its own statement or marked explicitly with the \`void\` operator.",
+      "messageId": "invalidVoidExprWrapVoid",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 37`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
+      "messageId": "invalidVoidExprReturnLast",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 38`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 39`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
+      "messageId": "invalidVoidExprReturnLast",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 40`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
+      "messageId": "invalidVoidExprReturnLast",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 41`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 20,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 42`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 2,
+        },
+        "start": {
+          "column": 24,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 43`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 44`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 45`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 46`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 47`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
+      "messageId": "invalidVoidExprReturnLast",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 48`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
+      "messageId": "invalidVoidExprReturnLast",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 49`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 50`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 51`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 3,
+        },
+        "start": {
+          "column": 25,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 52`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
+      "messageId": "invalidVoidExprArrow",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 3,
+        },
+        "start": {
+          "column": 25,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 53`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
+      "messageId": "invalidVoidExprReturnLast",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 6,
+        },
+        "start": {
+          "column": 12,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 54`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
+      "messageId": "invalidVoidExprReturnLast",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 55`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please move it before the \`return\` statement.",
+      "messageId": "invalidVoidExprReturn",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 2,
+        },
+        "start": {
+          "column": 8,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 56`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
+      "messageId": "invalidVoidExprReturnLast",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 8,
+        },
+        "start": {
+          "column": 10,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-confusing-void-expression > invalid 57`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
+      "messageId": "invalidVoidExprReturnLast",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 8,
+        },
+        "start": {
+          "column": 10,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-confusing-void-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

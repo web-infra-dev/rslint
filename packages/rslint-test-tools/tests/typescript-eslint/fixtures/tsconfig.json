@@ -1,7 +1,10 @@
 {
   "compilerOptions": {
     "strictNullChecks": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "jsx": "preserve"
   },
-  "include": ["src/**/*.ts"]
+  "include": [
+    "src/**/*.ts"
+  ]
 }
