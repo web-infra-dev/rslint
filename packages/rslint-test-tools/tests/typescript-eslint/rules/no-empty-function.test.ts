@@ -1,24 +1,13 @@
-import { describe, test, expect } from '@rstest/core';
-import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
-import { getFixturesRootDir } from '../RuleTester.ts';
+import { RuleTester } from '@typescript-eslint/rule-tester';
 
-const rootPath = getFixturesRootDir();
 
-const ruleTester = new RuleTester({
-  languageOptions: {
-    parserOptions: {
-      project: './tsconfig.json',
-      tsconfigRootDir: rootPath,
-    },
-  },
-});
 
-describe('no-empty-function', () => {
-  test('rule tests', () => {
-    ruleTester.run('no-empty-function', {
-      valid: [
-        {
-          code: `
+const ruleTester = new RuleTester();
+
+ruleTester.run('no-empty-function', {
+  valid: [
+    {
+      code: `
 class Person {
   private name: string;
   constructor(name: string) {
@@ -26,192 +15,190 @@ class Person {
   }
 }
       `,
-        },
-        {
-          code: `
+    },
+    {
+      code: `
 class Person {
   constructor(private name: string) {}
 }
       `,
-        },
-        {
-          code: `
+    },
+    {
+      code: `
 class Person {
   constructor(name: string) {}
 }
       `,
-          options: [{ allow: ['constructors'] }],
-        },
-        {
-          code: `
+      options: [{ allow: ['constructors'] }],
+    },
+    {
+      code: `
 class Person {
   otherMethod(name: string) {}
 }
       `,
-          options: [{ allow: ['methods'] }],
-        },
-        {
-          code: `
+      options: [{ allow: ['methods'] }],
+    },
+    {
+      code: `
 class Foo {
   private constructor() {}
 }
       `,
-          options: [{ allow: ['private-constructors'] }],
-        },
-        {
-          code: `
+      options: [{ allow: ['private-constructors'] }],
+    },
+    {
+      code: `
 class Foo {
   protected constructor() {}
 }
       `,
-          options: [{ allow: ['protected-constructors'] }],
-        },
-        {
-          code: `
+      options: [{ allow: ['protected-constructors'] }],
+    },
+    {
+      code: `
 function foo() {
   const a = null;
 }
       `,
-        },
-        {
-          code: `
+    },
+    {
+      code: `
 class Foo {
   @decorator()
   foo() {}
 }
       `,
-          options: [{ allow: ['decoratedFunctions'] }],
-        },
-        {
-          code: `
+      options: [{ allow: ['decoratedFunctions'] }],
+    },
+    {
+      code: `
 class Foo extends Base {
   override foo() {}
 }
       `,
-          options: [{ allow: ['overrideMethods'] }],
-        },
-      ],
+      options: [{ allow: ['overrideMethods'] }],
+    },
+  ],
 
-      invalid: [
-        {
-          code: `
+  invalid: [
+    {
+      code: `
 class Person {
   constructor(name: string) {}
 }
       `,
-          errors: [
-            {
-              column: 29,
-              data: {
-                name: 'constructor',
-              },
-              line: 3,
-              messageId: 'unexpected',
-            },
-          ],
-        },
+      errors: [
         {
-          code: `
+          column: 29,
+          data: {
+            name: 'constructor',
+          },
+          line: 3,
+          messageId: 'unexpected',
+        },
+      ],
+    },
+    {
+      code: `
 class Person {
   otherMethod(name: string) {}
 }
       `,
-          errors: [
-            {
-              column: 29,
-              data: {
-                name: "method 'otherMethod'",
-              },
-              line: 3,
-              messageId: 'unexpected',
-            },
-          ],
-        },
+      errors: [
         {
-          code: `
+          column: 29,
+          data: {
+            name: "method 'otherMethod'",
+          },
+          line: 3,
+          messageId: 'unexpected',
+        },
+      ],
+    },
+    {
+      code: `
 class Foo {
   private constructor() {}
 }
       `,
-          errors: [
-            {
-              column: 25,
-              data: {
-                name: 'constructor',
-              },
-              line: 3,
-              messageId: 'unexpected',
-            },
-          ],
-        },
+      errors: [
         {
-          code: `
+          column: 25,
+          data: {
+            name: 'constructor',
+          },
+          line: 3,
+          messageId: 'unexpected',
+        },
+      ],
+    },
+    {
+      code: `
 class Foo {
   protected constructor() {}
 }
       `,
-          errors: [
-            {
-              column: 27,
-              data: {
-                name: 'constructor',
-              },
-              line: 3,
-              messageId: 'unexpected',
-            },
-          ],
-        },
+      errors: [
         {
-          code: `
+          column: 27,
+          data: {
+            name: 'constructor',
+          },
+          line: 3,
+          messageId: 'unexpected',
+        },
+      ],
+    },
+    {
+      code: `
 function foo() {}
       `,
-          errors: [
-            {
-              column: 16,
-              data: {
-                name: "function 'foo'",
-              },
-              line: 2,
-              messageId: 'unexpected',
-            },
-          ],
-        },
+      errors: [
         {
-          code: `
+          column: 16,
+          data: {
+            name: "function 'foo'",
+          },
+          line: 2,
+          messageId: 'unexpected',
+        },
+      ],
+    },
+    {
+      code: `
 class Foo {
   @decorator()
   foo() {}
 }
       `,
-          errors: [
-            {
-              column: 9,
-              data: {
-                name: "method 'foo'",
-              },
-              line: 4,
-              messageId: 'unexpected',
-            },
-          ],
-        },
+      errors: [
         {
-          code: `
+          column: 9,
+          data: {
+            name: "method 'foo'",
+          },
+          line: 4,
+          messageId: 'unexpected',
+        },
+      ],
+    },
+    {
+      code: `
 class Foo extends Base {
   override foo() {}
 }
       `,
-          errors: [
-            {
-              column: 18,
-              data: {
-                name: "method 'foo'",
-              },
-              line: 3,
-              messageId: 'unexpected',
-            },
-          ],
+      errors: [
+        {
+          column: 18,
+          data: {
+            name: "method 'foo'",
+          },
+          line: 3,
+          messageId: 'unexpected',
         },
       ],
-    });
-  });
+    },
+  ],
 });

@@ -1,28 +1,17 @@
-import { describe, test, expect } from '@rstest/core';
 import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
-import { getFixturesRootDir } from '../RuleTester.ts';
 
-const rootPath = getFixturesRootDir();
 
-const ruleTester = new RuleTester({
-  languageOptions: {
-    parserOptions: {
-      project: './tsconfig.json',
-      tsconfigRootDir: rootPath,
-    },
-  },
-});
 
-describe('no-empty-interface', () => {
-  test('run rule', () => {
-    ruleTester.run('no-empty-interface', {
-      valid: [
-        `
+const ruleTester = new RuleTester();
+
+ruleTester.run('no-empty-interface', {
+  valid: [
+    `
 interface Foo {
   name: string;
 }
     `,
-        `
+    `
 interface Foo {
   name: string;
 }
@@ -34,18 +23,18 @@ interface Bar {
 // valid because extending multiple interfaces can be used instead of a union type
 interface Baz extends Foo, Bar {}
     `,
-        {
-          code: `
+    {
+      code: `
 interface Foo {
   name: string;
 }
 
 interface Bar extends Foo {}
       `,
-          options: [{ allowSingleExtends: true }],
-        },
-        {
-          code: `
+      options: [{ allowSingleExtends: true }],
+    },
+    {
+      code: `
 interface Foo {
   props: string;
 }
@@ -54,34 +43,34 @@ interface Bar extends Foo {}
 
 class Bar {}
       `,
-          options: [{ allowSingleExtends: true }],
+      options: [{ allowSingleExtends: true }],
+    },
+  ],
+  invalid: [
+    {
+      code: 'interface Foo {}',
+      errors: [
+        {
+          column: 11,
+          line: 1,
+          messageId: 'noEmpty',
         },
       ],
-      invalid: [
+      output: null,
+    },
+    {
+      code: noFormat`interface Foo extends {}`,
+      errors: [
         {
-          code: 'interface Foo {}',
-          errors: [
-            {
-              column: 11,
-              line: 1,
-              messageId: 'noEmpty',
-            },
-          ],
-          output: null as any,
+          column: 11,
+          line: 1,
+          messageId: 'noEmpty',
         },
-        {
-          code: noFormat`interface Foo extends {}`,
-          errors: [
-            {
-              column: 11,
-              line: 1,
-              messageId: 'noEmpty',
-            },
-          ],
-          output: null as any,
-        },
-        {
-          code: `
+      ],
+      output: null,
+    },
+    {
+      code: `
 interface Foo {
   props: string;
 }
@@ -90,15 +79,15 @@ interface Bar extends Foo {}
 
 class Baz {}
       `,
-          errors: [
-            {
-              column: 11,
-              line: 6,
-              messageId: 'noEmptyWithSuper',
-            },
-          ],
-          options: [{ allowSingleExtends: false }],
-          output: `
+      errors: [
+        {
+          column: 11,
+          line: 6,
+          messageId: 'noEmptyWithSuper',
+        },
+      ],
+      options: [{ allowSingleExtends: false }],
+      output: `
 interface Foo {
   props: string;
 }
@@ -107,9 +96,9 @@ type Bar = Foo
 
 class Baz {}
       `,
-        },
-        {
-          code: `
+    },
+    {
+      code: `
 interface Foo {
   props: string;
 }
@@ -118,18 +107,18 @@ interface Bar extends Foo {}
 
 class Bar {}
       `,
-          errors: [
-            {
-              column: 11,
-              line: 6,
-              messageId: 'noEmptyWithSuper',
-            },
-          ],
-          options: [{ allowSingleExtends: false }],
-          output: null as any,
-        },
+      errors: [
         {
-          code: `
+          column: 11,
+          line: 6,
+          messageId: 'noEmptyWithSuper',
+        },
+      ],
+      options: [{ allowSingleExtends: false }],
+      output: null,
+    },
+    {
+      code: `
 interface Foo {
   props: string;
 }
@@ -138,15 +127,15 @@ interface Bar extends Foo {}
 
 const bar = class Bar {};
       `,
-          errors: [
-            {
-              column: 11,
-              line: 6,
-              messageId: 'noEmptyWithSuper',
-            },
-          ],
-          options: [{ allowSingleExtends: false }],
-          output: `
+      errors: [
+        {
+          column: 11,
+          line: 6,
+          messageId: 'noEmptyWithSuper',
+        },
+      ],
+      options: [{ allowSingleExtends: false }],
+      output: `
 interface Foo {
   props: string;
 }
@@ -155,139 +144,136 @@ type Bar = Foo
 
 const bar = class Bar {};
       `,
-        },
-        {
-          code: `
+    },
+    {
+      code: `
 interface Foo {
   name: string;
 }
 
 interface Bar extends Foo {}
       `,
-          errors: [
-            {
-              column: 11,
-              line: 6,
-              messageId: 'noEmptyWithSuper',
-            },
-          ],
-          options: [{ allowSingleExtends: false }],
-          output: `
+      errors: [
+        {
+          column: 11,
+          line: 6,
+          messageId: 'noEmptyWithSuper',
+        },
+      ],
+      options: [{ allowSingleExtends: false }],
+      output: `
 interface Foo {
   name: string;
 }
 
 type Bar = Foo
       `,
-        },
+    },
+    {
+      code: 'interface Foo extends Array<number> {}',
+      errors: [
         {
-          code: 'interface Foo extends Array<number> {}',
-          errors: [
-            {
-              column: 11,
-              line: 1,
-              messageId: 'noEmptyWithSuper',
-            },
-          ],
-          output: `type Foo = Array<number>`,
+          column: 11,
+          line: 1,
+          messageId: 'noEmptyWithSuper',
         },
+      ],
+      output: `type Foo = Array<number>`,
+    },
+    {
+      code: 'interface Foo extends Array<number | {}> {}',
+      errors: [
         {
-          code: 'interface Foo extends Array<number | {}> {}',
-          errors: [
-            {
-              column: 11,
-              line: 1,
-              messageId: 'noEmptyWithSuper',
-            },
-          ],
-          output: `type Foo = Array<number | {}>`,
+          column: 11,
+          line: 1,
+          messageId: 'noEmptyWithSuper',
         },
-        {
-          code: `
+      ],
+      output: `type Foo = Array<number | {}>`,
+    },
+    {
+      code: `
 interface Bar {
   bar: string;
 }
 interface Foo extends Array<Bar> {}
       `,
-          errors: [
-            {
-              column: 11,
-              line: 5,
-              messageId: 'noEmptyWithSuper',
-            },
-          ],
-          output: `
+      errors: [
+        {
+          column: 11,
+          line: 5,
+          messageId: 'noEmptyWithSuper',
+        },
+      ],
+      output: `
 interface Bar {
   bar: string;
 }
 type Foo = Array<Bar>
       `,
-        },
-        {
-          code: `
+    },
+    {
+      code: `
 type R = Record<string, unknown>;
 interface Foo extends R {}
       `,
-          errors: [
-            {
-              column: 11,
-              line: 3,
-              messageId: 'noEmptyWithSuper',
-            },
-          ],
-          output: `
+      errors: [
+        {
+          column: 11,
+          line: 3,
+          messageId: 'noEmptyWithSuper',
+        },
+      ],
+      output: `
 type R = Record<string, unknown>;
 type Foo = R
       `,
-        },
-        {
-          code: `
+    },
+    {
+      code: `
 interface Foo<T> extends Bar<T> {}
       `,
-          errors: [
-            {
-              column: 11,
-              line: 2,
-              messageId: 'noEmptyWithSuper',
-            },
-          ],
-          output: `
+      errors: [
+        {
+          column: 11,
+          line: 2,
+          messageId: 'noEmptyWithSuper',
+        },
+      ],
+      output: `
 type Foo<T> = Bar<T>
       `,
-        },
-        {
-          code: `
+    },
+    {
+      code: `
 declare module FooBar {
   type Baz = typeof baz;
   export interface Bar extends Baz {}
 }
       `,
-          errors: [
+      errors: [
+        {
+          column: 20,
+          endColumn: 23,
+          endLine: 4,
+          line: 4,
+          messageId: 'noEmptyWithSuper',
+          suggestions: [
             {
-              column: 20,
-              endColumn: 23,
-              endLine: 4,
-              line: 4,
               messageId: 'noEmptyWithSuper',
-              suggestions: [
-                {
-                  messageId: 'noEmptyWithSuper',
-                  output: `
+              output: `
 declare module FooBar {
   type Baz = typeof baz;
   export type Bar = Baz
 }
       `,
-                },
-              ],
             },
           ],
-          // @ts-ignore
-          filename: 'test.d.ts',
-          // output matches input because a suggestion was made
-          output: null as any,
         },
       ],
-    });
-  });
+      filename: 'test.d.ts',
+      // output matches input because a suggestion was made
+      output: null,
+    },
+  ],
 });
