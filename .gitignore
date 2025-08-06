@@ -150,3 +150,6 @@ npm/*/rslint
 npm/*/rslint.exe
 
 .idea
+
+## vscode settings
+.vscode/settings.json
