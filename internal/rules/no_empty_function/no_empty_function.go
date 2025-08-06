@@ -196,11 +196,12 @@ var NoEmptyFunctionRule = rule.CreateRule(rule.Rule{
 			// Search for the opening brace between node start and body start
 			for i := nodeStart; i <= bodyStart && i < len(sourceText); i++ {
 				if sourceText[i] == '{' {
+					// Report at the opening brace position to match TypeScript-ESLint
 					return core.TextRange{}.WithPos(i).WithEnd(i + 1), true
 				}
 			}
 
-			// Fallback: use the body's start position
+			// Fallback: use the body's start position to match TypeScript-ESLint
 			return core.TextRange{}.WithPos(bodyStart).WithEnd(bodyStart + 1), true
 		}
 
