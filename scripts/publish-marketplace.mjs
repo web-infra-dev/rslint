@@ -33,8 +33,8 @@ async function publish_all() {
     await $`rm -rf ./packages/vscode-extension/dist/rslint`;
     await $`rm -rf ./packages/vscode-extension/dist/rslint.exe`;
     await $`cp binaries/${os}-${arch}-rslint/${os}-${arch}-rslint ./packages/vscode-extension/dist/rslint`;
-    await $`chmod +x ./packages/vscode-extension/dist/rslint`
-    await $`ls -lR ./packages/vscode-extension/dist`
+    await $`chmod +x ./packages/vscode-extension/dist/rslint`;
+    await $`ls -lR ./packages/vscode-extension/dist`;
     const prereleaseFlag = prerelease ? ['--pre-release'] : [];
 
     await $`cd packages/vscode-extension && pnpm vsce package --target ${os}-${arch} ${prereleaseFlag}`;
