@@ -32,10 +32,7 @@ Rslint is a fork of [tsgolint](https://github.com/typescript-eslint/tsgolint), b
 
 ## 🚀 Getting Started
 
-> [!NOTE]
-> Documentation and installation guides are coming soon. Rslint is currently in active development.
-
-Stay tuned for our first stable release with comprehensive documentation and migration guides.
+See [Guide](./GUIDE.md).
 
 ## 🦀 Rstack
 
