@@ -135,7 +135,7 @@ func hasRequireDeclaration(stmt *ast.Node) bool {
 	return false
 }
 
-var NoRequireImportsRule = rule.Rule{
+var NoRequireImportsRule = rule.CreateRule(rule.Rule{
 	Name: "no-require-imports",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := NoRequireImportsOptions{
@@ -261,4 +261,4 @@ var NoRequireImportsRule = rule.Rule{
 			},
 		}
 	},
-}
+})

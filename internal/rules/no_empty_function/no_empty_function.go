@@ -11,7 +11,7 @@ type NoEmptyFunctionOptions struct {
 	Allow []string `json:"allow"`
 }
 
-var NoEmptyFunctionRule = rule.Rule{
+var NoEmptyFunctionRule = rule.CreateRule(rule.Rule{
 	Name: "no-empty-function",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := NoEmptyFunctionOptions{
@@ -486,4 +486,4 @@ var NoEmptyFunctionRule = rule.Rule{
 			ast.KindSetAccessor:         checkFunction,
 		}
 	},
-}
+})

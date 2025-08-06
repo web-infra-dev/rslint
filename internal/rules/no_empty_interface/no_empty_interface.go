@@ -13,7 +13,7 @@ type NoEmptyInterfaceOptions struct {
 	AllowSingleExtends bool `json:"allowSingleExtends"`
 }
 
-var NoEmptyInterfaceRule = rule.Rule{
+var NoEmptyInterfaceRule = rule.CreateRule(rule.Rule{
 	Name: "no-empty-interface",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := NoEmptyInterfaceOptions{
@@ -177,4 +177,4 @@ var NoEmptyInterfaceRule = rule.Rule{
 			},
 		}
 	},
-}
+})
