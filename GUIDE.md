@@ -1,18 +1,18 @@
 # Rslint Guide
 
-This guide provides comprehensive documentation for using Rslint, a high-performance JavaScript and TypeScript linter written in Go.
+This guide provides basic documentation for using Rslint, a high-performance JavaScript and TypeScript linter written in Go.
 
 ## Installation
 
 ```bash
 # Install via npm
-npm install -g @rslint/core
+npm install @rslint/core
 
 # Install via pnpm
-pnpm add -g @rslint/core
+pnpm add @rslint/core
 
 # Install via yarn
-yarn global add @rslint/core
+yarn global @rslint/core
 ```
 
 ## Basic Usage
@@ -34,8 +34,6 @@ rslint --help
 
 ### Configuration
 
-Rslint supports multiple configuration formats:
-
 **rslint.json**
 
 ```json
@@ -45,6 +43,7 @@ Rslint supports multiple configuration formats:
     "ignores": ["./files-not-want-lint.ts", "./tests/**/fixtures/**.ts"],
     "languageOptions": {
       "parserOptions": {
+        // Rslint will lint all files included in your typescript projects defined here
         // support lint multi packages in monorepo
         "project": ["./tsconfig.json", "packages/app1/tsconfig.json"]
       }
