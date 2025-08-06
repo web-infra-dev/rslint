@@ -6,6 +6,7 @@ import {
   ServerOptions,
   TransportKind,
 } from 'vscode-languageclient/node';
+import { chmodSync } from 'node:fs';
 
 let client: LanguageClient;
 
@@ -19,6 +20,7 @@ export function activate(context: ExtensionContext) {
       ? binPathConfig
       : Uri.joinPath(context.extensionUri, 'dist', 'rslint').fsPath;
   console.log('Rslint binary path:', binPath);
+  chmodSync(binPath, 0o755); // The binary might not be executable by default
   const run: Executable = {
     command: binPath,
     args: ['--lsp'],
