@@ -147,7 +147,7 @@ export class RuleTester {
         this.options.languageOptions?.parserOptions?.tsconfigRootDir ||
         process.cwd();
       const config = path.resolve(cwd, './rslint.json');
-      let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
+
       // test whether case has only
       let hasOnly =
         cases.valid.some(x => {
@@ -157,6 +157,7 @@ export class RuleTester {
             return false;
           }
         }) || cases.invalid.some(x => x.only);
+      let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
       test('valid', async () => {
         for (const validCase of cases.valid) {
           if (typeof validCase === 'object' && validCase.skip) {
@@ -172,10 +173,17 @@ export class RuleTester {
           }
           const code =
             typeof validCase === 'string' ? validCase : validCase.code;
+          const isJSX =
+            typeof validCase === 'string'
+              ? false
+              : validCase.languageOptions?.parserOptions?.ecmaFeatures?.jsx;
 
           const options =
             typeof validCase === 'string' ? [] : validCase.options || [];
-
+          let virtual_entry = path.resolve(
+            cwd,
+            isJSX ? 'src/virtual.tsx' : 'src/virtual.ts',
+          );
           // workaround for this hardcoded path https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/eslint-plugin/tests/rules/no-floating-promises.test.ts#L712
           if (Array.isArray(options)) {
             for (const opt of options) {
@@ -230,6 +238,7 @@ export class RuleTester {
               [ruleName]: options,
             },
           });
+
           expect(diags).toMatchSnapshot();
 
           assert(

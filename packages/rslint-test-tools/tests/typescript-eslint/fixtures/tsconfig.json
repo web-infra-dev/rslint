@@ -1,10 +1,25 @@
 {
   "compilerOptions": {
-    "strictNullChecks": true,
-    "isolatedModules": true,
-    "jsx": "preserve"
+    "jsx": "preserve",
+    "target": "es5",
+    "module": "commonjs",
+    "strict": true,
+    "esModuleInterop": true,
+    "lib": [
+      "es2015",
+      "es2017",
+      "esnext"
+    ],
+    "experimentalDecorators": true,
   },
   "include": [
-    "src/**/*.ts"
+    "file.ts",
+    "consistent-type-exports.ts",
+    "deprecated.ts",
+    "mixed-enums-decl.ts",
+    "react.tsx",
+    "var-declaration.ts",
+    "errors.ts",
+    "switch-exhaustiveness-check.ts"
   ]
 }
