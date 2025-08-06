@@ -11,7 +11,9 @@ let client: LanguageClient;
 
 export function activate(context: ExtensionContext) {
   console.log('Rslint extension activating...');
-  const binPathConfig = workspace.getConfiguration().get('rslint.binPath')!;
+  const binPathConfig = workspace
+    .getConfiguration()
+    .get('rslint.binPath') as string;
   const binPath =
     binPathConfig && binPathConfig.trim() !== ''
       ? binPathConfig
