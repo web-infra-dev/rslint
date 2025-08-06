@@ -42,7 +42,7 @@ async function publish_all() {
       console.log(`Dry run: Skipping actual publish for ${os}-${arch}`);
       continue;
     }
-    await $`cd packages/vscode-extension && pnpm ${marketplace} publish --target ${os}-${arch} --packagePath ./rslint-${os}-${arch}-${version}.vsix ${prereleaseFlag}`;
+    await $`cd packages/vscode-extension && pnpm ${marketplace} publish --packagePath ./rslint-${os}-${arch}-${version}.vsix ${prereleaseFlag}`;
     console.log(`Finish Publishing v${version} for ${os}-${arch}.`);
   }
 }
