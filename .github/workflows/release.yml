@@ -48,7 +48,7 @@ jobs:
   publish-npm:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'npm' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - NPM Packages' || 'Publish NPM Packages' }}
-    needs: [build, check]
+    needs: [build]
     runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Show dry-run status
@@ -98,7 +98,7 @@ jobs:
   publish-extesion:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - Extensions' || 'Publish Extensions' }}
-    needs: [build, check]
+    needs: [build]
     runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout
