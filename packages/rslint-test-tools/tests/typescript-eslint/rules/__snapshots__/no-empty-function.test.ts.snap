@@ -9,7 +9,7 @@ exports[`no-empty-function > invalid 1`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 30,
+          "column": 31,
           "line": 3,
         },
         "start": {
@@ -35,7 +35,7 @@ exports[`no-empty-function > invalid 2`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 30,
+          "column": 31,
           "line": 3,
         },
         "start": {
