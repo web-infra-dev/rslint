@@ -142,7 +142,10 @@ jobs:
               pnpm publish:vsce
             fi
           fi
-
+      - name: Upload VSCE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          path: rslint-*.vsix
       - name: Build and publish to Open VSX Registry
         # TODO fix the timeout problem while publish to Open VSX Registry
         if: false
