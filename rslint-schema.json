@@ -1,0 +1,329 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/web-infra-dev/rslint/schemas/rslint-config.json",
+  "title": "Rslint Configuration",
+  "description": "Configuration file for Rslint - a high-performance TypeScript/JavaScript linter",
+  "type": "array",
+  "minItems": 1,
+  "items": {
+    "$ref": "#/definitions/ConfigEntry"
+  },
+  "definitions": {
+    "ConfigEntry": {
+      "type": "object",
+      "description": "A single configuration entry in the rslint.json array",
+      "properties": {
+        "language": {
+          "type": "string",
+          "description": "Programming language for this configuration entry",
+          "enum": ["javascript"],
+          "default": "javascript"
+        },
+        "files": {
+          "type": "array",
+          "description": "Additional files to include beyond those specified in tsconfig.json",
+          "items": {
+            "type": "string",
+            "description": "File pattern (glob) to include"
+          },
+          "default": []
+        },
+        "ignores": {
+          "type": "array",
+          "description": "File patterns to ignore when linting",
+          "items": {
+            "type": "string",
+            "description": "File pattern (glob) to ignore"
+          },
+          "examples": [["node_modules/**", "dist/**", "*.test.ts"]]
+        },
+        "languageOptions": {
+          "$ref": "#/definitions/LanguageOptions",
+          "description": "Language-specific configuration options"
+        },
+        "rules": {
+          "$ref": "#/definitions/Rules",
+          "description": "Linting rules configuration",
+          "default": {}
+        },
+        "plugins": {
+          "type": "array",
+          "description": "List of plugin names to enable",
+          "items": {
+            "type": "string",
+            "enum": ["@typescript-eslint"]
+          },
+          "uniqueItems": true,
+          "examples": [["@typescript-eslint"]]
+        }
+      },
+      "required": ["language"],
+      "additionalProperties": false
+    },
+    "LanguageOptions": {
+      "type": "object",
+      "description": "Language-specific configuration options",
+      "properties": {
+        "parserOptions": {
+          "$ref": "#/definitions/ParserOptions",
+          "description": "Parser-specific configuration options"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ParserOptions": {
+      "type": "object",
+      "description": "Parser-specific configuration options",
+      "properties": {
+        "projectService": {
+          "type": "boolean",
+          "description": "Enable project service for typed linting (runs TypeScript language service behind the scene)",
+          "default": false
+        },
+        "project": {
+          "type": "array",
+          "description": "TypeScript project configuration files to use for typed linting",
+          "items": {
+            "type": "string",
+            "description": "Path to tsconfig.json file"
+          },
+          "examples": [
+            ["./tsconfig.json"],
+            ["./packages/*/tsconfig.json", "./tsconfig.base.json"]
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Rules": {
+      "type": "object",
+      "description": "Configuration for linting rules",
+      "patternProperties": {
+        "^@typescript-eslint/": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "^[a-zA-Z0-9_-]+/[a-zA-Z0-9_-]+$": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "^[a-zA-Z0-9_-]+$": {
+          "$ref": "#/definitions/RuleValue"
+        }
+      },
+      "properties": {
+        "@typescript-eslint/adjacent-overload-signatures": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/array-type": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/await-thenable": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/class-literal-property-style": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-array-delete": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-base-to-string": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-confusing-void-expression": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-duplicate-type-constituents": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-floating-promises": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-for-in-array": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-implied-eval": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-meaningless-void-operator": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-misused-promises": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-misused-spread": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-mixed-enums": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-redundant-type-constituents": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-unnecessary-boolean-literal-compare": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-unnecessary-template-expression": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-unnecessary-type-arguments": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-unnecessary-type-assertion": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-unsafe-argument": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-unsafe-assignment": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-unsafe-call": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-unsafe-enum-comparison": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-unsafe-member-access": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-unsafe-return": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-unsafe-type-assertion": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-unsafe-unary-minus": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-unused-vars": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-useless-empty-export": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/no-var-requires": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/non-nullable-type-assertion-style": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/only-throw-error": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/prefer-as-const": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/prefer-promise-reject-errors": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/prefer-reduce-type-parameter": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/prefer-return-this-type": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/promise-function-async": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/related-getter-setter-pairs": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/require-array-sort-compare": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/require-await": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/restrict-plus-operands": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/restrict-template-expressions": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/return-await": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/switch-exhaustiveness-check": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/unbound-method": {
+          "$ref": "#/definitions/RuleValue"
+        },
+        "@typescript-eslint/use-unknown-in-catch-callback-variable": {
+          "$ref": "#/definitions/RuleValue"
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/RuleValue"
+      }
+    },
+    "RuleValue": {
+      "description": "Rule configuration value",
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": ["off", "warn", "error"],
+          "description": "Simple rule severity level"
+        },
+        {
+          "type": "array",
+          "description": "Array format rule configuration [severity, options]",
+          "minItems": 1,
+          "maxItems": 2,
+          "items": [
+            {
+              "type": "string",
+              "enum": ["off", "warn", "error"],
+              "description": "Rule severity level"
+            },
+            {
+              "type": "object",
+              "description": "Rule-specific options",
+              "additionalProperties": true
+            }
+          ]
+        },
+        {
+          "type": "object",
+          "description": "Object format rule configuration",
+          "properties": {
+            "level": {
+              "type": "string",
+              "enum": ["off", "warn", "error"],
+              "description": "Rule severity level"
+            },
+            "options": {
+              "type": "object",
+              "description": "Rule-specific options",
+              "additionalProperties": true
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "examples": [
+    [
+      {
+        "language": "javascript",
+        "files": [],
+        "ignores": ["node_modules/**", "dist/**", "*.test.ts"],
+        "languageOptions": {
+          "parserOptions": {
+            "projectService": false,
+            "project": ["./tsconfig.json"]
+          }
+        },
+        "rules": {
+          "@typescript-eslint/no-unsafe-member-access": "error",
+          "@typescript-eslint/no-floating-promises": "warn",
+          "@typescript-eslint/promise-function-async": [
+            "warn",
+            { "allowAny": true }
+          ]
+        },
+        "plugins": ["@typescript-eslint"]
+      }
+    ]
+  ]
+}

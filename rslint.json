@@ -1,6 +1,6 @@
 [
   {
-    "language": "javascript", // includes typescript & javascript, we may support register other language in the future
+    "language": "javascript",
     "files": [], // extra files out of tsconfig.json
     "ignores": [
       "node_modules/**",
