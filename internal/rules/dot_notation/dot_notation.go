@@ -102,6 +102,10 @@ func checkNode(ctx rule.RuleContext, node *ast.Node, opts DotNotationOptions, al
 	case ast.KindStringLiteral:
 		propertyName = argument.AsStringLiteral().Text
 		isValidProperty = true
+	case ast.KindNoSubstitutionTemplateLiteral:
+		// Handle `obj[`foo`]` (no expressions)
+		propertyName = argument.AsNoSubstitutionTemplateLiteral().Text
+		isValidProperty = true
 	case ast.KindNumericLiteral:
 		// Numeric properties should use bracket notation
 		return
@@ -159,7 +163,14 @@ func checkPropertyAccessKeywords(ctx rule.RuleContext, node *ast.Node) {
 	}
 
 	propertyName := name.AsIdentifier().Text
-	if isReservedWord(propertyName) {
+	// Align with typescript-eslint behavior: do not flag some identifiers even when allowKeywords is false
+	skipKeywords := map[string]bool{
+		"arguments": true,
+		"let":       true,
+		"yield":     true,
+		"eval":      true,
+	}
+	if isReservedWord(propertyName) && !skipKeywords[propertyName] {
 		ctx.ReportNodeWithFixes(node, rule.RuleMessage{
 			Id:          "useBrackets",
 			Description: fmt.Sprintf(".%s is a syntax error.", propertyName),
@@ -196,10 +207,14 @@ func shouldAllowBracketNotation(ctx rule.RuleContext, node *ast.Node, propertyNa
 		}
 	}
 
-	// If allowIndexSignaturePropertyAccess is true, check for actual index signatures
+	// If allowIndexSignaturePropertyAccess is true, allow bracket only when there is NO named property,
+	// but the type has an applicable index signature.
 	if allowIndexSignaturePropertyAccess {
-		if hasIndexSignature(ctx, objectType) {
-			return true
+		// If there is a named property, prefer dot notation
+		if sym := ctx.TypeChecker.GetPropertyOfType(objectType, propertyName); sym == nil {
+			if hasIndexSignature(ctx, objectType) {
+				return true
+			}
 		}
 	}
 
