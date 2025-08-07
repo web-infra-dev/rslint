@@ -24,6 +24,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_base_to_string"
 	"github.com/web-infra-dev/rslint/internal/rules/no_confusing_void_expression"
 	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_type_constituents"
+	"github.com/web-infra-dev/rslint/internal/rules/no_empty_function"
+	"github.com/web-infra-dev/rslint/internal/rules/no_empty_interface"
 	"github.com/web-infra-dev/rslint/internal/rules/no_floating_promises"
 	"github.com/web-infra-dev/rslint/internal/rules/no_for_in_array"
 	"github.com/web-infra-dev/rslint/internal/rules/no_implied_eval"
@@ -32,6 +34,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_misused_spread"
 	"github.com/web-infra-dev/rslint/internal/rules/no_mixed_enums"
 	"github.com/web-infra-dev/rslint/internal/rules/no_redundant_type_constituents"
+	"github.com/web-infra-dev/rslint/internal/rules/no_require_imports"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unnecessary_boolean_literal_compare"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unnecessary_template_expression"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unnecessary_type_arguments"
@@ -112,6 +115,8 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		no_base_to_string.NoBaseToStringRule,
 		no_confusing_void_expression.NoConfusingVoidExpressionRule,
 		no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule,
+		no_empty_function.NoEmptyFunctionRule,
+		no_empty_interface.NoEmptyInterfaceRule,
 		no_floating_promises.NoFloatingPromisesRule,
 		no_for_in_array.NoForInArrayRule,
 		no_implied_eval.NoImpliedEvalRule,
@@ -120,6 +125,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		no_misused_spread.NoMisusedSpreadRule,
 		no_mixed_enums.NoMixedEnumsRule,
 		no_redundant_type_constituents.NoRedundantTypeConstituentsRule,
+		no_require_imports.NoRequireImportsRule,
 		no_unnecessary_boolean_literal_compare.NoUnnecessaryBooleanLiteralCompareRule,
 		no_unnecessary_template_expression.NoUnnecessaryTemplateExpressionRule,
 		no_unnecessary_type_arguments.NoUnnecessaryTypeArgumentsRule,

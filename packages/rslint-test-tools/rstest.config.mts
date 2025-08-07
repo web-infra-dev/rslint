@@ -10,6 +10,9 @@ export default defineConfig({
     './tests/typescript-eslint/rules/class-literal-property-style.test.ts',
     './tests/typescript-eslint/rules/no-array-delete.test.ts',
     './tests/typescript-eslint/rules/no-confusing-void-expression.test.ts',
+    './tests/typescript-eslint/rules/no-empty-function.test.ts',
+    './tests/typescript-eslint/rules/no-empty-interface.test.ts',
+    './tests/typescript-eslint/rules/no-require-imports.test.ts',
     './tests/typescript-eslint/rules/no-duplicate-type-constituents.test.ts',
   ],
 });

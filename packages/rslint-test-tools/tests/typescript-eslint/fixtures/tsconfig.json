@@ -10,7 +10,7 @@
       "es2017",
       "esnext"
     ],
-    "experimentalDecorators": true,
+    "experimentalDecorators": true
   },
   "include": [
     "file.ts",

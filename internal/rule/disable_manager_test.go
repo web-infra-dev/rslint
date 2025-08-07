@@ -237,7 +237,7 @@ func TestRegexPatternsForTypeScriptESLint(t *testing.T) {
 			if len(rules) == 0 {
 				t.Errorf("parseRuleNames should have parsed rules from %q", captured)
 			}
-			
+
 			// Verify that rules contain the typescript-eslint rules
 			hasTypeScriptRule := false
 			for _, rule := range rules {

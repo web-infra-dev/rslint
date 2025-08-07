@@ -79,6 +79,7 @@ rspress
 rstack
 rstest
 scopemanager
+stype
 shouldnt
 sourcegraph
 spreadassignment
