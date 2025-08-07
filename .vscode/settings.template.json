@@ -12,6 +12,15 @@
   "files.associations": {
     "rslint.json": "jsonc"
   },
+  "json.schemas": [
+    {
+      "fileMatch": [
+        "rslint.json",
+        "rslint.jsonc"
+      ],
+      "url": "./rslint-schema.json"
+    }
+  ],
   "cSpell.words": [
     "rslint"
   ],
