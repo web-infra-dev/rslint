@@ -157,7 +157,7 @@ export class RuleTester {
             return false;
           }
         }) || cases.invalid.some(x => x.only);
-      let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
+      const defaultVirtualEntry = path.resolve(cwd, 'src/virtual.ts');
       test('valid', async () => {
         for (const validCase of cases.valid) {
           if (typeof validCase === 'object' && validCase.skip) {
@@ -228,11 +228,16 @@ export class RuleTester {
           if (hasOnly && !only) {
             continue;
           }
+          const isJSX = item.languageOptions?.parserOptions?.ecmaFeatures?.jsx;
+          const test_virtual_entry = path.resolve(
+            cwd,
+            isJSX ? 'src/virtual.tsx' : 'src/virtual.ts',
+          );
           const diags = await lint({
             config,
             workingDirectory: cwd,
             fileContents: {
-              [virtual_entry]: code,
+              [test_virtual_entry]: code,
             },
             ruleOptions: {
               [ruleName]: options,
