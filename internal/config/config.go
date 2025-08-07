@@ -262,8 +262,8 @@ func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConf
 	return enabledRules
 }
 
-// RegisterAllTypeSriptEslintPluginRules registers all available rules in the global registry
-func RegisterAllTypeSriptEslintPluginRules() {
+// RegisterAllTypeScriptEslintPluginRules registers all available rules in the global registry
+func RegisterAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/adjacent-overload-signatures", adjacent_overload_signatures.AdjacentOverloadSignaturesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/array-type", array_type.ArrayTypeRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/await-thenable", await_thenable.AwaitThenableRule)

@@ -15,6 +15,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "build:npm": "zx scripts/build-npm.mjs",
+    "check-spell": "pnpx cspell",
     "version": "zx scripts/version.mjs",
     "release": "pnpm publish -r --no-git-checks",
     "publish:vsce": "zx scripts/publish-marketplace.mjs",
@@ -33,6 +34,7 @@
   "devDependencies": {
     "@rslint/core": "workspace:*",
     "@rstest/core": "^0.1.0",
+    "cspell-ban-words": "^0.0.4",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.2",
     "prettier": "3.5.0",

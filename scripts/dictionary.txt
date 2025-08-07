@@ -1,0 +1,12 @@
+# Custom Dictionary Words
+tsgo
+rsbuild
+rsdoctor
+rslib
+rslint
+rslog
+rspack
+rspeedy
+rspress
+rstack
+rstest

@@ -97,7 +97,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	}
 
 	// Initialize rule registry with all available rules
-	rslintconfig.RegisterAllTypeSriptEslintPluginRules()
+	rslintconfig.RegisterAllTypeScriptEslintPluginRules()
 
 	// Load rslint configuration and determine which tsconfig files to use
 	_, tsConfigs, configDirectory := rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
