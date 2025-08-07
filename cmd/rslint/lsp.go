@@ -381,6 +381,11 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 		Diagnostics: lsp_diagnostics,
 	}
 
+	var diagsBuilder strings.Builder
+	for _, diag := range lsp_diagnostics {
+		fmt.Fprintf(&diagsBuilder, "%v:%+v\n", diag.Message, diag.Range)
+	}
+	log.Printf("Publishing diagnostics for %s:\n%s", uri, diagsBuilder.String())
 	s.conn.Notify(ctx, "textDocument/publishDiagnostics", params)
 }
 
