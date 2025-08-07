@@ -169,6 +169,7 @@ jobs:
 
   check:
     name: Test
+    if: ${{ github.event.inputs.dry_run == false }}
     needs: build
     strategy:
       fail-fast: true
