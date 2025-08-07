@@ -141,7 +141,7 @@ class Person {
 				{
 					MessageId: "unexpected",
 					Line:      3,
-					Column:    28,
+					Column:    29,
 				},
 			},
 		},
@@ -155,7 +155,7 @@ class Person {
 				{
 					MessageId: "unexpected",
 					Line:      3,
-					Column:    28,
+					Column:    29,
 				},
 			},
 		},
@@ -169,7 +169,7 @@ class Foo {
 				{
 					MessageId: "unexpected",
 					Line:      3,
-					Column:    24,
+					Column:    25,
 				},
 			},
 		},
@@ -183,7 +183,7 @@ class Foo {
 				{
 					MessageId: "unexpected",
 					Line:      3,
-					Column:    26,
+					Column:    27,
 				},
 			},
 		},
@@ -195,7 +195,7 @@ function foo() {}
 				{
 					MessageId: "unexpected",
 					Line:      2,
-					Column:    15,
+					Column:    16,
 				},
 			},
 		},
@@ -210,7 +210,7 @@ class Foo {
 				{
 					MessageId: "unexpected",
 					Line:      4,
-					Column:    8,
+					Column:    9,
 				},
 			},
 		},
@@ -224,7 +224,7 @@ class Foo extends Base {
 				{
 					MessageId: "unexpected",
 					Line:      3,
-					Column:    17,
+					Column:    18,
 				},
 			},
 		},
@@ -236,7 +236,7 @@ class Foo extends Base {
 				{
 					MessageId: "unexpected",
 					Line:      1,
-					Column:    18,
+					Column:    19,
 				},
 			},
 		},
@@ -246,7 +246,7 @@ class Foo extends Base {
 				{
 					MessageId: "unexpected",
 					Line:      1,
-					Column:    21,
+					Column:    22,
 				},
 			},
 		},
@@ -256,7 +256,7 @@ class Foo extends Base {
 				{
 					MessageId: "unexpected",
 					Line:      1,
-					Column:    16,
+					Column:    17,
 				},
 			},
 		},
@@ -269,7 +269,7 @@ class Foo {
 				{
 					MessageId: "unexpected",
 					Line:      3,
-					Column:    12,
+					Column:    13,
 				},
 			},
 		},
@@ -282,7 +282,7 @@ class Foo {
 				{
 					MessageId: "unexpected",
 					Line:      3,
-					Column:    25,
+					Column:    26,
 				},
 			},
 		},
@@ -295,7 +295,7 @@ class Foo {
 				{
 					MessageId: "unexpected",
 					Line:      3,
-					Column:    14,
+					Column:    15,
 				},
 			},
 		},
@@ -308,7 +308,7 @@ class Foo {
 				{
 					MessageId: "unexpected",
 					Line:      3,
-					Column:    9,
+					Column:    10,
 				},
 			},
 		},
@@ -318,7 +318,7 @@ class Foo {
 				{
 					MessageId: "unexpected",
 					Line:      1,
-					Column:    23,
+					Column:    24,
 				},
 			},
 		},
@@ -328,7 +328,7 @@ class Foo {
 				{
 					MessageId: "unexpected",
 					Line:      1,
-					Column:    27,
+					Column:    28,
 				},
 			},
 		},

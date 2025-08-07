@@ -2,7 +2,6 @@ package no_empty_function
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -143,66 +142,46 @@ var NoEmptyFunctionRule = rule.CreateRule(rule.Rule{
 			return false
 		}
 
-		// Get the opening brace position of a function body
-		getOpenBracePosition := func(node *ast.Node) (core.TextRange, bool) {
-			var body *ast.Node
+		// Get the body node for reporting
+		getBodyNode := func(node *ast.Node) *ast.Node {
 			switch node.Kind {
 			case ast.KindFunctionDeclaration:
 				fn := node.AsFunctionDeclaration()
 				if fn != nil {
-					body = fn.Body
+					return fn.Body
 				}
 			case ast.KindFunctionExpression:
 				fn := node.AsFunctionExpression()
 				if fn != nil {
-					body = fn.Body
+					return fn.Body
 				}
 			case ast.KindArrowFunction:
 				fn := node.AsArrowFunction()
 				if fn != nil && fn.Body != nil && fn.Body.Kind == ast.KindBlock {
-					body = fn.Body
+					return fn.Body
 				}
 			case ast.KindConstructor:
 				constructor := node.AsConstructorDeclaration()
 				if constructor != nil {
-					body = constructor.Body
+					return constructor.Body
 				}
 			case ast.KindMethodDeclaration:
 				method := node.AsMethodDeclaration()
 				if method != nil {
-					body = method.Body
+					return method.Body
 				}
 			case ast.KindGetAccessor:
 				accessor := node.AsGetAccessorDeclaration()
 				if accessor != nil {
-					body = accessor.Body
+					return accessor.Body
 				}
 			case ast.KindSetAccessor:
 				accessor := node.AsSetAccessorDeclaration()
 				if accessor != nil {
-					body = accessor.Body
+					return accessor.Body
 				}
 			}
-
-			if body == nil {
-				return core.TextRange{}, false
-			}
-
-			// Find the opening brace by searching for '{' character from node start to body end
-			sourceText := ctx.SourceFile.Text()
-			nodeStart := node.Pos()
-			bodyStart := body.Pos()
-
-			// Search for the opening brace between node start and body start
-			for i := nodeStart; i <= bodyStart && i < len(sourceText); i++ {
-				if sourceText[i] == '{' {
-					// Report at the opening brace position to match TypeScript-ESLint
-					return core.TextRange{}.WithPos(i).WithEnd(i + 1), true
-				}
-			}
-
-			// Fallback: use the body's start position to match TypeScript-ESLint
-			return core.TextRange{}.WithPos(bodyStart).WithEnd(bodyStart + 1), true
+			return nil
 		}
 
 		// Get the function name for error message
@@ -461,10 +440,11 @@ var NoEmptyFunctionRule = rule.CreateRule(rule.Rule{
 				}
 			}
 
-			// Report the error at the opening brace position
+			// Report the error on the body node to match ESLint behavior
 			funcName := getFunctionName(node)
-			if braceRange, found := getOpenBracePosition(node); found {
-				ctx.ReportRange(braceRange, rule.RuleMessage{
+			bodyNode := getBodyNode(node)
+			if bodyNode != nil {
+				ctx.ReportNode(bodyNode, rule.RuleMessage{
 					Id:          "unexpected",
 					Description: "Unexpected empty " + funcName + ".",
 				})
