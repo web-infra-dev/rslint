@@ -73,7 +73,6 @@ jobs:
         uses: ./.github/actions/move-artifacts
 
       - name: Publish npm packages
-        if: env.release_npm == 'true'
         env:
           NPM_TOKEN: ${{ secrets.RSLINT_NPM_TOKEN }}
         run: |

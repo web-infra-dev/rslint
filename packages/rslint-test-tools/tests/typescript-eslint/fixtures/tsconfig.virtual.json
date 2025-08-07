@@ -1,9 +1,20 @@
 {
   "compilerOptions": {
-    "strictNullChecks": true,
-    "jsx": "preserve"
+    "jsx": "preserve",
+    "target": "es5",
+    "module": "commonjs",
+    "strict": true,
+    "esModuleInterop": true,
+    "lib": [
+      "es2015",
+      "es2017",
+      "esnext"
+    ],
+    "experimentalDecorators": true
   },
   "include": [
-    "src/virtual.ts"
+    "src/virtual.tsx",
+    "src/virtual.ts",
+    
   ]
 }

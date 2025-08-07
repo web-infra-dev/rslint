@@ -33,6 +33,8 @@ async function publish_all() {
     await $`rm -rf ./packages/vscode-extension/dist/rslint`;
     await $`rm -rf ./packages/vscode-extension/dist/rslint.exe`;
     await $`cp binaries/${os}-${arch}-rslint/${os}-${arch}-rslint ./packages/vscode-extension/dist/rslint`;
+    await $`chmod +x ./packages/vscode-extension/dist/rslint`;
+    await $`ls -lR ./packages/vscode-extension/dist`;
     const prereleaseFlag = prerelease ? ['--pre-release'] : [];
 
     await $`cd packages/vscode-extension && pnpm vsce package --target ${os}-${arch} ${prereleaseFlag}`;
@@ -42,7 +44,7 @@ async function publish_all() {
       console.log(`Dry run: Skipping actual publish for ${os}-${arch}`);
       continue;
     }
-    await $`cd packages/vscode-extension && pnpm ${marketplace} publish --target ${os}-${arch} --packagePath ./rslint-${os}-${arch}-${version}.vsix ${prereleaseFlag}`;
+    await $`cd packages/vscode-extension && pnpm ${marketplace} publish --packagePath ./rslint-${os}-${arch}-${version}.vsix ${prereleaseFlag}`;
     console.log(`Finish Publishing v${version} for ${os}-${arch}.`);
   }
 }
