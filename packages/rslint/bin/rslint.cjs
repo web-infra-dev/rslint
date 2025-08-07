@@ -6,6 +6,9 @@ function getBinPath() {
   if (fs.existsSync(path.resolve(__dirname, './rslint'))) {
     return path.resolve(__dirname, './rslint');
   }
+  if (fs.existsSync(path.resolve(__dirname, './rslint.exe'))) {
+    return path.resolve(__dirname, './rslint.exe');
+  }
   let platformKey = `${process.platform}-${os.arch()}`;
 
   return require.resolve(`@rslint/${platformKey}/rslint`);
