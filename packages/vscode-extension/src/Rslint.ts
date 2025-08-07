@@ -32,7 +32,6 @@ export class Rslint implements Disposable {
 
     const binPath = await this.getBinaryPath();
     this.logger.info('Rslint binary path:', binPath);
-    chmodSync(binPath, 0o755);
 
     const run: Executable = {
       command: binPath,
