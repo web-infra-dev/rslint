@@ -27,90 +27,30 @@ var defaultNoNamespaceOptions = NoNamespaceOptions{
 	AllowDefinitionFiles: utils.Ref(true),
 }
 
-// PromiseFunctionAsyncRule 是主要的规则实例
-// 该规则检查返回 Promise 的函数是否使用了 async 关键字
-var PromiseFunctionAsyncRule = rule.CreateRule(rule.Rule{
-	Name: "promise-function-async",
+// rule instance
+// check if the namespace is used
+var NoNamespaceRule = rule.CreateRule(rule.Rule{
+	Name: "no-namespace",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		// 解析和设置默认选项
-		opts, ok := options.(PromiseFunctionAsyncOptions)
+		opts, ok := options.(NoNamespaceOptions)
 		if !ok {
-			opts = PromiseFunctionAsyncOptions{}
-		}
-		if opts.AllowAny == nil {
-			opts.AllowAny = utils.Ref(true)
-		}
-		if opts.AllowedPromiseNames == nil {
-			opts.AllowedPromiseNames = []string{}
-		}
-		if opts.CheckArrowFunctions == nil {
-			opts.CheckArrowFunctions = utils.Ref(true)
-		}
-		if opts.CheckFunctionDeclarations == nil {
-			opts.CheckFunctionDeclarations = utils.Ref(true)
-		}
-		if opts.CheckFunctionExpressions == nil {
-			opts.CheckFunctionExpressions = utils.Ref(true)
-		}
-		if opts.CheckMethodDeclarations == nil {
-			opts.CheckMethodDeclarations = utils.Ref(true)
+			opts = NoNamespaceOptions{}
 		}
 
-		// 构建允许的 Promise 类型名称集合
-		allAllowedPromiseNames := utils.NewSetWithSizeHint[string](len(opts.AllowedPromiseNames))
-		allAllowedPromiseNames.Add("Promise")
-		for _, name := range opts.AllowedPromiseNames {
-			allAllowedPromiseNames.Add(name)
+		// set default options
+		if opts.AllowDeclarations == nil {
+			opts.AllowDeclarations = defaultNoNamespaceOptions.AllowDeclarations
+		}
+		if opts.AllowDefinitionFiles == nil {
+			opts.AllowDefinitionFiles = defaultNoNamespaceOptions.AllowDefinitionFiles
 		}
 
-		// containsAllTypesByName 检查类型是否包含指定的 Promise 类型名称
-		var containsAllTypesByName func(t *checker.Type, matchAnyInstead bool) bool
-		containsAllTypesByName = func(t *checker.Type, matchAnyInstead bool) bool {
-			// 跳过 any 或 unknown 类型
-			if utils.IsTypeFlagSet(t, checker.TypeFlagsAnyOrUnknown) {
-				return false
-			}
-
-			// 处理引用类型
-			if utils.IsTypeFlagSet(t, checker.TypeFlagsObject) && checker.Type_objectFlags(t)&checker.ObjectFlagsReference != 0 {
-				t = t.Target()
-			}
-
-			// 检查符号名称是否匹配允许的 Promise 名称
-			symbol := checker.Type_symbol(t)
-			if symbol != nil && allAllowedPromiseNames.Has(symbol.Name) {
-				return true
-			}
-
-			predicate := func(t *checker.Type) bool {
-				return containsAllTypesByName(t, matchAnyInstead)
-			}
-
-			// 处理联合类型和交叉类型
-			if utils.IsUnionType(t) || utils.IsIntersectionType(t) {
-				if matchAnyInstead {
-					return utils.Every(t.Types(), predicate)
-				}
-				return utils.Some(t.Types(), predicate)
-			}
-
-			// 处理类或接口类型
-			if checker.Type_objectFlags(t)&checker.ObjectFlagsClassOrInterface == 0 {
-				return false
-			}
-
-			bases := checker.Checker_getBaseTypes(ctx.TypeChecker, t)
-			if matchAnyInstead {
-				return utils.Some(bases, predicate)
-			}
-			return len(bases) > 0 && utils.Every(bases, predicate)
-		}
-
-		// 创建规则监听器
+		// create listeners
 		listeners := make(rule.RuleListeners, 3)
 
 		// validateNode 验证节点是否需要 async 关键字
 		validateNode := func(node *ast.Node) {
+
 			// 如果已经是 async 函数或没有函数体，则跳过
 			if utils.IncludesModifier(node, ast.KindAsyncKeyword) || node.Body() == nil {
 				return
