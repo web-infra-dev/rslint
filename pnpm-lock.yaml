@@ -18,9 +18,6 @@ importers:
       '@rstest/core':
         specifier: ^0.1.0
         version: 0.1.0
-      cspell-ban-words:
-        specifier: ^0.0.4
-        version: 0.0.4
       husky:
         specifier: ^9.1.7
         version: 9.1.7
@@ -1159,9 +1156,6 @@ packages:
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
-
-  cspell-ban-words@0.0.4:
-    resolution: {integrity: sha512-w+18WPFAEmo2F+Fr4L29+GdY5ckOLN95WPwb/arfrtuzzB5VzQRFyIujo0T7pq+xFE0Z2gjfLn33Wk/u5ctNQQ==}
 
   css-select@5.2.2:
     resolution: {integrity: sha512-TizTzUddG/xYLA3NXodFM0fSbNizXjOKhqiQQwvhlspadZokn1KDy0NZFS0wuEubIYAV5/c1/lAr0TaaFXEXzw==}
@@ -3706,8 +3700,6 @@ snapshots:
       path-key: 3.1.1
       shebang-command: 2.0.0
       which: 2.0.2
-
-  cspell-ban-words@0.0.4: {}
 
   css-select@5.2.2:
     dependencies:
