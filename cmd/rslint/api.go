@@ -20,6 +20,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/array_type"
 	"github.com/web-infra-dev/rslint/internal/rules/await_thenable"
 	"github.com/web-infra-dev/rslint/internal/rules/class_literal_property_style"
+	"github.com/web-infra-dev/rslint/internal/rules/dot_notation"
+	"github.com/web-infra-dev/rslint/internal/rules/explicit_member_accessibility"
+	"github.com/web-infra-dev/rslint/internal/rules/max_params"
+	"github.com/web-infra-dev/rslint/internal/rules/member_ordering"
 	"github.com/web-infra-dev/rslint/internal/rules/no_array_delete"
 	"github.com/web-infra-dev/rslint/internal/rules/no_base_to_string"
 	"github.com/web-infra-dev/rslint/internal/rules/no_confusing_void_expression"
@@ -111,6 +115,10 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		array_type.ArrayTypeRule,
 		await_thenable.AwaitThenableRule,
 		class_literal_property_style.ClassLiteralPropertyStyleRule,
+		dot_notation.DotNotationRule,
+		explicit_member_accessibility.ExplicitMemberAccessibilityRule,
+		max_params.MaxParamsRule,
+		member_ordering.MemberOrderingRule,
 		no_array_delete.NoArrayDeleteRule,
 		no_base_to_string.NoBaseToStringRule,
 		no_confusing_void_expression.NoConfusingVoidExpressionRule,

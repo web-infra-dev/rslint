@@ -301,6 +301,8 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 						isValidNull := !typeIncludesNull || contextualTypeIncludesNull
 						isValidVoid := !typeIncludesVoid || contextualTypeIncludesVoid
 
+						// Only report as unnecessary if ALL nullable types in the expression are also accepted by the contextual type
+						// If the expression has null but the contextual type doesn't, the non-null assertion is necessary
 						if isValidUndefined && isValidNull && isValidVoid {
 							ctx.ReportNodeWithFixes(node, buildContextuallyUnnecessaryMessage(), buildRemoveExclamationFix())
 						}

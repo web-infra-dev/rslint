@@ -11,6 +11,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/array_type"
 	"github.com/web-infra-dev/rslint/internal/rules/await_thenable"
 	"github.com/web-infra-dev/rslint/internal/rules/class_literal_property_style"
+	"github.com/web-infra-dev/rslint/internal/rules/dot_notation"
+	"github.com/web-infra-dev/rslint/internal/rules/explicit_member_accessibility"
+	"github.com/web-infra-dev/rslint/internal/rules/max_params"
+	"github.com/web-infra-dev/rslint/internal/rules/member_ordering"
 	"github.com/web-infra-dev/rslint/internal/rules/no_array_delete"
 	"github.com/web-infra-dev/rslint/internal/rules/no_base_to_string"
 	"github.com/web-infra-dev/rslint/internal/rules/no_confusing_void_expression"
@@ -271,6 +275,10 @@ func RegisterAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/array-type", array_type.ArrayTypeRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/await-thenable", await_thenable.AwaitThenableRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/class-literal-property-style", class_literal_property_style.ClassLiteralPropertyStyleRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/dot-notation", dot_notation.DotNotationRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/explicit-member-accessibility", explicit_member_accessibility.ExplicitMemberAccessibilityRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/max-params", max_params.MaxParamsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/member-ordering", member_ordering.MemberOrderingRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-array-delete", no_array_delete.NoArrayDeleteRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-base-to-string", no_base_to_string.NoBaseToStringRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-confusing-void-expression", no_confusing_void_expression.NoConfusingVoidExpressionRule)
