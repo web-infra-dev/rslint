@@ -36,7 +36,7 @@ var RuleNameRule = rule.Rule{
 3. **Register the rule in `internal/config/config.go`**:
 
    - Add import: `"github.com/web-infra-dev/rslint/internal/rules/rule_name"`
-   - In `RegisterAllTypeSriptEslintPluginRules()`, add:
+   - In `RegisterAllTypeScriptEslintPluginRules()`, add:
      ```go
      GlobalRuleRegistry.Register("@typescript-eslint/rule-name", rule_name.RuleNameRule)
      ```
@@ -195,7 +195,7 @@ Your changes must pass:
 
 ## Debugging Tips
 
-1. **Check rule registration**: Ensure the rule is in `RegisterAllTypeSriptEslintPluginRules()`
+1. **Check rule registration**: Ensure the rule is in `RegisterAllTypeScriptEslintPluginRules()`
 2. **Verify configuration**: Rule must be in `rslint.json` to generate diagnostics
 3. **Test CLI directly**: Use `rslint` binary to verify rule works
 4. **VSCode extension tests**: If failing with "Expected diagnostics but got 0", this is usually due to missing rule registration (not LSP issues)

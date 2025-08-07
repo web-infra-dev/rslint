@@ -109,6 +109,9 @@ jobs:
         if: runner.os != 'Linux'
         run: pnpm -r test
 
+      - name: Check Spell
+        run: pnpm check-spell
+
       - name: Lint
         run: pnpm run lint
 
