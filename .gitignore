@@ -152,4 +152,4 @@ npm/*/rslint.exe
 .idea
 
 ## vscode settings
-.vscode/settings.json
+.vscode/settings.json# Test CI trigger
