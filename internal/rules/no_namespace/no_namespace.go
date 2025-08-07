@@ -1,8 +1,9 @@
 package no_namespace
 
 import (
+	"strings"
+
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -32,92 +33,56 @@ var defaultNoNamespaceOptions = NoNamespaceOptions{
 var NoNamespaceRule = rule.CreateRule(rule.Rule{
 	Name: "no-namespace",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts, ok := options.(NoNamespaceOptions)
-		if !ok {
-			opts = NoNamespaceOptions{}
-		}
+		opts := defaultNoNamespaceOptions
 
-		// set default options
-		if opts.AllowDeclarations == nil {
-			opts.AllowDeclarations = defaultNoNamespaceOptions.AllowDeclarations
-		}
-		if opts.AllowDefinitionFiles == nil {
-			opts.AllowDefinitionFiles = defaultNoNamespaceOptions.AllowDefinitionFiles
-		}
+		// Parse options with dual-format support (handles both array and object formats)
+		if options != nil {
+			var optsMap map[string]interface{}
+			var ok bool
 
-		// create listeners
-		listeners := make(rule.RuleListeners, 3)
-
-		// validateNode 验证节点是否需要 async 关键字
-		validateNode := func(node *ast.Node) {
-
-			// 如果已经是 async 函数或没有函数体，则跳过
-			if utils.IncludesModifier(node, ast.KindAsyncKeyword) || node.Body() == nil {
-				return
+			// Handle array format: [{ option: value }]
+			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
+				optsMap, ok = optArray[0].(map[string]interface{})
+			} else {
+				// Handle direct object format: { option: value }
+				optsMap, ok = options.(map[string]interface{})
 			}
 
-			// 获取函数类型和调用签名
-			t := ctx.TypeChecker.GetTypeAtLocation(node)
-			signatures := utils.GetCallSignatures(ctx.TypeChecker, t)
-			if len(signatures) == 0 {
-				return
+			if ok {
+				if allowDeclarations, ok := optsMap["allowDeclarations"].(bool); ok {
+					opts.AllowDeclarations = utils.Ref(allowDeclarations)
+				}
+				if allowDefinitionFiles, ok := optsMap["allowDefinitionFiles"].(bool); ok {
+					opts.AllowDefinitionFiles = utils.Ref(allowDefinitionFiles)
+				}
 			}
+		}
 
-			// 检查所有签名是否都返回 Promise
-			everySignatureReturnsPromise := true
-			for _, signature := range signatures {
-				returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
-				if !*opts.AllowAny && utils.IsTypeFlagSet(returnType, checker.TypeFlagsAnyOrUnknown) {
-					// 如果返回类型是未知的且不允许 any，则报告错误但不自动修复
-					// TODO(port): getFunctionHeadLoc
-					ctx.ReportNode(node, buildMissingAsyncMessage())
+		return rule.RuleListeners{
+			ast.KindModuleDeclaration: func(node *ast.Node) {
+				moduleDecl := node.AsModuleDeclaration()
+				if moduleDecl == nil {
 					return
 				}
 
-				// 要求所有潜在的返回类型都是 promise/any/unknown
-				everySignatureReturnsPromise = everySignatureReturnsPromise && containsAllTypesByName(
-					returnType,
-					// 如果没有显式设置返回类型，我们检查返回类型的任何部分是否匹配 Promise（而不是要求全部匹配）
-					node.Type() != nil,
-				)
-			}
-
-			if !everySignatureReturnsPromise {
-				return
-			}
-
-			// 确定插入 async 关键字的位置
-			insertAsyncBeforeNode := node
-			if ast.IsMethodDeclaration(node) {
-				insertAsyncBeforeNode = node.Name()
-			}
-			// TODO(port): getFunctionHeadLoc
-			ctx.ReportNodeWithFixes(node, buildMissingAsyncMessage(), rule.RuleFixInsertBefore(ctx.SourceFile, insertAsyncBeforeNode, " async "))
-		}
-
-		// 根据配置添加相应的监听器
-		if *opts.CheckArrowFunctions {
-			listeners[ast.KindArrowFunction] = validateNode
-		}
-
-		if *opts.CheckFunctionDeclarations {
-			listeners[ast.KindFunctionDeclaration] = validateNode
-		}
-
-		if *opts.CheckFunctionExpressions {
-			listeners[ast.KindFunctionExpression] = validateNode
-		}
-
-		if *opts.CheckMethodDeclarations {
-			listeners[ast.KindMethodDeclaration] = func(node *ast.Node) {
-				// 抽象方法不能是 async
-				if utils.IncludesModifier(node, ast.KindAbstractKeyword) {
+				// Check if this is a namespace declaration (keyword is KindNamespaceKeyword)
+				if moduleDecl.Keyword != ast.KindNamespaceKeyword {
 					return
 				}
-				validateNode(node)
-			}
-		}
 
-		return listeners
+				// Check if we're in a .d.ts file and allowDefinitionFiles is true
+				if opts.AllowDefinitionFiles != nil && *opts.AllowDefinitionFiles && strings.HasSuffix(ctx.SourceFile.FileName(), ".d.ts") {
+					return
+				}
+
+				// Check if this is a declare namespace and allowDeclarations is true
+				if opts.AllowDeclarations != nil && *opts.AllowDeclarations && utils.IncludesModifier(node, ast.KindDeclareKeyword) {
+					return
+				}
+
+				// Report the namespace usage
+				ctx.ReportNode(moduleDecl.Name(), buildNoNamespaceMessage())
+			},
+		}
 	},
 })
