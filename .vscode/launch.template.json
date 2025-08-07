@@ -11,7 +11,7 @@
       ],
       "autoAttachChildProcesses": true,
       "outFiles": [
-        "${workspaceFolder}/packages/vscode-extension/out/**/*.js"
+        "${workspaceFolder}/packages/vscode-extension/dist/**/*.js"
       ],
       "preLaunchTask": "npm: watch - packages/vscode-extension"
     }
