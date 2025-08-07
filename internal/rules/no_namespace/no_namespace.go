@@ -11,7 +11,7 @@ import (
 // build the message for no-namespace rule
 func buildNoNamespaceMessage() rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "noNamespace",
+		Id:          "moduleSyntaxIsPreferred",
 		Description: "Namespace is not allowed.",
 	}
 }

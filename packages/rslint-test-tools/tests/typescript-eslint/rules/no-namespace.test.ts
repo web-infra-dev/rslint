@@ -80,7 +80,7 @@ export declare namespace foo {
         {
           column: 1,
           line: 1,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
     },
@@ -90,7 +90,7 @@ export declare namespace foo {
         {
           column: 1,
           line: 1,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
     },
@@ -100,7 +100,7 @@ export declare namespace foo {
         {
           column: 1,
           line: 1,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: false }],
@@ -111,7 +111,7 @@ export declare namespace foo {
         {
           column: 1,
           line: 1,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: false }],
@@ -122,7 +122,7 @@ export declare namespace foo {
         {
           column: 1,
           line: 1,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: true }],
@@ -133,7 +133,7 @@ export declare namespace foo {
         {
           column: 1,
           line: 1,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: true }],
@@ -144,7 +144,7 @@ export declare namespace foo {
         {
           column: 1,
           line: 1,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
     },
@@ -154,7 +154,7 @@ export declare namespace foo {
         {
           column: 1,
           line: 1,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
     },
@@ -164,7 +164,7 @@ export declare namespace foo {
         {
           column: 1,
           line: 1,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: false }],
@@ -175,7 +175,7 @@ export declare namespace foo {
         {
           column: 1,
           line: 1,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: false }],
@@ -186,7 +186,7 @@ export declare namespace foo {
         {
           column: 1,
           line: 1,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       filename: 'test.d.ts',
@@ -198,7 +198,7 @@ export declare namespace foo {
         {
           column: 1,
           line: 1,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       filename: 'test.d.ts',
@@ -210,7 +210,7 @@ export declare namespace foo {
         {
           column: 1,
           line: 1,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       filename: 'test.d.ts',
@@ -222,7 +222,7 @@ export declare namespace foo {
         {
           column: 1,
           line: 1,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       filename: 'test.d.ts',
@@ -234,7 +234,7 @@ export declare namespace foo {
         {
           column: 1,
           line: 1,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: false }],
@@ -251,12 +251,12 @@ namespace Foo.Bar {
         {
           column: 1,
           line: 2,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
         {
           column: 3,
           line: 3,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
     },
@@ -272,12 +272,12 @@ namespace A {
         {
           column: 1,
           line: 2,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
         {
           column: 3,
           line: 3,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: true }],
@@ -294,12 +294,12 @@ namespace A {
         {
           column: 1,
           line: 2,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
         {
           column: 3,
           line: 3,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: true }],
@@ -316,7 +316,7 @@ namespace A {
         {
           column: 1,
           line: 2,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: true }],
@@ -333,7 +333,7 @@ namespace A {
         {
           column: 1,
           line: 2,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: true }],
@@ -350,7 +350,7 @@ namespace A {
         {
           column: 1,
           line: 2,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: true }],
@@ -367,7 +367,7 @@ namespace A {
         {
           column: 1,
           line: 2,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: true }],
@@ -384,7 +384,7 @@ namespace A {
         {
           column: 1,
           line: 2,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: true }],
@@ -401,12 +401,12 @@ namespace A {
         {
           column: 1,
           line: 2,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
         {
           column: 10,
           line: 3,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: true }],
@@ -423,12 +423,12 @@ export namespace A {
         {
           column: 8,
           line: 2,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
         {
           column: 3,
           line: 3,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: true }],
@@ -445,12 +445,12 @@ export namespace A {
         {
           column: 8,
           line: 2,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
         {
           column: 3,
           line: 3,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: true }],
@@ -467,7 +467,7 @@ export namespace A {
         {
           column: 8,
           line: 2,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: true }],
@@ -484,7 +484,7 @@ export namespace A {
         {
           column: 8,
           line: 2,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: true }],
@@ -501,7 +501,7 @@ export namespace A {
         {
           column: 8,
           line: 2,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: true }],
@@ -518,7 +518,7 @@ export namespace A {
         {
           column: 8,
           line: 2,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: true }],
@@ -535,7 +535,7 @@ export namespace A {
         {
           column: 8,
           line: 2,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: true }],
@@ -552,12 +552,12 @@ export namespace A {
         {
           column: 8,
           line: 2,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
         {
           column: 10,
           line: 3,
-          messageId: 'noNamespace',
+          messageId: 'moduleSyntaxIsPreferred',
         },
       ],
       options: [{ allowDeclarations: true }],

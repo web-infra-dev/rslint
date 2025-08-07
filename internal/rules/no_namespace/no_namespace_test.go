@@ -97,7 +97,7 @@ namespace Test {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 			},
 		},
@@ -112,10 +112,10 @@ namespace Outer {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 			},
 		},
@@ -130,7 +130,7 @@ namespace Test {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 			},
 		},
@@ -145,7 +145,7 @@ namespace Test {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 			},
 		},
@@ -160,7 +160,7 @@ namespace Test {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 			},
 		},
@@ -173,7 +173,7 @@ declare namespace Test {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 			},
 		},
@@ -190,10 +190,10 @@ namespace B {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 			},
 		},
@@ -219,7 +219,7 @@ namespace Utils {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 			},
 		},
@@ -236,7 +236,7 @@ declare namespace Test {
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 			},
 		},
@@ -255,7 +255,7 @@ declare namespace Test {
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 			},
 		},
@@ -273,7 +273,7 @@ declare module "external" {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 			},
 		},
@@ -293,7 +293,7 @@ declare global {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 			},
 		},
@@ -311,13 +311,13 @@ namespace Level1 {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 			},
 		},
@@ -332,7 +332,7 @@ namespace Types {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 			},
 		},
@@ -349,7 +349,7 @@ namespace Constants {
       `,
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 			},
 		},
@@ -366,7 +366,7 @@ namespace Test {
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "noNamespace",
+					MessageId: "moduleSyntaxIsPreferred",
 				},
 			},
 		},
@@ -388,8 +388,8 @@ func TestNoNamespaceOptionsParsing(t *testing.T) {
 // Test message building
 func TestNoNamespaceMessage(t *testing.T) {
 	message := buildNoNamespaceMessage()
-	if message.Id != "noNamespace" {
-		t.Errorf("Expected message ID to be 'noNamespace', got %s", message.Id)
+	if message.Id != "moduleSyntaxIsPreferred" {
+		t.Errorf("Expected message ID to be 'moduleSyntaxIsPreferred', got %s", message.Id)
 	}
 	if message.Description != "Namespace is not allowed." {
 		t.Errorf("Expected message description to be 'Namespace is not allowed.', got %s", message.Description)
