@@ -283,13 +283,13 @@ func main() {
 							if ok {
 								named, ok := ptrType.Elem().(*types.Named)
 								if ok && !named.Obj().Exported() {
-									strct, ok := named.Underlying().(*types.Struct)
+									structType, ok := named.Underlying().(*types.Struct)
 									if ok {
 										n := named.Obj().Name()
 										dependencies = append(dependencies, struct {
 											string
 											*types.Struct
-										}{n, strct})
+										}{n, structType})
 										shimBuilder.WriteString("extra_")
 										shimBuilder.WriteString(n)
 										continue
@@ -309,15 +309,15 @@ func main() {
 						}
 					}
 
-					strct, ok := named.Underlying().(*types.Struct)
+					structType, ok := named.Underlying().(*types.Struct)
 					if !ok {
 						log.Fatalf("expected %v to be struct", name)
 					}
 
-					emitExtraStruct(name, strct)
+					emitExtraStruct(name, structType)
 
-					mappedFieldTypes := make(map[string]*types.Var, strct.NumFields())
-					for field := range strct.Fields() {
+					mappedFieldTypes := make(map[string]*types.Var, structType.NumFields())
+					for field := range structType.Fields() {
 						mappedFieldTypes[field.Name()] = field
 					}
 
