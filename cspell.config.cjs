@@ -1,5 +1,3 @@
-const { banWords } = require('cspell-ban-words');
-
 module.exports = {
   version: '0.2',
   language: 'en',
@@ -15,8 +13,8 @@ module.exports = {
     'pnpm-lock.yaml',
     'shim',
     'packages/vscode-extension/out',
+    'packages/rslint-test-tools/tests',
   ],
-  flagWords: banWords,
   dictionaries: ['dictionary'],
   dictionaryDefinitions: [
     {

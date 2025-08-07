@@ -34,7 +34,6 @@
   "devDependencies": {
     "@rslint/core": "workspace:*",
     "@rstest/core": "^0.1.0",
-    "cspell-ban-words": "^0.0.4",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.2",
     "prettier": "3.5.0",
