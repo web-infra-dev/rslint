@@ -57,7 +57,7 @@ export function test() {
   return value;
 }
     `},
-		// 新增测试用例：测试数组格式的选项
+		// Test array format options
 		{
 			Code: `
 // Declare namespace with array options format
@@ -71,7 +71,7 @@ declare namespace Test {
 				},
 			},
 		},
-		// 新增测试用例：测试空选项对象
+		// Test empty options object
 		{
 			Code: `
 // Regular code with empty options
@@ -79,7 +79,7 @@ const value = 1;
       `,
 			Options: map[string]interface{}{},
 		},
-		// 新增测试用例：测试 nil 选项
+		// Test nil options
 		{
 			Code: `
 // Regular code with nil options
@@ -223,7 +223,7 @@ namespace Utils {
 				},
 			},
 		},
-		// 新增测试用例：测试 allowDeclarations 为 false 时的情况
+		// Test allowDeclarations explicitly set to false
 		{
 			Code: `
 // Declare namespace with allowDeclarations explicitly set to false
@@ -240,7 +240,7 @@ declare namespace Test {
 				},
 			},
 		},
-		// 新增测试用例：测试数组格式选项但 allowDeclarations 为 false
+		// Test array options format but allowDeclarations false
 		{
 			Code: `
 // Declare namespace with array options format but allowDeclarations false
@@ -259,7 +259,7 @@ declare namespace Test {
 				},
 			},
 		},
-		// 新增测试用例：测试命名空间与模块声明的混合
+		// Test mix of namespace and module declaration
 		{
 			Code: `
 // Mix of namespace and module declaration
@@ -277,7 +277,7 @@ declare module "external" {
 				},
 			},
 		},
-		// 新增测试用例：测试命名空间与全局声明的混合
+		// Test mix of namespace and global declaration
 		{
 			Code: `
 // Mix of namespace and global declaration
@@ -297,7 +297,7 @@ declare global {
 				},
 			},
 		},
-		// 新增测试用例：测试深层嵌套的命名空间
+		// Test deeply nested namespaces
 		{
 			Code: `
 // Deeply nested namespaces
@@ -321,7 +321,7 @@ namespace Level1 {
 				},
 			},
 		},
-		// 新增测试用例：测试命名空间与类型别名的组合
+		// Test namespace with type aliases
 		{
 			Code: `
 // Namespace with type aliases
@@ -336,7 +336,7 @@ namespace Types {
 				},
 			},
 		},
-		// 新增测试用例：测试命名空间与枚举的组合
+		// Test namespace with enums
 		{
 			Code: `
 // Namespace with enums
@@ -353,7 +353,7 @@ namespace Constants {
 				},
 			},
 		},
-		// 新增测试用例：测试普通命名空间即使 allowDefinitionFiles 为 true 也应该报错
+		// Test regular namespace should be reported even when allowDefinitionFiles is true
 		{
 			Code: `
 // Regular namespace should be reported even when allowDefinitionFiles is true
@@ -373,9 +373,9 @@ namespace Test {
 	})
 }
 
-// 新增测试函数：测试选项解析逻辑
+// Test options parsing logic
 func TestNoNamespaceOptionsParsing(t *testing.T) {
-	// 测试默认选项
+	// Test default options
 	opts := defaultNoNamespaceOptions
 	if *opts.AllowDeclarations != false {
 		t.Errorf("Expected default AllowDeclarations to be false, got %v", *opts.AllowDeclarations)
@@ -385,7 +385,7 @@ func TestNoNamespaceOptionsParsing(t *testing.T) {
 	}
 }
 
-// 新增测试函数：测试消息构建
+// Test message building
 func TestNoNamespaceMessage(t *testing.T) {
 	message := buildNoNamespaceMessage()
 	if message.Id != "noNamespace" {
