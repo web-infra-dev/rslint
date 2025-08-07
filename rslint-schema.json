@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/web-infra-dev/rslint/schemas/rslint-config.json",
+  "$id": "rslint-schema.json",
   "title": "Rslint Configuration",
   "description": "Configuration file for Rslint - a high-performance TypeScript/JavaScript linter",
   "type": "array",
