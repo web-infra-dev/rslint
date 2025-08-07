@@ -23,3 +23,5 @@ export const fileExists = async (uri: Uri): Promise<boolean> => {
 
 export const PLATFORM_KEY = `${process.platform}-${arch()}`;
 export const PLATFORM_BIN_REQUEST = `@rslint/${PLATFORM_KEY}/rslint`;
+
+export type RslintBinPath = 'local' | 'built-in' | 'custom';
