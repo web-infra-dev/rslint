@@ -181,7 +181,7 @@ export class Rslint implements Disposable {
 
       try {
         this.logger.debug('Looking for Rslint binary in PnP mode');
-        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
         const yarnPnpApi = require(yarnPnpFile.fsPath);
 
         const rslintCorePackage = yarnPnpApi.resolveRequest(
