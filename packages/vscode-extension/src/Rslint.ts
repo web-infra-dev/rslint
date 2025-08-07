@@ -8,7 +8,7 @@ import {
 } from 'vscode-languageclient/node';
 import { Logger } from './logger';
 import type { Extension } from './Extension';
-import { fileExists, PLATFROM_BIN_REQUEST } from './utils';
+import { fileExists, PLATFORM_BIN_REQUEST } from './utils';
 import { dirname } from 'node:path';
 import { chmodSync } from 'node:fs';
 
@@ -114,7 +114,7 @@ export class Rslint implements Disposable {
     }
   }
 
-  private async findBianryFromUserSettings(): Promise<string | null> {
+  private async findBinaryFromUserSettings(): Promise<string | null> {
     const binPathConfig = (
       workspace.getConfiguration().get('rslint.binPath') as string
     ).trim();
@@ -144,7 +144,7 @@ export class Rslint implements Disposable {
     return null;
   }
 
-  private findBianryFromNodeModules(): string | null {
+  private findBinaryFromNodeModules(): string | null {
     const searchRoot = this.workspaceFolder.uri.fsPath;
 
     try {
@@ -154,7 +154,7 @@ export class Rslint implements Disposable {
           paths: [searchRoot],
         }),
       );
-      const platformPackageBinPath = require.resolve(PLATFROM_BIN_REQUEST, {
+      const platformPackageBinPath = require.resolve(PLATFORM_BIN_REQUEST, {
         paths: [pathToRslintCorePackage],
       });
 
@@ -169,7 +169,7 @@ export class Rslint implements Disposable {
     return null;
   }
 
-  private async findBianryFromPnp(): Promise<string | null> {
+  private async findBinaryFromPnp(): Promise<string | null> {
     const folder = this.workspaceFolder;
 
     for (const extension of ['cjs', 'js']) {
@@ -195,7 +195,7 @@ export class Rslint implements Disposable {
 
         const rslintPlatformPkg = Uri.file(
           yarnPnpApi.resolveRequest(
-            PLATFROM_BIN_REQUEST,
+            PLATFORM_BIN_REQUEST,
             rslintCorePackage,
           ) as string,
         );
@@ -215,7 +215,7 @@ export class Rslint implements Disposable {
     return null;
   }
 
-  private findBianryFromBuiltIn(): string {
+  private findBinaryFromBuiltIn(): string {
     const builtInBinPath = Uri.joinPath(
       this.extension.context.extensionUri,
       'dist',
@@ -235,10 +235,10 @@ export class Rslint implements Disposable {
   // 4. From extension built-in as fallback
   private async getBinaryPath(): Promise<string> {
     const finalBinPath =
-      (await this.findBianryFromUserSettings()) ??
-      this.findBianryFromNodeModules() ??
-      (await this.findBianryFromPnp()) ??
-      this.findBianryFromBuiltIn();
+      (await this.findBinaryFromUserSettings()) ??
+      this.findBinaryFromNodeModules() ??
+      (await this.findBinaryFromPnp()) ??
+      this.findBinaryFromBuiltIn();
 
     this.logger.debug('Final Rslint binary path:', finalBinPath);
     return finalBinPath;
