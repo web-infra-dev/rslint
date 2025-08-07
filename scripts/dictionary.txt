@@ -1,7 +1,14 @@
 # Custom Dictionary Words
+cachedvfs
+cpuprof
+fooz
+lsproto
 tsgo
+tspath
+tsoptions
 rsbuild
 rsdoctor
+tses
 rslib
 rslint
 rslog

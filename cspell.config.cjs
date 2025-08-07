@@ -13,6 +13,7 @@ module.exports = {
     'typescript-go',
     'node_modules',
     'pnpm-lock.yaml',
+    'shim',
     'packages/vscode-extension/out',
   ],
   flagWords: banWords,
