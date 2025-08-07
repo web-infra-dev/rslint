@@ -61,7 +61,7 @@ exports[`no-empty-function > invalid 3`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 26,
+          "column": 27,
           "line": 3,
         },
         "start": {
@@ -87,7 +87,7 @@ exports[`no-empty-function > invalid 4`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 28,
+          "column": 29,
           "line": 3,
         },
         "start": {
@@ -113,7 +113,7 @@ exports[`no-empty-function > invalid 5`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 17,
+          "column": 18,
           "line": 2,
         },
         "start": {
@@ -139,7 +139,7 @@ exports[`no-empty-function > invalid 6`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 10,
+          "column": 11,
           "line": 4,
         },
         "start": {
@@ -165,7 +165,7 @@ exports[`no-empty-function > invalid 7`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 19,
+          "column": 20,
           "line": 3,
         },
         "start": {
