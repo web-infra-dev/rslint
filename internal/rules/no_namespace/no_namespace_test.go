@@ -5,875 +5,393 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/rules/fixtures"
-	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func TestPromiseFunctionAsyncRule(t *testing.T) {
-	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &PromiseFunctionAsyncRule, []rule_tester.ValidTestCase{
+func TestNoNamespaceRule(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNamespaceRule, []rule_tester.ValidTestCase{
 		{Code: `
-const nonAsyncNonPromiseArrowFunction = (n: number) => n;
-    `},
-		{Code: `
-function nonAsyncNonPromiseFunctionDeclaration(n: number) {
-  return n;
+// Regular module declaration (not namespace)
+declare module "foo" {
+  export const bar: string;
 }
     `},
 		{Code: `
-const asyncPromiseFunctionExpressionA = async function (p: Promise<void>) {
-  return p;
-};
+// Global module augmentation
+declare global {
+  interface Window {
+    foo: string;
+  }
+}
     `},
 		{Code: `
-const asyncPromiseFunctionExpressionB = async function () {
-  return new Promise<void>();
-};
+// Ambient module declaration
+declare module "bar" {
+  export const baz: number;
+}
     `},
+		{
+			Code: `
+// Declare namespace (allowed when allowDeclarations is true)
+declare namespace Test {
+  export const value = 1;
+}
+      `,
+			Options: map[string]interface{}{
+				"allowDeclarations": true,
+			},
+		},
 		{Code: `
+// Regular TypeScript code without namespaces
+const value = 1;
+function test() {
+  return value;
+}
 class Test {
-  public nonAsyncNonPromiseArrowFunction = (n: number) => n;
-  public nonAsyncNonPromiseMethod() {
-    return 0;
-  }
-
-  public async asyncPromiseMethodA(p: Promise<void>) {
-    return p;
-  }
-
-  public async asyncPromiseMethodB() {
-    return new Promise<void>();
-  }
+  constructor() {}
 }
     `},
 		{Code: `
-class InvalidAsyncModifiers {
-  public constructor() {
-    return new Promise<void>();
-  }
-  public get asyncGetter() {
-    return new Promise<void>();
-  }
-  public set asyncGetter(p: Promise<void>) {
-    return p;
-  }
-  public get asyncGetterFunc() {
-    return async () => new Promise<void>();
-  }
-  public set asyncGetterFunc(p: () => Promise<void>) {
-    return p;
-  }
+// Module with exports (not namespace)
+export const value = 1;
+export function test() {
+  return value;
 }
     `},
-		{Code: `
-const invalidAsyncModifiers = {
-  get asyncGetter() {
-    return new Promise<void>();
-  },
-  set asyncGetter(p: Promise<void>) {
-    return p;
-  },
-  get asyncGetterFunc() {
-    return async () => new Promise<void>();
-  },
-  set asyncGetterFunc(p: () => Promise<void>) {
-    return p;
-  },
-};
-    `},
-		{Code: `
-      export function valid(n: number) {
-        return n;
-      }
-    `},
-		{Code: `
-      export default function invalid(n: number) {
-        return n;
-      }
-    `},
-		{Code: `
-      class Foo {
-        constructor() {}
-      }
-    `},
-		{Code: `
-class Foo {
-  async catch<T>(arg: Promise<T>) {
-    return arg;
-  }
-}
-    `},
+		// Test array format options
 		{
 			Code: `
-function returnsAny(): any {
-  return 0;
+// Declare namespace with array options format
+declare namespace Test {
+  export const value = 1;
 }
       `,
-			Options: PromiseFunctionAsyncOptions{AllowAny: utils.Ref(true)},
+			Options: []interface{}{
+				map[string]interface{}{
+					"allowDeclarations": true,
+				},
+			},
 		},
+		// Test empty options object
 		{
 			Code: `
-function returnsUnknown(): unknown {
-  return 0;
-}
+// Regular code with empty options
+const value = 1;
       `,
-			Options: PromiseFunctionAsyncOptions{AllowAny: utils.Ref(true)},
+			Options: map[string]interface{}{},
 		},
+		// Test nil options
 		{
 			Code: `
-interface ReadableStream {}
-interface Options {
-  stream: ReadableStream;
-}
-
-type Return = ReadableStream | Promise<void>;
-const foo = (options: Options): Return => {
-  return options.stream ? asStream(options) : asPromise(options);
-};
+// Regular code with nil options
+const value = 1;
       `,
-		},
-		{
-			Code: `
-function foo(): Promise<string> | boolean {
-  return Math.random() > 0.5 ? Promise.resolve('value') : false;
-}
-      `,
-		},
-		{
-			Code: `
-abstract class Test {
-  abstract test1(): Promise<number>;
-
-  // abstract method with body is always an error but it still parses into valid AST
-  abstract test2(): Promise<number> {
-    return Promise.resolve(1);
-  }
-}
-      `,
-		},
-		{Code: `
-function promiseInUnionWithExplicitReturnType(
-  p: boolean,
-): Promise<number> | number {
-  return p ? Promise.resolve(5) : 5;
-}
-    `},
-		{Code: `
-function explicitReturnWithPromiseInUnion(): Promise<number> | number {
-  return 5;
-}
-    `},
-		{Code: `
-async function asyncFunctionReturningUnion(p: boolean) {
-  return p ? Promise.resolve(5) : 5;
-}
-    `},
-		{Code: `
-function overloadingThatCanReturnPromise(): Promise<number>;
-function overloadingThatCanReturnPromise(a: boolean): number;
-function overloadingThatCanReturnPromise(
-  a?: boolean,
-): Promise<number> | number {
-  return Promise.resolve(5);
-}
-    `},
-		{Code: `
-function overloadingThatCanReturnPromise(a: boolean): number;
-function overloadingThatCanReturnPromise(): Promise<number>;
-function overloadingThatCanReturnPromise(
-  a?: boolean,
-): Promise<number> | number {
-  return Promise.resolve(5);
-}
-    `},
-		{Code: `
-function a(): Promise<void>;
-function a(x: boolean): void;
-function a(x?: boolean) {
-  if (x == null) return Promise.reject(new Error());
-  throw new Error();
-}
-    `},
-		{
-			Code: `
-function overloadingThatIncludeUnknown(): number;
-function overloadingThatIncludeUnknown(a: boolean): unknown;
-function overloadingThatIncludeUnknown(a?: boolean): unknown | number {
-  return Promise.resolve(5);
-}
-      `,
-			Options: PromiseFunctionAsyncOptions{AllowAny: utils.Ref(true)},
-		},
-		{
-			Code: `
-function overloadingThatIncludeAny(): number;
-function overloadingThatIncludeAny(a: boolean): any;
-function overloadingThatIncludeAny(a?: boolean): any | number {
-  return Promise.resolve(5);
-}
-      `,
-			Options: PromiseFunctionAsyncOptions{AllowAny: utils.Ref(true)},
+			Options: nil,
 		},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
-function returnsAny(): any {
-  return 0;
+// Basic namespace usage
+namespace Test {
+  export const value = 1;
 }
       `,
-			Options: PromiseFunctionAsyncOptions{AllowAny: utils.Ref(false)},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "missingAsync",
+					MessageId: "noNamespace",
 				},
 			},
 		},
 		{
 			Code: `
-function returnsUnknown(): unknown {
-  return 0;
+// Nested namespace
+namespace Outer {
+  namespace Inner {
+    export const value = 1;
+  }
 }
       `,
-			Options: PromiseFunctionAsyncOptions{AllowAny: utils.Ref(false)},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "missingAsync",
+					MessageId: "noNamespace",
+				},
+				{
+					MessageId: "noNamespace",
 				},
 			},
 		},
 		{
 			Code: `
-const nonAsyncPromiseFunctionExpressionA = function (p: Promise<void>) {
-  return p;
-};
+// Namespace with interface
+namespace Test {
+  export interface Config {
+    value: string;
+  }
+}
       `,
-			Output: []string{`
-const nonAsyncPromiseFunctionExpressionA =  async function (p: Promise<void>) {
-  return p;
-};
-      `,
-			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "missingAsync",
+					MessageId: "noNamespace",
 				},
 			},
 		},
 		{
 			Code: `
-const nonAsyncPromiseFunctionExpressionB = function () {
-  return new Promise<void>();
-};
+// Namespace with class
+namespace Test {
+  export class MyClass {
+    constructor() {}
+  }
+}
       `,
-			Output: []string{`
-const nonAsyncPromiseFunctionExpressionB =  async function () {
-  return new Promise<void>();
-};
-      `,
-			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "missingAsync",
+					MessageId: "noNamespace",
 				},
 			},
 		},
 		{
 			Code: `
-function nonAsyncPromiseFunctionDeclarationA(p: Promise<void>) {
-  return p;
+// Namespace with function
+namespace Test {
+  export function myFunction() {
+    return "test";
+  }
 }
       `,
-			Output: []string{`
- async function nonAsyncPromiseFunctionDeclarationA(p: Promise<void>) {
-  return p;
-}
-      `,
-			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "missingAsync",
+					MessageId: "noNamespace",
 				},
 			},
 		},
 		{
 			Code: `
-function nonAsyncPromiseFunctionDeclarationB() {
-  return new Promise<void>();
+// Declare namespace (not allowed by default)
+declare namespace Test {
+  export const value = 1;
 }
       `,
-			Output: []string{`
- async function nonAsyncPromiseFunctionDeclarationB() {
-  return new Promise<void>();
-}
-      `,
-			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "missingAsync",
+					MessageId: "noNamespace",
 				},
 			},
 		},
 		{
 			Code: `
-const nonAsyncPromiseArrowFunctionA = (p: Promise<void>) => p;
+// Multiple namespaces
+namespace A {
+  export const a = 1;
+}
+
+namespace B {
+  export const b = 2;
+}
       `,
-			Output: []string{`
-const nonAsyncPromiseArrowFunctionA =  async (p: Promise<void>) => p;
-      `,
-			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "missingAsync",
+					MessageId: "noNamespace",
+				},
+				{
+					MessageId: "noNamespace",
 				},
 			},
 		},
 		{
 			Code: `
-const nonAsyncPromiseArrowFunctionB = () => new Promise<void>();
+// Namespace with complex content
+namespace Utils {
+  export interface Options {
+    debug?: boolean;
+    timeout?: number;
+  }
+
+  export class Helper {
+    static process(options: Options): void {
+      // implementation
+    }
+  }
+
+  export function validate(input: string): boolean {
+    return input.length > 0;
+  }
+}
       `,
-			Output: []string{`
-const nonAsyncPromiseArrowFunctionB =  async () => new Promise<void>();
-      `,
-			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "missingAsync",
+					MessageId: "noNamespace",
 				},
 			},
 		},
+		// Test allowDeclarations explicitly set to false
 		{
 			Code: `
-const functions = {
-  nonAsyncPromiseMethod() {
-    return Promise.resolve(1);
-  },
-};
+// Declare namespace with allowDeclarations explicitly set to false
+declare namespace Test {
+  export const value = 1;
+}
       `,
-			Output: []string{`
-const functions = {
-   async nonAsyncPromiseMethod() {
-    return Promise.resolve(1);
-  },
-};
-      `,
+			Options: map[string]interface{}{
+				"allowDeclarations": false,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "missingAsync",
-					Line:      3,
+					MessageId: "noNamespace",
 				},
 			},
 		},
+		// Test array options format but allowDeclarations false
 		{
 			Code: `
-class Test {
-  public nonAsyncPromiseMethodA(p: Promise<void>) {
-    return p;
-  }
-
-  public static nonAsyncPromiseMethodB() {
-    return new Promise<void>();
-  }
+// Declare namespace with array options format but allowDeclarations false
+declare namespace Test {
+  export const value = 1;
 }
       `,
-			Output: []string{`
-class Test {
-  public  async nonAsyncPromiseMethodA(p: Promise<void>) {
-    return p;
-  }
-
-  public static  async nonAsyncPromiseMethodB() {
-    return new Promise<void>();
-  }
-}
-      `,
+			Options: []interface{}{
+				map[string]interface{}{
+					"allowDeclarations": false,
+				},
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "missingAsync",
-					Line:      3,
-				},
-				{
-					MessageId: "missingAsync",
-					Line:      7,
+					MessageId: "noNamespace",
 				},
 			},
 		},
+		// Test mix of namespace and module declaration
 		{
 			Code: `
-const nonAsyncPromiseFunctionExpression = function (p: Promise<void>) {
-  return p;
-};
-
-function nonAsyncPromiseFunctionDeclaration(p: Promise<void>) {
-  return p;
+// Mix of namespace and module declaration
+namespace Test {
+  export const value = 1;
 }
 
-const nonAsyncPromiseArrowFunction = (p: Promise<void>) => p;
-
-class Test {
-  public nonAsyncPromiseMethod(p: Promise<void>) {
-    return p;
-  }
+declare module "external" {
+  export const externalValue = 2;
 }
       `,
-			Output: []string{`
-const nonAsyncPromiseFunctionExpression =  async function (p: Promise<void>) {
-  return p;
-};
-
- async function nonAsyncPromiseFunctionDeclaration(p: Promise<void>) {
-  return p;
-}
-
-const nonAsyncPromiseArrowFunction = (p: Promise<void>) => p;
-
-class Test {
-  public  async nonAsyncPromiseMethod(p: Promise<void>) {
-    return p;
-  }
-}
-      `,
-			},
-			Options: PromiseFunctionAsyncOptions{CheckArrowFunctions: utils.Ref(false)},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "missingAsync",
-					Line:      2,
-				},
-				{
-					MessageId: "missingAsync",
-					Line:      6,
-				},
-				{
-					MessageId: "missingAsync",
-					Line:      13,
+					MessageId: "noNamespace",
 				},
 			},
 		},
+		// Test mix of namespace and global declaration
 		{
 			Code: `
-const nonAsyncPromiseFunctionExpression = function (p: Promise<void>) {
-  return p;
-};
-
-function nonAsyncPromiseFunctionDeclaration(p: Promise<void>) {
-  return p;
+// Mix of namespace and global declaration
+namespace Test {
+  export const value = 1;
 }
 
-const nonAsyncPromiseArrowFunction = (p: Promise<void>) => p;
-
-class Test {
-  public nonAsyncPromiseMethod(p: Promise<void>) {
-    return p;
+declare global {
+  interface GlobalInterface {
+    prop: string;
   }
 }
       `,
-			Output: []string{`
-const nonAsyncPromiseFunctionExpression =  async function (p: Promise<void>) {
-  return p;
-};
-
-function nonAsyncPromiseFunctionDeclaration(p: Promise<void>) {
-  return p;
-}
-
-const nonAsyncPromiseArrowFunction =  async (p: Promise<void>) => p;
-
-class Test {
-  public  async nonAsyncPromiseMethod(p: Promise<void>) {
-    return p;
-  }
-}
-      `,
-			},
-			Options: PromiseFunctionAsyncOptions{CheckFunctionDeclarations: utils.Ref(false)},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "missingAsync",
-					Line:      2,
-				},
-				{
-					MessageId: "missingAsync",
-					Line:      10,
-				},
-				{
-					MessageId: "missingAsync",
-					Line:      13,
+					MessageId: "noNamespace",
 				},
 			},
 		},
+		// Test deeply nested namespaces
 		{
 			Code: `
-const nonAsyncPromiseFunctionExpression = function (p: Promise<void>) {
-  return p;
-};
-
-function nonAsyncPromiseFunctionDeclaration(p: Promise<void>) {
-  return p;
-}
-
-const nonAsyncPromiseArrowFunction = (p: Promise<void>) => p;
-
-class Test {
-  public nonAsyncPromiseMethod(p: Promise<void>) {
-    return p;
+// Deeply nested namespaces
+namespace Level1 {
+  namespace Level2 {
+    namespace Level3 {
+      export const value = 1;
+    }
   }
 }
       `,
-			Output: []string{`
-const nonAsyncPromiseFunctionExpression = function (p: Promise<void>) {
-  return p;
-};
-
- async function nonAsyncPromiseFunctionDeclaration(p: Promise<void>) {
-  return p;
-}
-
-const nonAsyncPromiseArrowFunction =  async (p: Promise<void>) => p;
-
-class Test {
-  public  async nonAsyncPromiseMethod(p: Promise<void>) {
-    return p;
-  }
-}
-      `,
-			},
-			Options: PromiseFunctionAsyncOptions{CheckFunctionExpressions: utils.Ref(false)},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "missingAsync",
-					Line:      6,
+					MessageId: "noNamespace",
 				},
 				{
-					MessageId: "missingAsync",
-					Line:      10,
+					MessageId: "noNamespace",
 				},
 				{
-					MessageId: "missingAsync",
-					Line:      13,
+					MessageId: "noNamespace",
 				},
 			},
 		},
+		// Test namespace with type aliases
 		{
 			Code: `
-const nonAsyncPromiseFunctionExpression = function (p: Promise<void>) {
-  return p;
-};
-
-function nonAsyncPromiseFunctionDeclaration(p: Promise<void>) {
-  return p;
-}
-
-const nonAsyncPromiseArrowFunction = (p: Promise<void>) => p;
-
-class Test {
-  public nonAsyncPromiseMethod(p: Promise<void>) {
-    return p;
-  }
+// Namespace with type aliases
+namespace Types {
+  export type StringOrNumber = string | number;
+  export type Callback<T> = (value: T) => void;
 }
       `,
-			Output: []string{`
-const nonAsyncPromiseFunctionExpression =  async function (p: Promise<void>) {
-  return p;
-};
-
- async function nonAsyncPromiseFunctionDeclaration(p: Promise<void>) {
-  return p;
-}
-
-const nonAsyncPromiseArrowFunction =  async (p: Promise<void>) => p;
-
-class Test {
-  public nonAsyncPromiseMethod(p: Promise<void>) {
-    return p;
-  }
-}
-      `,
-			},
-			Options: PromiseFunctionAsyncOptions{CheckMethodDeclarations: utils.Ref(false)},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "missingAsync",
-					Line:      2,
-				},
-				{
-					MessageId: "missingAsync",
-					Line:      6,
-				},
-				{
-					MessageId: "missingAsync",
-					Line:      10,
+					MessageId: "noNamespace",
 				},
 			},
 		},
+		// Test namespace with enums
 		{
 			Code: `
-class PromiseType {}
-
-const returnAllowedType = () => new PromiseType();
+// Namespace with enums
+namespace Constants {
+  export enum Status {
+    Active = "active",
+    Inactive = "inactive"
+  }
+}
       `,
-			Output: []string{`
-class PromiseType {}
-
-const returnAllowedType =  async () => new PromiseType();
-      `,
-			},
-			Options: PromiseFunctionAsyncOptions{AllowedPromiseNames: []string{"PromiseType"}},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "missingAsync",
-					Line:      4,
+					MessageId: "noNamespace",
 				},
 			},
 		},
+		// Test regular namespace should be reported even when allowDefinitionFiles is true
 		{
 			Code: `
-interface SPromise<T> extends Promise<T> {}
-function foo(): Promise<string> | SPromise<boolean> {
-  return Math.random() > 0.5
-    ? Promise.resolve('value')
-    : Promise.resolve(false);
+// Regular namespace should be reported even when allowDefinitionFiles is true
+namespace Test {
+  export const value = 1;
 }
       `,
-			Output: []string{`
-interface SPromise<T> extends Promise<T> {}
- async function foo(): Promise<string> | SPromise<boolean> {
-  return Math.random() > 0.5
-    ? Promise.resolve('value')
-    : Promise.resolve(false);
-}
-      `,
-			},
-			Options: PromiseFunctionAsyncOptions{AllowedPromiseNames: []string{"SPromise"}},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "missingAsync",
-					Line:      3,
-				},
-			},
-		},
-		{
-			Code: `
-class Test {
-  @decorator
-  public test() {
-    return Promise.resolve(123);
-  }
-}
-      `,
-			Output: []string{`
-class Test {
-  @decorator
-  public  async test() {
-    return Promise.resolve(123);
-  }
-}
-      `,
+			Options: map[string]interface{}{
+				"allowDefinitionFiles": true,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
-					MessageId: "missingAsync",
-					Line:      3,
-					Column:    3,
-				},
-			},
-		},
-		{
-			Code: `
-class Test {
-  @decorator(async () => {})
-  static protected[(1)]() {
-    return Promise.resolve(1);
-  }
-  public'bar'() {
-    return Promise.resolve(2);
-  }
-  private['baz']() {
-    return Promise.resolve(3);
-  }
-}
-      `,
-			Output: []string{`
-class Test {
-  @decorator(async () => {})
-  static protected async [(1)]() {
-    return Promise.resolve(1);
-  }
-  public async 'bar'() {
-    return Promise.resolve(2);
-  }
-  private async ['baz']() {
-    return Promise.resolve(3);
-  }
-}
-      `,
-			},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "missingAsync",
-					Line:      3,
-					Column:    3,
-				},
-				{
-					MessageId: "missingAsync",
-					Line:      7,
-					Column:    3,
-				},
-				{
-					MessageId: "missingAsync",
-					Line:      10,
-					Column:    3,
-				},
-			},
-		},
-		{
-			Code: `
-class Foo {
-  catch() {
-    return Promise.resolve(1);
-  }
-
-  public default() {
-    return Promise.resolve(2);
-  }
-
-  @decorator
-  private case<T>() {
-    return Promise.resolve(3);
-  }
-}
-      `,
-			Output: []string{`
-class Foo {
-   async catch() {
-    return Promise.resolve(1);
-  }
-
-  public  async default() {
-    return Promise.resolve(2);
-  }
-
-  @decorator
-  private  async case<T>() {
-    return Promise.resolve(3);
-  }
-}
-      `,
-			},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "missingAsync",
-					Line:      3,
-					Column:    3,
-				},
-				{
-					MessageId: "missingAsync",
-					Line:      7,
-					Column:    3,
-				},
-				{
-					MessageId: "missingAsync",
-					Line:      11,
-					Column:    3,
-				},
-			},
-		},
-		{
-			Code: `
-const foo = {
-  catch() {
-    return Promise.resolve(1);
-  },
-};
-      `,
-			Output: []string{`
-const foo = {
-   async catch() {
-    return Promise.resolve(1);
-  },
-};
-      `,
-			},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "missingAsync",
-					Line:      3,
-					Column:    3,
-				},
-			},
-		},
-		{
-			Code: `
-function promiseInUnionWithoutExplicitReturnType(p: boolean) {
-  return p ? Promise.resolve(5) : 5;
-}
-      `,
-			Output: []string{`
- async function promiseInUnionWithoutExplicitReturnType(p: boolean) {
-  return p ? Promise.resolve(5) : 5;
-}
-      `,
-			},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "missingAsync",
-				},
-			},
-		},
-		{
-			Code: `
-function overloadingThatCanReturnPromise(): Promise<number>;
-function overloadingThatCanReturnPromise(a: boolean): Promise<string>;
-function overloadingThatCanReturnPromise(
-  a?: boolean,
-): Promise<number | string> {
-  return Promise.resolve(5);
-}
-      `,
-			Output: []string{`
-function overloadingThatCanReturnPromise(): Promise<number>;
-function overloadingThatCanReturnPromise(a: boolean): Promise<string>;
- async function overloadingThatCanReturnPromise(
-  a?: boolean,
-): Promise<number | string> {
-  return Promise.resolve(5);
-}
-      `,
-			},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "missingAsync",
-				},
-			},
-		},
-		{
-			Code: `
-function overloadingThatIncludeAny(): number;
-function overloadingThatIncludeAny(a: boolean): any;
-function overloadingThatIncludeAny(a?: boolean): any | number {
-  return Promise.resolve(5);
-}
-      `,
-			Options: PromiseFunctionAsyncOptions{AllowAny: utils.Ref(false)},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "missingAsync",
-				},
-			},
-		},
-		{
-			Code: `
-function overloadingThatIncludeUnknown(): number;
-function overloadingThatIncludeUnknown(a: boolean): unknown;
-function overloadingThatIncludeUnknown(a?: boolean): unknown | number {
-  return Promise.resolve(5);
-}
-      `,
-			Options: PromiseFunctionAsyncOptions{AllowAny: utils.Ref(false)},
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "missingAsync",
+					MessageId: "noNamespace",
 				},
 			},
 		},
 	})
+}
+
+// Test options parsing logic
+func TestNoNamespaceOptionsParsing(t *testing.T) {
+	// Test default options
+	opts := defaultNoNamespaceOptions
+	if *opts.AllowDeclarations != false {
+		t.Errorf("Expected default AllowDeclarations to be false, got %v", *opts.AllowDeclarations)
+	}
+	if *opts.AllowDefinitionFiles != true {
+		t.Errorf("Expected default AllowDefinitionFiles to be true, got %v", *opts.AllowDefinitionFiles)
+	}
+}
+
+// Test message building
+func TestNoNamespaceMessage(t *testing.T) {
+	message := buildNoNamespaceMessage()
+	if message.Id != "noNamespace" {
+		t.Errorf("Expected message ID to be 'noNamespace', got %s", message.Id)
+	}
+	if message.Description != "Namespace is not allowed." {
+		t.Errorf("Expected message description to be 'Namespace is not allowed.', got %s", message.Description)
+	}
 }

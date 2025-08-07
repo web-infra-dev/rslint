@@ -1,163 +1,88 @@
 package no_namespace
 
 import (
+	"strings"
+
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func buildMissingAsyncMessage() rule.RuleMessage {
+// build the message for no-namespace rule
+func buildNoNamespaceMessage() rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "missingAsync",
-		Description: "Functions that return promises must be async.",
+		Id:          "noNamespace",
+		Description: "Namespace is not allowed.",
 	}
 }
 
-type PromiseFunctionAsyncOptions struct {
-	AllowAny *bool
-	// TODO(port): TypeOrValueSpecifier
-	AllowedPromiseNames       []string
-	CheckArrowFunctions       *bool
-	CheckFunctionDeclarations *bool
-	CheckFunctionExpressions  *bool
-	CheckMethodDeclarations   *bool
+// rule options
+type NoNamespaceOptions struct {
+	AllowDeclarations    *bool `json:"allowDeclarations"`
+	AllowDefinitionFiles *bool `json:"allowDefinitionFiles"`
 }
 
-var PromiseFunctionAsyncRule = rule.CreateRule(rule.Rule{
-	Name: "promise-function-async",
+// default options
+var defaultNoNamespaceOptions = NoNamespaceOptions{
+	AllowDeclarations:    utils.Ref(false),
+	AllowDefinitionFiles: utils.Ref(true),
+}
+
+// rule instance
+// check if the namespace is used
+var NoNamespaceRule = rule.CreateRule(rule.Rule{
+	Name: "no-namespace",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts, ok := options.(PromiseFunctionAsyncOptions)
-		if !ok {
-			opts = PromiseFunctionAsyncOptions{}
-		}
-		if opts.AllowAny == nil {
-			opts.AllowAny = utils.Ref(true)
-		}
-		if opts.AllowedPromiseNames == nil {
-			opts.AllowedPromiseNames = []string{}
-		}
-		if opts.CheckArrowFunctions == nil {
-			opts.CheckArrowFunctions = utils.Ref(true)
-		}
-		if opts.CheckFunctionDeclarations == nil {
-			opts.CheckFunctionDeclarations = utils.Ref(true)
-		}
-		if opts.CheckFunctionExpressions == nil {
-			opts.CheckFunctionExpressions = utils.Ref(true)
-		}
-		if opts.CheckMethodDeclarations == nil {
-			opts.CheckMethodDeclarations = utils.Ref(true)
-		}
+		opts := defaultNoNamespaceOptions
 
-		allAllowedPromiseNames := utils.NewSetWithSizeHint[string](len(opts.AllowedPromiseNames))
-		allAllowedPromiseNames.Add("Promise")
-		for _, name := range opts.AllowedPromiseNames {
-			allAllowedPromiseNames.Add(name)
-		}
+		// Parse options with dual-format support (handles both array and object formats)
+		if options != nil {
+			var optsMap map[string]interface{}
+			var ok bool
 
-		var containsAllTypesByName func(t *checker.Type, matchAnyInstead bool) bool
-		containsAllTypesByName = func(t *checker.Type, matchAnyInstead bool) bool {
-			if utils.IsTypeFlagSet(t, checker.TypeFlagsAnyOrUnknown) {
-				return false
+			// Handle array format: [{ option: value }]
+			if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
+				optsMap, ok = optArray[0].(map[string]interface{})
+			} else {
+				// Handle direct object format: { option: value }
+				optsMap, ok = options.(map[string]interface{})
 			}
 
-			if utils.IsTypeFlagSet(t, checker.TypeFlagsObject) && checker.Type_objectFlags(t)&checker.ObjectFlagsReference != 0 {
-				t = t.Target()
-			}
-
-			symbol := checker.Type_symbol(t)
-			if symbol != nil && allAllowedPromiseNames.Has(symbol.Name) {
-				return true
-			}
-
-			predicate := func(t *checker.Type) bool {
-				return containsAllTypesByName(t, matchAnyInstead)
-			}
-
-			if utils.IsUnionType(t) || utils.IsIntersectionType(t) {
-				if matchAnyInstead {
-					return utils.Every(t.Types(), predicate)
+			if ok {
+				if allowDeclarations, ok := optsMap["allowDeclarations"].(bool); ok {
+					opts.AllowDeclarations = utils.Ref(allowDeclarations)
 				}
-				return utils.Some(t.Types(), predicate)
+				if allowDefinitionFiles, ok := optsMap["allowDefinitionFiles"].(bool); ok {
+					opts.AllowDefinitionFiles = utils.Ref(allowDefinitionFiles)
+				}
 			}
-
-			if checker.Type_objectFlags(t)&checker.ObjectFlagsClassOrInterface == 0 {
-				return false
-			}
-
-			bases := checker.Checker_getBaseTypes(ctx.TypeChecker, t)
-			if matchAnyInstead {
-				return utils.Some(bases, predicate)
-			}
-			return len(bases) > 0 && utils.Every(bases, predicate)
 		}
 
-		listeners := make(rule.RuleListeners, 3)
-
-		validateNode := func(node *ast.Node) {
-			if utils.IncludesModifier(node, ast.KindAsyncKeyword) || node.Body() == nil {
-				return
-			}
-
-			t := ctx.TypeChecker.GetTypeAtLocation(node)
-			signatures := utils.GetCallSignatures(ctx.TypeChecker, t)
-			if len(signatures) == 0 {
-				return
-			}
-
-			everySignatureReturnsPromise := true
-			for _, signature := range signatures {
-				returnType := checker.Checker_getReturnTypeOfSignature(ctx.TypeChecker, signature)
-				if !*opts.AllowAny && utils.IsTypeFlagSet(returnType, checker.TypeFlagsAnyOrUnknown) {
-					// Report without auto fixer because the return type is unknown
-					// TODO(port): getFunctionHeadLoc
-					ctx.ReportNode(node, buildMissingAsyncMessage())
+		return rule.RuleListeners{
+			ast.KindModuleDeclaration: func(node *ast.Node) {
+				moduleDecl := node.AsModuleDeclaration()
+				if moduleDecl == nil {
 					return
 				}
 
-				// require all potential return types to be promise/any/unknown
-				everySignatureReturnsPromise = everySignatureReturnsPromise && containsAllTypesByName(
-					returnType,
-					// If no return type is explicitly set, we check if any parts of the return type match a Promise (instead of requiring all to match).
-					node.Type() != nil,
-				)
-			}
-
-			if !everySignatureReturnsPromise {
-				return
-			}
-
-			insertAsyncBeforeNode := node
-			if ast.IsMethodDeclaration(node) {
-				insertAsyncBeforeNode = node.Name()
-			}
-			// TODO(port): getFunctionHeadLoc
-			ctx.ReportNodeWithFixes(node, buildMissingAsyncMessage(), rule.RuleFixInsertBefore(ctx.SourceFile, insertAsyncBeforeNode, " async "))
-		}
-
-		if *opts.CheckArrowFunctions {
-			listeners[ast.KindArrowFunction] = validateNode
-		}
-
-		if *opts.CheckFunctionDeclarations {
-			listeners[ast.KindFunctionDeclaration] = validateNode
-		}
-
-		if *opts.CheckFunctionExpressions {
-			listeners[ast.KindFunctionExpression] = validateNode
-		}
-
-		if *opts.CheckMethodDeclarations {
-			listeners[ast.KindMethodDeclaration] = func(node *ast.Node) {
-				if utils.IncludesModifier(node, ast.KindAbstractKeyword) {
-					// Abstract method can't be async
+				// Check if this is a namespace declaration (keyword is KindNamespaceKeyword)
+				if moduleDecl.Keyword != ast.KindNamespaceKeyword {
 					return
 				}
-				validateNode(node)
-			}
-		}
 
-		return listeners
+				// Check if we're in a .d.ts file and allowDefinitionFiles is true
+				if opts.AllowDefinitionFiles != nil && *opts.AllowDefinitionFiles && strings.HasSuffix(ctx.SourceFile.FileName(), ".d.ts") {
+					return
+				}
+
+				// Check if this is a declare namespace and allowDeclarations is true
+				if opts.AllowDeclarations != nil && *opts.AllowDeclarations && utils.IncludesModifier(node, ast.KindDeclareKeyword) {
+					return
+				}
+
+				// Report the namespace usage
+				ctx.ReportNode(moduleDecl.Name(), buildNoNamespaceMessage())
+			},
+		}
 	},
 })
