@@ -1,5 +1,3 @@
-// Package no_namespace 提供了 TypeScript 代码检查规则
-// 注意：当前文件内容似乎与文件名不匹配，实际实现的是 promise-function-async 规则
 package no_namespace
 
 import (
@@ -9,23 +7,24 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// buildMissingAsyncMessage 构建缺失 async 关键字的错误消息
-func buildMissingAsyncMessage() rule.RuleMessage {
+// build the message for no-namespace rule
+func buildNoNamespaceMessage() rule.RuleMessage {
 	return rule.RuleMessage{
-		Id:          "missingAsync",
-		Description: "Functions that return promises must be async.",
+		Id:          "noNamespace",
+		Description: "Namespace is not allowed.",
 	}
 }
 
-// PromiseFunctionAsyncOptions 定义了 Promise 函数异步化规则的配置选项
-type PromiseFunctionAsyncOptions struct {
-	AllowAny *bool // 是否允许 any 类型
-	// TODO(port): TypeOrValueSpecifier
-	AllowedPromiseNames       []string // 允许的 Promise 类型名称列表
-	CheckArrowFunctions       *bool    // 是否检查箭头函数
-	CheckFunctionDeclarations *bool    // 是否检查函数声明
-	CheckFunctionExpressions  *bool    // 是否检查函数表达式
-	CheckMethodDeclarations   *bool    // 是否检查方法声明
+// rule options
+type NoNamespaceOptions struct {
+	AllowDeclarations    *bool `json:"allowDeclarations"`
+	AllowDefinitionFiles *bool `json:"allowDefinitionFiles"`
+}
+
+// default options
+var defaultNoNamespaceOptions = NoNamespaceOptions{
+	AllowDeclarations:    utils.Ref(false),
+	AllowDefinitionFiles: utils.Ref(true),
 }
 
 // PromiseFunctionAsyncRule 是主要的规则实例
