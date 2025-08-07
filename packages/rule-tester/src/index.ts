@@ -157,7 +157,6 @@ export class RuleTester {
             return false;
           }
         }) || cases.invalid.some(x => x.only);
-      const defaultVirtualEntry = path.resolve(cwd, 'src/virtual.ts');
       test('valid', async () => {
         for (const validCase of cases.valid) {
           if (typeof validCase === 'object' && validCase.skip) {
