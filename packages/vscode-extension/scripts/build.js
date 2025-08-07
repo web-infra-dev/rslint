@@ -4,8 +4,8 @@ const fs = require('fs');
 const isWatchMode = process.argv.includes('--watch');
 
 const config = {
-  entryPoints: ['src/extension.ts'],
-  outfile: 'dist/extension.js',
+  entryPoints: ['src/main.ts'],
+  outfile: 'dist/main.js',
   format: 'cjs',
   bundle: true,
 
