@@ -60,8 +60,9 @@ type LintRequest struct {
 	Format           string   `json:"format,omitempty"`
 	WorkingDirectory string   `json:"workingDirectory,omitempty"`
 	// Supports both string level and array [level, options] format
-	RuleOptions  map[string]interface{} `json:"ruleOptions,omitempty"`
-	FileContents map[string]string      `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
+	RuleOptions     map[string]interface{} `json:"ruleOptions,omitempty"`
+	FileContents    map[string]string      `json:"fileContents,omitempty"`     // Map of file paths to their contents for VFS
+	CompilerOptions map[string]interface{} `json:"compilerOptions,omitempty"` // TypeScript compiler options to override config file settings
 }
 
 // LintResponse represents a lint response from Go to JS

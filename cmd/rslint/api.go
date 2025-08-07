@@ -185,7 +185,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	// Create programs from all tsconfig files found in rslint config
 	programs := []*compiler.Program{}
 	for _, configFileName := range tsConfigs {
-		program, err := utils.CreateProgram(false, fs, configDirectory, configFileName, host)
+		program, err := utils.CreateProgramWithOverrides(false, fs, configDirectory, configFileName, host, req.CompilerOptions)
 		if err != nil {
 			return nil, fmt.Errorf("error creating TS program for %s: %w", configFileName, err)
 		}

@@ -21,12 +21,26 @@ func CreateCompilerHost(cwd string, fs vfs.FS) compiler.CompilerHost {
 }
 
 func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath string, host compiler.CompilerHost) (*compiler.Program, error) {
+	return CreateProgramWithOverrides(singleThreaded, fs, cwd, tsconfigPath, host, nil)
+}
+
+func CreateProgramWithOverrides(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath string, host compiler.CompilerHost, compilerOptionsOverrides map[string]interface{}) (*compiler.Program, error) {
 	resolvedConfigPath := tspath.ResolvePath(cwd, tsconfigPath)
 	if !fs.FileExists(resolvedConfigPath) {
 		return nil, fmt.Errorf("couldn't read tsconfig at %v", resolvedConfigPath)
 	}
 
-	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(tsconfigPath, &core.CompilerOptions{}, host, nil)
+	// Start with empty existing options, we'll apply overrides later
+	existingOptions := &core.CompilerOptions{}
+	
+	// Apply compiler options overrides if provided
+	if compilerOptionsOverrides != nil {
+		for key, value := range compilerOptionsOverrides {
+			tsoptions.ParseCompilerOptions(key, value, existingOptions)
+		}
+	}
+
+	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(tsconfigPath, existingOptions, host, nil)
 
 	opts := compiler.ProgramOptions{
 		Config:         configParseResult,
