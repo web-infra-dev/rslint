@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -392,4 +393,54 @@ func isFileIgnoredSimple(filePath string, ignorePatterns []string) bool {
 		}
 	}
 	return false
+}
+
+// InitConfig creates a default rslint.json configuration file in the specified directory
+func InitConfig(directory string) error {
+	configPath := filepath.Join(directory, "rslint.json")
+
+	// Check if config file already exists
+	if _, err := os.Stat(configPath); err == nil {
+		return fmt.Errorf("rslint.json already exists in %s", directory)
+	}
+
+	// Create default configuration
+	configContent := `[
+  {
+    "language": "javascript",
+    "files": [],
+    "ignores": [
+      "node_modules/**",
+      "dist/**",
+      "build/**",
+      "*.min.js"
+    ],
+    "languageOptions": {
+      "parserOptions": {
+        "projectService": false,
+        "project": ["./tsconfig.json"]
+      }
+    },
+    "rules": {
+      "@typescript-eslint/no-unsafe-assignment": "warn",
+      "@typescript-eslint/no-unsafe-member-access": "warn",
+      "@typescript-eslint/no-unsafe-argument": "warn",
+      "@typescript-eslint/no-unnecessary-type-assertion": "warn",
+      "@typescript-eslint/no-empty-function": "warn",
+      "@typescript-eslint/no-empty-interface": "warn",
+      "@typescript-eslint/no-require-imports": "warn",
+      "@typescript-eslint/no-namespace": "warn"
+    },
+    "plugins": ["@typescript-eslint"]
+  }
+]`
+
+	// Write the configuration file
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create rslint.json: %w", err)
+	}
+
+	fmt.Printf("Created rslint.json in %s\n", directory)
+	return nil
 }
