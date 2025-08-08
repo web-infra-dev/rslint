@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -535,7 +534,7 @@ func TestInitConfig(t *testing.T) {
 		}
 
 		// Verify error message
-		expectedError := fmt.Sprintf("rslint.json already exists in %s", testDir)
+		expectedError := "rslint.json already exists in " + testDir
 		if err.Error() != expectedError {
 			t.Errorf("Expected error message '%s', but got '%s'", expectedError, err.Error())
 		}
@@ -674,7 +673,7 @@ func TestInitConfig(t *testing.T) {
 		errors := make(chan error, numGoroutines)
 		var wg sync.WaitGroup
 
-		for i := 0; i < numGoroutines; i++ {
+		for range numGoroutines {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
@@ -786,7 +785,7 @@ func TestInitConfig(t *testing.T) {
 		}
 
 		// Verify error message
-		expectedError := fmt.Sprintf("rslint.json already exists in %s", testDir)
+		expectedError := "rslint.json already exists in " + testDir
 		if err.Error() != expectedError {
 			t.Errorf("Expected error message '%s', but got '%s'", expectedError, err.Error())
 		}
