@@ -18,7 +18,7 @@ Rslint is a high-performance TypeScript/JavaScript linter written in Go, designe
 
 **Setup Commands (Execute in Order):**
 
-1. `git submodule update --init --recursive` -- takes 3 minutes. NEVER CANCEL. Set timeout to 10+ minutes.
+1. `git submodule update --init --recursive` -- typically takes about 3 minutes, but duration may vary significantly depending on network speed and repository size. NEVER CANCEL. Set timeout to 10+ minutes.
 2. `pnpm install` -- takes <1 second (dependencies cached). Set timeout to 5+ minutes for safety.
 3. `pnpm build` -- takes 5 minutes. NEVER CANCEL. Set timeout to 15+ minutes.
 
