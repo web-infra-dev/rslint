@@ -158,30 +158,29 @@ func GetWellKnownSymbolPropertyOfType(t *checker.Type, name string, typeChecker 
 	return checker.Checker_getPropertyOfType(typeChecker, t, checker.Checker_getPropertyNameForKnownSymbolName(typeChecker, name))
 }
 
-/**
- * Checks if a given compiler option is enabled, accounting for whether all flags
- * (except `strictPropertyInitialization`) have been enabled by `strict: true`.
- * @category Compiler Options
- * @example
- * ```ts
- * const optionsLenient = {
- * 	noImplicitAny: true,
- * };
- *
- * isStrictCompilerOptionEnabled(optionsLenient, "noImplicitAny"); // true
- * isStrictCompilerOptionEnabled(optionsLenient, "noImplicitThis"); // false
- * ```
- * @example
- * ```ts
- * const optionsStrict = {
- * 	noImplicitThis: false,
- * 	strict: true,
- * };
- *
- * isStrictCompilerOptionEnabled(optionsStrict, "noImplicitAny"); // true
- * isStrictCompilerOptionEnabled(optionsStrict, "noImplicitThis"); // false
- * ```
- */
+// Checks if a given compiler option is enabled, accounting for whether all flags
+// (except `strictPropertyInitialization`) have been enabled by `strict: true`.
+//
+// @category Compiler Options
+//
+// @example
+//
+//	const optionsLenient = {
+//		noImplicitAny: true,
+//	};
+//
+// isStrictCompilerOptionEnabled(optionsLenient, "noImplicitAny"); // true
+// isStrictCompilerOptionEnabled(optionsLenient, "noImplicitThis"); // false
+//
+// @example
+//
+//	const optionsStrict = {
+//		noImplicitThis: false,
+//		strict: true,
+//	};
+//
+// isStrictCompilerOptionEnabled(optionsStrict, "noImplicitAny"); // true
+// isStrictCompilerOptionEnabled(optionsStrict, "noImplicitThis"); // false
 func IsStrictCompilerOptionEnabled(
 	options *core.CompilerOptions,
 	option core.Tristate,
@@ -197,20 +196,20 @@ func IsStrictCompilerOptionEnabled(
 	// );
 }
 
-/**
- * Iterates over all tokens of `node`
- * @category Nodes - Other Utilities
- * @example
- * ```ts
- * declare const node: ts.Node;
- *
- * forEachToken(node, (token) => {
- * 	console.log("Found token:", token.getText());
- * });
- * ```
- * @param node The node whose tokens should be visited
- * @param callback Is called for every token contained in `node`
- */
+// Iterates over all tokens of `node`
+//
+// @category Nodes - Other Utilities
+//
+// @example
+//
+// declare const node: ts.Node;
+//
+//	forEachToken(node, (token) => {
+//		console.log("Found token:", token.getText());
+//	});
+//
+// @param node The node whose tokens should be visited
+// @param callback Is called for every token contained in `node`
 func ForEachToken(node *ast.Node, callback func(token *ast.Node), sourceFile *ast.SourceFile) {
 	queue := []*ast.Node{}
 
@@ -256,21 +255,18 @@ func ForEachToken(node *ast.Node, callback func(token *ast.Node), sourceFile *as
 	}
 }
 
+// Port https://github.com/JoshuaKGoldberg/ts-api-utils/blob/491c0374725a5dd64632405efea101f20ed5451f/src/comments.ts#L37C17-L37C31
+// Iterates over all comments owned by `node` or its children.
 //
-/**
- * Port https://github.com/JoshuaKGoldberg/ts-api-utils/blob/491c0374725a5dd64632405efea101f20ed5451f/src/comments.ts#L37C17-L37C31
- *
- * Iterates over all comments owned by `node` or its children.
- * @category Nodes - Other Utilities
- * @example
- * ```ts
- * declare const node: ts.Node;
- *
- * forEachComment(node, (fullText, comment) => {
- *    console.log(`Found comment at position ${comment.pos}: '${fullText}'.`);
- * });
- * ```
- */
+// @category Nodes - Other Utilities
+//
+// @example
+//
+// declare const node: ts.Node;
+//
+//	forEachComment(node, (fullText, comment) => {
+//	   console.log(`Found comment at position ${comment.pos}: '${fullText}'.`);
+//	});
 func ForEachComment(node *ast.Node, callback func(comment *ast.CommentRange), sourceFile *ast.SourceFile) {
 	nodeFactory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
 
@@ -306,12 +302,10 @@ func ForEachComment(node *ast.Node, callback func(comment *ast.CommentRange), so
 	)
 }
 
-/**
- * Port https://github.com/JoshuaKGoldberg/ts-api-utils/blob/491c0374725a5dd64632405efea101f20ed5451f/src/comments.ts#L84
- *
- * Exclude trailing positions that would lead to scanning for trivia inside `JsxText`.
- * @internal
- */
+// Port https://github.com/JoshuaKGoldberg/ts-api-utils/blob/491c0374725a5dd64632405efea101f20ed5451f/src/comments.ts#L84
+//
+// Exclude trailing positions that would lead to scanning for trivia inside `JsxText`.
+// @internal
 func canHaveTrailingTrivia(token *ast.Node) bool {
 	switch token.Kind {
 	case ast.KindCloseBraceToken:
@@ -338,10 +332,8 @@ func canHaveTrailingTrivia(token *ast.Node) bool {
 	return true
 }
 
-/**
- * Test if a node is a `JsxElement` or `JsxFragment`.
- * @internal
- */
+// Test if a node is a `JsxElement` or `JsxFragment`.
+// @internal
 func isJsxElementOrFragment(node *ast.Node) bool {
 	return node.Kind == ast.KindJsxElement || node.Kind == ast.KindJsxFragment
 }
