@@ -1,9 +1,13 @@
 package config
 
 import (
+	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -392,4 +396,59 @@ func isFileIgnoredSimple(filePath string, ignorePatterns []string) bool {
 		}
 	}
 	return false
+}
+
+// downloadConfigFromURL downloads configuration content from a remote URL
+func downloadConfigFromURL(url string) ([]byte, error) {
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+
+	resp, err := client.Get(url)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download config from %s: %w", url, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to download config: HTTP %d", resp.StatusCode)
+	}
+
+	content, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	return content, nil
+}
+
+// InitConfig creates a default rslint.json configuration file in the specified directory
+func InitConfig(directory string) error {
+	// Create directory if it doesn't exist
+	if err := os.MkdirAll(directory, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", directory, err)
+	}
+
+	configPath := filepath.Join(directory, "rslint.json")
+
+	// Check if config file already exists
+	if _, err := os.Stat(configPath); err == nil {
+		return fmt.Errorf("rslint.json already exists in %s", directory)
+	}
+
+	// Download configuration from remote URL
+	remoteURL := "https://raw.githubusercontent.com/web-infra-dev/rslint/refs/heads/main/rslint.json"
+	configContent, err := downloadConfigFromURL(remoteURL)
+	if err != nil {
+		return fmt.Errorf("failed to download configuration: %w", err)
+	}
+
+	// Write the configuration file
+	err = os.WriteFile(configPath, configContent, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create rslint.json: %w", err)
+	}
+
+	fmt.Printf("Downloaded and created rslint.json in %s from %s\n", directory, remoteURL)
+	return nil
 }

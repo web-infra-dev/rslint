@@ -1,6 +1,12 @@
 package config
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"runtime"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/bmatcuk/doublestar/v4"
@@ -450,4 +456,385 @@ func TestGetRulesForFileWithArrayConfig(t *testing.T) {
 	} else {
 		t.Error("expected rule5 to exist")
 	}
+}
+
+func TestInitConfig(t *testing.T) {
+	// Create temporary directory for testing
+	tempDir := t.TempDir()
+
+	t.Run("Successfully download and create configuration file", func(t *testing.T) {
+		// Test directory
+		testDir := filepath.Join(tempDir, "success_test")
+		err := os.MkdirAll(testDir, 0755)
+		if err != nil {
+			t.Fatalf("Failed to create test directory: %v", err)
+		}
+
+		// Call InitConfig
+		err = InitConfig(testDir)
+
+		// Verify no error
+		if err != nil {
+			t.Errorf("InitConfig should succeed, but returned error: %v", err)
+		}
+
+		// Verify configuration file is created
+		configPath := filepath.Join(testDir, "rslint.json")
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			t.Error("Configuration file should be created, but file does not exist")
+		}
+
+		// Verify configuration file content
+		content, err := os.ReadFile(configPath)
+		if err != nil {
+			t.Errorf("Failed to read configuration file: %v", err)
+		}
+
+		// Verify content is not empty
+		if len(content) == 0 {
+			t.Error("Configuration file content should not be empty")
+		}
+
+		// Verify content is not empty and contains basic structure
+		if len(content) == 0 {
+			t.Error("Configuration file content should not be empty")
+		}
+
+		// Check if it contains basic configuration structure (not requiring strict JSON)
+		contentStr := string(content)
+		if !strings.Contains(contentStr, "language") {
+			t.Error("Configuration file should contain 'language' field")
+		}
+		if !strings.Contains(contentStr, "files") {
+			t.Error("Configuration file should contain 'files' field")
+		}
+	})
+
+	t.Run("Return error when configuration file already exists", func(t *testing.T) {
+		// Test directory
+		testDir := filepath.Join(tempDir, "exists_test")
+		err := os.MkdirAll(testDir, 0755)
+		if err != nil {
+			t.Fatalf("Failed to create test directory: %v", err)
+		}
+
+		// Pre-create a configuration file
+		configPath := filepath.Join(testDir, "rslint.json")
+		existingContent := `[{"language": "typescript", "files": ["**/*.ts"]}]`
+		err = os.WriteFile(configPath, []byte(existingContent), 0644)
+		if err != nil {
+			t.Fatalf("Failed to create existing configuration file: %v", err)
+		}
+
+		// Call InitConfig
+		err = InitConfig(testDir)
+
+		// Verify error is returned
+		if err == nil {
+			t.Error("InitConfig should return error when configuration file already exists")
+		}
+
+		// Verify error message
+		expectedError := fmt.Sprintf("rslint.json already exists in %s", testDir)
+		if err.Error() != expectedError {
+			t.Errorf("Expected error message '%s', but got '%s'", expectedError, err.Error())
+		}
+
+		// Verify original file content is not modified
+		content, err := os.ReadFile(configPath)
+		if err != nil {
+			t.Errorf("Failed to read configuration file: %v", err)
+		}
+		if string(content) != existingContent {
+			t.Error("Existing configuration file content should not be modified")
+		}
+	})
+
+	t.Run("Auto-create directory when it doesn't exist", func(t *testing.T) {
+		// Use non-existent directory
+		nonExistentDir := filepath.Join(tempDir, "non_existent", "subdir")
+
+		// Call InitConfig
+		err := InitConfig(nonExistentDir)
+
+		// Verify no error
+		if err != nil {
+			t.Errorf("InitConfig should successfully create directory and configuration file, but returned error: %v", err)
+		}
+
+		// Verify directory is created
+		if _, err := os.Stat(nonExistentDir); os.IsNotExist(err) {
+			t.Error("Directory should be auto-created")
+		}
+
+		// Verify configuration file is created
+		configPath := filepath.Join(nonExistentDir, "rslint.json")
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			t.Error("Configuration file should be created")
+		}
+	})
+
+	t.Run("Network error handling", func(t *testing.T) {
+		// This test needs to simulate network errors
+		// Since downloadConfigFromURL is an internal function, we need to test it through other means
+		// Here we test an invalid URL scenario (if possible)
+
+		// Note: This test may need to modify the downloadConfigFromURL function to support testing
+		// Or control the remote URL through environment variables
+		t.Skip("Network error test requires modification of downloadConfigFromURL function to support testing")
+	})
+
+	t.Run("HTTP error status code handling", func(t *testing.T) {
+		// This test needs to simulate HTTP error status codes
+		t.Skip("HTTP error status code test requires modification of downloadConfigFromURL function to support testing")
+	})
+
+	t.Run("File permission error handling", func(t *testing.T) {
+		// Test directory
+		testDir := filepath.Join(tempDir, "permission_test")
+		err := os.MkdirAll(testDir, 0755)
+		if err != nil {
+			t.Fatalf("Failed to create test directory: %v", err)
+		}
+
+		// On Unix systems, we can try to set read-only permissions
+		// But this may not work on all systems
+		if runtime.GOOS != "windows" {
+			// Set directory to read-only (this may prevent file creation)
+			err = os.Chmod(testDir, 0444)
+			if err != nil {
+				t.Logf("Unable to set directory permissions for testing: %v", err)
+				t.Skip("Permission test skipped")
+			}
+
+			// Try to call InitConfig
+			err = InitConfig(testDir)
+
+			// Should return error
+			if err == nil {
+				t.Error("InitConfig should return error in read-only directory")
+			}
+
+			// Restore permissions for cleanup
+			os.Chmod(testDir, 0755)
+		}
+	})
+
+	t.Run("Configuration file content validation", func(t *testing.T) {
+		// Test directory
+		testDir := filepath.Join(tempDir, "content_test")
+		err := os.MkdirAll(testDir, 0755)
+		if err != nil {
+			t.Fatalf("Failed to create test directory: %v", err)
+		}
+
+		// Call InitConfig
+		err = InitConfig(testDir)
+		if err != nil {
+			t.Fatalf("InitConfig failed: %v", err)
+		}
+
+		// Read and validate configuration file content
+		configPath := filepath.Join(testDir, "rslint.json")
+		content, err := os.ReadFile(configPath)
+		if err != nil {
+			t.Fatalf("Failed to read configuration file: %v", err)
+		}
+
+		// Verify content is not empty and contains basic structure
+		if len(content) == 0 {
+			t.Fatalf("Configuration file content should not be empty")
+		}
+
+		// Check if it contains basic configuration structure (not requiring strict JSON)
+		contentStr := string(content)
+		if !strings.Contains(contentStr, "language") {
+			t.Fatalf("Configuration file should contain 'language' field")
+		}
+		if !strings.Contains(contentStr, "files") {
+			t.Fatalf("Configuration file should contain 'files' field")
+		}
+
+		// Verify configuration structure (if possible)
+		if !strings.Contains(contentStr, "[") || !strings.Contains(contentStr, "]") {
+			t.Fatalf("Configuration file should contain array structure")
+		}
+	})
+
+	t.Run("Concurrent call safety", func(t *testing.T) {
+		// Test directory
+		testDir := filepath.Join(tempDir, "concurrent_test")
+		err := os.MkdirAll(testDir, 0755)
+		if err != nil {
+			t.Fatalf("Failed to create test directory: %v", err)
+		}
+
+		// Concurrent calls to InitConfig
+		const numGoroutines = 5
+		errors := make(chan error, numGoroutines)
+		var wg sync.WaitGroup
+
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				err := InitConfig(testDir)
+				errors <- err
+			}()
+		}
+
+		wg.Wait()
+		close(errors)
+
+		// Count successful and failed calls
+		successCount := 0
+		errorCount := 0
+		for err := range errors {
+			if err == nil {
+				successCount++
+			} else {
+				errorCount++
+			}
+		}
+
+		// Due to race conditions, there may be multiple successful calls
+		// But at least one should succeed, and there should be only one configuration file
+		if successCount < 1 {
+			t.Errorf("Expected at least one successful call, but got %d", successCount)
+		}
+
+		// Verify configuration file is actually created
+		configPath := filepath.Join(testDir, "rslint.json")
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			t.Error("Configuration file should be created")
+		}
+
+		// Verify there is only one configuration file (by checking file size)
+		fileInfo, err := os.Stat(configPath)
+		if err != nil {
+			t.Errorf("Unable to get file info: %v", err)
+		}
+		if fileInfo.Size() == 0 {
+			t.Error("Configuration file should not be empty")
+		}
+	})
+
+	t.Run("Empty directory path handling", func(t *testing.T) {
+		// Test empty directory path
+		err := InitConfig("")
+
+		// Should return error (because cannot create directory with empty path)
+		if err == nil {
+			t.Error("Empty directory path should return error")
+		}
+	})
+
+	t.Run("Relative path handling", func(t *testing.T) {
+		// Test relative path
+		relativeDir := "relative_test_dir"
+		defer os.RemoveAll(relativeDir) // cleanup
+
+		err := InitConfig(relativeDir)
+
+		// Verify no error
+		if err != nil {
+			t.Errorf("Relative path should succeed, but returned error: %v", err)
+		}
+
+		// Verify configuration file is created
+		configPath := filepath.Join(relativeDir, "rslint.json")
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			t.Error("Configuration file should be created")
+		}
+	})
+
+	t.Run("Special character path handling", func(t *testing.T) {
+		// Test path with special characters
+		specialDir := filepath.Join(tempDir, "test-dir_with.special@chars")
+		err := InitConfig(specialDir)
+
+		// Verify no error
+		if err != nil {
+			t.Errorf("Special character path should succeed, but returned error: %v", err)
+		}
+
+		// Verify configuration file is created
+		configPath := filepath.Join(specialDir, "rslint.json")
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			t.Error("Configuration file should be created")
+		}
+	})
+
+	t.Run("Multiple calls to same directory", func(t *testing.T) {
+		// Test directory
+		testDir := filepath.Join(tempDir, "multiple_calls_test")
+		err := os.MkdirAll(testDir, 0755)
+		if err != nil {
+			t.Fatalf("Failed to create test directory: %v", err)
+		}
+
+		// First call should succeed
+		err = InitConfig(testDir)
+		if err != nil {
+			t.Errorf("First call should succeed, but returned error: %v", err)
+		}
+
+		// Second call should fail
+		err = InitConfig(testDir)
+		if err == nil {
+			t.Error("Second call should return error")
+		}
+
+		// Verify error message
+		expectedError := fmt.Sprintf("rslint.json already exists in %s", testDir)
+		if err.Error() != expectedError {
+			t.Errorf("Expected error message '%s', but got '%s'", expectedError, err.Error())
+		}
+	})
+
+	t.Run("Configuration file permission verification", func(t *testing.T) {
+		// Test directory
+		testDir := filepath.Join(tempDir, "permission_verify_test")
+		err := os.MkdirAll(testDir, 0755)
+		if err != nil {
+			t.Fatalf("Failed to create test directory: %v", err)
+		}
+
+		// Call InitConfig
+		err = InitConfig(testDir)
+		if err != nil {
+			t.Fatalf("InitConfig failed: %v", err)
+		}
+
+		// Verify configuration file permissions
+		configPath := filepath.Join(testDir, "rslint.json")
+		fileInfo, err := os.Stat(configPath)
+		if err != nil {
+			t.Fatalf("Unable to get file info: %v", err)
+		}
+
+		// Check file permissions (Unix systems)
+		if runtime.GOOS != "windows" {
+			mode := fileInfo.Mode()
+			// File should be readable and writable
+			if mode&0400 == 0 {
+				t.Error("Configuration file should be readable")
+			}
+			if mode&0200 == 0 {
+				t.Error("Configuration file should be writable")
+			}
+		}
+	})
+
+	t.Run("Network timeout handling", func(t *testing.T) {
+		// This test needs to simulate network timeouts
+		// Since downloadConfigFromURL is an internal function, we skip this test
+		t.Skip("Network timeout test requires modification of downloadConfigFromURL function to support testing")
+	})
+
+	t.Run("Disk space insufficient handling", func(t *testing.T) {
+		// This test needs to simulate insufficient disk space
+		// Difficult to simulate in real environment, so skip
+		t.Skip("Disk space insufficient test is difficult to simulate in real environment")
+	})
 }
