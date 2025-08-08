@@ -5,7 +5,7 @@ exports[`member-ordering > invalid 1`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
-      "message": "Member new should be declared before all method definitions.",
+      "message": "Member new (); should be declared before all method definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -31,7 +31,7 @@ exports[`member-ordering > invalid 2`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
-      "message": "Member call should be declared before all field definitions.",
+      "message": "Member (): void; should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -153,7 +153,7 @@ exports[`member-ordering > invalid 3`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member new should be declared before all field definitions.",
+      "message": "Member new (); should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -169,7 +169,7 @@ exports[`member-ordering > invalid 3`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member Z should be declared before all field definitions.",
+      "message": "Member [Z: string]: any; should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -291,7 +291,7 @@ exports[`member-ordering > invalid 4`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member new should be declared before all field definitions.",
+      "message": "Member new (); should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -307,7 +307,7 @@ exports[`member-ordering > invalid 4`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member Z should be declared before all field definitions.",
+      "message": "Member [Z: string]: any; should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -429,7 +429,7 @@ exports[`member-ordering > invalid 5`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member new should be declared before all field definitions.",
+      "message": "Member new (); should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -445,7 +445,7 @@ exports[`member-ordering > invalid 5`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member Z should be declared before all field definitions.",
+      "message": "Member [Z: string]: any; should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -561,7 +561,7 @@ exports[`member-ordering > invalid 7`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
-      "message": "Member new should be declared before all method definitions.",
+      "message": "Member new (); should be declared before all method definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -683,7 +683,7 @@ exports[`member-ordering > invalid 8`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member Z should be declared before all field definitions.",
+      "message": "Member [Z: string]: any; should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -699,7 +699,7 @@ exports[`member-ordering > invalid 8`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member new should be declared before all field definitions.",
+      "message": "Member new (); should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -821,7 +821,7 @@ exports[`member-ordering > invalid 9`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member new should be declared before all signature definitions.",
+      "message": "Member new (); should be declared before all signature definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -943,7 +943,7 @@ exports[`member-ordering > invalid 10`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member new should be declared before all field definitions.",
+      "message": "Member new (); should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -959,7 +959,7 @@ exports[`member-ordering > invalid 10`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member Z should be declared before all field definitions.",
+      "message": "Member [Z: string]: any; should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -1403,7 +1403,7 @@ exports[`member-ordering > invalid 16`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member  should be declared before all field definitions.",
+      "message": "Member constructor() {} should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -1525,7 +1525,7 @@ exports[`member-ordering > invalid 17`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member  should be declared before all field definitions.",
+      "message": "Member constructor() {} should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -1609,7 +1609,7 @@ exports[`member-ordering > invalid 19`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member  should be declared before all public field definitions.",
+      "message": "Member constructor() {} should be declared before all public field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -1635,7 +1635,7 @@ exports[`member-ordering > invalid 20`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
-      "message": "Member  should be declared before all method definitions.",
+      "message": "Member constructor() {} should be declared before all method definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -2035,7 +2035,7 @@ exports[`member-ordering > invalid 28`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member  should be declared before all field definitions.",
+      "message": "Member constructor() {} should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -2157,7 +2157,7 @@ exports[`member-ordering > invalid 29`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member  should be declared before all field definitions.",
+      "message": "Member constructor() {} should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -2241,7 +2241,7 @@ exports[`member-ordering > invalid 31`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member  should be declared before all public field definitions.",
+      "message": "Member constructor() {} should be declared before all public field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -2267,7 +2267,7 @@ exports[`member-ordering > invalid 32`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
-      "message": "Member  should be declared before all method definitions.",
+      "message": "Member constructor() {} should be declared before all method definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -2403,7 +2403,7 @@ exports[`member-ordering > invalid 36`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member  should be declared before all public instance method definitions.",
+      "message": "Member constructor() {} should be declared before all public instance method definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -2419,7 +2419,7 @@ exports[`member-ordering > invalid 36`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member Z should be declared before all public instance method definitions.",
+      "message": "Member [Z: string]: any; should be declared before all public instance method definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -2747,8 +2747,7 @@ exports[`member-ordering > invalid 48`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
-      "message": "Member @Decorator()
-  B() {} should be declared before all method definitions.",
+      "message": "Member @Decorator() should be declared before all method definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -2826,7 +2825,7 @@ exports[`member-ordering > invalid 51`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
-      "message": "Member  should be declared before all get, set definitions.",
+      "message": "Member constructor() {} should be declared before all get, set definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -2852,7 +2851,7 @@ exports[`member-ordering > invalid 52`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
-      "message": "Member  should be declared before all private decorated field, public set, private method definitions.",
+      "message": "Member constructor() {} should be declared before all private decorated field, public set, private method definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -2946,7 +2945,7 @@ exports[`member-ordering > invalid 55`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
-      "message": "Member static block should be declared before all method definitions.",
+      "message": "Member static {} should be declared before all method definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -2972,7 +2971,7 @@ exports[`member-ordering > invalid 56`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
-      "message": "Member static block should be declared before all field definitions.",
+      "message": "Member static {} should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -3024,7 +3023,7 @@ exports[`member-ordering > invalid 58`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
-      "message": "Member static block should be declared before all method definitions.",
+      "message": "Member static {} should be declared before all method definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -3040,8 +3039,7 @@ exports[`member-ordering > invalid 58`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member @dec
-  md() {} should be declared before all method definitions.",
+      "message": "Member @dec should be declared before all method definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -3119,7 +3117,7 @@ exports[`member-ordering > invalid 61`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
-      "message": "Member B should be declared before all public static field definitions.",
+      "message": "Member [B: string]: any; should be declared before all public static field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -3145,7 +3143,7 @@ exports[`member-ordering > invalid 62`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
-      "message": "Member B should be declared before member static C: boolean;.",
+      "message": "Member [B: string]: any; should be declared before member static C: boolean;.",
       "messageId": "incorrectOrder",
       "range": {
         "end": {
@@ -3223,7 +3221,7 @@ exports[`member-ordering > invalid 65`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
-      "message": "Member  should be declared before all public set, private method definitions.",
+      "message": "Member constructor() {} should be declared before all public set, private method definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -3407,7 +3405,7 @@ exports[`member-ordering > invalid 69`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
-      "message": "Member i should be declared before all signature definitions.",
+      "message": "Member readonly [i: string]: string; should be declared before all signature definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {

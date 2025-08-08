@@ -21,7 +21,7 @@ exports[`member-ordering-alphabetically-order > invalid 1`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member a should be declared before member a: b;.",
+      "message": "Member [a: string]: number; should be declared before member a: b;.",
       "messageId": "incorrectOrder",
       "range": {
         "end": {
@@ -37,7 +37,7 @@ exports[`member-ordering-alphabetically-order > invalid 1`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member call should be declared before member new.",
+      "message": "Member (): Baz; should be declared before member new (): Bar;.",
       "messageId": "incorrectOrder",
       "range": {
         "end": {

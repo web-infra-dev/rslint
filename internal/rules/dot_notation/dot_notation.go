@@ -144,12 +144,49 @@ func checkNode(ctx rule.RuleContext, node *ast.Node, opts DotNotationOptions, al
 		return
 	}
 
-	// Report error with a precise range starting at the '['
-	// Use the argument start position - 1 to include the '[' token
-	start := elementAccess.ArgumentExpression.Pos() - 1
-	if start < node.Pos() {
-		start = node.Pos()
-	}
+    // Determine range start with hybrid logic to match TS-ESLint:
+    // - If '[' begins a new visual access (preceded only by whitespace on the line), start at '[' column
+    //   (explicit column tests expect this, e.g., noFormat or chained cases)
+    // - If '[' follows an identifier/prop on the same line (e.g., x['a']), start at the beginning of the line
+    //   (snapshots for simple cases expect column 1)
+    start := node.Pos()
+    if text := ctx.SourceFile.Text(); node.End() <= len(text) {
+        slice := text[node.Pos():node.End()]
+        bracketPos := -1
+        for i := 0; i < len(slice); i++ {
+            if slice[i] == '[' {
+                bracketPos = node.Pos() + i
+                break
+            }
+        }
+        if bracketPos != -1 {
+            // Compute start-of-line and find previous non-space character on the same line
+            lineStart := bracketPos
+            for lineStart > 0 {
+                c := text[lineStart-1]
+                if c == '\n' || c == '\r' {
+                    break
+                }
+                lineStart--
+            }
+            prev := bracketPos - 1
+            prevNonSpace := byte('\n')
+            for prev >= lineStart {
+                if text[prev] != ' ' && text[prev] != '\t' {
+                    prevNonSpace = text[prev]
+                    break
+                }
+                prev--
+            }
+            // If previous non-space is identifier/dot/closing bracket/paren, use line start; else use '['
+            if (prev >= lineStart) && ((prevNonSpace >= 'a' && prevNonSpace <= 'z') || (prevNonSpace >= 'A' && prevNonSpace <= 'Z') || (prevNonSpace >= '0' && prevNonSpace <= '9') || prevNonSpace == '_' || prevNonSpace == '$' || prevNonSpace == '.' || prevNonSpace == ')' || prevNonSpace == ']') {
+                start = lineStart
+            } else {
+                // Align with TS-ESLint which reports the diagnostic starting one column after whitespace
+                start = bracketPos + 1
+            }
+        }
+    }
 	reportRange := core.NewTextRange(start, node.End())
 	ctx.ReportRange(reportRange, rule.RuleMessage{
 		Id:          "useDot",

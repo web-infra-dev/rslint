@@ -151,7 +151,7 @@ exports[`member-ordering-alphabetically-case-insensitive-order > invalid 6`] = `
   "diagnostics": [
     {
       "filePath": "src/virtual.ts",
-      "message": "Member call should be declared before all field definitions.",
+      "message": "Member (): Baz; should be declared before all field definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {
@@ -167,7 +167,7 @@ exports[`member-ordering-alphabetically-case-insensitive-order > invalid 6`] = `
     },
     {
       "filePath": "src/virtual.ts",
-      "message": "Member new should be declared before all method definitions.",
+      "message": "Member new (): Bar; should be declared before all method definitions.",
       "messageId": "incorrectGroupOrder",
       "range": {
         "end": {

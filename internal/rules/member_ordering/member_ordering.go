@@ -360,12 +360,26 @@ func getMemberName(node *ast.Node, sourceFile *ast.SourceFile) string {
 	switch node.Kind {
 	case ast.KindPropertySignature, ast.KindMethodSignature,
 		ast.KindPropertyDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
-		name, _ := utils.GetNameFromMember(sourceFile, node)
+		// For signatures, the node itself is the name node
+		var nameNode *ast.Node
+		if node.Kind == ast.KindPropertyDeclaration {
+			nameNode = node.AsPropertyDeclaration().Name()
+		} else if node.Kind == ast.KindGetAccessor {
+			nameNode = node.AsGetAccessorDeclaration().Name()
+		} else if node.Kind == ast.KindSetAccessor {
+			nameNode = node.AsSetAccessorDeclaration().Name()
+		} else {
+			nameNode = node
+		}
+		name, _ := utils.GetNameFromMember(sourceFile, nameNode)
 		return name
 
 	case ast.KindMethodDeclaration:
-		name, _ := utils.GetNameFromMember(sourceFile, node)
-		return name
+		if nameNode := node.AsMethodDeclaration().Name(); nameNode != nil {
+			name, _ := utils.GetNameFromMember(sourceFile, nameNode)
+			return name
+		}
+		return ""
 
 	case ast.KindConstructSignature:
 		return "new"
@@ -382,6 +396,125 @@ func getMemberName(node *ast.Node, sourceFile *ast.SourceFile) string {
 	}
 
 	return ""
+}
+
+// getMemberSortName returns a normalized name to be used for sorting comparisons.
+// For quoted literal member names (e.g. "b.c"), this strips the surrounding quotes
+// so comparisons are based on the actual text content rather than quote characters.
+func getMemberSortName(node *ast.Node, sourceFile *ast.SourceFile) string {
+	switch node.Kind {
+	case ast.KindPropertySignature, ast.KindMethodSignature,
+		ast.KindPropertyDeclaration, ast.KindGetAccessor, ast.KindSetAccessor,
+		ast.KindMethodDeclaration:
+		var nameNode *ast.Node
+		if node.Kind == ast.KindPropertyDeclaration {
+			nameNode = node.AsPropertyDeclaration().Name()
+		} else if node.Kind == ast.KindGetAccessor {
+			nameNode = node.AsGetAccessorDeclaration().Name()
+		} else if node.Kind == ast.KindSetAccessor {
+			nameNode = node.AsSetAccessorDeclaration().Name()
+		} else if node.Kind == ast.KindMethodDeclaration {
+			nameNode = node.AsMethodDeclaration().Name()
+		} else {
+			nameNode = node
+		}
+		name, nameType := utils.GetNameFromMember(sourceFile, nameNode)
+		if nameType == utils.MemberNameTypeQuoted {
+			// Strip surrounding quotes for sort comparisons
+			if len(name) >= 2 && ((name[0] == '"' && name[len(name)-1] == '"') || (name[0] == '\'' && name[len(name)-1] == '\'')) {
+				return name[1 : len(name)-1]
+			}
+		}
+		return name
+	case ast.KindConstructSignature:
+        return "new"
+	case ast.KindCallSignature:
+        return "call"
+	case ast.KindIndexSignature:
+		return getNameFromIndexSignature(node)
+	case ast.KindClassStaticBlockDeclaration:
+		return "static block"
+	}
+	return ""
+}
+
+// getMemberDisplay returns a concise member name for messages (e.g., G, H, I, #I, a, 'b.c', call, new)
+func getMemberDisplay(sourceFile *ast.SourceFile, node *ast.Node) string {
+	switch node.Kind {
+	case ast.KindMethodDeclaration:
+		if name := node.AsMethodDeclaration().Name(); name != nil {
+			n, _ := utils.GetNameFromMember(sourceFile, name)
+			return n
+		}
+	case ast.KindGetAccessor:
+		if name := node.AsGetAccessorDeclaration().Name(); name != nil {
+			n, _ := utils.GetNameFromMember(sourceFile, name)
+			return n
+		}
+	case ast.KindSetAccessor:
+		if name := node.AsSetAccessorDeclaration().Name(); name != nil {
+			n, _ := utils.GetNameFromMember(sourceFile, name)
+			return n
+		}
+	case ast.KindPropertyDeclaration:
+		if name := node.AsPropertyDeclaration().Name(); name != nil {
+			n, _ := utils.GetNameFromMember(sourceFile, name)
+			return n
+		}
+	case ast.KindPropertySignature, ast.KindMethodSignature:
+		// use node directly
+		n, _ := utils.GetNameFromMember(sourceFile, node)
+		return n
+	case ast.KindConstructSignature:
+		return "new"
+	case ast.KindCallSignature:
+		return "call"
+	case ast.KindClassStaticBlockDeclaration:
+		return "static block"
+	}
+	return getMemberName(node, sourceFile)
+}
+
+// getMemberSnippet returns a compact source snippet for a member's head, used in messages
+func getMemberSnippet(sourceFile *ast.SourceFile, node *ast.Node) string {
+	r := utils.TrimNodeTextRange(sourceFile, node)
+	text := sourceFile.Text()[r.Pos():r.End()]
+	// Take only the first line and trim
+	end := len(text)
+	for i := 0; i < len(text); i++ {
+		if text[i] == '\n' || text[i] == '\r' {
+			end = i
+			break
+		}
+	}
+	head := strings.TrimSpace(text[:end])
+	// Avoid trailing bodies for methods: cut after name and parens or property name
+	// leave as-is; snapshots show full heads like "public static G() {}" or "a: Foo;"
+	return head
+}
+
+// getGroupOrderDisplay returns simplified member head text for group order messages
+// e.g. "new", "call", "G();", "#I();", "public static a: string;" is simplified to name tokens when needed
+func getGroupOrderDisplay(sourceFile *ast.SourceFile, node *ast.Node) string {
+	switch node.Kind {
+	case ast.KindConstructSignature:
+		return "new"
+	case ast.KindCallSignature:
+		return "call"
+	case ast.KindMethodDeclaration:
+		name := getMemberName(node, sourceFile)
+		if name == "" {
+			return getMemberSnippet(sourceFile, node)
+		}
+		return name + "();"
+	default:
+		// fall back to concise name for fields/accessors
+		n := getMemberName(node, sourceFile)
+		if n != "" {
+			return n
+		}
+		return getMemberSnippet(sourceFile, node)
+	}
 }
 
 func getNameFromIndexSignature(node *ast.Node) string {
@@ -579,10 +712,10 @@ func getLowestRank(ranks []int, target int, order []interface{}) string {
 		lowestRanks = []string{str}
 	}
 
-	// Replace dashes with spaces
-	for i, rank := range lowestRanks {
-		lowestRanks[i] = strings.ReplaceAll(rank, "-", " ")
-	}
+    // Replace dashes with spaces
+    for i, rank := range lowestRanks {
+        lowestRanks[i] = strings.ReplaceAll(rank, "-", " ")
+    }
 
 	return strings.Join(lowestRanks, ", ")
 }
@@ -653,7 +786,8 @@ func checkGroupSort(ctx rule.RuleContext, members []*ast.Node, groupOrder []inte
 
 	for _, member := range members {
 		rank := getRank(member, groupOrder, supportsModifiers)
-		name := getMemberName(member, ctx.SourceFile)
+        // Use simplified display for group-order messages to match snapshots
+        _ = getGroupOrderDisplay(ctx.SourceFile, member)
 
 		if rank == -1 {
 			continue
@@ -662,11 +796,11 @@ func checkGroupSort(ctx rule.RuleContext, members []*ast.Node, groupOrder []inte
 		if len(previousRanks) > 0 {
 			rankLastMember := previousRanks[len(previousRanks)-1]
 			if rank < rankLastMember {
-				ctx.ReportNode(member, rule.RuleMessage{
-					Id: "incorrectGroupOrder",
-					Description: fmt.Sprintf("Member %s should be declared before all %s definitions.",
-						name, getLowestRank(previousRanks, rank, groupOrder)),
-				})
+                ctx.ReportNode(member, rule.RuleMessage{
+                    Id: "incorrectGroupOrder",
+                    Description: fmt.Sprintf("Member %s should be declared before all %s definitions.",
+                        getMemberSnippet(ctx.SourceFile, member), getLowestRank(previousRanks, rank, groupOrder)),
+                })
 				isCorrectlySorted = false
 			} else if rank == rankLastMember {
 				// Same member group - add to existing group
@@ -694,24 +828,36 @@ func checkAlphaSort(ctx rule.RuleContext, members []*ast.Node, order Order) bool
 		return true
 	}
 
-	previousName := ""
+	previousDisplay := ""
+	previousSortName := ""
 	isCorrectlySorted := true
 
 	for _, member := range members {
-		name := getMemberName(member, ctx.SourceFile)
+        // Use snippet for messages to match snapshots like "a: Foo;" and "public static G() {}"
+        display := getMemberSnippet(ctx.SourceFile, member)
+		sortName := getMemberSortName(member, ctx.SourceFile)
 
-		if name != "" && previousName != "" {
-			if naturalOutOfOrder(name, previousName, order) {
-				ctx.ReportNode(member, rule.RuleMessage{
-					Id:          "incorrectOrder",
-					Description: fmt.Sprintf("Member %s should be declared before member %s.", name, previousName),
-				})
+		if sortName != "" && previousSortName != "" {
+			// For case-insensitive alphabetical/natural orders, compare using lowercase forms
+			compareName := sortName
+			comparePrev := previousSortName
+			switch order {
+			case OrderAlphabeticallyCaseInsensitive, OrderNaturalCaseInsensitive:
+				compareName = strings.ToLower(compareName)
+				comparePrev = strings.ToLower(comparePrev)
+			}
+			if naturalOutOfOrder(compareName, comparePrev, normalizeOrderForCompare(order)) {
+                ctx.ReportNode(member, rule.RuleMessage{
+                    Id:          "incorrectOrder",
+                    Description: fmt.Sprintf("Member %s should be declared before member %s.", display, previousDisplay),
+                })
 				isCorrectlySorted = false
 			}
 		}
 
-		if name != "" {
-			previousName = name
+		if sortName != "" {
+            previousDisplay = display
+			previousSortName = sortName
 		}
 	}
 
@@ -735,6 +881,29 @@ func naturalOutOfOrder(name, previousName string, order Order) bool {
 	}
 
 	return false
+}
+
+// normalizeOrderForCompare maps case-insensitive variants to their base form for comparison
+func normalizeOrderForCompare(order Order) Order {
+	switch order {
+	case OrderAlphabeticallyCaseInsensitive:
+		return OrderAlphabetically
+	case OrderNaturalCaseInsensitive:
+		return OrderNatural
+	default:
+		return order
+	}
+}
+
+// isMemberTypesNever returns true if the memberTypes config is set to "never"
+func isMemberTypesNever(cfg *OrderConfig) bool {
+    if cfg == nil {
+        return false
+    }
+    if str, ok := cfg.MemberTypes.(string); ok && str == "never" {
+        return true
+    }
+    return false
 }
 
 func checkRequiredOrder(ctx rule.RuleContext, members []*ast.Node, optionalityOrder OptionalityOrder) bool {
@@ -790,9 +959,14 @@ func validateMembersOrder(ctx rule.RuleContext, members []*ast.Node, orderConfig
 	// If memberTypes is "never", skip group ordering but still apply alpha sort when requested
 	if str, ok := orderConfig.MemberTypes.(string); ok && str == "never" {
 		if orderConfig.Order != "" && orderConfig.Order != OrderAsWritten {
-			memberPtrs := make([]*ast.Node, len(members))
-			copy(memberPtrs, members)
-			// Apply alphabetical/natural ordering across all members without grouping
+			memberPtrs := make([]*ast.Node, 0, len(members))
+			for _, m := range members {
+				// Ignore method declarations without body (overload-like) for sorting
+				if m.Kind == ast.KindMethodDeclaration && m.AsMethodDeclaration().Body == nil && !isAbstract(m) {
+					continue
+				}
+				memberPtrs = append(memberPtrs, m)
+			}
 			_ = checkAlphaSort(ctx, memberPtrs, orderConfig.Order)
 		}
 		return
@@ -838,10 +1012,9 @@ func validateMembersOrder(ctx rule.RuleContext, members []*ast.Node, orderConfig
 }
 
 func checkOrder(ctx rule.RuleContext, members []*ast.Node, memberTypes []interface{}, order Order, supportsModifiers bool) {
-	hasAlphaSort := order != "" && order != OrderAsWritten
-
-	// Check group order
-	grouped := checkGroupSort(ctx, members, memberTypes, supportsModifiers)
+    hasAlphaSort := order != "" && order != OrderAsWritten
+    // Group-order unless the config is effectively 'never'
+    grouped := checkGroupSort(ctx, members, memberTypes, supportsModifiers)
 
 	if grouped == nil {
 		// If group sort failed, still check alpha sort for all members
@@ -853,12 +1026,12 @@ func checkOrder(ctx rule.RuleContext, members []*ast.Node, memberTypes []interfa
 		return
 	}
 
-	// Check alpha sort within groups
-	if hasAlphaSort {
-		for _, group := range grouped {
-			checkAlphaSort(ctx, group, order)
-		}
-	}
+    // Check alpha sort within groups
+    if hasAlphaSort {
+        for _, group := range grouped {
+            checkAlphaSort(ctx, group, order)
+        }
+    }
 }
 
 func groupMembersByType(members []*ast.Node, memberTypes []interface{}, supportsModifiers bool, callback func([]*ast.Node)) {

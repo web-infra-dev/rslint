@@ -142,6 +142,10 @@ export class RuleTester {
     },
   ) {
     describe(ruleName, () => {
+      // Normalize rule aliases used by tests to the canonical rule name
+      if (ruleName.startsWith('member-ordering')) {
+        ruleName = 'member-ordering';
+      }
       ruleName = '@typescript-eslint/' + ruleName;
       let cwd =
         this.options.languageOptions?.parserOptions?.tsconfigRootDir ||
