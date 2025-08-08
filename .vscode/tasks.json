@@ -6,11 +6,20 @@
 			"script": "watch",
 			"path": "packages/vscode-extension",
 			"group": "build",
-			"problemMatcher": [
-				"$tsc-watch"
-			],
+			"problemMatcher": {
+        "base": "$tsc-watch",
+        "background": {
+          "beginsPattern": {
+            "regexp": "^start rebuild$"
+          },
+          "endsPattern": {
+            "regexp": "^rebuild done$"
+          }
+        }
+      },
 			"label": "npm: watch - packages/vscode-extension",
-			"isBackground": true
+			"isBackground": true,
+      
 		}
 	]
 }
