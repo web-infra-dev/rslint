@@ -2,7 +2,6 @@ package member_ordering
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -213,6 +212,15 @@ func parseOptions(options any) *Options {
 
 	if options == nil {
 		return opts
+	}
+
+	// Support ESLint-style array format: [{ ...options }]
+	if optArray, isArray := options.([]interface{}); isArray {
+		if len(optArray) > 0 {
+			if first, ok := optArray[0].(map[string]interface{}); ok {
+				options = first
+			}
+		}
 	}
 
 	if optsMap, ok := options.(map[string]interface{}); ok {
@@ -442,15 +450,15 @@ func getMemberGroups(node *ast.Node, supportsModifiers bool) []string {
 		return nil
 	}
 
-	// Handle method definitions with empty body
+	groups := []string{}
+
+	// Ignore overload-like method declarations without body (treat as transparent for ordering)
 	if node.Kind == ast.KindMethodDeclaration {
 		method := node.AsMethodDeclaration()
-		if method.Body == nil {
-			return nil
+		if method.Body == nil && !isAbstract(node) {
+			return groups
 		}
 	}
-
-	groups := []string{}
 
 	if !supportsModifiers {
 		groups = append(groups, string(nodeType))
@@ -526,7 +534,8 @@ func getMemberGroups(node *ast.Node, supportsModifiers bool) []string {
 func getRank(node *ast.Node, memberTypes []interface{}, supportsModifiers bool) int {
 	groups := getMemberGroups(node, supportsModifiers)
 	if len(groups) == 0 {
-		return len(memberTypes) - 1
+		// No applicable groups (e.g., overload signature without body) -> ignore for ordering
+		return -1
 	}
 
 	// First, try to find an exact match in member types
@@ -645,9 +654,6 @@ func checkGroupSort(ctx rule.RuleContext, members []*ast.Node, groupOrder []inte
 	for _, member := range members {
 		rank := getRank(member, groupOrder, supportsModifiers)
 		name := getMemberName(member, ctx.SourceFile)
-		// DEBUG: write to stderr to avoid breaking protocol
-		// Remove after diagnosing ordering issues
-		fmt.Fprintf(os.Stderr, "[member-ordering DEBUG] kind=%d name=%q rank=%d supportsModifiers=%v\n", member.Kind, name, rank, supportsModifiers)
 
 		if rank == -1 {
 			continue
@@ -777,7 +783,18 @@ func reportOptionalityError(ctx rule.RuleContext, member *ast.Node, optionalityO
 }
 
 func validateMembersOrder(ctx rule.RuleContext, members []*ast.Node, orderConfig *OrderConfig, supportsModifiers bool) {
-	if orderConfig == nil || orderConfig.MemberTypes == "never" {
+	if orderConfig == nil {
+		return
+	}
+
+	// If memberTypes is "never", skip group ordering but still apply alpha sort when requested
+	if str, ok := orderConfig.MemberTypes.(string); ok && str == "never" {
+		if orderConfig.Order != "" && orderConfig.Order != OrderAsWritten {
+			memberPtrs := make([]*ast.Node, len(members))
+			copy(memberPtrs, members)
+			// Apply alphabetical/natural ordering across all members without grouping
+			_ = checkAlphaSort(ctx, memberPtrs, orderConfig.Order)
+		}
 		return
 	}
 

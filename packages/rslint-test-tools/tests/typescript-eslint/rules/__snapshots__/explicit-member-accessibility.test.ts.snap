@@ -113,7 +113,7 @@ exports[`explicit-member-accessibility > invalid 5`] = `
       "messageId": "missingAccessibility",
       "range": {
         "end": {
-          "column": 13,
+          "column": 4,
           "line": 3,
         },
         "start": {
@@ -125,6 +125,310 @@ exports[`explicit-member-accessibility > invalid 5`] = `
     },
   ],
   "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Missing accessibility modifier on method definition getX.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Missing accessibility modifier on class property x.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "explicit-member-accessibility",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Missing accessibility modifier on method definition getX.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Public accessibility modifier on method definition getX.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Public accessibility modifier on class property foo.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Public accessibility modifier on class property x.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "explicit-member-accessibility",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Public accessibility modifier on method definition getX.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Missing accessibility modifier on get property accessor internalValue.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "explicit-member-accessibility",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Missing accessibility modifier on set property accessor internalValue.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 10,
+        },
+        "start": {
+          "column": 3,
+          "line": 10,
+        },
+      },
+      "ruleName": "explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Missing accessibility modifier on constructor constructor.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "explicit-member-accessibility",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Missing accessibility modifier on get property accessor internalValue.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "explicit-member-accessibility",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Missing accessibility modifier on set property accessor internalValue.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 10,
+        },
+        "start": {
+          "column": 3,
+          "line": 10,
+        },
+      },
+      "ruleName": "explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Missing accessibility modifier on constructor constructor.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "explicit-member-accessibility",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Public accessibility modifier on parameter property x.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 2,
   "fileCount": 1,
   "ruleCount": 1,
 }
