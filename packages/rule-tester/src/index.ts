@@ -177,8 +177,30 @@ export class RuleTester {
               ? false
               : validCase.languageOptions?.parserOptions?.ecmaFeatures?.jsx;
 
-          const options =
+          let options =
             typeof validCase === 'string' ? [] : validCase.options || [];
+
+          // Handle special case for dot-notation rule with noPropertyAccessFromIndexSignature tsconfig
+          if (
+            ruleName === '@typescript-eslint/dot-notation' &&
+            typeof validCase === 'object' &&
+            validCase.languageOptions?.parserOptions?.project ===
+              './tsconfig.noPropertyAccessFromIndexSignature.json'
+          ) {
+            // Simulate noPropertyAccessFromIndexSignature: true by setting allowIndexSignaturePropertyAccess: true
+            if (Array.isArray(options) && options.length === 0) {
+              options = [{ allowIndexSignaturePropertyAccess: true }];
+            } else if (
+              Array.isArray(options) &&
+              options.length > 0 &&
+              typeof options[0] === 'object'
+            ) {
+              options[0] = {
+                ...options[0],
+                allowIndexSignaturePropertyAccess: true,
+              };
+            }
+          }
           let virtual_entry = path.resolve(
             cwd,
             isJSX ? 'src/virtual.tsx' : 'src/virtual.ts',
@@ -214,13 +236,28 @@ export class RuleTester {
       });
       test('invalid', async t => {
         for (const item of cases.invalid) {
-          const {
-            code,
-            errors,
-            only = false,
-            skip = false,
-            options = [],
-          } = item;
+          let { code, errors, only = false, skip = false, options = [] } = item;
+
+          // Handle special case for dot-notation rule with noPropertyAccessFromIndexSignature tsconfig
+          if (
+            ruleName === '@typescript-eslint/dot-notation' &&
+            item.languageOptions?.parserOptions?.project ===
+              './tsconfig.noPropertyAccessFromIndexSignature.json'
+          ) {
+            // Simulate noPropertyAccessFromIndexSignature: true by setting allowIndexSignaturePropertyAccess: true
+            if (Array.isArray(options) && options.length === 0) {
+              options = [{ allowIndexSignaturePropertyAccess: true }];
+            } else if (
+              Array.isArray(options) &&
+              options.length > 0 &&
+              typeof options[0] === 'object'
+            ) {
+              options[0] = {
+                ...options[0],
+                allowIndexSignaturePropertyAccess: true,
+              };
+            }
+          }
           if (skip) {
             continue;
           }

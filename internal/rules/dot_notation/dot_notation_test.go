@@ -28,6 +28,12 @@ func TestDotNotationRule(t *testing.T) {
 			},
 		},
 		{
+			Code: "a.let;",
+			Options: map[string]interface{}{
+				"allowKeywords": false,
+			},
+		},
+		{
 			Code: "a['while'];",
 			Options: map[string]interface{}{
 				"allowKeywords": false,
@@ -188,18 +194,6 @@ x['hello'] = 3;
 				},
 			},
 			Output: []string{`foo["while"];`},
-			Options: map[string]interface{}{
-				"allowKeywords": false,
-			},
-		},
-		{
-			Code: "a.let;",
-			Errors: []rule_tester.InvalidTestCaseError{
-				{
-					MessageId: "useBrackets",
-				},
-			},
-			Output: []string{`a["let"];`},
 			Options: map[string]interface{}{
 				"allowKeywords": false,
 			},

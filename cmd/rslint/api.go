@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -172,21 +171,14 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		option interface{}
 	}
 	rulesWithOptions := []RuleWithOption{}
-	// Filter rules based on request.RuleOptions, supporting both short and plugin-prefixed names
+	// filter rule based on request.RuleOptions
 	if len(req.RuleOptions) > 0 {
-		// Build a map from short name -> option by trimming any prefix like "@typescript-eslint/"
-		shortOpts := map[string]interface{}{}
-		for key, opt := range req.RuleOptions {
-			short := key
-			if idx := strings.LastIndexByte(key, '/'); idx >= 0 {
-				short = key[idx+1:]
-			}
-			shortOpts[short] = opt
-		}
-
 		for _, r := range origin_rules {
-			if option, ok := shortOpts[r.Name]; ok {
-				rulesWithOptions = append(rulesWithOptions, RuleWithOption{rule: r, option: option})
+			if option, ok := req.RuleOptions[r.Name]; ok {
+				rulesWithOptions = append(rulesWithOptions, RuleWithOption{
+					rule:   r,
+					option: option,
+				})
 			}
 		}
 	}

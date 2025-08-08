@@ -1,6 +1,7 @@
 # TODO:
 
-- [x] 8: Run dot-notation test to identify current errors (priority: High)
-- [ ] 9: Fix the underlying issues in the Go implementation (**IN PROGRESS**) (priority: High)
-- [ ] 10: Fix column position calculation (3 vs 4 mismatch) - still failing (**IN PROGRESS**) (priority: High)
-- [ ] 11: Fix key_baz case - template literal pattern matching not working (**IN PROGRESS**) (priority: High)
+- [ ] 12: Investigate test infrastructure code to understand how languageOptions are handled (priority: High)
+- [ ] 13: Find where parserOptions.project settings should be passed to the Go linter (priority: High)
+- [ ] 14: Identify the gap in the test infrastructure that prevents proper option propagation (priority: High)
+- [ ] 15: Fix the infrastructure to properly pass languageOptions.parserOptions.project to linter (priority: High)
+- [ ] 16: Test the fix with dot-notation rule that depends on noPropertyAccessFromIndexSignature (priority: Medium)

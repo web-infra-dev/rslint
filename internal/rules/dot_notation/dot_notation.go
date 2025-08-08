@@ -140,42 +140,15 @@ func checkNode(ctx rule.RuleContext, node *ast.Node, opts DotNotationOptions, al
 	}
 
 	// Check for private/protected/index signature access
-	if (opts.AllowPrivateClassPropertyAccess || opts.AllowProtectedClassPropertyAccess || allowIndexSignaturePropertyAccess) &&
-		shouldAllowBracketNotation(ctx, node, propertyName, opts, allowIndexSignaturePropertyAccess) {
+	if shouldAllowBracketNotation(ctx, node, propertyName, opts, allowIndexSignaturePropertyAccess) {
 		return
 	}
 
-	// Report error at the '[' token to align with TSESLint positions
-	text := string(ctx.SourceFile.Text())
-	
-	// Get the exact position of the '[' token using the ArgumentExpression
-	// This is more reliable than searching through text
-	argumentStart := elementAccess.ArgumentExpression.Pos()
-	
-	// The '[' should be just before the argument expression
-	// Search backwards from the argument to find the '[' character
-	bracketStart := -1
-	for i := argumentStart - 1; i >= 0 && i >= elementAccess.Expression.End(); i-- {
-		if text[i] == '[' {
-			bracketStart = i
-			break
-		}
-	}
-	
-	if bracketStart >= 0 {
-		// TypeScript ESLint reports from the position after '[' character
-		// This matches their column reporting behavior
-		ctx.ReportRange(core.NewTextRange(bracketStart+1, node.End()), rule.RuleMessage{
-			Id:          "useDot",
-			Description: fmt.Sprintf("['%s'] is better written in dot notation.", propertyName),
-		})
-	} else {
-		// Fallback: use the position just before the argument expression
-		ctx.ReportRange(core.NewTextRange(argumentStart, node.End()), rule.RuleMessage{
-			Id:          "useDot",
-			Description: fmt.Sprintf("['%s'] is better written in dot notation.", propertyName),
-		})
-	}
+	// Report error with fix
+	ctx.ReportNodeWithFixes(node, rule.RuleMessage{
+		Id:          "useDot",
+		Description: fmt.Sprintf("['%s'] is better written in dot notation.", propertyName),
+	}, createFix(ctx, node, propertyName))
 }
 
 func checkPropertyAccessKeywords(ctx rule.RuleContext, node *ast.Node) {
@@ -207,9 +180,6 @@ func checkPropertyAccessKeywords(ctx rule.RuleContext, node *ast.Node) {
 }
 
 func shouldAllowBracketNotation(ctx rule.RuleContext, node *ast.Node, propertyName string, opts DotNotationOptions, allowIndexSignaturePropertyAccess bool) bool {
-	// If noPropertyAccessFromIndexSignature is enabled and the property matches a template literal pattern,
-	// allow bracket notation (we'll check this more accurately below with type information)
-	
 	// Enhanced implementation using TypeScript type checker for accurate property analysis
 
 	// Get the object being accessed
@@ -222,6 +192,12 @@ func shouldAllowBracketNotation(ctx rule.RuleContext, node *ast.Node, propertyNa
 	objectType := ctx.TypeChecker.GetNonNullableType(ctx.TypeChecker.GetTypeAtLocation(elementAccess.Expression))
 	if objectType == nil {
 		return false
+	}
+
+	// Check for template literal patterns when allowIndexSignaturePropertyAccess is enabled
+	// This handles cases like `[key: \`key_\${string}\`]` where key_baz should be allowed
+	if allowIndexSignaturePropertyAccess && hasIndexSignature(ctx, objectType) && matchesTemplateLiteralPattern(ctx, objectType, propertyName) {
+		return true
 	}
 
 	// If allowPrivateClassPropertyAccess is true, check for actual private properties
@@ -247,14 +223,7 @@ func shouldAllowBracketNotation(ctx rule.RuleContext, node *ast.Node, propertyNa
 		if hasIndexSignature(ctx, objectType) {
 			propSymbol := ctx.TypeChecker.GetPropertyOfType(objectType, propertyName)
 			// If property is not explicitly declared, allow bracket notation
-			// This handles template literal types like `key_${string}` where key_baz should be allowed
 			if propSymbol == nil {
-				return true
-			}
-			// Also check if the property matches a template literal pattern
-			// For template literal types, TypeScript may resolve the property as concrete
-			// but we still want to allow bracket notation
-			if matchesTemplateLiteralPattern(ctx, objectType, propertyName) {
 				return true
 			}
 		}

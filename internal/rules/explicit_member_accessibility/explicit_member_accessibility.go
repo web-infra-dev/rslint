@@ -573,7 +573,7 @@ func getMissingAccessibilitySuggestions(node *ast.Node, ctx rule.RuleContext) []
 			case ast.KindSetAccessor:
 				modifiers = node.AsSetAccessorDeclaration().Modifiers()
 			}
-			
+
 			if modifiers != nil {
 				// Find the last decorator
 				var lastDecoratorEnd int = -1
@@ -582,7 +582,7 @@ func getMissingAccessibilitySuggestions(node *ast.Node, ctx rule.RuleContext) []
 						lastDecoratorEnd = mod.End()
 					}
 				}
-				
+
 				if lastDecoratorEnd > 0 {
 					// Insert after the last decorator
 					insertPos = lastDecoratorEnd
