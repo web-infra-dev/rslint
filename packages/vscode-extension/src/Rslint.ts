@@ -1,10 +1,18 @@
-import { workspace, Uri, Disposable, WorkspaceFolder } from 'vscode';
+import {
+  workspace,
+  Uri,
+  Disposable,
+  WorkspaceFolder,
+  window,
+  OutputChannel,
+} from 'vscode';
 import {
   Executable,
   LanguageClient,
   LanguageClientOptions,
   ServerOptions,
   State,
+  Trace,
 } from 'vscode-languageclient/node';
 import { Logger } from './logger';
 import type { Extension } from './Extension';
@@ -17,6 +25,7 @@ export class Rslint implements Disposable {
   private readonly logger: Logger;
   private readonly extension: Extension;
   private readonly workspaceFolder: WorkspaceFolder;
+  private lspOutputChannel: OutputChannel | undefined;
 
   constructor(extension: Extension, workspaceFolder: WorkspaceFolder) {
     this.extension = extension;
@@ -43,6 +52,12 @@ export class Rslint implements Disposable {
       debug: run,
     };
 
+    // Check if LSP tracing is enabled
+    const traceServer = workspace
+      .getConfiguration('rslint')
+      .get<string>('trace.server', 'off');
+    const traceEnabled = traceServer !== 'off';
+
     const clientOptions: LanguageClientOptions = {
       documentSelector: [
         { scheme: 'file', language: 'typescript' },
@@ -57,6 +72,16 @@ export class Rslint implements Disposable {
       },
     };
 
+    if (traceEnabled) {
+      this.lspOutputChannel = window.createOutputChannel('Rslint LSP trace');
+      clientOptions.traceOutputChannel = this.lspOutputChannel;
+      this.logger.info(
+        'LSP tracing enabled, output will be logged to "Rslint LSP trace" channel',
+      );
+    } else {
+      this.logger.debug('LSP tracing disabled by configuration');
+    }
+
     this.client = new LanguageClient(
       'rslint',
       'Rslint Language Server',
@@ -66,6 +91,14 @@ export class Rslint implements Disposable {
 
     try {
       await this.client.start();
+
+      if (traceEnabled) {
+        const traceLevel =
+          traceServer === 'verbose' ? Trace.Verbose : Trace.Messages;
+        await this.client.setTrace(traceLevel);
+        this.logger.info(`LSP trace level set to: ${traceServer}`);
+      }
+
       this.logger.info('Rslint language client started successfully');
     } catch (err: unknown) {
       this.logger.error('Failed to start Rslint language client', err);
@@ -111,6 +144,7 @@ export class Rslint implements Disposable {
         this.logger.error('Error disposing Rslint client', err);
       });
     }
+    this.lspOutputChannel?.dispose();
   }
 
   private async findBinaryFromUserSettings(): Promise<string | null> {
