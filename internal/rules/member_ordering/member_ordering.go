@@ -717,8 +717,6 @@ func naturalOutOfOrder(name, previousName string, order Order) bool {
 	case OrderAlphabeticallyCaseInsensitive:
 		return strings.ToLower(name) < strings.ToLower(previousName)
 	case OrderNatural:
-		return naturalCompare(name, previousName) != 1
-	case OrderNaturalCaseInsensitive:
 		return naturalCompare(name, previousName) < 0
 	case OrderNaturalCaseInsensitive:
 		return naturalCompare(strings.ToLower(name), strings.ToLower(previousName)) < 0
@@ -788,9 +786,7 @@ func validateMembersOrder(ctx rule.RuleContext, members []*ast.Node, orderConfig
 
 	// Convert ast.Node slice to pointer slice
 	memberPtrs := make([]*ast.Node, len(members))
-	for i, member := range members {
-		memberPtrs[i] = member
-	}
+	copy(memberPtrs, members)
 
 	// Handle optionality order
 	if orderConfig.OptionalityOrder != nil {
@@ -886,9 +882,7 @@ var MemberOrderingRule = rule.Rule{
 				}
 				if config != nil {
 					members := make([]*ast.Node, len(class.Members.Nodes))
-					for i, member := range class.Members.Nodes {
-						members[i] = member
-					}
+					copy(members, class.Members.Nodes)
 					validateMembersOrder(ctx, members, config, true)
 				}
 			},
@@ -901,9 +895,7 @@ var MemberOrderingRule = rule.Rule{
 				}
 				if config != nil {
 					members := make([]*ast.Node, len(class.Members.Nodes))
-					for i, member := range class.Members.Nodes {
-						members[i] = member
-					}
+					copy(members, class.Members.Nodes)
 					validateMembersOrder(ctx, members, config, true)
 				}
 			},
@@ -916,9 +908,7 @@ var MemberOrderingRule = rule.Rule{
 				}
 				if config != nil {
 					members := make([]*ast.Node, len(iface.Members.Nodes))
-					for i, member := range iface.Members.Nodes {
-						members[i] = member
-					}
+					copy(members, iface.Members.Nodes)
 					validateMembersOrder(ctx, members, config, false)
 				}
 			},
@@ -931,9 +921,7 @@ var MemberOrderingRule = rule.Rule{
 				}
 				if config != nil {
 					members := make([]*ast.Node, len(typeLit.Members.Nodes))
-					for i, member := range typeLit.Members.Nodes {
-						members[i] = member
-					}
+					copy(members, typeLit.Members.Nodes)
 					validateMembersOrder(ctx, members, config, false)
 				}
 			},
