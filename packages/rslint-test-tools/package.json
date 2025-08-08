@@ -18,7 +18,8 @@
     "@typescript-eslint/rule-tester": "workspace:*",
     "@typescript-eslint/utils": "workspace:*",
     "@rstest/core": "0.1.0",
-    "@typescript-eslint/parser": "8.39.0"
+    "@typescript-eslint/parser": "8.39.0",
+    "eslint": "9.32.0"
   },
   "publishConfig": {
     "access": "public"

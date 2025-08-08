@@ -141,8 +141,8 @@ export class RuleTester {
       invalid: InvalidTestCase[];
     },
   ) {
+    ruleName = '@typescript-eslint/' + ruleName;
     describe(ruleName, () => {
-      ruleName = '@typescript-eslint/' + ruleName;
       let cwd =
         this.options.languageOptions?.parserOptions?.tsconfigRootDir ||
         process.cwd();
