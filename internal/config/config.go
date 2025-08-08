@@ -436,8 +436,14 @@ func InitConfig(directory string) error {
 		return fmt.Errorf("rslint.json already exists in %s", directory)
 	}
 
+	defaultRemoteURL := "https://raw.githubusercontent.com/web-infra-dev/rslint/refs/heads/main/rslint.json"
+
+	remoteURL := os.Getenv("RSLINT_REMOTE_CONFIG_URL")
+	if remoteURL == "" {
+		remoteURL = defaultRemoteURL
+	}
+
 	// Download configuration from remote URL
-	remoteURL := "https://raw.githubusercontent.com/web-infra-dev/rslint/refs/heads/main/rslint.json"
 	configContent, err := downloadConfigFromURL(remoteURL)
 	if err != nil {
 		return fmt.Errorf("failed to download configuration: %w", err)
