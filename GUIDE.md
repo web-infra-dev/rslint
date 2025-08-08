@@ -20,6 +20,9 @@ yarn add @rslint/core
 ### Command Line Interface
 
 ```bash
+# create a rslint.json(optional)
+rslint --init
+
 # use default rslint.json
 rslint
 # use custom configuration file

@@ -314,6 +314,7 @@ Usage:
   rslint [OPTIONS]
 
 Options:
+  --init                Initialize a new rslint config file in the current directory
   --config PATH         Which rslint config file to use. Defaults to rslint.json.
   --format FORMAT       Output format: default | jsonline
   --fix                 Automatically fix problems
@@ -328,6 +329,7 @@ func runCMD() int {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
 	var (
+		init   bool
 		help   bool
 		config string
 		fix    bool
@@ -344,6 +346,7 @@ func runCMD() int {
 	flag.StringVar(&format, "format", "default", "output format")
 	flag.StringVar(&config, "config", "", "which rslint config to use")
 	flag.BoolVar(&fix, "fix", false, "automatically fix problems")
+	flag.BoolVar(&init, "init", false, "initialize a new rslint config file")
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&help, "h", false, "show help")
 	flag.BoolVar(&noColor, "no-color", false, "disable colored output")
@@ -404,6 +407,14 @@ func runCMD() int {
 		return 1
 	}
 	currentDirectory = tspath.NormalizePath(currentDirectory)
+
+	if init {
+		if err := rslintconfig.InitConfig(currentDirectory); err != nil {
+			fmt.Fprintf(os.Stderr, "error initializing config: %v\n", err)
+			return 1
+		}
+		return 0
+	}
 
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 
