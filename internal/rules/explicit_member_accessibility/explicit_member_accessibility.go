@@ -87,7 +87,7 @@ func parseOptions(options any) Config {
 }
 
 func getAccessibilityModifier(node *ast.Node) string {
-	switch node.Kind {
+	switch kind := node.Kind; kind {
 	case ast.KindMethodDeclaration:
 		method := node.AsMethodDeclaration()
 		return getModifierText(method.Modifiers())
@@ -135,7 +135,7 @@ func hasDecorators(node *ast.Node) bool {
 
 func findPublicKeywordRange(ctx rule.RuleContext, node *ast.Node) (core.TextRange, core.TextRange) {
 	var modifiers *ast.ModifierList
-	switch node.Kind {
+	switch kind := node.Kind; kind {
 	case ast.KindMethodDeclaration:
 		modifiers = node.AsMethodDeclaration().Modifiers()
 	case ast.KindPropertyDeclaration:
@@ -180,7 +180,7 @@ func findPublicKeywordRange(ctx rule.RuleContext, node *ast.Node) (core.TextRang
 
 func getMemberName(node *ast.Node, ctx rule.RuleContext) string {
 	var nameNode *ast.Node
-	switch node.Kind {
+	switch kind := node.Kind; kind {
 	case ast.KindMethodDeclaration:
 		nameNode = node.AsMethodDeclaration().Name()
 	case ast.KindPropertyDeclaration:
@@ -375,7 +375,7 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 			if check == AccessibilityNoPublic && accessibility == "public" {
 				// Find and report on the public keyword specifically, and provide fix
 				var modifiers *ast.ModifierList
-				switch node.Kind {
+				switch kind := node.Kind; kind {
 				case ast.KindMethodDeclaration:
 					modifiers = node.AsMethodDeclaration().Modifiers()
 				case ast.KindConstructor:
@@ -576,7 +576,7 @@ func getMissingAccessibilitySuggestions(node *ast.Node, ctx rule.RuleContext) []
 
 			if modifiers != nil {
 				// Find the last decorator
-				var lastDecoratorEnd int = -1
+				var lastDecoratorEnd = -1
 				for _, mod := range modifiers.Nodes {
 					if mod.Kind == ast.KindDecorator && mod.End() > lastDecoratorEnd {
 						lastDecoratorEnd = mod.End()
