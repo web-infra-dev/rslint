@@ -424,6 +424,11 @@ func downloadConfigFromURL(url string) ([]byte, error) {
 
 // InitConfig creates a default rslint.json configuration file in the specified directory
 func InitConfig(directory string) error {
+	// Create directory if it doesn't exist
+	if err := os.MkdirAll(directory, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", directory, err)
+	}
+
 	configPath := filepath.Join(directory, "rslint.json")
 
 	// Check if config file already exists
