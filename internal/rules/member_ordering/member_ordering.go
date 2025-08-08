@@ -719,7 +719,9 @@ func naturalOutOfOrder(name, previousName string, order Order) bool {
 	case OrderNatural:
 		return naturalCompare(name, previousName) != 1
 	case OrderNaturalCaseInsensitive:
-		return naturalCompare(strings.ToLower(name), strings.ToLower(previousName)) != 1
+		return naturalCompare(name, previousName) < 0
+	case OrderNaturalCaseInsensitive:
+		return naturalCompare(strings.ToLower(name), strings.ToLower(previousName)) < 0
 	}
 
 	return false
