@@ -34,6 +34,10 @@ Rslint is a fork of [tsgolint](https://github.com/typescript-eslint/tsgolint), b
 
 See [Guide](./GUIDE.md).
 
+## 📖 Documentation
+
+- [Architecture Overview](./architecture.md) - Comprehensive system architecture and implementation details
+
 ## 🦀 Rstack
 
 Rstack is a unified JavaScript toolchain built around Rspack, with high performance and consistent architecture.
