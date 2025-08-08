@@ -13,7 +13,7 @@ exports[`dot-notation > invalid 1`] = `
           "line": 7,
         },
         "start": {
-          "column": 2,
+          "column": 3,
           "line": 7,
         },
       },
@@ -39,7 +39,7 @@ exports[`dot-notation > invalid 2`] = `
           "line": 7,
         },
         "start": {
-          "column": 2,
+          "column": 3,
           "line": 7,
         },
       },
@@ -65,7 +65,7 @@ exports[`dot-notation > invalid 3`] = `
           "line": 1,
         },
         "start": {
-          "column": 2,
+          "column": 3,
           "line": 1,
         },
       },
@@ -91,7 +91,7 @@ exports[`dot-notation > invalid 4`] = `
           "line": 1,
         },
         "start": {
-          "column": 2,
+          "column": 3,
           "line": 1,
         },
       },
@@ -117,7 +117,7 @@ exports[`dot-notation > invalid 5`] = `
           "line": 1,
         },
         "start": {
-          "column": 2,
+          "column": 3,
           "line": 1,
         },
       },
@@ -143,7 +143,7 @@ exports[`dot-notation > invalid 6`] = `
           "line": 1,
         },
         "start": {
-          "column": 2,
+          "column": 3,
           "line": 1,
         },
       },
@@ -169,7 +169,7 @@ exports[`dot-notation > invalid 7`] = `
           "line": 1,
         },
         "start": {
-          "column": 2,
+          "column": 3,
           "line": 1,
         },
       },
@@ -195,7 +195,7 @@ exports[`dot-notation > invalid 8`] = `
           "line": 1,
         },
         "start": {
-          "column": 2,
+          "column": 3,
           "line": 1,
         },
       },
@@ -221,7 +221,7 @@ exports[`dot-notation > invalid 9`] = `
           "line": 1,
         },
         "start": {
-          "column": 4,
+          "column": 5,
           "line": 1,
         },
       },
@@ -247,7 +247,7 @@ exports[`dot-notation > invalid 10`] = `
           "line": 1,
         },
         "start": {
-          "column": 2,
+          "column": 3,
           "line": 1,
         },
       },
@@ -273,7 +273,7 @@ exports[`dot-notation > invalid 11`] = `
           "line": 1,
         },
         "start": {
-          "column": 2,
+          "column": 3,
           "line": 1,
         },
       },
@@ -299,7 +299,7 @@ exports[`dot-notation > invalid 12`] = `
           "line": 3,
         },
         "start": {
-          "column": 3,
+          "column": 4,
           "line": 3,
         },
       },
@@ -307,6 +307,48 @@ exports[`dot-notation > invalid 12`] = `
     },
   ],
   "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "['catch'] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 6,
+          "line": 5,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "['catch'] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 6,
+          "line": 3,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 2,
   "fileCount": 1,
   "ruleCount": 1,
 }
