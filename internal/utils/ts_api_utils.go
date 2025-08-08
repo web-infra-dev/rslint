@@ -4,6 +4,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 )
 
 func UnionTypeParts(t *checker.Type) []*checker.Type {
@@ -194,4 +195,153 @@ func IsStrictCompilerOptionEnabled(
 	// 	(option !== "strictPropertyInitialization" ||
 	// 		isStrictCompilerOptionEnabled(options, "strictNullChecks"))
 	// );
+}
+
+/**
+ * Iterates over all tokens of `node`
+ * @category Nodes - Other Utilities
+ * @example
+ * ```ts
+ * declare const node: ts.Node;
+ *
+ * forEachToken(node, (token) => {
+ * 	console.log("Found token:", token.getText());
+ * });
+ * ```
+ * @param node The node whose tokens should be visited
+ * @param callback Is called for every token contained in `node`
+ */
+func ForEachToken(node *ast.Node, callback func(token *ast.Node), sourceFile *ast.SourceFile) {
+	queue := []*ast.Node{}
+
+	for {
+		if ast.IsTokenKind(node.Kind) {
+			callback(node)
+		} else {
+			children := make([]*ast.Node, 0)
+
+			// GetChildren
+			scanner := scanner.GetScannerForSourceFile(sourceFile, node.Pos())
+			startPos := node.Pos()
+			for startPos < node.End() {
+				tokenKind := scanner.Token()
+				tokenFullStart := scanner.TokenFullStart()
+				tokenEnd := scanner.TokenEnd()
+				token := sourceFile.GetOrCreateToken(tokenKind, tokenFullStart, tokenEnd, node)
+
+				children = append(children, token)
+
+				startPos = tokenEnd
+				scanner.Scan()
+			}
+
+			if len(children) == 1 {
+				node = children[0]
+				continue
+			}
+
+			// Add children in reverse order, when we pop the next element from the queue, it's the first child
+			for i := len(children) - 1; i >= 0; i-- {
+				queue = append(queue, children[i])
+			}
+		}
+
+		if len(queue) == 0 {
+			break
+		}
+
+		// Pop the last element from the queue
+		node = queue[len(queue)-1]
+		queue = queue[:len(queue)-1]
+	}
+}
+
+//
+/**
+ * Port https://github.com/JoshuaKGoldberg/ts-api-utils/blob/491c0374725a5dd64632405efea101f20ed5451f/src/comments.ts#L37C17-L37C31
+ *
+ * Iterates over all comments owned by `node` or its children.
+ * @category Nodes - Other Utilities
+ * @example
+ * ```ts
+ * declare const node: ts.Node;
+ *
+ * forEachComment(node, (fullText, comment) => {
+ *    console.log(`Found comment at position ${comment.pos}: '${fullText}'.`);
+ * });
+ * ```
+ */
+func ForEachComment(node *ast.Node, callback func(comment *ast.CommentRange), sourceFile *ast.SourceFile) {
+	nodeFactory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
+
+	fullText := sourceFile.Text()
+	notJsx := sourceFile.LanguageVariant != core.LanguageVariantJSX
+
+	ForEachToken(
+		node,
+		func(token *ast.Node) {
+			if token.Pos() == token.End() {
+				return
+			}
+
+			if token.Kind != ast.KindJsxText {
+				pos := token.Pos()
+				if token.Pos() == 0 {
+					pos = len(scanner.GetShebang(fullText))
+				}
+
+				for comment := range scanner.GetLeadingCommentRanges(nodeFactory, fullText, pos) {
+					callback(&comment)
+				}
+			}
+
+			if notJsx || canHaveTrailingTrivia(token) {
+				for comment := range scanner.GetTrailingCommentRanges(nodeFactory, fullText, token.End()) {
+					callback(&comment)
+				}
+				return
+			}
+		},
+		sourceFile,
+	)
+}
+
+/**
+ * Port https://github.com/JoshuaKGoldberg/ts-api-utils/blob/491c0374725a5dd64632405efea101f20ed5451f/src/comments.ts#L84
+ *
+ * Exclude trailing positions that would lead to scanning for trivia inside `JsxText`.
+ * @internal
+ */
+func canHaveTrailingTrivia(token *ast.Node) bool {
+	switch token.Kind {
+	case ast.KindCloseBraceToken:
+		// after a JsxExpression inside a JsxElement's body can only be other JsxChild, but no trivia
+		return token.Parent.Kind != ast.KindJsxExpression || !isJsxElementOrFragment(token.Parent.Parent)
+	case ast.KindGreaterThanToken:
+		switch token.Parent.Kind {
+		case ast.KindJsxClosingElement:
+		case ast.KindJsxClosingFragment:
+			// there's only trailing trivia if it's the end of the top element
+			return !isJsxElementOrFragment(token.Parent.Parent.Parent)
+		case ast.KindJsxOpeningElement:
+			// if end is not equal, this is part of the type arguments list. in all other cases it would be inside the element body
+			return token.End() != token.Parent.End()
+		case ast.KindJsxOpeningFragment:
+			return false // would be inside the fragment
+		case ast.KindJsxSelfClosingElement:
+			// if end is not equal, this is part of the type arguments list
+			// there's only trailing trivia if it's the end of the top element
+			return token.End() != token.Parent.End() || !isJsxElementOrFragment(token.Parent.Parent)
+		}
+	}
+
+	return true
+}
+
+/**
+ * Test if a node is a `JsxElement` or `JsxFragment`.
+ * @internal
+ */
+func isJsxElementOrFragment(node *ast.Node) bool {
+	return node.Kind == ast.KindJsxElement || node.Kind == ast.KindJsxFragment
 }
