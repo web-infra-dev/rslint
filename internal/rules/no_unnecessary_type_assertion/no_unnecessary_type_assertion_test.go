@@ -188,20 +188,7 @@ function testFunction(_param: string | null): void {
 const value = 'test' as string | null | undefined;
 testFunction(value!);
     `},
-		{
-			Code: `
-declare namespace JSX {
-  interface IntrinsicElements {
-    div: { key?: string | number };
-  }
-}
 
-function Test(props: { id?: null | string | number }) {
-  return <div key={props.id!} />;
-}
-      `,
-			Tsx: true,
-		},
 		{
 			Code: `
 const a = [1, 2];
@@ -793,6 +780,38 @@ declare namespace JSX {
 }
 
 function Test(props: { id?: string | number }) {
+  return <div key={props.id} />;
+}
+      `,
+			},
+			Tsx: true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "contextuallyUnnecessary",
+					Line:      9,
+				},
+			},
+		},
+		{
+			Code: `
+declare namespace JSX {
+  interface IntrinsicElements {
+    div: { key?: string | number };
+  }
+}
+
+function Test(props: { id?: null | string | number }) {
+  return <div key={props.id!} />;
+}
+      `,
+			Output: []string{`
+declare namespace JSX {
+  interface IntrinsicElements {
+    div: { key?: string | number };
+  }
+}
+
+function Test(props: { id?: null | string | number }) {
   return <div key={props.id} />;
 }
       `,
