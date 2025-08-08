@@ -434,9 +434,8 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 					}
 				}
 			} else if check == AccessibilityExplicit && accessibility == "" {
-				// Report precisely on the member name (or keyword for constructors/abstract)
-				r := getMissingAccessibilityRange(ctx, node)
-				ctx.ReportRange(r, rule.RuleMessage{
+				// Report on the method node directly for correct positioning
+				ctx.ReportNode(node, rule.RuleMessage{
 					Id:          "missingAccessibility",
 					Description: fmt.Sprintf("Missing accessibility modifier on %s %s.", nodeType, methodName),
 				})
@@ -472,9 +471,8 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 					}
 				}
 			} else if propCheck == AccessibilityExplicit && accessibility == "" {
-				// Report precisely on the property name or include accessor/abstract keyword when present
-				r := getMissingAccessibilityRange(ctx, node)
-				ctx.ReportRange(r, rule.RuleMessage{
+				// Report on the property node directly for correct positioning
+				ctx.ReportNode(node, rule.RuleMessage{
 					Id:          "missingAccessibility",
 					Description: fmt.Sprintf("Missing accessibility modifier on %s %s.", nodeType, propertyName),
 				})

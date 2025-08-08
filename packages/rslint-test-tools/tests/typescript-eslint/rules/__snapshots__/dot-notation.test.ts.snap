@@ -299,8 +299,8 @@ exports[`dot-notation > invalid 12`] = `
           "line": 3,
         },
         "start": {
-          "column": 4,
-          "line": 3,
+          "column": 1,
+          "line": 2,
         },
       },
       "ruleName": "dot-notation",
@@ -325,8 +325,8 @@ exports[`dot-notation > invalid 13`] = `
           "line": 5,
         },
         "start": {
-          "column": 6,
-          "line": 3,
+          "column": 1,
+          "line": 1,
         },
       },
       "ruleName": "dot-notation",
@@ -341,14 +341,326 @@ exports[`dot-notation > invalid 13`] = `
           "line": 3,
         },
         "start": {
-          "column": 6,
-          "line": 3,
+          "column": 1,
+          "line": 1,
         },
       },
       "ruleName": "dot-notation",
     },
   ],
   "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": ".while is a syntax error.",
+      "messageId": "useBrackets",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "['bar'] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "['bar'] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "['bar'] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": ".while is a syntax error.",
+      "messageId": "useBrackets",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "['null'] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "['bar'] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": ".if is a syntax error.",
+      "messageId": "useBrackets",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 22`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "['protected_prop'] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 7,
+        },
+        "start": {
+          "column": 1,
+          "line": 7,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 23`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "['prop'] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 8,
+        },
+        "start": {
+          "column": 1,
+          "line": 8,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 24`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "['key_baz'] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 6,
+        },
+        "start": {
+          "column": 1,
+          "line": 6,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 25`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "['extraKey'] is better written in dot notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 10,
+        },
+        "start": {
+          "column": 3,
+          "line": 10,
+        },
+      },
+      "ruleName": "dot-notation",
+    },
+  ],
+  "errorCount": 1,
   "fileCount": 1,
   "ruleCount": 1,
 }

@@ -438,43 +438,6 @@ func getMemberSortName(node *ast.Node, sourceFile *ast.SourceFile) string {
 	return ""
 }
 
-// getMemberDisplay returns a concise member name for messages (e.g., G, H, I, #I, a, 'b.c', call, new)
-func getMemberDisplay(sourceFile *ast.SourceFile, node *ast.Node) string {
-	switch node.Kind {
-	case ast.KindMethodDeclaration:
-		if name := node.AsMethodDeclaration().Name(); name != nil {
-			n, _ := utils.GetNameFromMember(sourceFile, name)
-			return n
-		}
-	case ast.KindGetAccessor:
-		if name := node.AsGetAccessorDeclaration().Name(); name != nil {
-			n, _ := utils.GetNameFromMember(sourceFile, name)
-			return n
-		}
-	case ast.KindSetAccessor:
-		if name := node.AsSetAccessorDeclaration().Name(); name != nil {
-			n, _ := utils.GetNameFromMember(sourceFile, name)
-			return n
-		}
-	case ast.KindPropertyDeclaration:
-		if name := node.AsPropertyDeclaration().Name(); name != nil {
-			n, _ := utils.GetNameFromMember(sourceFile, name)
-			return n
-		}
-	case ast.KindPropertySignature, ast.KindMethodSignature:
-		// use node directly
-		n, _ := utils.GetNameFromMember(sourceFile, node)
-		return n
-	case ast.KindConstructSignature:
-		return "new"
-	case ast.KindCallSignature:
-		return "call"
-	case ast.KindClassStaticBlockDeclaration:
-		return "static block"
-	}
-	return getMemberName(node, sourceFile)
-}
-
 // getMemberSnippet returns a compact source snippet for a member's head, used in messages
 func getMemberSnippet(sourceFile *ast.SourceFile, node *ast.Node) string {
 	r := utils.TrimNodeTextRange(sourceFile, node)
@@ -1022,21 +985,41 @@ func checkOrder(ctx rule.RuleContext, members []*ast.Node, memberTypes []interfa
 
 	if grouped == nil {
 		// Group order incorrect; emit group-order diagnostics to match TS-ESLint
-		// Walk members and report the first offending member for each out-of-order transition
-		prevRank := -1
+		// Report ALL members that violate the expected order
+
+		// First, find the minimum expected rank for each position
+		minExpectedRank := -1
 		for _, member := range members {
 			rank := getRank(member, memberTypes, supportsModifiers)
 			if rank == -1 {
 				continue
 			}
-			if prevRank != -1 && rank < prevRank {
+			if minExpectedRank == -1 || rank < minExpectedRank {
+				minExpectedRank = rank
+			}
+		}
+
+		// Now report every member that appears after members of a lower rank
+		highestSeenRank := -1
+		for _, member := range members {
+			rank := getRank(member, memberTypes, supportsModifiers)
+			if rank == -1 {
+				continue
+			}
+
+			// Update the highest rank we've seen so far
+			if rank > highestSeenRank {
+				highestSeenRank = rank
+			}
+
+			// If this member's rank is less than the highest we've seen,
+			// it's out of order and should be reported
+			if rank < highestSeenRank {
 				ctx.ReportNode(member, rule.RuleMessage{
 					Id:          "incorrectGroupOrder",
-					Description: fmt.Sprintf("Member %s should be declared before all %s definitions.", getMemberSnippet(ctx.SourceFile, member), getLowestRank([]int{prevRank}, rank, memberTypes)),
+					Description: fmt.Sprintf("Member %s should be declared before all %s definitions.", getMemberSnippet(ctx.SourceFile, member), getLowestRank([]int{highestSeenRank}, rank, memberTypes)),
 				})
-				// continue scanning to allow further alpha checks below
 			}
-			prevRank = rank
 		}
 		// Still check alpha sort within same-rank groups
 		if hasAlphaSort {

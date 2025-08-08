@@ -3,7 +3,6 @@ package dot_notation
 import (
 	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -76,25 +75,43 @@ var DotNotationRule = rule.Rule{
 			patternRegex, _ = regexp.Compile(opts.AllowPattern)
 		}
 
-		// Queue dot-notation diagnostics to ensure deterministic, ascending source order
-		type queuedDiag struct {
-			start int
-			end   int
-			msg   rule.RuleMessage
-		}
-		pending := make([]queuedDiag, 0, 4)
-
-		// Wrapper which pushes a diagnostic to pending
-		queueReport := func(start, end int, msg rule.RuleMessage) {
-			pending = append(pending, queuedDiag{start: start, end: end, msg: msg})
-		}
-
 		listeners := rule.RuleListeners{
 			ast.KindElementAccessExpression: func(node *ast.Node) {
-				// queue reports instead of immediate emit
-				start, end, msg, ok := computeDotNotationDiagnostic(ctx, node, opts, allowIndexSignaturePropertyAccess, patternRegex)
-				if ok {
-					queueReport(start, end, msg)
+				// Simplified approach: check if this node should be converted to dot notation
+				if shouldConvertToDotNotation(ctx, node, opts, allowIndexSignaturePropertyAccess, patternRegex) {
+					// Extract property name for fix
+					elementAccess := node.AsElementAccessExpression()
+					if elementAccess != nil && elementAccess.ArgumentExpression != nil {
+						argument := elementAccess.ArgumentExpression
+						var propertyName string
+
+						switch argument.Kind {
+						case ast.KindStringLiteral:
+							stringLiteral := argument.AsStringLiteral()
+							if stringLiteral != nil {
+								text := stringLiteral.Text
+								if len(text) >= 2 && ((text[0] == '"' && text[len(text)-1] == '"') || (text[0] == '\'' && text[len(text)-1] == '\'')) {
+									text = text[1 : len(text)-1]
+								}
+								propertyName = text
+							}
+						case ast.KindNullKeyword:
+							propertyName = "null"
+						case ast.KindTrueKeyword:
+							propertyName = "true"
+						case ast.KindFalseKeyword:
+							propertyName = "false"
+						}
+
+						if propertyName != "" {
+							msg := rule.RuleMessage{
+								Id:          "useDot",
+								Description: fmt.Sprintf("['%s'] is better written in dot notation.", propertyName),
+							}
+							fix := createFix(ctx, node, propertyName)
+							ctx.ReportNodeWithFixes(node, msg, fix)
+						}
+					}
 				}
 			},
 			ast.KindPropertyAccessExpression: func(node *ast.Node) {
@@ -102,21 +119,86 @@ var DotNotationRule = rule.Rule{
 					checkPropertyAccessKeywords(ctx, node)
 				}
 			},
-			// Flush pending on file exit sorted by start position so earlier lines come first
-			rule.ListenerOnExit(ast.KindSourceFile): func(node *ast.Node) {
-				if len(pending) == 0 {
-					return
-				}
-				sort.SliceStable(pending, func(i, j int) bool { return pending[i].start < pending[j].start })
-				for _, d := range pending {
-					ctx.ReportRange(core.NewTextRange(d.start, d.end), d.msg)
-				}
-				pending = pending[:0]
-			},
 		}
 
 		return listeners
 	},
+}
+
+// shouldConvertToDotNotation checks if a bracket access should be converted to dot notation
+func shouldConvertToDotNotation(ctx rule.RuleContext, node *ast.Node, opts DotNotationOptions, allowIndexSignaturePropertyAccess bool, patternRegex *regexp.Regexp) bool {
+	if !ast.IsElementAccessExpression(node) {
+		return false
+	}
+
+	elementAccess := node.AsElementAccessExpression()
+	if elementAccess == nil {
+		return false
+	}
+
+	argument := elementAccess.ArgumentExpression
+	if argument == nil {
+		return false
+	}
+
+	// Only handle string literals, numeric literals, and identifiers that evaluate to strings
+	var propertyName string
+	isValidProperty := false
+
+	switch argument.Kind {
+	case ast.KindStringLiteral:
+		stringLiteral := argument.AsStringLiteral()
+		if stringLiteral == nil {
+			return false
+		}
+		// Remove quotes from string literal text
+		text := stringLiteral.Text
+		if len(text) >= 2 && ((text[0] == '"' && text[len(text)-1] == '"') || (text[0] == '\'' && text[len(text)-1] == '\'')) {
+			text = text[1 : len(text)-1]
+		}
+		propertyName = text
+		isValidProperty = true
+	case ast.KindNoSubstitutionTemplateLiteral:
+		// Handle `obj[`foo`]` (no expressions)
+		propertyName = argument.AsNoSubstitutionTemplateLiteral().Text
+		isValidProperty = true
+	case ast.KindNumericLiteral:
+		// Numeric properties should use bracket notation
+		return false
+	case ast.KindNullKeyword, ast.KindTrueKeyword, ast.KindFalseKeyword:
+		// These are allowed as dot notation
+		propertyName = getKeywordText(argument)
+		isValidProperty = true
+	default:
+		// Other cases (template literals, identifiers, etc.) should keep bracket notation
+		return false
+	}
+
+	if !isValidProperty || propertyName == "" {
+		return false
+	}
+
+	// Check if it's a valid identifier
+	if !isValidIdentifierName(propertyName) {
+		return false
+	}
+
+	// Check pattern allowlist
+	if patternRegex != nil && patternRegex.MatchString(propertyName) {
+		return false
+	}
+
+	// Check for keywords
+	if !opts.AllowKeywords && isReservedWord(propertyName) {
+		return false
+	}
+
+	// Check for private/protected/index signature access
+	if shouldAllowBracketNotation(ctx, node, propertyName, opts, allowIndexSignaturePropertyAccess) {
+		return false
+	}
+
+	return true
 }
 
 // computeDotNotationDiagnostic computes a single diagnostic for a bracket access if it should be converted
@@ -127,7 +209,14 @@ func computeDotNotationDiagnostic(ctx rule.RuleContext, node *ast.Node, opts Dot
 	}
 
 	elementAccess := node.AsElementAccessExpression()
+	if elementAccess == nil {
+		return 0, 0, rule.RuleMessage{}, false
+	}
+
 	argument := elementAccess.ArgumentExpression
+	if argument == nil {
+		return 0, 0, rule.RuleMessage{}, false
+	}
 
 	// Only handle string literals, numeric literals, and identifiers that evaluate to strings
 	var propertyName string
@@ -135,7 +224,16 @@ func computeDotNotationDiagnostic(ctx rule.RuleContext, node *ast.Node, opts Dot
 
 	switch argument.Kind {
 	case ast.KindStringLiteral:
-		propertyName = argument.AsStringLiteral().Text
+		stringLiteral := argument.AsStringLiteral()
+		if stringLiteral == nil {
+			return 0, 0, rule.RuleMessage{}, false
+		}
+		// Remove quotes from string literal text
+		text := stringLiteral.Text
+		if len(text) >= 2 && ((text[0] == '"' && text[len(text)-1] == '"') || (text[0] == '\'' && text[len(text)-1] == '\'')) {
+			text = text[1 : len(text)-1]
+		}
+		propertyName = text
 		isValidProperty = true
 	case ast.KindNoSubstitutionTemplateLiteral:
 		// Handle `obj[`foo`]` (no expressions)

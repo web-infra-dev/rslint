@@ -41,3 +41,134 @@ exports[`member-ordering-required > invalid 1`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`member-ordering-required > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member b?: string; should be declared after all required members.",
+      "messageId": "incorrectRequiredMembersOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-required > invalid 3`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-required > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member a: string; should be declared before member b: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-required > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member b?: string; should be declared before member d?: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-required > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member b: string; should be declared after all optional members.",
+      "messageId": "incorrectRequiredMembersOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-required > invalid 7`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-required > invalid 8`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

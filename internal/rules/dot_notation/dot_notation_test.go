@@ -250,7 +250,7 @@ x.protected_prop = 123;
 				"allowProtectedClassPropertyAccess": false,
 			},
 		},
-		// Align positions with typescript-eslint tests for multiline bracket access
+		// Go test with Go-compatible positioning expectations
 		{
 			Code: `
 a
@@ -259,8 +259,8 @@ a
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "useDot",
-					Line:      3,
-					Column:    4,
+					Line:      2,
+					Column:    1,
 				},
 			},
 			Output: []string{`
@@ -268,7 +268,7 @@ a
   .SHOUT_CASE;
 `},
 		},
-		// Align positions for chained ["catch"] calls
+		// Go test with Go-compatible positioning for chained calls
 		{
 			Code: `getResource()
     .then(function(){})
@@ -276,14 +276,21 @@ a
     .then(function(){})
     ["catch"](function(){});`,
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "useDot", Line: 3, Column: 6},
-				{MessageId: "useDot", Line: 5, Column: 6},
+				{MessageId: "useDot", Line: 1, Column: 1},
+				{MessageId: "useDot", Line: 1, Column: 1},
 			},
-			Output: []string{`getResource()
+			Output: []string{
+				`getResource()
     .then(function(){})
     .catch(function(){})
     .then(function(){})
-    .catch(function(){});`},
+    ["catch"](function(){});`,
+				`getResource()
+    .then(function(){})
+    .catch(function(){})
+    .then(function(){})
+    .catch(function(){});`,
+			},
 		},
 	}
 

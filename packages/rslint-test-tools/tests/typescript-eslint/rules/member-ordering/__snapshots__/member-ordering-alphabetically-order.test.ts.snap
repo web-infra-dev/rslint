@@ -57,3 +57,1301 @@ exports[`member-ordering-alphabetically-order > invalid 1`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`member-ordering-alphabetically-order > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member 'b.c': Foo; should be declared before member 'b.d': Foo;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member b: string; should be declared before member c: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member a: string; should be declared before member b: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member a: b; should be declared before member b(): void;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member [a: string]: number; should be declared before member a: b;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member (): Baz; should be declared before member new (): Bar;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member 'b.c': Foo; should be declared before member 'b.d': Foo;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member b: string; should be declared before member c: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member a: string; should be declared before member b: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public static a: string; should be declared before member protected static b: string = '';.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public static b: string; should be declared before member public static c: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public static a: string; should be declared before member public static b: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public static a: string; should be declared before member protected static b: string = '';.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public static b: string; should be declared before member public static c: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public static a: string; should be declared before member public static b: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public static a: string; should be declared before member protected static b: string = '';.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public static b: string; should be declared before member public static c: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public static a: string; should be declared before member public static b: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public static a: string; should be declared before member protected static b: string = '';.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public static b: string; should be declared before member public static c: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public static a: string; should be declared before member public static b: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member a: b; should be declared before member b(): void;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member [a: string]: number; should be declared before member a: b;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member (): Baz; should be declared before member new (): Bar;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member b: string; should be declared before member c: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member a: string; should be declared before member b: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member a: b; should be declared before member b(): void;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member [a: string]: number; should be declared before member a: b;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member (): Baz; should be declared before member new (): Bar;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member b: string; should be declared before member c: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member a: string; should be declared before member b: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member constructor() {} should be declared before all public instance set definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 15,
+        },
+        "start": {
+          "column": 3,
+          "line": 15,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member get b() {} should be declared before all decorated get definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member set d() {} should be declared before all decorated set definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 11,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member constructor() {} should be declared before all public instance set definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 13,
+        },
+        "start": {
+          "column": 3,
+          "line": 13,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member get h() {} should be declared before all public instance set definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 15,
+        },
+        "start": {
+          "column": 3,
+          "line": 15,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 22`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public d: string = ''; should be declared before all public constructor definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public static b: string = ''; should be declared before member public static c: string = '';.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public static a: string; should be declared before member public static b: string = '';.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 23`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member b1: string; should be declared before all constructor definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 11,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member b2: string; should be declared before all constructor definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 12,
+        },
+        "start": {
+          "column": 3,
+          "line": 12,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member @Dec() should be declared before member @Dec().",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 24`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public d: string = ''; should be declared before all public constructor definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public static b: string = ''; should be declared before member public static c: string = '';.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public static a: string; should be declared before member public static b: string = '';.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 25`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public d: string = ''; should be declared before all public constructor definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public static b: string = ''; should be declared before member public static c: string = '';.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member public static a: string; should be declared before member public static b: string = '';.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 26`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member (): Baz; should be declared before all method definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 13,
+        },
+        "start": {
+          "column": 3,
+          "line": 13,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member new (): Bar; should be declared before all method definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 15,
+        },
+        "start": {
+          "column": 3,
+          "line": 15,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member b(): void; should be declared before member c(): void;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 10,
+        },
+        "start": {
+          "column": 3,
+          "line": 10,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member a(): void; should be declared before member b(): void;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 11,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 27`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member (): Baz; should be declared before all method definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 13,
+        },
+        "start": {
+          "column": 3,
+          "line": 13,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member new (): Bar; should be declared before all method definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 15,
+        },
+        "start": {
+          "column": 3,
+          "line": 15,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member b(): void; should be declared before member c(): void;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 10,
+        },
+        "start": {
+          "column": 3,
+          "line": 10,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member a(): void; should be declared before member b(): void;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 11,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 28`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member #b = 2; should be declared before member #c = 3;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member #a = 1; should be declared before member #b = 2;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 29`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member @Dec() accessor a; should be declared before member @Dec() accessor b;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member accessor c; should be declared before member accessor d;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member abstract accessor e; should be declared before member abstract accessor f;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 10,
+        },
+        "start": {
+          "column": 3,
+          "line": 10,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-alphabetically-order > invalid 30`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member accessor c; should be declared before all abstract accessor definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member @Dec() accessor d; should be declared before all abstract accessor definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
