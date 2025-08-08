@@ -11,11 +11,11 @@
   "publishConfig": {
     "access": "public",
     "executableFiles": [
-      "./rslint"
+      "./rslint.exe"
     ]
   },
   "files": [
-    "rslint"
+    "rslint.exe"
   ],
   "os": [
     "win32"
