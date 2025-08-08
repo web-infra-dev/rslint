@@ -378,7 +378,7 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 			ignoredMethodNames[name] = true
 		}
 
-        checkMethodAccessibilityModifier := func(node *ast.Node) {
+		checkMethodAccessibilityModifier := func(node *ast.Node) {
 			if isPrivateIdentifier(node) {
 				return
 			}
@@ -404,7 +404,10 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 
 			accessibility := getAccessibilityModifier(node)
 
-            if check == AccessibilityNoPublic && accessibility == "public" {
+			// Align with TS-ESLint: report missing accessibility on constructor declarations
+			// when configured (i.e., do not suppress the constructor diagnostic here).
+
+			if check == AccessibilityNoPublic && accessibility == "public" {
 				// Find and report on the public keyword specifically, and provide fix
 				var modifiers *ast.ModifierList
 				switch kind := node.Kind; kind {
@@ -430,7 +433,7 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 						}
 					}
 				}
-            } else if check == AccessibilityExplicit && accessibility == "" {
+			} else if check == AccessibilityExplicit && accessibility == "" {
 				// Report precisely on the member name (or keyword for constructors/abstract)
 				r := getMissingAccessibilityRange(ctx, node)
 				ctx.ReportRange(r, rule.RuleMessage{
@@ -478,7 +481,7 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 			}
 		}
 
-        checkParameterPropertyAccessibilityModifier := func(node *ast.Node) {
+		checkParameterPropertyAccessibilityModifier := func(node *ast.Node) {
 			if node.Kind != ast.KindParameter {
 				return
 			}
@@ -504,7 +507,7 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 				}
 			}
 
-            // Consider only parameters that are parameter properties (have readonly or accessibility)
+			// Consider only parameters that are parameter properties (have readonly or accessibility)
 			if !hasReadonly && !hasAccessibility {
 				return
 			}
@@ -533,7 +536,7 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 				return
 			}
 
-            // Emit at most one diagnostic per parameter property, matching TS-ESLint tests
+			// Emit at most one diagnostic per parameter property, matching TS-ESLint tests
 			if paramPropCheck == AccessibilityExplicit && accessibility == "" {
 				var reportRange core.TextRange
 				if hasReadonly && readonlyNode != nil {

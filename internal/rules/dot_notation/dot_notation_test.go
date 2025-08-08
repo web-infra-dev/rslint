@@ -250,6 +250,41 @@ x.protected_prop = 123;
 				"allowProtectedClassPropertyAccess": false,
 			},
 		},
+		// Align positions with typescript-eslint tests for multiline bracket access
+		{
+			Code: `
+a
+  ['SHOUT_CASE'];
+`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "useDot",
+					Line:      3,
+					Column:    4,
+				},
+			},
+			Output: []string{`
+a
+  .SHOUT_CASE;
+`},
+		},
+		// Align positions for chained ["catch"] calls
+		{
+			Code: `getResource()
+    .then(function(){})
+    ["catch"](function(){})
+    .then(function(){})
+    ["catch"](function(){});`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "useDot", Line: 3, Column: 6},
+				{MessageId: "useDot", Line: 5, Column: 6},
+			},
+			Output: []string{`getResource()
+    .then(function(){})
+    .catch(function(){})
+    .then(function(){})
+    .catch(function(){});`},
+		},
 	}
 
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &DotNotationRule, validTestCases, invalidTestCases)

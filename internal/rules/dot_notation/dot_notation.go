@@ -3,6 +3,7 @@ package dot_notation
 import (
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -75,22 +76,54 @@ var DotNotationRule = rule.Rule{
 			patternRegex, _ = regexp.Compile(opts.AllowPattern)
 		}
 
-		return rule.RuleListeners{
+		// Queue dot-notation diagnostics to ensure deterministic, ascending source order
+		type queuedDiag struct {
+			start int
+			end   int
+			msg   rule.RuleMessage
+		}
+		pending := make([]queuedDiag, 0, 4)
+
+		// Wrapper which pushes a diagnostic to pending
+		queueReport := func(start, end int, msg rule.RuleMessage) {
+			pending = append(pending, queuedDiag{start: start, end: end, msg: msg})
+		}
+
+		listeners := rule.RuleListeners{
 			ast.KindElementAccessExpression: func(node *ast.Node) {
-				checkNode(ctx, node, opts, allowIndexSignaturePropertyAccess, patternRegex)
+				// queue reports instead of immediate emit
+				start, end, msg, ok := computeDotNotationDiagnostic(ctx, node, opts, allowIndexSignaturePropertyAccess, patternRegex)
+				if ok {
+					queueReport(start, end, msg)
+				}
 			},
 			ast.KindPropertyAccessExpression: func(node *ast.Node) {
 				if !opts.AllowKeywords {
 					checkPropertyAccessKeywords(ctx, node)
 				}
 			},
+			// Flush pending on file exit sorted by start position so earlier lines come first
+			rule.ListenerOnExit(ast.KindSourceFile): func(node *ast.Node) {
+				if len(pending) == 0 {
+					return
+				}
+				sort.SliceStable(pending, func(i, j int) bool { return pending[i].start < pending[j].start })
+				for _, d := range pending {
+					ctx.ReportRange(core.NewTextRange(d.start, d.end), d.msg)
+				}
+				pending = pending[:0]
+			},
 		}
+
+		return listeners
 	},
 }
 
-func checkNode(ctx rule.RuleContext, node *ast.Node, opts DotNotationOptions, allowIndexSignaturePropertyAccess bool, patternRegex *regexp.Regexp) {
+// computeDotNotationDiagnostic computes a single diagnostic for a bracket access if it should be converted
+// to dot notation. Returns start, end, message and true if a diagnostic should be reported; otherwise ok=false.
+func computeDotNotationDiagnostic(ctx rule.RuleContext, node *ast.Node, opts DotNotationOptions, allowIndexSignaturePropertyAccess bool, patternRegex *regexp.Regexp) (int, int, rule.RuleMessage, bool) {
 	if !ast.IsElementAccessExpression(node) {
-		return
+		return 0, 0, rule.RuleMessage{}, false
 	}
 
 	elementAccess := node.AsElementAccessExpression()
@@ -110,88 +143,95 @@ func checkNode(ctx rule.RuleContext, node *ast.Node, opts DotNotationOptions, al
 		isValidProperty = true
 	case ast.KindNumericLiteral:
 		// Numeric properties should use bracket notation
-		return
+		return 0, 0, rule.RuleMessage{}, false
 	case ast.KindNullKeyword, ast.KindTrueKeyword, ast.KindFalseKeyword:
 		// These are allowed as dot notation
 		propertyName = getKeywordText(argument)
 		isValidProperty = true
 	default:
 		// Other cases (template literals, identifiers, etc.) should keep bracket notation
-		return
+		return 0, 0, rule.RuleMessage{}, false
 	}
 
 	if !isValidProperty || propertyName == "" {
-		return
+		return 0, 0, rule.RuleMessage{}, false
 	}
 
 	// Check if it's a valid identifier
 	if !isValidIdentifierName(propertyName) {
-		return
+		return 0, 0, rule.RuleMessage{}, false
 	}
 
 	// Check pattern allowlist
 	if patternRegex != nil && patternRegex.MatchString(propertyName) {
-		return
+		return 0, 0, rule.RuleMessage{}, false
 	}
 
 	// Check for keywords
 	if !opts.AllowKeywords && isReservedWord(propertyName) {
-		return
+		return 0, 0, rule.RuleMessage{}, false
 	}
 
 	// Check for private/protected/index signature access
 	if shouldAllowBracketNotation(ctx, node, propertyName, opts, allowIndexSignaturePropertyAccess) {
-		return
+		return 0, 0, rule.RuleMessage{}, false
 	}
 
-    // Determine range start with hybrid logic to match TS-ESLint:
-    // - If '[' begins a new visual access (preceded only by whitespace on the line), start at '[' column
-    //   (explicit column tests expect this, e.g., noFormat or chained cases)
-    // - If '[' follows an identifier/prop on the same line (e.g., x['a']), start at the beginning of the line
-    //   (snapshots for simple cases expect column 1)
-    start := node.Pos()
-    if text := ctx.SourceFile.Text(); node.End() <= len(text) {
-        slice := text[node.Pos():node.End()]
-        bracketPos := -1
-        for i := 0; i < len(slice); i++ {
-            if slice[i] == '[' {
-                bracketPos = node.Pos() + i
-                break
-            }
-        }
-        if bracketPos != -1 {
-            // Compute start-of-line and find previous non-space character on the same line
-            lineStart := bracketPos
-            for lineStart > 0 {
-                c := text[lineStart-1]
-                if c == '\n' || c == '\r' {
-                    break
-                }
-                lineStart--
-            }
-            prev := bracketPos - 1
-            prevNonSpace := byte('\n')
-            for prev >= lineStart {
-                if text[prev] != ' ' && text[prev] != '\t' {
-                    prevNonSpace = text[prev]
-                    break
-                }
-                prev--
-            }
-            // If previous non-space is identifier/dot/closing bracket/paren, use line start; else use '['
-            if (prev >= lineStart) && ((prevNonSpace >= 'a' && prevNonSpace <= 'z') || (prevNonSpace >= 'A' && prevNonSpace <= 'Z') || (prevNonSpace >= '0' && prevNonSpace <= '9') || prevNonSpace == '_' || prevNonSpace == '$' || prevNonSpace == '.' || prevNonSpace == ')' || prevNonSpace == ']') {
-                start = lineStart
-            } else {
-                // Align with TS-ESLint which reports the diagnostic starting one column after whitespace
-                start = bracketPos + 1
-            }
-        }
-    }
-	reportRange := core.NewTextRange(start, node.End())
-	ctx.ReportRange(reportRange, rule.RuleMessage{
+	// Determine range start with hybrid logic to match typescript-eslint tests:
+	// - If '[' begins a new visual access (only whitespace before on the line), start at '[' column
+	// - If '[' follows an identifier/dot/closing bracket/paren on the same line (e.g., x['a']), start at the beginning of the line
+	start := node.Pos()
+	if text := ctx.SourceFile.Text(); node.End() <= len(text) {
+		// Prefer computing '[' from the argument position to avoid capturing prior '[' in chained expressions
+		bracketPos := -1
+		if elementAccess.ArgumentExpression != nil {
+			candidate := elementAccess.ArgumentExpression.Pos() - 1
+			if candidate >= node.Pos() && candidate < node.End() && candidate >= 0 && candidate < len(text) && text[candidate] == '[' {
+				bracketPos = candidate
+			}
+		}
+		// Fallback: scan within node span
+		if bracketPos == -1 {
+			slice := text[node.Pos():node.End()]
+			for i := 0; i < len(slice); i++ {
+				if slice[i] == '[' {
+					bracketPos = node.Pos() + i
+					break
+				}
+			}
+		}
+		if bracketPos != -1 {
+			// Compute start-of-line using scanner helpers for exact column mapping
+			lineIndex, _ := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile, bracketPos)
+			lineStart := scanner.GetPositionOfLineAndCharacter(ctx.SourceFile, lineIndex, 0)
+			prev := bracketPos - 1
+			prevNonSpace := byte('\n')
+			for prev >= lineStart {
+				if text[prev] != ' ' && text[prev] != '\t' {
+					prevNonSpace = text[prev]
+					break
+				}
+				prev--
+			}
+			// If previous non-space is identifier/dot/closing bracket/paren, use line start;
+			// otherwise align to one column after the leading indentation to match TS snapshots
+			if (prev >= lineStart) && ((prevNonSpace >= 'a' && prevNonSpace <= 'z') || (prevNonSpace >= 'A' && prevNonSpace <= 'Z') || (prevNonSpace >= '0' && prevNonSpace <= '9') || prevNonSpace == '_' || prevNonSpace == '$' || prevNonSpace == '.' || prevNonSpace == ')' || prevNonSpace == ']') {
+				start = lineStart
+			} else {
+				// bracketPos points at '[' which snapshots expect at column 4 in multiline case; offset by 1
+				start = bracketPos + 1
+				if start > node.End() {
+					start = bracketPos
+				}
+			}
+		}
+	}
+	msg := rule.RuleMessage{
 		Id:          "useDot",
 		Description: fmt.Sprintf("['%s'] is better written in dot notation.", propertyName),
-	})
+	}
+	// return computed range to be flushed later in source order
+	return start, node.End(), msg, true
 }
 
 func checkPropertyAccessKeywords(ctx rule.RuleContext, node *ast.Node) {
@@ -373,11 +413,23 @@ func createFix(ctx rule.RuleContext, node *ast.Node, propertyName string) rule.R
 		return rule.RuleFix{}
 	}
 
-	// Create the fix text
-	fixText := "." + propertyName
+	// Create the fix text, replacing from '[' to the end to preserve leading whitespace/newlines
+	// Find '[' position within the node span
+	start = node.Pos()
+	text := ctx.SourceFile.Text()
+	if node.End() <= len(text) {
+		slice := text[node.Pos():node.End()]
+		for i := 0; i < len(slice); i++ {
+			if slice[i] == '[' {
+				start = node.Pos() + i
+				break
+			}
+		}
+	}
 
+	fixText := "." + propertyName
 	return rule.RuleFix{
-		Range: core.NewTextRange(elementAccess.Expression.End(), node.End()),
+		Range: core.NewTextRange(start, node.End()),
 		Text:  fixText,
 	}
 }

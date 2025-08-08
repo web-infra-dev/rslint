@@ -427,9 +427,9 @@ func getMemberSortName(node *ast.Node, sourceFile *ast.SourceFile) string {
 		}
 		return name
 	case ast.KindConstructSignature:
-        return "new"
+		return "new"
 	case ast.KindCallSignature:
-        return "call"
+		return "call"
 	case ast.KindIndexSignature:
 		return getNameFromIndexSignature(node)
 	case ast.KindClassStaticBlockDeclaration:
@@ -712,10 +712,10 @@ func getLowestRank(ranks []int, target int, order []interface{}) string {
 		lowestRanks = []string{str}
 	}
 
-    // Replace dashes with spaces
-    for i, rank := range lowestRanks {
-        lowestRanks[i] = strings.ReplaceAll(rank, "-", " ")
-    }
+	// Replace dashes with spaces
+	for i, rank := range lowestRanks {
+		lowestRanks[i] = strings.ReplaceAll(rank, "-", " ")
+	}
 
 	return strings.Join(lowestRanks, ", ")
 }
@@ -782,12 +782,13 @@ func naturalCompare(a, b string) int {
 func checkGroupSort(ctx rule.RuleContext, members []*ast.Node, groupOrder []interface{}, supportsModifiers bool) [][]*ast.Node {
 	var previousRanks []int
 	var memberGroups [][]*ast.Node
+	// Defer reporting of group-order errors until after alpha-sort pass in caller
 	isCorrectlySorted := true
 
 	for _, member := range members {
 		rank := getRank(member, groupOrder, supportsModifiers)
-        // Use simplified display for group-order messages to match snapshots
-        _ = getGroupOrderDisplay(ctx.SourceFile, member)
+		// Use simplified display for group-order messages to match snapshots
+		_ = getGroupOrderDisplay(ctx.SourceFile, member)
 
 		if rank == -1 {
 			continue
@@ -796,11 +797,7 @@ func checkGroupSort(ctx rule.RuleContext, members []*ast.Node, groupOrder []inte
 		if len(previousRanks) > 0 {
 			rankLastMember := previousRanks[len(previousRanks)-1]
 			if rank < rankLastMember {
-                ctx.ReportNode(member, rule.RuleMessage{
-                    Id: "incorrectGroupOrder",
-                    Description: fmt.Sprintf("Member %s should be declared before all %s definitions.",
-                        getMemberSnippet(ctx.SourceFile, member), getLowestRank(previousRanks, rank, groupOrder)),
-                })
+				// Mark as incorrect, but do not report yet
 				isCorrectlySorted = false
 			} else if rank == rankLastMember {
 				// Same member group - add to existing group
@@ -820,6 +817,7 @@ func checkGroupSort(ctx rule.RuleContext, members []*ast.Node, groupOrder []inte
 	if isCorrectlySorted {
 		return memberGroups
 	}
+	// When group ordering is incorrect, return nil so caller can decide message precedence
 	return nil
 }
 
@@ -833,8 +831,8 @@ func checkAlphaSort(ctx rule.RuleContext, members []*ast.Node, order Order) bool
 	isCorrectlySorted := true
 
 	for _, member := range members {
-        // Use snippet for messages to match snapshots like "a: Foo;" and "public static G() {}"
-        display := getMemberSnippet(ctx.SourceFile, member)
+		// Use snippet for messages to match snapshots like "a: Foo;" and "public static G() {}"
+		display := getMemberSnippet(ctx.SourceFile, member)
 		sortName := getMemberSortName(member, ctx.SourceFile)
 
 		if sortName != "" && previousSortName != "" {
@@ -847,16 +845,16 @@ func checkAlphaSort(ctx rule.RuleContext, members []*ast.Node, order Order) bool
 				comparePrev = strings.ToLower(comparePrev)
 			}
 			if naturalOutOfOrder(compareName, comparePrev, normalizeOrderForCompare(order)) {
-                ctx.ReportNode(member, rule.RuleMessage{
-                    Id:          "incorrectOrder",
-                    Description: fmt.Sprintf("Member %s should be declared before member %s.", display, previousDisplay),
-                })
+				ctx.ReportNode(member, rule.RuleMessage{
+					Id:          "incorrectOrder",
+					Description: fmt.Sprintf("Member %s should be declared before member %s.", display, previousDisplay),
+				})
 				isCorrectlySorted = false
 			}
 		}
 
 		if sortName != "" {
-            previousDisplay = display
+			previousDisplay = display
 			previousSortName = sortName
 		}
 	}
@@ -897,13 +895,13 @@ func normalizeOrderForCompare(order Order) Order {
 
 // isMemberTypesNever returns true if the memberTypes config is set to "never"
 func isMemberTypesNever(cfg *OrderConfig) bool {
-    if cfg == nil {
-        return false
-    }
-    if str, ok := cfg.MemberTypes.(string); ok && str == "never" {
-        return true
-    }
-    return false
+	if cfg == nil {
+		return false
+	}
+	if str, ok := cfg.MemberTypes.(string); ok && str == "never" {
+		return true
+	}
+	return false
 }
 
 func checkRequiredOrder(ctx rule.RuleContext, members []*ast.Node, optionalityOrder OptionalityOrder) bool {
@@ -1012,12 +1010,35 @@ func validateMembersOrder(ctx rule.RuleContext, members []*ast.Node, orderConfig
 }
 
 func checkOrder(ctx rule.RuleContext, members []*ast.Node, memberTypes []interface{}, order Order, supportsModifiers bool) {
-    hasAlphaSort := order != "" && order != OrderAsWritten
-    // Group-order unless the config is effectively 'never'
-    grouped := checkGroupSort(ctx, members, memberTypes, supportsModifiers)
+	hasAlphaSort := order != "" && order != OrderAsWritten
+	// Detect when memberTypes is "never" to skip group ordering entirely (alpha-sort only)
+	memberTypesNever := len(memberTypes) == 1 && memberTypes[0] == "never"
+	var grouped [][]*ast.Node
+	if !memberTypesNever {
+		grouped = checkGroupSort(ctx, members, memberTypes, supportsModifiers)
+	} else {
+		grouped = [][]*ast.Node{members}
+	}
 
 	if grouped == nil {
-		// If group sort failed, still check alpha sort for all members
+		// Group order incorrect; emit group-order diagnostics to match TS-ESLint
+		// Walk members and report the first offending member for each out-of-order transition
+		prevRank := -1
+		for _, member := range members {
+			rank := getRank(member, memberTypes, supportsModifiers)
+			if rank == -1 {
+				continue
+			}
+			if prevRank != -1 && rank < prevRank {
+				ctx.ReportNode(member, rule.RuleMessage{
+					Id:          "incorrectGroupOrder",
+					Description: fmt.Sprintf("Member %s should be declared before all %s definitions.", getMemberSnippet(ctx.SourceFile, member), getLowestRank([]int{prevRank}, rank, memberTypes)),
+				})
+				// continue scanning to allow further alpha checks below
+			}
+			prevRank = rank
+		}
+		// Still check alpha sort within same-rank groups
 		if hasAlphaSort {
 			groupMembersByType(members, memberTypes, supportsModifiers, func(group []*ast.Node) {
 				checkAlphaSort(ctx, group, order)
@@ -1026,12 +1047,12 @@ func checkOrder(ctx rule.RuleContext, members []*ast.Node, memberTypes []interfa
 		return
 	}
 
-    // Check alpha sort within groups
-    if hasAlphaSort {
-        for _, group := range grouped {
-            checkAlphaSort(ctx, group, order)
-        }
-    }
+	// Check alpha sort within groups
+	if hasAlphaSort {
+		for _, group := range grouped {
+			checkAlphaSort(ctx, group, order)
+		}
+	}
 }
 
 func groupMembersByType(members []*ast.Node, memberTypes []interface{}, supportsModifiers bool, callback func([]*ast.Node)) {
