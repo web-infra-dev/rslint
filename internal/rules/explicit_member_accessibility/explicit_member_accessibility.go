@@ -128,10 +128,6 @@ func getModifierText(modifiers *ast.ModifierList) string {
 	return ""
 }
 
-func hasDecorators(node *ast.Node) bool {
-	// Check if node has decorator modifiers
-	return ast.GetCombinedModifierFlags(node)&ast.ModifierFlagsDecorator != 0
-}
 
 
 func getMemberName(node *ast.Node, ctx rule.RuleContext) string {
@@ -208,44 +204,7 @@ func getNodeType(node *ast.Node, memberKind string) string {
 // Removed getMemberHeadLoc and getParameterPropertyHeadLoc functions
 // Now using ReportNode directly which handles positioning correctly
 
-func isAbstract(node *ast.Node) bool {
-	var modifiers *ast.ModifierList
-	switch node.Kind {
-	case ast.KindMethodDeclaration:
-		modifiers = node.AsMethodDeclaration().Modifiers()
-	case ast.KindPropertyDeclaration:
-		modifiers = node.AsPropertyDeclaration().Modifiers()
-	case ast.KindGetAccessor:
-		modifiers = node.AsGetAccessorDeclaration().Modifiers()
-	case ast.KindSetAccessor:
-		modifiers = node.AsSetAccessorDeclaration().Modifiers()
-	}
 
-	if modifiers != nil {
-		for _, mod := range modifiers.Nodes {
-			if mod.Kind == ast.KindAbstractKeyword {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-func isAccessorProperty(node *ast.Node) bool {
-	if node.Kind != ast.KindPropertyDeclaration {
-		return false
-	}
-
-	prop := node.AsPropertyDeclaration()
-	if prop.Modifiers() != nil {
-		for _, mod := range prop.Modifiers().Nodes {
-			if mod.Kind == ast.KindAccessorKeyword {
-				return true
-			}
-		}
-	}
-	return false
-}
 
 var ExplicitMemberAccessibilityRule = rule.Rule{
 	Name: "explicit-member-accessibility",
