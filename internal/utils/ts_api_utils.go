@@ -332,6 +332,8 @@ func canHaveTrailingTrivia(token *ast.Node) bool {
 	return true
 }
 
+// Port https://github.com/JoshuaKGoldberg/ts-api-utils/blob/491c0374725a5dd64632405efea101f20ed5451f/src/comments.ts#L118
+//
 // Test if a node is a `JsxElement` or `JsxFragment`.
 // @internal
 func isJsxElementOrFragment(node *ast.Node) bool {
