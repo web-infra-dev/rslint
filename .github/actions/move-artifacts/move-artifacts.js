@@ -19,7 +19,7 @@ function findRslintBinaries(dir = 'binaries') {
       // Look for files ending with -rslint in subdirectories
       const subEntries = fs.readdirSync(fullPath, { withFileTypes: true });
       for (const subEntry of subEntries) {
-        if (subEntry.isFile() && subEntry.name.endsWith('-rslint')) {
+        if (subEntry.isFile() && subEntry.name.includes('-rslint')) {
           files.push(path.join(fullPath, subEntry.name));
         }
       }
