@@ -20,6 +20,7 @@
     "react.tsx",
     "var-declaration.ts",
     "errors.ts",
-    "switch-exhaustiveness-check.ts"
+    "switch-exhaustiveness-check.ts",
+    "debug-test.ts"
   ]
 }

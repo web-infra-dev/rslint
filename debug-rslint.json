@@ -1,0 +1,14 @@
+[
+  {
+    "language": "javascript",
+    "files": ["./debug-valid-test.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "project": ["./tsconfig.json"]
+      }
+    },
+    "rules": {
+      "@typescript-eslint/member-ordering": []
+    }
+  }
+]

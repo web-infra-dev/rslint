@@ -60,8 +60,8 @@ type LanguageOptions struct {
 
 // ParserOptions represents TypeScript parser options
 type ParserOptions struct {
-	Project        string `json:"project,omitempty"`
-	ProjectService bool   `json:"projectService,omitempty"`
+	Project        interface{} `json:"project,omitempty"` // Can be string or []string
+	ProjectService bool        `json:"projectService,omitempty"`
 }
 
 // LintRequest represents a lint request from JS to Go

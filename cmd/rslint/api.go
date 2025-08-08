@@ -110,14 +110,36 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	var tsConfigs []string
 	var configDirectory string
 
-	if req.LanguageOptions != nil && req.LanguageOptions.ParserOptions != nil && req.LanguageOptions.ParserOptions.Project != "" {
+	if req.LanguageOptions != nil && req.LanguageOptions.ParserOptions != nil && req.LanguageOptions.ParserOptions.Project != nil {
 		// Use project from languageOptions
 		configDirectory = currentDirectory
-		projectPath := tspath.ResolvePath(currentDirectory, req.LanguageOptions.ParserOptions.Project)
-		if !fs.FileExists(projectPath) {
-			return nil, fmt.Errorf("tsconfig file specified in languageOptions %q doesn't exist", projectPath)
+		
+		var projectPaths []string
+		switch project := req.LanguageOptions.ParserOptions.Project.(type) {
+		case string:
+			if project != "" {
+				projectPaths = []string{project}
+			}
+		case []interface{}:
+			for _, p := range project {
+				if str, ok := p.(string); ok && str != "" {
+					projectPaths = append(projectPaths, str)
+				}
+			}
 		}
-		tsConfigs = []string{projectPath}
+		
+		if len(projectPaths) == 0 {
+			return nil, fmt.Errorf("no valid project paths found in languageOptions")
+		}
+		
+		// Resolve and validate all project paths
+		for _, projectPath := range projectPaths {
+			resolvedPath := tspath.ResolvePath(currentDirectory, projectPath)
+			if !fs.FileExists(resolvedPath) {
+				return nil, fmt.Errorf("tsconfig file specified in languageOptions %q doesn't exist", resolvedPath)
+			}
+			tsConfigs = append(tsConfigs, resolvedPath)
+		}
 	} else {
 		// Use default configuration loading
 		_, tsConfigs, configDirectory = rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
@@ -188,7 +210,16 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	// filter rule based on request.RuleOptions
 	if len(req.RuleOptions) > 0 {
 		for _, r := range origin_rules {
-			if option, ok := req.RuleOptions[r.Name]; ok {
+			// Try both short name and full @typescript-eslint/ prefixed name
+			var option interface{}
+			var found bool
+			if option, found = req.RuleOptions[r.Name]; found {
+				// Found with short name (e.g., "member-ordering")
+			} else if option, found = req.RuleOptions["@typescript-eslint/"+r.Name]; found {
+				// Found with full name (e.g., "@typescript-eslint/member-ordering")
+			}
+			
+			if found {
 				rulesWithOptions = append(rulesWithOptions, RuleWithOption{
 					rule:   r,
 					option: option,
