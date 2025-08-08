@@ -40,7 +40,10 @@ on:
           - all
           - npm
           - extension
-
+permissions:
+  # Provenance generation in GitHub Actions requires "write" access to the "id-token"
+  id-token: write
+  contents: read
 env:
   GO_VERSION: '1.24.1'
 
@@ -49,11 +52,12 @@ jobs:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'npm' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - NPM Packages' || 'Publish NPM Packages' }}
     needs: [build]
-    runs-on: rspack-ubuntu-22.04-large
+    runs-on: ubuntu-22.04
+    environment: npm
     steps:
       - name: Show dry-run status
         run: |
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
             echo "🏃‍♂️ RUNNING IN DRY-RUN MODE - No packages will be published to npm registry"
             echo "=================================================="
           else
@@ -72,6 +76,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+      # Update npm to the latest version to enable OIDC
+      - name: Update npm
+        run: |
+          npm install -g npm@latest
+          npm --version
 
       - name: Install pnpm
         run: corepack enable
@@ -88,11 +97,10 @@ jobs:
         uses: ./.github/actions/move-artifacts
 
       - name: Publish npm packages
-        if: ${{ github.event.inputs.dry_run == false }}
+        if: ${{ inputs.dry_run == false }}
         env:
           NPM_TOKEN: ${{ secrets.RSLINT_NPM_TOKEN }}
         run: |
-          npm config set "//registry.npmjs.org/:_authToken" "${NPM_TOKEN}"
           pnpm -r publish --no-git-checks --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
 
   publish-extesion:
@@ -128,15 +136,15 @@ jobs:
         env:
           VSCE_PAT: ${{ secrets.RSLINT_VSCE_PAT }}
         run: |
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
             echo "🚀 DRY RUN: Building and packaging VS Code extension without publishing..."
-            if [ "${{ github.event.inputs.extension_type }}" = "pre-release" ]; then
+            if [ "${{ inputs.extension_type }}" = "pre-release" ]; then
               pnpm publish:vsce --prerelease --dry-run
             else
               pnpm publish:vsce --dry-run
             fi
           else
-            if [ "${{ github.event.inputs.extension_type }}" = "pre-release" ]; then
+            if [ "${{ inputs.extension_type }}" = "pre-release" ]; then
               pnpm publish:vsce --prerelease
             else
               pnpm publish:vsce
@@ -152,15 +160,15 @@ jobs:
         env:
           OVSX_PAT: ${{ secrets.RSLINT_OVSX_PAT }}
         run: |
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
             echo "🚀 DRY RUN: Building and packaging for Open VSX Registry without publishing..."
-            if [ "${{ github.event.inputs.extension_type }}" = "pre-release" ]; then
+            if [ "${{ inputs.extension_type }}" = "pre-release" ]; then
               pnpm publish:ovsx --prerelease --dry-run
             else
               pnpm publish:ovsx --dry-run
             fi
           else
-            if [ "${{ github.event.inputs.extension_type }}" = "pre-release" ]; then
+            if [ "${{ inputs.extension_type }}" = "pre-release" ]; then
               pnpm publish:ovsx --prerelease
             else
               pnpm publish:ovsx
@@ -169,7 +177,7 @@ jobs:
 
   check:
     name: Test
-    if: ${{ github.event.inputs.dry_run == false }}
+    if: ${{ inputs.dry_run == false }}
     needs: build
     strategy:
       fail-fast: true
