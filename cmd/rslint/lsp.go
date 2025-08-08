@@ -82,6 +82,7 @@ func (s *LSPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 }
 
 func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
+	log.Printf("Handling initialize: %+v", req)
 	// Check if params is nil
 	if req.Params == nil {
 		return nil, &jsonrpc2.Error{
@@ -116,6 +117,7 @@ func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request)
 }
 
 func (s *LSPServer) handleDidOpen(ctx context.Context, req *jsonrpc2.Request) {
+	log.Printf("Handling didOpen: %+v", req)
 	var params lsproto.DidOpenTextDocumentParams
 	if err := json.Unmarshal(*req.Params, &params); err != nil {
 		return
@@ -129,6 +131,7 @@ func (s *LSPServer) handleDidOpen(ctx context.Context, req *jsonrpc2.Request) {
 }
 
 func (s *LSPServer) handleDidChange(ctx context.Context, req *jsonrpc2.Request) {
+	log.Printf("Handling didChange: %+v", req)
 	var params lsproto.DidChangeTextDocumentParams
 	if err := json.Unmarshal(*req.Params, &params); err != nil {
 		return
@@ -145,6 +148,7 @@ func (s *LSPServer) handleDidChange(ctx context.Context, req *jsonrpc2.Request) 
 }
 
 func (s *LSPServer) handleDidSave(ctx context.Context, req *jsonrpc2.Request) {
+	log.Printf("Handling didSave: %+v", req)
 	// Re-run diagnostics on save
 	var params lsproto.DidSaveTextDocumentParams
 
@@ -163,6 +167,7 @@ func (s *LSPServer) handleShutdown(ctx context.Context, req *jsonrpc2.Request) (
 }
 
 func (s *LSPServer) handleCodeAction(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
+	log.Printf("Handling codeAction: %+v", req)
 	var params lsproto.CodeActionParams
 	if err := json.Unmarshal(*req.Params, &params); err != nil {
 		return nil, &jsonrpc2.Error{
@@ -232,6 +237,7 @@ func (s *LSPServer) handleCodeAction(ctx context.Context, req *jsonrpc2.Request)
 }
 
 func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri, content string) {
+	log.Printf("Running diagnostics for: %+v", uri)
 	uriString := string(uri)
 
 	// Only process TypeScript/JavaScript files
