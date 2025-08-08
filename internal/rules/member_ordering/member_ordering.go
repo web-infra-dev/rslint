@@ -857,12 +857,14 @@ func groupMembersByType(members []*ast.Node, memberTypes []interface{}, supports
 		rankOfCurrentMember := memberRanks[i]
 		rankOfNextMember := memberRanks[i+1]
 
-		switch rank := rankOfCurrentMember; {
-		case rank == previousRank:
+		// Group members with same rank
+		if rankOfCurrentMember == previousRank { //nolint:staticcheck // False positive: runtime values, not suitable for tagged switch
+			// Add to existing group
 			groupedMembers[len(groupedMembers)-1] = append(groupedMembers[len(groupedMembers)-1], member)
-		case rank == rankOfNextMember:
+		} else if rankOfCurrentMember == rankOfNextMember {
+			// Start new group
 			groupedMembers = append(groupedMembers, []*ast.Node{member})
-			previousRank = rank
+			previousRank = rankOfCurrentMember
 		}
 	}
 
