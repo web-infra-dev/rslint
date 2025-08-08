@@ -153,3 +153,6 @@ npm/*/rslint.exe
 
 ## vscode settings
 .vscode/settings.json
+
+# go cache
+packages/rslint/pkg/
