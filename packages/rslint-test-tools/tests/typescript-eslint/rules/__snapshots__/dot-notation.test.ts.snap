@@ -299,7 +299,7 @@ exports[`dot-notation > invalid 12`] = `
           "line": 3,
         },
         "start": {
-          "column": 3,
+          "column": 4,
           "line": 3,
         },
       },
