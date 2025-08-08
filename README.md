@@ -34,7 +34,7 @@ Rslint is a fork of [tsgolint](https://github.com/typescript-eslint/tsgolint), b
 
 See [Guide](./GUIDE.md).
 
-## 📖 Documentation
+## 📖 Architecture Overview
 
 - [Architecture Overview](./architecture.md) - Comprehensive system architecture and implementation details
 
