@@ -18,7 +18,8 @@ async function build_all() {
     { os: 'windows', arch: 'arm64', 'node-arch': 'arm64', 'node-os': 'win32' },
   ];
   for (const platform of platforms) {
-    await $`GOOS=${platform.os} GOARCH=${platform.arch} go build -o npm/${platform['node-os'] || platform.os}-${platform['node-arch']}/rslint ./cmd/rslint`;
+    const binaryName = platform.os === 'windows' ? 'rslint.exe' : 'rslint';
+    await $`GOOS=${platform.os} GOARCH=${platform.arch} go build -o npm/${platform['node-os'] || platform.os}-${platform['node-arch']}/${binaryName} ./cmd/rslint`;
   }
 }
 async function main() {
