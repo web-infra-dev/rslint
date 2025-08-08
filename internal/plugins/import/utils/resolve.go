@@ -7,7 +7,6 @@ import (
 )
 
 func Resolve(moduleSpecifier *ast.StringLiteralLike, ctx rule.RuleContext) string {
-	// TODO: implement this
 	module := ctx.Program.GetResolvedModuleFromModuleSpecifier(ctx.SourceFile, moduleSpecifier)
 	return module.ResolvedFileName
 }
