@@ -177,30 +177,8 @@ export class RuleTester {
               ? false
               : validCase.languageOptions?.parserOptions?.ecmaFeatures?.jsx;
 
-          let options =
+          const options =
             typeof validCase === 'string' ? [] : validCase.options || [];
-
-          // Handle special case for dot-notation rule with noPropertyAccessFromIndexSignature tsconfig
-          if (
-            ruleName === '@typescript-eslint/dot-notation' &&
-            typeof validCase === 'object' &&
-            validCase.languageOptions?.parserOptions?.project ===
-              './tsconfig.noPropertyAccessFromIndexSignature.json'
-          ) {
-            // Simulate noPropertyAccessFromIndexSignature: true by setting allowIndexSignaturePropertyAccess: true
-            if (Array.isArray(options) && options.length === 0) {
-              options = [{ allowIndexSignaturePropertyAccess: true }];
-            } else if (
-              Array.isArray(options) &&
-              options.length > 0 &&
-              typeof options[0] === 'object'
-            ) {
-              options[0] = {
-                ...options[0],
-                allowIndexSignaturePropertyAccess: true,
-              };
-            }
-          }
           let virtual_entry = path.resolve(
             cwd,
             isJSX ? 'src/virtual.tsx' : 'src/virtual.ts',
@@ -226,6 +204,10 @@ export class RuleTester {
             ruleOptions: {
               [ruleName]: options,
             },
+            languageOptions:
+              typeof validCase === 'object'
+                ? validCase.languageOptions
+                : undefined,
           });
 
           assert(
@@ -236,28 +218,13 @@ export class RuleTester {
       });
       test('invalid', async t => {
         for (const item of cases.invalid) {
-          let { code, errors, only = false, skip = false, options = [] } = item;
-
-          // Handle special case for dot-notation rule with noPropertyAccessFromIndexSignature tsconfig
-          if (
-            ruleName === '@typescript-eslint/dot-notation' &&
-            item.languageOptions?.parserOptions?.project ===
-              './tsconfig.noPropertyAccessFromIndexSignature.json'
-          ) {
-            // Simulate noPropertyAccessFromIndexSignature: true by setting allowIndexSignaturePropertyAccess: true
-            if (Array.isArray(options) && options.length === 0) {
-              options = [{ allowIndexSignaturePropertyAccess: true }];
-            } else if (
-              Array.isArray(options) &&
-              options.length > 0 &&
-              typeof options[0] === 'object'
-            ) {
-              options[0] = {
-                ...options[0],
-                allowIndexSignaturePropertyAccess: true,
-              };
-            }
-          }
+          const {
+            code,
+            errors,
+            only = false,
+            skip = false,
+            options = [],
+          } = item;
           if (skip) {
             continue;
           }
@@ -278,6 +245,7 @@ export class RuleTester {
             ruleOptions: {
               [ruleName]: options,
             },
+            languageOptions: item.languageOptions,
           });
 
           expect(diags).toMatchSnapshot();

@@ -53,15 +53,27 @@ type HandshakeResponse struct {
 	OK      bool   `json:"ok"`
 }
 
+// LanguageOptions represents language-specific parser options
+type LanguageOptions struct {
+	ParserOptions *ParserOptions `json:"parserOptions,omitempty"`
+}
+
+// ParserOptions represents TypeScript parser options
+type ParserOptions struct {
+	Project        string `json:"project,omitempty"`
+	ProjectService bool   `json:"projectService,omitempty"`
+}
+
 // LintRequest represents a lint request from JS to Go
 type LintRequest struct {
-	Files            []string `json:"files,omitempty"`
-	Config           string   `json:"config,omitempty"` // Path to rslint.json config file
-	Format           string   `json:"format,omitempty"`
-	WorkingDirectory string   `json:"workingDirectory,omitempty"`
+	Files            []string          `json:"files,omitempty"`
+	Config           string            `json:"config,omitempty"` // Path to rslint.json config file
+	Format           string            `json:"format,omitempty"`
+	WorkingDirectory string            `json:"workingDirectory,omitempty"`
 	// Supports both string level and array [level, options] format
-	RuleOptions  map[string]interface{} `json:"ruleOptions,omitempty"`
-	FileContents map[string]string      `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
+	RuleOptions     map[string]interface{} `json:"ruleOptions,omitempty"`
+	FileContents    map[string]string      `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
+	LanguageOptions *LanguageOptions       `json:"languageOptions,omitempty"`
 }
 
 // LintResponse represents a lint response from Go to JS

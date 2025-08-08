@@ -107,7 +107,21 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	rslintconfig.RegisterAllTypeScriptEslintPluginRules()
 
 	// Load rslint configuration and determine which tsconfig files to use
-	_, tsConfigs, configDirectory := rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
+	var tsConfigs []string
+	var configDirectory string
+	
+	if req.LanguageOptions != nil && req.LanguageOptions.ParserOptions != nil && req.LanguageOptions.ParserOptions.Project != "" {
+		// Use project from languageOptions
+		configDirectory = currentDirectory
+		projectPath := tspath.ResolvePath(currentDirectory, req.LanguageOptions.ParserOptions.Project)
+		if !fs.FileExists(projectPath) {
+			return nil, fmt.Errorf("tsconfig file specified in languageOptions %q doesn't exist", projectPath)
+		}
+		tsConfigs = []string{projectPath}
+	} else {
+		// Use default configuration loading
+		_, tsConfigs, configDirectory = rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
+	}
 
 	// Create rules
 	var origin_rules = []rule.Rule{
