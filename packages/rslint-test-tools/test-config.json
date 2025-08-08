@@ -1,0 +1,16 @@
+[
+  {
+    "language": "javascript",
+    "files": ["test-column-issue.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "projectService": false,
+        "project": ["../../tsconfig.json"]
+      }
+    },
+    "rules": {
+      "@typescript-eslint/dot-notation": "error"
+    },
+    "plugins": ["@typescript-eslint"]
+  }
+]

@@ -13,10 +13,10 @@ type MaxParamsOptions struct {
 	CountVoidThis bool `json:"countVoidThis"`
 }
 
-func buildExceedMessage(name string, count int, max int) rule.RuleMessage {
+func buildExceedMessage(name string, count int, maxAllowed int) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "exceed",
-		Description: fmt.Sprintf("%s has too many parameters (%d). Maximum allowed is %d.", name, count, max),
+		Description: fmt.Sprintf("%s has too many parameters (%d). Maximum allowed is %d.", name, count, maxAllowed),
 	}
 }
 

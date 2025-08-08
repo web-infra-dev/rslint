@@ -2,9 +2,94 @@
 
 exports[`member-ordering > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member new should be declared before all method definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 17,
+        },
+        "start": {
+          "column": 3,
+          "line": 17,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 0,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member call should be declared before all field definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member new should be declared before all method definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 16,
+        },
+        "start": {
+          "column": 3,
+          "line": 16,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member Z should be declared before all field definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 17,
+        },
+        "start": {
+          "column": 3,
+          "line": 17,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
 }
 `;

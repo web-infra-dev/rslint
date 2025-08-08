@@ -115,7 +115,7 @@ func getModifierText(modifiers *ast.ModifierList) string {
 	if modifiers == nil {
 		return ""
 	}
-	for _, mod := range modifiers.NodeList.Nodes {
+	for _, mod := range modifiers.Nodes {
 		switch mod.Kind {
 		case ast.KindPublicKeyword:
 			return "public"
@@ -154,14 +154,14 @@ func findPublicKeywordRange(ctx rule.RuleContext, node *ast.Node) (core.TextRang
 		return core.NewTextRange(0, 0), core.NewTextRange(0, 0)
 	}
 
-	for i, mod := range modifiers.NodeList.Nodes {
+	for i, mod := range modifiers.Nodes {
 		if mod.Kind == ast.KindPublicKeyword {
 			keywordRange := core.NewTextRange(mod.Pos(), mod.End())
 
 			// Calculate range to remove (including following whitespace)
 			removeEnd := mod.End()
-			if i+1 < len(modifiers.NodeList.Nodes) {
-				removeEnd = modifiers.NodeList.Nodes[i+1].Pos()
+			if i+1 < len(modifiers.Nodes) {
+				removeEnd = modifiers.Nodes[i+1].Pos()
 			} else {
 				// Find next token after public keyword
 				text := string(ctx.SourceFile.Text())
@@ -240,7 +240,7 @@ func getNodeType(node *ast.Node, memberKind string) string {
 	case "constructor":
 		return "constructor"
 	case "get", "set":
-		return fmt.Sprintf("%s property accessor", memberKind)
+		return memberKind + " property accessor"
 	default:
 		if node.Kind == ast.KindPropertyDeclaration {
 			return "class property"
@@ -266,7 +266,7 @@ func isAbstract(node *ast.Node) bool {
 	}
 
 	if modifiers != nil {
-		for _, mod := range modifiers.NodeList.Nodes {
+		for _, mod := range modifiers.Nodes {
 			if mod.Kind == ast.KindAbstractKeyword {
 				return true
 			}
@@ -282,7 +282,7 @@ func isAccessorProperty(node *ast.Node) bool {
 
 	prop := node.AsPropertyDeclaration()
 	if prop.Modifiers() != nil {
-		for _, mod := range prop.Modifiers().NodeList.Nodes {
+		for _, mod := range prop.Modifiers().Nodes {
 			if mod.Kind == ast.KindAccessorKeyword {
 				return true
 			}
@@ -387,7 +387,7 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 				}
 
 				if modifiers != nil {
-					for _, mod := range modifiers.NodeList.Nodes {
+					for _, mod := range modifiers.Nodes {
 						if mod.Kind == ast.KindPublicKeyword {
 							message := rule.RuleMessage{
 								Id:          "unwantedPublicAccessibility",
@@ -424,7 +424,7 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 				// Find and report on the public keyword specifically, and provide fix
 				prop := node.AsPropertyDeclaration()
 				if prop.Modifiers() != nil {
-					for _, mod := range prop.Modifiers().NodeList.Nodes {
+					for _, mod := range prop.Modifiers().Nodes {
 						if mod.Kind == ast.KindPublicKeyword {
 							message := rule.RuleMessage{
 								Id:          "unwantedPublicAccessibility",
@@ -460,7 +460,7 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 			hasReadonly := false
 			hasAccessibility := false
 			var readonlyNode *ast.Node
-			for _, mod := range param.Modifiers().NodeList.Nodes {
+			for _, mod := range param.Modifiers().Nodes {
 				if mod.Kind == ast.KindReadonlyKeyword {
 					hasReadonly = true
 					readonlyNode = mod
@@ -496,7 +496,6 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 
 			accessibility := getAccessibilityModifier(node)
 
-			// Debug: Skip parameter property checking if paramPropCheck is off
 			if paramPropCheck == AccessibilityOff {
 				return
 			}
@@ -523,7 +522,7 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 				if accessibility == "public" {
 					// Find and report on the public keyword specifically
 					if param.Modifiers() != nil {
-						for _, mod := range param.Modifiers().NodeList.Nodes {
+						for _, mod := range param.Modifiers().Nodes {
 							if mod.Kind == ast.KindPublicKeyword {
 								message := rule.RuleMessage{
 									Id:          "unwantedPublicAccessibility",
@@ -562,8 +561,38 @@ func getMissingAccessibilitySuggestions(node *ast.Node, ctx rule.RuleContext) []
 
 		// If node has decorators, insert after the last decorator
 		if hasDecorators(node) {
-			// For now, skip decorator handling as the API has changed
-			// TODO: Update decorator handling when API is stabilized
+			// Get the modifiers list to find decorator positions
+			var modifiers *ast.ModifierList
+			switch node.Kind {
+			case ast.KindMethodDeclaration:
+				modifiers = node.AsMethodDeclaration().Modifiers()
+			case ast.KindPropertyDeclaration:
+				modifiers = node.AsPropertyDeclaration().Modifiers()
+			case ast.KindGetAccessor:
+				modifiers = node.AsGetAccessorDeclaration().Modifiers()
+			case ast.KindSetAccessor:
+				modifiers = node.AsSetAccessorDeclaration().Modifiers()
+			}
+			
+			if modifiers != nil {
+				// Find the last decorator
+				var lastDecoratorEnd int = -1
+				for _, mod := range modifiers.Nodes {
+					if mod.Kind == ast.KindDecorator && mod.End() > lastDecoratorEnd {
+						lastDecoratorEnd = mod.End()
+					}
+				}
+				
+				if lastDecoratorEnd > 0 {
+					// Insert after the last decorator
+					insertPos = lastDecoratorEnd
+					// Add space after decorator if not already present
+					text := string(ctx.SourceFile.Text())
+					if insertPos < len(text) && text[insertPos] != ' ' && text[insertPos] != '\n' {
+						insertText = " " + insertText
+					}
+				}
+			}
 		}
 
 		// For abstract members, insert after "abstract" keyword
@@ -577,7 +606,7 @@ func getMissingAccessibilitySuggestions(node *ast.Node, ctx rule.RuleContext) []
 			}
 
 			if modifiers != nil {
-				for _, mod := range modifiers.NodeList.Nodes {
+				for _, mod := range modifiers.Nodes {
 					if mod.Kind == ast.KindAbstractKeyword {
 						insertPos = mod.Pos()
 						insertText = accessibility + " abstract "
@@ -591,7 +620,7 @@ func getMissingAccessibilitySuggestions(node *ast.Node, ctx rule.RuleContext) []
 		if isAccessorProperty(node) {
 			prop := node.AsPropertyDeclaration()
 			if prop.Modifiers() != nil {
-				for _, mod := range prop.Modifiers().NodeList.Nodes {
+				for _, mod := range prop.Modifiers().Nodes {
 					if mod.Kind == ast.KindAccessorKeyword {
 						insertPos = mod.Pos()
 						break
@@ -631,7 +660,7 @@ func getParameterPropertyAccessibilitySuggestions(node *ast.Node, ctx rule.RuleC
 		insertText := accessibility + " "
 
 		// If parameter has readonly, insert before readonly
-		for _, mod := range param.Modifiers().NodeList.Nodes {
+		for _, mod := range param.Modifiers().Nodes {
 			if mod.Kind == ast.KindReadonlyKeyword {
 				insertPos = mod.Pos()
 				break
