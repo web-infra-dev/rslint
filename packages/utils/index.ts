@@ -4,10 +4,14 @@ export enum AST_TOKEN_TYPES {
 }
 export const TSESTree: any = {};
 export type TSESTree = any;
+
+// eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace TSESTree {
   export type Program = any;
   export type Node = any;
 }
+
+// eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace TSESLint {
   // eslint-disable-next-line @typescript-eslint/no-empty-function
   export class Linter {
