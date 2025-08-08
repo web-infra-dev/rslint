@@ -144,11 +144,17 @@ func checkNode(ctx rule.RuleContext, node *ast.Node, opts DotNotationOptions, al
 		return
 	}
 
-	// Report error with fix
-	ctx.ReportNodeWithFixes(node, rule.RuleMessage{
+	// Report error with a precise range starting at the '['
+	// Use the argument start position - 1 to include the '[' token
+	start := elementAccess.ArgumentExpression.Pos() - 1
+	if start < node.Pos() {
+		start = node.Pos()
+	}
+	reportRange := core.NewTextRange(start, node.End())
+	ctx.ReportRange(reportRange, rule.RuleMessage{
 		Id:          "useDot",
 		Description: fmt.Sprintf("['%s'] is better written in dot notation.", propertyName),
-	}, createFix(ctx, node, propertyName))
+	})
 }
 
 func checkPropertyAccessKeywords(ctx rule.RuleContext, node *ast.Node) {
@@ -297,7 +303,6 @@ func hasIndexSignature(ctx rule.RuleContext, objectType *checker.Type) bool {
 	numberIndexType := ctx.TypeChecker.GetNumberIndexType(nonNullable)
 	return numberIndexType != nil
 }
-
 
 // matchesTemplateLiteralPattern checks if a property name matches template literal patterns
 // This is a heuristic to handle cases like `key_${string}` where `key_baz` should be allowed
@@ -456,4 +461,3 @@ func getKeywordText(node *ast.Node) string {
 		return ""
 	}
 }
-
