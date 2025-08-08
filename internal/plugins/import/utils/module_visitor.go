@@ -39,7 +39,7 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 		}
 
 		modulePath := call.Arguments.Nodes[0]
-		if !isStringLiteralLike(modulePath) {
+		if modulePath == nil || !isStringLiteralLike(modulePath) {
 			return
 		}
 
@@ -58,12 +58,12 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 			return
 		}
 
-		if len(call.Arguments.Nodes) != 1 {
+		if len(call.Arguments.Nodes) < 1 {
 			return
 		}
 
 		modulePath := call.Arguments.Nodes[0]
-		if !isStringLiteralLike(modulePath) {
+		if modulePath == nil || !isStringLiteralLike(modulePath) {
 			return
 		}
 

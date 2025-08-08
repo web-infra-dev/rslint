@@ -6,7 +6,12 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-func Resolve(moduleSpecifier *ast.StringLiteralLike, ctx rule.RuleContext) string {
+func Resolve(moduleSpecifier *ast.StringLiteralLike, ctx rule.RuleContext) (string, bool) {
 	module := ctx.Program.GetResolvedModuleFromModuleSpecifier(ctx.SourceFile, moduleSpecifier)
-	return module.ResolvedFileName
+
+	if module != nil {
+		return module.ResolvedFileName, true
+	}
+
+	return "", false
 }

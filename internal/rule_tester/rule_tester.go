@@ -18,6 +18,7 @@ import (
 
 type ValidTestCase struct {
 	Code     string
+	FileName string
 	Only     bool
 	Skip     bool
 	Options  any
@@ -41,6 +42,7 @@ type InvalidTestCaseSuggestion struct {
 
 type InvalidTestCase struct {
 	Code     string
+	FileName string
 	Only     bool
 	Skip     bool
 	Output   []string
@@ -56,14 +58,9 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 	onlyMode := slices.ContainsFunc(validTestCases, func(c ValidTestCase) bool { return c.Only }) ||
 		slices.ContainsFunc(invalidTestCases, func(c InvalidTestCase) bool { return c.Only })
 
-	runLinter := func(t *testing.T, code string, options any, tsconfigPathOverride string, tsx bool) []rule.RuleDiagnostic {
+	runLinter := func(t *testing.T, code string, options any, tsconfigPathOverride string, fileName string) []rule.RuleDiagnostic {
 		var diagnosticsMu sync.Mutex
 		diagnostics := make([]rule.RuleDiagnostic, 0, 3)
-
-		fileName := "file.ts"
-		if tsx {
-			fileName = "react.tsx"
-		}
 
 		fs := utils.NewOverlayVFSForFile(tspath.ResolvePath(rootDir, fileName), code)
 		host := utils.CreateCompilerHost(rootDir, fs)
@@ -114,7 +111,15 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 				t.SkipNow()
 			}
 
-			diagnostics := runLinter(t, testCase.Code, testCase.Options, testCase.TSConfig, testCase.Tsx)
+			fileName := "file.ts"
+			if testCase.Tsx {
+				fileName = "react.tsx"
+			}
+			if testCase.FileName != "" {
+				fileName = testCase.FileName
+			}
+
+			diagnostics := runLinter(t, testCase.Code, testCase.Options, testCase.TSConfig, fileName)
 			if len(diagnostics) != 0 {
 				// TODO: pretty errors
 				t.Errorf("Expected valid test case not to contain errors. Code:\n%v", testCase.Code)
@@ -138,8 +143,16 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 			outputs := make([]string, 0, 1)
 			code := testCase.Code
 
+			fileName := "file.ts"
+			if testCase.Tsx {
+				fileName = "react.tsx"
+			}
+			if testCase.FileName != "" {
+				fileName = testCase.FileName
+			}
+
 			for i := range 10 {
-				diagnostics := runLinter(t, code, testCase.Options, testCase.TSConfig, testCase.Tsx)
+				diagnostics := runLinter(t, code, testCase.Options, testCase.TSConfig, fileName)
 				if i == 0 {
 					initialDiagnostics = diagnostics
 				}

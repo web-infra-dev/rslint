@@ -1,4 +1,4 @@
-package rules
+package no_self_import
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -23,10 +23,12 @@ var NoSelfImportRule = rule.Rule{
 func isImportingSelf(ctx rule.RuleContext, source *ast.StringLiteralLike, node *ast.ImportSpecifierNode) {
 	filePath := utils.GetPhysicalFilename(ctx)
 
-	if /** filePath != "<text>" && */ filePath == utils.Resolve(source, ctx) {
-		ctx.ReportNode(node, rule.RuleMessage{
-			Id:          "import/no-self-import",
-			Description: "Module imports itself.",
-		})
+	if resolvedPath, ok := utils.Resolve(source, ctx); ok {
+		if /** filePath != "<text>" && */ filePath == resolvedPath {
+			ctx.ReportNode(node, rule.RuleMessage{
+				Id:          "import/no-self-import",
+				Description: "Module imports itself.",
+			})
+		}
 	}
 }
