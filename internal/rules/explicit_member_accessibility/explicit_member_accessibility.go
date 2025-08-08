@@ -164,7 +164,7 @@ func findPublicKeywordRange(ctx rule.RuleContext, node *ast.Node) (core.TextRang
 				removeEnd = modifiers.Nodes[i+1].Pos()
 			} else {
 				// Find next token after public keyword
-				text := string(ctx.SourceFile.Text())
+				text := ctx.SourceFile.Text()
 				for removeEnd < len(text) && (text[removeEnd] == ' ' || text[removeEnd] == '\t') {
 					removeEnd++
 				}
@@ -461,12 +461,11 @@ var ExplicitMemberAccessibilityRule = rule.Rule{
 			hasAccessibility := false
 			var readonlyNode *ast.Node
 			for _, mod := range param.Modifiers().Nodes {
-				if mod.Kind == ast.KindReadonlyKeyword {
+				switch kind := mod.Kind; kind {
+				case ast.KindReadonlyKeyword:
 					hasReadonly = true
 					readonlyNode = mod
-				} else if mod.Kind == ast.KindPublicKeyword ||
-					mod.Kind == ast.KindPrivateKeyword ||
-					mod.Kind == ast.KindProtectedKeyword {
+				case ast.KindPublicKeyword, ast.KindPrivateKeyword, ast.KindProtectedKeyword:
 					hasAccessibility = true
 				}
 			}
