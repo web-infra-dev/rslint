@@ -23,5 +23,6 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-empty-interface.test.ts',
     './tests/typescript-eslint/rules/no-require-imports.test.ts',
     './tests/typescript-eslint/rules/no-duplicate-type-constituents.test.ts',
+    './tests/typescript-eslint/rules/no_namespace.test.ts',
   ],
 });

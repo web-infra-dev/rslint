@@ -4,9 +4,16 @@ import { $, fs, path, glob, chalk } from 'zx';
 
 // Validate argument
 const bumpType = process.argv[3];
-if (!bumpType || !['major', 'minor', 'patch'].includes(bumpType)) {
+const canaryMode = process.argv[4]; // Optional: 'commit' or 'timestamp' (default)
+
+if (!bumpType || !['major', 'minor', 'patch', 'canary'].includes(bumpType)) {
   console.error(
-    chalk.red('❌ Usage: zx scripts/version.mjs <major|minor|patch>'),
+    chalk.red(
+      '❌ Usage: zx scripts/version.mjs <major|minor|patch|canary> [commit|timestamp]',
+    ),
+  );
+  console.error(
+    chalk.gray('   For canary: timestamp (default) or commit hash'),
   );
   process.exit(1);
 }
@@ -16,11 +23,14 @@ console.log(chalk.blue(`🚀 Bumping all package versions: ${bumpType}`));
 /**
  * Bump semantic version
  * @param {string} version - Current version (e.g., "1.2.3")
- * @param {string} type - Bump type ("major", "minor", "patch")
- * @returns {string} - New version
+ * @param {string} type - Bump type ("major", "minor", "patch", "canary")
+ * @param {string} mode - For canary: "commit" or "timestamp" (default)
+ * @returns {Promise<string>} - New version
  */
-function bumpVersion(version, type) {
-  const [major, minor, patch] = version.split('.').map(Number);
+async function bumpVersion(version, type, mode = 'timestamp') {
+  // Remove existing prerelease identifiers for base version calculation
+  const baseVersion = version.split('-')[0];
+  const [major, minor, patch] = baseVersion.split('.').map(Number);
 
   switch (type) {
     case 'major':
@@ -29,6 +39,26 @@ function bumpVersion(version, type) {
       return `${major}.${minor + 1}.0`;
     case 'patch':
       return `${major}.${minor}.${patch + 1}`;
+    case 'canary': {
+      // For canary, we bump patch and add canary suffix
+      let identifier;
+      if (mode === 'commit') {
+        try {
+          // Get short commit hash
+          const commitHash = await $`git rev-parse --short HEAD`;
+          identifier = commitHash.stdout.trim();
+        } catch (error) {
+          console.warn(
+            chalk.yellow('⚠️  Failed to get commit hash, using timestamp'),
+          );
+          identifier = Math.floor(Date.now() / 1000);
+        }
+      } else {
+        // Use timestamp (default)
+        identifier = Math.floor(Date.now() / 1000);
+      }
+      return `${major}.${minor}.${patch + 1}-canary.${identifier}`;
+    }
     default:
       throw new Error(`Invalid bump type: ${type}`);
   }
@@ -132,7 +162,11 @@ async function main() {
 
     // Find the highest current version
     const highestVersion = currentVersions
-      .map(v => v.split('.').map(Number))
+      .map(v => {
+        // Extract base version (remove prerelease identifiers)
+        const baseVersion = v.split('-')[0];
+        return baseVersion.split('.').map(Number);
+      })
       .reduce((max, current) => {
         for (let i = 0; i < 3; i++) {
           if (current[i] > max[i]) return current;
@@ -152,7 +186,7 @@ async function main() {
     );
 
     // Calculate the new version from the highest current version
-    const newVersion = bumpVersion(highestVersion, bumpType);
+    const newVersion = await bumpVersion(highestVersion, bumpType, canaryMode);
     console.log(chalk.green(`🎯 Target version: ${newVersion}`));
 
     // First pass: bump all versions to the new unified version
@@ -198,7 +232,22 @@ async function main() {
     console.log(
       chalk.gray('  3. Run: pnpm run test (to verify everything works)'),
     );
-    console.log(chalk.gray('  4. Commit changes and create release'));
+
+    if (bumpType === 'canary') {
+      console.log(
+        chalk.gray('  4. Publish canary: pnpm run release --tag canary'),
+      );
+      console.log(
+        chalk.yellow(
+          '\n⚠️  Canary versions should be published with the "canary" tag',
+        ),
+      );
+      console.log(
+        chalk.yellow('   Or use: pnpm run release:canary (automated)'),
+      );
+    } else {
+      console.log(chalk.gray('  4. Commit changes and create release'));
+    }
   } catch (error) {
     console.error(chalk.red('❌ Error during version bump:'), error.message);
     process.exit(1);
