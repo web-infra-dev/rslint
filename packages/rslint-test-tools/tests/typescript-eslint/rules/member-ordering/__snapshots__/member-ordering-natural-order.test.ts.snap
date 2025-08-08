@@ -2,9 +2,116 @@
 
 exports[`member-ordering-natural-order > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member 5: number; should be declared before member 10: number;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 1,
   "fileCount": 1,
-  "ruleCount": 0,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering-natural-order > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member a5(): void; should be declared before member a10(): void;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member B5(): void; should be declared before member a5(): void;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 8,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member B1(): void; should be declared before member B10(): void;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 10,
+        },
+        "start": {
+          "column": 3,
+          "line": 10,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member B1: number; should be declared before member a10: number;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 14,
+        },
+        "start": {
+          "column": 3,
+          "line": 14,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member B5: number; should be declared before member a1: number;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 16,
+        },
+        "start": {
+          "column": 3,
+          "line": 16,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 5,
+  "fileCount": 1,
+  "ruleCount": 1,
 }
 `;

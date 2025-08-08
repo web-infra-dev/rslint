@@ -2,9 +2,58 @@
 
 exports[`member-ordering-alphabetically-order > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member a: b; should be declared before member b(): void;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member a should be declared before member a: b;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member call should be declared before member new.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 3,
   "fileCount": 1,
-  "ruleCount": 0,
+  "ruleCount": 1,
 }
 `;

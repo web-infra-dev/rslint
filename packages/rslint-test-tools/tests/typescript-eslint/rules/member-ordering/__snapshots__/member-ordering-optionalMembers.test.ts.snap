@@ -2,9 +2,42 @@
 
 exports[`member-ordering-required > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
+  "diagnostics": [
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member d?: string; should be declared before member m: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+    {
+      "filePath": "src/virtual.ts",
+      "message": "Member b?: string; should be declared before member d?: string;.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "member-ordering",
+    },
+  ],
+  "errorCount": 2,
   "fileCount": 1,
-  "ruleCount": 0,
+  "ruleCount": 1,
 }
 `;
