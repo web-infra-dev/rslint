@@ -300,7 +300,7 @@ exports[`dot-notation > invalid 12`] = `
         },
         "start": {
           "column": 1,
-          "line": 2,
+          "line": 3,
         },
       },
       "ruleName": "dot-notation",
