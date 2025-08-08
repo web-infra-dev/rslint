@@ -66,10 +66,10 @@ type ParserOptions struct {
 
 // LintRequest represents a lint request from JS to Go
 type LintRequest struct {
-	Files            []string          `json:"files,omitempty"`
-	Config           string            `json:"config,omitempty"` // Path to rslint.json config file
-	Format           string            `json:"format,omitempty"`
-	WorkingDirectory string            `json:"workingDirectory,omitempty"`
+	Files            []string `json:"files,omitempty"`
+	Config           string   `json:"config,omitempty"` // Path to rslint.json config file
+	Format           string   `json:"format,omitempty"`
+	WorkingDirectory string   `json:"workingDirectory,omitempty"`
 	// Supports both string level and array [level, options] format
 	RuleOptions     map[string]interface{} `json:"ruleOptions,omitempty"`
 	FileContents    map[string]string      `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
