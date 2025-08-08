@@ -298,23 +298,6 @@ func hasIndexSignature(ctx rule.RuleContext, objectType *checker.Type) bool {
 	return numberIndexType != nil
 }
 
-// matchesIndexSignaturePattern checks if a property name matches index signature patterns
-// For now, we'll use a simple heuristic: if the property is not explicitly declared
-// but the type has index signatures, we allow bracket notation
-func matchesIndexSignaturePattern(ctx rule.RuleContext, objectType *checker.Type, propertyName string) bool {
-	if objectType == nil {
-		return false
-	}
-
-	// Simple heuristic: if we have index signatures and the property is not explicitly declared,
-	// allow bracket notation. This handles cases like template literal types.
-	if hasIndexSignature(ctx, objectType) {
-		propSymbol := ctx.TypeChecker.GetPropertyOfType(objectType, propertyName)
-		return propSymbol == nil
-	}
-
-	return false
-}
 
 // matchesTemplateLiteralPattern checks if a property name matches template literal patterns
 // This is a heuristic to handle cases like `key_${string}` where `key_baz` should be allowed
@@ -474,17 +457,3 @@ func getKeywordText(node *ast.Node) string {
 	}
 }
 
-// Message builders
-func buildUseDotMessage(key string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "useDot",
-		Description: fmt.Sprintf("[%s] is better written in dot notation.", key),
-	}
-}
-
-func buildUseBracketsMessage(key string) rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "useBrackets",
-		Description: fmt.Sprintf(".%s is a syntax error.", key),
-	}
-}
