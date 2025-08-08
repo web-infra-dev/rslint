@@ -109,7 +109,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	// Load rslint configuration and determine which tsconfig files to use
 	var tsConfigs []string
 	var configDirectory string
-	
+
 	if req.LanguageOptions != nil && req.LanguageOptions.ParserOptions != nil && req.LanguageOptions.ParserOptions.Project != "" {
 		// Use project from languageOptions
 		configDirectory = currentDirectory
