@@ -16,9 +16,8 @@ import {
 } from 'vscode-languageclient/node';
 import { Logger } from './logger';
 import type { Extension } from './Extension';
-import { fileExists, PLATFORM_BIN_REQUEST } from './utils';
+import { fileExists, PLATFORM_BIN_REQUEST, RslintBinPath } from './utils';
 import { dirname } from 'node:path';
-import { chmodSync } from 'node:fs';
 
 export class Rslint implements Disposable {
   private client: LanguageClient | undefined;
@@ -148,33 +147,35 @@ export class Rslint implements Disposable {
   }
 
   private async findBinaryFromUserSettings(): Promise<string | null> {
-    const binPathConfig = (
-      workspace.getConfiguration().get('rslint.binPath') as string
-    ).trim();
+    const customBinPathConfig = workspace
+      .getConfiguration()
+      .get<string>('rslint.customBinPath')
+      ?.trim();
 
-    if (binPathConfig) {
-      this.logger.debug(
-        `Try using Rslint binary path from user settings: ${binPathConfig}`,
+    if (!customBinPathConfig) {
+      this.logger.warn(
+        'rslint.binPath is set to "custom" but rslint.customBinPath is not configured',
       );
-
-      const exist = await fileExists(Uri.file(binPathConfig));
-
-      if (exist) {
-        this.logger.debug(
-          `Using Rslint binary from user settings: ${binPathConfig}`,
-        );
-        return binPathConfig;
-      } else {
-        this.logger.warn(
-          `Rslint binary path from user settings does not exist: ${binPathConfig}`,
-        );
-      }
+      return null;
     }
 
     this.logger.debug(
-      'No Rslint binary path found in user settings, skip resolving',
+      `Try using Rslint binary path from user settings: ${customBinPathConfig}`,
     );
-    return null;
+
+    const exist = await fileExists(Uri.file(customBinPathConfig));
+
+    if (exist) {
+      this.logger.debug(
+        `Using Rslint binary from user settings: ${customBinPathConfig}`,
+      );
+      return customBinPathConfig;
+    } else {
+      this.logger.error(
+        `Rslint binary path from user settings does not exist: ${customBinPathConfig}`,
+      );
+      return null;
+    }
   }
 
   private findBinaryFromNodeModules(): string | null {
@@ -261,19 +262,37 @@ export class Rslint implements Disposable {
     return builtInBinPath;
   }
 
-  // Try resolve Rslint binary path in the following order:
-  // 1. From workspace settings
-  // 2. From `node_modules`
-  // 3. From `node_modules` in PnP mode
-  // 4. From extension built-in as fallback
   private async getBinaryPath(): Promise<string> {
-    const finalBinPath =
-      (await this.findBinaryFromUserSettings()) ??
-      this.findBinaryFromNodeModules() ??
-      (await this.findBinaryFromPnp()) ??
-      this.findBinaryFromBuiltIn();
+    const binPathConfig = workspace
+      .getConfiguration()
+      .get<RslintBinPath>('rslint.binPath')!;
+
+    let finalBinPath: string | null = null;
+    if (binPathConfig === 'local') {
+      // 1. Check if the binary exists in node_modules or PnP
+      // 2. Fallback to built-in binary if not found
+      let localBinPath =
+        this.findBinaryFromNodeModules() ?? (await this.findBinaryFromPnp());
+
+      if (localBinPath === null) {
+        this.logger.info(
+          'No local Rslint binary found, falling back to built-in binary',
+        );
+      }
+
+      finalBinPath = localBinPath ?? this.findBinaryFromBuiltIn();
+    } else if (binPathConfig === 'built-in') {
+      finalBinPath = this.findBinaryFromBuiltIn();
+    } else if (binPathConfig === 'custom') {
+      finalBinPath = await this.findBinaryFromUserSettings();
+      if (finalBinPath === null) {
+        throw new Error(
+          'Customized Rslint binary path is not set or does not exist',
+        );
+      }
+    }
 
     this.logger.debug('Final Rslint binary path:', finalBinPath);
-    return finalBinPath;
+    return finalBinPath!;
   }
 }
