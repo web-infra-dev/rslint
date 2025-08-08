@@ -7,6 +7,10 @@
     "./package.json": "./package.json"
   },
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/web-infra-dev/rslint"
+  },
   "scripts": {
     "build:bin": "go build -v -o bin/rslint ../../cmd/rslint",
     "build:debug": "GOEXPERIMENT=noregabi go build -v -gcflags='all=-N -l' -o  bin/rslint ../../cmd/rslint ",
