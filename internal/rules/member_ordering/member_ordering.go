@@ -453,9 +453,10 @@ func getMemberGroups(node *ast.Node, supportsModifiers bool) []string {
 
 	if !supportsModifiers {
 		groups = append(groups, string(nodeType))
-		if nodeType == KindReadonlySignature {
+		switch nt := nodeType; nt {
+		case KindReadonlySignature:
 			groups = append(groups, string(KindSignature))
-		} else if nodeType == KindReadonlyField {
+		case KindReadonlyField:
 			groups = append(groups, string(KindField))
 		}
 		return groups
@@ -511,9 +512,10 @@ func getMemberGroups(node *ast.Node, supportsModifiers bool) []string {
 
 	// Add base member type
 	groups = append(groups, string(nodeType))
-	if nodeType == KindReadonlySignature {
+	switch nt := nodeType; nt {
+	case KindReadonlySignature:
 		groups = append(groups, string(KindSignature))
-	} else if nodeType == KindReadonlyField {
+	case KindReadonlyField:
 		groups = append(groups, string(KindField))
 	}
 
