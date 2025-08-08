@@ -11,7 +11,7 @@ function getBinPath() {
   }
   let platformKey = `${process.platform}-${os.arch()}`;
 
-  return require.resolve(`@rslint/${platformKey}/rslint`);
+  return require.resolve(`@rslint/${platformKey}/rslint${process.platform === 'win32' ? '.exe' : ''}`);
 }
 function main() {
   const binPath = getBinPath();
