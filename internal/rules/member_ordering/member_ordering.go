@@ -2,6 +2,7 @@ package member_ordering
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -644,6 +645,9 @@ func checkGroupSort(ctx rule.RuleContext, members []*ast.Node, groupOrder []inte
 	for _, member := range members {
 		rank := getRank(member, groupOrder, supportsModifiers)
 		name := getMemberName(member, ctx.SourceFile)
+		// DEBUG: write to stderr to avoid breaking protocol
+		// Remove after diagnosing ordering issues
+		fmt.Fprintf(os.Stderr, "[member-ordering DEBUG] kind=%d name=%q rank=%d supportsModifiers=%v\n", member.Kind, name, rank, supportsModifiers)
 
 		if rank == -1 {
 			continue
