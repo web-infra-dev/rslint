@@ -1,6 +1,6 @@
 {
   "name": "rslint-monorepo",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "description": "Rslint Monorepo",
   "homepage": "https://github.com/web-infra-dev/rslint#readme",
