@@ -59,7 +59,7 @@
         "rslint.customBinPath": {
           "order": 2,
           "type": "string",
-          "description": "Custom path to Rslint executable. Only used when `rslint.binPath` is set to `custom`. Requiring reload VS Code to take effect."
+          "description": "Custom path to Rslint executable. Only used when `rslint.binPath` is set to `custom`. Requires reloading VS Code to take effect."
         },
         "rslint.trace.server": {
           "order": 3,
