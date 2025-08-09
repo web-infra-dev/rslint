@@ -3,11 +3,8 @@ package explicit_member_accessibility
 import (
 	"fmt"
 
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -204,123 +201,6 @@ func getNodeType(node *ast.Node, memberKind string) string {
 
 // Removed getMemberHeadLoc and getParameterPropertyHeadLoc functions
 // Now using ReportNode directly which handles positioning correctly
-
-func getMissingAccessibilityRange(ctx rule.RuleContext, node *ast.Node) core.TextRange {
-	// Default to node's name range when available
-	findAccessorKeywordStart := func(nameRange core.TextRange) int {
-		// Search backwards from name for 'get' or 'set' keyword within the declaration span
-		text := ctx.SourceFile.Text()
-		startBound := node.Pos()
-		endBound := nameRange.Pos()
-		if startBound < 0 || endBound > len(text) || startBound >= endBound {
-			return nameRange.Pos()
-		}
-		snippet := text[startBound:endBound]
-		// look for last occurrence to get the actual keyword near the name
-		idxGet := strings.LastIndex(snippet, "get")
-		idxSet := strings.LastIndex(snippet, "set")
-		idx := -1
-		kw := ""
-		if idxGet > idxSet {
-			idx = idxGet
-			kw = "get"
-		} else {
-			idx = idxSet
-			kw = "set"
-		}
-		if idx >= 0 {
-			// ensure simple word boundary (whitespace or start before; whitespace/paren after)
-			abs := startBound + idx
-			beforeOk := abs == startBound || (abs > 0 && (text[abs-1] == ' ' || text[abs-1] == '\t' || text[abs-1] == '\n'))
-			afterPos := abs + len(kw)
-			afterOk := afterPos < len(text) && (text[afterPos] == ' ' || text[afterPos] == '\t' || text[afterPos] == '\n' || text[afterPos] == '(')
-			if beforeOk && afterOk {
-				return abs
-			}
-		}
-		return nameRange.Pos()
-	}
-	switch node.Kind {
-	case ast.KindConstructor:
-		// Highlight the 'constructor' keyword only
-		return scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, node.Pos())
-	case ast.KindMethodDeclaration:
-		m := node.AsMethodDeclaration()
-		nameNode := m.Name()
-		if nameNode != nil {
-			nameRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
-			start := nameRange.Pos()
-			// If abstract, start from 'abstract'
-			if m.Modifiers() != nil {
-				for _, mod := range m.Modifiers().Nodes {
-					if mod.Kind == ast.KindAbstractKeyword {
-						start = mod.Pos()
-						break
-					}
-				}
-			}
-			nameText, _ := utils.GetNameFromMember(ctx.SourceFile, nameNode)
-			end := nameRange.Pos() + len(nameText)
-			return core.NewTextRange(start, end)
-		}
-		return utils.TrimNodeTextRange(ctx.SourceFile, node)
-	case ast.KindGetAccessor:
-		g := node.AsGetAccessorDeclaration()
-		nameNode := g.Name()
-		if nameNode != nil {
-			nameRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
-			// Start at the 'get' keyword token by scanning between node start and name
-			start := findAccessorKeywordStart(nameRange)
-			nameText, _ := utils.GetNameFromMember(ctx.SourceFile, nameNode)
-			end := nameRange.Pos() + len(nameText)
-			return core.NewTextRange(start, end)
-		}
-		return utils.TrimNodeTextRange(ctx.SourceFile, node)
-	case ast.KindSetAccessor:
-		s := node.AsSetAccessorDeclaration()
-		nameNode := s.Name()
-		if nameNode != nil {
-			nameRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
-			// Start at the 'set' keyword token by scanning between node start and name
-			start := findAccessorKeywordStart(nameRange)
-			nameText, _ := utils.GetNameFromMember(ctx.SourceFile, nameNode)
-			end := nameRange.Pos() + len(nameText)
-			return core.NewTextRange(start, end)
-		}
-		return utils.TrimNodeTextRange(ctx.SourceFile, node)
-	case ast.KindPropertyDeclaration:
-		p := node.AsPropertyDeclaration()
-		nameNode := p.Name()
-		if nameNode != nil {
-			nameRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
-			start := nameRange.Pos()
-			if p.Modifiers() != nil {
-				// Prefer abstract start if present
-				for _, mod := range p.Modifiers().Nodes {
-					if mod.Kind == ast.KindAbstractKeyword {
-						start = mod.Pos()
-						break
-					}
-				}
-				// Otherwise, if accessor keyword present, start there to include `accessor foo`
-				if start == nameRange.Pos() {
-					for _, mod := range p.Modifiers().Nodes {
-						if mod.Kind == ast.KindAccessorKeyword {
-							start = mod.Pos()
-							break
-						}
-					}
-				}
-			}
-			nameText, _ := utils.GetNameFromMember(ctx.SourceFile, nameNode)
-			end := nameRange.Pos() + len(nameText)
-			return core.NewTextRange(start, end)
-		}
-		return utils.TrimNodeTextRange(ctx.SourceFile, node)
-	}
-	// Fallback
-	return utils.TrimNodeTextRange(ctx.SourceFile, node)
-}
 
 var ExplicitMemberAccessibilityRule = rule.Rule{
 

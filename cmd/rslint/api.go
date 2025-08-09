@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -114,7 +115,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	if req.LanguageOptions != nil && req.LanguageOptions.ParserOptions != nil && req.LanguageOptions.ParserOptions.Project != nil {
 		// Use project from languageOptions
 		configDirectory = currentDirectory
-		
+
 		var projectPaths []string
 		switch project := req.LanguageOptions.ParserOptions.Project.(type) {
 		case string:
@@ -128,11 +129,11 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 				}
 			}
 		}
-		
+
 		if len(projectPaths) == 0 {
-			return nil, fmt.Errorf("no valid project paths found in languageOptions")
+			return nil, errors.New("no valid project paths found in languageOptions")
 		}
-		
+
 		// Resolve and validate all project paths
 		for _, projectPath := range projectPaths {
 			resolvedPath := tspath.ResolvePath(currentDirectory, projectPath)
@@ -217,10 +218,12 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 			var found bool
 			if option, found = req.RuleOptions[r.Name]; found {
 				// Found with short name (e.g., "member-ordering")
+				// option and found are set correctly by the if condition
 			} else if option, found = req.RuleOptions["@typescript-eslint/"+r.Name]; found {
 				// Found with full name (e.g., "@typescript-eslint/member-ordering")
+				// option and found are set correctly by the if condition
 			}
-			
+
 			if found {
 				rulesWithOptions = append(rulesWithOptions, RuleWithOption{
 					rule:   r,

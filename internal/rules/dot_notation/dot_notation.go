@@ -201,137 +201,6 @@ func shouldConvertToDotNotation(ctx rule.RuleContext, node *ast.Node, opts DotNo
 	return true
 }
 
-// computeDotNotationDiagnostic computes a single diagnostic for a bracket access if it should be converted
-// to dot notation. Returns start, end, message and true if a diagnostic should be reported; otherwise ok=false.
-func computeDotNotationDiagnostic(ctx rule.RuleContext, node *ast.Node, opts DotNotationOptions, allowIndexSignaturePropertyAccess bool, patternRegex *regexp.Regexp) (int, int, rule.RuleMessage, bool) {
-	if !ast.IsElementAccessExpression(node) {
-		return 0, 0, rule.RuleMessage{}, false
-	}
-
-	elementAccess := node.AsElementAccessExpression()
-	if elementAccess == nil {
-		return 0, 0, rule.RuleMessage{}, false
-	}
-
-	argument := elementAccess.ArgumentExpression
-	if argument == nil {
-		return 0, 0, rule.RuleMessage{}, false
-	}
-
-	// Only handle string literals, numeric literals, and identifiers that evaluate to strings
-	var propertyName string
-	isValidProperty := false
-
-	switch argument.Kind {
-	case ast.KindStringLiteral:
-		stringLiteral := argument.AsStringLiteral()
-		if stringLiteral == nil {
-			return 0, 0, rule.RuleMessage{}, false
-		}
-		// Remove quotes from string literal text
-		text := stringLiteral.Text
-		if len(text) >= 2 && ((text[0] == '"' && text[len(text)-1] == '"') || (text[0] == '\'' && text[len(text)-1] == '\'')) {
-			text = text[1 : len(text)-1]
-		}
-		propertyName = text
-		isValidProperty = true
-	case ast.KindNoSubstitutionTemplateLiteral:
-		// Handle `obj[`foo`]` (no expressions)
-		propertyName = argument.AsNoSubstitutionTemplateLiteral().Text
-		isValidProperty = true
-	case ast.KindNumericLiteral:
-		// Numeric properties should use bracket notation
-		return 0, 0, rule.RuleMessage{}, false
-	case ast.KindNullKeyword, ast.KindTrueKeyword, ast.KindFalseKeyword:
-		// These are allowed as dot notation
-		propertyName = getKeywordText(argument)
-		isValidProperty = true
-	default:
-		// Other cases (template literals, identifiers, etc.) should keep bracket notation
-		return 0, 0, rule.RuleMessage{}, false
-	}
-
-	if !isValidProperty || propertyName == "" {
-		return 0, 0, rule.RuleMessage{}, false
-	}
-
-	// Check if it's a valid identifier
-	if !isValidIdentifierName(propertyName) {
-		return 0, 0, rule.RuleMessage{}, false
-	}
-
-	// Check pattern allowlist
-	if patternRegex != nil && patternRegex.MatchString(propertyName) {
-		return 0, 0, rule.RuleMessage{}, false
-	}
-
-	// Check for keywords
-	if !opts.AllowKeywords && isReservedWord(propertyName) {
-		return 0, 0, rule.RuleMessage{}, false
-	}
-
-	// Check for private/protected/index signature access
-	if shouldAllowBracketNotation(ctx, node, propertyName, opts, allowIndexSignaturePropertyAccess) {
-		return 0, 0, rule.RuleMessage{}, false
-	}
-
-	// Determine range start with hybrid logic to match typescript-eslint tests:
-	// - If '[' begins a new visual access (only whitespace before on the line), start at '[' column
-	// - If '[' follows an identifier/dot/closing bracket/paren on the same line (e.g., x['a']), start at the beginning of the line
-	start := node.Pos()
-	if text := ctx.SourceFile.Text(); node.End() <= len(text) {
-		// Prefer computing '[' from the argument position to avoid capturing prior '[' in chained expressions
-		bracketPos := -1
-		if elementAccess.ArgumentExpression != nil {
-			candidate := elementAccess.ArgumentExpression.Pos() - 1
-			if candidate >= node.Pos() && candidate < node.End() && candidate >= 0 && candidate < len(text) && text[candidate] == '[' {
-				bracketPos = candidate
-			}
-		}
-		// Fallback: scan within node span
-		if bracketPos == -1 {
-			slice := text[node.Pos():node.End()]
-			for i := 0; i < len(slice); i++ {
-				if slice[i] == '[' {
-					bracketPos = node.Pos() + i
-					break
-				}
-			}
-		}
-		if bracketPos != -1 {
-			// Compute start-of-line using scanner helpers for exact column mapping
-			lineIndex, _ := scanner.GetLineAndCharacterOfPosition(ctx.SourceFile, bracketPos)
-			lineStart := scanner.GetPositionOfLineAndCharacter(ctx.SourceFile, lineIndex, 0)
-			prev := bracketPos - 1
-			prevNonSpace := byte('\n')
-			for prev >= lineStart {
-				if text[prev] != ' ' && text[prev] != '\t' {
-					prevNonSpace = text[prev]
-					break
-				}
-				prev--
-			}
-			// If previous non-space is identifier/dot/closing bracket/paren, use line start;
-			// otherwise align to one column after the leading indentation to match TS snapshots
-			if (prev >= lineStart) && ((prevNonSpace >= 'a' && prevNonSpace <= 'z') || (prevNonSpace >= 'A' && prevNonSpace <= 'Z') || (prevNonSpace >= '0' && prevNonSpace <= '9') || prevNonSpace == '_' || prevNonSpace == '$' || prevNonSpace == '.' || prevNonSpace == ')' || prevNonSpace == ']') {
-				start = lineStart
-			} else {
-				// bracketPos points at '[' which snapshots expect at column 4 in multiline case; offset by 1
-				start = bracketPos + 1
-				if start > node.End() {
-					start = bracketPos
-				}
-			}
-		}
-	}
-	msg := rule.RuleMessage{
-		Id:          "useDot",
-		Description: fmt.Sprintf("['%s'] is better written in dot notation.", propertyName),
-	}
-	// return computed range to be flushed later in source order
-	return start, node.End(), msg, true
-}
-
 func checkPropertyAccessKeywords(ctx rule.RuleContext, node *ast.Node) {
 	if !ast.IsPropertyAccessExpression(node) {
 		return
@@ -517,7 +386,7 @@ func createFix(ctx rule.RuleContext, node *ast.Node, propertyName string) rule.R
 	text := ctx.SourceFile.Text()
 	if node.End() <= len(text) {
 		slice := text[node.Pos():node.End()]
-		for i := 0; i < len(slice); i++ {
+		for i := range slice {
 			if slice[i] == '[' {
 				start = node.Pos() + i
 				break

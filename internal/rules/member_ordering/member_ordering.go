@@ -357,18 +357,19 @@ func isFunctionExpression(node *ast.Node) bool {
 }
 
 func getMemberName(node *ast.Node, sourceFile *ast.SourceFile) string {
-	switch node.Kind {
+	switch kind := node.Kind; kind {
 	case ast.KindPropertySignature, ast.KindMethodSignature,
 		ast.KindPropertyDeclaration, ast.KindGetAccessor, ast.KindSetAccessor:
 		// For signatures, the node itself is the name node
 		var nameNode *ast.Node
-		if node.Kind == ast.KindPropertyDeclaration {
+		switch kind {
+		case ast.KindPropertyDeclaration:
 			nameNode = node.AsPropertyDeclaration().Name()
-		} else if node.Kind == ast.KindGetAccessor {
+		case ast.KindGetAccessor:
 			nameNode = node.AsGetAccessorDeclaration().Name()
-		} else if node.Kind == ast.KindSetAccessor {
+		case ast.KindSetAccessor:
 			nameNode = node.AsSetAccessorDeclaration().Name()
-		} else {
+		default:
 			nameNode = node
 		}
 		name, _ := utils.GetNameFromMember(sourceFile, nameNode)
@@ -402,20 +403,21 @@ func getMemberName(node *ast.Node, sourceFile *ast.SourceFile) string {
 // For quoted literal member names (e.g. "b.c"), this strips the surrounding quotes
 // so comparisons are based on the actual text content rather than quote characters.
 func getMemberSortName(node *ast.Node, sourceFile *ast.SourceFile) string {
-	switch node.Kind {
+	switch kind := node.Kind; kind {
 	case ast.KindPropertySignature, ast.KindMethodSignature,
 		ast.KindPropertyDeclaration, ast.KindGetAccessor, ast.KindSetAccessor,
 		ast.KindMethodDeclaration:
 		var nameNode *ast.Node
-		if node.Kind == ast.KindPropertyDeclaration {
+		switch kind {
+		case ast.KindPropertyDeclaration:
 			nameNode = node.AsPropertyDeclaration().Name()
-		} else if node.Kind == ast.KindGetAccessor {
+		case ast.KindGetAccessor:
 			nameNode = node.AsGetAccessorDeclaration().Name()
-		} else if node.Kind == ast.KindSetAccessor {
+		case ast.KindSetAccessor:
 			nameNode = node.AsSetAccessorDeclaration().Name()
-		} else if node.Kind == ast.KindMethodDeclaration {
+		case ast.KindMethodDeclaration:
 			nameNode = node.AsMethodDeclaration().Name()
-		} else {
+		default:
 			nameNode = node
 		}
 		name, nameType := utils.GetNameFromMember(sourceFile, nameNode)
@@ -444,7 +446,7 @@ func getMemberSnippet(sourceFile *ast.SourceFile, node *ast.Node) string {
 	text := sourceFile.Text()[r.Pos():r.End()]
 	// Take only the first line and trim
 	end := len(text)
-	for i := 0; i < len(text); i++ {
+	for i := range text {
 		if text[i] == '\n' || text[i] == '\r' {
 			end = i
 			break

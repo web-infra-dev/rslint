@@ -25,7 +25,8 @@ import path from 'node:path';
 import process from 'node:process';
 
 const GITHUB_API_BASE = 'https://api.github.com';
-const RAW_BASE = 'https://raw.githubusercontent.com/typescript-eslint/typescript-eslint/main';
+const RAW_BASE =
+  'https://raw.githubusercontent.com/typescript-eslint/typescript-eslint/main';
 const REMOTE_RULES_DIR = 'packages/eslint-plugin/src/rules';
 const REMOTE_TESTS_DIR = 'packages/eslint-plugin/tests/rules';
 
@@ -35,7 +36,7 @@ const LOCAL_RULES_DIR = path.resolve(ROOT, 'internal', 'rules');
 const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || '';
 const baseHeaders = {
   'User-Agent': 'rslint-sync-script',
-  'Accept': 'application/vnd.github+json',
+  Accept: 'application/vnd.github+json',
   ...(token ? { Authorization: `Bearer ${token}` } : {}),
 };
 
@@ -47,20 +48,24 @@ async function listRemoteDirectory(relativePath) {
   const url = `${GITHUB_API_BASE}/repos/typescript-eslint/typescript-eslint/contents/${relativePath}`;
   const res = await fetch(url, { headers: baseHeaders });
   if (!res.ok) {
-    throw new Error(`Failed to list ${relativePath}: ${res.status} ${res.statusText}`);
+    throw new Error(
+      `Failed to list ${relativePath}: ${res.status} ${res.statusText}`,
+    );
   }
   return res.json();
 }
 
 async function getRemoteRuleNames() {
   const items = await listRemoteDirectory(REMOTE_RULES_DIR);
-  return items
-    .filter((i) => i.type === 'file' && i.name.endsWith('.ts'))
-    .map((i) => i.name)
-    // exclude rule index aggregator and any non-rule helpers
-    .filter((name) => name !== 'index.ts')
-    .map((name) => name.replace(/\.ts$/, ''))
-    .sort();
+  return (
+    items
+      .filter(i => i.type === 'file' && i.name.endsWith('.ts'))
+      .map(i => i.name)
+      // exclude rule index aggregator and any non-rule helpers
+      .filter(name => name !== 'index.ts')
+      .map(name => name.replace(/\.ts$/, ''))
+      .sort()
+  );
 }
 
 async function getRemoteTestsMap() {
@@ -89,8 +94,14 @@ async function readLocalState() {
     const rulePath = path.join(LOCAL_RULES_DIR, snake, `${snake}.go`);
     const testPath = path.join(LOCAL_RULES_DIR, snake, `${snake}_test.go`);
     const [ruleExists, testExists] = await Promise.all([
-      fs.access(rulePath).then(() => true).catch(() => false),
-      fs.access(testPath).then(() => true).catch(() => false),
+      fs
+        .access(rulePath)
+        .then(() => true)
+        .catch(() => false),
+      fs
+        .access(testPath)
+        .then(() => true)
+        .catch(() => false),
     ]);
     state.set(snake, { ruleExists, testExists });
   }
@@ -121,7 +132,7 @@ function buildGoFile(packageName, srcRelativePath, content, kind) {
   const normalized = content.replace(/\r\n/g, '\n');
   const body = normalized
     .split('\n')
-    .map((line) => `// ${line}`)
+    .map(line => `// ${line}`)
     .join('\n');
   return header + body + '\n';
 }
@@ -133,7 +144,7 @@ async function ensureDir(dir) {
 async function main() {
   const args = new Set(process.argv.slice(2));
   const dryRun = args.has('--dry-run');
-  const onlyArg = Array.from(args).find((a) => a.startsWith('--only='));
+  const onlyArg = Array.from(args).find(a => a.startsWith('--only='));
   const onlyRule = onlyArg ? onlyArg.slice('--only='.length) : null; // kebab-case
 
   console.log(`Local rules directory: ${LOCAL_RULES_DIR}`);
@@ -144,7 +155,7 @@ async function main() {
   ]);
 
   const candidates = onlyRule
-    ? remoteRules.filter((r) => r === onlyRule)
+    ? remoteRules.filter(r => r === onlyRule)
     : remoteRules;
 
   let created = 0;
@@ -157,7 +168,10 @@ async function main() {
     const dir = path.join(LOCAL_RULES_DIR, snake);
     const ruleGo = path.join(dir, `${snake}.go`);
     const testGo = path.join(dir, `${snake}_test.go`);
-    const local = localState.get(snake) || { ruleExists: false, testExists: false };
+    const local = localState.get(snake) || {
+      ruleExists: false,
+      testExists: false,
+    };
 
     const needRule = !local.ruleExists;
     const needTest = !local.testExists;
@@ -216,9 +230,7 @@ async function main() {
   console.log(`Done. created=${created} skipped=${skipped} errors=${errors}`);
 }
 
-main().catch((e) => {
+main().catch(e => {
   console.error(e);
   process.exit(1);
 });
-
-
