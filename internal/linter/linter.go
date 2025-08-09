@@ -54,11 +54,15 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []s
 						}
 					}
 					lintedFileCount.Add(1)
+
+					comments := make([]*ast.CommentRange, 0)
+					utils.ForEachComment(&file.Node, func(comment *ast.CommentRange) { comments = append(comments, comment) }, file)
+
 					registeredListeners := make(map[ast.Kind][](func(node *ast.Node)), 20)
 					{
 						rules := getRulesForFile(file)
 						// Create disable manager for this file
-						disableManager := rule.NewDisableManager(file)
+						disableManager := rule.NewDisableManager(file, comments)
 
 						for _, r := range rules {
 							ctx := rule.RuleContext{
