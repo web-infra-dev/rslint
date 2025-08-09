@@ -204,6 +204,46 @@ func TestGetRulesForFileWithIgnores(t *testing.T) {
 	}
 }
 
+func TestGetImportPluginRules(t *testing.T) {
+	baseConfig := ConfigEntry{
+		Language: "typescript",
+		Files:    []string{"**/*.ts", "**/*.tsx"},
+		Ignores:  []string{"**/*.test.ts", "node_modules/**"},
+		Rules:    Rules{},
+	}
+
+	tests := []struct {
+		rulesCount int
+		plugin     string
+	}{
+		{
+			rulesCount: 1,
+			plugin:     "eslint-plugin-import",
+		},
+		{
+			rulesCount: 0,
+			plugin:     "eslint-plugin-import/recommended",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.plugin, func(t *testing.T) {
+			config := RslintConfig{
+				baseConfig,
+				{
+					Plugins: []string{tt.plugin},
+				},
+			}
+			rules := config.GetRulesForFile("foo.ts")
+
+			if len(rules) != tt.rulesCount {
+				t.Errorf("GetRulesForFile(foo.ts) with plugin %v ruleCount = %v, expected %v (rules: %v)",
+					tt.plugin, len(rules), tt.rulesCount, rules)
+			}
+		})
+	}
+}
+
 func TestParseArrayRuleConfig(t *testing.T) {
 	tests := []struct {
 		name            string

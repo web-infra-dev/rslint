@@ -246,7 +246,7 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 	}
 
 	// Initialize rule registry with all available rules (ensure it's done once)
-	config.RegisterAllTypeScriptEslintPluginRules()
+	config.RegisterAllRules()
 
 	// Convert URI to file path
 	filePath := uriToPath(uriString)
@@ -484,7 +484,7 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 	}
 
 	// Initialize rule registry with all available rules
-	config.RegisterAllTypeScriptEslintPluginRules()
+	config.RegisterAllRules()
 
 	// Collect diagnostics
 	var diagnostics []rule.RuleDiagnostic
