@@ -23,12 +23,12 @@ func TestNoSelfImportRule(t *testing.T) {
 		t,
 		&no_self_import.NoSelfImportRule,
 		[]rule_tester.ValidTestCase{
-			{Code: `import { bar } from "./bar.ts"`, Filename: "foo.ts"},
-			{Code: `import { bar } from "./bar.json" with { type: "json" }`, Filename: "foo.ts"},
-			{Code: `require("./bar.ts")`, Filename: "foo.ts"},
-			{Code: `require()`, Filename: "foo.ts"},
-			{Code: `require(123)`, Filename: "foo.ts"},
-			{Code: `require("./foo.ts", 123)`, Filename: "foo.ts"},
+			{Code: `import { bar } from "./bar.ts"`, FileName: "foo.ts"},
+			{Code: `import { bar } from "./bar.json" with { type: "json" }`, FileName: "foo.ts"},
+			{Code: `require("./bar.ts")`, FileName: "foo.ts"},
+			{Code: `require()`, FileName: "foo.ts"},
+			{Code: `require(123)`, FileName: "foo.ts"},
+			{Code: `require("./foo.ts", 123)`, FileName: "foo.ts"},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
@@ -40,7 +40,7 @@ import { foo } from './foo.ts';
 import('./foo.ts');
 import('./foo.ts', { with: { type: 'module' } });
 `,
-				Filename: "foo.ts",
+				FileName: "foo.ts",
 				Errors:   errors,
 			},
 			{
@@ -52,7 +52,7 @@ import { foo } from './foo.js';
 import('./foo.js');
 import('./foo.js', { with: { type: 'module' } });
 `,
-				Filename: "foo.ts",
+				FileName: "foo.ts",
 				Errors:   errors,
 			},
 			{
@@ -64,7 +64,7 @@ import { foo } from './foo';
 import('./foo');
 import('./foo', { with: { type: 'module' } });
 `,
-				Filename: "foo.ts",
+				FileName: "foo.ts",
 				Errors:   errors,
 			},
 		},
