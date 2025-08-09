@@ -208,7 +208,7 @@ export class RuleTester {
 
           assert(
             diags.diagnostics?.length === 0,
-            `Expected no diagnostics for valid case, but got: ${JSON.stringify(diags)}`,
+            `Expected no diagnostics for valid case, but got: ${JSON.stringify(diags)} \nwith code:\n${code}`,
           );
         }
       });
@@ -247,7 +247,7 @@ export class RuleTester {
 
           assert(
             diags.diagnostics?.length > 0,
-            `Expected diagnostics for invalid case`,
+            `Expected diagnostics for invalid case: ${code}`,
           );
           // eslint-disable-next-line
           checkDiagnosticEqual(diags.diagnostics, errors);
