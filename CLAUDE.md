@@ -2,6 +2,24 @@
 
 This guide helps AI agents understand and work with the Rslint codebase effectively.
 
+## Comprehensive Documentation Reference
+
+**For detailed technical information**, refer to the comprehensive documentation in the `.trae/documents/` directory:
+
+- **Go API Documentation** (`go_api_documentation.md`): Complete reference for all Go APIs, including CLI commands, core linting engine, TypeScript-Go integration, rule implementations, and internal utilities with detailed function signatures, usage examples, and architectural patterns.
+
+- **AST & Parser Documentation** (`ast_parser_configuration_documentation.md`): Exhaustive coverage of AST nodes, parser implementation, configuration systems, TypeScript compiler integration, checker services, symbol resolution, type system, scanner/lexer, and complete technical architecture with type definitions and implementation details.
+
+These documents provide 20x more detail than this guide, including:
+
+- Complete function signatures and type definitions
+- Detailed implementation specifics and algorithms
+- Comprehensive code examples and usage patterns
+- Architectural diagrams and system interactions
+- Performance characteristics and optimization guidelines
+- Threading models and memory management
+- Integration patterns and best practices
+
 ## Core Concepts
 
 Rslint is a TypeScript/JavaScript linter written in Go that implements TypeScript-ESLint rules. It uses the TypeScript compiler API through a Go shim and provides diagnostics via CLI and Language Server Protocol (LSP).

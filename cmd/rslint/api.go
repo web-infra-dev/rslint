@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -20,6 +21,10 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/array_type"
 	"github.com/web-infra-dev/rslint/internal/rules/await_thenable"
 	"github.com/web-infra-dev/rslint/internal/rules/class_literal_property_style"
+	"github.com/web-infra-dev/rslint/internal/rules/dot_notation"
+	"github.com/web-infra-dev/rslint/internal/rules/explicit_member_accessibility"
+	"github.com/web-infra-dev/rslint/internal/rules/max_params"
+	"github.com/web-infra-dev/rslint/internal/rules/member_ordering"
 	"github.com/web-infra-dev/rslint/internal/rules/no_array_delete"
 	"github.com/web-infra-dev/rslint/internal/rules/no_base_to_string"
 	"github.com/web-infra-dev/rslint/internal/rules/no_confusing_void_expression"
@@ -104,7 +109,43 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	rslintconfig.RegisterAllTypeScriptEslintPluginRules()
 
 	// Load rslint configuration and determine which tsconfig files to use
-	_, tsConfigs, configDirectory := rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
+	var tsConfigs []string
+	var configDirectory string
+
+	if req.LanguageOptions != nil && req.LanguageOptions.ParserOptions != nil && req.LanguageOptions.ParserOptions.Project != nil {
+		// Use project from languageOptions
+		configDirectory = currentDirectory
+
+		var projectPaths []string
+		switch project := req.LanguageOptions.ParserOptions.Project.(type) {
+		case string:
+			if project != "" {
+				projectPaths = []string{project}
+			}
+		case []interface{}:
+			for _, p := range project {
+				if str, ok := p.(string); ok && str != "" {
+					projectPaths = append(projectPaths, str)
+				}
+			}
+		}
+
+		if len(projectPaths) == 0 {
+			return nil, errors.New("no valid project paths found in languageOptions")
+		}
+
+		// Resolve and validate all project paths
+		for _, projectPath := range projectPaths {
+			resolvedPath := tspath.ResolvePath(currentDirectory, projectPath)
+			if !fs.FileExists(resolvedPath) {
+				return nil, fmt.Errorf("tsconfig file specified in languageOptions %q doesn't exist", resolvedPath)
+			}
+			tsConfigs = append(tsConfigs, resolvedPath)
+		}
+	} else {
+		// Use default configuration loading
+		_, tsConfigs, configDirectory = rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
+	}
 
 	// Create rules
 	var origin_rules = []rule.Rule{
@@ -112,6 +153,10 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		array_type.ArrayTypeRule,
 		await_thenable.AwaitThenableRule,
 		class_literal_property_style.ClassLiteralPropertyStyleRule,
+		dot_notation.DotNotationRule,
+		explicit_member_accessibility.ExplicitMemberAccessibilityRule,
+		max_params.MaxParamsRule,
+		member_ordering.MemberOrderingRule,
 		no_array_delete.NoArrayDeleteRule,
 		no_base_to_string.NoBaseToStringRule,
 		no_confusing_void_expression.NoConfusingVoidExpressionRule,
@@ -168,7 +213,15 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	// filter rule based on request.RuleOptions
 	if len(req.RuleOptions) > 0 {
 		for _, r := range origin_rules {
-			if option, ok := req.RuleOptions[r.Name]; ok {
+			// Try both short name and full @typescript-eslint/ prefixed name
+			var option interface{}
+			var found bool
+			if option, found = req.RuleOptions[r.Name]; !found {
+				// Try with full @typescript-eslint/ prefix
+				option, found = req.RuleOptions["@typescript-eslint/"+r.Name]
+			}
+
+			if found {
 				rulesWithOptions = append(rulesWithOptions, RuleWithOption{
 					rule:   r,
 					option: option,
