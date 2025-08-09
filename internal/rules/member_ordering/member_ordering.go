@@ -858,16 +858,6 @@ func normalizeOrderForCompare(order Order) Order {
 	}
 }
 
-// isMemberTypesNever returns true if the memberTypes config is set to "never"
-func isMemberTypesNever(cfg *OrderConfig) bool {
-	if cfg == nil {
-		return false
-	}
-	if str, ok := cfg.MemberTypes.(string); ok && str == "never" {
-		return true
-	}
-	return false
-}
 
 func checkRequiredOrder(ctx rule.RuleContext, members []*ast.Node, optionalityOrder OptionalityOrder) bool {
 	switchIndex := -1

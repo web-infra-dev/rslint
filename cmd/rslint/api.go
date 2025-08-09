@@ -216,12 +216,9 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 			// Try both short name and full @typescript-eslint/ prefixed name
 			var option interface{}
 			var found bool
-			if option, found = req.RuleOptions[r.Name]; found {
-				// Found with short name (e.g., "member-ordering")
-				// option and found are set correctly by the if condition
-			} else if option, found = req.RuleOptions["@typescript-eslint/"+r.Name]; found {
-				// Found with full name (e.g., "@typescript-eslint/member-ordering")
-				// option and found are set correctly by the if condition
+			if option, found = req.RuleOptions[r.Name]; !found {
+				// Try with full @typescript-eslint/ prefix
+				option, found = req.RuleOptions["@typescript-eslint/"+r.Name]
 			}
 
 			if found {
