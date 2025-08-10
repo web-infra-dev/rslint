@@ -9,7 +9,7 @@ import (
 
 func TestNoNonNullAssertionRule(t *testing.T) {
 	validTestCases := []rule_tester.ValidTestCase{
-		// 基本有效情况 - 没有非空断言
+		// Basic valid cases - no non-null assertions
 		{Code: `const foo = "hello"; console.log(foo);`},
 		{Code: `function foo(bar: string) { console.log(bar); }`},
 		{Code: `const foo: string | null = "hello"; if (foo) { console.log(foo); }`},
@@ -21,7 +21,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 	}
 
 	invalidTestCases := []rule_tester.InvalidTestCase{
-		// 基本非空断言 - 应该报告错误
+		// Basic non-null assertion - should report error
 		{
 			Code: `const foo: string | null = "hello"; const bar = foo!;`,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -30,7 +30,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 				},
 			},
 		},
-		// 属性访问中的非空断言
+		// Non-null assertion in property access
 		{
 			Code: `const foo: string | null = "hello"; const bar = foo!.length;`,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -39,7 +39,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 				},
 			},
 		},
-		// 函数调用中的非空断言
+		// Non-null assertion in function call
 		{
 			Code: `const foo: string | null = "hello"; const bar = foo!.toUpperCase();`,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -48,7 +48,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 				},
 			},
 		},
-		// 数组访问中的非空断言
+		// Non-null assertion in array access
 		{
 			Code: `const foo: string[] | null = ["hello"]; const bar = foo![0];`,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -57,7 +57,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 				},
 			},
 		},
-		// 链式非空断言 - 应该报告2个错误
+		// Chained non-null assertions - should report 2 errors
 		{
 			Code: `const foo: string | null = "hello"; const bar = foo!!;`,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -69,7 +69,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 				},
 			},
 		},
-		// 条件表达式中的非空断言
+		// Non-null assertion in conditional expression
 		{
 			Code: `const foo: string | null = "hello"; const bar = foo! ? "yes" : "no";`,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -78,7 +78,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 				},
 			},
 		},
-		// 逻辑表达式中的非空断言
+		// Non-null assertion in logical expression
 		{
 			Code: `const foo: string | null = "hello"; const bar = foo! && "yes";`,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -87,7 +87,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 				},
 			},
 		},
-		// 返回语句中的非空断言
+		// Non-null assertion in return statement
 		{
 			Code: `function test(): string { const foo: string | null = "hello"; return foo!; }`,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -96,7 +96,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 				},
 			},
 		},
-		// 变量声明中的非空断言
+		// Non-null assertion in variable declaration
 		{
 			Code: `let foo: string | null = "hello"; foo = foo!;`,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -105,7 +105,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 				},
 			},
 		},
-		// 参数中的非空断言
+		// Non-null assertion in parameters
 		{
 			Code: `function test(foo: string | null) { const bar = foo!; }`,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -114,7 +114,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 				},
 			},
 		},
-		// 对象属性中的非空断言
+		// Non-null assertion in object properties
 		{
 			Code: `const obj = { foo: "hello" as string | null }; const bar = obj.foo!;`,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -123,7 +123,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 				},
 			},
 		},
-		// 模板字符串中的非空断言
+		// Non-null assertion in template strings
 		{
 			Code: "const foo: string | null = \"hello\"; const bar = `Value: ${foo!}`;",
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -132,7 +132,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 				},
 			},
 		},
-		// 类型断言中的非空断言
+		// Non-null assertion in type assertion
 		{
 			Code: `const foo: string | null = "hello"; const bar = (foo! as string).length;`,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -141,7 +141,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 				},
 			},
 		},
-		// 泛型中的非空断言
+		// Non-null assertion in generics
 		{
 			Code: `function test<T extends string | null>(foo: T): T { return foo!; }`,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -150,7 +150,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 				},
 			},
 		},
-		// 联合类型中的非空断言
+		// Non-null assertion in union types
 		{
 			Code: `const foo: (string | null)[] = ["hello"]; const bar = foo[0]!;`,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -159,7 +159,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 				},
 			},
 		},
-		// 嵌套表达式中的非空断言
+		// Non-null assertion in nested expressions
 		{
 			Code: `const foo: string | null = "hello"; const bar = (foo! + "world").length;`,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -168,7 +168,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 				},
 			},
 		},
-		// 三元表达式中的非空断言
+		// Non-null assertion in ternary expressions
 		{
 			Code: `const foo: string | null = "hello"; const bar = foo! ? foo!.length : 0;`,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -186,7 +186,7 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 }
 
 func TestNoNonNullAssertionOptionsParsing(t *testing.T) {
-	// 测试规则基本信息
+	// Test basic rule information
 	rule := NoNonNullAssertionRule
 	if rule.Name != "@typescript-eslint/no-non-null-assertion" {
 		t.Errorf("Expected rule name to be '@typescript-eslint/no-non-null-assertion', got %s", rule.Name)
@@ -203,21 +203,21 @@ func TestNoNonNullAssertionMessage(t *testing.T) {
 	}
 }
 
-// 测试边界情况
+// Test edge cases
 func TestNoNonNullAssertionEdgeCases(t *testing.T) {
 	validTestCases := []rule_tester.ValidTestCase{
-		// 嵌套赋值表达式
+		// Nested assignment expressions
 		{Code: `let obj: { prop?: string } = {}; obj.prop! = "value";`},
 
-		// 解构赋值中的非空断言
+		// Non-null assertion in destructuring assignment
 		{Code: `let arr: (string | null)[] = ["hello"]; [arr[0]!] = ["world"];`},
 
-		// 复杂赋值表达式
+		// Complex assignment expressions
 		{Code: `let foo: string | null = "hello"; (foo! as any) = "world";`},
 	}
 
 	invalidTestCases := []rule_tester.InvalidTestCase{
-		// 这些测试用例已经在主测试函数中包含了
+		// These test cases are already included in the main test function
 	}
 
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &NoNonNullAssertionRule, validTestCases, invalidTestCases)
