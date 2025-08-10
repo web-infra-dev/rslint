@@ -77,7 +77,6 @@ export class RSLintService {
     });
 
     // Set up binary message reading
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     this.process.stdout!.on('data', data => {
       this.handleChunk(data);
     });
@@ -103,7 +102,6 @@ export class RSLintService {
       length.writeUInt32LE(json.length, 0);
 
       // Send message
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       this.process.stdin!.write(
         Buffer.concat([length, Buffer.from(json, 'utf8')]),
       );
@@ -201,7 +199,6 @@ export class RSLintService {
   async close(): Promise<void> {
     return new Promise(resolve => {
       this.sendMessage('exit', {}).finally(() => {
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         this.process.stdin!.end();
         resolve();
       });
