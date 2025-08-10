@@ -188,8 +188,8 @@ func TestNoNonNullAssertionRule(t *testing.T) {
 func TestNoNonNullAssertionOptionsParsing(t *testing.T) {
 	// 测试规则基本信息
 	rule := NoNonNullAssertionRule
-	if rule.Name != "no-non-null-assertion" {
-		t.Errorf("Expected rule name to be 'no-non-null-assertion', got %s", rule.Name)
+	if rule.Name != "@typescript-eslint/no-non-null-assertion" {
+		t.Errorf("Expected rule name to be '@typescript-eslint/no-non-null-assertion', got %s", rule.Name)
 	}
 }
 

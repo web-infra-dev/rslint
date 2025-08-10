@@ -39,12 +39,57 @@ var NoNonNullAssertionRule = rule.CreateRule(rule.Rule{
 			ast.KindNonNullExpression: func(node *ast.Node) {
 				// Check if the non-null assertion is used in an assignment expression
 				parent := node.Parent
-				if parent != nil && ast.IsAssignmentExpression(parent, true) {
-					// Allow non-null assertions on the left side of assignments
-					// This is necessary when TypeScript requires non-null types for assignment targets
-					binaryExpr := parent.AsBinaryExpression()
-					if binaryExpr != nil && binaryExpr.Left == node {
-						return
+				if parent != nil {
+					// Allow non-null assertions in assignment expressions (left side)
+					if ast.IsAssignmentExpression(parent, true) {
+						binaryExpr := parent.AsBinaryExpression()
+						if binaryExpr != nil && binaryExpr.Left == node {
+							return
+						}
+					}
+
+					// Allow non-null assertions in destructuring assignments
+					if ast.IsArrayLiteralExpression(parent) {
+						// Check if this array literal is part of a destructuring assignment
+						grandParent := parent.Parent
+						if grandParent != nil && ast.IsBinaryExpression(grandParent) {
+							binaryExpr := grandParent.AsBinaryExpression()
+							if binaryExpr != nil && binaryExpr.OperatorToken.Kind == ast.KindEqualsToken && binaryExpr.Left == parent {
+								return
+							}
+						}
+					}
+
+					// Allow non-null assertions in parenthesized expressions that are part of assignments
+					if ast.IsParenthesizedExpression(parent) {
+						grandParent := parent.Parent
+						if grandParent != nil && ast.IsBinaryExpression(grandParent) {
+							binaryExpr := grandParent.AsBinaryExpression()
+							if binaryExpr != nil && binaryExpr.OperatorToken.Kind == ast.KindEqualsToken && binaryExpr.Left == parent {
+								return
+							}
+						}
+					}
+
+					// Allow non-null assertions in type assertions that are part of assignments
+					if ast.IsAssertionExpression(parent) {
+						grandParent := parent.Parent
+						if grandParent != nil {
+							if ast.IsBinaryExpression(grandParent) {
+								binaryExpr := grandParent.AsBinaryExpression()
+								if binaryExpr != nil && binaryExpr.OperatorToken.Kind == ast.KindEqualsToken && binaryExpr.Left == parent {
+									return
+								}
+							} else if ast.IsParenthesizedExpression(grandParent) {
+								greatGrandParent := grandParent.Parent
+								if greatGrandParent != nil && ast.IsBinaryExpression(greatGrandParent) {
+									binaryExpr := greatGrandParent.AsBinaryExpression()
+									if binaryExpr != nil && binaryExpr.OperatorToken.Kind == ast.KindEqualsToken && binaryExpr.Left == grandParent {
+										return
+									}
+								}
+							}
+						}
 					}
 				}
 
