@@ -265,6 +265,7 @@ export class Rslint implements Disposable {
   private async getBinaryPath(): Promise<string> {
     const binPathConfig = workspace
       .getConfiguration()
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       .get<RslintBinPath>('rslint.binPath')!;
 
     let finalBinPath: string | null = null;
@@ -293,6 +294,7 @@ export class Rslint implements Disposable {
     }
 
     this.logger.debug('Final Rslint binary path:', finalBinPath);
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     return finalBinPath!;
   }
 }
