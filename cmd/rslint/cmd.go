@@ -408,7 +408,7 @@ func runCMD() int {
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
 
 	// Initialize rule registry with all available rules
-	rslintconfig.RegisterAllTypeScriptEslintPluginRules()
+	rslintconfig.RegisterAllRules()
 	var rslintConfig rslintconfig.RslintConfig
 	var tsConfigs []string
 	// Load rslint configuration and determine which rules to enable
