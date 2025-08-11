@@ -82,7 +82,7 @@ func (s *LSPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 }
 
 func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
-	log.Printf("Handling initialize: %+v", req)
+	log.Printf("Handling initialize: %+v with pid %d", req, os.Getpid())
 	// Check if params is nil
 	if req.Params == nil {
 		return nil, &jsonrpc2.Error{
