@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/ls"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/vfs"
@@ -99,7 +100,7 @@ func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request)
 	} else {
 		//nolint
 		if params.RootUri.DocumentUri != nil {
-			s.rootURI = uriToPath(string(*params.RootUri.DocumentUri))
+			s.rootURI = uriToPath(*params.RootUri.DocumentUri)
 		}
 	}
 
@@ -184,7 +185,7 @@ func (s *LSPServer) handleCodeAction(ctx context.Context, req *jsonrpc2.Request)
 	if !exists {
 		// If no diagnostics exist for this document, try to generate them
 		// This can happen if the document was opened without a proper didOpen event
-		filePath := uriToPath(string(uri))
+		filePath := uriToPath(uri)
 		if content, err := os.ReadFile(filePath); err == nil {
 			s.documents[uri] = string(content)
 			s.runDiagnostics(ctx, uri, string(content))
@@ -250,7 +251,7 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 	config.RegisterAllRules()
 
 	// Convert URI to file path
-	filePath := uriToPath(uriString)
+	filePath := uriToPath(uri)
 
 	// Create a temporary file system with the content
 	vfs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
@@ -400,19 +401,8 @@ func isTypeScriptFile(uri string) bool {
 		strings.HasSuffix(path, ".jsx")
 }
 
-func uriToPath(uri string) string {
-	if strings.HasPrefix(uri, "file://") {
-		path := strings.TrimPrefix(uri, "file://")
-		// Handle URL encoded characters and normalize path
-		path = strings.ReplaceAll(path, "%20", " ")
-		// Normalize path separators for cross-platform compatibility
-		if len(path) > 0 && path[0] != '/' {
-			// Windows paths may start without leading slash after file://
-			return path
-		}
-		return path
-	}
-	return uri
+func uriToPath(uri lsproto.DocumentUri) string {
+	return ls.DocumentURIToFileName(uri)
 }
 
 // findRslintConfig searches for rslint configuration files using multiple strategies
@@ -508,7 +498,7 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 		defer diagnosticsLock.Unlock()
 		diagnostics = append(diagnostics, d)
 	}
-	filename := uriToPath(string(uri))
+	filename := uriToPath(uri)
 
 	// Run linter with all programs using rule registry
 	_, err := linter.RunLinter(
