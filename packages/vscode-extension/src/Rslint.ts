@@ -293,7 +293,6 @@ export class Rslint implements Disposable {
     }
 
     this.logger.debug('Final Rslint binary path:', finalBinPath);
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     return finalBinPath!;
   }
 }
