@@ -158,6 +158,31 @@ func GetWellKnownSymbolPropertyOfType(t *checker.Type, name string, typeChecker 
 	return checker.Checker_getPropertyOfType(typeChecker, t, checker.Checker_getPropertyNameForKnownSymbolName(typeChecker, name))
 }
 
+func GetChildren(node *ast.Node, sourceFile *ast.SourceFile) []*ast.Node {
+	children := make([]*ast.Node, 0)
+
+	pos := node.Pos()
+	node.ForEachChild(func(child *ast.Node) bool {
+		childPos := child.Pos()
+		if pos < childPos {
+			scanner := scanner.GetScannerForSourceFile(sourceFile, pos)
+			for pos < childPos {
+				token := scanner.Token()
+				tokenFullStart := scanner.TokenFullStart()
+				tokenEnd := scanner.TokenEnd()
+				children = append(children, sourceFile.GetOrCreateToken(token, tokenFullStart, tokenEnd, node))
+				pos = tokenEnd
+				scanner.Scan()
+			}
+		}
+
+		children = append(children, child)
+		pos = child.End()
+		return false
+	})
+	return children
+}
+
 // Checks if a given compiler option is enabled, accounting for whether all flags
 // (except `strictPropertyInitialization`) have been enabled by `strict: true`.
 //
@@ -196,6 +221,8 @@ func IsStrictCompilerOptionEnabled(
 	// );
 }
 
+// Port https://github.com/JoshuaKGoldberg/ts-api-utils/blob/491c0374725a5dd64632405efea101f20ed5451f/src/tokens.ts#L34
+//
 // Iterates over all tokens of `node`
 //
 // @category Nodes - Other Utilities
@@ -211,35 +238,13 @@ func IsStrictCompilerOptionEnabled(
 // @param node The node whose tokens should be visited
 // @param callback Is called for every token contained in `node`
 func ForEachToken(node *ast.Node, callback func(token *ast.Node), sourceFile *ast.SourceFile) {
-	queue := []*ast.Node{}
+	queue := make([]*ast.Node, 0)
 
 	for {
 		if ast.IsTokenKind(node.Kind) {
 			callback(node)
 		} else {
-			children := make([]*ast.Node, 0)
-
-			// GetChildren
-			scanner := scanner.GetScannerForSourceFile(sourceFile, node.Pos())
-			startPos := node.Pos()
-			for startPos < node.End() {
-				tokenKind := scanner.Token()
-				tokenFullStart := scanner.TokenFullStart()
-				tokenEnd := scanner.TokenEnd()
-				token := sourceFile.GetOrCreateToken(tokenKind, tokenFullStart, tokenEnd, node)
-
-				children = append(children, token)
-
-				startPos = tokenEnd
-				scanner.Scan()
-			}
-
-			if len(children) == 1 {
-				node = children[0]
-				continue
-			}
-
-			// Add children in reverse order, when we pop the next element from the queue, it's the first child
+			children := GetChildren(node, sourceFile)
 			for i := len(children) - 1; i >= 0; i-- {
 				queue = append(queue, children[i])
 			}
@@ -249,13 +254,13 @@ func ForEachToken(node *ast.Node, callback func(token *ast.Node), sourceFile *as
 			break
 		}
 
-		// Pop the last element from the queue
 		node = queue[len(queue)-1]
 		queue = queue[:len(queue)-1]
 	}
 }
 
 // Port https://github.com/JoshuaKGoldberg/ts-api-utils/blob/491c0374725a5dd64632405efea101f20ed5451f/src/comments.ts#L37C17-L37C31
+//
 // Iterates over all comments owned by `node` or its children.
 //
 // @category Nodes - Other Utilities
@@ -268,8 +273,6 @@ func ForEachToken(node *ast.Node, callback func(token *ast.Node), sourceFile *as
 //	   console.log(`Found comment at position ${comment.pos}: '${fullText}'.`);
 //	});
 func ForEachComment(node *ast.Node, callback func(comment *ast.CommentRange), sourceFile *ast.SourceFile) {
-	nodeFactory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
-
 	fullText := sourceFile.Text()
 	notJsx := sourceFile.LanguageVariant != core.LanguageVariantJSX
 
@@ -282,17 +285,17 @@ func ForEachComment(node *ast.Node, callback func(comment *ast.CommentRange), so
 
 			if token.Kind != ast.KindJsxText {
 				pos := token.Pos()
-				if token.Pos() == 0 {
+				if pos == 0 {
 					pos = len(scanner.GetShebang(fullText))
 				}
 
-				for comment := range scanner.GetLeadingCommentRanges(nodeFactory, fullText, pos) {
+				for comment := range scanner.GetLeadingCommentRanges(&ast.NodeFactory{}, fullText, pos) {
 					callback(&comment)
 				}
 			}
 
 			if notJsx || canHaveTrailingTrivia(token) {
-				for comment := range scanner.GetTrailingCommentRanges(nodeFactory, fullText, token.End()) {
+				for comment := range scanner.GetTrailingCommentRanges(&ast.NodeFactory{}, fullText, token.End()) {
 					callback(&comment)
 				}
 				return
