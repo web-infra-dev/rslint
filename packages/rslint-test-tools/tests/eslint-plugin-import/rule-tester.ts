@@ -4,7 +4,7 @@ import util from 'node:util';
 import { lint } from '@rslint/core';
 
 // Port from 'eslint'
-interface ValidTestCase {
+export interface ValidTestCase {
   name?: string;
   code: string;
   options?: any;
@@ -22,7 +22,7 @@ interface SuggestionOutput {
   output: string;
 }
 
-interface InvalidTestCase extends ValidTestCase {
+export interface InvalidTestCase extends ValidTestCase {
   errors: number | Array<TestCaseError | string>;
   output?: string | null | undefined;
 }
