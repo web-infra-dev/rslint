@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/url"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -401,18 +403,63 @@ func isTypeScriptFile(uri string) bool {
 }
 
 func uriToPath(uri string) string {
-	if strings.HasPrefix(uri, "file://") {
-		path := strings.TrimPrefix(uri, "file://")
-		// Handle URL encoded characters and normalize path
-		path = strings.ReplaceAll(path, "%20", " ")
-		// Normalize path separators for cross-platform compatibility
-		if len(path) > 0 && path[0] != '/' {
-			// Windows paths may start without leading slash after file://
-			return path
-		}
-		return path
+	// Only handle file URIs; otherwise return as-is
+	if !strings.HasPrefix(strings.ToLower(uri), "file:") {
+		return uri
 	}
-	return uri
+
+	u, err := url.Parse(uri)
+	if err != nil {
+		// Fallback: strip prefix heuristically
+		s := strings.TrimPrefix(uri, "file://")
+		s = strings.TrimPrefix(s, "file:")
+		return s
+	}
+
+	// Decode any percent-encoded characters
+	p, _ := url.PathUnescape(u.Path)
+	host := u.Host
+
+	if runtime.GOOS == "windows" {
+		// Treat localhost as local disk path
+		if strings.EqualFold(host, "localhost") {
+			host = ""
+		}
+
+		// Handle form like file://C:/path (host holds drive)
+		if len(host) == 2 && host[1] == ':' {
+			if !strings.HasPrefix(p, "/") {
+				p = "/" + p
+			}
+			p = host + p
+			host = ""
+		}
+
+		// Remove leading slash before drive letter: /C:/foo -> C:/foo
+		if len(p) >= 3 && p[0] == '/' && p[2] == ':' {
+			p = p[1:]
+		}
+
+		// UNC paths: file://server/share/file -> //server/share/file
+		if host != "" {
+			if !strings.HasPrefix(p, "/") {
+				p = "/" + p
+			}
+			return "//" + host + p
+		}
+
+		// Normalize to forward slashes; Go and Windows APIs accept them
+		return p
+	}
+
+	// Non-Windows: just return the decoded path; include host for remote UNC-like
+	if host != "" && !strings.EqualFold(host, "localhost") {
+		if !strings.HasPrefix(p, "/") {
+			p = "/" + p
+		}
+		return "//" + host + p
+	}
+	return p
 }
 
 // findRslintConfig searches for rslint configuration files using multiple strategies
