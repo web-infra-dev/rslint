@@ -23,7 +23,7 @@ interface SuggestionOutput {
 }
 
 export interface InvalidTestCase extends ValidTestCase {
-  errors: number | Array<TestCaseError | string>;
+  errors: number | (TestCaseError | string)[];
   output?: string | null | undefined;
 }
 

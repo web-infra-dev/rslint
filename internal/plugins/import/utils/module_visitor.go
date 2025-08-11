@@ -102,5 +102,9 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 }
 
 func isStringLiteralLike(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+
 	return node.Kind == ast.KindStringLiteral || node.Kind == ast.KindNoSubstitutionTemplateLiteral
 }
