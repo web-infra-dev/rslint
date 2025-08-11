@@ -19,7 +19,7 @@ func (m *mockFS) FileExists(path string) bool {
 	return exists
 }
 
-// Implement other required methods from vfs.FS interface (not used in findRslintConfig)
+// Stubbed implementations of other vfs.FS interface methods for testing purposes
 func (m *mockFS) UseCaseSensitiveFileNames() bool                                   { return true }
 func (m *mockFS) ReadFile(path string) (string, bool)                               { return "", false }
 func (m *mockFS) WriteFile(path string, data string, writeByteOrderMark bool) error { return nil }
