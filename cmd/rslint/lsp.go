@@ -14,6 +14,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/ls"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/vfs"
@@ -401,18 +402,7 @@ func isTypeScriptFile(uri string) bool {
 }
 
 func uriToPath(uri string) string {
-	if strings.HasPrefix(uri, "file://") {
-		path := strings.TrimPrefix(uri, "file://")
-		// Handle URL encoded characters and normalize path
-		path = strings.ReplaceAll(path, "%20", " ")
-		// Normalize path separators for cross-platform compatibility
-		if len(path) > 0 && path[0] != '/' {
-			// Windows paths may start without leading slash after file://
-			return path
-		}
-		return path
-	}
-	return uri
+    return ls.DocumentURIToFileName(lsproto.DocumentUri(uri))
 }
 
 // findRslintConfig searches for rslint configuration files using multiple strategies
