@@ -1,7 +1,6 @@
 package rule
 
 import (
-	"regexp"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -53,12 +52,6 @@ func (dm *DisableManager) parseESLintDirectives(comments []*ast.CommentRange) {
 
 	text := dm.sourceFile.Text()
 
-	// Regular expressions to match ESLint directives
-	eslintDisableLineRe := regexp.MustCompile(`eslint-disable-line(?:\s+([^\r\n]+))?`)
-	eslintDisableNextLineRe := regexp.MustCompile(`eslint-disable-next-line(?:\s+([^\r\n]+))?`)
-	eslintDisableRe := regexp.MustCompile(`eslint-disable(?:\s+([^*]+))?`)
-	eslintEnableRe := regexp.MustCompile(`eslint-enable(?:\s+([^*]+))?`)
-
 	for _, comment := range comments {
 		var commentContent string
 		switch comment.Kind {
@@ -69,43 +62,47 @@ func (dm *DisableManager) parseESLintDirectives(comments []*ast.CommentRange) {
 		}
 
 		lineNum, _ := scanner.GetLineAndCharacterOfPosition(dm.sourceFile, comment.Pos())
+		rulePos := 0
 
-		// Check for eslint-disable-line
-		if matches := eslintDisableLineRe.FindStringSubmatch(commentContent); matches != nil {
-			rules := parseRuleNames(matches[1])
-			if len(rules) == 0 {
-				dm.lineDisabledRules[lineNum] = append(dm.lineDisabledRules[lineNum], "*")
-			} else {
-				dm.lineDisabledRules[lineNum] = append(dm.lineDisabledRules[lineNum], rules...)
-			}
-		}
+		if strings.HasPrefix(commentContent, "eslint-disable") {
+			rulePos += 14
+			text := commentContent[rulePos:]
 
-		// Check for eslint-disable-next-line
-		if matches := eslintDisableNextLineRe.FindStringSubmatch(commentContent); matches != nil {
-			rules := parseRuleNames(matches[1])
-			nextLineNum := lineNum + 1
-			if len(rules) == 0 {
-				dm.nextLineDisabledRules[nextLineNum] = append(dm.nextLineDisabledRules[nextLineNum], "*")
+			if strings.HasPrefix(text, "-line") {
+				// Check for eslint-disable-line
+				rulePos += 5
+				rules := parseRuleNames(commentContent[rulePos:])
+				if len(rules) == 0 {
+					dm.lineDisabledRules[lineNum] = append(dm.lineDisabledRules[lineNum], "*")
+				} else {
+					dm.lineDisabledRules[lineNum] = append(dm.lineDisabledRules[lineNum], rules...)
+				}
+			} else if strings.HasPrefix(text, "-next-line") {
+				// Check for eslint-disable-next-line
+				rulePos += 10
+				rules := parseRuleNames(commentContent[rulePos:])
+				nextLineNum := lineNum + 1
+				if len(rules) == 0 {
+					dm.nextLineDisabledRules[nextLineNum] = append(dm.nextLineDisabledRules[nextLineNum], "*")
+				} else {
+					dm.nextLineDisabledRules[nextLineNum] = append(dm.nextLineDisabledRules[nextLineNum], rules...)
+				}
 			} else {
-				dm.nextLineDisabledRules[nextLineNum] = append(dm.nextLineDisabledRules[nextLineNum], rules...)
-			}
-		}
-
-		// Check for eslint-disable (block comments)
-		if matches := eslintDisableRe.FindStringSubmatch(commentContent); matches != nil {
-			rules := parseRuleNames(matches[1])
-			if len(rules) == 0 {
-				dm.disabledRules["*"] = true
-			} else {
-				for _, rule := range rules {
-					dm.disabledRules[rule] = true
+				// Check for eslint-disable (block comments)
+				rules := parseRuleNames(commentContent[rulePos:])
+				if len(rules) == 0 {
+					dm.disabledRules["*"] = true
+				} else {
+					for _, rule := range rules {
+						dm.disabledRules[rule] = true
+					}
 				}
 			}
-		}
+		} else if strings.HasPrefix(commentContent, "eslint-enable") {
+			rulePos += 13
 
-		// Check for eslint-enable (block comments)
-		if matches := eslintEnableRe.FindStringSubmatch(commentContent); matches != nil {
-			rules := parseRuleNames(matches[1])
+			// Check for eslint-enable (block comments)
+			rules := parseRuleNames(commentContent[rulePos:])
 			if len(rules) == 0 {
 				// Enable all rules
 				for key := range dm.disabledRules {
