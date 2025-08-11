@@ -58,7 +58,6 @@ export class Extension implements Disposable {
   ): Rslint {
     if (this.rslintInstances.has(id)) {
       this.logger.warn(`Rslint instance with id '${id}' already exists`);
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       return this.rslintInstances.get(id)!;
     }
 

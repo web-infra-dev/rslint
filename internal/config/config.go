@@ -25,7 +25,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_misused_spread"
 	"github.com/web-infra-dev/rslint/internal/rules/no_mixed_enums"
 	"github.com/web-infra-dev/rslint/internal/rules/no_namespace"
-	"github.com/web-infra-dev/rslint/internal/rules/no_non_null_assertion"
 	"github.com/web-infra-dev/rslint/internal/rules/no_redundant_type_constituents"
 	"github.com/web-infra-dev/rslint/internal/rules/no_require_imports"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unnecessary_boolean_literal_compare"
@@ -287,7 +286,6 @@ func RegisterAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/no-misused-spread", no_misused_spread.NoMisusedSpreadRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-mixed-enums", no_mixed_enums.NoMixedEnumsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-namespace", no_namespace.NoNamespaceRule)
-	GlobalRuleRegistry.Register("@typescript-eslint/no-non-null-assertion", no_non_null_assertion.NoNonNullAssertionRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-redundant-type-constituents", no_redundant_type_constituents.NoRedundantTypeConstituentsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-require-imports", no_require_imports.NoRequireImportsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unnecessary-boolean-literal-compare", no_unnecessary_boolean_literal_compare.NoUnnecessaryBooleanLiteralCompareRule)
