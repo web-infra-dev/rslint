@@ -4,7 +4,6 @@ exports[`await-thenable > invalid 1`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
       "messageId": "await",
       "range": {
@@ -30,7 +29,6 @@ exports[`await-thenable > invalid 2`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
       "messageId": "await",
       "range": {
@@ -56,7 +54,6 @@ exports[`await-thenable > invalid 3`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
       "messageId": "await",
       "range": {
@@ -82,7 +79,6 @@ exports[`await-thenable > invalid 4`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
       "messageId": "await",
       "range": {
@@ -108,7 +104,6 @@ exports[`await-thenable > invalid 5`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
       "messageId": "await",
       "range": {
@@ -134,7 +129,6 @@ exports[`await-thenable > invalid 6`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
       "messageId": "await",
       "range": {
@@ -160,7 +154,6 @@ exports[`await-thenable > invalid 7`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
       "messageId": "await",
       "range": {
@@ -186,7 +179,6 @@ exports[`await-thenable > invalid 8`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
       "messageId": "await",
       "range": {
@@ -212,7 +204,6 @@ exports[`await-thenable > invalid 9`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
       "messageId": "await",
       "range": {
@@ -238,7 +229,6 @@ exports[`await-thenable > invalid 10`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`for await...of\` of a value that is not async iterable.",
       "messageId": "forAwaitOfNonAsyncIterable",
       "range": {
@@ -264,7 +254,6 @@ exports[`await-thenable > invalid 11`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`for await...of\` of a value that is not async iterable.",
       "messageId": "forAwaitOfNonAsyncIterable",
       "range": {
@@ -290,7 +279,6 @@ exports[`await-thenable > invalid 12`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`await using\` of a value that is not async disposable.",
       "messageId": "awaitUsingOfNonAsyncDisposable",
       "range": {
@@ -316,7 +304,6 @@ exports[`await-thenable > invalid 13`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`await using\` of a value that is not async disposable.",
       "messageId": "awaitUsingOfNonAsyncDisposable",
       "range": {
@@ -342,7 +329,6 @@ exports[`await-thenable > invalid 14`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`await using\` of a value that is not async disposable.",
       "messageId": "awaitUsingOfNonAsyncDisposable",
       "range": {
@@ -358,7 +344,6 @@ exports[`await-thenable > invalid 14`] = `
       "ruleName": "@typescript-eslint/await-thenable",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`await using\` of a value that is not async disposable.",
       "messageId": "awaitUsingOfNonAsyncDisposable",
       "range": {
@@ -374,7 +359,6 @@ exports[`await-thenable > invalid 14`] = `
       "ruleName": "@typescript-eslint/await-thenable",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`await using\` of a value that is not async disposable.",
       "messageId": "awaitUsingOfNonAsyncDisposable",
       "range": {
@@ -400,7 +384,6 @@ exports[`await-thenable > invalid 15`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`await using\` of a value that is not async disposable.",
       "messageId": "awaitUsingOfNonAsyncDisposable",
       "range": {
@@ -426,7 +409,6 @@ exports[`await-thenable > invalid 16`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
       "messageId": "await",
       "range": {
@@ -452,7 +434,6 @@ exports[`await-thenable > invalid 17`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
       "messageId": "await",
       "range": {
@@ -478,7 +459,6 @@ exports[`await-thenable > invalid 18`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
       "messageId": "await",
       "range": {

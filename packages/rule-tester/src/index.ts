@@ -2,7 +2,7 @@
 
 import path from 'node:path';
 import { test, describe, expect } from '@rstest/core';
-import { lint, type Diagnostic } from '@rslint/core';
+import { lint, LintResponse, type Diagnostic } from '@rslint/core';
 import assert from 'node:assert';
 
 interface TsDiagnostic {
@@ -181,7 +181,7 @@ export class RuleTester {
             typeof validCase === 'string' ? [] : validCase.options || [];
           let virtual_entry = path.resolve(
             cwd,
-            isJSX ? 'src/virtual.tsx' : 'src/virtual.ts',
+            isJSX ? 'virtual.tsx' : 'virtual.ts',
           );
           // workaround for this hardcoded path https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/eslint-plugin/tests/rules/no-floating-promises.test.ts#L712
           if (Array.isArray(options)) {
@@ -230,7 +230,7 @@ export class RuleTester {
           const isJSX = item.languageOptions?.parserOptions?.ecmaFeatures?.jsx;
           const test_virtual_entry = path.resolve(
             cwd,
-            isJSX ? 'src/virtual.tsx' : 'src/virtual.ts',
+            isJSX ? 'virtual.tsx' : 'virtual.ts',
           );
           const diags = await lint({
             config,
@@ -242,8 +242,7 @@ export class RuleTester {
               [ruleName]: options,
             },
           });
-
-          expect(diags).toMatchSnapshot();
+          expect(filterSnapshot(diags)).toMatchSnapshot();
 
           assert(
             diags.diagnostics?.length > 0,
@@ -256,7 +255,14 @@ export class RuleTester {
     });
   }
 }
-
+// remove unnecessary props from diagnostics, return optional filtered LintResponse
+function filterSnapshot(diags: LintResponse): LintResponse {
+  for (const diag of diags.diagnostics ?? []) {
+    // @ts-ignore
+    delete diag.filePath;
+  }
+  return diags;
+}
 /**
  * Simple no-op tag to mark code samples as "should not format with prettier"
  *   for the plugin-test-formatting lint rule

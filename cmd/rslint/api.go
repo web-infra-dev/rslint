@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"os"
 	"sync"
 
@@ -95,9 +96,14 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 
 	// Create filesystem
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	allowedFiles := []string{}
 	// Apply file contents if provided
 	if len(req.FileContents) > 0 {
 		fs = utils.NewOverlayVFS(fs, req.FileContents)
+		for file := range req.FileContents {
+
+			allowedFiles = append(allowedFiles, file) // Collect allowed files from request
+		}
 	}
 
 	// Initialize rule registry with all available rules
@@ -236,7 +242,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	lintedFilesCount, err := linter.RunLinter(
 		programs,
 		false, // Don't use single-threaded mode for IPC
-		nil,
+		allowedFiles,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			return utils.Map(rulesWithOptions, func(r RuleWithOption) linter.ConfiguredRule {
 

@@ -5,7 +5,7 @@
     "languageOptions": {
       "parserOptions": {
         "projectService": false,
-        "project": ["./tsconfig.virtual.json"]
+        "project": ["./tsconfig.json"]
       }
     },
     "rules": {},
