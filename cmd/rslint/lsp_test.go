@@ -6,7 +6,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 )
 
-// mockFS is a simple mock implementation of vfs.FS for testing
+// mockFS is a mock implementation of vfs.FS for testing. Only FileExists is properly implemented;
+// other methods are stubbed with default implementations.
 type mockFS struct {
 	files map[string]bool // path -> exists
 }
