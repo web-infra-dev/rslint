@@ -16,6 +16,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/sourcegraph/jsonrpc2"
@@ -272,39 +273,12 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 
 	host := utils.CreateCompilerHost(workingDir, vfs)
 
-	// Try to find rslint.json with multiple strategies
+	// Try to find rslint configuration files with multiple strategies
 	var rslintConfigPath string
 	var configFound bool
 
-	// Strategy 1: Try in the working directory
-	rslintConfigPath = workingDir + "/rslint.json"
-	if vfs.FileExists(rslintConfigPath) {
-		configFound = true
-	}
-
-	// Strategy 2: If not found, walk up the directory tree
-	if !configFound && filePath != "" {
-		dir := filePath
-		if idx := strings.LastIndex(dir, "/"); idx != -1 {
-			dir = dir[:idx]
-		}
-
-		for i := 0; i < 5 && dir != "/" && dir != ""; i++ { // Limit search depth
-			testPath := dir + "/rslint.json"
-			if vfs.FileExists(testPath) {
-				rslintConfigPath = testPath
-				workingDir = dir
-				configFound = true
-				break
-			}
-			// Move up one directory
-			if idx := strings.LastIndex(dir, "/"); idx != -1 {
-				dir = dir[:idx]
-			} else {
-				break
-			}
-		}
-	}
+	// Use helper function to find config
+	rslintConfigPath, workingDir, configFound = findRslintConfig(vfs, workingDir, filePath)
 
 	if !configFound {
 		return
@@ -439,6 +413,44 @@ func uriToPath(uri string) string {
 		return path
 	}
 	return uri
+}
+
+// findRslintConfig searches for rslint configuration files using multiple strategies
+func findRslintConfig(fs vfs.FS, workingDir, filePath string) (string, string, bool) {
+	defaultConfigs := []string{"rslint.json", "rslint.jsonc"}
+
+	// Strategy 1: Try in the working directory
+	for _, configName := range defaultConfigs {
+		configPath := workingDir + "/" + configName
+		if fs.FileExists(configPath) {
+			return configPath, workingDir, true
+		}
+	}
+
+	// Strategy 2: If not found, walk up the directory tree
+	if filePath != "" {
+		dir := filePath
+		if idx := strings.LastIndex(dir, "/"); idx != -1 {
+			dir = dir[:idx]
+		}
+
+		for i := 0; i < 5 && dir != "/" && dir != ""; i++ { // Limit search depth
+			for _, configName := range defaultConfigs {
+				testPath := dir + "/" + configName
+				if fs.FileExists(testPath) {
+					return testPath, dir, true
+				}
+			}
+			// Move up one directory
+			if idx := strings.LastIndex(dir, "/"); idx != -1 {
+				dir = dir[:idx]
+			} else {
+				break
+			}
+		}
+	}
+
+	return "", workingDir, false
 }
 
 func runLSP() int {
