@@ -1,9 +1,46 @@
 import path from 'node:path';
 import util from 'node:util';
 
-import type { RuleTester as ESLintRuleTester } from 'eslint';
-
 import { lint } from '@rslint/core';
+
+// Port from 'eslint'
+interface ValidTestCase {
+  name?: string;
+  code: string;
+  options?: any;
+  filename?: string | undefined;
+  only?: boolean;
+  // TODO: support `languageOptions` later
+  // languageOptions?: Linter.LanguageOptions | undefined;
+  settings?: { [name: string]: any } | undefined;
+}
+
+interface SuggestionOutput {
+  messageId?: string;
+  desc?: string;
+  data?: Record<string, unknown> | undefined;
+  output: string;
+}
+
+interface InvalidTestCase extends ValidTestCase {
+  errors: number | Array<TestCaseError | string>;
+  output?: string | null | undefined;
+}
+
+interface TestCaseError {
+  message?: string | RegExp;
+  messageId?: string;
+  /**
+   * @deprecated `type` is deprecated and will be removed in the next major version.
+   */
+  type?: string | undefined;
+  data?: any;
+  line?: number | undefined;
+  column?: number | undefined;
+  endLine?: number | undefined;
+  endColumn?: number | undefined;
+  suggestions?: SuggestionOutput[] | undefined;
+}
 
 // Port from https://github.com/eslint/eslint/blob/34f0723e2d0faf8ac8dc95ec56e6d181bd6b67f2/lib/rule-tester/rule-tester.js#L1145
 
@@ -12,8 +49,8 @@ export class RuleTester {
     ruleName: string,
     rule: never,
     cases: {
-      valid: ESLintRuleTester.ValidTestCase[];
-      invalid: ESLintRuleTester.InvalidTestCase[];
+      valid: ValidTestCase[];
+      invalid: InvalidTestCase[];
     },
   ) {
     ruleName = 'import/' + ruleName;

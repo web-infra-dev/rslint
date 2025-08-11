@@ -94,9 +94,6 @@ importers:
       '@typescript-eslint/utils':
         specifier: workspace:*
         version: link:../utils
-      eslint:
-        specifier: 9.32.0
-        version: 9.32.0(jiti@2.5.1)
 
   packages/rule-tester:
     dependencies:
