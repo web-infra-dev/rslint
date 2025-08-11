@@ -7,7 +7,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/url"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -261,11 +264,7 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 		// If rootURI is not set properly, try to infer from the file path
 		if filePath != "" {
 			// Use the directory of the current file as a starting point
-			if idx := strings.LastIndex(filePath, "/"); idx != -1 {
-				workingDir = filePath[:idx]
-			} else {
-				workingDir = "."
-			}
+			workingDir = filepath.Dir(filePath)
 		} else {
 			workingDir = "."
 		}
@@ -320,7 +319,7 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 
 		if targetFile == nil {
 			for _, sf := range sourceFiles {
-				if strings.HasSuffix(sf.FileName(), filePath) || sf.FileName() == filePath {
+				if pathsReferToSameFile(sf.FileName(), filePath) {
 					targetFile = sf
 					break
 				}
