@@ -1,0 +1,17 @@
+name: Setup Node
+description: Setup Node.js Environment
+
+runs:
+  using: composite
+
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+
+    - name: Install pnpm
+      run: corepack enable
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
