@@ -14,6 +14,13 @@
         "${workspaceFolder}/packages/vscode-extension/dist/**/*.js"
       ],
       "preLaunchTask": "npm: watch - packages/vscode-extension"
+    },
+    {
+      "name": "Attach to RSlint LSP Server Process",
+      "type": "go",
+      "request": "attach",
+      "mode": "local",
+      "processId": 0
     }
   ]
 }
