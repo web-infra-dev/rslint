@@ -4,7 +4,6 @@ exports[`no-empty-interface > invalid 1`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An empty interface is equivalent to \`{}\`.",
       "messageId": "noEmpty",
       "range": {
@@ -30,7 +29,6 @@ exports[`no-empty-interface > invalid 2`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An empty interface is equivalent to \`{}\`.",
       "messageId": "noEmpty",
       "range": {
@@ -56,7 +54,6 @@ exports[`no-empty-interface > invalid 3`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An interface declaring no members is equivalent to its supertype.",
       "messageId": "noEmptyWithSuper",
       "range": {
@@ -82,7 +79,6 @@ exports[`no-empty-interface > invalid 4`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An interface declaring no members is equivalent to its supertype.",
       "messageId": "noEmptyWithSuper",
       "range": {
@@ -108,7 +104,6 @@ exports[`no-empty-interface > invalid 5`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An interface declaring no members is equivalent to its supertype.",
       "messageId": "noEmptyWithSuper",
       "range": {
@@ -134,7 +129,6 @@ exports[`no-empty-interface > invalid 6`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An interface declaring no members is equivalent to its supertype.",
       "messageId": "noEmptyWithSuper",
       "range": {
@@ -160,7 +154,6 @@ exports[`no-empty-interface > invalid 7`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An interface declaring no members is equivalent to its supertype.",
       "messageId": "noEmptyWithSuper",
       "range": {
@@ -186,7 +179,6 @@ exports[`no-empty-interface > invalid 8`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An interface declaring no members is equivalent to its supertype.",
       "messageId": "noEmptyWithSuper",
       "range": {
@@ -212,7 +204,6 @@ exports[`no-empty-interface > invalid 9`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An interface declaring no members is equivalent to its supertype.",
       "messageId": "noEmptyWithSuper",
       "range": {
@@ -238,7 +229,6 @@ exports[`no-empty-interface > invalid 10`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An interface declaring no members is equivalent to its supertype.",
       "messageId": "noEmptyWithSuper",
       "range": {
@@ -264,7 +254,6 @@ exports[`no-empty-interface > invalid 11`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An interface declaring no members is equivalent to its supertype.",
       "messageId": "noEmptyWithSuper",
       "range": {
@@ -290,7 +279,6 @@ exports[`no-empty-interface > invalid 12`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An interface declaring no members is equivalent to its supertype.",
       "messageId": "noEmptyWithSuper",
       "range": {

@@ -4,7 +4,6 @@ exports[`no-duplicate-type-constituents > invalid 1`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  1.",
       "messageId": "duplicate",
       "range": {
@@ -30,7 +29,6 @@ exports[`no-duplicate-type-constituents > invalid 2`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Intersection type constituent is duplicated with  true.",
       "messageId": "duplicate",
       "range": {
@@ -56,7 +54,6 @@ exports[`no-duplicate-type-constituents > invalid 3`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  null.",
       "messageId": "duplicate",
       "range": {
@@ -82,7 +79,6 @@ exports[`no-duplicate-type-constituents > invalid 4`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  any.",
       "messageId": "duplicate",
       "range": {
@@ -108,7 +104,6 @@ exports[`no-duplicate-type-constituents > invalid 5`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  string.",
       "messageId": "duplicate",
       "range": {
@@ -134,7 +129,6 @@ exports[`no-duplicate-type-constituents > invalid 6`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  Set<string>.",
       "messageId": "duplicate",
       "range": {
@@ -160,7 +154,6 @@ exports[`no-duplicate-type-constituents > invalid 7`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  IsArray<number>.",
       "messageId": "duplicate",
       "range": {
@@ -186,7 +179,6 @@ exports[`no-duplicate-type-constituents > invalid 8`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  string[].",
       "messageId": "duplicate",
       "range": {
@@ -212,7 +204,6 @@ exports[`no-duplicate-type-constituents > invalid 9`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  string[][].",
       "messageId": "duplicate",
       "range": {
@@ -238,7 +229,6 @@ exports[`no-duplicate-type-constituents > invalid 10`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  [1, 2, 3].",
       "messageId": "duplicate",
       "range": {
@@ -264,7 +254,6 @@ exports[`no-duplicate-type-constituents > invalid 11`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  string.",
       "messageId": "duplicate",
       "range": {
@@ -290,7 +279,6 @@ exports[`no-duplicate-type-constituents > invalid 12`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  null.",
       "messageId": "duplicate",
       "range": {
@@ -316,7 +304,6 @@ exports[`no-duplicate-type-constituents > invalid 13`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  string.",
       "messageId": "duplicate",
       "range": {
@@ -342,7 +329,6 @@ exports[`no-duplicate-type-constituents > invalid 14`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  'A'.",
       "messageId": "duplicate",
       "range": {
@@ -368,7 +354,6 @@ exports[`no-duplicate-type-constituents > invalid 15`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  A.",
       "messageId": "duplicate",
       "range": {
@@ -394,7 +379,6 @@ exports[`no-duplicate-type-constituents > invalid 16`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  A.",
       "messageId": "duplicate",
       "range": {
@@ -420,7 +404,6 @@ exports[`no-duplicate-type-constituents > invalid 17`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  A.",
       "messageId": "duplicate",
       "range": {
@@ -446,7 +429,6 @@ exports[`no-duplicate-type-constituents > invalid 18`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  A1.",
       "messageId": "duplicate",
       "range": {
@@ -462,7 +444,6 @@ exports[`no-duplicate-type-constituents > invalid 18`] = `
       "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  A1.",
       "messageId": "duplicate",
       "range": {
@@ -488,7 +469,6 @@ exports[`no-duplicate-type-constituents > invalid 19`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  A.",
       "messageId": "duplicate",
       "range": {
@@ -514,7 +494,6 @@ exports[`no-duplicate-type-constituents > invalid 20`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  A.",
       "messageId": "duplicate",
       "range": {
@@ -530,7 +509,6 @@ exports[`no-duplicate-type-constituents > invalid 20`] = `
       "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  B.",
       "messageId": "duplicate",
       "range": {
@@ -556,7 +534,6 @@ exports[`no-duplicate-type-constituents > invalid 21`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  A.",
       "messageId": "duplicate",
       "range": {
@@ -572,7 +549,6 @@ exports[`no-duplicate-type-constituents > invalid 21`] = `
       "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  A.",
       "messageId": "duplicate",
       "range": {
@@ -598,7 +574,6 @@ exports[`no-duplicate-type-constituents > invalid 22`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  A.",
       "messageId": "duplicate",
       "range": {
@@ -624,7 +599,6 @@ exports[`no-duplicate-type-constituents > invalid 23`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  (A | B).",
       "messageId": "duplicate",
       "range": {
@@ -650,7 +624,6 @@ exports[`no-duplicate-type-constituents > invalid 24`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  A.",
       "messageId": "duplicate",
       "range": {
@@ -676,7 +649,6 @@ exports[`no-duplicate-type-constituents > invalid 25`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  (A | B).",
       "messageId": "duplicate",
       "range": {
@@ -692,7 +664,6 @@ exports[`no-duplicate-type-constituents > invalid 25`] = `
       "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  (A | B).",
       "messageId": "duplicate",
       "range": {
@@ -718,7 +689,6 @@ exports[`no-duplicate-type-constituents > invalid 26`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with A.",
       "messageId": "duplicate",
       "range": {
@@ -734,7 +704,6 @@ exports[`no-duplicate-type-constituents > invalid 26`] = `
       "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  B.",
       "messageId": "duplicate",
       "range": {
@@ -750,7 +719,6 @@ exports[`no-duplicate-type-constituents > invalid 26`] = `
       "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  (A | B).",
       "messageId": "duplicate",
       "range": {
@@ -776,7 +744,6 @@ exports[`no-duplicate-type-constituents > invalid 27`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with number.",
       "messageId": "duplicate",
       "range": {
@@ -792,7 +759,6 @@ exports[`no-duplicate-type-constituents > invalid 27`] = `
       "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  string.",
       "messageId": "duplicate",
       "range": {
@@ -818,7 +784,6 @@ exports[`no-duplicate-type-constituents > invalid 28`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  (number | (string | null)).",
       "messageId": "duplicate",
       "range": {
@@ -844,7 +809,6 @@ exports[`no-duplicate-type-constituents > invalid 29`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Intersection type constituent is duplicated with number.",
       "messageId": "duplicate",
       "range": {
@@ -860,7 +824,6 @@ exports[`no-duplicate-type-constituents > invalid 29`] = `
       "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Intersection type constituent is duplicated with  string.",
       "messageId": "duplicate",
       "range": {
@@ -886,7 +849,6 @@ exports[`no-duplicate-type-constituents > invalid 30`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Intersection type constituent is duplicated with  number.",
       "messageId": "duplicate",
       "range": {
@@ -902,7 +864,6 @@ exports[`no-duplicate-type-constituents > invalid 30`] = `
       "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Intersection type constituent is duplicated with  string.",
       "messageId": "duplicate",
       "range": {
@@ -928,7 +889,6 @@ exports[`no-duplicate-type-constituents > invalid 31`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  A.",
       "messageId": "duplicate",
       "range": {
@@ -954,7 +914,6 @@ exports[`no-duplicate-type-constituents > invalid 32`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Union type constituent is duplicated with  string.",
       "messageId": "duplicate",
       "range": {
@@ -980,7 +939,6 @@ exports[`no-duplicate-type-constituents > invalid 33`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Explicit undefined is unnecessary on an optional parameter.",
       "messageId": "unnecessary",
       "range": {
@@ -1006,7 +964,6 @@ exports[`no-duplicate-type-constituents > invalid 34`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Explicit undefined is unnecessary on an optional parameter.",
       "messageId": "unnecessary",
       "range": {
@@ -1032,7 +989,6 @@ exports[`no-duplicate-type-constituents > invalid 35`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Explicit undefined is unnecessary on an optional parameter.",
       "messageId": "unnecessary",
       "range": {
@@ -1058,7 +1014,6 @@ exports[`no-duplicate-type-constituents > invalid 36`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Explicit undefined is unnecessary on an optional parameter.",
       "messageId": "unnecessary",
       "range": {
@@ -1084,7 +1039,6 @@ exports[`no-duplicate-type-constituents > invalid 37`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Explicit undefined is unnecessary on an optional parameter.",
       "messageId": "unnecessary",
       "range": {
@@ -1110,7 +1064,6 @@ exports[`no-duplicate-type-constituents > invalid 38`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Explicit undefined is unnecessary on an optional parameter.",
       "messageId": "unnecessary",
       "range": {
@@ -1136,7 +1089,6 @@ exports[`no-duplicate-type-constituents > invalid 39`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Explicit undefined is unnecessary on an optional parameter.",
       "messageId": "unnecessary",
       "range": {
@@ -1162,7 +1114,6 @@ exports[`no-duplicate-type-constituents > invalid 40`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Explicit undefined is unnecessary on an optional parameter.",
       "messageId": "unnecessary",
       "range": {
@@ -1188,7 +1139,6 @@ exports[`no-duplicate-type-constituents > invalid 41`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Explicit undefined is unnecessary on an optional parameter.",
       "messageId": "unnecessary",
       "range": {
@@ -1214,7 +1164,6 @@ exports[`no-duplicate-type-constituents > invalid 42`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Explicit undefined is unnecessary on an optional parameter.",
       "messageId": "unnecessary",
       "range": {
@@ -1240,7 +1189,6 @@ exports[`no-duplicate-type-constituents > invalid 43`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Explicit undefined is unnecessary on an optional parameter.",
       "messageId": "unnecessary",
       "range": {
@@ -1266,7 +1214,6 @@ exports[`no-duplicate-type-constituents > invalid 44`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Explicit undefined is unnecessary on an optional parameter.",
       "messageId": "unnecessary",
       "range": {
@@ -1292,7 +1239,6 @@ exports[`no-duplicate-type-constituents > invalid 45`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Explicit undefined is unnecessary on an optional parameter.",
       "messageId": "unnecessary",
       "range": {
@@ -1318,7 +1264,6 @@ exports[`no-duplicate-type-constituents > invalid 46`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Explicit undefined is unnecessary on an optional parameter.",
       "messageId": "unnecessary",
       "range": {

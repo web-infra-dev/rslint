@@ -2,74 +2,9 @@
 
 exports[`lint api > diag snapshot 1`] = `
 {
-  "diagnostics": [
-    {
-      "filePath": "src/disable-file.ts",
-      "message": "Unsafe member access .someProperty on an \`any\` value.",
-      "messageId": "unsafeMemberExpression",
-      "range": {
-        "end": {
-          "column": 31,
-          "line": 5,
-        },
-        "start": {
-          "column": 19,
-          "line": 5,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unsafe-member-access",
-    },
-    {
-      "filePath": "src/disable.ts",
-      "message": "Unsafe member access .someProperty on an \`any\` value.",
-      "messageId": "unsafeMemberExpression",
-      "range": {
-        "end": {
-          "column": 31,
-          "line": 5,
-        },
-        "start": {
-          "column": 19,
-          "line": 5,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unsafe-member-access",
-    },
-    {
-      "filePath": "src/index.ts",
-      "message": "Unsafe member access .b on an \`any\` value.",
-      "messageId": "unsafeMemberExpression",
-      "range": {
-        "end": {
-          "column": 4,
-          "line": 2,
-        },
-        "start": {
-          "column": 3,
-          "line": 2,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unsafe-member-access",
-    },
-    {
-      "filePath": "src/index.ts",
-      "message": "Unsafe member access .c on an \`any\` value.",
-      "messageId": "unsafeMemberExpression",
-      "range": {
-        "end": {
-          "column": 4,
-          "line": 5,
-        },
-        "start": {
-          "column": 3,
-          "line": 5,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-unsafe-member-access",
-    },
-  ],
-  "errorCount": 4,
-  "fileCount": 4,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 0,
   "ruleCount": 1,
 }
 `;

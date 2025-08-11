@@ -1,0 +1,1361 @@
+// Rstest Snapshot v1
+
+exports[`no-implied-eval > invalid 1`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 12,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 14,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 5,
+        },
+        "start": {
+          "column": 12,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 2`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 2,
+        },
+        "start": {
+          "column": 12,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 4,
+        },
+        "start": {
+          "column": 14,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 5,
+        },
+        "start": {
+          "column": 12,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 3`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 2,
+        },
+        "start": {
+          "column": 12,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 4,
+        },
+        "start": {
+          "column": 14,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 5,
+        },
+        "start": {
+          "column": 12,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 4`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 6,
+        },
+        "start": {
+          "column": 14,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 7,
+        },
+        "start": {
+          "column": 12,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 5`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 6,
+        },
+        "start": {
+          "column": 12,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 7,
+        },
+        "start": {
+          "column": 13,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 8,
+        },
+        "start": {
+          "column": 14,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 9,
+        },
+        "start": {
+          "column": 12,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 6`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 6,
+        },
+        "start": {
+          "column": 12,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 7,
+        },
+        "start": {
+          "column": 13,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 8,
+        },
+        "start": {
+          "column": 14,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 9,
+        },
+        "start": {
+          "column": 12,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 7`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 6,
+        },
+        "start": {
+          "column": 14,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 7,
+        },
+        "start": {
+          "column": 12,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 8`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 6,
+        },
+        "start": {
+          "column": 14,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 7,
+        },
+        "start": {
+          "column": 12,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 9`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 6,
+        },
+        "start": {
+          "column": 14,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 7,
+        },
+        "start": {
+          "column": 12,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 10`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 6,
+        },
+        "start": {
+          "column": 14,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 7,
+        },
+        "start": {
+          "column": 12,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 11`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 5,
+        },
+        "start": {
+          "column": 16,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 6,
+        },
+        "start": {
+          "column": 14,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 12`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 5,
+        },
+        "start": {
+          "column": 12,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 13`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 2,
+        },
+        "start": {
+          "column": 19,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 20,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 6,
+        },
+        "start": {
+          "column": 23,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 8,
+        },
+        "start": {
+          "column": 21,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 9,
+        },
+        "start": {
+          "column": 24,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 11,
+        },
+        "start": {
+          "column": 19,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 12,
+        },
+        "start": {
+          "column": 22,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 8,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 14`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 2,
+        },
+        "start": {
+          "column": 19,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 20,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 6,
+        },
+        "start": {
+          "column": 23,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 8,
+        },
+        "start": {
+          "column": 21,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 9,
+        },
+        "start": {
+          "column": 24,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 11,
+        },
+        "start": {
+          "column": 19,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 12,
+        },
+        "start": {
+          "column": 22,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 8,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 15`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 26,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 5,
+        },
+        "start": {
+          "column": 24,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 6,
+        },
+        "start": {
+          "column": 27,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 8,
+        },
+        "start": {
+          "column": 25,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 9,
+        },
+        "start": {
+          "column": 28,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 11,
+        },
+        "start": {
+          "column": 23,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 12,
+        },
+        "start": {
+          "column": 26,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 8,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 16`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Consider passing a function.",
+      "messageId": "noImpliedEvalError",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 12,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 17`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use the Function constructor to create functions.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 18`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use the Function constructor to create functions.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 19`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use the Function constructor to create functions.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 20`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use the Function constructor to create functions.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 21`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use the Function constructor to create functions.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-implied-eval > invalid 22`] = `
+{
+  "diagnostics": [
+    {
+      "message": "Implied eval. Do not use the Function constructor to create functions.",
+      "messageId": "noFunctionConstructor",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-implied-eval",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
