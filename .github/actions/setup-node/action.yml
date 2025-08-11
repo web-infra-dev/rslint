@@ -11,7 +11,9 @@ runs:
         node-version: '24'
 
     - name: Install pnpm
+      shell: bash
       run: corepack enable
 
     - name: Install dependencies
+      shell: bash
       run: pnpm install --frozen-lockfile
