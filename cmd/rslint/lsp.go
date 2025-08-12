@@ -444,9 +444,9 @@ func runLintWithProjectService(uri lsproto.DocumentUri, service *project.Service
 	// Initialize rule registry with all available rules
 	config.RegisterAllRules()
 	filename := uriToPath(uri)
-	content, err := service.FS().ReadFile(filename)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file %s: %w", filename, err)
+	content, ok := service.FS().ReadFile(filename)
+	if !ok {
+		return nil, fmt.Errorf("failed to read file %s", filename)
 	}
 	service.OpenFile(filename, content, core.GetScriptKindFromFileName(filename), service.GetCurrentDirectory())
 	project := service.EnsureDefaultProjectForURI(uri)

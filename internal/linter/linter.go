@@ -19,7 +19,7 @@ type ConfiguredRule struct {
 	Run      func(ctx rule.RuleContext) rule.RuleListeners
 }
 
-func RunLinterInProgram(program *compiler.Program, allowFiles []string, excludedPaths []string, getRulesForFile RuleHandler, onDiagnostic DiagnosticHandler) int32 {
+func RunLinterInProgram(program *compiler.Program, allowFiles []string, skipFiles []string, getRulesForFile RuleHandler, onDiagnostic DiagnosticHandler) int32 {
 	checker, done := program.GetTypeChecker(context.Background())
 	defer done()
 	var lintedFileCount int32 = 0
@@ -27,7 +27,14 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, excluded
 		p := string(file.Path())
 		// skip lint node_modules and bundled files
 		// FIXME: we may have better api to tell whether a file is a bundled file or not
-		if utils.IsExcludedPath(p, excludedPaths) {
+		skipFile := false
+		for _, skipPattern := range skipFiles {
+			if strings.Contains(p, skipPattern) {
+				skipFile = true
+				break
+			}
+		}
+		if skipFile {
 			continue
 		}
 		// only lint allowedFiles if allowedFiles is not empty
