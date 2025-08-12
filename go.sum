@@ -15,8 +15,8 @@ github.com/mattn/go-colorable v0.1.13/go.mod h1:7S9/ev0klgBDR4GtXTXX8a3vIGJpMovk
 github.com/mattn/go-isatty v0.0.16/go.mod h1:kYGgaQfpe5nmfYZH+SKPsOc2e4SrIfOl2e/yFXSvRLM=
 github.com/mattn/go-isatty v0.0.20 h1:xfD0iDuEKnDkl03q4limB+vH+GxLEtL/jb4xVJSWWEY=
 github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D7dTCTo3Y=
-github.com/microsoft/typescript-go v0.0.0-20250808210900-e087a3e09d31 h1:XVDhbpkA3VViwFWLuul/+mUFxRrashIbMKGiNWpaqrU=
-github.com/microsoft/typescript-go v0.0.0-20250808210900-e087a3e09d31/go.mod h1:EilU3HRKGhtWtFbO/cguqAte4JAgtaqbepoL9vzr/Do=
+github.com/microsoft/typescript-go v0.0.0-20250812073229-cedc0cbe6c18 h1:tnLEMPlvJzwbOXXiXjaVxzYwF7zOpB4Lgh9TAN6YhSs=
+github.com/microsoft/typescript-go v0.0.0-20250812073229-cedc0cbe6c18/go.mod h1:EilU3HRKGhtWtFbO/cguqAte4JAgtaqbepoL9vzr/Do=
 github.com/peter-evans/patience v0.3.0 h1:rX0JdJeepqdQl1Sk9c9uvorjYYzL2TfgLX1adqYm9cA=
 github.com/peter-evans/patience v0.3.0/go.mod h1:Kmxu5sY1NmBLFSStvXjX1wS9mIv7wMcP/ubucyMOAu0=
 github.com/sourcegraph/jsonrpc2 v0.2.1 h1:2GtljixMQYUYCmIg7W9aF2dFmniq/mOr2T9tFRh6zSQ=

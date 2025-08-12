@@ -29,8 +29,6 @@ func ComputeLineStarts(text string) *ls.LineMap
 type Converters = ls.Converters
 type DeclarationInfo = ls.DeclarationInfo
 type Definition = ls.Definition
-////go:linkname DeprecateSortText github.com/microsoft/typescript-go/internal/ls.DeprecateSortText
-// func DeprecateSortText(original ls.sortText) ls.sortText
 //go:linkname DocumentURIToFileName github.com/microsoft/typescript-go/internal/ls.DocumentURIToFileName
 func DocumentURIToFileName(uri lsproto.DocumentUri) string
 var ErrNoSourceFile = ls.ErrNoSourceFile
@@ -42,8 +40,6 @@ const ExportKindExportEquals = ls.ExportKindExportEquals
 const ExportKindNamed = ls.ExportKindNamed
 //go:linkname FileNameToDocumentURI github.com/microsoft/typescript-go/internal/ls.FileNameToDocumentURI
 func FileNameToDocumentURI(fileName string) lsproto.DocumentUri
-////go:linkname GetCompletionItemData github.com/microsoft/typescript-go/internal/ls.GetCompletionItemData
-// func GetCompletionItemData(item *lsproto.CompletionItem) (*ls.itemData, error)
 type Host = ls.Host
 //go:linkname IsInString github.com/microsoft/typescript-go/internal/ls.IsInString
 func IsInString(sourceFile *ast.SourceFile, position int, previousToken *ast.Node) bool
@@ -65,18 +61,12 @@ const KeywordCompletionFiltersTypeKeywords = ls.KeywordCompletionFiltersTypeKeyw
 //go:linkname LanguageKindToScriptKind github.com/microsoft/typescript-go/internal/ls.LanguageKindToScriptKind
 func LanguageKindToScriptKind(languageID lsproto.LanguageKind) core.ScriptKind
 type LanguageService = ls.LanguageService
-//go:linkname LanguageService_GetSymbolAtPosition github.com/microsoft/typescript-go/internal/ls.(*LanguageService).GetSymbolAtPosition
-func LanguageService_GetSymbolAtPosition(recv *ls.LanguageService, ctx context.Context, fileName string, position int) (*ast.Symbol, error)
-//go:linkname LanguageService_GetSymbolAtLocation github.com/microsoft/typescript-go/internal/ls.(*LanguageService).GetSymbolAtLocation
-func LanguageService_GetSymbolAtLocation(recv *ls.LanguageService, ctx context.Context, node *ast.Node) *ast.Symbol
 type LineMap = ls.LineMap
 type Location = ls.Location
 //go:linkname NewConverters github.com/microsoft/typescript-go/internal/ls.NewConverters
 func NewConverters(positionEncoding lsproto.PositionEncodingKind, getLineMap func(fileName string) *ls.LineMap) *ls.Converters
 //go:linkname NewLanguageService github.com/microsoft/typescript-go/internal/ls.NewLanguageService
 func NewLanguageService(host ls.Host) *ls.LanguageService
-////go:linkname NewSymbolAndEntries github.com/microsoft/typescript-go/internal/ls.NewSymbolAndEntries
-// func NewSymbolAndEntries(kind ls.definitionKind, node *ast.Node, symbol *ast.Symbol, references []*ls.referenceEntry) *ls.SymbolAndEntries
 type PossibleTypeArgumentInfo = ls.PossibleTypeArgumentInfo
 //go:linkname ProvideWorkspaceSymbols github.com/microsoft/typescript-go/internal/ls.ProvideWorkspaceSymbols
 func ProvideWorkspaceSymbols(ctx context.Context, programs []*compiler.Program, converters *ls.Converters, query string) (lsproto.WorkspaceSymbolResponse, error)

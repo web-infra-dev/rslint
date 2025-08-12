@@ -42,6 +42,7 @@ func main() {
 		"collections",
 		"lsp/lsproto",
 		"ls",
+		"project",
 	}
 
 	packagesToShimFullNames := make([]string, len(packagesToShim))
