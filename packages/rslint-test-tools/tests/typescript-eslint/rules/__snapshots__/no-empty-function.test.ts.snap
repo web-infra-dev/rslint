@@ -4,7 +4,6 @@ exports[`no-empty-function > invalid 1`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected empty constructor.",
       "messageId": "unexpected",
       "range": {
@@ -30,7 +29,6 @@ exports[`no-empty-function > invalid 2`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected empty method 'otherMethod'.",
       "messageId": "unexpected",
       "range": {
@@ -56,7 +54,6 @@ exports[`no-empty-function > invalid 3`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected empty constructor.",
       "messageId": "unexpected",
       "range": {
@@ -82,7 +79,6 @@ exports[`no-empty-function > invalid 4`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected empty constructor.",
       "messageId": "unexpected",
       "range": {
@@ -108,7 +104,6 @@ exports[`no-empty-function > invalid 5`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected empty function 'foo'.",
       "messageId": "unexpected",
       "range": {
@@ -134,7 +129,6 @@ exports[`no-empty-function > invalid 6`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected empty method 'foo'.",
       "messageId": "unexpected",
       "range": {
@@ -160,7 +154,6 @@ exports[`no-empty-function > invalid 7`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Unexpected empty method 'foo'.",
       "messageId": "unexpected",
       "range": {

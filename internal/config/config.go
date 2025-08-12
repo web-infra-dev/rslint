@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
+	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules/adjacent_overload_signatures"
 	"github.com/web-infra-dev/rslint/internal/rules/array_type"
@@ -171,9 +172,14 @@ func (rc *RuleConfig) GetSeverity() rule.DiagnosticSeverity {
 	return rule.ParseSeverity(rc.Level)
 }
 func GetAllRulesForPlugin(plugin string) []rule.Rule {
-	if plugin == "@typescript-eslint" {
+	switch plugin {
+	case "@typescript-eslint":
 		return getAllTypeScriptEslintPluginRules()
-	} else {
+	case "eslint-plugin-import":
+		return importPlugin.GetAllRules()
+	case "eslint-plugin-import/recommended":
+		return importPlugin.GetRecommendedRules()
+	default:
 		return []rule.Rule{} // Return empty slice for unsupported plugins
 	}
 }
@@ -270,8 +276,13 @@ func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConf
 	return enabledRules
 }
 
-// RegisterAllTypeScriptEslintPluginRules registers all available rules in the global registry
-func RegisterAllTypeScriptEslintPluginRules() {
+func RegisterAllRules() {
+	registerAllTypeScriptEslintPluginRules()
+	registerAllEslintImportPluginRules()
+}
+
+// registerAllTypeScriptEslintPluginRules registers all available rules in the global registry
+func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/adjacent-overload-signatures", adjacent_overload_signatures.AdjacentOverloadSignaturesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/array-type", array_type.ArrayTypeRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/await-thenable", await_thenable.AwaitThenableRule)
@@ -327,6 +338,12 @@ func RegisterAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/switch-exhaustiveness-check", switch_exhaustiveness_check.SwitchExhaustivenessCheckRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/unbound-method", unbound_method.UnboundMethodRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/use-unknown-in-catch-callback-variable", use_unknown_in_catch_callback_variable.UseUnknownInCatchCallbackVariableRule)
+}
+
+func registerAllEslintImportPluginRules() {
+	for _, rule := range importPlugin.GetAllRules() {
+		GlobalRuleRegistry.Register(rule.Name, rule)
+	}
 }
 
 // getAllTypeScriptEslintPluginRules returns all registered rules (for backward compatibility when no config is provided)

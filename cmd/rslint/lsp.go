@@ -14,8 +14,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/ls"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/sourcegraph/jsonrpc2"
@@ -82,7 +84,7 @@ func (s *LSPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrp
 }
 
 func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
-	log.Printf("Handling initialize: %+v", req)
+	log.Printf("Handling initialize: %+v with pid %d", req, os.Getpid())
 	// Check if params is nil
 	if req.Params == nil {
 		return nil, &jsonrpc2.Error{
@@ -98,7 +100,7 @@ func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request)
 	} else {
 		//nolint
 		if params.RootUri.DocumentUri != nil {
-			s.rootURI = uriToPath(string(*params.RootUri.DocumentUri))
+			s.rootURI = uriToPath(*params.RootUri.DocumentUri)
 		}
 	}
 
@@ -183,7 +185,7 @@ func (s *LSPServer) handleCodeAction(ctx context.Context, req *jsonrpc2.Request)
 	if !exists {
 		// If no diagnostics exist for this document, try to generate them
 		// This can happen if the document was opened without a proper didOpen event
-		filePath := uriToPath(string(uri))
+		filePath := uriToPath(uri)
 		if content, err := os.ReadFile(filePath); err == nil {
 			s.documents[uri] = string(content)
 			s.runDiagnostics(ctx, uri, string(content))
@@ -246,10 +248,10 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 	}
 
 	// Initialize rule registry with all available rules (ensure it's done once)
-	config.RegisterAllTypeScriptEslintPluginRules()
+	config.RegisterAllRules()
 
 	// Convert URI to file path
-	filePath := uriToPath(uriString)
+	filePath := uriToPath(uri)
 
 	// Create a temporary file system with the content
 	vfs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
@@ -272,39 +274,12 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 
 	host := utils.CreateCompilerHost(workingDir, vfs)
 
-	// Try to find rslint.json with multiple strategies
+	// Try to find rslint configuration files with multiple strategies
 	var rslintConfigPath string
 	var configFound bool
 
-	// Strategy 1: Try in the working directory
-	rslintConfigPath = workingDir + "/rslint.json"
-	if vfs.FileExists(rslintConfigPath) {
-		configFound = true
-	}
-
-	// Strategy 2: If not found, walk up the directory tree
-	if !configFound && filePath != "" {
-		dir := filePath
-		if idx := strings.LastIndex(dir, "/"); idx != -1 {
-			dir = dir[:idx]
-		}
-
-		for i := 0; i < 5 && dir != "/" && dir != ""; i++ { // Limit search depth
-			testPath := dir + "/rslint.json"
-			if vfs.FileExists(testPath) {
-				rslintConfigPath = testPath
-				workingDir = dir
-				configFound = true
-				break
-			}
-			// Move up one directory
-			if idx := strings.LastIndex(dir, "/"); idx != -1 {
-				dir = dir[:idx]
-			} else {
-				break
-			}
-		}
-	}
+	// Use helper function to find config
+	rslintConfigPath, workingDir, configFound = findRslintConfig(vfs, workingDir, filePath)
 
 	if !configFound {
 		return
@@ -426,19 +401,46 @@ func isTypeScriptFile(uri string) bool {
 		strings.HasSuffix(path, ".jsx")
 }
 
-func uriToPath(uri string) string {
-	if strings.HasPrefix(uri, "file://") {
-		path := strings.TrimPrefix(uri, "file://")
-		// Handle URL encoded characters and normalize path
-		path = strings.ReplaceAll(path, "%20", " ")
-		// Normalize path separators for cross-platform compatibility
-		if len(path) > 0 && path[0] != '/' {
-			// Windows paths may start without leading slash after file://
-			return path
+func uriToPath(uri lsproto.DocumentUri) string {
+	return ls.DocumentURIToFileName(uri)
+}
+
+// findRslintConfig searches for rslint configuration files using multiple strategies
+func findRslintConfig(fs vfs.FS, workingDir, filePath string) (string, string, bool) {
+	defaultConfigs := []string{"rslint.json", "rslint.jsonc"}
+
+	// Strategy 1: Try in the working directory
+	for _, configName := range defaultConfigs {
+		configPath := workingDir + "/" + configName
+		if fs.FileExists(configPath) {
+			return configPath, workingDir, true
 		}
-		return path
 	}
-	return uri
+
+	// Strategy 2: If not found, walk up the directory tree
+	if filePath != "" {
+		dir := filePath
+		if idx := strings.LastIndex(dir, "/"); idx != -1 {
+			dir = dir[:idx]
+		}
+
+		for i := 0; i < 5 && dir != "/" && dir != ""; i++ { // Limit search depth
+			for _, configName := range defaultConfigs {
+				testPath := dir + "/" + configName
+				if fs.FileExists(testPath) {
+					return testPath, dir, true
+				}
+			}
+			// Move up one directory
+			if idx := strings.LastIndex(dir, "/"); idx != -1 {
+				dir = dir[:idx]
+			} else {
+				break
+			}
+		}
+	}
+
+	return "", workingDir, false
 }
 
 func runLSP() int {
@@ -484,7 +486,7 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 	}
 
 	// Initialize rule registry with all available rules
-	config.RegisterAllTypeScriptEslintPluginRules()
+	config.RegisterAllRules()
 
 	// Collect diagnostics
 	var diagnostics []rule.RuleDiagnostic
@@ -496,7 +498,7 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 		defer diagnosticsLock.Unlock()
 		diagnostics = append(diagnostics, d)
 	}
-	filename := uriToPath(string(uri))
+	filename := uriToPath(uri)
 
 	// Run linter with all programs using rule registry
 	_, err := linter.RunLinter(

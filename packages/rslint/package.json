@@ -1,6 +1,6 @@
 {
   "name": "@rslint/core",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "exports": {
     ".": "./dist/index.js",
     "./bin": "./bin/rslint.cjs",
@@ -12,8 +12,8 @@
     "url": "https://github.com/web-infra-dev/rslint"
   },
   "scripts": {
-    "build:bin": "go build -v -o bin/rslint ../../cmd/rslint",
-    "build:debug": "GOEXPERIMENT=noregabi go build -v -gcflags='all=-N -l' -o  bin/rslint ../../cmd/rslint ",
+    "build:bin": "go build -v -o bin/ ../../cmd/rslint",
+    "build:debug": "GOEXPERIMENT=noregabi go build -v -gcflags='all=-N -l' -o bin/ ../../cmd/rslint ",
     "build:js": "tsc -b tsconfig.build.json --force",
     "dev": "tsc -b tsconfig.build.json --force --watch",
     "build": "pnpm build:bin && pnpm build:js",

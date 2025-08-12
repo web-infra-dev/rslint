@@ -4,7 +4,6 @@ exports[`adjacent-overload-signatures > invalid 1`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -30,7 +29,6 @@ exports[`adjacent-overload-signatures > invalid 2`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -56,7 +54,6 @@ exports[`adjacent-overload-signatures > invalid 3`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -82,7 +79,6 @@ exports[`adjacent-overload-signatures > invalid 4`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -108,7 +104,6 @@ exports[`adjacent-overload-signatures > invalid 5`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -134,7 +129,6 @@ exports[`adjacent-overload-signatures > invalid 6`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -160,7 +154,6 @@ exports[`adjacent-overload-signatures > invalid 7`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -186,7 +179,6 @@ exports[`adjacent-overload-signatures > invalid 8`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -212,7 +204,6 @@ exports[`adjacent-overload-signatures > invalid 9`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -238,7 +229,6 @@ exports[`adjacent-overload-signatures > invalid 10`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -264,7 +254,6 @@ exports[`adjacent-overload-signatures > invalid 11`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -290,7 +279,6 @@ exports[`adjacent-overload-signatures > invalid 12`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -316,7 +304,6 @@ exports[`adjacent-overload-signatures > invalid 13`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All baz signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -342,7 +329,6 @@ exports[`adjacent-overload-signatures > invalid 14`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -368,7 +354,6 @@ exports[`adjacent-overload-signatures > invalid 15`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All baz signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -394,7 +379,6 @@ exports[`adjacent-overload-signatures > invalid 16`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -420,7 +404,6 @@ exports[`adjacent-overload-signatures > invalid 17`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -446,7 +429,6 @@ exports[`adjacent-overload-signatures > invalid 18`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -472,7 +454,6 @@ exports[`adjacent-overload-signatures > invalid 19`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All call signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -498,7 +479,6 @@ exports[`adjacent-overload-signatures > invalid 20`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -524,7 +504,6 @@ exports[`adjacent-overload-signatures > invalid 21`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -550,7 +529,6 @@ exports[`adjacent-overload-signatures > invalid 22`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -576,7 +554,6 @@ exports[`adjacent-overload-signatures > invalid 23`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -602,7 +579,6 @@ exports[`adjacent-overload-signatures > invalid 24`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All baz signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -628,7 +604,6 @@ exports[`adjacent-overload-signatures > invalid 25`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All new signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -654,7 +629,6 @@ exports[`adjacent-overload-signatures > invalid 26`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All new signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -670,7 +644,6 @@ exports[`adjacent-overload-signatures > invalid 26`] = `
       "ruleName": "@typescript-eslint/adjacent-overload-signatures",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "All new signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -696,7 +669,6 @@ exports[`adjacent-overload-signatures > invalid 27`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All constructor signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -722,7 +694,6 @@ exports[`adjacent-overload-signatures > invalid 28`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -748,7 +719,6 @@ exports[`adjacent-overload-signatures > invalid 29`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -774,7 +744,6 @@ exports[`adjacent-overload-signatures > invalid 30`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -800,7 +769,6 @@ exports[`adjacent-overload-signatures > invalid 31`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All constructor signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -826,7 +794,6 @@ exports[`adjacent-overload-signatures > invalid 32`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -852,7 +819,6 @@ exports[`adjacent-overload-signatures > invalid 33`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All static foo signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -878,7 +844,6 @@ exports[`adjacent-overload-signatures > invalid 34`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "All #private signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {
@@ -894,7 +859,6 @@ exports[`adjacent-overload-signatures > invalid 34`] = `
       "ruleName": "@typescript-eslint/adjacent-overload-signatures",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "All '#private' signatures should be adjacent.",
       "messageId": "adjacentSignature",
       "range": {

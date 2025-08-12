@@ -4,6 +4,10 @@ export default defineConfig({
   testEnvironment: 'node',
   globals: true,
   include: [
+    // eslint-plugin-import
+    './tests/eslint-plugin-import/rules/no-self-import.test.ts',
+
+    // typescript-eslint
     './tests/typescript-eslint/rules/adjacent-overload-signatures.test.ts',
     './tests/typescript-eslint/rules/array-type.test.ts',
     './tests/typescript-eslint/rules/await-thenable.test.ts',
@@ -24,5 +28,6 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-require-imports.test.ts',
     './tests/typescript-eslint/rules/no-duplicate-type-constituents.test.ts',
     './tests/typescript-eslint/rules/no_namespace.test.ts',
+    './tests/typescript-eslint/rules/no-implied-eval.test.ts',
   ],
 });

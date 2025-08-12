@@ -4,7 +4,6 @@ exports[`no-array-delete > invalid 1`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -30,7 +29,6 @@ exports[`no-array-delete > invalid 2`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -56,7 +54,6 @@ exports[`no-array-delete > invalid 3`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -82,7 +79,6 @@ exports[`no-array-delete > invalid 4`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -108,7 +104,6 @@ exports[`no-array-delete > invalid 5`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -134,7 +129,6 @@ exports[`no-array-delete > invalid 6`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -160,7 +154,6 @@ exports[`no-array-delete > invalid 7`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -186,7 +179,6 @@ exports[`no-array-delete > invalid 8`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -212,7 +204,6 @@ exports[`no-array-delete > invalid 9`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -238,7 +229,6 @@ exports[`no-array-delete > invalid 10`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -264,7 +254,6 @@ exports[`no-array-delete > invalid 11`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -290,7 +279,6 @@ exports[`no-array-delete > invalid 12`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -316,7 +304,6 @@ exports[`no-array-delete > invalid 13`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -342,7 +329,6 @@ exports[`no-array-delete > invalid 14`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -368,7 +354,6 @@ exports[`no-array-delete > invalid 15`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -394,7 +379,6 @@ exports[`no-array-delete > invalid 16`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -420,7 +404,6 @@ exports[`no-array-delete > invalid 17`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -446,7 +429,6 @@ exports[`no-array-delete > invalid 18`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -472,7 +454,6 @@ exports[`no-array-delete > invalid 19`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -498,7 +479,6 @@ exports[`no-array-delete > invalid 20`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -524,7 +504,6 @@ exports[`no-array-delete > invalid 21`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {
@@ -550,7 +529,6 @@ exports[`no-array-delete > invalid 22`] = `
 {
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Using the \`delete\` operator with an array expression is unsafe.",
       "messageId": "noArrayDelete",
       "range": {

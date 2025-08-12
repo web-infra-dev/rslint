@@ -5,15 +5,9 @@
     "module": "commonjs",
     "strict": true,
     "esModuleInterop": true,
-    "lib": [
-      "es2015",
-      "es2017",
-      "esnext"
-    ],
+    "lib": ["es2015", "es2017", "esnext"],
+    "allowJs": true,
     "experimentalDecorators": true
   },
-  "include": [
-    "src/virtual.tsx",
-    "src/virtual.ts"
-  ]
+  "include": ["files/**/*"]
 }

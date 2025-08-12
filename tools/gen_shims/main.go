@@ -41,6 +41,7 @@ func main() {
 		"vfs/osvfs",
 		"collections",
 		"lsp/lsproto",
+		"ls",
 	}
 
 	packagesToShimFullNames := make([]string, len(packagesToShim))

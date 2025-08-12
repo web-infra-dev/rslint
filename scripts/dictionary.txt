@@ -24,6 +24,7 @@ doublestar
 endline
 errchkjson
 esbuild
+esmodule
 execdir
 fatih
 flaggable
@@ -111,3 +112,4 @@ trae
 Ptrs
 iface
 dirents
+GOEXE

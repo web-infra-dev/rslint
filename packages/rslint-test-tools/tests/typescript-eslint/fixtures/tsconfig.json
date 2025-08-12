@@ -13,6 +13,8 @@
     "experimentalDecorators": true
   },
   "include": [
+    "virtual.tsx",
+    "virtual.ts",
     "file.ts",
     "consistent-type-exports.ts",
     "deprecated.ts",
