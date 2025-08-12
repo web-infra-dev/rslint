@@ -183,3 +183,6 @@ func IsStrWhiteSpace(r rune) bool {
 	// WhiteSpace
 	return unicode.Is(unicode.Zs, r)
 }
+
+// ExcludePaths contains paths that should be excluded from linting
+var ExcludePaths = []string{"/node_modules/", "bundled:"}

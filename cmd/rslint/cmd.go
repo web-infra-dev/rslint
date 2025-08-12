@@ -481,6 +481,7 @@ func runCMD() int {
 		programs,
 		singleThreaded,
 		nil,
+		utils.ExcludePaths,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
 			return activeRules

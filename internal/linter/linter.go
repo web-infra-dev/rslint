@@ -21,7 +21,7 @@ type ConfiguredRule struct {
 
 // when allowedFiles is passed as nil which means all files are allowed
 // when allowedFiles is passed as slice, only files in the slice are allowed
-func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []string, getRulesForFile func(sourceFile *ast.SourceFile) []ConfiguredRule, onDiagnostic func(diagnostic rule.RuleDiagnostic)) (int32, error) {
+func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []string, skipFiles []string, getRulesForFile func(sourceFile *ast.SourceFile) []ConfiguredRule, onDiagnostic func(diagnostic rule.RuleDiagnostic)) (int32, error) {
 
 	wg := core.NewWorkGroup(singleThreaded)
 
@@ -34,9 +34,15 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []s
 			wg.Queue(func() {
 				for _, file := range program.GetSourceFiles() {
 					p := string(file.Path())
-					// skip lint node_modules and bundled files
-					// FIXME: we may have better api to tell whether a file is a bundled file or not
-					if strings.Contains(p, "/node_modules/") || strings.Contains(p, "bundled:") {
+					// skip files based on skipFiles parameter
+					skipFile := false
+					for _, skipPattern := range skipFiles {
+						if strings.Contains(p, skipPattern) {
+							skipFile = true
+							break
+						}
+					}
+					if skipFile {
 						continue
 					}
 					// only lint allowedFiles if allowedFiles is not empty
