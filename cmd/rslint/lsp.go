@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -41,7 +42,8 @@ type LSPServer struct {
 	diagnostics map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
 	// align with https://github.com/microsoft/typescript-go/blob/5cdf239b02006783231dd4da8ca125cef398cd27/internal/lsp/server.go#L147
 	//nolint
-	projectService     *project.Service
+	projectService *project.Service
+	//nolint
 	logger             *project.Logger
 	fs                 vfs.FS
 	defaultLibraryPath string
@@ -82,7 +84,8 @@ func NewLSPServer() *LSPServer {
 }
 
 func (s *LSPServer) Handle(requestCtx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
-	ctx, _ := context.WithCancel(core.WithRequestID(requestCtx, req.ID.String()))
+	// FIXME: implement cancel logic
+	ctx := core.WithRequestID(requestCtx, req.ID.String())
 
 	s.conn = conn
 	switch req.Method {
@@ -153,23 +156,23 @@ func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request)
 	rslintConfigPath, configFound = findRslintConfig(s.fs, s.cwd)
 
 	if !configFound {
-		return nil, fmt.Errorf("config file not found")
+		return nil, errors.New("config file not found")
 	}
 
 	// Load rslint configuration and extract tsconfig paths
 	loader := config.NewConfigLoader(s.fs, s.cwd)
 	rslintConfig, configDirectory, err := loader.LoadRslintConfig(rslintConfigPath)
 	if err != nil {
-		return nil, fmt.Errorf("could not load rslint config: %v", err)
+		return nil, fmt.Errorf("could not load rslint config: %w", err)
 	}
 	s.rslintConfig = rslintConfig
 	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, configDirectory)
 	if err != nil {
-		return nil, fmt.Errorf("could not load TypeScript configs from rslint config: %v", err)
+		return nil, fmt.Errorf("could not load TypeScript configs from rslint config: %w", err)
 	}
 
 	if len(tsConfigs) == 0 {
-		return nil, fmt.Errorf("no TypeScript configurations found in rslint config")
+		return nil, errors.New("no TypeScript configurations found in rslint config")
 	}
 
 	// Do not pre-create configured projects here. The service will create
