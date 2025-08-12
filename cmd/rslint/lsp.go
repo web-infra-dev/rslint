@@ -39,6 +39,7 @@ type LSPServer struct {
 	documents   map[lsproto.DocumentUri]string                // URI -> content
 	diagnostics map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
 	// align with https://github.com/microsoft/typescript-go/blob/5cdf239b02006783231dd4da8ca125cef398cd27/internal/lsp/server.go#L147
+	//nolint
 	projectService *project.Service
 }
 
