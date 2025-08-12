@@ -1,5 +1,7 @@
 {
-  "ExtraMethods": {
-    "LanguageService": ["GetSymbolAtPosition", "GetSymbolAtLocation"]
-  }
+  "IgnoreFunctions": [
+    "DeprecateSortText",
+    "GetCompletionItemData",
+    "NewSymbolAndEntries"
+  ]
 }

@@ -6,9 +6,6 @@ git reset --hard origin/main
 git pull --prune
 popd
 git add ./typescript-go
-pushd typescript-go
-git am --3way --no-gpg-sign ../patches/*.patch
-popd
 
 go work sync
 
