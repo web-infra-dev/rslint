@@ -63,20 +63,14 @@ jobs:
         with:
           submodules: true
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
           go-version: ${{ matrix.go-version }}
           cache-name: test-node
-      - name: Install pnpm
-        run: corepack enable
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
 
       - name: Format
         run: pnpm format:check

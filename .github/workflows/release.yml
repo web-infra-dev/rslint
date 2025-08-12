@@ -103,9 +103,9 @@ jobs:
         run: |
           pnpm -r publish --no-git-checks --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
 
-  publish-extesion:
+  publish-extension-vscode:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
-    name: ${{ inputs.dry_run == true && 'Dry Run - Extensions' || 'Publish Extensions' }}
+    name: ${{ inputs.dry_run == true && 'Dry Run - VSCode Extensions' || 'Publish VSCode Extensions' }}
     needs: [build]
     runs-on: rspack-ubuntu-22.04-large
     steps:
@@ -117,15 +117,7 @@ jobs:
           submodules: true
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-
-      - name: Install pnpm
-        run: corepack enable
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        uses: ./.github/actions/setup-node
 
       - name: Download Artifact
         uses: actions/download-artifact@v4.1.7
@@ -154,9 +146,29 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           path: packages/vscode-extension/rslint-*.vsix
+
+  publish-extension-open-vsx:
+    if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
+    name: ${{ inputs.dry_run == true && 'Dry Run - Open VSX Extensions' || 'Publish Open VSX Extensions' }}
+    needs: [build]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.inputs.branch }}
+          submodules: true
+
+      - name: Setup Node
+        uses: ./.github/actions/setup-node
+
+      - name: Download Artifact
+        uses: actions/download-artifact@v4.1.7
+        with:
+          path: binaries
+
       - name: Build and publish to Open VSX Registry
-        # TODO fix the timeout problem while publish to Open VSX Registry
-        if: false
         env:
           OVSX_PAT: ${{ secrets.RSLINT_OVSX_PAT }}
         run: |
