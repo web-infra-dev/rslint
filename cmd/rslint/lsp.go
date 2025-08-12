@@ -464,7 +464,7 @@ func runLintWithProjectService(uri lsproto.DocumentUri, service *project.Service
 		diagnostics = append(diagnostics, d)
 	}
 
-	linter.RunLinterInProgram(program, []string{filename}, []string{},
+	linter.RunLinterInProgram(program, []string{filename}, util.ExcludePaths,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
 			return activeRules
