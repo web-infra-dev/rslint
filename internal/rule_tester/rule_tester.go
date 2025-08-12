@@ -16,14 +16,24 @@ import (
 	"gotest.tools/v3/assert"
 )
 
+type LanguageOptions struct {
+	ParserOptions *ParserOptions `json:"parserOptions,omitempty"`
+}
+
+type ParserOptions struct {
+	Project        string `json:"project,omitempty"`
+	ProjectService bool   `json:"projectService,omitempty"`
+}
+
 type ValidTestCase struct {
-	Code     string
-	FileName string
-	Only     bool
-	Skip     bool
-	Options  any
-	TSConfig string
-	Tsx      bool
+	Code            string
+	FileName        string
+	Only            bool
+	Skip            bool
+	Options         any
+	TSConfig        string
+	Tsx             bool
+	LanguageOptions *LanguageOptions
 }
 
 type InvalidTestCaseError struct {
@@ -41,15 +51,16 @@ type InvalidTestCaseSuggestion struct {
 }
 
 type InvalidTestCase struct {
-	Code     string
-	FileName string
-	Only     bool
-	Skip     bool
-	Output   []string
-	Errors   []InvalidTestCaseError
-	TSConfig string
-	Options  any
-	Tsx      bool
+	Code            string
+	FileName        string
+	Only            bool
+	Skip            bool
+	Output          []string
+	Errors          []InvalidTestCaseError
+	TSConfig        string
+	Options         any
+	Tsx             bool
+	LanguageOptions *LanguageOptions
 }
 
 func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Rule, validTestCases []ValidTestCase, invalidTestCases []InvalidTestCase) {
@@ -58,7 +69,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 	onlyMode := slices.ContainsFunc(validTestCases, func(c ValidTestCase) bool { return c.Only }) ||
 		slices.ContainsFunc(invalidTestCases, func(c InvalidTestCase) bool { return c.Only })
 
-	runLinter := func(t *testing.T, code string, options any, tsconfigPathOverride string, fileName string) []rule.RuleDiagnostic {
+	runLinter := func(t *testing.T, code string, options any, tsconfigPathOverride string, fileName string, languageOptions *LanguageOptions) []rule.RuleDiagnostic {
 		var diagnosticsMu sync.Mutex
 		diagnostics := make([]rule.RuleDiagnostic, 0, 3)
 
@@ -68,6 +79,10 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 		tsconfigPath := tsconfigPath
 		if tsconfigPathOverride != "" {
 			tsconfigPath = tsconfigPathOverride
+		}
+		// Override with languageOptions.parserOptions.project if provided
+		if languageOptions != nil && languageOptions.ParserOptions != nil && languageOptions.ParserOptions.Project != "" {
+			tsconfigPath = tspath.ResolvePath(rootDir, languageOptions.ParserOptions.Project)
 		}
 
 		program, err := utils.CreateProgram(true, fs, rootDir, tsconfigPath, host)
@@ -84,7 +99,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 			func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 				return []linter.ConfiguredRule{
 					{
-						Name:     "test",
+						Name:     r.Name,
 						Severity: rule.SeverityError,
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {
 							return r.Run(ctx, options)
@@ -120,7 +135,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 				fileName = testCase.FileName
 			}
 
-			diagnostics := runLinter(t, testCase.Code, testCase.Options, testCase.TSConfig, fileName)
+			diagnostics := runLinter(t, testCase.Code, testCase.Options, testCase.TSConfig, fileName, testCase.LanguageOptions)
 			if len(diagnostics) != 0 {
 				// TODO: pretty errors
 				t.Errorf("Expected valid test case not to contain errors. Code:\n%v", testCase.Code)
@@ -153,7 +168,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 			}
 
 			for i := range 10 {
-				diagnostics := runLinter(t, code, testCase.Options, testCase.TSConfig, fileName)
+				diagnostics := runLinter(t, code, testCase.Options, testCase.TSConfig, fileName, testCase.LanguageOptions)
 				if i == 0 {
 					initialDiagnostics = diagnostics
 				}

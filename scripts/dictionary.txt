@@ -108,4 +108,8 @@ untest
 unwinded
 variabledeclaration
 visitchildren
+trae
+Ptrs
+iface
+dirents
 GOEXE
