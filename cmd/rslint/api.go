@@ -138,6 +138,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		programs,
 		false, // Don't use single-threaded mode for IPC
 		allowedFiles,
+		[]string{"/node_modules/", "bundled:"},
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			return utils.Map(rulesWithOptions, func(r RuleWithOption) linter.ConfiguredRule {
 
