@@ -212,14 +212,11 @@ func TestFindRslintConfig(t *testing.T) {
 			}
 
 			// Call the function under test
-			gotPath, gotDir, gotFound := findRslintConfig(mockFS, tt.workingDir, tt.filePath)
+			gotPath, gotFound := findRslintConfig(mockFS, tt.workingDir, tt.filePath)
 
 			// Assert results
 			if gotPath != tt.expectedPath {
 				t.Errorf("findRslintConfig() gotPath = %v, want %v", gotPath, tt.expectedPath)
-			}
-			if gotDir != tt.expectedDir {
-				t.Errorf("findRslintConfig() gotDir = %v, want %v", gotDir, tt.expectedDir)
 			}
 			if gotFound != tt.expectedFound {
 				t.Errorf("findRslintConfig() gotFound = %v, want %v", gotFound, tt.expectedFound)
