@@ -186,3 +186,10 @@ func IsStrWhiteSpace(r rune) bool {
 
 // ExcludePaths contains paths that should be excluded from linting
 var ExcludePaths = []string{"/node_modules/", "bundled:"}
+
+func Must[T any](v T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return v
+}
