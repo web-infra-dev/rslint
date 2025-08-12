@@ -40,16 +40,16 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache-name: test-go
       - name: golangci-lint
-        if: runner.os != 'Linux'
+        if: runner.os == 'Linux'
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.3.0
           args: --timeout=5m ./cmd/... ./internal/...
       - name: go vet
-        if: runner.os != 'Linux'
+        if: runner.os == 'Linux'
         run: npm run lint:go
       - name: go fmt
-        if: runner.os != 'Linux'
+        if: runner.os == 'Linux'
         run: npm run format:go
       - name: Unit Test
         run: |
@@ -111,11 +111,11 @@ jobs:
         run: pnpm -r test
 
       - name: Check Spell
-        if: runner.os != 'Linux'
+        if: runner.os == 'Linux'
         run: pnpm check-spell
 
       - name: Lint
-        if: runner.os != 'Linux'
+        if: runner.os == 'Linux'
         run: pnpm run lint
 
   done:
