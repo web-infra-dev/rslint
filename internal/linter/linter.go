@@ -27,7 +27,7 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, excluded
 		p := string(file.Path())
 		// skip lint node_modules and bundled files
 		// FIXME: we may have better api to tell whether a file is a bundled file or not
-		if strings.Contains(p, "/node_modules/") || strings.Contains(p, "bundled:") {
+		if utils.IsExcludedPath(p, excludedPaths) {
 			continue
 		}
 		// only lint allowedFiles if allowedFiles is not empty
