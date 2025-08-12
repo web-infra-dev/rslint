@@ -2,10 +2,10 @@ package config
 
 import (
 	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
+	"github.com/microsoft/typescript-go/shim/tspath"
 	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules/adjacent_overload_signatures"
@@ -386,19 +386,10 @@ func isFileIgnored(filePath string, ignorePatterns []string) bool {
 
 // normalizePath converts file path to be relative to cwd for consistent matching
 func normalizePath(filePath, cwd string) string {
-	cleanPath := filepath.Clean(filePath)
-
-	// If absolute path, try to make it relative to working directory
-	if filepath.IsAbs(cleanPath) {
-		if relPath, err := filepath.Rel(cwd, cleanPath); err == nil {
-			// Only use relative path if it doesn't go outside the working directory
-			if !strings.HasPrefix(relPath, "..") {
-				return relPath
-			}
-		}
-	}
-
-	return cleanPath
+	return tspath.NormalizePath(tspath.ConvertToRelativePath(filePath, tspath.ComparePathsOptions{
+		UseCaseSensitiveFileNames: true,
+		CurrentDirectory:          cwd,
+	}))
 }
 
 // isFileIgnoredSimple provides fallback matching when cwd is unavailable
