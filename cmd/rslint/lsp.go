@@ -16,6 +16,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/ls"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
+	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -37,6 +38,8 @@ type LSPServer struct {
 	rootURI     string
 	documents   map[lsproto.DocumentUri]string                // URI -> content
 	diagnostics map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
+	// align with https://github.com/microsoft/typescript-go/blob/5cdf239b02006783231dd4da8ca125cef398cd27/internal/lsp/server.go#L147
+	projectService *project.Service
 }
 
 func NewLSPServer() *LSPServer {

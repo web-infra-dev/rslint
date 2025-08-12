@@ -19,6 +19,7 @@ replace (
 	github.com/microsoft/typescript-go/shim/vfs => ./shim/vfs
 	github.com/microsoft/typescript-go/shim/vfs/cachedvfs => ./shim/vfs/cachedvfs
 	github.com/microsoft/typescript-go/shim/vfs/osvfs => ./shim/vfs/osvfs
+	github.com/microsoft/typescript-go/shim/project => ./shim/project
 )
 
 require (
@@ -31,6 +32,7 @@ require (
 	github.com/microsoft/typescript-go/shim/compiler v0.0.0
 	github.com/microsoft/typescript-go/shim/core v0.0.0
 	github.com/microsoft/typescript-go/shim/lsp/lsproto v0.0.0
+	github.com/microsoft/typescript-go/shim/project v0.0.0
 	github.com/microsoft/typescript-go/shim/scanner v0.0.0
 	github.com/microsoft/typescript-go/shim/tsoptions v0.0.0
 	github.com/microsoft/typescript-go/shim/tspath v0.0.0
@@ -38,6 +40,7 @@ require (
 	github.com/microsoft/typescript-go/shim/vfs/cachedvfs v0.0.0
 	github.com/microsoft/typescript-go/shim/ls v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/osvfs v0.0.0
+	github.com/microsoft/typescript-go/shim/project v0.0.0
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	golang.org/x/sys v0.35.0
 	golang.org/x/tools v0.34.0
