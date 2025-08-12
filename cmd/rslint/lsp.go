@@ -13,19 +13,21 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
-	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/ls"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/scanner"
+
+	// "github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
-	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
+
 	"github.com/sourcegraph/jsonrpc2"
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	"github.com/web-infra-dev/rslint/internal/utils"
+	util "github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func ptrTo[T any](v T) *T {
@@ -41,16 +43,50 @@ type LSPServer struct {
 	// align with https://github.com/microsoft/typescript-go/blob/5cdf239b02006783231dd4da8ca125cef398cd27/internal/lsp/server.go#L147
 	//nolint
 	projectService *project.Service
+	//nolint
+	logger             *project.Logger
+	fs                 vfs.FS
+	defaultLibraryPath string
+	typingsLocation    string
+	cwd                string
+	rslintConfig       config.RslintConfig
+}
+
+func (s *LSPServer) FS() vfs.FS {
+	return s.fs
+}
+func (s *LSPServer) DefaultLibraryPath() string {
+	return s.defaultLibraryPath
+}
+func (s *LSPServer) TypingsLocation() string {
+	return s.typingsLocation
+}
+func (s *LSPServer) GetCurrentDirectory() string {
+	return s.cwd
+}
+func (s *LSPServer) Client() project.Client {
+	return nil
+}
+
+// FIXME: support watcher in the future
+func (s *LSPServer) WatchFiles(ctx context.Context, watchers []*lsproto.FileSystemWatcher) (project.WatcherHandle, error) {
+	return "", nil
 }
 
 func NewLSPServer() *LSPServer {
+	log.Printf("cwd: %v", util.Must(os.Getwd()))
 	return &LSPServer{
 		documents:   make(map[lsproto.DocumentUri]string),
 		diagnostics: make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
+		fs:          bundled.WrapFS(osvfs.FS()),
+		cwd:         util.Must(os.Getwd()),
 	}
 }
 
-func (s *LSPServer) Handle(ctx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
+func (s *LSPServer) Handle(requestCtx context.Context, conn *jsonrpc2.Conn, req *jsonrpc2.Request) (interface{}, error) {
+	// FIXME: implement cancel logic
+	ctx := core.WithRequestID(requestCtx, req.ID.String())
+
 	s.conn = conn
 	switch req.Method {
 	case "initialize":
@@ -108,6 +144,39 @@ func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request)
 		}
 	}
 
+	s.projectService = project.NewService(s, project.ServiceOptions{
+		Logger:           project.NewLogger([]io.Writer{os.Stderr}, "tsgo.log", project.LogLevelVerbose),
+		PositionEncoding: lsproto.PositionEncodingKindUTF8,
+	})
+	// Try to find rslint configuration files with multiple strategies
+	var rslintConfigPath string
+	var configFound bool
+
+	// Use helper function to find config
+	rslintConfigPath, configFound = findRslintConfig(s.fs, s.cwd)
+
+	if !configFound {
+		return nil, errors.New("config file not found")
+	}
+
+	// Load rslint configuration and extract tsconfig paths
+	loader := config.NewConfigLoader(s.fs, s.cwd)
+	rslintConfig, configDirectory, err := loader.LoadRslintConfig(rslintConfigPath)
+	if err != nil {
+		return nil, fmt.Errorf("could not load rslint config: %w", err)
+	}
+	s.rslintConfig = rslintConfig
+	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, configDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("could not load TypeScript configs from rslint config: %w", err)
+	}
+
+	if len(tsConfigs) == 0 {
+		return nil, errors.New("no TypeScript configurations found in rslint config")
+	}
+
+	// Do not pre-create configured projects here. The service will create
+	// configured or inferred projects on demand when files are opened.
 	result := &lsproto.InitializeResult{
 		Capabilities: &lsproto.ServerCapabilities{
 			TextDocumentSync: &lsproto.TextDocumentSyncOptionsOrKind{
@@ -123,7 +192,7 @@ func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request)
 }
 
 func (s *LSPServer) handleDidOpen(ctx context.Context, req *jsonrpc2.Request) {
-	log.Printf("Handling didOpen: %+v", req)
+	log.Printf("Handling didOpen: %+v,%+v", req, ctx)
 	var params lsproto.DidOpenTextDocumentParams
 	if err := json.Unmarshal(*req.Params, &params); err != nil {
 		return
@@ -173,7 +242,7 @@ func (s *LSPServer) handleShutdown(ctx context.Context, req *jsonrpc2.Request) (
 }
 
 func (s *LSPServer) handleCodeAction(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
-	log.Printf("Handling codeAction: %+v", req)
+	log.Printf("Handling codeAction: %+v,%+v", req, ctx)
 	var params lsproto.CodeActionParams
 	if err := json.Unmarshal(*req.Params, &params); err != nil {
 		return nil, &jsonrpc2.Error{
@@ -254,100 +323,10 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 	// Initialize rule registry with all available rules (ensure it's done once)
 	config.RegisterAllRules()
 
-	// Convert URI to file path
-	filePath := uriToPath(uri)
-
-	// Create a temporary file system with the content
-	vfs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-
-	// Determine working directory with improved fallback strategy
-	workingDir := s.rootURI
-	if workingDir == "" || workingDir == "." {
-		// If rootURI is not set properly, try to infer from the file path
-		if filePath != "" {
-			// Use the directory of the current file as a starting point
-			if idx := strings.LastIndex(filePath, "/"); idx != -1 {
-				workingDir = filePath[:idx]
-			} else {
-				workingDir = "."
-			}
-		} else {
-			workingDir = "."
-		}
-	}
-
-	host := utils.CreateCompilerHost(workingDir, vfs)
-
-	// Try to find rslint configuration files with multiple strategies
-	var rslintConfigPath string
-	var configFound bool
-
-	// Use helper function to find config
-	rslintConfigPath, workingDir, configFound = findRslintConfig(vfs, workingDir, filePath)
-
-	if !configFound {
-		return
-	}
-
-	// Load rslint configuration and extract tsconfig paths
-	loader := config.NewConfigLoader(vfs, workingDir)
-	rslintConfig, configDirectory, err := loader.LoadRslintConfig(rslintConfigPath)
-	if err != nil {
-		log.Printf("Could not load rslint config: %v", err)
-		return
-	}
-
-	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, configDirectory)
-	if err != nil {
-		log.Printf("Could not load TypeScript configs from rslint config: %v", err)
-		return
-	}
-
-	if len(tsConfigs) == 0 {
-		log.Printf("No TypeScript configurations found in rslint config")
-		return
-	}
-
-	// Create multiple programs for all tsconfig files
-	var programs []*compiler.Program
-	var targetFile *ast.SourceFile
-
-	for _, tsConfigPath := range tsConfigs {
-		program, err := utils.CreateProgram(true, vfs, workingDir, tsConfigPath, host)
-		if err != nil {
-			log.Printf("Could not create program for %s: %v", tsConfigPath, err)
-			continue
-		}
-		programs = append(programs, program)
-
-		// Check if the current file is in this program
-		sourceFiles := program.GetSourceFiles()
-
-		if targetFile == nil {
-			for _, sf := range sourceFiles {
-				if strings.HasSuffix(sf.FileName(), filePath) || sf.FileName() == filePath {
-					targetFile = sf
-					break
-				}
-			}
-		}
-	}
-
-	if len(programs) == 0 {
-		log.Printf("Could not create any programs")
-		return
-	}
-
-	if targetFile == nil {
-		// If we can't find the file in any program, skip diagnostics
-		log.Printf("Could not find file %s in any program", filePath)
-		return
-	}
-
 	// Collect diagnostics
 	var lsp_diagnostics []*lsproto.Diagnostic
 
-	rule_diags, err := runLintWithPrograms(uri, programs, rslintConfig)
+	rule_diags, err := runLintWithProjectService(uri, s.projectService, ctx, s.rslintConfig)
 
 	if err != nil {
 		log.Printf("Error running lint: %v", err)
@@ -410,41 +389,17 @@ func uriToPath(uri lsproto.DocumentUri) string {
 }
 
 // findRslintConfig searches for rslint configuration files using multiple strategies
-func findRslintConfig(fs vfs.FS, workingDir, filePath string) (string, string, bool) {
+func findRslintConfig(fs vfs.FS, workingDir string) (string, bool) {
 	defaultConfigs := []string{"rslint.json", "rslint.jsonc"}
 
 	// Strategy 1: Try in the working directory
 	for _, configName := range defaultConfigs {
 		configPath := workingDir + "/" + configName
 		if fs.FileExists(configPath) {
-			return configPath, workingDir, true
+			return configPath, true
 		}
 	}
-
-	// Strategy 2: If not found, walk up the directory tree
-	if filePath != "" {
-		dir := filePath
-		if idx := strings.LastIndex(dir, "/"); idx != -1 {
-			dir = dir[:idx]
-		}
-
-		for i := 0; i < 5 && dir != "/" && dir != ""; i++ { // Limit search depth
-			for _, configName := range defaultConfigs {
-				testPath := dir + "/" + configName
-				if fs.FileExists(testPath) {
-					return testPath, dir, true
-				}
-			}
-			// Move up one directory
-			if idx := strings.LastIndex(dir, "/"); idx != -1 {
-				dir = dir[:idx]
-			} else {
-				break
-			}
-		}
-	}
-
-	return "", workingDir, false
+	return "", false
 }
 
 func runLSP() int {
@@ -484,14 +439,20 @@ type LintResponse struct {
 	RuleCount   int                  `json:"ruleCount"`
 }
 
-func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, rslintConfig config.RslintConfig) ([]rule.RuleDiagnostic, error) {
-	if len(programs) == 0 {
-		return nil, errors.New("no programs provided")
-	}
-
+func runLintWithProjectService(uri lsproto.DocumentUri, service *project.Service, ctx context.Context, rslintConfig config.RslintConfig) ([]rule.RuleDiagnostic, error) {
+	log.Printf("context: %v", ctx)
 	// Initialize rule registry with all available rules
 	config.RegisterAllRules()
-
+	filename := uriToPath(uri)
+	content, ok := service.FS().ReadFile(filename)
+	if !ok {
+		return nil, fmt.Errorf("failed to read file %s", filename)
+	}
+	service.OpenFile(filename, content, core.GetScriptKindFromFileName(filename), service.GetCurrentDirectory())
+	project := service.EnsureDefaultProjectForURI(uri)
+	languageService, done := project.GetLanguageServiceForRequest(ctx)
+	program := languageService.GetProgram()
+	defer done()
 	// Collect diagnostics
 	var diagnostics []rule.RuleDiagnostic
 	var diagnosticsLock sync.Mutex
@@ -502,23 +463,12 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 		defer diagnosticsLock.Unlock()
 		diagnostics = append(diagnostics, d)
 	}
-	filename := uriToPath(uri)
 
-	// Run linter with all programs using rule registry
-	_, err := linter.RunLinter(
-		programs,
-		false, // Don't use single-threaded mode for LSP
-		[]string{filename},
-		utils.ExcludePaths,
+	linter.RunLinterInProgram(program, []string{filename}, util.ExcludePaths,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
 			return activeRules
-		},
-		diagnosticCollector,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("error running linter: %w", err)
-	}
+		}, diagnosticCollector)
 
 	if diagnostics == nil {
 		diagnostics = []rule.RuleDiagnostic{}

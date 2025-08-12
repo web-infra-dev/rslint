@@ -134,7 +134,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	}
 
 	// Run linter
-	lintedFilesCount, err := 		linter.RunLinter(
+	lintedFilesCount, err := linter.RunLinter(
 		programs,
 		false, // Don't use single-threaded mode for IPC
 		allowedFiles,
