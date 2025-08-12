@@ -279,7 +279,7 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 	var configFound bool
 
 	// Use helper function to find config
-	rslintConfigPath, workingDir, configFound = findRslintConfig(vfs, workingDir, filePath)
+	rslintConfigPath, configFound = findRslintConfig(vfs, workingDir, filePath)
 
 	if !configFound {
 		return
@@ -406,41 +406,18 @@ func uriToPath(uri lsproto.DocumentUri) string {
 }
 
 // findRslintConfig searches for rslint configuration files using multiple strategies
-func findRslintConfig(fs vfs.FS, workingDir, filePath string) (string, string, bool) {
-	defaultConfigs := []string{"rslint.json", "rslint.jsonc"}
+func findRslintConfig(fs vfs.FS, workingDir, filePath string) (absolutePath string, configFound bool) {
+	defaultConfigs := []string{filePath, "rslint.json", "rslint.jsonc"}
 
 	// Strategy 1: Try in the working directory
 	for _, configName := range defaultConfigs {
 		configPath := workingDir + "/" + configName
 		if fs.FileExists(configPath) {
-			return configPath, workingDir, true
+			return configPath, true
 		}
 	}
 
-	// Strategy 2: If not found, walk up the directory tree
-	if filePath != "" {
-		dir := filePath
-		if idx := strings.LastIndex(dir, "/"); idx != -1 {
-			dir = dir[:idx]
-		}
-
-		for i := 0; i < 5 && dir != "/" && dir != ""; i++ { // Limit search depth
-			for _, configName := range defaultConfigs {
-				testPath := dir + "/" + configName
-				if fs.FileExists(testPath) {
-					return testPath, dir, true
-				}
-			}
-			// Move up one directory
-			if idx := strings.LastIndex(dir, "/"); idx != -1 {
-				dir = dir[:idx]
-			} else {
-				break
-			}
-		}
-	}
-
-	return "", workingDir, false
+	return "", false
 }
 
 func runLSP() int {
