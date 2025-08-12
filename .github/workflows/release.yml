@@ -172,6 +172,48 @@ jobs:
         env:
           OVSX_PAT: ${{ secrets.RSLINT_OVSX_PAT }}
         run: |
+          sleep infinity
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "🚀 DRY RUN: Building and packaging for Open VSX Registry without publishing..."
+            if [ "${{ inputs.extension_type }}" = "pre-release" ]; then
+              pnpm publish:ovsx --prerelease --dry-run
+            else
+              pnpm publish:ovsx --dry-run
+            fi
+          else
+            if [ "${{ inputs.extension_type }}" = "pre-release" ]; then
+              pnpm publish:ovsx --prerelease
+            else
+              pnpm publish:ovsx
+            fi
+          fi
+
+  publish-extension-open-vsx-selfhost:
+    if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
+    name: ${{ inputs.dry_run == true && 'Dry Run - Open VSX Extensions' || 'Publish Open VSX Extensions' }}
+    needs: [build]
+    runs-on: rspack-ubuntu-22.04-large
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event.inputs.branch }}
+          submodules: true
+
+      - name: Setup Node
+        uses: ./.github/actions/setup-node
+
+      - name: Download Artifact
+        uses: actions/download-artifact@v4.1.7
+        with:
+          path: binaries
+
+      - name: Build and publish to Open VSX Registry
+        env:
+          OVSX_PAT: ${{ secrets.RSLINT_OVSX_PAT }}
+        run: |
+          sleep infinity
           if [ "${{ inputs.dry_run }}" = "true" ]; then
             echo "🚀 DRY RUN: Building and packaging for Open VSX Registry without publishing..."
             if [ "${{ inputs.extension_type }}" = "pre-release" ]; then
