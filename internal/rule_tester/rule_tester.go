@@ -80,6 +80,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 			[]*compiler.Program{program},
 			true,
 			allowedFiles,
+			[]string{}, // No files to skip in test environment
 			func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 				return []linter.ConfiguredRule{
 					{
