@@ -103,7 +103,7 @@ jobs:
         run: |
           pnpm -r publish --no-git-checks --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
 
-  publish-extesion-vscode:
+  publish-extension-vscode:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - VSCode Extensions' || 'Publish VSCode Extensions' }}
     needs: [build]
