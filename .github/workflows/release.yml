@@ -147,7 +147,7 @@ jobs:
         with:
           path: packages/vscode-extension/rslint-*.vsix
 
-  publish-extesion-open-vsx:
+  publish-extension-open-vsx:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - Open VSX Extensions' || 'Publish Open VSX Extensions' }}
     needs: [build]
