@@ -22,7 +22,12 @@ jobs:
     runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
-        runner: [rspack-ubuntu-22.04-large, windows-latest]
+        runner:
+          [
+            rspack-ubuntu-22.04-large,
+            rspack-windows-2022-large,
+            rspack-darwin-14-medium,
+          ]
         go-version: ['1.24.1']
     steps:
       - name: Checkout code
