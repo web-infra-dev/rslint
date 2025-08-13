@@ -178,7 +178,7 @@ func (s *LSPServer) handleInitialized(ctx context.Context, req *jsonrpc2.Request
 	}
 
 	s.projectService = project.NewService(s, project.ServiceOptions{
-		Logger:           project.NewLogger([]io.Writer{os.Stderr}, "tsgo.log", project.LogLevelVerbose),
+		Logger:           project.NewLogger([]io.Writer{os.Stderr}, "", project.LogLevelVerbose),
 		PositionEncoding: lsproto.PositionEncodingKindUTF8,
 	})
 	// Try to find rslint configuration files with multiple strategies
