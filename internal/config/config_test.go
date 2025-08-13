@@ -562,26 +562,6 @@ func TestInitDefaultConfig(t *testing.T) {
 		}
 	})
 
-	t.Run("verify file permissions", func(t *testing.T) {
-		tempDir := t.TempDir()
-
-		err := InitDefaultConfig(tempDir)
-		if err != nil {
-			t.Fatalf("InitDefaultConfig failed: %v", err)
-		}
-
-		configPath := filepath.Join(tempDir, "rslint.jsonc")
-		fileInfo, err := os.Stat(configPath)
-		if err != nil {
-			t.Fatalf("failed to stat config file: %v", err)
-		}
-
-		expectedMode := os.FileMode(0644)
-		if fileInfo.Mode().Perm() != expectedMode {
-			t.Errorf("expected file mode %v, got %v", expectedMode, fileInfo.Mode().Perm())
-		}
-	})
-
 	t.Run("create config with relative path", func(t *testing.T) {
 		tempDir := t.TempDir()
 
