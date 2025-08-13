@@ -1,0 +1,42 @@
+name: Update Rule Manifest
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  update-rule-manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check for rule changes
+        id: diff
+        run: |
+          git fetch origin main
+          git diff --name-only HEAD~10 HEAD | grep '^internal/rules/' || echo '' > changed_rules.txt
+          git diff --name-status HEAD~10 HEAD | grep '^internal/rules/' || echo '' > changed_rules_status.txt
+
+      - name: Generate rule-manifest.json if rules changed
+        if: ${{ hashFiles('changed_rules.txt') != '' }}
+        run: |
+          node scripts/gen-rule-manifest.js
+
+      - name: Commit and push if rule-manifest.json changed
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          if [[ $(git status --porcelain rule-manifest.json) ]]; then
+            git add rule-manifest.json
+            git commit -m 'chore: update rule-manifest.json [auto]'
+            git push
+          fi
