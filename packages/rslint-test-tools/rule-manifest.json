@@ -1,0 +1,319 @@
+{
+  "rules": [
+    {
+      "name": "adjacent_overload_signatures",
+      "group": "typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "array_type",
+      "group": "typescript-eslint",
+      "status": "partial-impl",
+      "failing_case": [
+        {
+          "name": "array-type (nested)",
+          "url": "packages/rslint-test-tools/tests/typescript-eslint/rules/array-type.test.ts#L1998"
+        },
+        {
+          "name": "schema validation",
+          "url": "packages/rslint-test-tools/tests/typescript-eslint/rules/array-type.test.ts#L2234"
+        }
+      ]
+    },
+    {
+      "name": "await_thenable",
+      "group": "typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "class_literal_property_style",
+      "group": "typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "no_array_delete",
+      "group": "typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "no_base_to_string",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_confusing_void_expression",
+      "group": "typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "no_duplicate_type_constituents",
+      "group": "typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "no_empty_function",
+      "group": "typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "no_empty_interface",
+      "group": "typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "no_floating_promises",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_for_in_array",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_implied_eval",
+      "group": "typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "no_meaningless_void_operator",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_misused_promises",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_misused_spread",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_mixed_enums",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_namespace",
+      "group": "typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "no_redundant_type_constituents",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_require_imports",
+      "group": "typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "no_unnecessary_boolean_literal_compare",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_unnecessary_template_expression",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_unnecessary_type_arguments",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_unnecessary_type_assertion",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_unsafe_argument",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_unsafe_assignment",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_unsafe_call",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_unsafe_enum_comparison",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_unsafe_member_access",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_unsafe_return",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_unsafe_type_assertion",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_unsafe_unary_minus",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_unused_vars",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_useless_empty_export",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no_var_requires",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "non_nullable_type_assertion_style",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "only_throw_error",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "prefer_as_const",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "prefer_promise_reject_errors",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "prefer_reduce_type_parameter",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "prefer_return_this_type",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "promise_function_async",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "related_getter_setter_pairs",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "require_array_sort_compare",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "require_await",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "restrict_plus_operands",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "restrict_template_expressions",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "return_await",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "switch_exhaustiveness_check",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "unbound_method",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "use_unknown_in_catch_callback_variable",
+      "group": "typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    }
+  ]
+}
