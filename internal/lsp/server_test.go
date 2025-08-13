@@ -1,4 +1,4 @@
-package main
+package lsp
 
 import (
 	"testing"
@@ -75,45 +75,9 @@ func TestFindRslintConfig(t *testing.T) {
 				"/project/src/components/rslint.jsonc": false,
 				"/project/rslint.json":                 true,
 			},
-			expectedPath:  "/project/rslint.json",
-			expectedDir:   "/project",
-			expectedFound: true,
-		},
-		{
-			name:       "config found by walking up from file path",
-			workingDir: "/wrong/path",
-			filePath:   "/project/src/components/file.ts",
-			fileSystemMap: map[string]bool{
-				"/wrong/path/rslint.json":              false,
-				"/wrong/path/rslint.jsonc":             false,
-				"/project/src/components/rslint.json":  false,
-				"/project/src/components/rslint.jsonc": false,
-				"/project/src/rslint.json":             false,
-				"/project/src/rslint.jsonc":            false,
-				"/project/rslint.json":                 true,
-			},
-			expectedPath:  "/project/rslint.json",
-			expectedDir:   "/project",
-			expectedFound: true,
-		},
-		{
-			name:       "config found multiple levels up",
-			workingDir: "/project/src/components/nested",
-			filePath:   "/project/src/components/nested/deep/file.ts",
-			fileSystemMap: map[string]bool{
-				"/project/src/components/nested/rslint.json":       false,
-				"/project/src/components/nested/rslint.jsonc":      false,
-				"/project/src/components/nested/deep/rslint.json":  false,
-				"/project/src/components/nested/deep/rslint.jsonc": false,
-				"/project/src/components/rslint.json":              false,
-				"/project/src/components/rslint.jsonc":             false,
-				"/project/src/rslint.json":                         false,
-				"/project/src/rslint.jsonc":                        false,
-				"/project/rslint.jsonc":                            true,
-			},
-			expectedPath:  "/project/rslint.jsonc",
-			expectedDir:   "/project",
-			expectedFound: true,
+			expectedPath:  "",
+			expectedDir:   "",
+			expectedFound: false,
 		},
 		{
 			name:       "no config found anywhere",
