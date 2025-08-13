@@ -90,6 +90,7 @@ subclassing
 symb
 symbolname
 thenables
+trae
 tses
 tseslint
 tsgo
