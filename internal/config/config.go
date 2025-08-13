@@ -135,12 +135,12 @@ const defaultJsonc = `
 [
   {
     // ignore files and folders for linting
-    "ignores": ["./files-not-want-lint.ts", "./tests/**/fixtures/**.ts"],
+    "ignores": [],
     "languageOptions": {
       "parserOptions": {
         // Rslint will lint all files included in your typescript projects defined here
         // support lint multi packages in monorepo
-        "project": ["./tsconfig.json", "packages/app1/tsconfig.json"]
+        "project": ["./tsconfig.json"]
       }
     },
     // same configuration as https://typescript-eslint.io/rules/
