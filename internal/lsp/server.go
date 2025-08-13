@@ -38,7 +38,6 @@ func ptrTo[T any](v T) *T {
 // LSP Server implementation
 type LSPServer struct {
 	conn        *jsonrpc2.Conn
-	rootURI     string
 	documents   map[lsproto.DocumentUri]string                // URI -> content
 	diagnostics map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
 	// align with https://github.com/microsoft/typescript-go/blob/5cdf239b02006783231dd4da8ca125cef398cd27/internal/lsp/server.go#L147
@@ -93,21 +92,35 @@ func (s *LSPServer) Handle(requestCtx context.Context, conn *jsonrpc2.Conn, req 
 	case "initialize":
 		return s.handleInitialize(ctx, req)
 	case "initialized":
-		// Client finished initialization
-		return nil, nil
+		return s.handleInitialized(ctx, req)
 	case "textDocument/didOpen":
+		if s.rslintConfig == nil {
+			return nil, nil
+		}
 		s.handleDidOpen(ctx, req)
 		return nil, nil
 	case "textDocument/didChange":
+		if s.rslintConfig == nil {
+			return nil, nil
+		}
 		s.handleDidChange(ctx, req)
 		return nil, nil
 	case "textDocument/didSave":
+		if s.rslintConfig == nil {
+			return nil, nil
+		}
 		s.handleDidSave(ctx, req)
 		return nil, nil
 	case "textDocument/diagnostic":
+		if s.rslintConfig == nil {
+			return nil, nil
+		}
 		s.handleDidSave(ctx, req)
 		return nil, nil
 	case "textDocument/codeAction":
+		if s.rslintConfig == nil {
+			return nil, nil
+		}
 		return s.handleCodeAction(ctx, req)
 	case "shutdown":
 		return s.handleShutdown(ctx, req)
@@ -133,15 +146,34 @@ func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request)
 			Message: "Initialize params cannot be nil",
 		}
 	}
+	result := &lsproto.InitializeResult{
+		Capabilities: &lsproto.ServerCapabilities{
+			TextDocumentSync: &lsproto.TextDocumentSyncOptionsOrKind{
+				Kind: ptrTo(lsproto.TextDocumentSyncKindFull),
+			},
+			CodeActionProvider: &lsproto.BooleanOrCodeActionOptions{
+				Boolean: ptrTo(true),
+			},
+		},
+	}
 
-	// Parse initialize params
-	var params lsproto.InitializeParams
+	return result, nil
+}
+func (s *LSPServer) handleInitialized(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
+	// Check if params is nil
+	if req.Params == nil {
+		return nil, &jsonrpc2.Error{
+			Code:    jsonrpc2.CodeInvalidParams,
+			Message: "Initialized params cannot be nil",
+		}
+	}
+
+	// Parse initialized params
+	var params lsproto.InitializedParams
 	if err := json.Unmarshal(*req.Params, &params); err != nil {
-		s.rootURI = "."
-	} else {
-		//nolint
-		if params.RootUri.DocumentUri != nil {
-			s.rootURI = uriToPath(*params.RootUri.DocumentUri)
+		return nil, &jsonrpc2.Error{
+			Code:    jsonrpc2.CodeInvalidParams,
+			Message: "Invalid initialized params",
 		}
 	}
 
@@ -157,7 +189,7 @@ func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request)
 	rslintConfigPath, configFound = findRslintConfig(s.fs, s.cwd)
 
 	if !configFound {
-		return nil, errors.New("config file not found")
+		return nil, nil
 	}
 
 	// Load rslint configuration and extract tsconfig paths
@@ -176,22 +208,8 @@ func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request)
 		return nil, errors.New("no TypeScript configurations found in rslint config")
 	}
 
-	// Do not pre-create configured projects here. The service will create
-	// configured or inferred projects on demand when files are opened.
-	result := &lsproto.InitializeResult{
-		Capabilities: &lsproto.ServerCapabilities{
-			TextDocumentSync: &lsproto.TextDocumentSyncOptionsOrKind{
-				Kind: ptrTo(lsproto.TextDocumentSyncKindFull),
-			},
-			CodeActionProvider: &lsproto.BooleanOrCodeActionOptions{
-				Boolean: ptrTo(true),
-			},
-		},
-	}
-
-	return result, nil
+	return nil, nil
 }
-
 func (s *LSPServer) handleDidOpen(ctx context.Context, req *jsonrpc2.Request) {
 	log.Printf("Handling didOpen: %+v,%+v", req, ctx)
 	var params lsproto.DidOpenTextDocumentParams
