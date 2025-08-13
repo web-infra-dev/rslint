@@ -135,7 +135,7 @@ function buildManifest() {
           failing_case = skipCases;
         }
       }
-      return { name: rule, group, status, failing_case };
+      return { name: rule.replace(/_/g, '-'), group, status, failing_case };
     });
   return { rules };
 }

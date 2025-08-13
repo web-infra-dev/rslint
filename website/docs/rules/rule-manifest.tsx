@@ -399,7 +399,36 @@ export default function RuleManifestTable() {
                       wordBreak: 'break-word',
                     }}
                   >
-                    {rule.name}
+                    <a
+                      href={`https://typescript-eslint.io/rules/${rule.name}/`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: '#2563eb',
+                        textDecoration: 'none',
+                        borderBottom: '2px solid #2563eb',
+                        paddingBottom: '2px',
+                        fontWeight: '600',
+                        transition: 'all 0.2s ease-in-out',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.color = '#1d4ed8';
+                        e.currentTarget.style.borderBottomColor = '#1d4ed8';
+                        e.currentTarget.style.backgroundColor = '#eff6ff';
+                        e.currentTarget.style.padding = '2px 4px';
+                        e.currentTarget.style.borderRadius = '4px';
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.color = '#2563eb';
+                        e.currentTarget.style.borderBottomColor = '#2563eb';
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.padding = '2px 0';
+                        e.currentTarget.style.borderRadius = '0';
+                      }}
+                      title={`View ${rule.name} rule documentation in typescript-eslint`}
+                    >
+                      {rule.name}
+                    </a>
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     <GroupBadge group={rule.group} />
