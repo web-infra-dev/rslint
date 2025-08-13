@@ -1,6 +1,10 @@
 package config
 
 import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/bmatcuk/doublestar/v4"
@@ -490,4 +494,177 @@ func TestGetRulesForFileWithArrayConfig(t *testing.T) {
 	} else {
 		t.Error("expected rule5 to exist")
 	}
+}
+
+func TestInitDefaultConfig(t *testing.T) {
+	t.Run("create config in empty directory", func(t *testing.T) {
+		tempDir := t.TempDir()
+
+		err := InitDefaultConfig(tempDir)
+		if err != nil {
+			t.Fatalf("InitDefaultConfig failed: %v", err)
+		}
+
+		configPath := filepath.Join(tempDir, "rslint.jsonc")
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			t.Error("rslint.jsonc file was not created")
+		}
+
+		content, err := os.ReadFile(configPath)
+		if err != nil {
+			t.Fatalf("failed to read created config file: %v", err)
+		}
+
+		if string(content) != defaultJsonc {
+			t.Error("created config file content does not match expected default content")
+		}
+	})
+
+	t.Run("fail when config already exists", func(t *testing.T) {
+		tempDir := t.TempDir()
+		configPath := filepath.Join(tempDir, "rslint.jsonc")
+
+		err := os.WriteFile(configPath, []byte("existing content"), 0644)
+		if err != nil {
+			t.Fatalf("failed to create existing config file: %v", err)
+		}
+
+		err = InitDefaultConfig(tempDir)
+		if err == nil {
+			t.Error("expected InitDefaultConfig to fail when config already exists")
+		}
+
+		expectedErrorMsg := fmt.Sprintf("rslint.json already exists in %s", tempDir)
+		if err.Error() != expectedErrorMsg {
+			t.Errorf("expected error message %q, got %q", expectedErrorMsg, err.Error())
+		}
+
+		content, err := os.ReadFile(configPath)
+		if err != nil {
+			t.Fatalf("failed to read config file: %v", err)
+		}
+
+		if string(content) != "existing content" {
+			t.Error("existing config file was modified")
+		}
+	})
+
+	t.Run("fail with invalid directory", func(t *testing.T) {
+		invalidDir := "/nonexistent/directory/path"
+
+		err := InitDefaultConfig(invalidDir)
+		if err == nil {
+			t.Error("expected InitDefaultConfig to fail with invalid directory")
+		}
+
+		expectedPrefix := "failed to create rslint.json:"
+		if !strings.HasPrefix(err.Error(), expectedPrefix) {
+			t.Errorf("expected error to start with %q, got %q", expectedPrefix, err.Error())
+		}
+	})
+
+	t.Run("verify file permissions", func(t *testing.T) {
+		tempDir := t.TempDir()
+
+		err := InitDefaultConfig(tempDir)
+		if err != nil {
+			t.Fatalf("InitDefaultConfig failed: %v", err)
+		}
+
+		configPath := filepath.Join(tempDir, "rslint.jsonc")
+		fileInfo, err := os.Stat(configPath)
+		if err != nil {
+			t.Fatalf("failed to stat config file: %v", err)
+		}
+
+		expectedMode := os.FileMode(0644)
+		if fileInfo.Mode().Perm() != expectedMode {
+			t.Errorf("expected file mode %v, got %v", expectedMode, fileInfo.Mode().Perm())
+		}
+	})
+
+	t.Run("create config with relative path", func(t *testing.T) {
+		tempDir := t.TempDir()
+
+		originalWD, err := os.Getwd()
+		if err != nil {
+			t.Fatalf("failed to get current working directory: %v", err)
+		}
+		defer func() {
+			if err := os.Chdir(originalWD); err != nil {
+				t.Errorf("failed to restore working directory: %v", err)
+			}
+		}()
+
+		err = os.Chdir(tempDir)
+		if err != nil {
+			t.Fatalf("failed to change working directory: %v", err)
+		}
+
+		err = InitDefaultConfig(".")
+		if err != nil {
+			t.Fatalf("InitDefaultConfig with relative path failed: %v", err)
+		}
+
+		configPath := "rslint.jsonc"
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			t.Error("rslint.jsonc file was not created with relative path")
+		}
+	})
+
+	t.Run("create config in nested directory", func(t *testing.T) {
+		tempDir := t.TempDir()
+
+		nestedDir := filepath.Join(tempDir, "project", "config")
+		err := os.MkdirAll(nestedDir, 0755)
+		if err != nil {
+			t.Fatalf("failed to create nested directory: %v", err)
+		}
+
+		err = InitDefaultConfig(nestedDir)
+		if err != nil {
+			t.Fatalf("InitDefaultConfig in nested directory failed: %v", err)
+		}
+
+		configPath := filepath.Join(nestedDir, "rslint.jsonc")
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			t.Error("rslint.jsonc file was not created in nested directory")
+		}
+	})
+
+	t.Run("verify config content is valid JSON", func(t *testing.T) {
+		tempDir := t.TempDir()
+
+		err := InitDefaultConfig(tempDir)
+		if err != nil {
+			t.Fatalf("InitDefaultConfig failed: %v", err)
+		}
+
+		configPath := filepath.Join(tempDir, "rslint.jsonc")
+		content, err := os.ReadFile(configPath)
+		if err != nil {
+			t.Fatalf("failed to read config file: %v", err)
+		}
+
+		if len(content) == 0 {
+			t.Error("created config file is empty")
+		}
+
+		contentStr := string(content)
+		expectedElements := []string{
+			"ignores",
+			"languageOptions",
+			"parserOptions",
+			"project",
+			"rules",
+			"plugins",
+			"@typescript-eslint",
+		}
+
+		for _, element := range expectedElements {
+			if !strings.Contains(contentStr, element) {
+				t.Errorf("config content missing expected element: %s", element)
+			}
+		}
+	})
 }
