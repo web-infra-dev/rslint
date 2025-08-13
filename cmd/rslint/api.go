@@ -48,11 +48,14 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	allowedFiles := []string{}
 	// Apply file contents if provided
 	if len(req.FileContents) > 0 {
-		fs = utils.NewOverlayVFS(fs, req.FileContents)
-		for file := range req.FileContents {
-
-			allowedFiles = append(allowedFiles, file) // Collect allowed files from request
+		fileContents := make(map[string]string, len(req.FileContents))
+		for k, v := range req.FileContents {
+			normalizePath := tspath.NormalizePath(k)
+			fileContents[normalizePath] = v
+			allowedFiles = append(allowedFiles, normalizePath)
 		}
+		fs = utils.NewOverlayVFS(fs, fileContents)
+
 	}
 
 	// Initialize rule registry with all available rules
