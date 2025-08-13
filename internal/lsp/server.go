@@ -2,7 +2,6 @@ package lsp
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/go-json-experiment/json"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -266,10 +266,9 @@ func (s *LSPServer) handleCodeAction(ctx context.Context, req *jsonrpc2.Request)
 	if err := json.Unmarshal(*req.Params, &params); err != nil {
 		return nil, &jsonrpc2.Error{
 			Code:    jsonrpc2.CodeParseError,
-			Message: "Failed to parse code action params",
+			Message: fmt.Sprintf("Failed to parse code action params %v", err),
 		}
 	}
-
 	uri := params.TextDocument.Uri
 
 	// Get stored diagnostics for this document
