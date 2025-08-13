@@ -41,8 +41,6 @@ on:
           - npm
           - extension
 permissions:
-  # Provenance generation in GitHub Actions requires "write" access to the "id-token"
-  id-token: write
   contents: read
 env:
   GO_VERSION: '1.24.1'
@@ -54,6 +52,9 @@ jobs:
     needs: [build]
     runs-on: ubuntu-22.04
     environment: npm
+    permissions:
+      contents: write
+      id-token: write
     steps:
       - name: Show dry-run status
         run: |
