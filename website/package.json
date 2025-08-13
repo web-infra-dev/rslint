@@ -1,0 +1,16 @@
+{
+  "name": "website",
+  "version": "0.1.9",
+  "private": true,
+  "scripts": {
+    "build": "rspress build",
+    "dev": "rspress dev",
+    "preview": "rspress preview"
+  },
+  "dependencies": {
+    "@rspress/core": "^2.0.0-beta.25"
+  },
+  "devDependencies": {
+    "@types/node": "^22.8.1"
+  }
+}

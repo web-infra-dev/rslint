@@ -13,4 +13,5 @@ packages/vscode-extension/.vscode-test
 packages/rslint-test-tools/tests/typescript-eslint/fixtures
 packages/rslint-test-tools/tests/typescript-eslint/rules
 packages/rslint/pkg/
+website/doc_build
 pnpm-lock.yaml
