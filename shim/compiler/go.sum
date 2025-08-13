@@ -4,8 +4,8 @@ github.com/go-json-experiment/json v0.0.0-20250725192818-e39067aee2d2 h1:iizUGZ9
 github.com/go-json-experiment/json v0.0.0-20250725192818-e39067aee2d2/go.mod h1:TiCD2a1pcmjd7YnhGH0f/zKNcCD06B029pHhzV23c2M=
 github.com/google/go-cmp v0.7.0 h1:wk8382ETsv4JYUZwIsn6YpYiWiBsYLSJiTsyBybVuN8=
 github.com/google/go-cmp v0.7.0/go.mod h1:pXiqmnSA92OHEEa9HXL2W4E7lf9JzCmGVUdgjX3N/iU=
-github.com/microsoft/typescript-go v0.0.0-20250808210900-e087a3e09d31 h1:XVDhbpkA3VViwFWLuul/+mUFxRrashIbMKGiNWpaqrU=
-github.com/microsoft/typescript-go v0.0.0-20250808210900-e087a3e09d31/go.mod h1:EilU3HRKGhtWtFbO/cguqAte4JAgtaqbepoL9vzr/Do=
+github.com/microsoft/typescript-go v0.0.0-20250812073229-cedc0cbe6c18 h1:tnLEMPlvJzwbOXXiXjaVxzYwF7zOpB4Lgh9TAN6YhSs=
+github.com/microsoft/typescript-go v0.0.0-20250812073229-cedc0cbe6c18/go.mod h1:EilU3HRKGhtWtFbO/cguqAte4JAgtaqbepoL9vzr/Do=
 github.com/peter-evans/patience v0.3.0 h1:rX0JdJeepqdQl1Sk9c9uvorjYYzL2TfgLX1adqYm9cA=
 github.com/peter-evans/patience v0.3.0/go.mod h1:Kmxu5sY1NmBLFSStvXjX1wS9mIv7wMcP/ubucyMOAu0=
 golang.org/x/sys v0.35.0 h1:vz1N37gP5bs89s7He8XuIYXpyY0+QlsKmzipCbUtyxI=

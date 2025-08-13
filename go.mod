@@ -13,6 +13,7 @@ replace (
 	github.com/microsoft/typescript-go/shim/core => ./shim/core
 	github.com/microsoft/typescript-go/shim/ls => ./shim/ls
 	github.com/microsoft/typescript-go/shim/lsp/lsproto => ./shim/lsp/lsproto
+	github.com/microsoft/typescript-go/shim/project => ./shim/project
 	github.com/microsoft/typescript-go/shim/scanner => ./shim/scanner
 	github.com/microsoft/typescript-go/shim/tsoptions => ./shim/tsoptions
 	github.com/microsoft/typescript-go/shim/tspath => ./shim/tspath
@@ -30,13 +31,14 @@ require (
 	github.com/microsoft/typescript-go/shim/collections v0.0.0
 	github.com/microsoft/typescript-go/shim/compiler v0.0.0
 	github.com/microsoft/typescript-go/shim/core v0.0.0
+	github.com/microsoft/typescript-go/shim/ls v0.0.0
 	github.com/microsoft/typescript-go/shim/lsp/lsproto v0.0.0
+	github.com/microsoft/typescript-go/shim/project v0.0.0
 	github.com/microsoft/typescript-go/shim/scanner v0.0.0
 	github.com/microsoft/typescript-go/shim/tsoptions v0.0.0
 	github.com/microsoft/typescript-go/shim/tspath v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/cachedvfs v0.0.0
-	github.com/microsoft/typescript-go/shim/ls v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/osvfs v0.0.0
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	golang.org/x/sys v0.35.0
@@ -55,7 +57,7 @@ require (
 require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/go-json-experiment/json v0.0.0-20250725192818-e39067aee2d2 // indirect
-	github.com/microsoft/typescript-go v0.0.0-20250808210900-e087a3e09d31 // indirect
+	github.com/microsoft/typescript-go v0.0.0-20250812073229-cedc0cbe6c18 // indirect
 	github.com/sourcegraph/jsonrpc2 v0.2.1
 	golang.org/x/text v0.27.0
 )
