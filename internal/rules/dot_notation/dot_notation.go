@@ -499,17 +499,9 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 						   hasStringLikeIndexSignature(ctx.TypeChecker, appType) ||
 						   hasAnyIndexSignature(appType)
 			
-			if hasIndexSig {
-				// If property is explicitly declared (has symbol), suggest dot notation even with index signature
-				if sym != nil {
-					// Continue to suggest dot notation
-				} else if allowIndexAccess {
-					// Property is not explicitly declared and allowIndexAccess is enabled, allow bracket notation
-					return
-				}
-				// If allowIndexAccess is false and no explicit property, continue to suggest dot notation
-			} else if allowIndexAccess && sym == nil {
-				// No index signature but allowIndexAccess is enabled and no concrete property found
+			if allowIndexAccess && hasIndexSig && sym == nil {
+				// Property is not explicitly declared and allowIndexAccess is enabled 
+				// and there's an index signature that could cover this property
 				return
 			}
 
