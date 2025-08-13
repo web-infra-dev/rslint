@@ -1,7 +1,6 @@
 package config
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -534,7 +533,7 @@ func TestInitDefaultConfig(t *testing.T) {
 			t.Error("expected InitDefaultConfig to fail when config already exists")
 		}
 
-		expectedErrorMsg := fmt.Sprintf("rslint.json already exists in %s", tempDir)
+		expectedErrorMsg := "rslint.json already exists in " + tempDir
 		if err.Error() != expectedErrorMsg {
 			t.Errorf("expected error message %q, got %q", expectedErrorMsg, err.Error())
 		}
