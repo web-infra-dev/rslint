@@ -53,7 +53,9 @@ jobs:
     runs-on: ubuntu-22.04
     environment: npm
     permissions:
+      # For push git tags
       contents: write
+      # For Trusted Publish
       id-token: write
     steps:
       - name: Show dry-run status
