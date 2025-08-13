@@ -31,13 +31,12 @@ jobs:
         run: |
           node scripts/gen-rule-manifest.js
 
-      - name: Commit and push if rule-manifest.json changed
-        run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          if [[ $(git status --porcelain packages/rslint-test-tools/rule-manifest.json) ]]; then
-          if [[ $(git status --porcelain packages/rslint-test-tools/rule-manifest.json) ]]; then
-            git add packages/rslint-test-tools/rule-manifest.json
-            git commit -m 'chore: update rule-manifest.json [auto]'
-            git push
-          fi
+      - name: Create Pull Request if rule-manifest.json changed
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: 'chore: update rule-manifest.json [auto]'
+          title: 'chore: update rule-manifest.json [auto]'
+          body: 'Auto-generated PR to update rule-manifest.json when rules change.'
+          branch: auto/update-rule-manifest
+          add-paths: packages/rslint-test-tools/rule-manifest.json
+          author: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
