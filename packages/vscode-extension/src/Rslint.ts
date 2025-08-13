@@ -25,11 +25,19 @@ export class Rslint implements Disposable {
   private readonly extension: Extension;
   private readonly workspaceFolder: WorkspaceFolder;
   private lspOutputChannel: OutputChannel | undefined;
+  private outputChannel: OutputChannel | undefined;
 
-  constructor(extension: Extension, workspaceFolder: WorkspaceFolder) {
+  constructor(
+    extension: Extension,
+    workspaceFolder: WorkspaceFolder,
+    outputChannel: OutputChannel,
+    lspOutputChannel: OutputChannel,
+  ) {
     this.extension = extension;
     this.workspaceFolder = workspaceFolder;
     this.logger = new Logger('Rslint (workspace)').useDefaultLogLevel();
+    this.lspOutputChannel = lspOutputChannel;
+    this.outputChannel = outputChannel;
   }
 
   public async start(): Promise<void> {
@@ -69,10 +77,10 @@ export class Rslint implements Disposable {
           '**/{rslint.{json,jsonc},package-lock.json,pnpm-lock.yaml,yarn.lock}',
         ),
       },
+      outputChannel: this.outputChannel,
     };
 
     if (traceEnabled) {
-      this.lspOutputChannel = window.createOutputChannel('Rslint LSP trace');
       clientOptions.traceOutputChannel = this.lspOutputChannel;
       this.logger.info(
         'LSP tracing enabled, output will be logged to "Rslint LSP trace" channel',
