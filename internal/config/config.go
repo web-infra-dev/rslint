@@ -1,7 +1,9 @@
 package config
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/bmatcuk/doublestar/v4"
@@ -128,6 +130,31 @@ type RuleConfig struct {
 	Level   string                 `json:"level,omitempty"`   // "error", "warn", "off"
 	Options map[string]interface{} `json:"options,omitempty"` // Rule-specific options
 }
+
+const defaultJsonc = `
+[
+  {
+    // ignore files and folders for linting
+    "ignores": [],
+    "languageOptions": {
+      "parserOptions": {
+        // Rslint will lint all files included in your typescript projects defined here
+        // support lint multi packages in monorepo
+        "project": ["./tsconfig.json"]
+      }
+    },
+    // same configuration as https://typescript-eslint.io/rules/
+    "rules": {
+      "@typescript-eslint/require-await": "off",
+      "@typescript-eslint/no-unnecessary-type-assertion": "warn",
+      "@typescript-eslint/array-type": ["warn", { "default": "array-simple" }]
+    },
+    "plugins": [
+      "@typescript-eslint" // will enable all implemented @typescript-eslint rules by default
+    ]
+  }
+]
+`
 
 // IsEnabled returns true if the rule is enabled (not "off")
 func (rc *RuleConfig) IsEnabled() bool {
@@ -400,4 +427,22 @@ func isFileIgnoredSimple(filePath string, ignorePatterns []string) bool {
 		}
 	}
 	return false
+}
+
+// initialize a default config in the directory
+func InitDefaultConfig(directory string) error {
+	configPath := filepath.Join(directory, "rslint.jsonc")
+
+	// if the config exists
+	if _, err := os.Stat(configPath); err == nil {
+		return fmt.Errorf("rslint.json already exists in %s", directory)
+	}
+
+	// write file content
+	err := os.WriteFile(configPath, []byte(defaultJsonc), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create rslint.json: %w", err)
+	}
+
+	return nil
 }
