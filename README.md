@@ -1,3 +1,7 @@
+<picture>
+  <img alt="Rslint Banner" src="https://assets.rspack.rs/rslint/rslint-banner.png">
+</picture>
+
 # Rslint
 
 <p>
