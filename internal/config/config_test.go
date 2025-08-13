@@ -590,15 +590,10 @@ func TestInitDefaultConfig(t *testing.T) {
 			t.Fatalf("failed to get current working directory: %v", err)
 		}
 		defer func() {
-			if err := os.Chdir(originalWD); err != nil {
-				t.Errorf("failed to restore working directory: %v", err)
-			}
+			t.Chdir(originalWD)
 		}()
 
-		err = os.Chdir(tempDir)
-		if err != nil {
-			t.Fatalf("failed to change working directory: %v", err)
-		}
+		t.Chdir(tempDir)
 
 		err = InitDefaultConfig(".")
 		if err != nil {
