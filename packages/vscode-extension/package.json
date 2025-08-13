@@ -3,6 +3,7 @@
   "displayName": "Rslint",
   "description": "Language support for Rslint",
   "version": "0.1.8",
+  "icon": "images/icon.png",
   "private": true,
   "publisher": "rstack",
   "license": "MIT",
