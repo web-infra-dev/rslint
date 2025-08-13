@@ -21,6 +21,7 @@ runs:
 
     - name: Clean Go module cache dir
       shell: bash
+      if: runner.os == 'linux'
       run: sudo rm -rf ~/go/pkg/mod/golang.org/toolchain*
 
     - name: Go cache

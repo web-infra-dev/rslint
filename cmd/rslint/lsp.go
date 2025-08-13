@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 
@@ -394,7 +395,7 @@ func findRslintConfig(fs vfs.FS, workingDir string) (string, bool) {
 
 	// Strategy 1: Try in the working directory
 	for _, configName := range defaultConfigs {
-		configPath := workingDir + "/" + configName
+		configPath := filepath.Join(workingDir, configName)
 		if fs.FileExists(configPath) {
 			return configPath, true
 		}
