@@ -1,6 +1,7 @@
 package lsp
 
 import (
+	"runtime"
 	"testing"
 
 	"github.com/microsoft/typescript-go/shim/vfs"
@@ -32,6 +33,10 @@ func (m *mockFS) WalkDir(root string, walkFn vfs.WalkDirFunc) error             
 func (m *mockFS) Realpath(path string) string                                       { return path }
 
 func TestFindRslintConfig(t *testing.T) {
+	// FIXME: skip windows tests now
+	if runtime.GOOS == "windows" {
+		t.Skip("not supported in windows yet, due to MockFS not support windows yet")
+	}
 	tests := []struct {
 		name          string
 		workingDir    string
