@@ -1,0 +1,146 @@
+@import 'tailwindcss';
+@import './geist-design-system.css';
+@import './rspack-colors.css';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* this doesn't need flexbox, but flexbox layout is faster for the browser to
+ * compute */
+.HeatMap {
+  display: flex;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.Tooltip {
+  position: absolute;
+  line-height: 1.3;
+  pointer-events: none;
+}
+
+.TooltipContent {
+  background: rgb(38, 38, 38);
+  bottom: 8px;
+  color: white;
+  max-width: 300px;
+  overflow: hidden;
+  padding: 5px 10px;
+  position: absolute;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: pre;
+}
+
+.TooltipStatus i {
+  left: -2px;
+  margin-right: 5px;
+  top: 1px;
+}
+
+.Tooltip:after {
+  background: #262626;
+  content: '';
+  height: 10px;
+  left: -5px;
+  position: absolute;
+  top: -13px;
+  transform: rotate(-45deg);
+  width: 10px;
+}
+
+.Footer {
+  text-align: center;
+}
+
+.FooterLink {
+  margin: 0 5px;
+}
+
+/* derived from shadcn/ui */
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-is-it-ready-no: var(--is-it-ready-no);
+  --color-passing-square: var(--passing-square);
+  --color-failing-square: var(--failing-square);
+}
+
+/**
+ * Use colors from the geist design system:
+ * https://vercel.com/geist/colors
+ */
+.turbopack {
+  --radius: 0.5rem;
+  --background: var(--ds-background-100);
+  --foreground: var(--ds-gray-1000);
+  --popover: var(--ds-background-100);
+  --popover-foreground: var(--ds-gray-1000);
+  --primary: var(--ds-blue-200);
+  --primary-foreground: var(--ds-gray-1000);
+  --secondary: var(--ds-background-200);
+  --secondary-foreground: var(--ds-gray-900);
+  --muted: var(--ds-background-200);
+  --muted-foreground: var(--ds-gray-900);
+  --accent: var(--ds-blue-200);
+  --accent-foreground: var(--ds-blue-700);
+  --border: var(--ds-gray-200);
+  --input: var(--ds-gray-200);
+  --ring: var(--ds-gray-500);
+  --chart: var(--ds-red-700);
+  --chart-area: var(--ds-red-400);
+  --chart-axis: var(--ds-blue-400);
+  --is-it-ready-no: var(--ds-red-700);
+  --passing-square: var(--ds-blue-400);
+  --failing-square: var(--ds-red-700);
+}
+
+.rspack {
+  --radius: var(--rp-radius);
+  --background: var(--rp-c-bg);
+  --foreground: var(--rp-c-text-1);
+  --popover: var(--rp-c-bg);
+  --popover-foreground: var(--rp-c-text-1);
+  --primary: var(--rp-c-brand-tint);
+  --primary-foreground: var(--rp-c-brand);
+  --secondary: var(--rp-c-bg-soft);
+  --secondary-foreground: var(--rp-c-text-2);
+  --muted: var(--rp-c-bg-mute);
+  --muted-foreground: var(--rp-c-text-2);
+  --accent: var(--rp-c-brand-tint);
+  --accent-foreground: var(--rp-c-brand-dark);
+  --border: var(--rp-c-divider-light);
+  --input: var(--rp-c-divider-light);
+  --ring: var(--rp-c-divider);
+  --chart: var(--rp-c-brand);
+  --chart-area: var(--rp-c-brand-tint);
+  --chart-axis: var(--rp-c-divider);
+  --is-it-ready-no: var(--rp-c-brand);
+  --passing-square: #66c2ff;
+  --failing-square: var(--rp-c-brand);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
