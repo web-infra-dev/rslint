@@ -12,6 +12,10 @@ permissions:
   # Optional: allow read access to pull requests. Use with `only-new-issues` option.
   pull-requests: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.ref_name != 'main' }}
+
 env:
   GOMAXPROCS: 8
 
@@ -67,7 +71,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
-          version: v2.3.0
+          version: v2.4.0
           args: --timeout=5m ./cmd/... ./internal/...
 
       - name: go vet
