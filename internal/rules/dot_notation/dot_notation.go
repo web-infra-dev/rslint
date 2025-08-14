@@ -623,15 +623,18 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 			}
 
 			// Allow bracket notation for properties that are NOT explicitly declared.
-			// This matches TS-ESLint behavior when an index signature covers the access.
+			// If a template-literal index signature matches, allow regardless of ts option.
 			if sym == nil {
+				if propMatchesTemplateIndexSignature(ctx.TypeChecker, appType, ctx.SourceFile, propName) {
+					return
+				}
 				allowIndexAccess := opts.AllowIndexSignaturePropertyAccess
 				if ctx.Program != nil {
 					if copts := ctx.Program.Options(); copts != nil && copts.NoPropertyAccessFromIndexSignature.IsTrue() {
 						allowIndexAccess = true
 					}
 				}
-				if allowIndexAccess && (hasStringLikeIndexSignatureTS(ctx.TypeChecker, nnType) || hasStringLikeIndexSignature(ctx.TypeChecker, appType) || hasAnyIndexSignature(appType) || propMatchesTemplateIndexSignature(ctx.TypeChecker, appType, ctx.SourceFile, propName)) {
+				if allowIndexAccess && (hasStringLikeIndexSignatureTS(ctx.TypeChecker, nnType) || hasStringLikeIndexSignature(ctx.TypeChecker, appType) || hasAnyIndexSignature(appType)) {
 					return
 				}
 			}
@@ -653,12 +656,8 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 						break
 					}
 				}
-				// Compute the start of the line containing '['
-				lineStart := i
-				for lineStart > 0 && text[lineStart-1] != '\n' {
-					lineStart--
-				}
-				start := lineStart
+				// Default anchor at the '[' position
+				start := i
 				if hasNewline {
 					// For multi-line element access, anchor to the first quote inside the brackets
 					// to match the base rule's reported location (line of the '[').
