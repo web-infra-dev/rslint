@@ -21,6 +21,7 @@ jobs:
     name: Test Go
     runs-on: ${{ matrix.runner }}
     strategy:
+      fail-fast: false
       matrix:
         runner:
           [
@@ -64,6 +65,7 @@ jobs:
     name: Test npm packages
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [rspack-ubuntu-22.04-large, windows-latest]
         go-version: ['1.24.1']
