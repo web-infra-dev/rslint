@@ -23,7 +23,8 @@ type Options struct {
 func parseOptions(options any) Options {
 	// defaults
 	opts := Options{
-		AllowKeywords: true,
+		AllowKeywords:                     true,
+		AllowIndexSignaturePropertyAccess: true,
 	}
 
 	if options == nil {
@@ -247,7 +248,12 @@ func hasStringLikeIndexSignatureTS(typeChecker *checker.Checker, t *checker.Type
 			continue
 		}
 		kt := checker.IndexInfo_keyType(info)
-		if kt != nil && (checker.Type_flags(kt)&checker.TypeFlagsStringLike) != 0 {
+		if kt == nil {
+			continue
+		}
+		// Treat both string-like and template-literal key types as allowing string keys
+		flags := checker.Type_flags(kt)
+		if (flags&checker.TypeFlagsStringLike) != 0 || (flags&checker.TypeFlagsTemplateLiteral) != 0 {
 			return true
 		}
 	}
@@ -396,6 +402,25 @@ func hasStringLikeIndexSignature(typeChecker *checker.Checker, t *checker.Type) 
 	return false
 }
 
+// typeContainsTypeParameter returns true if the given type or any of its immediate
+// union/intersection constituents contains a type parameter.
+func typeContainsTypeParameter(t *checker.Type) bool {
+	if t == nil {
+		return false
+	}
+	if utils.IsTypeParameter(t) {
+		return true
+	}
+	if utils.IsUnionType(t) || utils.IsIntersectionType(t) {
+		for _, part := range t.Types() {
+			if utils.IsTypeParameter(part) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func getStringLiteralValue(srcFile *ast.SourceFile, n *ast.Node) (string, bool) {
 	switch n.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
@@ -485,12 +510,12 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 
 			if sym != nil {
 				flags := checker.GetDeclarationModifierFlagsFromSymbol(sym)
-				if (flags&ast.ModifierFlagsPrivate) != 0 {
+				if (flags & ast.ModifierFlagsPrivate) != 0 {
 					if opts.AllowPrivateClassPropertyAccess {
 						return
 					}
 					// Continue to report error when allowPrivateClassPropertyAccess is false
-				} else if (flags&ast.ModifierFlagsProtected) != 0 {
+				} else if (flags & ast.ModifierFlagsProtected) != 0 {
 					if opts.AllowProtectedClassPropertyAccess {
 						return
 					}
@@ -498,19 +523,25 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 				}
 			}
 
-			// Check if this property access would be satisfied by an index signature
-			// In such cases, we should allow bracket notation as it's not a "real" declared property
-			if hasStringLikeIndexSignatureTS(ctx.TypeChecker, nnType) {
-				return
-			}
-			if hasStringLikeIndexSignature(ctx.TypeChecker, appType) || hasAnyIndexSignature(appType) {
-				return
-			}
-
-			// Also allow when allowIndexAccess is enabled and no concrete property found
+			// Allow bracket notation for properties that are NOT explicitly declared,
+			// but are covered by an index signature AND the allowIndexSignaturePropertyAccess flag (or TS option) is enabled.
+			// Additionally, if the index signature key is template-literal based and the property name matches,
+			// treat it as covered by the index signature.
 			allowIndexAccess := opts.AllowIndexSignaturePropertyAccess || tsAllowIndex
 			if allowIndexAccess && sym == nil {
-				return
+				if hasStringLikeIndexSignatureTS(ctx.TypeChecker, nnType) || hasStringLikeIndexSignature(ctx.TypeChecker, appType) || hasAnyIndexSignature(appType) {
+					return
+				}
+				// Also permit when index key type or value type includes a type parameter; this captures
+				// cases like [extraKey: ExtraKey] where ExtraKey is a template-literal type parameter.
+				for _, info := range checker.Checker_getIndexInfosOfType(ctx.TypeChecker, appType) {
+					if info == nil {
+						continue
+					}
+					if typeContainsTypeParameter(checker.IndexInfo_keyType(info)) || typeContainsTypeParameter(checker.IndexInfo_valueType(info)) {
+						return
+					}
+				}
 			}
 
 			// Suggest using dot notation if the name is a valid identifier and
