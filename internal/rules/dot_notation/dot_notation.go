@@ -441,7 +441,6 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 				tsAllowIndex = true
 			}
 		}
-		// Derive allowIndexSignaturePropertyAccess from tsconfig option as well
 
 		listeners := rule.RuleListeners{}
 
