@@ -102,8 +102,8 @@ jobs:
           pnpm -r publish --no-git-checks --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions"
-          echo git tag v$(jq -r .version package.json)
-          git tag v$(jq -r .version package.json)
+          version=$(jq -r .version package.json)
+          git tag v$version -m "v$version"
           git push origin --follow-tags
 
   publish-extension-vscode:
