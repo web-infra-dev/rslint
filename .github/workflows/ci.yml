@@ -12,10 +12,6 @@ permissions:
   # Optional: allow read access to pull requests. Use with `only-new-issues` option.
   pull-requests: read
 
-env:
-  GO_VERSION: '1.24.1'
-  GOMAXPROCS: 4
-
 jobs:
   test-go:
     name: Test Go
@@ -28,7 +24,7 @@ jobs:
             rspack-windows-2022-large,
             rspack-darwin-14-medium,
           ]
-        go-version: ['1.24.1']
+        go-version: ['1.25.0']
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -66,7 +62,7 @@ jobs:
     strategy:
       matrix:
         os: [rspack-ubuntu-22.04-large, windows-latest]
-        go-version: ['1.24.1']
+        go-version: ['1.25.0']
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
