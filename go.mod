@@ -1,8 +1,8 @@
 module github.com/web-infra-dev/rslint
 
-go 1.24.2
+go 1.25.0
 
-toolchain go1.24.4
+toolchain go1.25.0
 
 replace (
 	github.com/microsoft/typescript-go/shim/ast => ./shim/ast
