@@ -8,10 +8,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 
-	"github.com/go-json-experiment/json"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/ls"
@@ -19,56 +19,96 @@ import (
 	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/scanner"
 
-	// "github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 
-	"github.com/sourcegraph/jsonrpc2"
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	util "github.com/web-infra-dev/rslint/internal/utils"
 )
 
-func (s *LSPServer) handleInitialize(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
-	log.Printf("Handling initialize: %+v with pid %d", req, os.Getpid())
-	// Check if params is nil
-	if req.Params == nil {
-		return nil, &jsonrpc2.Error{
-			Code:    jsonrpc2.CodeInvalidParams,
-			Message: "Initialize params cannot be nil",
+func (s *Server) handleInitialize(ctx context.Context, params *lsproto.InitializeParams) (lsproto.InitializeResponse, error) {
+	if s.initializeParams != nil {
+		return nil, lsproto.ErrInvalidRequest
+	}
+
+	s.initializeParams = params
+
+	s.positionEncoding = lsproto.PositionEncodingKindUTF16
+	if genCapabilities := s.initializeParams.Capabilities.General; genCapabilities != nil && genCapabilities.PositionEncodings != nil {
+		if slices.Contains(*genCapabilities.PositionEncodings, lsproto.PositionEncodingKindUTF8) {
+			s.positionEncoding = lsproto.PositionEncodingKindUTF8
 		}
 	}
-	result := &lsproto.InitializeResult{
+
+	response := &lsproto.InitializeResult{
+		ServerInfo: &lsproto.ServerInfo{
+			Name:    "typescript-go",
+			Version: ptrTo(core.Version()),
+		},
 		Capabilities: &lsproto.ServerCapabilities{
+			PositionEncoding: ptrTo(s.positionEncoding),
 			TextDocumentSync: &lsproto.TextDocumentSyncOptionsOrKind{
-				Kind: ptrTo(lsproto.TextDocumentSyncKindFull),
+				Options: &lsproto.TextDocumentSyncOptions{
+					OpenClose: ptrTo(true),
+					Change:    ptrTo(lsproto.TextDocumentSyncKindIncremental),
+					Save: &lsproto.BooleanOrSaveOptions{
+						SaveOptions: &lsproto.SaveOptions{
+							IncludeText: ptrTo(true),
+						},
+					},
+				},
 			},
-			CodeActionProvider: &lsproto.BooleanOrCodeActionOptions{
+			HoverProvider: &lsproto.BooleanOrHoverOptions{
+				Boolean: ptrTo(true),
+			},
+			DefinitionProvider: &lsproto.BooleanOrDefinitionOptions{
+				Boolean: ptrTo(true),
+			},
+			TypeDefinitionProvider: &lsproto.BooleanOrTypeDefinitionOptionsOrTypeDefinitionRegistrationOptions{
+				Boolean: ptrTo(true),
+			},
+			ReferencesProvider: &lsproto.BooleanOrReferenceOptions{
+				Boolean: ptrTo(true),
+			},
+			ImplementationProvider: &lsproto.BooleanOrImplementationOptionsOrImplementationRegistrationOptions{
+				Boolean: ptrTo(true),
+			},
+			DiagnosticProvider: &lsproto.DiagnosticOptionsOrRegistrationOptions{
+				Options: &lsproto.DiagnosticOptions{
+					InterFileDependencies: true,
+				},
+			},
+			CompletionProvider: &lsproto.CompletionOptions{
+				TriggerCharacters: &ls.TriggerCharacters,
+				ResolveProvider:   ptrTo(true),
+				// !!! other options
+			},
+			SignatureHelpProvider: &lsproto.SignatureHelpOptions{
+				TriggerCharacters: &[]string{"(", ","},
+			},
+			DocumentFormattingProvider: &lsproto.BooleanOrDocumentFormattingOptions{
+				Boolean: ptrTo(true),
+			},
+			DocumentRangeFormattingProvider: &lsproto.BooleanOrDocumentRangeFormattingOptions{
+				Boolean: ptrTo(true),
+			},
+			DocumentOnTypeFormattingProvider: &lsproto.DocumentOnTypeFormattingOptions{
+				FirstTriggerCharacter: "{",
+				MoreTriggerCharacter:  &[]string{"}", ";", "\n"},
+			},
+			WorkspaceSymbolProvider: &lsproto.BooleanOrWorkspaceSymbolOptions{
+				Boolean: ptrTo(true),
+			},
+			DocumentSymbolProvider: &lsproto.BooleanOrDocumentSymbolOptions{
 				Boolean: ptrTo(true),
 			},
 		},
 	}
 
-	return result, nil
+	return response, nil
 }
-func (s *LSPServer) handleInitialized(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
-	// Check if params is nil
-	if req.Params == nil {
-		return nil, &jsonrpc2.Error{
-			Code:    jsonrpc2.CodeInvalidParams,
-			Message: "Initialized params cannot be nil",
-		}
-	}
-
-	// Parse initialized params
-	var params lsproto.InitializedParams
-	if err := json.Unmarshal(*req.Params, &params); err != nil {
-		return nil, &jsonrpc2.Error{
-			Code:    jsonrpc2.CodeInvalidParams,
-			Message: "Invalid initialized params",
-		}
-	}
-
+func (s *Server) handleInitialized(ctx context.Context, params *lsproto.InitializedParams) error {
 	s.projectService = project.NewService(s, project.ServiceOptions{
 		Logger:           project.NewLogger([]io.Writer{os.Stderr}, "", project.LogLevelVerbose),
 		PositionEncoding: lsproto.PositionEncodingKindUTF8,
@@ -81,47 +121,39 @@ func (s *LSPServer) handleInitialized(ctx context.Context, req *jsonrpc2.Request
 	rslintConfigPath, configFound = findRslintConfig(s.fs, s.cwd)
 
 	if !configFound {
-		return nil, nil
+		return nil
 	}
 
 	// Load rslint configuration and extract tsconfig paths
 	loader := config.NewConfigLoader(s.fs, s.cwd)
 	rslintConfig, configDirectory, err := loader.LoadRslintConfig(rslintConfigPath)
 	if err != nil {
-		return nil, fmt.Errorf("could not load rslint config: %w", err)
+		return fmt.Errorf("could not load rslint config: %w", err)
 	}
 	s.rslintConfig = rslintConfig
 	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, configDirectory)
 	if err != nil {
-		return nil, fmt.Errorf("could not load TypeScript configs from rslint config: %w", err)
+		return fmt.Errorf("could not load TypeScript configs from rslint config: %w", err)
 	}
 
 	if len(tsConfigs) == 0 {
-		return nil, errors.New("no TypeScript configurations found in rslint config")
+		return errors.New("no TypeScript configurations found in rslint config")
 	}
 
-	return nil, nil
+	return nil
 }
-func (s *LSPServer) handleDidOpen(ctx context.Context, req *jsonrpc2.Request) {
-	log.Printf("Handling didOpen: %+v,%+v", req, ctx)
-	var params lsproto.DidOpenTextDocumentParams
-	if err := json.Unmarshal(*req.Params, &params); err != nil {
-		return
-	}
+func (s *Server) handleDidOpen(ctx context.Context, params *lsproto.DidOpenTextDocumentParams) error {
+	log.Printf("Handling didOpen: %+v,%+v", params, ctx)
 
 	uri := params.TextDocument.Uri
 	content := params.TextDocument.Text
 
 	s.documents[uri] = content
-	s.runDiagnostics(ctx, uri, content)
+	return nil
 }
 
-func (s *LSPServer) handleDidChange(ctx context.Context, req *jsonrpc2.Request) {
-	log.Printf("Handling didChange: %+v", req)
-	var params lsproto.DidChangeTextDocumentParams
-	if err := json.Unmarshal(*req.Params, &params); err != nil {
-		return
-	}
+func (s *Server) handleDidChange(ctx context.Context, params *lsproto.DidChangeTextDocumentParams) error {
+	log.Printf("Handling didChange: %+v", params)
 
 	uri := params.TextDocument.Uri
 
@@ -129,38 +161,19 @@ func (s *LSPServer) handleDidChange(ctx context.Context, req *jsonrpc2.Request) 
 	if len(params.ContentChanges) > 0 {
 		content := params.ContentChanges[0].WholeDocument.Text
 		s.documents[uri] = content
-		s.runDiagnostics(ctx, uri, content)
 	}
+	return nil
 }
 
-func (s *LSPServer) handleDidSave(ctx context.Context, req *jsonrpc2.Request) {
-	log.Printf("Handling didSave: %+v", req)
-	// Re-run diagnostics on save
-	var params lsproto.DidSaveTextDocumentParams
-
-	if err := json.Unmarshal(*req.Params, &params); err != nil {
-		return
-	}
-
+func (s *Server) handleDidSave(ctx context.Context, params *lsproto.DidSaveTextDocumentParams) error {
+	log.Printf("Handling didSave: %+v", params)
 	uri := params.TextDocument.Uri
-	if content, exists := s.documents[uri]; exists {
-		s.runDiagnostics(ctx, uri, content)
-	}
+	s.documents[uri] = *params.Text
+	return nil
 }
 
-func (s *LSPServer) handleShutdown(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
-	return nil, nil
-}
-
-func (s *LSPServer) handleCodeAction(ctx context.Context, req *jsonrpc2.Request) (interface{}, error) {
-	log.Printf("Handling codeAction: %+v,%+v", req, ctx)
-	var params lsproto.CodeActionParams
-	if err := json.Unmarshal(*req.Params, &params); err != nil {
-		return nil, &jsonrpc2.Error{
-			Code:    jsonrpc2.CodeParseError,
-			Message: fmt.Sprintf("Failed to parse code action params %v", err),
-		}
-	}
+func (s *Server) handleCodeAction(ctx context.Context, params *lsproto.CodeActionParams) (lsproto.CodeActionResponse, error) {
+	log.Printf("Handling codeAction: %+v,%+v", params, ctx)
 	uri := params.TextDocument.Uri
 
 	// Get stored diagnostics for this document
@@ -171,19 +184,23 @@ func (s *LSPServer) handleCodeAction(ctx context.Context, req *jsonrpc2.Request)
 		filePath := uriToPath(uri)
 		if content, err := os.ReadFile(filePath); err == nil {
 			s.documents[uri] = string(content)
-			s.runDiagnostics(ctx, uri, string(content))
 
 			// Try to get diagnostics again after running them
 			ruleDiagnostics, exists = s.diagnostics[uri]
 			if !exists {
-				return []*lsproto.CodeAction{}, nil
+				return lsproto.CodeActionResponse{
+					CommandOrCodeActionArray: &[]lsproto.CommandOrCodeAction{},
+				}, nil
 			}
 		} else {
-			return []*lsproto.CodeAction{}, nil
+			return lsproto.CodeActionResponse{
+				CommandOrCodeActionArray: &[]lsproto.CommandOrCodeAction{},
+			}, nil
 		}
 	}
 
-	var codeActions []*lsproto.CodeAction
+	//var codeActions []*lsproto.CodeAction
+	var codeActions []lsproto.CommandOrCodeAction
 
 	// Find diagnostics that overlap with the requested range
 	for _, ruleDiag := range ruleDiagnostics {
@@ -200,7 +217,10 @@ func (s *LSPServer) handleCodeAction(ctx context.Context, req *jsonrpc2.Request)
 			// Add code action for fixes
 			codeAction := createCodeActionFromRuleDiagnostic(ruleDiag, uri)
 			if codeAction != nil {
-				codeActions = append(codeActions, codeAction)
+				codeActions = append(codeActions, lsproto.CommandOrCodeAction{
+					Command:    nil,
+					CodeAction: codeAction,
+				})
 			}
 			// add extract disable rule actions
 			disableActions := createDisableRuleActions(ruleDiag, uri)
@@ -211,23 +231,30 @@ func (s *LSPServer) handleCodeAction(ctx context.Context, req *jsonrpc2.Request)
 				for _, suggestion := range *ruleDiag.Suggestions {
 					suggestionAction := createCodeActionFromSuggestion(ruleDiag, suggestion, uri)
 					if suggestionAction != nil {
-						codeActions = append(codeActions, suggestionAction)
+						codeActions = append(codeActions, lsproto.CommandOrCodeAction{
+							Command:    nil,
+							CodeAction: suggestionAction,
+						})
 					}
 				}
 			}
 		}
 	}
 
-	return codeActions, nil
+	return lsproto.CodeActionResponse{
+		CommandOrCodeActionArray: &codeActions,
+	}, nil
 }
 
-func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri, content string) {
-	log.Printf("Running diagnostics for: %+v", uri)
-	uriString := string(uri)
+func (s *Server) handleDocumentDiagnostic(ctx context.Context, params *lsproto.DocumentDiagnosticParams) (lsproto.DocumentDiagnosticResponse, error) {
+	log.Printf("Running diagnostics for: %+v", params)
+	uriString := string(params.TextDocument.Uri)
+	uri := params.TextDocument.Uri
+	content := s.documents[uri]
 
 	// Only process TypeScript/JavaScript files
 	if !isTypeScriptFile(uriString) {
-		return
+		return lsproto.DocumentDiagnosticResponse{}, nil
 	}
 
 	// Initialize rule registry with all available rules (ensure it's done once)
@@ -249,18 +276,11 @@ func (s *LSPServer) runDiagnostics(ctx context.Context, uri lsproto.DocumentUri,
 		lspDiag := convertRuleDiagnosticToLSP(diagnostic, content)
 		lsp_diagnostics = append(lsp_diagnostics, lspDiag)
 	}
-	// Publish diagnostics
-	params := lsproto.PublishDiagnosticsParams{
-		Uri:         uri,
-		Diagnostics: lsp_diagnostics,
-	}
-
-	var diagsBuilder strings.Builder
-	for _, diag := range lsp_diagnostics {
-		fmt.Fprintf(&diagsBuilder, "%v:%+v\n", diag.Message, diag.Range)
-	}
-	log.Printf("Publishing diagnostics for %s:\n%s", uri, diagsBuilder.String())
-	s.conn.Notify(ctx, "textDocument/publishDiagnostics", params)
+	return lsproto.RelatedFullDocumentDiagnosticReportOrUnchangedDocumentDiagnosticReport{
+		FullDocumentDiagnosticReport: &lsproto.RelatedFullDocumentDiagnosticReport{
+			Items: lsp_diagnostics,
+		},
+	}, nil
 }
 
 func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic, content string) *lsproto.Diagnostic {
@@ -475,8 +495,8 @@ func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rul
 }
 
 // Helper function to create disable rule actions for diagnostics without fixes
-func createDisableRuleActions(ruleDiag rule.RuleDiagnostic, uri lsproto.DocumentUri) []*lsproto.CodeAction {
-	var actions []*lsproto.CodeAction
+func createDisableRuleActions(ruleDiag rule.RuleDiagnostic, uri lsproto.DocumentUri) []lsproto.CommandOrCodeAction {
+	var actions []lsproto.CommandOrCodeAction
 
 	// Create the corresponding LSP diagnostic for reference
 	diagStartLine, diagStartChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
@@ -495,13 +515,19 @@ func createDisableRuleActions(ruleDiag rule.RuleDiagnostic, uri lsproto.Document
 	// Action 1: Disable rule for this line
 	disableLineAction := createDisableRuleForLineAction(ruleDiag, uri, lspDiagnostic)
 	if disableLineAction != nil {
-		actions = append(actions, disableLineAction)
+		actions = append(actions, lsproto.CommandOrCodeAction{
+			Command:    nil,
+			CodeAction: disableLineAction,
+		})
 	}
 
 	// Action 2: Disable rule for entire file
 	disableFileAction := createDisableRuleForFileAction(ruleDiag, uri, lspDiagnostic)
 	if disableFileAction != nil {
-		actions = append(actions, disableFileAction)
+		actions = append(actions, lsproto.CommandOrCodeAction{
+			Command:    nil,
+			CodeAction: disableFileAction,
+		})
 	}
 
 	return actions
