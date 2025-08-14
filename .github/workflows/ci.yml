@@ -66,8 +66,8 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.24.1
-          cache-name: test-go
+          go-version: 1.25.0
+          cache-name: go-lint
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
