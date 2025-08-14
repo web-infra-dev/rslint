@@ -19,9 +19,15 @@ env:
 jobs:
   test-go:
     name: Test Go
-    runs-on: rspack-ubuntu-22.04-large
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
+        runner:
+          [
+            rspack-ubuntu-22.04-large,
+            rspack-windows-2022-large,
+            rspack-darwin-14-medium,
+          ]
         go-version: ['1.24.1']
     steps:
       - name: Checkout code
@@ -39,13 +45,16 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache-name: test-go
       - name: golangci-lint
+        if: runner.os == 'Linux'
         uses: golangci/golangci-lint-action@v8
         with:
           version: v2.3.0
           args: --timeout=5m ./cmd/... ./internal/...
       - name: go vet
+        if: runner.os == 'Linux'
         run: npm run lint:go
       - name: go fmt
+        if: runner.os == 'Linux'
         run: npm run format:go
       - name: Unit Test
         run: |
@@ -53,9 +62,10 @@ jobs:
 
   test-node:
     name: Test npm packages
-    runs-on: rspack-ubuntu-22.04-large
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
+        os: [rspack-ubuntu-22.04-large, windows-latest]
         go-version: ['1.24.1']
     steps:
       - name: Checkout code
@@ -73,16 +83,18 @@ jobs:
         uses: ./.github/actions/setup-node
 
       - name: Format
+        if: runner.os == 'Linux'
         run: pnpm format:check
 
       - name: Build
         run: pnpm build
 
       - name: TypeCheck
+        if: runner.os == 'Linux'
         run: pnpm typecheck
 
-      - name: Install xvfb and dependencies
-        if: ${{ runner.os == 'Linux' && runner.environment == 'self-hosted' }}
+      - name: Install xvfb and dependencies (Linux only)
+        if: runner.os == 'Linux'
         run: |
           sudo apt update
           sudo apt install -y libasound2 libgbm1 libgtk-3-0 libnss3 xvfb
@@ -91,9 +103,9 @@ jobs:
         uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
         with:
           path: packages/vscode-extension/.vscode-test
-          key: 'vscode-test'
+          key: vscode-test-${{ matrix.os }}
           restore-keys: |
-            - 'vscode-test-'
+            vscode-test-${{ matrix.os }}-
 
       - name: Test on Linux
         if: runner.os == 'Linux'
@@ -104,9 +116,11 @@ jobs:
         run: pnpm -r test
 
       - name: Check Spell
+        if: runner.os == 'Linux'
         run: pnpm check-spell
 
       - name: Lint
+        if: runner.os == 'Linux'
         run: pnpm run lint
 
   done:
@@ -114,7 +128,7 @@ jobs:
       - test-go
       - test-node
     if: always()
-    runs-on: rspack-ubuntu-22.04-large
+    runs-on: ubuntu-latest
     name: CI Done
     steps:
       - run: exit 1
