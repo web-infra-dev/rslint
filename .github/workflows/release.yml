@@ -41,8 +41,6 @@ on:
           - npm
           - extension
 permissions:
-  # Provenance generation in GitHub Actions requires "write" access to the "id-token"
-  id-token: write
   contents: read
 env:
   GO_VERSION: '1.24.1'
@@ -54,6 +52,11 @@ jobs:
     needs: [build]
     runs-on: ubuntu-22.04
     environment: npm
+    permissions:
+      # For push git tags
+      contents: write
+      # For Trusted Publish
+      id-token: write
     steps:
       - name: Show dry-run status
         run: |
@@ -95,13 +98,15 @@ jobs:
 
       - name: Move binaries
         uses: ./.github/actions/move-artifacts
-
       - name: Publish npm packages
         if: ${{ inputs.dry_run == false }}
-        env:
-          NPM_TOKEN: ${{ secrets.RSLINT_NPM_TOKEN }}
         run: |
           pnpm -r publish --no-git-checks --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions"
+          echo git tag v$(jq -r .version package.json)
+          git tag v$(jq -r .version package.json)
+          git push origin --follow-tags
 
   publish-extension-vscode:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
