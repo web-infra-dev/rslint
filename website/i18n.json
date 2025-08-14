@@ -1,0 +1,18 @@
+{
+  "introduction": {
+    "en": "Introduction",
+    "zh": "介绍"
+  },
+  "quickStart": {
+    "en": "Quick Start",
+    "zh": "快速上手"
+  },
+  "subtitle": {
+    "en": "The Linter for TypeScript",
+    "zh": "The Linter for TypeScript"
+  },
+  "slogan": {
+    "en": "Go Fast. Go Typed.",
+    "zh": "Go Fast. Go Typed."
+  }
+}
