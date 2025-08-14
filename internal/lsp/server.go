@@ -55,6 +55,8 @@ func NewServer(opts *ServerOptions) *Server {
 		defaultLibraryPath:    opts.DefaultLibraryPath,
 		typingsLocation:       opts.TypingsLocation,
 		parsedFileCache:       opts.ParsedFileCache,
+		documents:             make(map[lsproto.DocumentUri]string),
+		diagnostics:           make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
 	}
 }
 
@@ -145,7 +147,7 @@ type Server struct {
 	watchEnabled bool
 	watcherID    atomic.Uint32
 	watchers     collections.SyncSet[project.WatcherHandle]
-
+	//nolint
 	logger         *project.Logger
 	projectService *project.Service
 
@@ -579,19 +581,4 @@ func ptrIsTrue(v *bool) bool {
 		return false
 	}
 	return *v
-}
-
-func shouldEnableWatch(params *lsproto.InitializeParams) bool {
-	if params == nil || params.Capabilities == nil || params.Capabilities.Workspace == nil {
-		return false
-	}
-	return params.Capabilities.Workspace.DidChangeWatchedFiles != nil &&
-		ptrIsTrue(params.Capabilities.Workspace.DidChangeWatchedFiles.DynamicRegistration)
-}
-
-func getCompletionClientCapabilities(params *lsproto.InitializeParams) *lsproto.CompletionClientCapabilities {
-	if params == nil || params.Capabilities == nil || params.Capabilities.TextDocument == nil {
-		return nil
-	}
-	return params.Capabilities.TextDocument.Completion
 }

@@ -2,8 +2,6 @@
 package main
 
 import (
-	"flag"
-	"fmt"
 	"os"
 	"runtime"
 
@@ -16,27 +14,6 @@ import (
 )
 
 func runLSP(args []string) int {
-	flag := flag.NewFlagSet("lsp", flag.ContinueOnError)
-	stdio := flag.Bool("stdio", false, "use stdio for communication")
-	pprofDir := flag.String("pprofDir", "", "Generate pprof CPU/memory profiles to the given directory.")
-	pipe := flag.String("pipe", "", "use named pipe for communication")
-	_ = pipe
-	socket := flag.String("socket", "", "use socket for communication")
-	_ = socket
-	if err := flag.Parse(args); err != nil {
-		return 2
-	}
-
-	if !*stdio {
-		fmt.Fprintln(os.Stderr, "only stdio is supported")
-		return 1
-	}
-
-	if *pprofDir != "" {
-		fmt.Fprintf(os.Stderr, "pprof profiles will be written to: %v\n", *pprofDir)
-		//profileSession := pprof.BeginProfiling(*pprofDir, os.Stderr)
-		//defer profileSession.Stop()
-	}
 
 	fs := bundled.WrapFS(osvfs.FS())
 	defaultLibraryPath := bundled.LibPath()

@@ -51,7 +51,7 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 			TextDocumentSync: &lsproto.TextDocumentSyncOptionsOrKind{
 				Options: &lsproto.TextDocumentSyncOptions{
 					OpenClose: ptrTo(true),
-					Change:    ptrTo(lsproto.TextDocumentSyncKindIncremental),
+					Change:    ptrTo(lsproto.TextDocumentSyncKindFull),
 					Save: &lsproto.BooleanOrSaveOptions{
 						SaveOptions: &lsproto.SaveOptions{
 							IncludeText: ptrTo(true),
@@ -59,49 +59,10 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 					},
 				},
 			},
-			HoverProvider: &lsproto.BooleanOrHoverOptions{
-				Boolean: ptrTo(true),
-			},
-			DefinitionProvider: &lsproto.BooleanOrDefinitionOptions{
-				Boolean: ptrTo(true),
-			},
-			TypeDefinitionProvider: &lsproto.BooleanOrTypeDefinitionOptionsOrTypeDefinitionRegistrationOptions{
-				Boolean: ptrTo(true),
-			},
-			ReferencesProvider: &lsproto.BooleanOrReferenceOptions{
-				Boolean: ptrTo(true),
-			},
-			ImplementationProvider: &lsproto.BooleanOrImplementationOptionsOrImplementationRegistrationOptions{
-				Boolean: ptrTo(true),
-			},
 			DiagnosticProvider: &lsproto.DiagnosticOptionsOrRegistrationOptions{
 				Options: &lsproto.DiagnosticOptions{
 					InterFileDependencies: true,
 				},
-			},
-			CompletionProvider: &lsproto.CompletionOptions{
-				TriggerCharacters: &ls.TriggerCharacters,
-				ResolveProvider:   ptrTo(true),
-				// !!! other options
-			},
-			SignatureHelpProvider: &lsproto.SignatureHelpOptions{
-				TriggerCharacters: &[]string{"(", ","},
-			},
-			DocumentFormattingProvider: &lsproto.BooleanOrDocumentFormattingOptions{
-				Boolean: ptrTo(true),
-			},
-			DocumentRangeFormattingProvider: &lsproto.BooleanOrDocumentRangeFormattingOptions{
-				Boolean: ptrTo(true),
-			},
-			DocumentOnTypeFormattingProvider: &lsproto.DocumentOnTypeFormattingOptions{
-				FirstTriggerCharacter: "{",
-				MoreTriggerCharacter:  &[]string{"}", ";", "\n"},
-			},
-			WorkspaceSymbolProvider: &lsproto.BooleanOrWorkspaceSymbolOptions{
-				Boolean: ptrTo(true),
-			},
-			DocumentSymbolProvider: &lsproto.BooleanOrDocumentSymbolOptions{
-				Boolean: ptrTo(true),
 			},
 		},
 	}
@@ -110,7 +71,7 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 }
 func (s *Server) handleInitialized(ctx context.Context, params *lsproto.InitializedParams) error {
 	s.projectService = project.NewService(s, project.ServiceOptions{
-		Logger:           project.NewLogger([]io.Writer{os.Stderr}, "", project.LogLevelVerbose),
+		Logger:           project.NewLogger([]io.Writer{}, "", project.LogLevelVerbose),
 		PositionEncoding: lsproto.PositionEncodingKindUTF8,
 	})
 	// Try to find rslint configuration files with multiple strategies
@@ -199,7 +160,6 @@ func (s *Server) handleCodeAction(ctx context.Context, params *lsproto.CodeActio
 		}
 	}
 
-	//var codeActions []*lsproto.CodeAction
 	var codeActions []lsproto.CommandOrCodeAction
 
 	// Find diagnostics that overlap with the requested range
