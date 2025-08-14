@@ -12,6 +12,9 @@ permissions:
   # Optional: allow read access to pull requests. Use with `only-new-issues` option.
   pull-requests: read
 
+env:
+  GOMAXPROCS: 8
+
 jobs:
   test-go:
     name: Test Go

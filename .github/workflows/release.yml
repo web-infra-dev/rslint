@@ -270,6 +270,8 @@ jobs:
         run: xvfb-run -a pnpm -r test
 
   build:
+    env:
+      GOMAXPROCS: 8
     name: Build-Binaries
     strategy:
       fail-fast: false
