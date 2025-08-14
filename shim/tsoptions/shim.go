@@ -74,7 +74,7 @@ func ParseCompilerOptions(key string, value any, allOptions *core.CompilerOption
 func ParseConfigFileTextToJson(fileName string, path tspath.Path, jsonText string) (any, []*ast.Diagnostic)
 type ParseConfigHost = tsoptions.ParseConfigHost
 //go:linkname ParseListTypeOption github.com/microsoft/typescript-go/internal/tsoptions.ParseListTypeOption
-func ParseListTypeOption(opt *tsoptions.CommandLineOption, value string) ([]string, []*ast.Diagnostic)
+func ParseListTypeOption(opt *tsoptions.CommandLineOption, value string) ([]any, []*ast.Diagnostic)
 //go:linkname ParseTypeAcquisition github.com/microsoft/typescript-go/internal/tsoptions.ParseTypeAcquisition
 func ParseTypeAcquisition(key string, value any, allOptions *core.TypeAcquisition) []*ast.Diagnostic
 //go:linkname ParseWatchOptions github.com/microsoft/typescript-go/internal/tsoptions.ParseWatchOptions

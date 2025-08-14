@@ -441,7 +441,7 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 				tsAllowIndex = true
 			}
 		}
-		allowIndexAccess := opts.AllowIndexSignaturePropertyAccess || tsAllowIndex
+		// Derive allowIndexSignaturePropertyAccess from tsconfig option as well
 
 		listeners := rule.RuleListeners{}
 
@@ -486,11 +486,16 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 
 			if sym != nil {
 				flags := checker.GetDeclarationModifierFlagsFromSymbol(sym)
-				if opts.AllowPrivateClassPropertyAccess && (flags&ast.ModifierFlagsPrivate) != 0 {
-					return
-				}
-				if opts.AllowProtectedClassPropertyAccess && (flags&ast.ModifierFlagsProtected) != 0 {
-					return
+				if (flags&ast.ModifierFlagsPrivate) != 0 {
+					if opts.AllowPrivateClassPropertyAccess {
+						return
+					}
+					// Continue to report error when allowPrivateClassPropertyAccess is false
+				} else if (flags&ast.ModifierFlagsProtected) != 0 {
+					if opts.AllowProtectedClassPropertyAccess {
+						return
+					}
+					// Continue to report error when allowProtectedClassPropertyAccess is false
 				}
 			}
 
@@ -504,6 +509,7 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 			}
 
 			// Also allow when allowIndexAccess is enabled and no concrete property found
+			allowIndexAccess := opts.AllowIndexSignaturePropertyAccess || tsAllowIndex
 			if allowIndexAccess && sym == nil {
 				return
 			}

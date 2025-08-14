@@ -2,7 +2,7 @@ module github.com/microsoft/typescript-go/shim/ls
 
 go 1.24.2
 
-require github.com/microsoft/typescript-go v0.0.0-20250808210900-e087a3e09d31
+require github.com/microsoft/typescript-go v0.0.0-20250812073229-cedc0cbe6c18
 
 require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
