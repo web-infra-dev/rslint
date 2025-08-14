@@ -25,6 +25,7 @@ jobs:
           [
             rspack-ubuntu-22.04-large,
             rspack-windows-2022-large,
+            windows-latest,
             rspack-darwin-14-medium,
           ]
         go-version: ['1.25.0']
@@ -63,18 +64,17 @@ jobs:
         with:
           go-version: 1.24.1
           cache-name: test-go
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.3.0
+          args: --timeout=5m ./cmd/... ./internal/...
 
       - name: go vet
         run: npm run lint:go
 
       - name: go fmt
         run: npm run format:go
-
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
-        with:
-          version: v2.3.0
-          args: --timeout=5m ./cmd/... ./internal/...
 
   test-node:
     name: Test npm packages
