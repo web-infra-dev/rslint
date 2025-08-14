@@ -11,9 +11,16 @@
     "resolveJsonModule": true,
     "moduleResolution": "bundler",
     "useDefineForClassFields": true,
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "paths": {
+      "@theme": ["./theme"],
+      "@components/*": ["./theme/components/*"],
+      "@zh/*": ["./docs/zh/*"],
+      "@en/*": ["./docs/en/*"],
+      "i18n": ["./i18n.json"]
+    }
   },
-  "include": ["docs", "theme", "rspress.config.ts"],
+  "include": ["docs", "theme", "rspress.config.ts", "./env.d.ts"],
   "mdx": {
     "checkMdx": true
   }
