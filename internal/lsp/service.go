@@ -28,6 +28,7 @@ import (
 )
 
 func (s *Server) handleInitialize(ctx context.Context, params *lsproto.InitializeParams) (lsproto.InitializeResponse, error) {
+	log.Printf("handle initialize with pid: %d\n", os.Getpid())
 	if s.initializeParams != nil {
 		return nil, lsproto.ErrInvalidRequest
 	}
@@ -63,6 +64,9 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 				Options: &lsproto.DiagnosticOptions{
 					InterFileDependencies: true,
 				},
+			},
+			CodeActionProvider: &lsproto.BooleanOrCodeActionOptions{
+				Boolean: ptrTo(true),
 			},
 		},
 	}
