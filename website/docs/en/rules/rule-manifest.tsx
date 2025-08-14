@@ -158,31 +158,7 @@ export default function RuleManifestTable() {
 
   return (
     <>
-      <style>
-        {`
-          .rule-status-title {
-            font-size: 1rem;
-            font-weight: 700;
-            color: #1f2937;
-            margin: 0 0 1.5rem 0;
-            padding: 0;
-            line-height: 1.2;
-            letter-spacing: -0.025em;
-            border-bottom: 3px solid #3b82f6;
-            padding-bottom: 0.75rem;
-            display: inline-block;
-          }
-          
-          .rule-status-title:hover {
-            color: #1e40af;
-            border-bottom-color: #1e40af;
-            transition: all 0.2s ease-in-out;
-          }
-        `}
-      </style>
       <div style={{ padding: '24px' }}>
-        <h1 className="rule-status-title">Rule Implementation Status</h1>
-
         {/* Summary Statistics */}
         <div
           style={{
