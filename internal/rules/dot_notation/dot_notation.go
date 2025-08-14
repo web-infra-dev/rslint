@@ -24,7 +24,7 @@ func parseOptions(options any) Options {
 	// defaults
 	opts := Options{
 		AllowKeywords:                     true,
-		AllowIndexSignaturePropertyAccess: true,
+		AllowIndexSignaturePropertyAccess: false,
 	}
 
 	if options == nil {
@@ -421,6 +421,109 @@ func typeContainsTypeParameter(t *checker.Type) bool {
 	return false
 }
 
+// propMatchesTemplateIndexSignature returns true if the type declares an index signature
+// with a template-literal key type whose head/tail match the given property name.
+func propMatchesTemplateIndexSignature(typeChecker *checker.Checker, t *checker.Type, srcFile *ast.SourceFile, prop string) bool {
+	if t == nil || srcFile == nil {
+		return false
+	}
+	// Walk declarations from either the alias symbol or the direct type symbol
+	var decls []*ast.Node
+	if alias := checker.Type_alias(t); alias != nil && alias.Symbol() != nil && len(alias.Symbol().Declarations) > 0 {
+		decls = alias.Symbol().Declarations
+	} else if sym := checker.Type_symbol(t); sym != nil && len(sym.Declarations) > 0 {
+		decls = sym.Declarations
+	} else {
+		return false
+	}
+	// Helper to check an IndexSignatureDeclaration node
+	matchesFromIndexSig := func(sig *ast.Node) bool {
+		if sig == nil || sig.Kind != ast.KindIndexSignature {
+			return false
+		}
+		is := sig.AsIndexSignatureDeclaration()
+		if is == nil || is.Parameters == nil || len(is.Parameters.Nodes) == 0 {
+			return false
+		}
+		p := is.Parameters.Nodes[0]
+		if p == nil || p.Type() == nil {
+			return false
+		}
+		typeNode := p.Type()
+		// Quick gate: only handle template-literal key types
+		kt := checker.Checker_getTypeFromTypeNode(typeChecker, typeNode)
+		if kt == nil || (checker.Type_flags(kt)&checker.TypeFlagsTemplateLiteral) == 0 {
+			return false
+		}
+		rng := utils.TrimNodeTextRange(srcFile, typeNode)
+		text := srcFile.Text()[rng.Pos():rng.End()]
+		// Remove surrounding whitespace and backticks/quotes
+		trimmed := strings.TrimSpace(text)
+		if len(trimmed) >= 2 && (trimmed[0] == '`' && trimmed[len(trimmed)-1] == '`') {
+			trimmed = trimmed[1 : len(trimmed)-1]
+		}
+		// Find first placeholder occurrence
+		start := strings.Index(trimmed, "${")
+		end := strings.LastIndex(trimmed, "}")
+		if start == -1 || end == -1 || end < start {
+			return false
+		}
+		head := trimmed[:start]
+		tail := ""
+		if end+1 < len(trimmed) {
+			tail = trimmed[end+1:]
+		}
+		return strings.HasPrefix(prop, head) && strings.HasSuffix(prop, tail)
+	}
+	for _, decl := range decls {
+		if decl == nil {
+			continue
+		}
+		switch decl.Kind {
+		case ast.KindInterfaceDeclaration:
+			iface := decl.AsInterfaceDeclaration()
+			if iface != nil && iface.Members != nil {
+				for _, m := range iface.Members.Nodes {
+					if matchesFromIndexSig(m) {
+						return true
+					}
+				}
+			}
+		case ast.KindTypeAliasDeclaration:
+			ta := decl.AsTypeAliasDeclaration()
+			if ta != nil && ta.Type != nil && ta.Type.Kind == ast.KindTypeLiteral {
+				tl := ta.Type.AsTypeLiteralNode()
+				if tl != nil && tl.Members != nil {
+					for _, m := range tl.Members.Nodes {
+						if matchesFromIndexSig(m) {
+							return true
+						}
+					}
+				}
+			}
+		case ast.KindTypeLiteral:
+			tl := decl.AsTypeLiteralNode()
+			if tl != nil && tl.Members != nil {
+				for _, m := range tl.Members.Nodes {
+					if matchesFromIndexSig(m) {
+						return true
+					}
+				}
+			}
+		case ast.KindClassDeclaration:
+			cd := decl.AsClassDeclaration()
+			if cd != nil && cd.Members != nil {
+				for _, m := range cd.Members.Nodes {
+					if matchesFromIndexSig(m) {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
 func getStringLiteralValue(srcFile *ast.SourceFile, n *ast.Node) (string, bool) {
 	switch n.Kind {
 	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
@@ -458,13 +561,9 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 			}
 		}
 
-		// Derive allowIndexSignaturePropertyAccess from tsconfig option as well
-		tsAllowIndex := false
+		// Derive allowIndexSignaturePropertyAccess from tsconfig option as well (currently not used directly)
 		if ctx.Program != nil {
-			copts := ctx.Program.Options()
-			if copts != nil && copts.NoPropertyAccessFromIndexSignature.IsTrue() {
-				tsAllowIndex = true
-			}
+			_ = ctx.Program.Options()
 		}
 
 		listeners := rule.RuleListeners{}
@@ -523,30 +622,21 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 				}
 			}
 
-			// Allow bracket notation for properties that are NOT explicitly declared,
-			// but are covered by an index signature AND the allowIndexSignaturePropertyAccess flag (or TS option) is enabled.
-			// Additionally, if the index signature key is template-literal based and the property name matches,
-			// treat it as covered by the index signature.
-			allowIndexAccess := opts.AllowIndexSignaturePropertyAccess || tsAllowIndex
-			if allowIndexAccess && sym == nil {
-				if hasStringLikeIndexSignatureTS(ctx.TypeChecker, nnType) || hasStringLikeIndexSignature(ctx.TypeChecker, appType) || hasAnyIndexSignature(appType) {
-					return
+			// Allow bracket notation for properties that are NOT explicitly declared.
+			// This matches TS-ESLint behavior when an index signature covers the access.
+			if sym == nil {
+				allowIndexAccess := opts.AllowIndexSignaturePropertyAccess
+				if ctx.Program != nil {
+					if copts := ctx.Program.Options(); copts != nil && copts.NoPropertyAccessFromIndexSignature.IsTrue() {
+						allowIndexAccess = true
+					}
 				}
-				// Also permit when index key type or value type includes a type parameter; this captures
-				// cases like [extraKey: ExtraKey] where ExtraKey is a template-literal type parameter.
-				for _, info := range checker.Checker_getIndexInfosOfType(ctx.TypeChecker, appType) {
-					if info == nil {
-						continue
-					}
-					if typeContainsTypeParameter(checker.IndexInfo_keyType(info)) || typeContainsTypeParameter(checker.IndexInfo_valueType(info)) {
-						return
-					}
+				if allowIndexAccess && (hasStringLikeIndexSignatureTS(ctx.TypeChecker, nnType) || hasStringLikeIndexSignature(ctx.TypeChecker, appType) || hasAnyIndexSignature(appType) || propMatchesTemplateIndexSignature(ctx.TypeChecker, appType, ctx.SourceFile, propName)) {
+					return
 				}
 			}
 
-			// Suggest using dot notation if the name is a valid identifier and
-			// - allowKeywords is true; or
-			// - it's not a reserved keyword (and not true/false/null when allowKeywords is false)
+			// If there is a declared property with this exact name, prefer dot; otherwise, fall back to index signature rules
 			if isValidIdentifier(propName) && (opts.AllowKeywords || (!isKeyword(propName))) {
 				text := ctx.SourceFile.Text()
 				exprRange := utils.TrimNodeTextRange(ctx.SourceFile, elem.Expression)
