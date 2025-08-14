@@ -8,7 +8,7 @@ export function Hero() {
   const tUrl = useI18nUrl();
   const t = useI18n<typeof import('i18n')>();
   const onClickGetStarted = () => {
-    navigate(tUrl('/guide/start/quick-start'));
+    navigate(tUrl('/guide'));
   };
   return (
     <BaseHero
