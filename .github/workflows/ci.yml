@@ -149,6 +149,7 @@ jobs:
     needs:
       - test-go
       - test-node
+      - go-lint
     if: always()
     runs-on: ubuntu-latest
     name: CI Done
