@@ -3,8 +3,8 @@ package dot_notation
 import (
 	"testing"
 
-	"github.com/web-infra-dev/rslint/internal/rule_tester"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
 func TestDotNotationRule(t *testing.T) {

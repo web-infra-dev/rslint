@@ -17,7 +17,7 @@ import (
 func CreateCompilerHost(cwd string, fs vfs.FS) compiler.CompilerHost {
 	defaultLibraryPath := bundled.LibPath()
 	var extendedConfigCache collections.SyncMap[tspath.Path, *tsoptions.ExtendedConfigCacheEntry]
-	return compiler.NewCompilerHost(cwd, fs, defaultLibraryPath, &extendedConfigCache,nil)
+	return compiler.NewCompilerHost(cwd, fs, defaultLibraryPath, &extendedConfigCache, nil)
 }
 
 func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath string, host compiler.CompilerHost) (*compiler.Program, error) {
