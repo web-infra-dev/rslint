@@ -219,16 +219,24 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			if node.Kind == ast.KindAsExpression {
 				s := scanner.GetScannerForSourceFile(ctx.SourceFile, expression.End())
 				asKeywordRange := s.TokenRange()
+				
+				sourceText := ctx.SourceFile.Text()
+				startPos := asKeywordRange.Pos()
+				
+				if startPos > expression.End() && sourceText[startPos-1] == ' ' {
+				if startPos-1 == expression.End() || sourceText[startPos-2] != ' ' {
+						startPos--
+					}
+				}
 
-				ctx.ReportNodeWithFixes(node, msg, rule.RuleFixRemoveRange(asKeywordRange), rule.RuleFixRemove(ctx.SourceFile, typeNode))
+				fixRange := asKeywordRange.WithPos(startPos).WithEnd(typeNode.End())
+				ctx.ReportNodeWithFixes(node, msg, rule.RuleFixRemoveRange(fixRange))
 			} else {
 				s := scanner.GetScannerForSourceFile(ctx.SourceFile, node.Pos())
 				openingAngleBracket := s.TokenRange()
-				s.ResetPos(typeNode.End())
-				s.Scan()
-				closingAngleBracket := s.TokenRange()
 
-				ctx.ReportNodeWithFixes(node, msg, rule.RuleFixRemoveRange(openingAngleBracket.WithEnd(closingAngleBracket.End())))
+				fixRange := openingAngleBracket.WithEnd(expression.Pos())
+				ctx.ReportNodeWithFixes(node, msg, rule.RuleFixRemoveRange(fixRange))
 			}
 			// TODO - add contextually unnecessary check for this
 		}

@@ -405,7 +405,7 @@ foo!;
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code:   "const a = `a` as const;",
-			Output: []string{"const a = `a`  ;"},
+			Output: []string{"const a = `a`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unnecessaryAssertion",
@@ -415,7 +415,7 @@ foo!;
 		},
 		{
 			Code:   "const a = 'a' as const;",
-			Output: []string{"const a = 'a'  ;"},
+			Output: []string{"const a = 'a';"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unnecessaryAssertion",
@@ -446,7 +446,7 @@ foo!;
 		},
 		{
 			Code:   "const foo = 3 as 3;",
-			Output: []string{"const foo = 3  ;"},
+			Output: []string{"const foo = 3;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unnecessaryAssertion",
@@ -480,7 +480,7 @@ foo!;
       `,
 			Output: []string{`
         type Foo = 3;
-        const foo = 3  ;
+        const foo = 3;
       `,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -514,7 +514,7 @@ const bar = foo;
 const foo = (3 + 5) as number;
       `,
 			Output: []string{`
-const foo = (3 + 5)  ;
+const foo = (3 + 5);
       `,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -548,7 +548,7 @@ const foo = (3 + 5) as Foo;
       `,
 			Output: []string{`
 type Foo = number;
-const foo = (3 + 5)  ;
+const foo = (3 + 5);
       `,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -903,7 +903,7 @@ const a = foo() as number;
       `,
 			Output: []string{`
 declare function foo(): number;
-const a = foo()  ;
+const a = foo();
       `,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -940,7 +940,7 @@ declare function foo(): RT;
 			Output: []string{`
 type RT = { log: () => void };
 declare function foo(): RT;
-(foo()  ).log;
+(foo()).log;
       `,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -970,7 +970,7 @@ const item = arr[0];
 const foo = (  3 + 5  ) as number;
       `,
 			Output: []string{`
-const foo = (  3 + 5  )  ;
+const foo = (  3 + 5  );
       `,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -986,7 +986,7 @@ const foo = (  3 + 5  )  ;
 const foo = (  3 + 5  ) /*as*/ as number;
       `,
 			Output: []string{`
-const foo = (  3 + 5  ) /*as*/  ;
+const foo = (  3 + 5  ) /*as*/;
       `,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -1007,8 +1007,7 @@ const foo = (  3 + 5
       `,
 			Output: []string{`
 const foo = (  3 + 5
-  ) /*as*/  //as
-  ;
+  ) /*as*/;
       `,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -1024,7 +1023,7 @@ const foo = (  3 + 5
 const foo = (3 + (5 as number) ) as number;
       `,
 			Output: []string{`
-const foo = (3 + (5 as number) )  ;
+const foo = (3 + (5 as number) );
       `,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -1040,7 +1039,7 @@ const foo = (3 + (5 as number) )  ;
 const foo = 3 + 5/*as*/ as number;
       `,
 			Output: []string{`
-const foo = 3 + 5/*as*/  ;
+const foo = 3 + 5/*as*/;
       `,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -1056,7 +1055,7 @@ const foo = 3 + 5/*as*/  ;
 const foo = 3 + 5/*a*/ /*b*/ as number;
       `,
 			Output: []string{`
-const foo = 3 + 5/*a*/ /*b*/  ;
+const foo = 3 + 5/*a*/ /*b*/;
       `,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -1168,7 +1167,7 @@ const bar = foo.a as string | undefined;
 declare const foo: {
   a?: string;
 };
-const bar = foo.a  ;
+const bar = foo.a;
       `,
 			},
 			TSConfig: "./tsconfig.exactOptionalPropertyTypes.json",
@@ -1191,7 +1190,7 @@ const bar = foo.a as string | undefined;
 declare const foo: {
   a?: string | undefined;
 };
-const bar = foo.a  ;
+const bar = foo.a;
       `,
 			},
 			TSConfig: "./tsconfig.exactOptionalPropertyTypes.json",
@@ -1264,7 +1263,7 @@ class T {
       `,
 			Output: []string{`
 class T {
-  readonly a = 'a'  ;
+  readonly a = 'a';
 }
       `,
 			},
@@ -1283,7 +1282,7 @@ class T {
       `,
 			Output: []string{`
 class T {
-  readonly a = 3  ;
+  readonly a = 3;
 }
       `,
 			},
@@ -1306,7 +1305,7 @@ class T {
 type S = 10;
 
 class T {
-  readonly a = 10  ;
+  readonly a = 10;
 }
       `,
 			},
@@ -1325,7 +1324,7 @@ class T {
       `,
 			Output: []string{`
 class T {
-  readonly a = (3 + 5)  ;
+  readonly a = (3 + 5);
 }
       `,
 			},
@@ -1369,7 +1368,7 @@ enum T {
 }
 
 declare const a: T.Value1;
-const b = a  ;
+const b = a;
       `,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -1395,7 +1394,7 @@ enum T {
 }
 
 declare const a: T.Value1;
-const b = a  ;
+const b = a;
       `,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
