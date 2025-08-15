@@ -1,12 +1,10 @@
 module github.com/microsoft/typescript-go/shim/core
 
-go 1.24.2
-
-toolchain go1.24.4
+go 1.25
 
 require (
-	github.com/microsoft/typescript-go v0.0.0-20250812073229-cedc0cbe6c18
-	golang.org/x/text v0.27.0
+	github.com/microsoft/typescript-go v0.0.0-20250814234431-ae2bacc8a459
+	golang.org/x/text v0.28.0
 )
 
-require github.com/go-json-experiment/json v0.0.0-20250725192818-e39067aee2d2 // indirect
+require github.com/go-json-experiment/json v0.0.0-20250811204210-4789234c3ea1 // indirect
