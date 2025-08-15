@@ -7,7 +7,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/web-infra-dev/rslint/internal/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
 	"gotest.tools/v3/assert"
 )
 

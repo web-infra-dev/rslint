@@ -158,28 +158,37 @@ func GetWellKnownSymbolPropertyOfType(t *checker.Type, name string, typeChecker 
 	return checker.Checker_getPropertyOfType(typeChecker, t, checker.Checker_getPropertyNameForKnownSymbolName(typeChecker, name))
 }
 
+// getChildrenFromNonJSDocNode from github.com/microsoft/typescript-go/internal/ls/utilities.go
 func GetChildren(node *ast.Node, sourceFile *ast.SourceFile) []*ast.Node {
-	children := make([]*ast.Node, 0)
-
-	pos := node.Pos()
+	var childNodes []*ast.Node
 	node.ForEachChild(func(child *ast.Node) bool {
-		childPos := child.Pos()
-		if pos < childPos {
-			scanner := scanner.GetScannerForSourceFile(sourceFile, pos)
-			for pos < childPos {
-				token := scanner.Token()
-				tokenFullStart := scanner.TokenFullStart()
-				tokenEnd := scanner.TokenEnd()
-				children = append(children, sourceFile.GetOrCreateToken(token, tokenFullStart, tokenEnd, node))
-				pos = tokenEnd
-				scanner.Scan()
-			}
-		}
-
-		children = append(children, child)
-		pos = child.End()
+		childNodes = append(childNodes, child)
 		return false
 	})
+	var children []*ast.Node
+	pos := node.Pos()
+	for _, child := range childNodes {
+		scanner := scanner.GetScannerForSourceFile(sourceFile, pos)
+		for pos < child.Pos() {
+			token := scanner.Token()
+			tokenFullStart := scanner.TokenFullStart()
+			tokenEnd := scanner.TokenEnd()
+			children = append(children, sourceFile.GetOrCreateToken(token, tokenFullStart, tokenEnd, node))
+			pos = tokenEnd
+			scanner.Scan()
+		}
+		children = append(children, child)
+		pos = child.End()
+	}
+	scanner := scanner.GetScannerForSourceFile(sourceFile, pos)
+	for pos < node.End() {
+		token := scanner.Token()
+		tokenFullStart := scanner.TokenFullStart()
+		tokenEnd := scanner.TokenEnd()
+		children = append(children, sourceFile.GetOrCreateToken(token, tokenFullStart, tokenEnd, node))
+		pos = tokenEnd
+		scanner.Scan()
+	}
 	return children
 }
 

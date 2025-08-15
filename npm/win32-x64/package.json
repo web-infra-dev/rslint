@@ -1,6 +1,6 @@
 {
   "name": "@rslint/win32-x64",
-  "version": "0.1.10",
+  "version": "0.1.11",
   "license": "MIT",
   "description": "binary for rslint",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",

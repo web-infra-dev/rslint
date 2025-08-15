@@ -5,7 +5,7 @@ import (
 
 	"github.com/web-infra-dev/rslint/internal/plugins/import/rules/no_self_import"
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
-	"github.com/web-infra-dev/rslint/internal/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/plugins/import/fixtures"
 )
 
 func TestNoSelfImportRule(t *testing.T) {

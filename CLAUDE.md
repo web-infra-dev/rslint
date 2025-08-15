@@ -35,14 +35,22 @@ var RuleNameRule = rule.Rule{
 
 3. **Register the rule in `internal/config/config.go`**:
 
-   - Add import: `"github.com/web-infra-dev/rslint/internal/rules/rule_name"`
-   - In `RegisterAllRules()` function (NOT RegisterAllTypeScriptEslintPluginRules), add:
+   - Add import: `"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/rule_name"`
+   - In `RegisterAllTypeScriptEslintPluginRules()`, add:
      ```go
      GlobalRuleRegistry.Register("@typescript-eslint/rule-name", rule_name.RuleNameRule)
      ```
-   - **IMPORTANT**: The rule must be registered in `RegisterAllRules()` for it to be available in the API
 
-4. **Add struct field to TypedRules if the rule needs configuration**
+4. **Add the rule to the API hardcoded list in `cmd/rslint/api.go`**:
+
+   - Add import: `"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/rule_name"`
+   - In the `origin_rules` slice (around line 100), add:
+     ```go
+     rule_name.RuleNameRule,
+     ```
+   - **IMPORTANT**: The API uses a hardcoded list for the test runner. If you don't add your rule here, tests will fail with "Expected diagnostics for invalid case" errors.
+
+5. **Add struct field to TypedRules if the rule needs configuration**
 
 ### Critical Safety Requirements
 
@@ -187,12 +195,11 @@ Your changes must pass:
 
 ## Debugging Tips
 
-1. **Check rule registration**: Ensure the rule is in `RegisterAllRules()` function in `internal/config/config.go`
+1. **Check rule registration**: Ensure the rule is in `RegisterAllTypeScriptEslintPluginRules()`
 2. **Verify configuration**: Rule must be in `rslint.json` to generate diagnostics
 3. **Test CLI directly**: Use `rslint` binary to verify rule works
-4. **VSCode extension tests**: If failing with "Expected diagnostics but got 0", this is usually due to missing rule registration
+4. **VSCode extension tests**: If failing with "Expected diagnostics but got 0", this is usually due to missing rule registration (not LSP issues)
 5. **Add logging**: Use `log.Printf()` in LSP code (outputs to stderr)
-6. **Shim generation issues**: If you get "undefined" errors for TypeScript API methods (e.g., `checker.IndexInfo_keyType`), regenerate shims with `go run ./tools/gen_shims`
 
 ## Common Pitfalls to Avoid
 
@@ -201,10 +208,9 @@ Your changes must pass:
 3. **Don't change** core infrastructure without understanding impacts
 4. **Always handle nil** from type assertions
 5. **Focus on Go tests first** - ensure your Go implementation passes before running TypeScript tests
-6. **Missing rule registration** - Rules MUST be registered in `RegisterAllRules()` in `internal/config/config.go` to be available via the API
-7. **Test failures** - "Expected diagnostics for invalid case" usually means the rule isn't registered properly
+6. **Missing API registration** - Always add new rules to the hardcoded list in `cmd/rslint/api.go`
+7. **Test failures** - "Expected diagnostics for invalid case" usually means the rule isn't registered in the API
 8. **Column position mismatches** - TypeScript-ESLint and Go implementation may calculate positions differently, focus on Go test compatibility
-9. **Undefined TypeScript API methods** - If CI fails with undefined methods from the shim (e.g., `checker.Checker_getIndexInfosOfType`), regenerate shims with `go run ./tools/gen_shims`
 
 ## Complete Checklist for Adding a New Rule
 
@@ -213,16 +219,16 @@ Your changes must pass:
 1. [ ] Create rule implementation in `internal/rules/<rule_name>/<rule_name>.go`
 2. [ ] Add nil checks for all AST node type assertions
 3. [ ] Create comprehensive Go tests in `internal/rules/<rule_name>/<rule_name>_test.go`
-4. [ ] Register in `internal/config/config.go` in the `RegisterAllRules()` function with full @typescript-eslint/ prefix
+4. [ ] Register in `internal/config/config.go` with full @typescript-eslint/ prefix
+5. [ ] Add to hardcoded list in `cmd/rslint/api.go`
 
 ### Testing & Validation
 
-5. [ ] Run Go tests: `go test ./internal/rules/<rule_name>/` - **MUST PASS**
-6. [ ] Run Go quality checks: `go vet ./cmd/... ./internal/...` and `go fmt ./cmd/... ./internal/...`
-7. [ ] Build binary: `go build ./cmd/rslint`
-8. [ ] Test manually with CLI: `cd packages/rslint/fixtures && ../bin/rslint src/test.ts`
-9. [ ] Run all Go tests: `go test -parallel 4 ./internal/...`
-10. [ ] If you get undefined shim errors, regenerate shims: `go run ./tools/gen_shims`
+6. [ ] Run Go tests: `go test ./internal/rules/<rule_name>/` - **MUST PASS**
+7. [ ] Run Go quality checks: `go vet ./cmd/... ./internal/...` and `go fmt ./cmd/... ./internal/...`
+8. [ ] Build binary: `go build ./cmd/rslint`
+9. [ ] Test manually with CLI: `cd packages/rslint/fixtures && ../bin/rslint src/test.ts`
+10. [ ] Run all Go tests: `go test -parallel 4 ./internal/...`
 
 ### Integration Testing (After Go Implementation Complete)
 
@@ -273,53 +279,3 @@ Your changes must pass:
 - All nodes are visited via `ForEachChild` which respects TypeScript's AST structure
 - Listeners are registered by node kind and executed during traversal
 - Use `isInVariableDeclaration` helper to check if a node is within any variable declaration ancestor
-
-## Shim Generation and TypeScript API Access
-
-### Understanding Shims
-
-The rslint project uses Go "shims" to access the TypeScript compiler API from Go code. These shims are auto-generated bindings that expose TypeScript compiler functionality to Go.
-
-### When to Regenerate Shims
-
-You need to regenerate shims when:
-
-1. CI fails with "undefined" errors for TypeScript API methods (e.g., `undefined: checker.IndexInfo_keyType`)
-2. You need to access new TypeScript API methods not yet exposed
-3. After updating the typescript-go submodule
-
-### How to Regenerate Shims
-
-```bash
-go run ./tools/gen_shims
-```
-
-This command:
-
-- Reads the TypeScript API definitions from the typescript-go submodule
-- Generates Go bindings based on configuration files in `shim/*/extra-shim.json`
-- Updates the `shim.go` files in each shim package
-
-### Adding New TypeScript API Methods
-
-If you need to expose additional TypeScript API methods:
-
-1. Check if the method exists in the corresponding `extra-shim.json` file (e.g., `shim/checker/extra-shim.json`)
-2. If not present, add it to the appropriate section:
-   - `ExtraFunctions`: For standalone functions
-   - `ExtraMethods`: For methods on types (e.g., `Checker.getIndexInfosOfType`)
-   - `ExtraFields`: For accessing private fields on types
-3. Regenerate shims with `go run ./tools/gen_shims`
-4. The new methods will be available as `TypeName_methodName` (e.g., `checker.Checker_getIndexInfosOfType`)
-
-### Example: Accessing Checker Methods
-
-```go
-import "github.com/microsoft/typescript-go/shim/checker"
-
-// Access a method exposed via shims
-infos := checker.Checker_getIndexInfosOfType(typeChecker, someType)
-
-// Access a field exposed via shims
-keyType := checker.IndexInfo_keyType(indexInfo)
-```
