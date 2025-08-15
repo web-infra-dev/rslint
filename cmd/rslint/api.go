@@ -6,8 +6,6 @@ import (
 	"os"
 	"sync"
 
-	"sort"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
@@ -50,14 +48,11 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	allowedFiles := []string{}
 	// Apply file contents if provided
 	if len(req.FileContents) > 0 {
-		fileContents := make(map[string]string, len(req.FileContents))
-		for k, v := range req.FileContents {
-			normalizePath := tspath.NormalizePath(k)
-			fileContents[normalizePath] = v
-			allowedFiles = append(allowedFiles, normalizePath)
-		}
-		fs = utils.NewOverlayVFS(fs, fileContents)
+		fs = utils.NewOverlayVFS(fs, req.FileContents)
+		for file := range req.FileContents {
 
+			allowedFiles = append(allowedFiles, file) // Collect allowed files from request
+		}
 	}
 
 	// Initialize rule registry with all available rules
@@ -143,7 +138,6 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		programs,
 		false, // Don't use single-threaded mode for IPC
 		allowedFiles,
-		utils.ExcludePaths,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			return utils.Map(rulesWithOptions, func(r RuleWithOption) linter.ConfiguredRule {
 
@@ -164,24 +158,6 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	if diagnostics == nil {
 		diagnostics = []api.Diagnostic{}
 	}
-	// Ensure deterministic ordering: by file, then start line/column, then end line/column
-	sort.SliceStable(diagnostics, func(i, j int) bool {
-		if diagnostics[i].FilePath != diagnostics[j].FilePath {
-			return diagnostics[i].FilePath < diagnostics[j].FilePath
-		}
-		si, sj := diagnostics[i].Range.Start, diagnostics[j].Range.Start
-		if si.Line != sj.Line {
-			return si.Line < sj.Line
-		}
-		if si.Column != sj.Column {
-			return si.Column < sj.Column
-		}
-		ei, ej := diagnostics[i].Range.End, diagnostics[j].Range.End
-		if ei.Line != ej.Line {
-			return ei.Line < ej.Line
-		}
-		return ei.Column < ej.Column
-	})
 	// Create response
 	return &api.LintResponse{
 		Diagnostics: diagnostics,

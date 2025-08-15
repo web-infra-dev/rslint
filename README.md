@@ -1,7 +1,3 @@
-<picture>
-  <img alt="Rslint Banner" src="https://assets.rspack.rs/rslint/rslint-banner.png">
-</picture>
-
 # Rslint
 
 <p>
@@ -36,7 +32,7 @@ Rslint is a fork of [tsgolint](https://github.com/typescript-eslint/tsgolint), b
 
 ## 🚀 Getting Started
 
-See [Guide](https://rslint.rs/guide/).
+See [Guide](./GUIDE.md).
 
 ## 📖 Architecture Overview
 

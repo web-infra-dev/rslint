@@ -4,14 +4,10 @@ import {
   workspace,
   WorkspaceFolder,
   ExtensionMode,
-  OutputChannel,
-  window,
 } from 'vscode';
 import { State } from 'vscode-languageclient/node';
 import { LogLevel, Logger } from './logger';
 import { Rslint } from './Rslint';
-import { setupStatusBar } from './statusBar';
-import { RegisterCommands } from './commands';
 
 export class Extension implements Disposable {
   private rslintInstances: Map<string, Rslint> = new Map();
@@ -29,26 +25,12 @@ export class Extension implements Disposable {
     this.logger.info('Rslint extension activating...');
 
     const folders = workspace.workspaceFolders ?? [];
-    const outputChannel = window.createOutputChannel(
-      'Rslint Language Server',
-      'log',
-    );
-    const lspOutputChannel = window.createOutputChannel(
-      'Rslint Language Server(LSP)',
-    );
-
     for (const folder of folders) {
-      const workspaceRslint = this.createRslintInstance(
-        folder.name,
-        folder,
-        outputChannel,
-        lspOutputChannel,
-      );
+      const workspaceRslint = this.createRslintInstance(folder.name, folder);
       await workspaceRslint.start();
       this.setupStateChangeMonitoring(workspaceRslint, folder.name);
     }
-    setupStatusBar(this.context);
-    RegisterCommands(this.context, outputChannel, lspOutputChannel);
+
     this.logger.info('Rslint extension activated successfully');
   }
 
@@ -73,8 +55,6 @@ export class Extension implements Disposable {
   public createRslintInstance(
     id: string,
     workspaceFolder: WorkspaceFolder,
-    outputChannel: OutputChannel,
-    lspOutputChannel: OutputChannel,
   ): Rslint {
     if (this.rslintInstances.has(id)) {
       this.logger.warn(`Rslint instance with id '${id}' already exists`);
@@ -82,12 +62,7 @@ export class Extension implements Disposable {
     }
 
     // TODO: single file mode
-    const rslint = new Rslint(
-      this,
-      workspaceFolder,
-      outputChannel,
-      lspOutputChannel,
-    );
+    const rslint = new Rslint(this, workspaceFolder);
     this.rslintInstances.set(id, rslint);
     this.logger.debug(`Created Rslint instance with id: ${id}`);
     return rslint;

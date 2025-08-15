@@ -12,28 +12,17 @@ permissions:
   # Optional: allow read access to pull requests. Use with `only-new-issues` option.
   pull-requests: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
-  cancel-in-progress: ${{ github.ref_name != 'main' }}
-
 env:
-  GOMAXPROCS: 8
+  GO_VERSION: '1.24.1'
+  GOMAXPROCS: 4
 
 jobs:
   test-go:
     name: Test Go
-    runs-on: ${{ matrix.runner }}
+    runs-on: rspack-ubuntu-22.04-large
     strategy:
-      fail-fast: false
       matrix:
-        runner: [
-            rspack-ubuntu-22.04-large,
-            # TODO: enable later
-            # rspack-windows-2022-large,
-            windows-latest,
-            rspack-darwin-14-medium,
-          ]
-        go-version: ['1.25.0']
+        go-version: ['1.24.1']
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -49,17 +38,31 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache-name: test-go
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.3.0
+          args: --timeout=5m ./cmd/... ./internal/...
+      - name: go vet
+        run: npm run lint:go
+      - name: go fmt
+        run: npm run format:go
       - name: Unit Test
         run: |
-          go test -parallel 8 ./internal/...
-  go-lint:
-    name: Go Lint
+          go test -parallel 4 ./internal/...
+
+  test-node:
+    name: Test npm packages
     runs-on: rspack-ubuntu-22.04-large
+    strategy:
+      matrix:
+        go-version: ['1.24.1']
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           submodules: true
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -67,56 +70,25 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.25.0
-          cache-name: go-lint
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
-        with:
-          version: v2.4.0
-          args: --timeout=5m ./cmd/... ./internal/...
-
-      - name: go vet
-        run: npm run lint:go
-
-      - name: go fmt
-        run: npm run format:go
-
-  test-node:
-    name: Test npm packages
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [rspack-ubuntu-22.04-large, windows-latest]
-        go-version: ['1.25.0']
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
           go-version: ${{ matrix.go-version }}
           cache-name: test-node
+      - name: Install pnpm
+        run: corepack enable
 
-      - name: Setup Node.js
-        uses: ./.github/actions/setup-node
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Format
-        if: runner.os == 'Linux'
         run: pnpm format:check
 
       - name: Build
         run: pnpm build
 
       - name: TypeCheck
-        if: runner.os == 'Linux'
         run: pnpm typecheck
 
-      - name: Install xvfb and dependencies (Linux only)
-        if: runner.os == 'Linux'
+      - name: Install xvfb and dependencies
+        if: ${{ runner.os == 'Linux' && runner.environment == 'self-hosted' }}
         run: |
           sudo apt update
           sudo apt install -y libasound2 libgbm1 libgtk-3-0 libnss3 xvfb
@@ -125,9 +97,9 @@ jobs:
         uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
         with:
           path: packages/vscode-extension/.vscode-test
-          key: vscode-test-${{ matrix.os }}
+          key: 'vscode-test'
           restore-keys: |
-            vscode-test-${{ matrix.os }}-
+            - 'vscode-test-'
 
       - name: Test on Linux
         if: runner.os == 'Linux'
@@ -138,20 +110,17 @@ jobs:
         run: pnpm -r test
 
       - name: Check Spell
-        if: runner.os == 'Linux'
         run: pnpm check-spell
 
       - name: Lint
-        if: runner.os == 'Linux'
         run: pnpm run lint
 
   done:
     needs:
       - test-go
       - test-node
-      - go-lint
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: rspack-ubuntu-22.04-large
     name: CI Done
     steps:
       - run: exit 1

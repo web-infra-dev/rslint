@@ -41,7 +41,11 @@ on:
           - npm
           - extension
 permissions:
+  # Provenance generation in GitHub Actions requires "write" access to the "id-token"
+  id-token: write
   contents: read
+env:
+  GO_VERSION: '1.24.1'
 
 jobs:
   publish-npm:
@@ -50,11 +54,6 @@ jobs:
     needs: [build]
     runs-on: ubuntu-22.04
     environment: npm
-    permissions:
-      # For push git tags
-      contents: write
-      # For Trusted Publish
-      id-token: write
     steps:
       - name: Show dry-run status
         run: |
@@ -96,19 +95,17 @@ jobs:
 
       - name: Move binaries
         uses: ./.github/actions/move-artifacts
+
       - name: Publish npm packages
         if: ${{ inputs.dry_run == false }}
+        env:
+          NPM_TOKEN: ${{ secrets.RSLINT_NPM_TOKEN }}
         run: |
           pnpm -r publish --no-git-checks --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions"
-          version=$(jq -r .version package.json)
-          git tag v$version -m "v$version"
-          git push origin v$version
 
-  publish-extension-vscode:
+  publish-extesion:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
-    name: ${{ inputs.dry_run == true && 'Dry Run - VSCode Extensions' || 'Publish VSCode Extensions' }}
+    name: ${{ inputs.dry_run == true && 'Dry Run - Extensions' || 'Publish Extensions' }}
     needs: [build]
     runs-on: rspack-ubuntu-22.04-large
     steps:
@@ -120,7 +117,15 @@ jobs:
           submodules: true
 
       - name: Setup Node.js
-        uses: ./.github/actions/setup-node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install pnpm
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Download Artifact
         uses: actions/download-artifact@v4.1.7
@@ -149,29 +154,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           path: packages/vscode-extension/rslint-*.vsix
-
-  publish-extension-open-vsx:
-    if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
-    name: ${{ inputs.dry_run == true && 'Dry Run - Open VSX Extensions' || 'Publish Open VSX Extensions' }}
-    needs: [build]
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 1
-          ref: ${{ github.event.inputs.branch }}
-          submodules: true
-
-      - name: Setup Node
-        uses: ./.github/actions/setup-node
-
-      - name: Download Artifact
-        uses: actions/download-artifact@v4.1.7
-        with:
-          path: binaries
-
       - name: Build and publish to Open VSX Registry
+        # TODO fix the timeout problem while publish to Open VSX Registry
+        if: false
         env:
           OVSX_PAT: ${{ secrets.RSLINT_OVSX_PAT }}
         run: |
@@ -220,7 +205,7 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.25.0
+          go-version: ${{ env.GO_VERSION }}
           cache-name: ${{ matrix.node_os }}-${{ matrix.node_arch }}
 
       - name: Install pnpm
@@ -270,8 +255,6 @@ jobs:
         run: xvfb-run -a pnpm -r test
 
   build:
-    env:
-      GOMAXPROCS: 8
     name: Build-Binaries
     strategy:
       fail-fast: false
@@ -318,7 +301,7 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.25.0
+          go-version: ${{ env.GO_VERSION }}
           cache-name: ${{ matrix.node_os }}-${{ matrix.node_arch }}
 
       - name: Install pnpm
