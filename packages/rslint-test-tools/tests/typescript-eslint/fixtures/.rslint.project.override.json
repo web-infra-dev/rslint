@@ -1,0 +1,16 @@
+[
+  {
+    "language": "javascript",
+    "files": [],
+    "languageOptions": {
+      "parserOptions": {
+        "projectService": false,
+        "project": [
+          "./tsconfig.noPropertyAccessFromIndexSignature.json"
+        ]
+      }
+    },
+    "rules": {},
+    "plugins": []
+  }
+]
