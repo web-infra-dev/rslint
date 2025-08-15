@@ -35,7 +35,7 @@ var RuleNameRule = rule.Rule{
 
 3. **Register the rule in `internal/config/config.go`**:
 
-   - Add import: `"github.com/web-infra-dev/rslint/internal/rules/rule_name"`
+   - Add import: `"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/rule_name"`
    - In `RegisterAllTypeScriptEslintPluginRules()`, add:
      ```go
      GlobalRuleRegistry.Register("@typescript-eslint/rule-name", rule_name.RuleNameRule)
@@ -43,7 +43,7 @@ var RuleNameRule = rule.Rule{
 
 4. **Add the rule to the API hardcoded list in `cmd/rslint/api.go`**:
 
-   - Add import: `"github.com/web-infra-dev/rslint/internal/rules/rule_name"`
+   - Add import: `"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/rule_name"`
    - In the `origin_rules` slice (around line 100), add:
      ```go
      rule_name.RuleNameRule,
