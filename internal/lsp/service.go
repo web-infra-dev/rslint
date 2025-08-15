@@ -24,7 +24,6 @@ import (
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
 	"github.com/web-infra-dev/rslint/internal/rule"
-	util "github.com/web-infra-dev/rslint/internal/utils"
 )
 
 func (s *Server) handleInitialize(ctx context.Context, params *lsproto.InitializeParams) (lsproto.InitializeResponse, error) {
@@ -329,7 +328,7 @@ func runLintWithProjectService(uri lsproto.DocumentUri, service *project.Service
 		diagnostics = append(diagnostics, d)
 	}
 
-	linter.RunLinterInProgram(program, []string{filename}, util.ExcludePaths,
+	linter.RunLinterInProgram(program, []string{filename}, []string{},
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
 			return activeRules
