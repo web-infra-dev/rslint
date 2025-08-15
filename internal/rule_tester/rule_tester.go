@@ -80,6 +80,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 			[]*compiler.Program{program},
 			true,
 			allowedFiles,
+			[]string{}, // excludedPaths
 			func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 				return []linter.ConfiguredRule{
 					{
