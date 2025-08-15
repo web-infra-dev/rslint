@@ -5,11 +5,11 @@ package collections
 
 import "github.com/microsoft/typescript-go/internal/collections"
 
-type ManyToManySet[K, V comparable] = collections.ManyToManySet[K,V]
 type MapEntry[K comparable, V any] = collections.MapEntry[K,V]
 type MultiMap[K, V comparable] = collections.MultiMap[K,V]
 type OrderedMap[K comparable, V any] = collections.OrderedMap[K,V]
 type OrderedSet[T comparable] = collections.OrderedSet[T]
 type Set[T comparable] = collections.Set[T]
+type SyncManyToManySet[K, V comparable] = collections.SyncManyToManySet[K,V]
 type SyncMap[K comparable, V any] = collections.SyncMap[K,V]
 type SyncSet[T comparable] = collections.SyncSet[T]

@@ -42,8 +42,6 @@ on:
           - extension
 permissions:
   contents: read
-env:
-  GO_VERSION: '1.24.1'
 
 jobs:
   publish-npm:
@@ -272,6 +270,8 @@ jobs:
         run: xvfb-run -a pnpm -r test
 
   build:
+    env:
+      GOMAXPROCS: 8
     name: Build-Binaries
     strategy:
       fail-fast: false

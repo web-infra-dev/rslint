@@ -20,7 +20,7 @@ func runMain() int {
 		switch args[0] {
 		case "--lsp":
 			// run in LSP mode for Language Server
-			return runLSP()
+			return runLSP(args[1:])
 		case "--api":
 			// run in API mode for JS API
 			return runAPI()
