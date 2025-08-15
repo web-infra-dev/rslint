@@ -6,6 +6,7 @@ import { pluginGoogleAnalytics } from 'rsbuild-plugin-google-analytics';
 import { pluginOpenGraph } from 'rsbuild-plugin-open-graph';
 import { pluginFontOpenSans } from 'rspress-plugin-font-open-sans';
 import pluginSitemap from 'rspress-plugin-sitemap';
+import { pluginPreloadRule } from './preload-plugin';
 
 const siteUrl = 'https://rslint.rs';
 const description = 'The Rspack-based testing framework';
@@ -55,6 +56,7 @@ export default defineConfig({
     ],
   },
   plugins: [
+    pluginPreloadRule(),
     pluginFontOpenSans(),
     pluginSitemap({
       domain: siteUrl,
