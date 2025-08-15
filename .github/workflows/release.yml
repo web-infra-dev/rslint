@@ -104,7 +104,7 @@ jobs:
           git config --global user.name "github-actions"
           version=$(jq -r .version package.json)
           git tag v$version -m "v$version"
-          git push origin --follow-tags
+          git push origin v$version
 
   publish-extension-vscode:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
