@@ -13,7 +13,7 @@ permissions:
   pull-requests: read
 
 env:
-  GO_VERSION: '1.24.1'
+  GO_VERSION: '1.25.0'
   GOMAXPROCS: 4
 
 jobs:
@@ -22,7 +22,7 @@ jobs:
     runs-on: rspack-ubuntu-22.04-large
     strategy:
       matrix:
-        go-version: ['1.24.1']
+        go-version: ['1.25.0']
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -56,7 +56,7 @@ jobs:
     runs-on: rspack-ubuntu-22.04-large
     strategy:
       matrix:
-        go-version: ['1.24.1']
+        go-version: ['1.25.0']
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
