@@ -224,7 +224,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 				startPos := asKeywordRange.Pos()
 				
 				if startPos > expression.End() && sourceText[startPos-1] == ' ' {
-				if startPos-1 == expression.End() || sourceText[startPos-2] != ' ' {
+				if startPos-1 == expression.End() || (startPos-2 >= 0 && sourceText[startPos-2] != ' ') {
 						startPos--
 					}
 				}
