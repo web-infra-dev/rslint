@@ -50,7 +50,7 @@ export default function IsItReady({
             {title}: <span className="font-semibold">NO</span>
           </h1>
           <p className="mt-2 mb-2">
-            <span className="font-semibold">{percent}%</span> of Next.js{' '}
+            <span className="font-semibold">{percent}%</span> of RSLint{' '}
             {description} are passing though
             <i aria-hidden className="not-italic ml-1">
               {'\u2705'}

@@ -57,8 +57,12 @@ test.describe('RSLint Tracking Application', () => {
   test('should display RSLint branding and title', async ({ page }) => {
     await page.goto('/');
 
-    // Check for RSLint branding
-    await expect(page.locator('text=RSLint')).toBeVisible();
+    // Wait for page to load
+    await page.waitForLoadState('networkidle');
+
+    // Check for RSLint branding (could be in progress bar or page content)
+    const rslintText = page.locator('text=/.*RSLint.*/');
+    await expect(rslintText.first()).toBeVisible({ timeout: 10000 });
 
     // Check page title
     await expect(page).toHaveTitle(/RSLint/);

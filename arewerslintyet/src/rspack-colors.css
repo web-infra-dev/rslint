@@ -1,0 +1,63 @@
+/* copied from the rspack website */
+:root {
+  --rp-c-bg: #fff;
+  --rp-c-bg-soft: #f9f9f9;
+  --rp-c-bg-mute: #f1f1f1;
+  --rp-c-divider: #3c3c3c4a;
+  --rp-c-divider-light: #3c3c3c1a;
+  --rp-c-text-1: #213547;
+  --rp-c-text-2: #3c3c3ca8;
+  --rp-c-text-3: #3c3c3c54;
+  --rp-c-text-4: #3c3c3c2e;
+  --rp-c-text-code: #476573;
+  --rp-c-text-code-bg: #99a1b31a;
+  --rp-c-brand: #0095ff;
+  --rp-c-brand-light: #33adff;
+  --rp-c-brand-lighter: #66c2ff;
+  --rp-c-brand-dark: #07f;
+  --rp-c-brand-darker: #005fcc;
+  --rp-c-brand-tint: #7fa3ff29;
+  --rp-c-gray: #8e8e8e;
+  --rp-c-gray-light-1: #aeaeae;
+  --rp-c-gray-light-2: #c7c7c7;
+  --rp-c-gray-light-3: #d1d1d1;
+  --rp-c-gray-light-4: #e5e5e5;
+  --rp-c-gray-light-5: #f2f2f2;
+  --rp-c-dark: #000;
+  --rp-c-dark-light-1: #2f2f2f;
+  --rp-c-dark-light-2: #3a3a3a;
+  --rp-c-dark-light-3: #4a4a4a;
+  --rp-c-dark-light-4: #5c5c5c;
+  --rp-c-dark-light-5: #6b6b6b;
+  --rp-radius: 1rem;
+  --rp-radius-small: 0.5rem;
+  --rp-radius-large: 1.5rem;
+  --rp-c-link: var(--rp-c-brand-dark);
+}
+.dark {
+  --rp-c-bg: #191d24;
+  --rp-c-bg-soft: #292e37;
+  --rp-c-bg-mute: #343a46;
+  --rp-c-bg-alt: #000;
+  --rp-c-divider: #545454a6;
+  --rp-c-divider-light: #5454547a;
+  --rp-c-text-1: #fffff5ed;
+  --rp-c-text-2: #ebebeb8f;
+  --rp-c-text-3: #ebebeb61;
+  --rp-c-text-4: #ebebeb2e;
+  --rp-c-text-code: #c9def1;
+  --rp-c-link: var(--rp-c-brand-light);
+}
+
+:root {
+  --rp-c-brand: #ff5e00;
+  --rp-c-brand-dark: #ff704d;
+  --rp-c-brand-darker: #ff704d;
+  --rp-c-brand-light: #ff7524;
+  --rp-c-brand-lighter: #ff7524;
+  --rp-c-link: var(--rp-c-brand);
+  --rp-c-brand-tint: #ff5e0012;
+}
+.dark {
+  --rp-c-link: var(--rp-c-brand-light);
+}
