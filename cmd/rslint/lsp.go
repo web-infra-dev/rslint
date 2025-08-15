@@ -505,6 +505,7 @@ func runLintWithPrograms(uri lsproto.DocumentUri, programs []*compiler.Program, 
 		programs,
 		false, // Don't use single-threaded mode for LSP
 		[]string{filename},
+		[]string{}, // excludedPaths
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
 			return activeRules
