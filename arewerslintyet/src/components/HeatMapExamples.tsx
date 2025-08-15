@@ -21,7 +21,11 @@ export function HeapMapExamples() {
     fetchData();
   }, []);
 
-  if (loading || !ruleExamplesResult || Object.keys(ruleExamplesResult).length === 0) {
+  if (
+    loading ||
+    !ruleExamplesResult ||
+    Object.keys(ruleExamplesResult).length === 0
+  ) {
     return null;
   }
 

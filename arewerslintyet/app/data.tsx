@@ -118,9 +118,8 @@ internal/rules/no_debugger/no_debugger.go
 export const getRuleExamplesResults = unstable_cache(
   async () => {
     try {
-      const data: { [ruleName: string]: /* isPassing */ boolean } = await kv.get(
-        `${kvPrefix}rule-examples-data`,
-      );
+      const data: { [ruleName: string]: /* isPassing */ boolean } =
+        await kv.get(`${kvPrefix}rule-examples-data`);
       return data;
     } catch (error) {
       // Mock data for development

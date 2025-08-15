@@ -115,7 +115,9 @@ export const getRuleExamplesResults = async () => {
 
 export const getDevelopmentLintRuns = async () => {
   try {
-    const graphData = await kv.lrange(`${kvPrefix}lint-runs`, 0, -1).then(processGraphData);
+    const graphData = await kv
+      .lrange(`${kvPrefix}lint-runs`, 0, -1)
+      .then(processGraphData);
     const mostRecent = graphData[graphData.length - 1];
     return { graphData, mostRecent };
   } catch (error) {

@@ -1,5 +1,3 @@
-
-
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 
 import {

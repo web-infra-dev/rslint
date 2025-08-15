@@ -201,7 +201,7 @@ internal/rules/no_new_array/no_new_array.go
 
 internal/rules/no_new_func/no_new_func.go
   ✗ should detect new Function()
-  ✗ should suggest function declaration`
+  ✗ should suggest function declaration`,
   };
 };
 
@@ -213,7 +213,8 @@ const RulesHeatMap = () => {
     <section className="mb-8">
       <h2 className="text-2xl font-semibold mb-4">RSLint Tests</h2>
       <p className="text-gray-600 dark:text-gray-300 mb-4">
-        Visual overview of RSLint test results. Each square represents a test case:
+        Visual overview of RSLint test results. Each square represents a test
+        case:
       </p>
       <div className="flex items-center gap-4 mb-4 text-sm">
         <div className="flex items-center gap-2">
@@ -225,7 +226,15 @@ const RulesHeatMap = () => {
           <span>Failing Tests</span>
         </div>
       </div>
-      <section className="HeatMap" style={{ display: 'flex', flexWrap: 'wrap', gap: '1px', maxWidth: '800px' }}>
+      <section
+        className="HeatMap"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '1px',
+          maxWidth: '800px',
+        }}
+      >
         <HeapMap lintResults={mockData} />
       </section>
     </section>
@@ -490,7 +499,13 @@ export default function RulesWithHeatMap() {
                   </td>
                   <td style={{ padding: '12px' }}>
                     {rule.failing_case && rule.failing_case.length > 0 ? (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: '4px',
+                        }}
+                      >
                         {rule.failing_case.slice(0, 3).map((failCase, idx) => (
                           <a
                             key={idx}
@@ -516,7 +531,9 @@ export default function RulesWithHeatMap() {
                         )}
                       </div>
                     ) : (
-                      <span style={{ color: '#6b7280', fontSize: '14px' }}>None</span>
+                      <span style={{ color: '#6b7280', fontSize: '14px' }}>
+                        None
+                      </span>
                     )}
                   </td>
                 </tr>

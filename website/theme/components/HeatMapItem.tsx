@@ -1,5 +1,3 @@
-
-
 import React, { useEffect } from 'react';
 import { useTooltip } from './TooltipContext';
 
