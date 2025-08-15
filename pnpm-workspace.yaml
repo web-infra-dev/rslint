@@ -1,4 +1,7 @@
 packages:
-  - 'packages/*'
-  - 'npm/*'
-  - 'website'
+  - packages/*
+  - npm/*
+  - website
+
+onlyBuiltDependencies:
+  - core-js
