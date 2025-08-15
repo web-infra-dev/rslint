@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { usePageData } from '@rspress/core/runtime';
 
 type FailingCase = {
   name: string;
@@ -108,15 +109,21 @@ export default function RuleManifestTable() {
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [groupFilter, setGroupFilter] = useState<string>('all');
-
+  const pageData = usePageData();
   useEffect(() => {
+    if (pageData.page.ruleManifest) {
+      let data: any = pageData.page.ruleManifest;
+      setRules(data.rules ?? []);
+      setLoading(false);
+      return;
+    }
     fetch(RULE_MANIFEST_URL)
       .then(res => {
         if (!res.ok) throw new Error('Failed to fetch rule-manifest.json');
         return res.json();
       })
       .then(data => {
-        setRules(Array.isArray(data) ? data : data.rules || []);
+        setRules(data.rules ?? []);
         setLoading(false);
       })
       .catch(err => {
