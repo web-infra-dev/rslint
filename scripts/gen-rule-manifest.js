@@ -3,7 +3,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const RULES_DIR = path.join(__dirname, '../internal/rules');
+// Plugins root directory
+const PLUGINS_DIR = path.join(__dirname, '../internal/plugins');
 const TEST_CONFIG_PATH = path.join(
   __dirname,
   '../packages/rslint-test-tools/rstest.config.mts',
@@ -17,12 +18,46 @@ const MANIFEST_PATH = path.join(
   '../packages/rslint-test-tools/rule-manifest.json',
 );
 
-function getRuleDirs() {
-  return fs
-    .readdirSync(RULES_DIR, { withFileTypes: true })
-    .filter(dirent => dirent.isDirectory() && !dirent.name.startsWith('.'))
-    .map(dirent => dirent.name)
-    .filter(name => name !== 'fixtures'); // exclude fixtures
+function getPluginRuleEntries() {
+  // Collect rule directories from internal/plugins/{plugin}/rules/*
+  if (!fs.existsSync(PLUGINS_DIR)) return [];
+  const plugins = fs
+    .readdirSync(PLUGINS_DIR, { withFileTypes: true })
+    .filter(d => d.isDirectory() && !d.name.startsWith('.'))
+    .map(d => d.name);
+  const entries = [];
+  const pluginNameCache = new Map();
+  function getPluginDisplayName(plugin) {
+    if (pluginNameCache.has(plugin)) return pluginNameCache.get(plugin);
+    const pluginGo = path.join(PLUGINS_DIR, plugin, 'plugin.go');
+    let display = plugin; // fallback
+    if (fs.existsSync(pluginGo)) {
+      try {
+        const content = fs.readFileSync(pluginGo, 'utf-8');
+        const m = content.match(/PLUGIN_NAME\s*=\s*"([^"]+)"/);
+        if (m) display = m[1];
+      } catch {}
+    }
+    pluginNameCache.set(plugin, display);
+    return display;
+  }
+  for (const plugin of plugins) {
+    const rulesDir = path.join(PLUGINS_DIR, plugin, 'rules');
+    if (!fs.existsSync(rulesDir) || !fs.statSync(rulesDir).isDirectory())
+      continue;
+    const pluginDisplayName = getPluginDisplayName(plugin);
+    const ruleDirs = fs
+      .readdirSync(rulesDir, { withFileTypes: true })
+      .filter(
+        d =>
+          d.isDirectory() && d.name !== 'fixtures' && !d.name.startsWith('.'),
+      )
+      .map(d => d.name);
+    for (const rule of ruleDirs) {
+      entries.push({ rule, group: pluginDisplayName });
+    }
+  }
+  return entries;
 }
 
 function getIncludedRules() {
@@ -102,30 +137,17 @@ function getSkipCases(rule) {
 
 function buildManifest() {
   const included = getIncludedRules();
-  const rules = getRuleDirs()
-    .sort()
+  const pluginEntries = getPluginRuleEntries();
+  const ruleSet = new Set(pluginEntries.map(e => e.rule));
+  const ruleToGroup = new Map();
+  for (const e of pluginEntries) ruleToGroup.set(e.rule, e.group);
+  const rules = Array.from(ruleSet)
+    .sort((a, b) => a.localeCompare(b))
     .map(rule => {
       let status = 'full';
       let failing_case = [];
-      // Determine group: if rule dir exists in internal/plugins/xxx, group=xxx; else typescript-eslint
-      let group = 'typescript-eslint';
-      const pluginsDir = path.join(__dirname, '../internal/plugins');
-      if (fs.existsSync(pluginsDir)) {
-        const pluginGroups = fs
-          .readdirSync(pluginsDir, { withFileTypes: true })
-          .filter(dirent => dirent.isDirectory())
-          .map(dirent => dirent.name);
-        for (const plugin of pluginGroups) {
-          const pluginRuleDir = path.join(pluginsDir, plugin, rule);
-          if (
-            fs.existsSync(pluginRuleDir) &&
-            fs.statSync(pluginRuleDir).isDirectory()
-          ) {
-            group = plugin;
-            break;
-          }
-        }
-      }
+      // Group now derived from PLUGIN_NAME constant; fallback to 'typescript-eslint'
+      let group = ruleToGroup.get(rule) || 'typescript-eslint';
       if (!included.has(rule)) {
         status = 'partial-test';
       } else {
