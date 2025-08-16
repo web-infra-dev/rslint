@@ -543,6 +543,1166 @@ const Component = () => {
 				`,
 			},
 		},
-		[]rule_tester.InvalidTestCase{},
+		[]rule_tester.InvalidTestCase{
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function ComponentWithConditionalHook() {
+  if (cond) {
+    useConditionalHook();
+  }
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "conditionalHook",
+						Line:      5,
+					},
+				},
+			},
+			{
+				Code: `
+Hook.useState();
+Hook._useState();
+Hook.use42();
+Hook.useHook();
+Hook.use_hook();
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "topLevelHook",
+						Line:      2,
+					},
+					{
+						MessageId: "topLevelHook",
+						Line:      4,
+					},
+					{
+						MessageId: "topLevelHook",
+						Line:      5,
+					},
+				},
+			},
+			{
+				Code: `
+class C {
+  m() {
+    This.useHook();
+    Super.useHook();
+  }
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "classHook",
+						Line:      4,
+					},
+					{
+						MessageId: "classHook",
+						Line:      5,
+					},
+				},
+			},
+			{
+				Code: `
+// This is a false positive (it's valid) that unfortunately
+// we cannot avoid. Prefer to rename it to not start with "use"
+class Foo extends Component {
+  render() {
+    if (cond) {
+      FooStore.useFeatureFlag();
+    }
+  }
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "classHook",
+						Line:      7,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function ComponentWithConditionalHook() {
+  if (cond) {
+    Namespace.useConditionalHook();
+  }
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "conditionalHook",
+						Line:      6,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function createComponent() {
+  return function ComponentWithConditionalHook() {
+    if (cond) {
+      useConditionalHook();
+    }
+  }
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "conditionalHook",
+						Line:      7,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function useHookWithConditionalHook() {
+  if (cond) {
+    useConditionalHook();
+  }
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "conditionalHook",
+						Line:      6,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function createHook() {
+  return function useHookWithConditionalHook() {
+    if (cond) {
+      useConditionalHook();
+    }
+  }
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "conditionalHook",
+						Line:      7,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function ComponentWithTernaryHook() {
+  cond ? useTernaryHook() : null;
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "conditionalHook",
+						Line:      5,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's a common misunderstanding.
+// We *could* make it valid but the runtime error could be confusing.
+function ComponentWithHookInsideCallback() {
+  useEffect(() => {
+    useHookInsideCallback();
+  });
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "genericHook",
+						Line:      6,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's a common misunderstanding.
+// We *could* make it valid but the runtime error could be confusing.
+function createComponent() {
+  return function ComponentWithHookInsideCallback() {
+    useEffect(() => {
+      useHookInsideCallback();
+    });
+  }
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "genericHook",
+						Line:      7,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's a common misunderstanding.
+// We *could* make it valid but the runtime error could be confusing.
+const ComponentWithHookInsideCallback = React.forwardRef((props, ref) => {
+  useEffect(() => {
+    useHookInsideCallback();
+  });
+  return <button {...props} ref={ref} />
+});
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "genericHook",
+						Line:      6,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's a common misunderstanding.
+// We *could* make it valid but the runtime error could be confusing.
+const ComponentWithHookInsideCallback = React.memo(props => {
+  useEffect(() => {
+    useHookInsideCallback();
+  });
+  return <button {...props} />
+});
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "genericHook",
+						Line:      6,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's a common misunderstanding.
+// We *could* make it valid but the runtime error could be confusing.
+function ComponentWithHookInsideCallback() {
+  function handleClick() {
+    useState();
+  }
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "functionHook",
+						Line:      6,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's a common misunderstanding.
+// We *could* make it valid but the runtime error could be confusing.
+function createComponent() {
+  return function ComponentWithHookInsideCallback() {
+    function handleClick() {
+      useState();
+    }
+  }
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "functionHook",
+						Line:      7,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function ComponentWithHookInsideLoop() {
+  while (cond) {
+    useHookInsideLoop();
+  }
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "loopHook",
+						Line:      6,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function ComponentWithHookInsideLoop() {
+  do {
+    useHookInsideLoop();
+  } while (cond);
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "loopHook",
+						Line:      6,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function ComponentWithHookInsideLoop() {
+  do {
+    foo();
+  } while (useHookInsideLoop());
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "loopHook",
+						Line:      7,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function renderItem() {
+  useState();
+}
+
+function List(props) {
+  return props.items.map(renderItem);
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "functionHook",
+						Line:      5,
+					},
+				},
+			},
+			{
+				Code: `
+// Currently invalid because it violates the convention and removes the "taint"
+// from a hook. We *could* make it valid to avoid some false positives but let's
+// ensure that we don't break the "renderItem" and "normalFunctionWithConditionalHook"
+// cases which must remain invalid.
+function normalFunctionWithHook() {
+  useHookInsideNormalFunction();
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "functionHook",
+						Line:      7,
+					},
+				},
+			},
+			{
+				Code: `
+// These are neither functions nor hooks.
+function _normalFunctionWithHook() {
+  useHookInsideNormalFunction();
+}
+function _useNotAHook() {
+  useHookInsideNormalFunction();
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "functionHook",
+						Line:      4,
+					},
+					{
+						MessageId: "functionHook",
+						Line:      7,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function normalFunctionWithConditionalHook() {
+  if (cond) {
+    useHookInsideNormalFunction();
+  }
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "functionHook",
+						Line:      6,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function useHookInLoops() {
+  while (a) {
+    useHook1();
+    if (b) return;
+    useHook2();
+  }
+  while (c) {
+    useHook3();
+    if (d) return;
+    useHook4();
+  }
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "loopHook",
+						Line:      6,
+					},
+					{
+						MessageId: "loopHook",
+						Line:      8,
+					},
+					{
+						MessageId: "loopHook",
+						Line:      11,
+					},
+					{
+						MessageId: "loopHook",
+						Line:      13,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function useHookInLoops() {
+  while (a) {
+    useHook1();
+    if (b) continue;
+    useHook2();
+  }
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "loopHook",
+						Line:      6,
+					},
+					{
+						MessageId: "loopHook",
+						Line:      8,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function useHookInLoops() {
+  do {
+    useHook1();
+    if (a) return;
+    useHook2();
+  } while (b);
+
+  do {
+    useHook3();
+    if (c) return;
+    useHook4();
+  } while (d)
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "loopHook",
+						Line:      6,
+					},
+					{
+						MessageId: "loopHook",
+						Line:      8,
+					},
+					{
+						MessageId: "loopHook",
+						Line:      12,
+					},
+					{
+						MessageId: "loopHook",
+						Line:      14,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function useHookInLoops() {
+  do {
+    useHook1();
+    if (a) continue;
+    useHook2();
+  } while (b);
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "loopHook",
+						Line:      6,
+					},
+					{
+						MessageId: "loopHook",
+						Line:      8,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function useLabeledBlock() {
+  label: {
+    if (a) break label;
+    useHook();
+  }
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "conditionalHook",
+						Line:      7,
+					},
+				},
+			},
+			{
+				Code: `
+// Currently invalid.
+// These are variations capturing the current heuristic--
+// we only allow hooks in PascalCase or useFoo functions.
+// We *could* make some of these valid. But before doing it,
+// consider specific cases documented above that contain reasoning.
+function a() { useState(); }
+const whatever = function b() { useState(); };
+const c = () => { useState(); };
+let d = () => useState();
+e = () => { useState(); };
+({f: () => { useState(); }});
+({g() { useState(); }});
+const {j = () => { useState(); }} = {};
+({k = () => { useState(); }} = {});
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "functionHook",
+						Line:      7,
+					},
+					{
+						MessageId: "functionHook",
+						Line:      8,
+					},
+					{
+						MessageId: "functionHook",
+						Line:      9,
+					},
+					{
+						MessageId: "functionHook",
+						Line:      10,
+					},
+					{
+						MessageId: "functionHook",
+						Line:      11,
+					},
+					{
+						MessageId: "functionHook",
+						Line:      12,
+					},
+					{
+						MessageId: "functionHook",
+						Line:      13,
+					},
+					{
+						MessageId: "functionHook",
+						Line:      14,
+					},
+					{
+						MessageId: "functionHook",
+						Line:      15,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function useHook() {
+  if (a) return;
+  useState();
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "conditionalHook",
+						Line:      6,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function useHook() {
+  if (a) return;
+  if (b) {
+    console.log('true');
+  } else {
+    console.log('false');
+  }
+  useState();
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "conditionalHook",
+						Line:      11,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function useHook() {
+  if (b) {
+    console.log('true');
+  } else {
+    console.log('false');
+  }
+  if (a) return;
+  useState();
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "conditionalHook",
+						Line:      11,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function useHook() {
+  a && useHook1();
+  b && useHook2();
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "conditionalHook",
+						Line:      5,
+					},
+					{
+						MessageId: "conditionalHook",
+						Line:      6,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function useHook() {
+  try {
+    f();
+    useState();
+  } catch {}
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "conditionalHook",
+						Line:      7,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+function useHook({ bar }) {
+  let foo1 = bar && useState();
+  let foo2 = bar || useState();
+  let foo3 = bar ?? useState();
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "conditionalHook",
+						Line:      5,
+					},
+					{
+						MessageId: "conditionalHook",
+						Line:      6,
+					},
+					{
+						MessageId: "conditionalHook",
+						Line:      7,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+const FancyButton = React.forwardRef((props, ref) => {
+  if (props.fancy) {
+    useCustomHook();
+  }
+  return <button ref={ref}>{props.children}</button>;
+});
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "conditionalHook",
+						Line:      6,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+const FancyButton = forwardRef(function(props, ref) {
+  if (props.fancy) {
+    useCustomHook();
+  }
+  return <button ref={ref}>{props.children}</button>;
+});
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "conditionalHook",
+						Line:      6,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous and might not warn otherwise.
+// This *must* be invalid.
+const MemoizedButton = memo(function(props) {
+  if (props.fancy) {
+    useCustomHook();
+  }
+  return <button>{props.children}</button>;
+});
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "conditionalHook",
+						Line:      6,
+					},
+				},
+			},
+			{
+				Code: `
+// This is invalid because "use"-prefixed functions used in named
+// functions are assumed to be hooks.
+React.unknownFunction(function notAComponent(foo, bar) {
+  useProbablyAHook(bar)
+});
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "functionHook",
+						Line:      5,
+					},
+				},
+			},
+			{
+				Code: `
+// Invalid because it's dangerous.
+// Normally, this would crash, but not if you use inline requires.
+// This *must* be invalid.
+// It's expected to have some false positives, but arguably
+// they are confusing anyway due to the use*() convention
+// already being associated with Hooks.
+useState();
+if (foo) {
+  const foo = React.useCallback(() => {});
+}
+useCustomHook();
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "topLevelHook",
+						Line:      8,
+					},
+					{
+						MessageId: "topLevelHook",
+						Line:      10,
+					},
+					{
+						MessageId: "topLevelHook",
+						Line:      12,
+					},
+				},
+			},
+			{
+				Code: `
+// Technically this is a false positive.
+// We *could* make it valid (and it used to be).
+//
+// However, top-level Hook-like calls can be very dangerous
+// in environments with inline requires because they can mask
+// the runtime error by accident.
+// So we prefer to disallow it despite the false positive.
+
+const {createHistory, useBasename} = require('history-2.1.2');
+const browserHistory = useBasename(createHistory)({
+  basename: '/',
+});
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "topLevelHook",
+						Line:      11,
+					},
+				},
+			},
+			{
+				Code: `
+class ClassComponentWithFeatureFlag extends React.Component {
+  render() {
+    if (foo) {
+      useFeatureFlag();
+    }
+  }
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "classHook",
+						Line:      5,
+					},
+				},
+			},
+			{
+				Code: `
+class ClassComponentWithHook extends React.Component {
+  render() {
+    React.useState();
+  }
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "classHook",
+						Line:      4,
+					},
+				},
+			},
+			{
+				Code: `
+(class {useHook = () => { useState(); }});
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "classHook",
+						Line:      2,
+					},
+				},
+			},
+			{
+				Code: `
+(class {useHook() { useState(); }});
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "classHook",
+						Line:      2,
+					},
+				},
+			},
+			{
+				Code: `
+(class {h = () => { useState(); }});
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "classHook",
+						Line:      2,
+					},
+				},
+			},
+			{
+				Code: `
+(class {i() { useState(); }});
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "classHook",
+						Line:      2,
+					},
+				},
+			},
+			{
+				Code: `
+async function AsyncComponent() {
+  useState();
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "asyncComponentHook",
+						Line:      3,
+					},
+				},
+			},
+			{
+				Code: `
+async function useAsyncHook() {
+  useState();
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "asyncComponentHook",
+						Line:      3,
+					},
+				},
+			},
+			{
+				Code: `
+async function Page() {
+  useId();
+  React.useId();
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "asyncComponentHook",
+						Line:      3,
+					},
+					{
+						MessageId: "asyncComponentHook",
+						Line:      4,
+					},
+				},
+			},
+			{
+				Code: `
+async function useAsyncHook() {
+  useId();
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "asyncComponentHook",
+						Line:      3,
+					},
+				},
+			},
+			{
+				Code: `
+async function notAHook() {
+  useId();
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "functionHook",
+						Line:      3,
+					},
+				},
+			},
+			{
+				Code: `
+Hook.use();
+Hook._use();
+Hook.useState();
+Hook._useState();
+Hook.use42();
+Hook.useHook();
+Hook.use_hook();
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "topLevelHook",
+						Line:      2,
+					},
+					{
+						MessageId: "topLevelHook",
+						Line:      4,
+					},
+					{
+						MessageId: "topLevelHook",
+						Line:      6,
+					},
+					{
+						MessageId: "topLevelHook",
+						Line:      7,
+					},
+				},
+			},
+			{
+				Code: `
+function notAComponent() {
+  use(promise);
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "functionHook",
+						Line:      3,
+					},
+				},
+			},
+			{
+				Code: `
+const text = use(promise);
+function App() {
+  return <Text text={text} />
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "topLevelHook",
+						Line:      2,
+					},
+				},
+			},
+			{
+				Code: `
+class C {
+  m() {
+    use(promise);
+  }
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "classHook",
+						Line:      4,
+					},
+				},
+			},
+			{
+				Code: `
+async function AsyncComponent() {
+  use();
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "asyncComponentHook",
+						Line:      3,
+					},
+				},
+			},
+			{
+				Code: `
+function App({p1, p2}) {
+  try {
+    use(p1);
+  } catch (error) {
+    console.error(error);
+  }
+  use(p2);
+  return <div>App</div>;
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "tryCatchUse",
+						Line:      4,
+					},
+				},
+			},
+			{
+				Code: `
+function App({p1, p2}) {
+  try {
+    doSomething();
+  } catch {
+    use(p1);
+  }
+  use(p2);
+  return <div>App</div>;
+}
+				`,
+
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "tryCatchUse",
+						Line:      6,
+					},
+				},
+			},
+		},
 	)
 }
