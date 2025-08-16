@@ -90,7 +90,6 @@ subclassing
 symb
 symbolname
 thenables
-trae
 tses
 tseslint
 tsgo
@@ -109,14 +108,4 @@ untest
 unwinded
 variabledeclaration
 visitchildren
-GOEXE
-stub
-llms
-unstub
-USERPROFILE
-LOGNAME
-errgroup
-Unwatch
-Unregistration
-Unregisterations
-jakebailey
+iface

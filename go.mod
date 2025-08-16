@@ -1,6 +1,6 @@
 module github.com/web-infra-dev/rslint
 
-go 1.25.0
+go 1.25
 
 replace (
 	github.com/microsoft/typescript-go/shim/ast => ./shim/ast
@@ -39,7 +39,6 @@ require (
 	github.com/microsoft/typescript-go/shim/vfs/cachedvfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/osvfs v0.0.0
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
-	golang.org/x/sync v0.16.0
 	golang.org/x/sys v0.35.0
 	golang.org/x/tools v0.35.0
 	gotest.tools/v3 v3.5.2
@@ -50,11 +49,13 @@ require (
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	golang.org/x/mod v0.26.0 // indirect
+	golang.org/x/sync v0.16.0 // indirect
 )
 
 require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
-	github.com/go-json-experiment/json v0.0.0-20250811204210-4789234c3ea1
+	github.com/go-json-experiment/json v0.0.0-20250811204210-4789234c3ea1 // indirect
 	github.com/microsoft/typescript-go v0.0.0-20250814234431-ae2bacc8a459 // indirect
+	github.com/sourcegraph/jsonrpc2 v0.2.1
 	golang.org/x/text v0.28.0
 )

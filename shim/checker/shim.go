@@ -93,6 +93,10 @@ func Checker_getPropertiesOfType(recv *checker.Checker, t *checker.Type) []*ast.
 func Checker_getPropertyOfType(recv *checker.Checker, t *checker.Type, name string) *ast.Symbol
 //go:linkname Checker_getSignaturesOfType github.com/microsoft/typescript-go/internal/checker.(*Checker).getSignaturesOfType
 func Checker_getSignaturesOfType(recv *checker.Checker, t *checker.Type, kind checker.SignatureKind) []*checker.Signature
+//go:linkname Checker_getIndexInfosOfType github.com/microsoft/typescript-go/internal/checker.(*Checker).getIndexInfosOfType
+func Checker_getIndexInfosOfType(recv *checker.Checker, t *checker.Type) []*checker.IndexInfo
+//go:linkname Checker_getIndexInfoOfType github.com/microsoft/typescript-go/internal/checker.(*Checker).getIndexInfoOfType
+func Checker_getIndexInfoOfType(recv *checker.Checker, t *checker.Type, keyType *checker.Type) *checker.IndexInfo
 //go:linkname Checker_getIndexTypeOfType github.com/microsoft/typescript-go/internal/checker.(*Checker).getIndexTypeOfType
 func Checker_getIndexTypeOfType(recv *checker.Checker, t *checker.Type, keyType *checker.Type) *checker.Type
 //go:linkname Checker_getBaseTypes github.com/microsoft/typescript-go/internal/checker.(*Checker).getBaseTypes
@@ -549,6 +553,24 @@ const IndexFlagsNoReducibleCheck = checker.IndexFlagsNoReducibleCheck
 const IndexFlagsNone = checker.IndexFlagsNone
 const IndexFlagsStringsOnly = checker.IndexFlagsStringsOnly
 type IndexInfo = checker.IndexInfo
+type extra_IndexInfo struct {
+  keyType *checker.Type
+  valueType *checker.Type
+  isReadonly bool
+  declaration *ast.Node
+}
+func IndexInfo_keyType(v *checker.IndexInfo) *checker.Type {
+  return ((*extra_IndexInfo)(unsafe.Pointer(v))).keyType
+}
+func IndexInfo_valueType(v *checker.IndexInfo) *checker.Type {
+  return ((*extra_IndexInfo)(unsafe.Pointer(v))).valueType
+}
+func IndexInfo_isReadonly(v *checker.IndexInfo) bool {
+  return ((*extra_IndexInfo)(unsafe.Pointer(v))).isReadonly
+}
+func IndexInfo_declaration(v *checker.IndexInfo) *ast.Node {
+  return ((*extra_IndexInfo)(unsafe.Pointer(v))).declaration
+}
 type IndexSymbolLinks = checker.IndexSymbolLinks
 type IndexType = checker.IndexType
 type IndexedAccessType = checker.IndexedAccessType

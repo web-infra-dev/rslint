@@ -17,7 +17,7 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 	visitors := rule.RuleListeners{}
 
 	checkSourceValue := func(source *ast.StringLiteralLike, node *ast.Node) {
-		if source == nil {
+		if !isStringLiteralLike(source) {
 			return
 		}
 
@@ -39,7 +39,7 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 		}
 
 		modulePath := call.Arguments.Nodes[0]
-		if modulePath == nil || !ast.IsStringLiteralLike(modulePath) {
+		if modulePath == nil || !isStringLiteralLike(modulePath) {
 			return
 		}
 
@@ -63,7 +63,7 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 		}
 
 		modulePath := call.Arguments.Nodes[0]
-		if modulePath == nil || !ast.IsStringLiteralLike(modulePath) {
+		if modulePath == nil || !isStringLiteralLike(modulePath) {
 			return
 		}
 
@@ -99,4 +99,12 @@ func VisitModules(visitor func(source *ast.StringLiteralLike, node *ast.Node), o
 	}
 
 	return visitors
+}
+
+func isStringLiteralLike(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+
+	return node.Kind == ast.KindStringLiteral || node.Kind == ast.KindNoSubstitutionTemplateLiteral
 }

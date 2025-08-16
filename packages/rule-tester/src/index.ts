@@ -1,6 +1,7 @@
 // Forked and modified from https://github.com/typescript-eslint/typescript-eslint/blob/16c344ec7d274ea542157e0f19682dd1930ab838/packages/rule-tester/src/RuleTester.ts#L4
 
 import path from 'node:path';
+import fs from 'node:fs';
 import { test, describe, expect } from '@rstest/core';
 import { lint, LintResponse, type Diagnostic } from '@rslint/core';
 import assert from 'node:assert';
@@ -146,7 +147,35 @@ export class RuleTester {
       let cwd =
         this.options.languageOptions?.parserOptions?.tsconfigRootDir ||
         process.cwd();
-      const config = path.resolve(cwd, './rslint.json');
+      const baseConfig = path.resolve(cwd, './rslint.json');
+      function deriveConfigForProject(project?: string | string[]): string {
+        if (!project) return baseConfig;
+        let cfg: any;
+        try {
+          const text = fs.readFileSync(baseConfig, 'utf8');
+          cfg = JSON.parse(text);
+        } catch (e) {
+          cfg = [
+            {
+              languageOptions: { parserOptions: { project: [] as string[] } },
+              rules: {},
+              plugins: ['@typescript-eslint'],
+              files: [],
+            },
+          ];
+        }
+        const arr = Array.isArray(cfg) ? cfg : [cfg];
+        for (const entry of arr) {
+          const parserOptions =
+            entry.languageOptions?.parserOptions ??
+            (entry.languageOptions = { parserOptions: {} as any })
+              .parserOptions;
+          parserOptions.project = Array.isArray(project) ? project : [project];
+        }
+        const tmpPath = path.resolve(cwd, `./.rslint.project.override.json`);
+        fs.writeFileSync(tmpPath, JSON.stringify(cfg, null, 2), 'utf8');
+        return tmpPath;
+      }
 
       // test whether case has only
       let hasOnly =
@@ -195,6 +224,11 @@ export class RuleTester {
               }
             }
           }
+          const projectOverride =
+            typeof validCase === 'object'
+              ? validCase.languageOptions?.parserOptions?.project
+              : undefined;
+          const config = deriveConfigForProject(projectOverride);
           const diags = await lint({
             config,
             workingDirectory: cwd,
@@ -232,6 +266,8 @@ export class RuleTester {
             cwd,
             isJSX ? 'virtual.tsx' : 'virtual.ts',
           );
+          const projectOverride = item.languageOptions?.parserOptions?.project;
+          const config = deriveConfigForProject(projectOverride);
           const diags = await lint({
             config,
             workingDirectory: cwd,
