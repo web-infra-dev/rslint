@@ -402,24 +402,6 @@ func hasStringLikeIndexSignature(typeChecker *checker.Checker, t *checker.Type) 
 	return false
 }
 
-// typeContainsTypeParameter returns true if the given type or any of its immediate
-// union/intersection constituents contains a type parameter.
-func typeContainsTypeParameter(t *checker.Type) bool {
-	if t == nil {
-		return false
-	}
-	if utils.IsTypeParameter(t) {
-		return true
-	}
-	if utils.IsUnionType(t) || utils.IsIntersectionType(t) {
-		for _, part := range t.Types() {
-			if utils.IsTypeParameter(part) {
-				return true
-			}
-		}
-	}
-	return false
-}
 
 // propMatchesTemplateIndexSignature returns true if the type declares an index signature
 // with a template-literal key type whose head/tail match the given property name.
