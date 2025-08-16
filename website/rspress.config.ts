@@ -36,6 +36,7 @@ export default defineConfig({
     // exclude document fragments from routes
     exclude: ['**/zh/shared/**', '**/en/shared/**', './theme'],
   },
+  globalStyles: path.join(__dirname, 'styles/index.css'),
   themeConfig: {
     socialLinks: [
       {
