@@ -242,7 +242,7 @@ const RuleImplementationStatus: React.FC = () => {
                           {rule.failing_case.map((caseItem, index) => (
                             <Button
                               variant="link"
-                              className="cursor-pointer p-0 items-left justify-start h-4"
+                              className="cursor-pointer p-0 items-start justify-start h-4"
                               key={caseItem.url}
                               onClick={() => {
                                 window.open(
