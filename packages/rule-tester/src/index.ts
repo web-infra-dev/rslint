@@ -261,6 +261,8 @@ function filterSnapshot(diags: LintResponse): LintResponse {
   for (const diag of diags.diagnostics ?? []) {
     // @ts-ignore
     delete diag.filePath;
+    // @ts-ignore
+    delete diag.fixes;
   }
   return diags;
 }
