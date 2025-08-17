@@ -8,7 +8,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -132,6 +131,23 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 			},
 		}
 
+		// Add fixes if available
+		if d.FixesPtr != nil && len(*d.FixesPtr) > 0 {
+			var fixes []api.Fix
+			for _, fix := range *d.FixesPtr {
+				// Convert TextRange to character positions
+				startPos := fix.Range.Pos()
+				endPos := fix.Range.End()
+				
+				fixes = append(fixes, api.Fix{
+					Text:     fix.Text,
+					StartPos: startPos,
+					EndPos:   endPos,
+				})
+			}
+			diagnostic.Fixes = fixes
+		}
+
 		diagnostics = append(diagnostics, diagnostic)
 		errorsCount++
 	}
@@ -173,35 +189,48 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 
 // HandleApplyFixes handles apply fixes requests in IPC mode
 func (h *IPCHandler) HandleApplyFixes(req api.ApplyFixesRequest) (*api.ApplyFixesResponse, error) {
-	// Convert client diagnostics to rule diagnostics for applying fixes
-	var ruleDiagnostics []rule.RuleDiagnostic
-	for _, clientDiag := range req.Diagnostics {
-		// Create a simple rule diagnostic from the client data
-		ruleDiagnostic := rule.RuleDiagnostic{
-			Range:    core.NewTextRange(0, 0), // Placeholder range
-			RuleName: clientDiag.RuleName,
-			Message: rule.RuleMessage{
-				Id:          clientDiag.MessageId,
-				Description: clientDiag.Message,
-			},
-			SourceFile: nil, // No source file needed for simple fix application
-			FixesPtr: &[]rule.RuleFix{
-				{
-					Text:  "", // Will be filled by the rule system if available
-					Range: core.NewTextRange(0, 0),
-				},
-			},
-		}
-		ruleDiagnostics = append(ruleDiagnostics, ruleDiagnostic)
+	
+	// Apply fixes directly using the client-provided fix data
+	var appliedCount int
+	var unappliedCount int
+	wasFixed := false
+	
+	// Collect all fixes
+	var allFixes []struct {
+		startPos int
+		endPos   int
+		text     string
 	}
-
-	// Apply fixes using the linter
-	fixedContent, unapplied, wasFixed := linter.ApplyRuleFixes(req.FileContent, ruleDiagnostics)
-
-	// Calculate counts
-	appliedCount := len(ruleDiagnostics) - len(unapplied)
-	unappliedCount := len(unapplied)
-
+	
+	for _, clientDiag := range req.Diagnostics {
+		for _, clientFix := range clientDiag.Fixes {
+			allFixes = append(allFixes, struct {
+				startPos int
+				endPos   int
+				text     string
+			}{
+				startPos: clientFix.StartPos,
+				endPos:   clientFix.EndPos,
+				text:     clientFix.Text,
+			})
+		}
+	}
+	
+	// Apply fixes from end to beginning to avoid position shifting
+	fixedContent := req.FileContent
+	for i := len(allFixes) - 1; i >= 0; i-- {
+		fix := allFixes[i]
+		if fix.startPos >= 0 && fix.endPos <= len(fixedContent) && fix.startPos < fix.endPos {
+			// Apply the fix
+			fixedContent = fixedContent[:fix.startPos] + fix.text + fixedContent[fix.endPos:]
+			appliedCount++
+			wasFixed = true
+		} else {
+			unappliedCount++
+		}
+	}
+	
+	
 	return &api.ApplyFixesResponse{
 		FixedContent:    fixedContent,
 		WasFixed:        wasFixed,

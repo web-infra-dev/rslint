@@ -113,6 +113,14 @@ type Diagnostic struct {
 	Range     Range  `json:"range"`
 	Severity  string `json:"severity,omitempty"`
 	MessageId string `json:"messageId"`
+	Fixes     []Fix  `json:"fixes,omitempty"`
+}
+
+// Fix represents a single fix that can be applied
+type Fix struct {
+	Text      string `json:"text"`
+	StartPos  int    `json:"startPos"`  // Character position in the file content
+	EndPos    int    `json:"endPos"`    // Character position in the file content
 }
 
 // Handler defines the interface for handling IPC messages
