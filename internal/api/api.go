@@ -22,6 +22,8 @@ type MessageKind string
 const (
 	// KindLint is sent from JS to Go to request linting
 	KindLint MessageKind = "lint"
+	// KindApplyFixes is sent from JS to Go to request applying fixes
+	KindApplyFixes MessageKind = "applyFixes"
 	// KindResponse is sent from Go to JS with the lint results
 	KindResponse MessageKind = "response"
 	// KindError is sent when an error occurs
@@ -72,6 +74,20 @@ type LintResponse struct {
 	RuleCount   int          `json:"ruleCount"`
 }
 
+// ApplyFixesRequest represents a request to apply fixes from JS to Go
+type ApplyFixesRequest struct {
+	FileContent  string        `json:"fileContent"`  // Current content of the file
+	Diagnostics  []Diagnostic  `json:"diagnostics"`  // Diagnostics with fixes to apply
+}
+
+// ApplyFixesResponse represents a response after applying fixes
+type ApplyFixesResponse struct {
+	FixedContent string `json:"fixedContent"` // The content after applying fixes
+	WasFixed     bool   `json:"wasFixed"`     // Whether any fixes were actually applied
+	AppliedCount int    `json:"appliedCount"` // Number of fixes that were applied
+	UnappliedCount int  `json:"unappliedCount"` // Number of fixes that couldn't be applied
+}
+
 // ErrorResponse represents an error response
 type ErrorResponse struct {
 	Message string `json:"message"`
@@ -97,11 +113,20 @@ type Diagnostic struct {
 	Range     Range  `json:"range"`
 	Severity  string `json:"severity,omitempty"`
 	MessageId string `json:"messageId"`
+	Fixes     []Fix  `json:"fixes,omitempty"`
+}
+
+// Fix represents a single fix that can be applied
+type Fix struct {
+	Text      string `json:"text"`
+	StartPos  int    `json:"startPos"`  // Character position in the file content
+	EndPos    int    `json:"endPos"`    // Character position in the file content
 }
 
 // Handler defines the interface for handling IPC messages
 type Handler interface {
 	HandleLint(req LintRequest) (*LintResponse, error)
+	HandleApplyFixes(req ApplyFixesRequest) (*ApplyFixesResponse, error)
 }
 
 // Service manages the IPC communication
@@ -184,6 +209,8 @@ func (s *Service) Start() error {
 			s.handleHandshake(msg)
 		case KindLint:
 			s.handleLint(msg)
+		case KindApplyFixes:
+			s.handleApplyFixes(msg)
 		case KindExit:
 			s.handleExit(msg)
 			return nil
@@ -233,6 +260,29 @@ func (s *Service) handleLint(msg *Message) {
 	}
 
 	resp, err := s.handler.HandleLint(req)
+	if err != nil {
+		s.sendError(msg.ID, err.Error())
+		return
+	}
+
+	s.sendResponse(msg.ID, resp)
+}
+
+// handleApplyFixes handles apply fixes messages
+func (s *Service) handleApplyFixes(msg *Message) {
+	var req ApplyFixesRequest
+	data, err := json.Marshal(msg.Data)
+	if err != nil {
+		s.sendError(msg.ID, fmt.Sprintf("failed to marshal data: %v", err))
+		return
+	}
+
+	if err := json.Unmarshal(data, &req); err != nil {
+		s.sendError(msg.ID, fmt.Sprintf("failed to parse apply fixes request: %v", err))
+		return
+	}
+
+	resp, err := s.handler.HandleApplyFixes(req)
 	if err != nil {
 		s.sendError(msg.ID, err.Error())
 		return

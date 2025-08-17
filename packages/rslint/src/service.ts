@@ -40,6 +40,18 @@ export interface LintOptions {
   fileContents?: Record<string, string>; // Map of file paths to their contents for VFS
 }
 
+export interface ApplyFixesRequest {
+  fileContent: string; // Current content of the file
+  diagnostics: Diagnostic[]; // Diagnostics with fixes to apply
+}
+
+export interface ApplyFixesResponse {
+  fixedContent: string; // The content after applying fixes
+  wasFixed: boolean; // Whether any fixes were actually applied
+  appliedCount: number; // Number of fixes that were applied
+  unappliedCount: number; // Number of fixes that couldn't be applied
+}
+
 interface RSlintOptions {
   rslintPath?: string;
   workingDirectory?: string;
@@ -190,6 +202,22 @@ export class RSLintService {
       ruleOptions,
       fileContents,
       format: 'jsonline',
+    });
+  }
+
+  /**
+   * Apply fixes to a file based on diagnostics
+   */
+  async applyFixes(options: ApplyFixesRequest): Promise<ApplyFixesResponse> {
+    const { fileContent, diagnostics } = options;
+
+    // Send handshake
+    await this.sendMessage('handshake', { version: '1.0.0' });
+
+    // Send apply fixes request
+    return this.sendMessage('applyFixes', {
+      fileContent,
+      diagnostics,
     });
   }
 

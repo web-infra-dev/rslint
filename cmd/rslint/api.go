@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-
 	"os"
 	"sync"
 
@@ -132,6 +131,23 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 			},
 		}
 
+		// Add fixes if available
+		if d.FixesPtr != nil && len(*d.FixesPtr) > 0 {
+			var fixes []api.Fix
+			for _, fix := range *d.FixesPtr {
+				// Convert TextRange to character positions
+				startPos := fix.Range.Pos()
+				endPos := fix.Range.End()
+				
+				fixes = append(fixes, api.Fix{
+					Text:     fix.Text,
+					StartPos: startPos,
+					EndPos:   endPos,
+				})
+			}
+			diagnostic.Fixes = fixes
+		}
+
 		diagnostics = append(diagnostics, diagnostic)
 		errorsCount++
 	}
@@ -168,6 +184,58 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		ErrorCount:  errorsCount,
 		FileCount:   int(lintedFilesCount),
 		RuleCount:   len(rulesWithOptions),
+	}, nil
+}
+
+// HandleApplyFixes handles apply fixes requests in IPC mode
+func (h *IPCHandler) HandleApplyFixes(req api.ApplyFixesRequest) (*api.ApplyFixesResponse, error) {
+	
+	// Apply fixes directly using the client-provided fix data
+	var appliedCount int
+	var unappliedCount int
+	wasFixed := false
+	
+	// Collect all fixes
+	var allFixes []struct {
+		startPos int
+		endPos   int
+		text     string
+	}
+	
+	for _, clientDiag := range req.Diagnostics {
+		for _, clientFix := range clientDiag.Fixes {
+			allFixes = append(allFixes, struct {
+				startPos int
+				endPos   int
+				text     string
+			}{
+				startPos: clientFix.StartPos,
+				endPos:   clientFix.EndPos,
+				text:     clientFix.Text,
+			})
+		}
+	}
+	
+	// Apply fixes from end to beginning to avoid position shifting
+	fixedContent := req.FileContent
+	for i := len(allFixes) - 1; i >= 0; i-- {
+		fix := allFixes[i]
+		if fix.startPos >= 0 && fix.endPos <= len(fixedContent) && fix.startPos < fix.endPos {
+			// Apply the fix
+			fixedContent = fixedContent[:fix.startPos] + fix.text + fixedContent[fix.endPos:]
+			appliedCount++
+			wasFixed = true
+		} else {
+			unappliedCount++
+		}
+	}
+	
+	
+	return &api.ApplyFixesResponse{
+		FixedContent:    fixedContent,
+		WasFixed:        wasFixed,
+		AppliedCount:    appliedCount,
+		UnappliedCount:  unappliedCount,
 	}, nil
 }
 
