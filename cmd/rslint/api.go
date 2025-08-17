@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-
 	"os"
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -168,6 +168,45 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		ErrorCount:  errorsCount,
 		FileCount:   int(lintedFilesCount),
 		RuleCount:   len(rulesWithOptions),
+	}, nil
+}
+
+// HandleApplyFixes handles apply fixes requests in IPC mode
+func (h *IPCHandler) HandleApplyFixes(req api.ApplyFixesRequest) (*api.ApplyFixesResponse, error) {
+	// Convert client diagnostics to rule diagnostics for applying fixes
+	var ruleDiagnostics []rule.RuleDiagnostic
+	for _, clientDiag := range req.Diagnostics {
+		// Create a simple rule diagnostic from the client data
+		ruleDiagnostic := rule.RuleDiagnostic{
+			Range:    core.NewTextRange(0, 0), // Placeholder range
+			RuleName: clientDiag.RuleName,
+			Message: rule.RuleMessage{
+				Id:          clientDiag.MessageId,
+				Description: clientDiag.Message,
+			},
+			SourceFile: nil, // No source file needed for simple fix application
+			FixesPtr: &[]rule.RuleFix{
+				{
+					Text:  "", // Will be filled by the rule system if available
+					Range: core.NewTextRange(0, 0),
+				},
+			},
+		}
+		ruleDiagnostics = append(ruleDiagnostics, ruleDiagnostic)
+	}
+
+	// Apply fixes using the linter
+	fixedContent, unapplied, wasFixed := linter.ApplyRuleFixes(req.FileContent, ruleDiagnostics)
+
+	// Calculate counts
+	appliedCount := len(ruleDiagnostics) - len(unapplied)
+	unappliedCount := len(unapplied)
+
+	return &api.ApplyFixesResponse{
+		FixedContent:    fixedContent,
+		WasFixed:        wasFixed,
+		AppliedCount:    appliedCount,
+		UnappliedCount:  unappliedCount,
 	}, nil
 }
 

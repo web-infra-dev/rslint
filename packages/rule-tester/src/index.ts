@@ -14,6 +14,7 @@ interface TsDiagnostic {
   suggestions?: any[] | null;
   data?: any;
   type?: any;
+  output?: string;
 }
 function toCamelCase(name: string): string {
   return name.replace(/-([a-z])/g, g => g[1].toUpperCase());
