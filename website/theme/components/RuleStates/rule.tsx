@@ -57,6 +57,14 @@ const fetcher = async (url: string): Promise<RuleManifest> => {
   return response.json();
 };
 
+function getRuleUrl(rule: Rule): string {
+  if (rule.group === '@typescript-eslint/eslint-plugin') {
+    return `https://typescript-eslint.io/rules/${rule.name}`;
+  }
+  // https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/no-self-import.md
+  return `https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/${rule.name}.md`;
+}
+
 // Statistics card component
 const StatCard: React.FC<{ item: RuleStateDescribe }> = ({ item }) => {
   const getTextColor = (style: RuleStateDescribe['style']): string => {
@@ -218,10 +226,7 @@ const RuleImplementationStatus: React.FC = () => {
                       <Button
                         variant="link"
                         onClick={() => {
-                          window.open(
-                            `https://typescript-eslint.io/rules/${rule.name}`,
-                            '_blank',
-                          );
+                          window.open(getRuleUrl(rule), '_blank');
                         }}
                         className="p-0"
                       >
@@ -242,7 +247,7 @@ const RuleImplementationStatus: React.FC = () => {
                           {rule.failing_case.map((caseItem, index) => (
                             <Button
                               variant="link"
-                              className="cursor-pointer p-0 items-start justify-start h-4"
+                              className="cursor-pointer p-0 justify-start h-4"
                               key={caseItem.url}
                               onClick={() => {
                                 window.open(
