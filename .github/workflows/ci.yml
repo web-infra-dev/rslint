@@ -49,8 +49,16 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache-name: test-go
 
-      - name: debugger
-        uses: ./.github/actions/debugger
+      - name: Setup MSYS2
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        id: setup-msys2
+
+      - name: Setup tmate session
+        if: runner.os == 'Windows'
+        uses: mxschmitt/action-tmate@v3
+        with:
+          msys2-location: ${{ steps.setup-msys2.outputs.msys2-location }}
 
       - name: Unit Test
         run: |
