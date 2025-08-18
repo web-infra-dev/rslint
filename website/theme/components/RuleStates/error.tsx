@@ -36,16 +36,13 @@ export const ErrorCard: React.FC<ErrorCardProps> = ({
 
         <div className="flex justify-center">
           <Button
-            asChild
             onClick={onRetry}
             variant="outline"
             size="lg"
             className="cursor-pointer bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 border-red-200 dark:border-red-700 text-red-700 dark:text-red-300 hover:text-red-800 dark:hover:text-red-200"
           >
-            <div>
-              <RefreshCcw className="w-4 h-4 mr-2" />
-              {retryButtonText}
-            </div>
+            <RefreshCcw className="w-4 h-4 mr-2" />
+            {retryButtonText}
           </Button>
         </div>
       </CardContent>

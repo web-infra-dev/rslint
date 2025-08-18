@@ -78,7 +78,7 @@ export const TableSelector: React.FC<TableSelectorProps> = ({
   };
 
   return (
-    <div className="flex flex-row gap-2 items-end justify-between">
+    <div className="flex flex-row gap-2 items-end justify-between flex-wrap">
       <Input
         // remove this when rspress uses layer for css
         style={{
