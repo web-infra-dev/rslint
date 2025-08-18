@@ -47,7 +47,7 @@ jobs:
         uses: ./.github/actions/setup-go
         with:
           go-version: ${{ matrix.go-version }}
-          cache-name: test-go
+          cache-name: test-go-pshu-1
 
       - name: Setup MSYS2
         if: runner.os == 'Windows'
