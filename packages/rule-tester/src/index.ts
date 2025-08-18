@@ -93,7 +93,7 @@ export type InvalidTestCase<T = any, U = any> = {
   options?: any;
   only?: boolean;
   skip?: boolean;
-  output?: string | null;
+  output?: string | null | string[];
   languageOptions?: RuleTesterOptions['languageOptions'];
 };
 export type ValidTestCase<T = any> =
@@ -281,7 +281,7 @@ export class RuleTester {
 }
 // remove unnecessary props from diagnostics, return optional filtered LintResponse
 function filterSnapshot(
-  diags: LintResponse & { output?: string; code?: string },
+  diags: LintResponse & { output?: string | string[] | null; code?: string },
 ): LintResponse {
   for (const diag of diags.diagnostics ?? []) {
     // @ts-ignore
