@@ -2,6 +2,11 @@
 
 exports[`no-empty-function > invalid 1`] = `
 {
+  "code": "
+class Person {
+  constructor(name: string) {}
+}
+      ",
   "diagnostics": [
     {
       "message": "Unexpected empty constructor.",
@@ -27,6 +32,11 @@ exports[`no-empty-function > invalid 1`] = `
 
 exports[`no-empty-function > invalid 2`] = `
 {
+  "code": "
+class Person {
+  otherMethod(name: string) {}
+}
+      ",
   "diagnostics": [
     {
       "message": "Unexpected empty method 'otherMethod'.",
@@ -52,6 +62,11 @@ exports[`no-empty-function > invalid 2`] = `
 
 exports[`no-empty-function > invalid 3`] = `
 {
+  "code": "
+class Foo {
+  private constructor() {}
+}
+      ",
   "diagnostics": [
     {
       "message": "Unexpected empty constructor.",
@@ -77,6 +92,11 @@ exports[`no-empty-function > invalid 3`] = `
 
 exports[`no-empty-function > invalid 4`] = `
 {
+  "code": "
+class Foo {
+  protected constructor() {}
+}
+      ",
   "diagnostics": [
     {
       "message": "Unexpected empty constructor.",
@@ -102,6 +122,9 @@ exports[`no-empty-function > invalid 4`] = `
 
 exports[`no-empty-function > invalid 5`] = `
 {
+  "code": "
+function foo() {}
+      ",
   "diagnostics": [
     {
       "message": "Unexpected empty function 'foo'.",
@@ -127,6 +150,12 @@ exports[`no-empty-function > invalid 5`] = `
 
 exports[`no-empty-function > invalid 6`] = `
 {
+  "code": "
+class Foo {
+  @decorator()
+  foo() {}
+}
+      ",
   "diagnostics": [
     {
       "message": "Unexpected empty method 'foo'.",
@@ -152,6 +181,11 @@ exports[`no-empty-function > invalid 6`] = `
 
 exports[`no-empty-function > invalid 7`] = `
 {
+  "code": "
+class Foo extends Base {
+  override foo() {}
+}
+      ",
   "diagnostics": [
     {
       "message": "Unexpected empty method 'foo'.",

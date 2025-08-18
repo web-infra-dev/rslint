@@ -8,6 +8,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -138,7 +139,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 				// Convert TextRange to character positions
 				startPos := fix.Range.Pos()
 				endPos := fix.Range.End()
-				
+
 				fixes = append(fixes, api.Fix{
 					Text:     fix.Text,
 					StartPos: startPos,
@@ -189,53 +190,73 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 
 // HandleApplyFixes handles apply fixes requests in IPC mode
 func (h *IPCHandler) HandleApplyFixes(req api.ApplyFixesRequest) (*api.ApplyFixesResponse, error) {
-	
-	// Apply fixes directly using the client-provided fix data
-	var appliedCount int
-	var unappliedCount int
+	// Convert API diagnostics to rule diagnostics for use with linter.ApplyRuleFixes
+	var ruleDiagnostics []rule.RuleDiagnostic
+
+	for _, clientDiag := range req.Diagnostics {
+		if len(clientDiag.Fixes) == 0 {
+			continue
+		}
+
+		// Convert API fixes to rule fixes
+		var ruleFixes []rule.RuleFix
+		for _, clientFix := range clientDiag.Fixes {
+			// Create TextRange from start and end positions
+			textRange := core.NewTextRange(clientFix.StartPos, clientFix.EndPos)
+
+			ruleFix := rule.RuleFix{
+				Text:  clientFix.Text,
+				Range: textRange,
+			}
+			ruleFixes = append(ruleFixes, ruleFix)
+		}
+
+		// Create rule diagnostic
+		ruleDiag := rule.RuleDiagnostic{
+			Range:    core.NewTextRange(0, 0), // Not used by ApplyRuleFixes
+			RuleName: clientDiag.RuleName,
+			Message: rule.RuleMessage{
+				Id:          clientDiag.MessageId,
+				Description: clientDiag.Message,
+			},
+			FixesPtr: &ruleFixes,
+		}
+
+		ruleDiagnostics = append(ruleDiagnostics, ruleDiag)
+	}
+
+	// Use linter.ApplyRuleFixes to apply the fixes
+	code := req.FileContent
+	outputs := []string{}
 	wasFixed := false
 	
-	// Collect all fixes
-	var allFixes []struct {
-		startPos int
-		endPos   int
-		text     string
-	}
-	
-	for _, clientDiag := range req.Diagnostics {
-		for _, clientFix := range clientDiag.Fixes {
-			allFixes = append(allFixes, struct {
-				startPos int
-				endPos   int
-				text     string
-			}{
-				startPos: clientFix.StartPos,
-				endPos:   clientFix.EndPos,
-				text:     clientFix.Text,
-			})
+	// Apply fixes iteratively to handle overlapping fixes
+	for {
+		fixedContent,unapplied, fixed := linter.ApplyRuleFixes(code, ruleDiagnostics)
+		if !fixed {
+			break
+		}
+		
+		outputs = append(outputs, fixedContent)
+		code = fixedContent
+		wasFixed = true
+		
+		// Update diagnostics to only include unapplied ones for next iteration
+		ruleDiagnostics = unapplied
+		if len(ruleDiagnostics) == 0 {
+			break
 		}
 	}
-	
-	// Apply fixes from end to beginning to avoid position shifting
-	fixedContent := req.FileContent
-	for i := len(allFixes) - 1; i >= 0; i-- {
-		fix := allFixes[i]
-		if fix.startPos >= 0 && fix.endPos <= len(fixedContent) && fix.startPos < fix.endPos {
-			// Apply the fix
-			fixedContent = fixedContent[:fix.startPos] + fix.text + fixedContent[fix.endPos:]
-			appliedCount++
-			wasFixed = true
-		} else {
-			unappliedCount++
-		}
-	}
-	
-	
+
+	// Count applied and unapplied fixes
+	appliedCount := len(req.Diagnostics) - len(ruleDiagnostics)
+	unappliedCount := len(ruleDiagnostics)
+
 	return &api.ApplyFixesResponse{
-		FixedContent:    fixedContent,
-		WasFixed:        wasFixed,
-		AppliedCount:    appliedCount,
-		UnappliedCount:  unappliedCount,
+		FixedContent:   outputs,
+		WasFixed:       wasFixed,
+		AppliedCount:   appliedCount,
+		UnappliedCount: unappliedCount,
 	}, nil
 }
 

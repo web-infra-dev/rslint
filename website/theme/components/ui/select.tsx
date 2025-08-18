@@ -32,7 +32,6 @@ function SelectTrigger({
 }) {
   return (
     <SelectPrimitive.Trigger
-      asChild
       data-slot="select-trigger"
       data-size={size}
       className={cn(
@@ -41,12 +40,10 @@ function SelectTrigger({
       )}
       {...props}
     >
-      <div>
-        {children}
-        <SelectPrimitive.Icon asChild>
-          <ChevronDownIcon className="size-4 opacity-50" />
-        </SelectPrimitive.Icon>
-      </div>
+      {children}
+      <SelectPrimitive.Icon asChild>
+        <ChevronDownIcon className="size-4 opacity-50" />
+      </SelectPrimitive.Icon>
     </SelectPrimitive.Trigger>
   );
 }

@@ -2,6 +2,12 @@
 
 exports[`no-implied-eval > invalid 1`] = `
 {
+  "code": "
+setTimeout('x = 1', 0);
+setInterval('x = 1', 0);
+setImmediate('x = 1');
+execScript('x = 1');
+      ",
   "diagnostics": [
     {
       "message": "Implied eval. Consider passing a function.",
@@ -72,6 +78,12 @@ exports[`no-implied-eval > invalid 1`] = `
 
 exports[`no-implied-eval > invalid 2`] = `
 {
+  "code": "
+setTimeout(undefined, 0);
+setInterval(undefined, 0);
+setImmediate(undefined);
+execScript(undefined);
+      ",
   "diagnostics": [
     {
       "message": "Implied eval. Consider passing a function.",
@@ -142,6 +154,12 @@ exports[`no-implied-eval > invalid 2`] = `
 
 exports[`no-implied-eval > invalid 3`] = `
 {
+  "code": "
+setTimeout(1 + '' + (() => {}), 0);
+setInterval(1 + '' + (() => {}), 0);
+setImmediate(1 + '' + (() => {}));
+execScript(1 + '' + (() => {}));
+      ",
   "diagnostics": [
     {
       "message": "Implied eval. Consider passing a function.",
@@ -212,6 +230,14 @@ exports[`no-implied-eval > invalid 3`] = `
 
 exports[`no-implied-eval > invalid 4`] = `
 {
+  "code": "
+const foo = 'x = 1';
+
+setTimeout(foo, 0);
+setInterval(foo, 0);
+setImmediate(foo);
+execScript(foo);
+      ",
   "diagnostics": [
     {
       "message": "Implied eval. Consider passing a function.",
@@ -282,6 +308,16 @@ exports[`no-implied-eval > invalid 4`] = `
 
 exports[`no-implied-eval > invalid 5`] = `
 {
+  "code": "
+const foo = function () {
+  return 'x + 1';
+};
+
+setTimeout(foo(), 0);
+setInterval(foo(), 0);
+setImmediate(foo());
+execScript(foo());
+      ",
   "diagnostics": [
     {
       "message": "Implied eval. Consider passing a function.",
@@ -352,6 +388,16 @@ exports[`no-implied-eval > invalid 5`] = `
 
 exports[`no-implied-eval > invalid 6`] = `
 {
+  "code": "
+const foo = function () {
+  return () => 'x + 1';
+};
+
+setTimeout(foo()(), 0);
+setInterval(foo()(), 0);
+setImmediate(foo()());
+execScript(foo()());
+      ",
   "diagnostics": [
     {
       "message": "Implied eval. Consider passing a function.",
@@ -422,6 +468,14 @@ exports[`no-implied-eval > invalid 6`] = `
 
 exports[`no-implied-eval > invalid 7`] = `
 {
+  "code": "
+const fn = function () {};
+
+setTimeout(fn + '', 0);
+setInterval(fn + '', 0);
+setImmediate(fn + '');
+execScript(fn + '');
+      ",
   "diagnostics": [
     {
       "message": "Implied eval. Consider passing a function.",
@@ -492,6 +546,14 @@ exports[`no-implied-eval > invalid 7`] = `
 
 exports[`no-implied-eval > invalid 8`] = `
 {
+  "code": "
+const foo: string = 'x + 1';
+
+setTimeout(foo, 0);
+setInterval(foo, 0);
+setImmediate(foo);
+execScript(foo);
+      ",
   "diagnostics": [
     {
       "message": "Implied eval. Consider passing a function.",
@@ -562,6 +624,14 @@ exports[`no-implied-eval > invalid 8`] = `
 
 exports[`no-implied-eval > invalid 9`] = `
 {
+  "code": "
+const foo = new String('x + 1');
+
+setTimeout(foo, 0);
+setInterval(foo, 0);
+setImmediate(foo);
+execScript(foo);
+      ",
   "diagnostics": [
     {
       "message": "Implied eval. Consider passing a function.",
@@ -632,6 +702,14 @@ exports[`no-implied-eval > invalid 9`] = `
 
 exports[`no-implied-eval > invalid 10`] = `
 {
+  "code": "
+const foo = 'x + 1';
+
+setTimeout(foo as any, 0);
+setInterval(foo as any, 0);
+setImmediate(foo as any);
+execScript(foo as any);
+      ",
   "diagnostics": [
     {
       "message": "Implied eval. Consider passing a function.",
@@ -702,6 +780,14 @@ exports[`no-implied-eval > invalid 10`] = `
 
 exports[`no-implied-eval > invalid 11`] = `
 {
+  "code": "
+const fn = (foo: string | any) => {
+  setTimeout(foo, 0);
+  setInterval(foo, 0);
+  setImmediate(foo);
+  execScript(foo);
+};
+      ",
   "diagnostics": [
     {
       "message": "Implied eval. Consider passing a function.",
@@ -772,6 +858,12 @@ exports[`no-implied-eval > invalid 11`] = `
 
 exports[`no-implied-eval > invalid 12`] = `
 {
+  "code": "
+const foo = 'foo';
+const bar = () => {};
+
+setTimeout(Math.radom() > 0.5 ? foo : bar, 0);
+      ",
   "diagnostics": [
     {
       "message": "Implied eval. Consider passing a function.",
@@ -797,6 +889,19 @@ exports[`no-implied-eval > invalid 12`] = `
 
 exports[`no-implied-eval > invalid 13`] = `
 {
+  "code": "
+window.setTimeout(\`\`, 0);
+window['setTimeout'](\`\`, 0);
+
+window.setInterval(\`\`, 0);
+window['setInterval'](\`\`, 0);
+
+window.setImmediate(\`\`);
+window['setImmediate'](\`\`);
+
+window.execScript(\`\`);
+window['execScript'](\`\`);
+      ",
   "diagnostics": [
     {
       "message": "Implied eval. Consider passing a function.",
@@ -927,6 +1032,19 @@ exports[`no-implied-eval > invalid 13`] = `
 
 exports[`no-implied-eval > invalid 14`] = `
 {
+  "code": "
+global.setTimeout(\`\`, 0);
+global['setTimeout'](\`\`, 0);
+
+global.setInterval(\`\`, 0);
+global['setInterval'](\`\`, 0);
+
+global.setImmediate(\`\`);
+global['setImmediate'](\`\`);
+
+global.execScript(\`\`);
+global['execScript'](\`\`);
+      ",
   "diagnostics": [
     {
       "message": "Implied eval. Consider passing a function.",
@@ -1057,6 +1175,19 @@ exports[`no-implied-eval > invalid 14`] = `
 
 exports[`no-implied-eval > invalid 15`] = `
 {
+  "code": "
+globalThis.setTimeout(\`\`, 0);
+globalThis['setTimeout'](\`\`, 0);
+
+globalThis.setInterval(\`\`, 0);
+globalThis['setInterval'](\`\`, 0);
+
+globalThis.setImmediate(\`\`);
+globalThis['setImmediate'](\`\`);
+
+globalThis.execScript(\`\`);
+globalThis['execScript'](\`\`);
+      ",
   "diagnostics": [
     {
       "message": "Implied eval. Consider passing a function.",
@@ -1187,6 +1318,12 @@ exports[`no-implied-eval > invalid 15`] = `
 
 exports[`no-implied-eval > invalid 16`] = `
 {
+  "code": "
+const foo: string | undefined = 'hello';
+const bar = () => {};
+
+setTimeout(foo || bar, 500);
+      ",
   "diagnostics": [
     {
       "message": "Implied eval. Consider passing a function.",
@@ -1212,6 +1349,7 @@ exports[`no-implied-eval > invalid 16`] = `
 
 exports[`no-implied-eval > invalid 17`] = `
 {
+  "code": "const fn = Function();",
   "diagnostics": [
     {
       "message": "Implied eval. Do not use the Function constructor to create functions.",
@@ -1237,6 +1375,7 @@ exports[`no-implied-eval > invalid 17`] = `
 
 exports[`no-implied-eval > invalid 18`] = `
 {
+  "code": "const fn = new Function('a', 'b', 'return a + b');",
   "diagnostics": [
     {
       "message": "Implied eval. Do not use the Function constructor to create functions.",
@@ -1262,6 +1401,7 @@ exports[`no-implied-eval > invalid 18`] = `
 
 exports[`no-implied-eval > invalid 19`] = `
 {
+  "code": "const fn = window.Function();",
   "diagnostics": [
     {
       "message": "Implied eval. Do not use the Function constructor to create functions.",
@@ -1287,6 +1427,7 @@ exports[`no-implied-eval > invalid 19`] = `
 
 exports[`no-implied-eval > invalid 20`] = `
 {
+  "code": "const fn = new window.Function();",
   "diagnostics": [
     {
       "message": "Implied eval. Do not use the Function constructor to create functions.",
@@ -1312,6 +1453,7 @@ exports[`no-implied-eval > invalid 20`] = `
 
 exports[`no-implied-eval > invalid 21`] = `
 {
+  "code": "const fn = window['Function']();",
   "diagnostics": [
     {
       "message": "Implied eval. Do not use the Function constructor to create functions.",
@@ -1337,6 +1479,7 @@ exports[`no-implied-eval > invalid 21`] = `
 
 exports[`no-implied-eval > invalid 22`] = `
 {
+  "code": "const fn = new window['Function']();",
   "diagnostics": [
     {
       "message": "Implied eval. Do not use the Function constructor to create functions.",

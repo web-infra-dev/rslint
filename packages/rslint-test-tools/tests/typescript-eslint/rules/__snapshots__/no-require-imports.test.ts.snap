@@ -2,6 +2,7 @@
 
 exports[`no-require-imports > invalid 1`] = `
 {
+  "code": "var lib = require('lib');",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -27,6 +28,7 @@ exports[`no-require-imports > invalid 1`] = `
 
 exports[`no-require-imports > invalid 2`] = `
 {
+  "code": "let lib2 = require('lib2');",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -52,6 +54,10 @@ exports[`no-require-imports > invalid 2`] = `
 
 exports[`no-require-imports > invalid 3`] = `
 {
+  "code": "
+var lib5 = require('lib5'),
+  lib6 = require('lib6');
+      ",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -92,6 +98,7 @@ exports[`no-require-imports > invalid 3`] = `
 
 exports[`no-require-imports > invalid 4`] = `
 {
+  "code": "import lib8 = require('lib8');",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -117,6 +124,7 @@ exports[`no-require-imports > invalid 4`] = `
 
 exports[`no-require-imports > invalid 5`] = `
 {
+  "code": "var lib = require?.('lib');",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -142,6 +150,7 @@ exports[`no-require-imports > invalid 5`] = `
 
 exports[`no-require-imports > invalid 6`] = `
 {
+  "code": "let lib2 = require?.('lib2');",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -167,6 +176,10 @@ exports[`no-require-imports > invalid 6`] = `
 
 exports[`no-require-imports > invalid 7`] = `
 {
+  "code": "
+var lib5 = require?.('lib5'),
+  lib6 = require?.('lib6');
+      ",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -207,6 +220,7 @@ exports[`no-require-imports > invalid 7`] = `
 
 exports[`no-require-imports > invalid 8`] = `
 {
+  "code": "const pkg = require('./package.json');",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -232,6 +246,7 @@ exports[`no-require-imports > invalid 8`] = `
 
 exports[`no-require-imports > invalid 9`] = `
 {
+  "code": "const pkg = require('./package.jsonc');",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -257,6 +272,7 @@ exports[`no-require-imports > invalid 9`] = `
 
 exports[`no-require-imports > invalid 10`] = `
 {
+  "code": "const pkg = require(\`./package.jsonc\`);",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -282,6 +298,7 @@ exports[`no-require-imports > invalid 10`] = `
 
 exports[`no-require-imports > invalid 11`] = `
 {
+  "code": "import pkg = require('./package.json');",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -307,6 +324,7 @@ exports[`no-require-imports > invalid 11`] = `
 
 exports[`no-require-imports > invalid 12`] = `
 {
+  "code": "import pkg = require('./package.jsonc');",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -332,6 +350,7 @@ exports[`no-require-imports > invalid 12`] = `
 
 exports[`no-require-imports > invalid 13`] = `
 {
+  "code": "import pkg = require('./package.json');",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -357,6 +376,7 @@ exports[`no-require-imports > invalid 13`] = `
 
 exports[`no-require-imports > invalid 14`] = `
 {
+  "code": "var foo = require?.('foo');",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -382,6 +402,7 @@ exports[`no-require-imports > invalid 14`] = `
 
 exports[`no-require-imports > invalid 15`] = `
 {
+  "code": "let foo = trick(require?.('foo'));",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -407,6 +428,7 @@ exports[`no-require-imports > invalid 15`] = `
 
 exports[`no-require-imports > invalid 16`] = `
 {
+  "code": "trick(require('foo'));",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -432,6 +454,7 @@ exports[`no-require-imports > invalid 16`] = `
 
 exports[`no-require-imports > invalid 17`] = `
 {
+  "code": "const foo = require('./foo.json') as Foo;",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -457,6 +480,7 @@ exports[`no-require-imports > invalid 17`] = `
 
 exports[`no-require-imports > invalid 18`] = `
 {
+  "code": "const foo: Foo = require('./foo.json').default;",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -482,6 +506,7 @@ exports[`no-require-imports > invalid 18`] = `
 
 exports[`no-require-imports > invalid 19`] = `
 {
+  "code": "const foo = <Foo>require('./foo.json');",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -507,6 +532,10 @@ exports[`no-require-imports > invalid 19`] = `
 
 exports[`no-require-imports > invalid 20`] = `
 {
+  "code": "
+const configValidator = new Validator(require('./a.json'));
+configValidator.addSchema(require('./a.json'));
+      ",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -547,6 +576,7 @@ exports[`no-require-imports > invalid 20`] = `
 
 exports[`no-require-imports > invalid 21`] = `
 {
+  "code": "require(foo);",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",
@@ -572,6 +602,7 @@ exports[`no-require-imports > invalid 21`] = `
 
 exports[`no-require-imports > invalid 22`] = `
 {
+  "code": "require?.(foo);",
   "diagnostics": [
     {
       "message": "A \`require()\` style import is forbidden.",

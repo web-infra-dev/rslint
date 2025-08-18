@@ -255,11 +255,8 @@ const RuleImplementationStatus: React.FC = () => {
                                   '_blank',
                                 );
                               }}
-                              asChild
                             >
-                              <div>
-                                {index + 1}.{caseItem.name}
-                              </div>
+                              {index + 1}.{caseItem.name}
                             </Button>
                           ))}
                         </div>
