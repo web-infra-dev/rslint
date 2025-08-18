@@ -2,7 +2,7 @@
 
 import path from 'node:path';
 import { test, describe, expect } from '@rstest/core';
-import { lint, LintResponse, type Diagnostic } from '@rslint/core';
+import { applyFixes, lint, LintResponse, type Diagnostic } from '@rslint/core';
 import assert from 'node:assert';
 
 interface TsDiagnostic {
@@ -93,7 +93,7 @@ export type InvalidTestCase<T = any, U = any> = {
   options?: any;
   only?: boolean;
   skip?: boolean;
-  output?: string | string[] | null;
+  output?: string | null | string[];
   languageOptions?: RuleTesterOptions['languageOptions'];
 };
 export type ValidTestCase<T = any> =
@@ -220,6 +220,7 @@ export class RuleTester {
             errors,
             only = false,
             skip = false,
+            output,
             options = [],
           } = item;
           if (skip) {
@@ -243,7 +244,6 @@ export class RuleTester {
               [ruleName]: options,
             },
           });
-          expect(filterSnapshot(diags)).toMatchSnapshot();
 
           assert(
             diags.diagnostics?.length > 0,
@@ -251,13 +251,38 @@ export class RuleTester {
           );
           // eslint-disable-next-line
           checkDiagnosticEqual(diags.diagnostics, errors);
+          if (output) {
+            // check autofix
+            const fixedCode = await applyFixes({
+              fileContent: code,
+              diagnostics: diags.diagnostics,
+            });
+            if (Array.isArray(output)) {
+              // skip for now, because the current implementation of autofix is different from typescript-eslint
+              // expect(fixedCode.fixedContent).toEqual(output);
+            } else {
+              expect(fixedCode.fixedContent[0]).toEqual(output);
+            }
+
+            expect(
+              filterSnapshot({
+                ...diags,
+                code,
+                output,
+              }),
+            ).toMatchSnapshot();
+          } else {
+            expect(filterSnapshot({ ...diags, code })).toMatchSnapshot();
+          }
         }
       });
     });
   }
 }
 // remove unnecessary props from diagnostics, return optional filtered LintResponse
-function filterSnapshot(diags: LintResponse): LintResponse {
+function filterSnapshot(
+  diags: LintResponse & { output?: string | string[] | null; code?: string },
+): LintResponse {
   for (const diag of diags.diagnostics ?? []) {
     // @ts-ignore
     delete diag.filePath;
