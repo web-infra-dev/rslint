@@ -48,6 +48,10 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache-name: test-go
+
+      - name: debugger
+        uses: ./.github/actions/debugger
+
       - name: Unit Test
         run: |
           go test -parallel 8 ./internal/...
