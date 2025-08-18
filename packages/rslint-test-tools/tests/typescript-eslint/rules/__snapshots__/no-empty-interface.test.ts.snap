@@ -71,6 +71,15 @@ exports[`no-empty-interface > invalid 3`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+interface Foo {
+  props: string;
+}
+
+type Bar = Foo
+
+class Baz {}
+      ",
   "ruleCount": 1,
 }
 `;
@@ -121,6 +130,15 @@ exports[`no-empty-interface > invalid 5`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+interface Foo {
+  props: string;
+}
+
+type Bar = Foo
+
+const bar = class Bar {};
+      ",
   "ruleCount": 1,
 }
 `;
@@ -146,6 +164,13 @@ exports[`no-empty-interface > invalid 6`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+interface Foo {
+  name: string;
+}
+
+type Bar = Foo
+      ",
   "ruleCount": 1,
 }
 `;
@@ -171,6 +196,7 @@ exports[`no-empty-interface > invalid 7`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "type Foo = Array<number>",
   "ruleCount": 1,
 }
 `;
@@ -196,6 +222,7 @@ exports[`no-empty-interface > invalid 8`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "type Foo = Array<number | {}>",
   "ruleCount": 1,
 }
 `;
@@ -221,6 +248,12 @@ exports[`no-empty-interface > invalid 9`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+interface Bar {
+  bar: string;
+}
+type Foo = Array<Bar>
+      ",
   "ruleCount": 1,
 }
 `;
@@ -246,6 +279,10 @@ exports[`no-empty-interface > invalid 10`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+type R = Record<string, unknown>;
+type Foo = R
+      ",
   "ruleCount": 1,
 }
 `;
@@ -271,6 +308,9 @@ exports[`no-empty-interface > invalid 11`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+type Foo<T> = Bar<T>
+      ",
   "ruleCount": 1,
 }
 `;
