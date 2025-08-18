@@ -47,7 +47,7 @@ jobs:
         uses: ./.github/actions/setup-go
         with:
           go-version: ${{ matrix.go-version }}
-          cache-name: test-go-pshu-1
+          cache-name: test-go-pshu-2
 
       - name: Setup MSYS2
         if: runner.os == 'Windows'
@@ -55,6 +55,7 @@ jobs:
         id: setup-msys2
 
       - name: Setup tmate session
+        if: false
         uses: mxschmitt/action-tmate@v3
         with:
           msys2-location: ${{ steps.setup-msys2.outputs.msys2-location }}
