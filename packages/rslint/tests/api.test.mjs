@@ -64,7 +64,6 @@ const y = x as string;`;
         [virtual_entry]: fileContent,
       },
     });
-    console.log('Lint diagnostics:', diags);
 
     // Check if we have diagnostics with fixes
     if (!diags.diagnostics || diags.diagnostics.length === 0) {

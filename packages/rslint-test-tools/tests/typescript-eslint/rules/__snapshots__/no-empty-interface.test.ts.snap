@@ -2,6 +2,7 @@
 
 exports[`no-empty-interface > invalid 1`] = `
 {
+  "code": "interface Foo {}",
   "diagnostics": [
     {
       "message": "An empty interface is equivalent to \`{}\`.",
@@ -27,6 +28,7 @@ exports[`no-empty-interface > invalid 1`] = `
 
 exports[`no-empty-interface > invalid 2`] = `
 {
+  "code": "interface Foo extends {}",
   "diagnostics": [
     {
       "message": "An empty interface is equivalent to \`{}\`.",
@@ -52,6 +54,15 @@ exports[`no-empty-interface > invalid 2`] = `
 
 exports[`no-empty-interface > invalid 3`] = `
 {
+  "code": "
+interface Foo {
+  props: string;
+}
+
+interface Bar extends Foo {}
+
+class Baz {}
+      ",
   "diagnostics": [
     {
       "message": "An interface declaring no members is equivalent to its supertype.",
@@ -86,6 +97,15 @@ class Baz {}
 
 exports[`no-empty-interface > invalid 4`] = `
 {
+  "code": "
+interface Foo {
+  props: string;
+}
+
+interface Bar extends Foo {}
+
+class Bar {}
+      ",
   "diagnostics": [
     {
       "message": "An interface declaring no members is equivalent to its supertype.",
@@ -111,6 +131,15 @@ exports[`no-empty-interface > invalid 4`] = `
 
 exports[`no-empty-interface > invalid 5`] = `
 {
+  "code": "
+interface Foo {
+  props: string;
+}
+
+interface Bar extends Foo {}
+
+const bar = class Bar {};
+      ",
   "diagnostics": [
     {
       "message": "An interface declaring no members is equivalent to its supertype.",
@@ -145,6 +174,13 @@ const bar = class Bar {};
 
 exports[`no-empty-interface > invalid 6`] = `
 {
+  "code": "
+interface Foo {
+  name: string;
+}
+
+interface Bar extends Foo {}
+      ",
   "diagnostics": [
     {
       "message": "An interface declaring no members is equivalent to its supertype.",
@@ -177,6 +213,7 @@ type Bar = Foo
 
 exports[`no-empty-interface > invalid 7`] = `
 {
+  "code": "interface Foo extends Array<number> {}",
   "diagnostics": [
     {
       "message": "An interface declaring no members is equivalent to its supertype.",
@@ -203,6 +240,7 @@ exports[`no-empty-interface > invalid 7`] = `
 
 exports[`no-empty-interface > invalid 8`] = `
 {
+  "code": "interface Foo extends Array<number | {}> {}",
   "diagnostics": [
     {
       "message": "An interface declaring no members is equivalent to its supertype.",
@@ -229,6 +267,12 @@ exports[`no-empty-interface > invalid 8`] = `
 
 exports[`no-empty-interface > invalid 9`] = `
 {
+  "code": "
+interface Bar {
+  bar: string;
+}
+interface Foo extends Array<Bar> {}
+      ",
   "diagnostics": [
     {
       "message": "An interface declaring no members is equivalent to its supertype.",
@@ -260,6 +304,10 @@ type Foo = Array<Bar>
 
 exports[`no-empty-interface > invalid 10`] = `
 {
+  "code": "
+type R = Record<string, unknown>;
+interface Foo extends R {}
+      ",
   "diagnostics": [
     {
       "message": "An interface declaring no members is equivalent to its supertype.",
@@ -289,6 +337,9 @@ type Foo = R
 
 exports[`no-empty-interface > invalid 11`] = `
 {
+  "code": "
+interface Foo<T> extends Bar<T> {}
+      ",
   "diagnostics": [
     {
       "message": "An interface declaring no members is equivalent to its supertype.",
@@ -317,6 +368,12 @@ type Foo<T> = Bar<T>
 
 exports[`no-empty-interface > invalid 12`] = `
 {
+  "code": "
+declare module FooBar {
+  type Baz = typeof baz;
+  export interface Bar extends Baz {}
+}
+      ",
   "diagnostics": [
     {
       "message": "An interface declaring no members is equivalent to its supertype.",

@@ -46,7 +46,7 @@ export interface ApplyFixesRequest {
 }
 
 export interface ApplyFixesResponse {
-  fixedContent: string; // The content after applying fixes
+  fixedContent: string[]; // The content after applying fixes (array of intermediate versions)
   wasFixed: boolean; // Whether any fixes were actually applied
   appliedCount: number; // Number of fixes that were applied
   unappliedCount: number; // Number of fixes that couldn't be applied

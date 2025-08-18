@@ -82,10 +82,10 @@ type ApplyFixesRequest struct {
 
 // ApplyFixesResponse represents a response after applying fixes
 type ApplyFixesResponse struct {
-	FixedContent string `json:"fixedContent"` // The content after applying fixes
-	WasFixed     bool   `json:"wasFixed"`     // Whether any fixes were actually applied
-	AppliedCount int    `json:"appliedCount"` // Number of fixes that were applied
-	UnappliedCount int  `json:"unappliedCount"` // Number of fixes that couldn't be applied
+	FixedContent []string `json:"fixedContent"` // The content after applying fixes (array of intermediate versions)
+	WasFixed     bool     `json:"wasFixed"`     // Whether any fixes were actually applied
+	AppliedCount int      `json:"appliedCount"` // Number of fixes that were applied
+	UnappliedCount int    `json:"unappliedCount"` // Number of fixes that couldn't be applied
 }
 
 // ErrorResponse represents an error response
