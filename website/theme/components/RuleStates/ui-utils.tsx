@@ -9,9 +9,7 @@ export const Badge: React.FC<{ children: ReactNode }> = ({ children }) => (
 
 // Heading component
 export const Heading: React.FC<{ children: ReactNode }> = ({ children }) => (
-  <p className="scroll-m-20 border-b pb-2 text-xl tracking-tight first:mt-0">
-    {children}
-  </p>
+  <p className="scroll-m-20 text-xl tracking-tight first:mt-0">{children}</p>
 );
 
 // Text component

@@ -116,7 +116,13 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+}
+
+body {
+  color: var(--rp-c-text-1);
+  background-color: var(--rp-c-bg);
 }
