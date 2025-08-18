@@ -55,7 +55,6 @@ jobs:
         id: setup-msys2
 
       - name: Setup tmate session
-        if: runner.os == 'Windows'
         uses: mxschmitt/action-tmate@v3
         with:
           msys2-location: ${{ steps.setup-msys2.outputs.msys2-location }}
