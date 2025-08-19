@@ -98,3 +98,129 @@ exports[`dot-notation > invalid 11`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`dot-notation > invalid 12`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 13`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 14`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 15`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 16`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 17`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 18`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 19`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 20`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 21`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 22`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 23`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 24`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 25`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
+  "ruleCount": 1,
+}
+`;
