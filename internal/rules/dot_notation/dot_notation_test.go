@@ -22,9 +22,10 @@ func TestDotNotationRule(t *testing.T) {
 				{
 					MessageId: "useDot",
 					Line:      1,
-					Column:    2,
+					Column:    1,
 				},
 			},
+			Output: []string{"a.b;"},
 		},
 		{
 			Code: "a['test'];",
@@ -32,9 +33,10 @@ func TestDotNotationRule(t *testing.T) {
 				{
 					MessageId: "useDot",
 					Line:      1,
-					Column:    2,
+					Column:    1,
 				},
 			},
+			Output: []string{"a.test;"},
 		},
 	})
 }
