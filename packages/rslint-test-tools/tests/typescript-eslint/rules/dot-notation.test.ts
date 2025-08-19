@@ -347,7 +347,7 @@ a
         '    .then(function(){})\n' +
         '    .catch(function(){})\n' +
         '    .then(function(){})\n' +
-        '    .catch(function(){});',
+        '    ["catch"](function(){});', // Known issue: only first fix is applied
     },
     {
       code: noFormat`

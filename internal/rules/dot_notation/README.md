@@ -13,6 +13,11 @@ This rule enforces the use of dot notation whenever possible, matching the behav
 
 - Line number reporting may differ slightly from TypeScript-ESLint due to AST traversal differences
 - Some TypeScript test snapshots may need updates due to infrastructure differences between Go and TypeScript implementations
+- Multiple fixes in the same file may not all be applied in a single pass (e.g., multiple `["catch"]` to `.catch` conversions)
+- Index signature handling differs from TypeScript-ESLint:
+  - Our implementation is more conservative when types have index signatures
+  - We may not report diagnostics for some edge cases where TypeScript-ESLint would
+  - This particularly affects template literal types and type utilities like `Lowercase<string>`
 
 ## Configuration
 

@@ -330,10 +330,10 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 				}
 			} else {
 				// Property not found as explicit declaration - check index signatures
-				// If the type has index signatures, this property access might match them
 				if hasAnyIndexSignature(appType) {
-					// This property matches an index signature pattern (like template literals)
-					// We should not suggest dot notation for these cases
+					// If the type has index signatures, be conservative and skip the diagnostic
+					// This handles template literal patterns, type utilities like Lowercase<string>, etc.
+					// TypeScript-ESLint has more sophisticated type checking that we can't fully replicate
 					return
 				}
 			}
@@ -382,9 +382,23 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 			// Avoid autofix if comments present (heuristic)
 			textRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
 			if !utils.HasCommentsInRange(ctx.SourceFile, textRange) {
+				text := ctx.SourceFile.Text()
 				objRange := utils.TrimNodeTextRange(ctx.SourceFile, pae.Expression)
-				objectText := ctx.SourceFile.Text()[objRange.Pos():objRange.End()]
-				replacement := objectText + "[\"" + name + "\"]"
+
+				// Find the dot position
+				dotPos := objRange.End()
+				for dotPos < textRange.End() && text[dotPos] != '.' {
+					dotPos++
+				}
+
+				// Preserve whitespace before the dot
+				whitespace := ""
+				if dotPos > objRange.End() {
+					whitespace = text[objRange.End():dotPos]
+				}
+
+				objectText := text[objRange.Pos():objRange.End()]
+				replacement := objectText + whitespace + "[\"" + name + "\"]"
 				ctx.ReportNodeWithFixes(node, buildUseBracketsMessage(name), rule.RuleFixReplace(ctx.SourceFile, node, replacement))
 				return
 			}
