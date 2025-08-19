@@ -548,7 +548,8 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 			objType := ctx.TypeChecker.GetTypeAtLocation(elem.Expression)
 			nnType := ctx.TypeChecker.GetNonNullableType(objType)
 			appType := checker.Checker_getApparentType(ctx.TypeChecker, nnType)
-			// Try resolve symbol to check modifiers on the non-nullable type first
+
+			// Try resolve symbol to check modifiers
 			sym := checker.Checker_getPropertyOfType(ctx.TypeChecker, appType, propName)
 			if sym == nil {
 				for _, s := range checker.Checker_getPropertiesOfType(ctx.TypeChecker, appType) {
@@ -559,34 +560,31 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 				}
 			}
 
+			// Check if we should allow based on modifiers
 			if sym != nil {
 				flags := checker.GetDeclarationModifierFlagsFromSymbol(sym)
 				if (flags & ast.ModifierFlagsPrivate) != 0 {
 					if opts.AllowPrivateClassPropertyAccess {
 						return
 					}
-					// Continue to report error when allowPrivateClassPropertyAccess is false
+					// Continue to report error - private property with bracket notation
 				} else if (flags & ast.ModifierFlagsProtected) != 0 {
 					if opts.AllowProtectedClassPropertyAccess {
 						return
 					}
-					// Continue to report error when allowProtectedClassPropertyAccess is false
+					// Continue to report error - protected property with bracket notation
 				}
-			}
-
-			// Allow bracket notation for properties that are NOT explicitly declared.
-			// If a template-literal index signature matches, allow regardless of ts option.
-			if sym == nil {
-				if propMatchesTemplateIndexSignature(ctx.TypeChecker, appType, ctx.SourceFile, propName) {
-					return
-				}
+			} else {
+				// Property not found as explicit declaration - check index signatures
 				allowIndexAccess := opts.AllowIndexSignaturePropertyAccess
 				if ctx.Program != nil {
 					if copts := ctx.Program.Options(); copts != nil && copts.NoPropertyAccessFromIndexSignature.IsTrue() {
 						allowIndexAccess = true
 					}
 				}
-				if allowIndexAccess && (hasStringLikeIndexSignature(ctx.TypeChecker, appType) || hasAnyIndexSignature(appType)) {
+
+				// Check if type has any index signature that could match this property
+				if allowIndexAccess && hasAnyIndexSignature(appType) {
 					return
 				}
 			}
