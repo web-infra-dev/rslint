@@ -2,626 +2,198 @@
 
 exports[`no-require-imports > invalid 1`] = `
 {
-  "code": "var lib = require('lib');",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 25,
-          "line": 1,
-        },
-        "start": {
-          "column": 11,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 2`] = `
 {
-  "code": "let lib2 = require('lib2');",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 27,
-          "line": 1,
-        },
-        "start": {
-          "column": 12,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 3`] = `
 {
-  "code": "
-var lib5 = require('lib5'),
-  lib6 = require('lib6');
-      ",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 27,
-          "line": 2,
-        },
-        "start": {
-          "column": 12,
-          "line": 2,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 25,
-          "line": 3,
-        },
-        "start": {
-          "column": 10,
-          "line": 3,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 4`] = `
 {
-  "code": "import lib8 = require('lib8');",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 30,
-          "line": 1,
-        },
-        "start": {
-          "column": 15,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 5`] = `
 {
-  "code": "var lib = require?.('lib');",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 27,
-          "line": 1,
-        },
-        "start": {
-          "column": 11,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 6`] = `
 {
-  "code": "let lib2 = require?.('lib2');",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 29,
-          "line": 1,
-        },
-        "start": {
-          "column": 12,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 7`] = `
 {
-  "code": "
-var lib5 = require?.('lib5'),
-  lib6 = require?.('lib6');
-      ",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 29,
-          "line": 2,
-        },
-        "start": {
-          "column": 12,
-          "line": 2,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 27,
-          "line": 3,
-        },
-        "start": {
-          "column": 10,
-          "line": 3,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 8`] = `
 {
-  "code": "const pkg = require('./package.json');",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 38,
-          "line": 1,
-        },
-        "start": {
-          "column": 13,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 9`] = `
 {
-  "code": "const pkg = require('./package.jsonc');",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 39,
-          "line": 1,
-        },
-        "start": {
-          "column": 13,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 10`] = `
 {
-  "code": "const pkg = require(\`./package.jsonc\`);",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 39,
-          "line": 1,
-        },
-        "start": {
-          "column": 13,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 11`] = `
 {
-  "code": "import pkg = require('./package.json');",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 39,
-          "line": 1,
-        },
-        "start": {
-          "column": 14,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 12`] = `
 {
-  "code": "import pkg = require('./package.jsonc');",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 40,
-          "line": 1,
-        },
-        "start": {
-          "column": 14,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 13`] = `
 {
-  "code": "import pkg = require('./package.json');",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 39,
-          "line": 1,
-        },
-        "start": {
-          "column": 14,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 14`] = `
 {
-  "code": "var foo = require?.('foo');",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 27,
-          "line": 1,
-        },
-        "start": {
-          "column": 11,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 15`] = `
 {
-  "code": "let foo = trick(require?.('foo'));",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 33,
-          "line": 1,
-        },
-        "start": {
-          "column": 17,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 16`] = `
 {
-  "code": "trick(require('foo'));",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 21,
-          "line": 1,
-        },
-        "start": {
-          "column": 7,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 17`] = `
 {
-  "code": "const foo = require('./foo.json') as Foo;",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 34,
-          "line": 1,
-        },
-        "start": {
-          "column": 13,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 18`] = `
 {
-  "code": "const foo: Foo = require('./foo.json').default;",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 39,
-          "line": 1,
-        },
-        "start": {
-          "column": 18,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 19`] = `
 {
-  "code": "const foo = <Foo>require('./foo.json');",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 39,
-          "line": 1,
-        },
-        "start": {
-          "column": 18,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 20`] = `
 {
-  "code": "
-const configValidator = new Validator(require('./a.json'));
-configValidator.addSchema(require('./a.json'));
-      ",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 58,
-          "line": 2,
-        },
-        "start": {
-          "column": 39,
-          "line": 2,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 46,
-          "line": 3,
-        },
-        "start": {
-          "column": 27,
-          "line": 3,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 21`] = `
 {
-  "code": "require(foo);",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 13,
-          "line": 1,
-        },
-        "start": {
-          "column": 1,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-require-imports > invalid 22`] = `
 {
-  "code": "require?.(foo);",
-  "diagnostics": [
-    {
-      "message": "A \`require()\` style import is forbidden.",
-      "messageId": "noRequireImports",
-      "range": {
-        "end": {
-          "column": 15,
-          "line": 1,
-        },
-        "start": {
-          "column": 1,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-require-imports",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;

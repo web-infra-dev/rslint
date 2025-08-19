@@ -2,209 +2,518 @@
 
 exports[`no-empty-function > invalid 1`] = `
 {
-  "code": "
-class Person {
-  constructor(name: string) {}
-}
-      ",
   "diagnostics": [
     {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'deprecatedFunction'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 9,
+        },
+        "start": {
+          "column": 44,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'normalFunction'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 14,
+        },
+        "start": {
+          "column": 45,
+          "line": 14,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'deprecatedFunctionWithOverloads'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 18,
+        },
+        "start": {
+          "column": 62,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
       "message": "Unexpected empty constructor.",
       "messageId": "unexpected",
       "range": {
         "end": {
           "column": 31,
-          "line": 3,
+          "line": 23,
         },
         "start": {
           "column": 29,
-          "line": 3,
+          "line": 23,
         },
       },
       "ruleName": "@typescript-eslint/no-empty-function",
     },
   ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "errorCount": 4,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-empty-function > invalid 2`] = `
 {
-  "code": "
-class Person {
-  otherMethod(name: string) {}
-}
-      ",
   "diagnostics": [
     {
-      "message": "Unexpected empty method 'otherMethod'.",
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'deprecatedFunction'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 9,
+        },
+        "start": {
+          "column": 44,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'normalFunction'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 14,
+        },
+        "start": {
+          "column": 45,
+          "line": 14,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'deprecatedFunctionWithOverloads'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 18,
+        },
+        "start": {
+          "column": 62,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty constructor.",
       "messageId": "unexpected",
       "range": {
         "end": {
           "column": 31,
-          "line": 3,
+          "line": 23,
         },
         "start": {
           "column": 29,
-          "line": 3,
+          "line": 23,
         },
       },
       "ruleName": "@typescript-eslint/no-empty-function",
     },
   ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "errorCount": 4,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-empty-function > invalid 3`] = `
 {
-  "code": "
-class Foo {
-  private constructor() {}
-}
-      ",
   "diagnostics": [
     {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'deprecatedFunction'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 9,
+        },
+        "start": {
+          "column": 44,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'normalFunction'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 14,
+        },
+        "start": {
+          "column": 45,
+          "line": 14,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'deprecatedFunctionWithOverloads'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 18,
+        },
+        "start": {
+          "column": 62,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
       "message": "Unexpected empty constructor.",
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 27,
-          "line": 3,
+          "column": 31,
+          "line": 23,
         },
         "start": {
-          "column": 25,
-          "line": 3,
+          "column": 29,
+          "line": 23,
         },
       },
       "ruleName": "@typescript-eslint/no-empty-function",
     },
   ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "errorCount": 4,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-empty-function > invalid 4`] = `
 {
-  "code": "
-class Foo {
-  protected constructor() {}
-}
-      ",
   "diagnostics": [
     {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'deprecatedFunction'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 9,
+        },
+        "start": {
+          "column": 44,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'normalFunction'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 14,
+        },
+        "start": {
+          "column": 45,
+          "line": 14,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'deprecatedFunctionWithOverloads'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 18,
+        },
+        "start": {
+          "column": 62,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
       "message": "Unexpected empty constructor.",
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 29,
-          "line": 3,
+          "column": 31,
+          "line": 23,
         },
         "start": {
-          "column": 27,
-          "line": 3,
+          "column": 29,
+          "line": 23,
         },
       },
       "ruleName": "@typescript-eslint/no-empty-function",
     },
   ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "errorCount": 4,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-empty-function > invalid 5`] = `
 {
-  "code": "
-function foo() {}
-      ",
   "diagnostics": [
     {
-      "message": "Unexpected empty function 'foo'.",
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'deprecatedFunction'.",
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 18,
-          "line": 2,
+          "column": 46,
+          "line": 9,
         },
         "start": {
-          "column": 16,
-          "line": 2,
+          "column": 44,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'normalFunction'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 14,
+        },
+        "start": {
+          "column": 45,
+          "line": 14,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'deprecatedFunctionWithOverloads'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 18,
+        },
+        "start": {
+          "column": 62,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty constructor.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 23,
+        },
+        "start": {
+          "column": 29,
+          "line": 23,
         },
       },
       "ruleName": "@typescript-eslint/no-empty-function",
     },
   ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "errorCount": 4,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-empty-function > invalid 6`] = `
 {
-  "code": "
-class Foo {
-  @decorator()
-  foo() {}
-}
-      ",
   "diagnostics": [
     {
-      "message": "Unexpected empty method 'foo'.",
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'deprecatedFunction'.",
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 11,
-          "line": 4,
+          "column": 46,
+          "line": 9,
         },
         "start": {
-          "column": 9,
-          "line": 4,
+          "column": 44,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'normalFunction'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 14,
+        },
+        "start": {
+          "column": 45,
+          "line": 14,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'deprecatedFunctionWithOverloads'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 18,
+        },
+        "start": {
+          "column": 62,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty constructor.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 23,
+        },
+        "start": {
+          "column": 29,
+          "line": 23,
         },
       },
       "ruleName": "@typescript-eslint/no-empty-function",
     },
   ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "errorCount": 4,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;
 
 exports[`no-empty-function > invalid 7`] = `
 {
-  "code": "
-class Foo extends Base {
-  override foo() {}
-}
-      ",
   "diagnostics": [
     {
-      "message": "Unexpected empty method 'foo'.",
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'deprecatedFunction'.",
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 20,
-          "line": 3,
+          "column": 46,
+          "line": 9,
         },
         "start": {
-          "column": 18,
-          "line": 3,
+          "column": 44,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'normalFunction'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 14,
+        },
+        "start": {
+          "column": 45,
+          "line": 14,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty function 'deprecatedFunctionWithOverloads'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 18,
+        },
+        "start": {
+          "column": 62,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-empty-function",
+    },
+    {
+      "filePath": "deprecated.ts",
+      "message": "Unexpected empty constructor.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 23,
+        },
+        "start": {
+          "column": 29,
+          "line": 23,
         },
       },
       "ruleName": "@typescript-eslint/no-empty-function",
     },
   ],
-  "errorCount": 1,
-  "fileCount": 1,
+  "errorCount": 4,
+  "fileCount": 7,
   "ruleCount": 1,
 }
 `;

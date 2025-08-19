@@ -1,6 +1,6 @@
 // Rstest Snapshot v1
 
-exports[`adjacent-overload-signatures > invalid 1`] = `
+exports[`dot-notation > invalid 1`] = `
 {
   "diagnostics": [],
   "errorCount": 0,
@@ -9,7 +9,7 @@ exports[`adjacent-overload-signatures > invalid 1`] = `
 }
 `;
 
-exports[`adjacent-overload-signatures > invalid 2`] = `
+exports[`dot-notation > invalid 2`] = `
 {
   "diagnostics": [],
   "errorCount": 0,
@@ -18,7 +18,7 @@ exports[`adjacent-overload-signatures > invalid 2`] = `
 }
 `;
 
-exports[`adjacent-overload-signatures > invalid 3`] = `
+exports[`dot-notation > invalid 3`] = `
 {
   "diagnostics": [],
   "errorCount": 0,
@@ -27,7 +27,7 @@ exports[`adjacent-overload-signatures > invalid 3`] = `
 }
 `;
 
-exports[`adjacent-overload-signatures > invalid 4`] = `
+exports[`dot-notation > invalid 4`] = `
 {
   "diagnostics": [],
   "errorCount": 0,
@@ -36,7 +36,7 @@ exports[`adjacent-overload-signatures > invalid 4`] = `
 }
 `;
 
-exports[`adjacent-overload-signatures > invalid 5`] = `
+exports[`dot-notation > invalid 5`] = `
 {
   "diagnostics": [],
   "errorCount": 0,
@@ -45,7 +45,7 @@ exports[`adjacent-overload-signatures > invalid 5`] = `
 }
 `;
 
-exports[`adjacent-overload-signatures > invalid 6`] = `
+exports[`dot-notation > invalid 6`] = `
 {
   "diagnostics": [],
   "errorCount": 0,
@@ -54,7 +54,7 @@ exports[`adjacent-overload-signatures > invalid 6`] = `
 }
 `;
 
-exports[`adjacent-overload-signatures > invalid 7`] = `
+exports[`dot-notation > invalid 7`] = `
 {
   "diagnostics": [],
   "errorCount": 0,
@@ -63,7 +63,7 @@ exports[`adjacent-overload-signatures > invalid 7`] = `
 }
 `;
 
-exports[`adjacent-overload-signatures > invalid 8`] = `
+exports[`dot-notation > invalid 8`] = `
 {
   "diagnostics": [],
   "errorCount": 0,
@@ -72,7 +72,25 @@ exports[`adjacent-overload-signatures > invalid 8`] = `
 }
 `;
 
-exports[`adjacent-overload-signatures > invalid 9`] = `
+exports[`dot-notation > invalid 9`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 10`] = `
+{
+  "diagnostics": [],
+  "errorCount": 0,
+  "fileCount": 7,
+  "ruleCount": 1,
+}
+`;
+
+exports[`dot-notation > invalid 11`] = `
 {
   "diagnostics": [],
   "errorCount": 0,
