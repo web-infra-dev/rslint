@@ -324,3 +324,36 @@ exports[`dot-notation > invalid 11`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`dot-notation > invalid 12`] = `
+{
+  "code": "
+a
+  ['SHOUT_CASE'];
+      ",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+a
+  .SHOUT_CASE;
+      ",
+  "ruleCount": 1,
+}
+`;

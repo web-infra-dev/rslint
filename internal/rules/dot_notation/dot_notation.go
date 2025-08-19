@@ -340,10 +340,27 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 
 			// If there is a declared property with this exact name, prefer dot; otherwise, fall back to index signature rules
 			if isValidIdentifier(propName) && (opts.AllowKeywords || (!isKeyword(propName))) {
-				exprRange := utils.TrimNodeTextRange(ctx.SourceFile, elem.Expression)
 				// Build the fix: replace ['prop'] with .prop
-				objectText := ctx.SourceFile.Text()[exprRange.Pos():exprRange.End()]
-				replacement := objectText + "." + propName
+				text := ctx.SourceFile.Text()
+				nodeRange := utils.TrimNodeTextRange(ctx.SourceFile, node)
+				exprRange := utils.TrimNodeTextRange(ctx.SourceFile, elem.Expression)
+
+				// Find the bracket position
+				bracketStart := exprRange.End()
+				for bracketStart < nodeRange.End() && text[bracketStart] != '[' {
+					bracketStart++
+				}
+
+				// Check if there's whitespace (including newlines) before the bracket
+				whitespace := ""
+				if bracketStart > exprRange.End() {
+					whitespace = text[exprRange.End():bracketStart]
+				}
+
+				// Build replacement preserving whitespace
+				objectText := text[exprRange.Pos():exprRange.End()]
+				replacement := objectText + whitespace + "." + propName
+
 				// Report on the node with the fix
 				ctx.ReportNodeWithFixes(node, buildUseDotMessage(), rule.RuleFixReplace(ctx.SourceFile, node, replacement))
 			}
