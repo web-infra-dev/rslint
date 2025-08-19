@@ -6,7 +6,7 @@ exports[`applyFixes api > apply fixes with real diagnostics 1`] = `
 const y = x as string;",
   "output": [
     "let x: string = "hello";
-const y = x  ;",
+const y = x;",
   ],
 }
 `;
