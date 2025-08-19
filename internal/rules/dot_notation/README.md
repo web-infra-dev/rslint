@@ -18,6 +18,8 @@ This rule enforces the use of dot notation whenever possible, matching the behav
   - Our implementation is more conservative when types have index signatures
   - We may not report diagnostics for some edge cases where TypeScript-ESLint would
   - This particularly affects template literal types and type utilities like `Lowercase<string>`
+  - Test infrastructure limitation: The test runner doesn't properly pass TypeScript configuration options,
+    so tests that rely on `noPropertyAccessFromIndexSignature` may behave differently
 
 ## Configuration
 
