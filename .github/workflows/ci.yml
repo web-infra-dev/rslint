@@ -29,6 +29,7 @@ jobs:
         runner: [
             rspack-ubuntu-22.04-large,
             # TODO: enable later
+            rspack-windows-2022-large-verify,
             rspack-windows-2022-large,
             windows-latest,
           ]
