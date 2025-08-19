@@ -2,6 +2,14 @@
 
 exports[`adjacent-overload-signatures > invalid 1`] = `
 {
+  "code": "
+function wrap() {
+  function foo(s: string);
+  function foo(n: number);
+  type bar = number;
+  function foo(sn: string | number) {}
+}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -27,6 +35,15 @@ exports[`adjacent-overload-signatures > invalid 1`] = `
 
 exports[`adjacent-overload-signatures > invalid 2`] = `
 {
+  "code": "
+if (true) {
+  function foo(s: string);
+  function foo(n: number);
+  let a = 1;
+  function foo(sn: string | number) {}
+  foo(a);
+}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -52,6 +69,13 @@ exports[`adjacent-overload-signatures > invalid 2`] = `
 
 exports[`adjacent-overload-signatures > invalid 3`] = `
 {
+  "code": "
+export function foo(s: string);
+export function foo(n: number);
+export function bar(): void {}
+export function baz(): void {}
+export function foo(sn: string | number) {}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -77,6 +101,13 @@ exports[`adjacent-overload-signatures > invalid 3`] = `
 
 exports[`adjacent-overload-signatures > invalid 4`] = `
 {
+  "code": "
+export function foo(s: string);
+export function foo(n: number);
+export type bar = number;
+export type baz = number | string;
+export function foo(sn: string | number) {}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -102,6 +133,13 @@ exports[`adjacent-overload-signatures > invalid 4`] = `
 
 exports[`adjacent-overload-signatures > invalid 5`] = `
 {
+  "code": "
+function foo(s: string);
+function foo(n: number);
+function bar(): void {}
+function baz(): void {}
+function foo(sn: string | number) {}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -127,6 +165,13 @@ exports[`adjacent-overload-signatures > invalid 5`] = `
 
 exports[`adjacent-overload-signatures > invalid 6`] = `
 {
+  "code": "
+function foo(s: string);
+function foo(n: number);
+type bar = number;
+type baz = number | string;
+function foo(sn: string | number) {}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -152,6 +197,13 @@ exports[`adjacent-overload-signatures > invalid 6`] = `
 
 exports[`adjacent-overload-signatures > invalid 7`] = `
 {
+  "code": "
+function foo(s: string) {}
+function foo(n: number) {}
+const a = '';
+const b = '';
+function foo(sn: string | number) {}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -177,6 +229,12 @@ exports[`adjacent-overload-signatures > invalid 7`] = `
 
 exports[`adjacent-overload-signatures > invalid 8`] = `
 {
+  "code": "
+function foo(s: string) {}
+function foo(n: number) {}
+class Bar {}
+function foo(sn: string | number) {}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -202,6 +260,17 @@ exports[`adjacent-overload-signatures > invalid 8`] = `
 
 exports[`adjacent-overload-signatures > invalid 9`] = `
 {
+  "code": "
+function foo(s: string) {}
+function foo(n: number) {}
+function foo(sn: string | number) {}
+class Bar {
+  foo(s: string);
+  foo(n: number);
+  name: string;
+  foo(sn: string | number) {}
+}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -227,6 +296,13 @@ exports[`adjacent-overload-signatures > invalid 9`] = `
 
 exports[`adjacent-overload-signatures > invalid 10`] = `
 {
+  "code": "
+declare function foo(s: string);
+declare function foo(n: number);
+declare function bar(): void;
+declare function baz(): void;
+declare function foo(sn: string | number);
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -252,6 +328,13 @@ exports[`adjacent-overload-signatures > invalid 10`] = `
 
 exports[`adjacent-overload-signatures > invalid 11`] = `
 {
+  "code": "
+declare function foo(s: string);
+declare function foo(n: number);
+const a = '';
+const b = '';
+declare function foo(sn: string | number);
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -277,6 +360,15 @@ exports[`adjacent-overload-signatures > invalid 11`] = `
 
 exports[`adjacent-overload-signatures > invalid 12`] = `
 {
+  "code": "
+declare module 'Foo' {
+  export function foo(s: string): void;
+  export function foo(n: number): void;
+  export function bar(): void;
+  export function baz(): void;
+  export function foo(sn: string | number): void;
+}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -302,6 +394,17 @@ exports[`adjacent-overload-signatures > invalid 12`] = `
 
 exports[`adjacent-overload-signatures > invalid 13`] = `
 {
+  "code": "
+declare module 'Foo' {
+  export function foo(s: string): void;
+  export function foo(n: number): void;
+  export function foo(sn: string | number): void;
+  function baz(s: string): void;
+  export function bar(): void;
+  function baz(n: number): void;
+  function baz(sn: string | number): void;
+}
+      ",
   "diagnostics": [
     {
       "message": "All baz signatures should be adjacent.",
@@ -327,6 +430,15 @@ exports[`adjacent-overload-signatures > invalid 13`] = `
 
 exports[`adjacent-overload-signatures > invalid 14`] = `
 {
+  "code": "
+declare namespace Foo {
+  export function foo(s: string): void;
+  export function foo(n: number): void;
+  export function bar(): void;
+  export function baz(): void;
+  export function foo(sn: string | number): void;
+}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -352,6 +464,17 @@ exports[`adjacent-overload-signatures > invalid 14`] = `
 
 exports[`adjacent-overload-signatures > invalid 15`] = `
 {
+  "code": "
+declare namespace Foo {
+  export function foo(s: string): void;
+  export function foo(n: number): void;
+  export function foo(sn: string | number): void;
+  function baz(s: string): void;
+  export function bar(): void;
+  function baz(n: number): void;
+  function baz(sn: string | number): void;
+}
+      ",
   "diagnostics": [
     {
       "message": "All baz signatures should be adjacent.",
@@ -377,6 +500,15 @@ exports[`adjacent-overload-signatures > invalid 15`] = `
 
 exports[`adjacent-overload-signatures > invalid 16`] = `
 {
+  "code": "
+type Foo = {
+  foo(s: string): void;
+  foo(n: number): void;
+  bar(): void;
+  baz(): void;
+  foo(sn: string | number): void;
+};
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -402,6 +534,15 @@ exports[`adjacent-overload-signatures > invalid 16`] = `
 
 exports[`adjacent-overload-signatures > invalid 17`] = `
 {
+  "code": "
+type Foo = {
+  foo(s: string): void;
+  ['foo'](n: number): void;
+  bar(): void;
+  baz(): void;
+  foo(sn: string | number): void;
+};
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -427,6 +568,16 @@ exports[`adjacent-overload-signatures > invalid 17`] = `
 
 exports[`adjacent-overload-signatures > invalid 18`] = `
 {
+  "code": "
+type Foo = {
+  foo(s: string): void;
+  name: string;
+  foo(n: number): void;
+  foo(sn: string | number): void;
+  bar(): void;
+  baz(): void;
+};
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -452,6 +603,17 @@ exports[`adjacent-overload-signatures > invalid 18`] = `
 
 exports[`adjacent-overload-signatures > invalid 19`] = `
 {
+  "code": "
+interface Foo {
+  (s: string): void;
+  foo(n: number): void;
+  (n: number): void;
+  (sn: string | number): void;
+  bar(): void;
+  baz(): void;
+  call(): void;
+}
+      ",
   "diagnostics": [
     {
       "message": "All call signatures should be adjacent.",
@@ -477,6 +639,15 @@ exports[`adjacent-overload-signatures > invalid 19`] = `
 
 exports[`adjacent-overload-signatures > invalid 20`] = `
 {
+  "code": "
+interface Foo {
+  foo(s: string): void;
+  foo(n: number): void;
+  bar(): void;
+  baz(): void;
+  foo(sn: string | number): void;
+}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -502,6 +673,15 @@ exports[`adjacent-overload-signatures > invalid 20`] = `
 
 exports[`adjacent-overload-signatures > invalid 21`] = `
 {
+  "code": "
+interface Foo {
+  foo(s: string): void;
+  ['foo'](n: number): void;
+  bar(): void;
+  baz(): void;
+  foo(sn: string | number): void;
+}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -527,6 +707,15 @@ exports[`adjacent-overload-signatures > invalid 21`] = `
 
 exports[`adjacent-overload-signatures > invalid 22`] = `
 {
+  "code": "
+interface Foo {
+  foo(s: string): void;
+  'foo'(n: number): void;
+  bar(): void;
+  baz(): void;
+  foo(sn: string | number): void;
+}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -552,6 +741,16 @@ exports[`adjacent-overload-signatures > invalid 22`] = `
 
 exports[`adjacent-overload-signatures > invalid 23`] = `
 {
+  "code": "
+interface Foo {
+  foo(s: string): void;
+  name: string;
+  foo(n: number): void;
+  foo(sn: string | number): void;
+  bar(): void;
+  baz(): void;
+}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -577,6 +776,17 @@ exports[`adjacent-overload-signatures > invalid 23`] = `
 
 exports[`adjacent-overload-signatures > invalid 24`] = `
 {
+  "code": "
+interface Foo {
+  foo(): void;
+  bar: {
+    baz(s: string): void;
+    baz(n: number): void;
+    foo(): void;
+    baz(sn: string | number): void;
+  };
+}
+      ",
   "diagnostics": [
     {
       "message": "All baz signatures should be adjacent.",
@@ -602,6 +812,15 @@ exports[`adjacent-overload-signatures > invalid 24`] = `
 
 exports[`adjacent-overload-signatures > invalid 25`] = `
 {
+  "code": "
+interface Foo {
+  new (s: string);
+  new (n: number);
+  foo(): void;
+  bar(): void;
+  new (sn: string | number);
+}
+      ",
   "diagnostics": [
     {
       "message": "All new signatures should be adjacent.",
@@ -627,6 +846,15 @@ exports[`adjacent-overload-signatures > invalid 25`] = `
 
 exports[`adjacent-overload-signatures > invalid 26`] = `
 {
+  "code": "
+interface Foo {
+  new (s: string);
+  foo(): void;
+  new (n: number);
+  bar(): void;
+  new (sn: string | number);
+}
+      ",
   "diagnostics": [
     {
       "message": "All new signatures should be adjacent.",
@@ -667,6 +895,15 @@ exports[`adjacent-overload-signatures > invalid 26`] = `
 
 exports[`adjacent-overload-signatures > invalid 27`] = `
 {
+  "code": "
+class Foo {
+  constructor(s: string);
+  constructor(n: number);
+  bar(): void {}
+  baz(): void {}
+  constructor(sn: string | number) {}
+}
+      ",
   "diagnostics": [
     {
       "message": "All constructor signatures should be adjacent.",
@@ -692,6 +929,15 @@ exports[`adjacent-overload-signatures > invalid 27`] = `
 
 exports[`adjacent-overload-signatures > invalid 28`] = `
 {
+  "code": "
+class Foo {
+  foo(s: string): void;
+  foo(n: number): void;
+  bar(): void {}
+  baz(): void {}
+  foo(sn: string | number): void {}
+}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -717,6 +963,15 @@ exports[`adjacent-overload-signatures > invalid 28`] = `
 
 exports[`adjacent-overload-signatures > invalid 29`] = `
 {
+  "code": "
+class Foo {
+  foo(s: string): void;
+  ['foo'](n: number): void;
+  bar(): void {}
+  baz(): void {}
+  foo(sn: string | number): void {}
+}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -742,6 +997,16 @@ exports[`adjacent-overload-signatures > invalid 29`] = `
 
 exports[`adjacent-overload-signatures > invalid 30`] = `
 {
+  "code": "
+class Foo {
+  // prettier-ignore
+  "foo"(s: string): void;
+  foo(n: number): void;
+  bar(): void {}
+  baz(): void {}
+  foo(sn: string | number): void {}
+}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -767,6 +1032,16 @@ exports[`adjacent-overload-signatures > invalid 30`] = `
 
 exports[`adjacent-overload-signatures > invalid 31`] = `
 {
+  "code": "
+class Foo {
+  constructor(s: string);
+  name: string;
+  constructor(n: number);
+  constructor(sn: string | number) {}
+  bar(): void {}
+  baz(): void {}
+}
+      ",
   "diagnostics": [
     {
       "message": "All constructor signatures should be adjacent.",
@@ -792,6 +1067,16 @@ exports[`adjacent-overload-signatures > invalid 31`] = `
 
 exports[`adjacent-overload-signatures > invalid 32`] = `
 {
+  "code": "
+class Foo {
+  foo(s: string): void;
+  name: string;
+  foo(n: number): void;
+  foo(sn: string | number): void {}
+  bar(): void {}
+  baz(): void {}
+}
+      ",
   "diagnostics": [
     {
       "message": "All foo signatures should be adjacent.",
@@ -817,6 +1102,16 @@ exports[`adjacent-overload-signatures > invalid 32`] = `
 
 exports[`adjacent-overload-signatures > invalid 33`] = `
 {
+  "code": "
+class Foo {
+  static foo(s: string): void;
+  name: string;
+  static foo(n: number): void;
+  static foo(sn: string | number): void {}
+  bar(): void {}
+  baz(): void {}
+}
+      ",
   "diagnostics": [
     {
       "message": "All static foo signatures should be adjacent.",
@@ -842,6 +1137,14 @@ exports[`adjacent-overload-signatures > invalid 33`] = `
 
 exports[`adjacent-overload-signatures > invalid 34`] = `
 {
+  "code": "
+class Test {
+  #private(): void;
+  '#private'(): void;
+  #private(arg: number): void {}
+  '#private'(arg: number): void {}
+}
+      ",
   "diagnostics": [
     {
       "message": "All #private signatures should be adjacent.",

@@ -2,6 +2,13 @@
 
 exports[`class-literal-property-style > invalid 1`] = `
 {
+  "code": "
+class Mx {
+  get p1() {
+    return 'hello world';
+  }
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using readonly fields.",
@@ -27,6 +34,13 @@ exports[`class-literal-property-style > invalid 1`] = `
 
 exports[`class-literal-property-style > invalid 2`] = `
 {
+  "code": "
+class Mx {
+  get p1() {
+    return \`hello world\`;
+  }
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using readonly fields.",
@@ -52,6 +66,13 @@ exports[`class-literal-property-style > invalid 2`] = `
 
 exports[`class-literal-property-style > invalid 3`] = `
 {
+  "code": "
+class Mx {
+  static get p1() {
+    return 'hello world';
+  }
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using readonly fields.",
@@ -77,6 +98,13 @@ exports[`class-literal-property-style > invalid 3`] = `
 
 exports[`class-literal-property-style > invalid 4`] = `
 {
+  "code": "
+class Mx {
+  public static get foo() {
+    return 1;
+  }
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using readonly fields.",
@@ -102,6 +130,13 @@ exports[`class-literal-property-style > invalid 4`] = `
 
 exports[`class-literal-property-style > invalid 5`] = `
 {
+  "code": "
+class Mx {
+  public get [myValue]() {
+    return 'a literal value';
+  }
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using readonly fields.",
@@ -127,6 +162,13 @@ exports[`class-literal-property-style > invalid 5`] = `
 
 exports[`class-literal-property-style > invalid 6`] = `
 {
+  "code": "
+class Mx {
+  public get [myValue]() {
+    return 12345n;
+  }
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using readonly fields.",
@@ -152,6 +194,11 @@ exports[`class-literal-property-style > invalid 6`] = `
 
 exports[`class-literal-property-style > invalid 7`] = `
 {
+  "code": "
+class Mx {
+  public readonly [myValue] = 'a literal value';
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using getters.",
@@ -177,6 +224,11 @@ exports[`class-literal-property-style > invalid 7`] = `
 
 exports[`class-literal-property-style > invalid 8`] = `
 {
+  "code": "
+class Mx {
+  readonly p1 = 'hello world';
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using getters.",
@@ -202,6 +254,11 @@ exports[`class-literal-property-style > invalid 8`] = `
 
 exports[`class-literal-property-style > invalid 9`] = `
 {
+  "code": "
+class Mx {
+  readonly p1 = \`hello world\`;
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using getters.",
@@ -227,6 +284,11 @@ exports[`class-literal-property-style > invalid 9`] = `
 
 exports[`class-literal-property-style > invalid 10`] = `
 {
+  "code": "
+class Mx {
+  static readonly p1 = 'hello world';
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using getters.",
@@ -252,6 +314,13 @@ exports[`class-literal-property-style > invalid 10`] = `
 
 exports[`class-literal-property-style > invalid 11`] = `
 {
+  "code": "
+class Mx {
+  protected get p1() {
+    return 'hello world';
+  }
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using readonly fields.",
@@ -277,6 +346,11 @@ exports[`class-literal-property-style > invalid 11`] = `
 
 exports[`class-literal-property-style > invalid 12`] = `
 {
+  "code": "
+class Mx {
+  protected readonly p1 = 'hello world';
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using getters.",
@@ -302,6 +376,13 @@ exports[`class-literal-property-style > invalid 12`] = `
 
 exports[`class-literal-property-style > invalid 13`] = `
 {
+  "code": "
+class Mx {
+  public static get p1() {
+    return 'hello world';
+  }
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using readonly fields.",
@@ -327,6 +408,11 @@ exports[`class-literal-property-style > invalid 13`] = `
 
 exports[`class-literal-property-style > invalid 14`] = `
 {
+  "code": "
+class Mx {
+  public static readonly p1 = 'hello world';
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using getters.",
@@ -352,6 +438,20 @@ exports[`class-literal-property-style > invalid 14`] = `
 
 exports[`class-literal-property-style > invalid 15`] = `
 {
+  "code": "
+class Mx {
+  public get myValue() {
+    return gql\`
+      {
+        user(id: 5) {
+          firstName
+          lastName
+        }
+      }
+    \`;
+  }
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using readonly fields.",
@@ -377,6 +477,18 @@ exports[`class-literal-property-style > invalid 15`] = `
 
 exports[`class-literal-property-style > invalid 16`] = `
 {
+  "code": "
+class Mx {
+  public readonly myValue = gql\`
+    {
+      user(id: 5) {
+        firstName
+        lastName
+      }
+    }
+  \`;
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using getters.",
@@ -402,6 +514,19 @@ exports[`class-literal-property-style > invalid 16`] = `
 
 exports[`class-literal-property-style > invalid 17`] = `
 {
+  "code": "
+class A {
+  private readonly foo: string = 'bar';
+  constructor(foo: string) {
+    const bar = new (class {
+      private readonly foo: string = 'baz';
+      constructor() {
+        this.foo = 'qux';
+      }
+    })();
+  }
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using getters.",
@@ -427,6 +552,21 @@ exports[`class-literal-property-style > invalid 17`] = `
 
 exports[`class-literal-property-style > invalid 18`] = `
 {
+  "code": "
+class A {
+  private readonly ['foo']: string = 'bar';
+  constructor(foo: string) {
+    const bar = new (class {
+      private readonly foo: string = 'baz';
+      constructor() {}
+    })();
+
+    if (bar) {
+      this.foo = 'baz';
+    }
+  }
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using getters.",
@@ -452,6 +592,16 @@ exports[`class-literal-property-style > invalid 18`] = `
 
 exports[`class-literal-property-style > invalid 19`] = `
 {
+  "code": "
+class A {
+  private readonly foo: string = 'bar';
+  constructor(foo: string) {
+    function func() {
+      this.foo = 'aa';
+    }
+  }
+}
+      ",
   "diagnostics": [
     {
       "message": "Literals should be exposed using getters.",

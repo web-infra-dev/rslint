@@ -2,6 +2,7 @@
 
 exports[`await-thenable > invalid 1`] = `
 {
+  "code": "await 0;",
   "diagnostics": [
     {
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
@@ -27,6 +28,7 @@ exports[`await-thenable > invalid 1`] = `
 
 exports[`await-thenable > invalid 2`] = `
 {
+  "code": "await 'value';",
   "diagnostics": [
     {
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
@@ -52,6 +54,7 @@ exports[`await-thenable > invalid 2`] = `
 
 exports[`await-thenable > invalid 3`] = `
 {
+  "code": "async () => await (Math.random() > 0.5 ? '' : 0);",
   "diagnostics": [
     {
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
@@ -77,6 +80,7 @@ exports[`await-thenable > invalid 3`] = `
 
 exports[`await-thenable > invalid 4`] = `
 {
+  "code": "async () => await(Math.random() > 0.5 ? '' : 0);",
   "diagnostics": [
     {
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
@@ -102,6 +106,10 @@ exports[`await-thenable > invalid 4`] = `
 
 exports[`await-thenable > invalid 5`] = `
 {
+  "code": "
+class NonPromise extends Array {}
+await new NonPromise();
+      ",
   "diagnostics": [
     {
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
@@ -127,6 +135,16 @@ exports[`await-thenable > invalid 5`] = `
 
 exports[`await-thenable > invalid 6`] = `
 {
+  "code": "
+async function test() {
+  class IncorrectThenable {
+    then() {}
+  }
+  const thenable = new IncorrectThenable();
+
+  await thenable;
+}
+      ",
   "diagnostics": [
     {
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
@@ -152,6 +170,10 @@ exports[`await-thenable > invalid 6`] = `
 
 exports[`await-thenable > invalid 7`] = `
 {
+  "code": "
+declare const callback: (() => void) | undefined;
+await callback?.();
+      ",
   "diagnostics": [
     {
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
@@ -177,6 +199,10 @@ exports[`await-thenable > invalid 7`] = `
 
 exports[`await-thenable > invalid 8`] = `
 {
+  "code": "
+declare const obj: { a?: { b?: () => void } };
+await obj.a?.b?.();
+      ",
   "diagnostics": [
     {
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
@@ -202,6 +228,10 @@ exports[`await-thenable > invalid 8`] = `
 
 exports[`await-thenable > invalid 9`] = `
 {
+  "code": "
+declare const obj: { a: { b: { c?: () => void } } } | undefined;
+await obj?.a.b.c?.();
+      ",
   "diagnostics": [
     {
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
@@ -227,6 +257,16 @@ exports[`await-thenable > invalid 9`] = `
 
 exports[`await-thenable > invalid 10`] = `
 {
+  "code": "
+function* yieldNumbers() {
+  yield 1;
+  yield 2;
+  yield 3;
+}
+for await (const value of yieldNumbers()) {
+  console.log(value);
+}
+      ",
   "diagnostics": [
     {
       "message": "Unexpected \`for await...of\` of a value that is not async iterable.",
@@ -252,6 +292,16 @@ exports[`await-thenable > invalid 10`] = `
 
 exports[`await-thenable > invalid 11`] = `
 {
+  "code": "
+function* yieldNumberPromises() {
+  yield Promise.resolve(1);
+  yield Promise.resolve(2);
+  yield Promise.resolve(3);
+}
+for await (const value of yieldNumberPromises()) {
+  console.log(value);
+}
+      ",
   "diagnostics": [
     {
       "message": "Unexpected \`for await...of\` of a value that is not async iterable.",
@@ -277,6 +327,12 @@ exports[`await-thenable > invalid 11`] = `
 
 exports[`await-thenable > invalid 12`] = `
 {
+  "code": "
+declare const disposable: Disposable;
+async function foo() {
+  await using d = disposable;
+}
+      ",
   "diagnostics": [
     {
       "message": "Unexpected \`await using\` of a value that is not async disposable.",
@@ -302,6 +358,13 @@ exports[`await-thenable > invalid 12`] = `
 
 exports[`await-thenable > invalid 13`] = `
 {
+  "code": "
+async function foo() {
+  await using _ = {
+    async [Symbol.dispose]() {},
+  };
+}
+      ",
   "diagnostics": [
     {
       "message": "Unexpected \`await using\` of a value that is not async disposable.",
@@ -327,6 +390,17 @@ exports[`await-thenable > invalid 13`] = `
 
 exports[`await-thenable > invalid 14`] = `
 {
+  "code": "
+declare const disposable: Disposable;
+declare const asyncDisposable: AsyncDisposable;
+async function foo() {
+  await using a = disposable,
+    b = asyncDisposable,
+    c = disposable,
+    d = asyncDisposable,
+    e = disposable;
+}
+      ",
   "diagnostics": [
     {
       "message": "Unexpected \`await using\` of a value that is not async disposable.",
@@ -382,6 +456,14 @@ exports[`await-thenable > invalid 14`] = `
 
 exports[`await-thenable > invalid 15`] = `
 {
+  "code": "
+declare const anee: any;
+declare const disposable: Disposable;
+async function foo() {
+  await using a = anee,
+    b = disposable;
+}
+      ",
   "diagnostics": [
     {
       "message": "Unexpected \`await using\` of a value that is not async disposable.",
@@ -407,6 +489,11 @@ exports[`await-thenable > invalid 15`] = `
 
 exports[`await-thenable > invalid 16`] = `
 {
+  "code": "
+async function wrapper<T extends number>(value: T) {
+  return await value;
+}
+      ",
   "diagnostics": [
     {
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
@@ -432,6 +519,13 @@ exports[`await-thenable > invalid 16`] = `
 
 exports[`await-thenable > invalid 17`] = `
 {
+  "code": "
+class C<T> {
+  async wrapper<T extends string>(value: T) {
+    return await value;
+  }
+}
+      ",
   "diagnostics": [
     {
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
@@ -457,6 +551,13 @@ exports[`await-thenable > invalid 17`] = `
 
 exports[`await-thenable > invalid 18`] = `
 {
+  "code": "
+class C<R extends number> {
+  async wrapper<T extends R>(value: T) {
+    return await value;
+  }
+}
+      ",
   "diagnostics": [
     {
       "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
