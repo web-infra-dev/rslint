@@ -233,30 +233,8 @@ func hasAnyIndexSignature(t *checker.Type) bool {
 
 // hasStringLikeIndexSignatureTS uses available checker APIs to detect declared string-like index signatures.
 func hasStringLikeIndexSignatureTS(typeChecker *checker.Checker, t *checker.Type) bool {
-	if t == nil {
-		return false
-	}
-	nn := typeChecker.GetNonNullableType(t)
-	app := checker.Checker_getApparentType(typeChecker, nn)
-
-	infos := checker.Checker_getIndexInfosOfType(typeChecker, app)
-	if len(infos) == 0 {
-		return false
-	}
-	for _, info := range infos {
-		if info == nil {
-			continue
-		}
-		kt := checker.IndexInfo_keyType(info)
-		if kt == nil {
-			continue
-		}
-		// Treat both string-like and template-literal key types as allowing string keys
-		flags := checker.Type_flags(kt)
-		if (flags&checker.TypeFlagsStringLike) != 0 || (flags&checker.TypeFlagsTemplateLiteral) != 0 {
-			return true
-		}
-	}
+	// This function would use getIndexInfosOfType if it were available in the shim
+	// For now, we rely on the AST-based hasStringLikeIndexSignature function
 	return false
 }
 
@@ -401,7 +379,6 @@ func hasStringLikeIndexSignature(typeChecker *checker.Checker, t *checker.Type) 
 	}
 	return false
 }
-
 
 // propMatchesTemplateIndexSignature returns true if the type declares an index signature
 // with a template-literal key type whose head/tail match the given property name.
@@ -616,7 +593,7 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 						allowIndexAccess = true
 					}
 				}
-				if allowIndexAccess && (hasStringLikeIndexSignatureTS(ctx.TypeChecker, nnType) || hasStringLikeIndexSignature(ctx.TypeChecker, appType) || hasAnyIndexSignature(appType)) {
+				if allowIndexAccess && (hasStringLikeIndexSignature(ctx.TypeChecker, appType) || hasAnyIndexSignature(appType)) {
 					return
 				}
 			}
