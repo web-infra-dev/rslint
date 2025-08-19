@@ -30,7 +30,6 @@ jobs:
           [
             rspack-ubuntu-22.04-large,
             rspack-windows-2022-large,
-            windows-latest,
             rspack-darwin-14-medium,
           ]
         go-version: ['1.25.0']
@@ -87,8 +86,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os:
-          [rspack-ubuntu-22.04-large, rspack-windows-2022-large, windows-latest]
+        os: [rspack-ubuntu-22.04-large, rspack-windows-2022-large]
         go-version: ['1.25.0']
     steps:
       - name: Checkout code
