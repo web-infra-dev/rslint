@@ -6,7 +6,6 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -331,69 +330,22 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 				}
 			} else {
 				// Property not found as explicit declaration - check index signatures
-				allowIndexAccess := opts.AllowIndexSignaturePropertyAccess
-				if ctx.Program != nil {
-					if copts := ctx.Program.Options(); copts != nil && copts.NoPropertyAccessFromIndexSignature.IsTrue() {
-						allowIndexAccess = true
-					}
-				}
-
-				// Check if type has any index signature that could match this property
-				if allowIndexAccess && hasAnyIndexSignature(appType) {
+				// If the type has index signatures, this property access might match them
+				if hasAnyIndexSignature(appType) {
+					// This property matches an index signature pattern (like template literals)
+					// We should not suggest dot notation for these cases
 					return
 				}
 			}
 
 			// If there is a declared property with this exact name, prefer dot; otherwise, fall back to index signature rules
 			if isValidIdentifier(propName) && (opts.AllowKeywords || (!isKeyword(propName))) {
-				text := ctx.SourceFile.Text()
 				exprRange := utils.TrimNodeTextRange(ctx.SourceFile, elem.Expression)
-				// Find '[' after the object
-				i := exprRange.End()
-				for i < len(text) && text[i] != '[' {
-					i++
-				}
-				// Detect if there is a newline between the object end and '['
-				hasNewline := false
-				for k := exprRange.End(); k < i; k++ {
-					if text[k] == '\n' {
-						hasNewline = true
-						break
-					}
-				}
-				// Default anchor at the '[' position
-				start := i
-				if hasNewline {
-					// For multi-line element access, anchor to the first quote inside the brackets
-					// to match the base rule's reported location (line of the '[').
-					quoteStart := -1
-					// Find the end at the closing ']'
-					endScan := i
-					for endScan < len(text) && text[endScan] != ']' {
-						endScan++
-					}
-					for p := i; p < endScan; p++ {
-						if text[p] == '\'' || text[p] == '"' || text[p] == '`' {
-							quoteStart = p
-							break
-						}
-					}
-					if quoteStart >= 0 {
-						start = quoteStart
-					} else {
-						start = i
-					}
-				}
-				// Find the end at the closing ']'
-				j := i
-				for j < len(text) && text[j] != ']' {
-					j++
-				}
-				if j < len(text) {
-					j++
-				}
-				anchored := core.NewTextRange(start, j)
-				ctx.ReportRange(anchored, buildUseDotMessage())
+				// Build the fix: replace ['prop'] with .prop
+				objectText := ctx.SourceFile.Text()[exprRange.Pos():exprRange.End()]
+				replacement := objectText + "." + propName
+				// Report on the node with the fix
+				ctx.ReportNodeWithFixes(node, buildUseDotMessage(), rule.RuleFixReplace(ctx.SourceFile, node, replacement))
 			}
 		}
 

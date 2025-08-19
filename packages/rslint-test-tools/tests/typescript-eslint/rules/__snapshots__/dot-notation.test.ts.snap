@@ -2,225 +2,325 @@
 
 exports[`dot-notation > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "
+class X {
+  private priv_prop = 123;
+}
+
+const x = new X();
+x['priv_prop'] = 123;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 7,
+        },
+        "start": {
+          "column": 1,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class X {
+  private priv_prop = 123;
+}
+
+const x = new X();
+x.priv_prop = 123;
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`dot-notation > invalid 2`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "
+class X {
+  public pub_prop = 123;
+}
+
+const x = new X();
+x['pub_prop'] = 123;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 7,
+        },
+        "start": {
+          "column": 1,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class X {
+  public pub_prop = 123;
+}
+
+const x = new X();
+x.pub_prop = 123;
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`dot-notation > invalid 3`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "a['true'];",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "a.true;",
   "ruleCount": 1,
 }
 `;
 
 exports[`dot-notation > invalid 4`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "a['time'];",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "a.time;",
   "ruleCount": 1,
 }
 `;
 
 exports[`dot-notation > invalid 5`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "a[null];",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "a.null;",
   "ruleCount": 1,
 }
 `;
 
 exports[`dot-notation > invalid 6`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "a[true];",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "a.true;",
   "ruleCount": 1,
 }
 `;
 
 exports[`dot-notation > invalid 7`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "a[false];",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "a.false;",
   "ruleCount": 1,
 }
 `;
 
 exports[`dot-notation > invalid 8`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "a['b'];",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "a.b;",
   "ruleCount": 1,
 }
 `;
 
 exports[`dot-notation > invalid 9`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "a.b['c'];",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "a.b.c;",
   "ruleCount": 1,
 }
 `;
 
 exports[`dot-notation > invalid 10`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "a['_dangle'];",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "a._dangle;",
   "ruleCount": 1,
 }
 `;
 
 exports[`dot-notation > invalid 11`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
-  "ruleCount": 1,
-}
-`;
-
-exports[`dot-notation > invalid 12`] = `
-{
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
-  "ruleCount": 1,
-}
-`;
-
-exports[`dot-notation > invalid 13`] = `
-{
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
-  "ruleCount": 1,
-}
-`;
-
-exports[`dot-notation > invalid 14`] = `
-{
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
-  "ruleCount": 1,
-}
-`;
-
-exports[`dot-notation > invalid 15`] = `
-{
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
-  "ruleCount": 1,
-}
-`;
-
-exports[`dot-notation > invalid 16`] = `
-{
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
-  "ruleCount": 1,
-}
-`;
-
-exports[`dot-notation > invalid 17`] = `
-{
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
-  "ruleCount": 1,
-}
-`;
-
-exports[`dot-notation > invalid 18`] = `
-{
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
-  "ruleCount": 1,
-}
-`;
-
-exports[`dot-notation > invalid 19`] = `
-{
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
-  "ruleCount": 1,
-}
-`;
-
-exports[`dot-notation > invalid 20`] = `
-{
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
-  "ruleCount": 1,
-}
-`;
-
-exports[`dot-notation > invalid 21`] = `
-{
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
-  "ruleCount": 1,
-}
-`;
-
-exports[`dot-notation > invalid 22`] = `
-{
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
-  "ruleCount": 1,
-}
-`;
-
-exports[`dot-notation > invalid 23`] = `
-{
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
-  "ruleCount": 1,
-}
-`;
-
-exports[`dot-notation > invalid 24`] = `
-{
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
-  "ruleCount": 1,
-}
-`;
-
-exports[`dot-notation > invalid 25`] = `
-{
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "a['SHOUT_CASE'];",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "a.SHOUT_CASE;",
   "ruleCount": 1,
 }
 `;
