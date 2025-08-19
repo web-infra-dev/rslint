@@ -29,9 +29,9 @@ jobs:
         runner: [
             rspack-ubuntu-22.04-large,
             # TODO: enable later
-            # rspack-windows-2022-large,
+            rspack-windows-2022-large-verify,
+            rspack-windows-2022-large,
             windows-latest,
-            rspack-darwin-14-medium,
           ]
         go-version: ['1.25.0']
     steps:
@@ -48,7 +48,19 @@ jobs:
         uses: ./.github/actions/setup-go
         with:
           go-version: ${{ matrix.go-version }}
-          cache-name: test-go
+          cache-name: test-go-pshu-2
+
+      - name: Setup MSYS2
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        id: setup-msys2
+
+      - name: Setup tmate session
+        if: false
+        uses: mxschmitt/action-tmate@v3
+        with:
+          msys2-location: ${{ steps.setup-msys2.outputs.msys2-location }}
+
       - name: Unit Test
         run: |
           go test -parallel 8 ./internal/...
@@ -87,7 +99,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [rspack-ubuntu-22.04-large, windows-latest]
+        os:
+          [
+            rspack-windows-2022-large-verify,
+            rspack-windows-2022-large,
+            windows-latest,
+          ]
         go-version: ['1.25.0']
     steps:
       - name: Checkout code
