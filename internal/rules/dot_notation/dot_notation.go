@@ -231,13 +231,6 @@ func hasAnyIndexSignature(t *checker.Type) bool {
 	return typeHasIndexSignature(t)
 }
 
-// hasStringLikeIndexSignatureTS uses available checker APIs to detect declared string-like index signatures.
-func hasStringLikeIndexSignatureTS(typeChecker *checker.Checker, t *checker.Type) bool {
-	// This function would use getIndexInfosOfType if it were available in the shim
-	// For now, we rely on the AST-based hasStringLikeIndexSignature function
-	return false
-}
-
 // hasStringLikeIndexSignature returns true if the (apparent) type has an index signature
 // whose key type is string-like. It recursively checks union and intersection parts.
 func hasStringLikeIndexSignature(typeChecker *checker.Checker, t *checker.Type) bool {
