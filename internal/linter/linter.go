@@ -141,6 +141,19 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, skipFile
 							Severity:    r.Severity,
 						})
 					},
+					ReportNodeWithFixesAndRange: func(node *ast.Node, customRange core.TextRange, msg rule.RuleMessage, fixes ...rule.RuleFix) {
+						if disableManager.IsRuleDisabled(r.Name, node.Pos()) {
+							return
+						}
+						onDiagnostic(rule.RuleDiagnostic{
+							RuleName:   r.Name,
+							Range:      customRange,
+							Message:    msg,
+							FixesPtr:   &fixes,
+							SourceFile: file,
+							Severity:   r.Severity,
+						})
+					},
 				}
 
 				for kind, listener := range r.Run(ctx) {
