@@ -16,11 +16,11 @@ x['priv_prop'] = 123;
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 14,
+          "column": 15,
           "line": 7,
         },
         "start": {
-          "column": 3,
+          "column": 1,
           "line": 7,
         },
       },
@@ -57,11 +57,11 @@ x['pub_prop'] = 123;
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 13,
+          "column": 14,
           "line": 7,
         },
         "start": {
-          "column": 3,
+          "column": 1,
           "line": 7,
         },
       },
@@ -91,11 +91,11 @@ exports[`dot-notation > invalid 3`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 9,
+          "column": 10,
           "line": 1,
         },
         "start": {
-          "column": 3,
+          "column": 1,
           "line": 1,
         },
       },
@@ -118,11 +118,11 @@ exports[`dot-notation > invalid 4`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 9,
+          "column": 10,
           "line": 1,
         },
         "start": {
-          "column": 3,
+          "column": 1,
           "line": 1,
         },
       },
@@ -145,11 +145,11 @@ exports[`dot-notation > invalid 5`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 7,
+          "column": 8,
           "line": 1,
         },
         "start": {
-          "column": 3,
+          "column": 1,
           "line": 1,
         },
       },
@@ -172,11 +172,11 @@ exports[`dot-notation > invalid 6`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 7,
+          "column": 8,
           "line": 1,
         },
         "start": {
-          "column": 3,
+          "column": 1,
           "line": 1,
         },
       },
@@ -199,11 +199,11 @@ exports[`dot-notation > invalid 7`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 8,
+          "column": 9,
           "line": 1,
         },
         "start": {
-          "column": 3,
+          "column": 1,
           "line": 1,
         },
       },
@@ -226,11 +226,11 @@ exports[`dot-notation > invalid 8`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 6,
+          "column": 7,
           "line": 1,
         },
         "start": {
-          "column": 3,
+          "column": 1,
           "line": 1,
         },
       },
@@ -253,11 +253,11 @@ exports[`dot-notation > invalid 9`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 8,
+          "column": 9,
           "line": 1,
         },
         "start": {
-          "column": 5,
+          "column": 1,
           "line": 1,
         },
       },
@@ -280,11 +280,11 @@ exports[`dot-notation > invalid 10`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 12,
+          "column": 13,
           "line": 1,
         },
         "start": {
-          "column": 3,
+          "column": 1,
           "line": 1,
         },
       },
@@ -307,11 +307,11 @@ exports[`dot-notation > invalid 11`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 15,
+          "column": 16,
           "line": 1,
         },
         "start": {
-          "column": 3,
+          "column": 1,
           "line": 1,
         },
       },
@@ -367,11 +367,11 @@ exports[`dot-notation > invalid 13`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 24,
+          "column": 25,
           "line": 1,
         },
         "start": {
-          "column": 19,
+          "column": 1,
           "line": 1,
         },
       },
@@ -393,11 +393,11 @@ exports[`dot-notation > invalid 14`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 10,
+          "column": 25,
           "line": 1,
         },
         "start": {
-          "column": 5,
+          "column": 1,
           "line": 1,
         },
       },
@@ -419,11 +419,11 @@ exports[`dot-notation > invalid 15`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 10,
+          "column": 11,
           "line": 1,
         },
         "start": {
-          "column": 5,
+          "column": 1,
           "line": 1,
         },
       },
@@ -472,11 +472,11 @@ exports[`dot-notation > invalid 17`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 9,
+          "column": 10,
           "line": 1,
         },
         "start": {
-          "column": 5,
+          "column": 1,
           "line": 1,
         },
       },
@@ -499,11 +499,11 @@ exports[`dot-notation > invalid 18`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 10,
+          "column": 11,
           "line": 1,
         },
         "start": {
-          "column": 5,
+          "column": 1,
           "line": 1,
         },
       },
@@ -559,11 +559,11 @@ x['protected_prop'] = 123;
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 19,
+          "column": 20,
           "line": 7,
         },
         "start": {
-          "column": 3,
+          "column": 1,
           "line": 7,
         },
       },
@@ -601,11 +601,11 @@ x['prop'] = 'hello';
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 9,
+          "column": 10,
           "line": 8,
         },
         "start": {
-          "column": 3,
+          "column": 1,
           "line": 8,
         },
       },
