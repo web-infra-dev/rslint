@@ -49,18 +49,6 @@ After building, you can test the rslint CLI:
 ./packages/rslint/bin/rslint --config rslint.json
 ```
 
-## Known Limitations
-
-### Test Infrastructure
-
-The test runner in `/packages/rule-tester` has a limitation where it cannot pass TypeScript compiler options from individual test cases to the Go implementation. This affects rules that need to behave differently based on compiler options like `noPropertyAccessFromIndexSignature`.
-
-**Issue**: The test runner always uses the same `rslint.json` config file for all test cases, which references a fixed `tsconfig.json`. Individual test cases can specify different tsconfig files via `languageOptions.parserOptions.project`, but these are ignored by the test runner.
-
-**Impact**: Tests that expect different behavior based on TypeScript compiler options may fail or require workarounds.
-
-**Location**: See `/packages/rule-tester/src/index.ts` line 273 - the `lint()` call doesn't use per-test configuration.
-
 ## Debugging VSCode Extension
 
 To Debug the VSCode Extension:
