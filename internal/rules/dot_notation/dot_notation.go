@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -20,7 +21,6 @@ type Options struct {
 }
 
 func parseOptions(options any) Options {
-	// defaults
 	opts := Options{
 		AllowKeywords:                     true,
 		AllowIndexSignaturePropertyAccess: false,
@@ -30,44 +30,32 @@ func parseOptions(options any) Options {
 		return opts
 	}
 
-	// Support [ { ... } ] and { ... }
-	if arr, ok := options.([]interface{}); ok {
-		if len(arr) > 0 {
-			if m, ok := arr[0].(map[string]interface{}); ok {
-				if v, ok := m["allowIndexSignaturePropertyAccess"].(bool); ok {
-					opts.AllowIndexSignaturePropertyAccess = v
-				}
-				if v, ok := m["allowKeywords"].(bool); ok {
-					opts.AllowKeywords = v
-				}
-				if v, ok := m["allowPattern"].(string); ok {
-					opts.AllowPattern = v
-				}
-				if v, ok := m["allowPrivateClassPropertyAccess"].(bool); ok {
-					opts.AllowPrivateClassPropertyAccess = v
-				}
-				if v, ok := m["allowProtectedClassPropertyAccess"].(bool); ok {
-					opts.AllowProtectedClassPropertyAccess = v
-				}
-			}
-		}
-		return opts
+	// Parse options with dual-format support (handles both array and object formats)
+	var optsMap map[string]interface{}
+	var ok bool
+
+	// Handle array format: [{ option: value }]
+	if optArray, isArray := options.([]interface{}); isArray && len(optArray) > 0 {
+		optsMap, ok = optArray[0].(map[string]interface{})
+	} else {
+		// Handle direct object format: { option: value }
+		optsMap, ok = options.(map[string]interface{})
 	}
 
-	if m, ok := options.(map[string]interface{}); ok {
-		if v, ok := m["allowIndexSignaturePropertyAccess"].(bool); ok {
+	if ok {
+		if v, ok := optsMap["allowIndexSignaturePropertyAccess"].(bool); ok {
 			opts.AllowIndexSignaturePropertyAccess = v
 		}
-		if v, ok := m["allowKeywords"].(bool); ok {
+		if v, ok := optsMap["allowKeywords"].(bool); ok {
 			opts.AllowKeywords = v
 		}
-		if v, ok := m["allowPattern"].(string); ok {
+		if v, ok := optsMap["allowPattern"].(string); ok {
 			opts.AllowPattern = v
 		}
-		if v, ok := m["allowPrivateClassPropertyAccess"].(bool); ok {
+		if v, ok := optsMap["allowPrivateClassPropertyAccess"].(bool); ok {
 			opts.AllowPrivateClassPropertyAccess = v
 		}
-		if v, ok := m["allowProtectedClassPropertyAccess"].(bool); ok {
+		if v, ok := optsMap["allowProtectedClassPropertyAccess"].(bool); ok {
 			opts.AllowProtectedClassPropertyAccess = v
 		}
 	}
@@ -75,13 +63,19 @@ func parseOptions(options any) Options {
 }
 
 func buildUseDotMessage() rule.RuleMessage {
-	return rule.RuleMessage{Id: "useDot", Description: "Use dot notation instead of bracket notation."}
+	return rule.RuleMessage{
+		Id:          "useDot",
+		Description: "Use dot notation instead of bracket notation.",
+	}
 }
 
 func buildUseBracketsMessage(key string) rule.RuleMessage {
 	// Keep key for parity with ESLint message data (not used in printing now)
 	_ = key
-	return rule.RuleMessage{Id: "useBrackets", Description: "Property is a keyword - use bracket notation."}
+	return rule.RuleMessage{
+		Id:          "useBrackets",
+		Description: "Property is a keyword - use bracket notation.",
+	}
 }
 
 // Reserved keywords that should trigger dot -> bracket when allowKeywords=false.
@@ -269,10 +263,10 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 		opts := parseOptions(options)
 		var allowRE *regexp.Regexp
 		if opts.AllowPattern != "" {
-			// best-effort; ignore regexp compile errors by treating as no allow pattern
 			if re, err := regexp.Compile(opts.AllowPattern); err == nil {
 				allowRE = re
 			}
+			// Note: Invalid regex patterns are silently ignored for compatibility
 		}
 
 		// Derive allowIndexSignaturePropertyAccess from tsconfig option as well (currently not used directly)
