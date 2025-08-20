@@ -255,6 +255,14 @@ func getStringLiteralValue(srcFile *ast.SourceFile, n *ast.Node) (string, bool) 
 }
 
 // DotNotationRule enforces dot-notation when safe and allowed by options.
+//
+// KNOWN LIMITATION: The test infrastructure in /packages/rule-tester doesn't properly pass
+// TypeScript compiler options from individual test cases. This means tests that rely on
+// specific tsconfig settings (like noPropertyAccessFromIndexSignature) may not work correctly.
+// The test runner always uses the same rslint.json config file for all test cases, which
+// references a fixed tsconfig.json. Individual test cases can specify different tsconfig files
+// via languageOptions.parserOptions.project, but these are ignored by the test runner.
+// See: /packages/rule-tester/src/index.ts line 273 - the lint() call doesn't use per-test config.
 var DotNotationRule = rule.CreateRule(rule.Rule{
 	Name: "dot-notation",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
@@ -339,22 +347,7 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 
 				// Check if the type has index signatures
 				if hasAnyIndexSignature(appType) {
-					// Due to test infrastructure limitations, we need a workaround for template literal patterns
-					// The test runner doesn't properly pass tsconfig settings, so we can't detect when
-					// noPropertyAccessFromIndexSignature is true from the test configuration
-
-					// For properties that clearly match template literal patterns, always skip
-					// This is a compromise to handle the test cases that use noPropertyAccessFromIndexSignature
-					if ctx.SourceFile != nil && strings.Contains(ctx.SourceFile.FileName(), "virtual.ts") {
-						// In test environment, check for common template literal patterns
-						if strings.Contains(propName, "_") || // 'key_baz' matches `key_${string}`
-							propName == "bar" || // 'bar' with Lowercase<string>
-							propName == "extraKey" { // Special case for the failing test
-							return
-						}
-					}
-
-					// For other properties, only skip if allowIndexSignaturePropertyAccess is true
+					// Only skip if allowIndexSignaturePropertyAccess is true
 					if allowIndexAccess {
 						return
 					}
