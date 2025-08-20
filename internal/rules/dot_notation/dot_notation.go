@@ -339,12 +339,11 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 					}
 				}
 
-				// Check if the type has index signatures
-				if hasAnyIndexSignature(appType) {
-					// Only skip if allowIndexSignaturePropertyAccess is true
-					if allowIndexAccess {
-						return
-					}
+				// Check if the type has index signatures AND the property can only be accessed via index signature
+				if hasAnyIndexSignature(appType) && allowIndexAccess {
+					// When noPropertyAccessFromIndexSignature is true OR allowIndexSignaturePropertyAccess is true,
+					// properties accessible only via index signature should use bracket notation
+					return
 				}
 			}
 
