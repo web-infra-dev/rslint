@@ -40,58 +40,22 @@ function checkDiagnosticEqual(
     // check range match
     // tsDiag sometimes doesn't have line and column, so we need to check that
     if (tsDiag.line) {
-      // Special handling for known line number differences between implementations
-      // Some rules report different line numbers due to AST differences
-      const lineDiff = Math.abs(rslintDiag.range.start.line - tsDiag.line);
-      if (
-        rslintDiag.ruleName === '@typescript-eslint/dot-notation' &&
-        lineDiff >= 1
-      ) {
-        // Known issue: dot-notation reports different line numbers
-        // This is due to differences in AST node position reporting
-        // between TypeScript-ESLint and our Go implementation
-        // TypeScript-ESLint reports on the bracket position, we report on the whole expression
-      } else {
-        assert(
-          rslintDiag.range.start.line === tsDiag.line,
-          `Start line mismatch: ${rslintDiag.range.start.line} !== ${tsDiag.line}`,
-        );
-      }
+      assert(
+        rslintDiag.range.start.line === tsDiag.line,
+        `Start line mismatch: ${rslintDiag.range.start.line} !== ${tsDiag.line}`,
+      );
     }
     if (tsDiag.endLine) {
-      // Special handling for dot-notation
-      if (rslintDiag.ruleName === '@typescript-eslint/dot-notation') {
-        // Allow flexibility in end positions due to AST differences
-      } else {
-        assert(
-          rslintDiag.range.end.line === tsDiag.endLine,
-          `End line mismatch: ${rslintDiag.range.end.line} !== ${tsDiag.endLine}`,
-        );
-      }
-    }
-    if (tsDiag.endColumn) {
-      // Special handling for dot-notation
-      if (rslintDiag.ruleName === '@typescript-eslint/dot-notation') {
-        // Allow flexibility in end positions due to AST differences
-      } else {
-        assert(
-          rslintDiag.range.end.column === tsDiag.endColumn,
-          `End column mismatch: ${rslintDiag.range.end.column} !== ${tsDiag.endColumn}`,
-        );
-      }
+      assert(
+        rslintDiag.range.end.line === tsDiag.endLine,
+        `End line mismatch: ${rslintDiag.range.end.line} !== ${tsDiag.endLine}`,
+      );
     }
     if (tsDiag.column) {
-      // Special handling for known column differences
-      if (rslintDiag.ruleName === '@typescript-eslint/dot-notation') {
-        // dot-notation may report different column positions due to AST differences
-        // TypeScript-ESLint reports the column of the bracket, we report the start of the expression
-        // Allow some flexibility in column positions
-      } else {
-        assert(
-          rslintDiag.range.start.column === tsDiag.column,
-          `Start column mismatch: ${rslintDiag.range.start.column} !== ${tsDiag.column}`,
-        );
-      }
+      assert(
+        rslintDiag.range.start.column === tsDiag.column,
+        `Start column mismatch: ${rslintDiag.range.start.column} !== ${tsDiag.column}`,
+      );
     }
     if (tsDiag.endColumn) {
       assert(

@@ -150,24 +150,23 @@ console.log(x?.['priv_prop']);
       `,
       options: [{ allowProtectedClassPropertyAccess: true }],
     },
-    // TODO: This test requires proper TypeScript configuration support in the test runner
-    // {
-    //   code: `
-    // type Foo = {
-    //   bar: boolean;
-    //   [key: \`key_\${string}\`]: number;
-    // };
-    // declare const foo: Foo;
-    // foo['key_baz'];
-    //       `,
-    //   languageOptions: {
-    //     parserOptions: {
-    //       project: './tsconfig.noPropertyAccessFromIndexSignature.json',
-    //       projectService: false,
-    //       tsconfigRootDir: rootPath,
-    //     },
-    //   },
-    // },
+    {
+      code: `
+type Foo = {
+  bar: boolean;
+  [key: \`key_\${string}\`]: number;
+};
+declare const foo: Foo;
+foo['key_baz'];
+      `,
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.noPropertyAccessFromIndexSignature.json',
+          projectService: false,
+          tsconfigRootDir: rootPath,
+        },
+      },
+    },
     {
       code: `
 type Key = Lowercase<string>;
@@ -348,7 +347,7 @@ a
         '    .then(function(){})\n' +
         '    .catch(function(){})\n' +
         '    .then(function(){})\n' +
-        '    ["catch"](function(){});', // Known issue: only first fix is applied
+        '    .catch(function(){});',
     },
     {
       code: noFormat`
@@ -441,24 +440,23 @@ const x = new X();
 x.prop = 'hello';
       `,
     },
-    // TODO: This test requires proper TypeScript configuration support in the test runner
-    // {
-    //   code: `
-    // type Foo = {
-    //   bar: boolean;
-    //   [key: \`key_\${string}\`]: number;
-    // };
-    // declare const foo: Foo;
-    // foo['key_baz'];
-    //       `,
-    //   languageOptions: {
-    //     parserOptions: {
-    //       project: './tsconfig.noPropertyAccessFromIndexSignature.json',
-    //       projectService: false,
-    //       tsconfigRootDir: rootPath,
-    //     },
-    //   },
-    // },
+    {
+      code: `
+type Foo = {
+  bar: boolean;
+  [key: \`key_\${string}\`]: number;
+};
+foo['key_baz'];
+      `,
+      errors: [{ messageId: 'useDot' }],
+      output: `
+type Foo = {
+  bar: boolean;
+  [key: \`key_\${string}\`]: number;
+};
+foo.key_baz;
+      `,
+    },
     {
       code: `
 type ExtraKey = \`extra\${string}\`;

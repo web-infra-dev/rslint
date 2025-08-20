@@ -2,81 +2,1534 @@
 
 exports[`no-duplicate-type-constituents > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "type T = 1 | 1;",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  1.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = 1  ;",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-duplicate-type-constituents > invalid 2`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "type T = true & true;",
+  "diagnostics": [
+    {
+      "message": "Intersection type constituent is duplicated with  true.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = true  ;",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-duplicate-type-constituents > invalid 3`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "type T = null | null;",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  null.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = null  ;",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-duplicate-type-constituents > invalid 4`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "type T = any | any;",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  any.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = any  ;",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-duplicate-type-constituents > invalid 5`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "type T = { a: string | string };",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  string.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = { a: string   };",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-duplicate-type-constituents > invalid 6`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "type T = Set<string> | Set<string>;",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  Set<string>.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = Set<string>  ;",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-duplicate-type-constituents > invalid 7`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "
+type IsArray<T> = T extends any[] ? true : false;
+type ActuallyDuplicated = IsArray<number> | IsArray<string>;
+      ",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  IsArray<number>.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 3,
+        },
+        "start": {
+          "column": 45,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type IsArray<T> = T extends any[] ? true : false;
+type ActuallyDuplicated = IsArray<number>  ;
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-duplicate-type-constituents > invalid 8`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "type T = string[] | string[];",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  string[].",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = string[]  ;",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-duplicate-type-constituents > invalid 9`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "type T = string[][] | string[][];",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  string[][].",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = string[][]  ;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 10`] = `
+{
+  "code": "type T = [1, 2, 3] | [1, 2, 3];",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  [1, 2, 3].",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = [1, 2, 3]  ;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 11`] = `
+{
+  "code": "type T = () => string | string;",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  string.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = () => string  ;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 12`] = `
+{
+  "code": "type T = () => null | null;",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  null.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = () => null  ;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 13`] = `
+{
+  "code": "type T = (arg: string | string) => void;",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  string.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = (arg: string  ) => void;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 14`] = `
+{
+  "code": "type T = 'A' | 'A';",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  'A'.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = 'A'  ;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 15`] = `
+{
+  "code": "
+type A = 'A';
+type T = A | A;
+      ",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type A = 'A';
+type T = A  ;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 16`] = `
+{
+  "code": "
+type A = 'A';
+const a: A | A = 'A';
+      ",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type A = 'A';
+const a: A   = 'A';
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 17`] = `
+{
+  "code": "
+type A = 'A';
+type T = A | /* comment */ A;
+      ",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 28,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type A = 'A';
+type T = A  /* comment */ ;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 18`] = `
+{
+  "code": "
+type A1 = 'A';
+type A2 = 'A';
+type A3 = 'A';
+type T = A1 | A2 | A3;
+      ",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  A1.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 5,
+        },
+        "start": {
+          "column": 15,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+    {
+      "message": "Union type constituent is duplicated with  A1.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 20,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "
+type A1 = 'A';
+type A2 = 'A';
+type A3 = 'A';
+type T = A1    ;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 19`] = `
+{
+  "code": "
+type A = 'A';
+type B = 'B';
+type T = A | B | A;
+      ",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 18,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type A = 'A';
+type B = 'B';
+type T = A | B  ;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 20`] = `
+{
+  "code": "
+type A = 'A';
+type B = 'B';
+type T = A | B | A | B;
+      ",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 18,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+    {
+      "message": "Union type constituent is duplicated with  B.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 4,
+        },
+        "start": {
+          "column": 22,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "
+type A = 'A';
+type B = 'B';
+type T = A | B    ;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 21`] = `
+{
+  "code": "
+type A = 'A';
+type B = 'B';
+type T = A | B | A | A;
+      ",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 18,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+    {
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 4,
+        },
+        "start": {
+          "column": 22,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "
+type A = 'A';
+type B = 'B';
+type T = A | B    ;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 22`] = `
+{
+  "code": "
+type A = 'A';
+type B = 'B';
+type C = 'C';
+type T = A | B | A | C;
+      ",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 5,
+        },
+        "start": {
+          "column": 18,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type A = 'A';
+type B = 'B';
+type C = 'C';
+type T = A | B   | C;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 23`] = `
+{
+  "code": "
+type A = 'A';
+type B = 'B';
+type T = (A | B) | (A | B);
+      ",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  (A | B).",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 20,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type A = 'A';
+type B = 'B';
+type T = (A | B)  ;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 24`] = `
+{
+  "code": "
+type A = 'A';
+type T = A | (A | A);
+      ",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type A = 'A';
+type T = A  ;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 25`] = `
+{
+  "code": "
+type A = 'A';
+type B = 'B';
+type C = 'C';
+type D = 'D';
+type F = (A | B) | (A | B) | ((C | D) & (A | B)) | (A | B);
+      ",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  (A | B).",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 6,
+        },
+        "start": {
+          "column": 20,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+    {
+      "message": "Union type constituent is duplicated with  (A | B).",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 6,
+        },
+        "start": {
+          "column": 52,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "
+type A = 'A';
+type B = 'B';
+type C = 'C';
+type D = 'D';
+type F = (A | B)   | ((C | D) & (A | B))  ;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 26`] = `
+{
+  "code": "
+type A = 'A';
+type B = 'B';
+type C = (A | B) | A | B | (A | B);
+      ",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 20,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+    {
+      "message": "Union type constituent is duplicated with  B.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 4,
+        },
+        "start": {
+          "column": 24,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+    {
+      "message": "Union type constituent is duplicated with  (A | B).",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 4,
+        },
+        "start": {
+          "column": 28,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": "
+type A = 'A';
+type B = 'B';
+type C = (A | B)      ;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 27`] = `
+{
+  "code": "type A = (number | string) | number | string;",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with number.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+    {
+      "message": "Union type constituent is duplicated with  string.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "type A = (number | string)    ;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 28`] = `
+{
+  "code": "type A = (number | (string | null)) | (string | (null | number));",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  (number | (string | null)).",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 65,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type A = (number | (string | null))  ;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 29`] = `
+{
+  "code": "type A = (number & string) & number & string;",
+  "diagnostics": [
+    {
+      "message": "Intersection type constituent is duplicated with number.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+    {
+      "message": "Intersection type constituent is duplicated with  string.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "type A = (number & string)    ;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 30`] = `
+{
+  "code": "type A = number & string & (number & string);",
+  "diagnostics": [
+    {
+      "message": "Intersection type constituent is duplicated with  number.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+    {
+      "message": "Intersection type constituent is duplicated with  string.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": [
+    "type A = number & string & (  string);",
+    "type A = number & string    ;",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 31`] = `
+{
+  "code": "
+type A = 'A';
+type T = Record<string, A | A>;
+      ",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  A.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 29,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type A = 'A';
+type T = Record<string, A  >;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 32`] = `
+{
+  "code": "type T = A | A | string | string;",
+  "diagnostics": [
+    {
+      "message": "Union type constituent is duplicated with  string.",
+      "messageId": "duplicate",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = A | A | string  ;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 33`] = `
+{
+  "code": "(a?: string | undefined) => {};",
+  "diagnostics": [
+    {
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "(a?: string  ) => {};",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 34`] = `
+{
+  "code": "
+        type T = undefined;
+        (arg?: T | string) => {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        type T = undefined;
+        (arg?:   string) => {};
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 35`] = `
+{
+  "code": "
+        interface F {
+          (a?: string | undefined): void;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 25,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        interface F {
+          (a?: string  ): void;
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 36`] = `
+{
+  "code": "type fn = new (a?: string | undefined) => void;",
+  "diagnostics": [
+    {
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type fn = new (a?: string  ) => void;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 37`] = `
+{
+  "code": "function f(a?: string | undefined) {}",
+  "diagnostics": [
+    {
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "function f(a?: string  ) {}",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 38`] = `
+{
+  "code": "f = function (a?: string | undefined) {};",
+  "diagnostics": [
+    {
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "f = function (a?: string  ) {};",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 39`] = `
+{
+  "code": "declare function f(a?: string | undefined): void;",
+  "diagnostics": [
+    {
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "declare function f(a?: string  ): void;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 40`] = `
+{
+  "code": "
+        declare class bb {
+          f(a?: string | undefined): void;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 26,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare class bb {
+          f(a?: string  ): void;
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 41`] = `
+{
+  "code": "
+        interface ee {
+          f(a?: string | undefined): void;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 26,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        interface ee {
+          f(a?: string  ): void;
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 42`] = `
+{
+  "code": "
+        interface ee {
+          new (a?: string | undefined): void;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 3,
+        },
+        "start": {
+          "column": 29,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        interface ee {
+          new (a?: string  ): void;
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 43`] = `
+{
+  "code": "type fn = (a?: string | undefined) => void;",
+  "diagnostics": [
+    {
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type fn = (a?: string  ) => void;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 44`] = `
+{
+  "code": "type fn = (a?: string | (undefined | number)) => void;",
+  "diagnostics": [
+    {
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type fn = (a?: string | (  number)) => void;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 45`] = `
+{
+  "code": "type fn = (a?: (undefined | number) | string) => void;",
+  "diagnostics": [
+    {
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type fn = (a?: (  number) | string) => void;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-type-constituents > invalid 46`] = `
+{
+  "code": "
+        abstract class cc {
+          abstract f(a?: string | undefined): void;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Explicit undefined is unnecessary on an optional parameter.",
+      "messageId": "unnecessary",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 3,
+        },
+        "start": {
+          "column": 35,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-duplicate-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        abstract class cc {
+          abstract f(a?: string  ): void;
+        }
+      ",
   "ruleCount": 1,
 }
 `;

@@ -2,63 +2,581 @@
 
 exports[`await-thenable > invalid 1`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "await 0;",
+  "diagnostics": [
+    {
+      "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
+      "messageId": "await",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
 
 exports[`await-thenable > invalid 2`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "await 'value';",
+  "diagnostics": [
+    {
+      "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
+      "messageId": "await",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
 
 exports[`await-thenable > invalid 3`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "async () => await (Math.random() > 0.5 ? '' : 0);",
+  "diagnostics": [
+    {
+      "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
+      "messageId": "await",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
 
 exports[`await-thenable > invalid 4`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "async () => await(Math.random() > 0.5 ? '' : 0);",
+  "diagnostics": [
+    {
+      "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
+      "messageId": "await",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
 
 exports[`await-thenable > invalid 5`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "
+class NonPromise extends Array {}
+await new NonPromise();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
+      "messageId": "await",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
 
 exports[`await-thenable > invalid 6`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "
+async function test() {
+  class IncorrectThenable {
+    then() {}
+  }
+  const thenable = new IncorrectThenable();
+
+  await thenable;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
+      "messageId": "await",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
 
 exports[`await-thenable > invalid 7`] = `
 {
-  "diagnostics": [],
-  "errorCount": 0,
-  "fileCount": 7,
+  "code": "
+declare const callback: (() => void) | undefined;
+await callback?.();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
+      "messageId": "await",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`await-thenable > invalid 8`] = `
+{
+  "code": "
+declare const obj: { a?: { b?: () => void } };
+await obj.a?.b?.();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
+      "messageId": "await",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`await-thenable > invalid 9`] = `
+{
+  "code": "
+declare const obj: { a: { b: { c?: () => void } } } | undefined;
+await obj?.a.b.c?.();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
+      "messageId": "await",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`await-thenable > invalid 10`] = `
+{
+  "code": "
+function* yieldNumbers() {
+  yield 1;
+  yield 2;
+  yield 3;
+}
+for await (const value of yieldNumbers()) {
+  console.log(value);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected \`for await...of\` of a value that is not async iterable.",
+      "messageId": "forAwaitOfNonAsyncIterable",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 7,
+        },
+        "start": {
+          "column": 1,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`await-thenable > invalid 11`] = `
+{
+  "code": "
+function* yieldNumberPromises() {
+  yield Promise.resolve(1);
+  yield Promise.resolve(2);
+  yield Promise.resolve(3);
+}
+for await (const value of yieldNumberPromises()) {
+  console.log(value);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected \`for await...of\` of a value that is not async iterable.",
+      "messageId": "forAwaitOfNonAsyncIterable",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 7,
+        },
+        "start": {
+          "column": 1,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`await-thenable > invalid 12`] = `
+{
+  "code": "
+declare const disposable: Disposable;
+async function foo() {
+  await using d = disposable;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected \`await using\` of a value that is not async disposable.",
+      "messageId": "awaitUsingOfNonAsyncDisposable",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 4,
+        },
+        "start": {
+          "column": 19,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`await-thenable > invalid 13`] = `
+{
+  "code": "
+async function foo() {
+  await using _ = {
+    async [Symbol.dispose]() {},
+  };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected \`await using\` of a value that is not async disposable.",
+      "messageId": "awaitUsingOfNonAsyncDisposable",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`await-thenable > invalid 14`] = `
+{
+  "code": "
+declare const disposable: Disposable;
+declare const asyncDisposable: AsyncDisposable;
+async function foo() {
+  await using a = disposable,
+    b = asyncDisposable,
+    c = disposable,
+    d = asyncDisposable,
+    e = disposable;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected \`await using\` of a value that is not async disposable.",
+      "messageId": "awaitUsingOfNonAsyncDisposable",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+    {
+      "message": "Unexpected \`await using\` of a value that is not async disposable.",
+      "messageId": "awaitUsingOfNonAsyncDisposable",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+    {
+      "message": "Unexpected \`await using\` of a value that is not async disposable.",
+      "messageId": "awaitUsingOfNonAsyncDisposable",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 9,
+        },
+        "start": {
+          "column": 9,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`await-thenable > invalid 15`] = `
+{
+  "code": "
+declare const anee: any;
+declare const disposable: Disposable;
+async function foo() {
+  await using a = anee,
+    b = disposable;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected \`await using\` of a value that is not async disposable.",
+      "messageId": "awaitUsingOfNonAsyncDisposable",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`await-thenable > invalid 16`] = `
+{
+  "code": "
+async function wrapper<T extends number>(value: T) {
+  return await value;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
+      "messageId": "await",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`await-thenable > invalid 17`] = `
+{
+  "code": "
+class C<T> {
+  async wrapper<T extends string>(value: T) {
+    return await value;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
+      "messageId": "await",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`await-thenable > invalid 18`] = `
+{
+  "code": "
+class C<R extends number> {
+  async wrapper<T extends R>(value: T) {
+    return await value;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected \`await\` of a non-Promise (non-"Thenable") value.",
+      "messageId": "await",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/await-thenable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
   "ruleCount": 1,
 }
 `;
