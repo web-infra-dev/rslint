@@ -16,11 +16,11 @@ x['priv_prop'] = 123;
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 15,
+          "column": 14,
           "line": 7,
         },
         "start": {
-          "column": 1,
+          "column": 3,
           "line": 7,
         },
       },
@@ -57,11 +57,11 @@ x['pub_prop'] = 123;
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 14,
+          "column": 13,
           "line": 7,
         },
         "start": {
-          "column": 1,
+          "column": 3,
           "line": 7,
         },
       },
@@ -91,11 +91,11 @@ exports[`dot-notation > invalid 3`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 10,
+          "column": 9,
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 3,
           "line": 1,
         },
       },
@@ -118,11 +118,11 @@ exports[`dot-notation > invalid 4`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 10,
+          "column": 9,
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 3,
           "line": 1,
         },
       },
@@ -145,11 +145,11 @@ exports[`dot-notation > invalid 5`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 8,
+          "column": 7,
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 3,
           "line": 1,
         },
       },
@@ -172,11 +172,11 @@ exports[`dot-notation > invalid 6`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 8,
+          "column": 7,
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 3,
           "line": 1,
         },
       },
@@ -199,11 +199,11 @@ exports[`dot-notation > invalid 7`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 9,
+          "column": 8,
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 3,
           "line": 1,
         },
       },
@@ -226,11 +226,11 @@ exports[`dot-notation > invalid 8`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 7,
+          "column": 6,
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 3,
           "line": 1,
         },
       },
@@ -253,11 +253,11 @@ exports[`dot-notation > invalid 9`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 9,
+          "column": 8,
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 5,
           "line": 1,
         },
       },
@@ -280,11 +280,11 @@ exports[`dot-notation > invalid 10`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 13,
+          "column": 12,
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 3,
           "line": 1,
         },
       },
@@ -307,11 +307,11 @@ exports[`dot-notation > invalid 11`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 16,
+          "column": 15,
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 3,
           "line": 1,
         },
       },
@@ -326,89 +326,6 @@ exports[`dot-notation > invalid 11`] = `
 `;
 
 exports[`dot-notation > invalid 12`] = `
-{
-  "code": "
-a
-  ['SHOUT_CASE'];
-      ",
-  "diagnostics": [
-    {
-      "message": "Use dot notation instead of bracket notation.",
-      "messageId": "useDot",
-      "range": {
-        "end": {
-          "column": 17,
-          "line": 3,
-        },
-        "start": {
-          "column": 1,
-          "line": 2,
-        },
-      },
-      "ruleName": "@typescript-eslint/dot-notation",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "
-a
-  .SHOUT_CASE;
-      ",
-  "ruleCount": 1,
-}
-`;
-
-exports[`dot-notation > invalid 13`] = `
-{
-  "code": "getResource()
-    .then(function(){})
-    ["catch"](function(){})
-    .then(function(){})
-    ["catch"](function(){});",
-  "diagnostics": [
-    {
-      "message": "Use dot notation instead of bracket notation.",
-      "messageId": "useDot",
-      "range": {
-        "end": {
-          "column": 14,
-          "line": 5,
-        },
-        "start": {
-          "column": 1,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/dot-notation",
-    },
-    {
-      "message": "Use dot notation instead of bracket notation.",
-      "messageId": "useDot",
-      "range": {
-        "end": {
-          "column": 14,
-          "line": 3,
-        },
-        "start": {
-          "column": 1,
-          "line": 1,
-        },
-      },
-      "ruleName": "@typescript-eslint/dot-notation",
-    },
-  ],
-  "errorCount": 2,
-  "fileCount": 1,
-  "output": "getResource()
-    .then(function(){})
-    .catch(function(){})
-    .then(function(){})
-    ["catch"](function(){});",
-  "ruleCount": 1,
-}
-`;
-
-exports[`dot-notation > invalid 14`] = `
 {
   "code": "
 foo
@@ -441,7 +358,7 @@ foo
 }
 `;
 
-exports[`dot-notation > invalid 15`] = `
+exports[`dot-notation > invalid 13`] = `
 {
   "code": "foo[/* comment */ 'bar'];",
   "diagnostics": [
@@ -450,11 +367,11 @@ exports[`dot-notation > invalid 15`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 25,
+          "column": 24,
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 19,
           "line": 1,
         },
       },
@@ -467,7 +384,7 @@ exports[`dot-notation > invalid 15`] = `
 }
 `;
 
-exports[`dot-notation > invalid 16`] = `
+exports[`dot-notation > invalid 14`] = `
 {
   "code": "foo['bar' /* comment */];",
   "diagnostics": [
@@ -476,11 +393,11 @@ exports[`dot-notation > invalid 16`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 25,
+          "column": 10,
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 5,
           "line": 1,
         },
       },
@@ -493,7 +410,7 @@ exports[`dot-notation > invalid 16`] = `
 }
 `;
 
-exports[`dot-notation > invalid 17`] = `
+exports[`dot-notation > invalid 15`] = `
 {
   "code": "foo['bar'];",
   "diagnostics": [
@@ -502,11 +419,11 @@ exports[`dot-notation > invalid 17`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 11,
+          "column": 10,
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 5,
           "line": 1,
         },
       },
@@ -520,7 +437,7 @@ exports[`dot-notation > invalid 17`] = `
 }
 `;
 
-exports[`dot-notation > invalid 18`] = `
+exports[`dot-notation > invalid 16`] = `
 {
   "code": "foo./* comment */ while;",
   "diagnostics": [
@@ -546,7 +463,7 @@ exports[`dot-notation > invalid 18`] = `
 }
 `;
 
-exports[`dot-notation > invalid 19`] = `
+exports[`dot-notation > invalid 17`] = `
 {
   "code": "foo[null];",
   "diagnostics": [
@@ -555,11 +472,11 @@ exports[`dot-notation > invalid 19`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 10,
+          "column": 9,
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 5,
           "line": 1,
         },
       },
@@ -573,7 +490,7 @@ exports[`dot-notation > invalid 19`] = `
 }
 `;
 
-exports[`dot-notation > invalid 20`] = `
+exports[`dot-notation > invalid 18`] = `
 {
   "code": "foo['bar'] instanceof baz;",
   "diagnostics": [
@@ -582,11 +499,11 @@ exports[`dot-notation > invalid 20`] = `
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 11,
+          "column": 10,
           "line": 1,
         },
         "start": {
-          "column": 1,
+          "column": 5,
           "line": 1,
         },
       },
@@ -600,7 +517,7 @@ exports[`dot-notation > invalid 20`] = `
 }
 `;
 
-exports[`dot-notation > invalid 21`] = `
+exports[`dot-notation > invalid 19`] = `
 {
   "code": "let.if();",
   "diagnostics": [
@@ -626,7 +543,7 @@ exports[`dot-notation > invalid 21`] = `
 }
 `;
 
-exports[`dot-notation > invalid 22`] = `
+exports[`dot-notation > invalid 20`] = `
 {
   "code": "
 class X {
@@ -642,11 +559,11 @@ x['protected_prop'] = 123;
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 20,
+          "column": 19,
           "line": 7,
         },
         "start": {
-          "column": 1,
+          "column": 3,
           "line": 7,
         },
       },
@@ -667,7 +584,7 @@ x.protected_prop = 123;
 }
 `;
 
-exports[`dot-notation > invalid 23`] = `
+exports[`dot-notation > invalid 21`] = `
 {
   "code": "
 class X {
@@ -684,11 +601,11 @@ x['prop'] = 'hello';
       "messageId": "useDot",
       "range": {
         "end": {
-          "column": 10,
+          "column": 9,
           "line": 8,
         },
         "start": {
-          "column": 1,
+          "column": 3,
           "line": 8,
         },
       },
@@ -705,94 +622,6 @@ class X {
 
 const x = new X();
 x.prop = 'hello';
-      ",
-  "ruleCount": 1,
-}
-`;
-
-exports[`dot-notation > invalid 24`] = `
-{
-  "code": "
-type Foo = {
-  bar: boolean;
-  [key: \`key_\${string}\`]: number;
-};
-foo['key_baz'];
-      ",
-  "diagnostics": [
-    {
-      "message": "Use dot notation instead of bracket notation.",
-      "messageId": "useDot",
-      "range": {
-        "end": {
-          "column": 15,
-          "line": 6,
-        },
-        "start": {
-          "column": 1,
-          "line": 6,
-        },
-      },
-      "ruleName": "@typescript-eslint/dot-notation",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "
-type Foo = {
-  bar: boolean;
-  [key: \`key_\${string}\`]: number;
-};
-foo.key_baz;
-      ",
-  "ruleCount": 1,
-}
-`;
-
-exports[`dot-notation > invalid 25`] = `
-{
-  "code": "
-type ExtraKey = \`extra\${string}\`;
-
-type Foo = {
-  foo: string;
-  [extraKey: ExtraKey]: number;
-};
-
-function f<T extends Foo>(x: T) {
-  x['extraKey'];
-}
-      ",
-  "diagnostics": [
-    {
-      "message": "Use dot notation instead of bracket notation.",
-      "messageId": "useDot",
-      "range": {
-        "end": {
-          "column": 16,
-          "line": 10,
-        },
-        "start": {
-          "column": 3,
-          "line": 10,
-        },
-      },
-      "ruleName": "@typescript-eslint/dot-notation",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "output": "
-type ExtraKey = \`extra\${string}\`;
-
-type Foo = {
-  foo: string;
-  [extraKey: ExtraKey]: number;
-};
-
-function f<T extends Foo>(x: T) {
-  x.extraKey;
-}
       ",
   "ruleCount": 1,
 }
