@@ -370,9 +370,8 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 				objectText := text[exprRange.Pos():exprRange.End()]
 				replacement := objectText + whitespace + "." + propName
 
-				// Report at the argument expression location for correct line/column, but apply fixes to the entire element access node
-				argRange := utils.TrimNodeTextRange(ctx.SourceFile, elem.ArgumentExpression)
-				ctx.ReportNodeWithFixesAndRange(node, argRange, buildUseDotMessage(), rule.RuleFixReplace(ctx.SourceFile, node, replacement))
+				// Report on the node with the fix
+				ctx.ReportNodeWithFixes(node, buildUseDotMessage(), rule.RuleFixReplace(ctx.SourceFile, node, replacement))
 			}
 		}
 
