@@ -150,65 +150,68 @@ console.log(x?.['priv_prop']);
       `,
       options: [{ allowProtectedClassPropertyAccess: true }],
     },
-    // COMMENTED OUT: Test infrastructure doesn't support per-test TypeScript configs
-    // {
-    //   code: `
-    // type Foo = {
-    //   bar: boolean;
-    //   [key: \`key_\${string}\`]: number;
-    // };
-    // declare const foo: Foo;
-    // foo['key_baz'];
-    //   `,
-    //   languageOptions: {
-    //     parserOptions: {
-    //       project: './tsconfig.noPropertyAccessFromIndexSignature.json',
-    //       projectService: false,
-    //       tsconfigRootDir: rootPath,
-    //     },
-    //   },
-    // },
-    // COMMENTED OUT: Test infrastructure doesn't support per-test TypeScript configs
-    // {
-    //   code: `
-    // type Key = Lowercase<string>;
-    // type Foo = {
-    //   BAR: boolean;
-    //   [key: Lowercase<string>]: number;
-    // };
-    // declare const foo: Foo;
-    // foo['bar'];
-    //   `,
-    //   languageOptions: {
-    //     parserOptions: {
-    //       project: './tsconfig.noPropertyAccessFromIndexSignature.json',
-    //       projectService: false,
-    //       tsconfigRootDir: rootPath,
-    //     },
-    //   },
-    // },
-    // COMMENTED OUT: Test infrastructure doesn't support per-test TypeScript configs
-    // {
-    //   code: `
-    // type ExtraKey = \`extra\${string}\`;
-    //
-    // type Foo = {
-    //   foo: string;
-    //   [extraKey: ExtraKey]: number;
-    // };
-    //
-    // function f<T extends Foo>(x: T) {
-    //   x['extraKey'];
-    // }
-    //   `,
-    //   languageOptions: {
-    //     parserOptions: {
-    //       project: './tsconfig.noPropertyAccessFromIndexSignature.json',
-    //       projectService: false,
-    //       tsconfigRootDir: rootPath,
-    //     },
-    //   },
-    // },
+    // Test infrastructure doesn't support per-test TypeScript configs
+    {
+      skip: true,
+      code: `
+type Foo = {
+  bar: boolean;
+  [key: \`key_\${string}\`]: number;
+};
+declare const foo: Foo;
+foo['key_baz'];
+      `,
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.noPropertyAccessFromIndexSignature.json',
+          projectService: false,
+          tsconfigRootDir: rootPath,
+        },
+      },
+    },
+    // Test infrastructure doesn't support per-test TypeScript configs
+    {
+      skip: true,
+      code: `
+type Key = Lowercase<string>;
+type Foo = {
+  BAR: boolean;
+  [key: Lowercase<string>]: number;
+};
+declare const foo: Foo;
+foo['bar'];
+      `,
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.noPropertyAccessFromIndexSignature.json',
+          projectService: false,
+          tsconfigRootDir: rootPath,
+        },
+      },
+    },
+    // Test infrastructure doesn't support per-test TypeScript configs
+    {
+      skip: true,
+      code: `
+type ExtraKey = \`extra\${string}\`;
+
+type Foo = {
+  foo: string;
+  [extraKey: ExtraKey]: number;
+};
+
+function f<T extends Foo>(x: T) {
+  x['extraKey'];
+}
+      `,
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.noPropertyAccessFromIndexSignature.json',
+          projectService: false,
+          tsconfigRootDir: rootPath,
+        },
+      },
+    },
   ],
   invalid: [
     {
@@ -252,12 +255,13 @@ x.pub_prop = 123;
     },
     //  baseRule
 
-    // {
-    //     code: 'a.true;',
-    //     output: "a['true'];",
-    //     options: [{ allowKeywords: false }],
-    //     errors: [{ messageId: "useBrackets", data: { key: "true" } }],
-    // },
+    {
+        skip: true,
+        code: 'a.true;',
+        output: "a['true'];",
+        options: [{ allowKeywords: false }],
+        errors: [{ messageId: "useBrackets", data: { key: "true" } }],
+    },
     {
       code: "a['true'];",
       errors: [{ data: { key: q('true') }, messageId: 'useDot' }],
@@ -306,54 +310,56 @@ x.pub_prop = 123;
       options: [{ allowPattern: '^[a-z]+(_[a-z]+)+$' }],
       output: 'a.SHOUT_CASE;',
     },
-    // SKIPPED: Multi-line test case has line number mismatch between rslint and typescript-eslint
-    // {
-    //   code: noFormat`
-    // a
-    //   ['SHOUT_CASE'];
-    //       `,
-    //   errors: [
-    //     {
-    //       column: 4,
-    //       data: { key: q('SHOUT_CASE') },
-    //       line: 3,
-    //       messageId: 'useDot',
-    //     },
-    //   ],
-    //   output: `
-    // a
-    //   .SHOUT_CASE;
-    //       `,
-    // },
-    // SKIPPED: Multi-line chained expression has line number mismatch
-    // {
-    //   code:
-    //     'getResource()\n' +
-    //     '    .then(function(){})\n' +
-    //     '    ["catch"](function(){})\n' +
-    //     '    .then(function(){})\n' +
-    //     '    ["catch"](function(){});',
-    //   errors: [
-    //     {
-    //       column: 6,
-    //       data: { key: q('catch') },
-    //       line: 3,
-    //       messageId: 'useDot',
-    //     },
-    //     {
-    //       column: 6,
-    //       data: { key: q('catch') },
-    //       line: 5,
-    //       messageId: 'useDot',
-    //     },
-    //   ],
-    //   output:
-    //     'getResource()\n' +
-    //     '    .then(function(){})\n' +
-    //     '    .catch(function(){})\n' +
-    //     '    .then(function(){})\n' +
-    //     '    .catch(function(){});',
-    // },
+    // Multi-line test case has line number mismatch between rslint and typescript-eslint
+    {
+      skip: true,
+      code: noFormat`
+a
+  ['SHOUT_CASE'];
+      `,
+      errors: [
+        {
+          column: 4,
+          data: { key: q('SHOUT_CASE') },
+          line: 3,
+          messageId: 'useDot',
+        },
+      ],
+      output: `
+a
+  .SHOUT_CASE;
+      `,
+    },
+    // Multi-line chained expression has line number mismatch
+    {
+      skip: true,
+      code:
+        'getResource()\n' +
+        '    .then(function(){})\n' +
+        '    ["catch"](function(){})\n' +
+        '    .then(function(){})\n' +
+        '    ["catch"](function(){});',
+      errors: [
+        {
+          column: 6,
+          data: { key: q('catch') },
+          line: 3,
+          messageId: 'useDot',
+        },
+        {
+          column: 6,
+          data: { key: q('catch') },
+          line: 5,
+          messageId: 'useDot',
+        },
+      ],
+      output:
+        'getResource()\n' +
+        '    .then(function(){})\n' +
+        '    .catch(function(){})\n' +
+        '    .then(function(){})\n' +
+        '    .catch(function(){});',
+    },
     {
       code: noFormat`
 foo
@@ -445,53 +451,55 @@ const x = new X();
 x.prop = 'hello';
       `,
     },
-    // COMMENTED OUT: Test infrastructure doesn't support per-test TypeScript configs
+    // Test infrastructure doesn't support per-test TypeScript configs
     // This case should not error when noPropertyAccessFromIndexSignature is enabled
-    // {
-    //   code: `
-    // type Foo = {
-    //   bar: boolean;
-    //   [key: \`key_\${string}\`]: number;
-    // };
-    // foo['key_baz'];
-    //   `,
-    //   errors: [{ messageId: 'useDot' }],
-    //   output: `
-    // type Foo = {
-    //   bar: boolean;
-    //   [key: \`key_\${string}\`]: number;
-    // };
-    // foo.key_baz;
-    //   `,
-    // },
-    // COMMENTED OUT: Test infrastructure doesn't support per-test TypeScript configs
+    {
+      skip: true,
+      code: `
+type Foo = {
+  bar: boolean;
+  [key: \`key_\${string}\`]: number;
+};
+foo['key_baz'];
+      `,
+      errors: [{ messageId: 'useDot' }],
+      output: `
+type Foo = {
+  bar: boolean;
+  [key: \`key_\${string}\`]: number;
+};
+foo.key_baz;
+      `,
+    },
+    // Test infrastructure doesn't support per-test TypeScript configs
     // This case should not error when noPropertyAccessFromIndexSignature is enabled
-    // {
-    //   code: `
-    // type ExtraKey = \`extra\${string}\`;
-    //
-    // type Foo = {
-    //   foo: string;
-    //   [extraKey: ExtraKey]: number;
-    // };
-    //
-    // function f<T extends Foo>(x: T) {
-    //   x['extraKey'];
-    // }
-    //   `,
-    //   errors: [{ messageId: 'useDot' }],
-    //   output: `
-    // type ExtraKey = \`extra\${string}\`;
-    //
-    // type Foo = {
-    //   foo: string;
-    //   [extraKey: ExtraKey]: number;
-    // };
-    //
-    // function f<T extends Foo>(x: T) {
-    //   x.extraKey;
-    // }
-    //   `,
-    // },
+    {
+      skip: true,
+      code: `
+type ExtraKey = \`extra\${string}\`;
+
+type Foo = {
+  foo: string;
+  [extraKey: ExtraKey]: number;
+};
+
+function f<T extends Foo>(x: T) {
+  x['extraKey'];
+}
+      `,
+      errors: [{ messageId: 'useDot' }],
+      output: `
+type ExtraKey = \`extra\${string}\`;
+
+type Foo = {
+  foo: string;
+  [extraKey: ExtraKey]: number;
+};
+
+function f<T extends Foo>(x: T) {
+  x.extraKey;
+}
+      `,
+    },
   ],
 });
