@@ -35,4 +35,6 @@ export {
   type LintResponse,
   type ApplyFixesRequest,
   type ApplyFixesResponse,
+  type LanguageOptions,
+  type ParserOptions,
 } from './service.ts';

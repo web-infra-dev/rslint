@@ -62,8 +62,38 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	rslintconfig.RegisterAllRules()
 
 	// Load rslint configuration and determine which tsconfig files to use
-	_, tsConfigs, configDirectory := rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
+	rslintConfig, tsConfigs, configDirectory := rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
 
+	// Merge languageOptions from request with config file if provided
+	if req.LanguageOptions != nil && len(rslintConfig) > 0 {
+		// Convert API LanguageOptions to config LanguageOptions
+		configLanguageOptions := &rslintconfig.LanguageOptions{}
+		if req.LanguageOptions.ParserOptions != nil {
+			configLanguageOptions.ParserOptions = &rslintconfig.ParserOptions{
+				ProjectService: req.LanguageOptions.ParserOptions.ProjectService,
+				Project:        rslintconfig.ProjectPaths(req.LanguageOptions.ParserOptions.Project),
+			}
+		}
+
+		// Override languageOptions for the first config entry
+		rslintConfig[0].LanguageOptions = configLanguageOptions
+
+		// Re-extract tsconfig files with updated languageOptions
+		overrideTsconfigs := []string{}
+		for _, entry := range rslintConfig {
+			if entry.LanguageOptions != nil && entry.LanguageOptions.ParserOptions != nil {
+				for _, config := range entry.LanguageOptions.ParserOptions.Project {
+					tsconfigPath := tspath.ResolvePath(configDirectory, config)
+					if fs.FileExists(tsconfigPath) {
+						overrideTsconfigs = append(overrideTsconfigs, tsconfigPath)
+					}
+				}
+			}
+		}
+		if len(overrideTsconfigs) > 0 {
+			tsConfigs = overrideTsconfigs
+		}
+	}
 	type RuleWithOption struct {
 		rule   rule.Rule
 		option interface{}
@@ -232,7 +262,7 @@ func (h *IPCHandler) HandleApplyFixes(req api.ApplyFixesRequest) (*api.ApplyFixe
 
 	// Apply fixes iteratively to handle overlapping fixes
 	for {
-		fixedContent,unapplied, fixed := linter.ApplyRuleFixes(code, ruleDiagnostics)
+		fixedContent, unapplied, fixed := linter.ApplyRuleFixes(code, ruleDiagnostics)
 		if !fixed {
 			break
 		}

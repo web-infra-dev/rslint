@@ -150,65 +150,62 @@ console.log(x?.['priv_prop']);
       `,
       options: [{ allowProtectedClassPropertyAccess: true }],
     },
-    // COMMENTED OUT: Test infrastructure doesn't support per-test TypeScript configs
-    // {
-    //   code: `
-    // type Foo = {
-    //   bar: boolean;
-    //   [key: \`key_\${string}\`]: number;
-    // };
-    // declare const foo: Foo;
-    // foo['key_baz'];
-    //   `,
-    //   languageOptions: {
-    //     parserOptions: {
-    //       project: './tsconfig.noPropertyAccessFromIndexSignature.json',
-    //       projectService: false,
-    //       tsconfigRootDir: rootPath,
-    //     },
-    //   },
-    // },
-    // COMMENTED OUT: Test infrastructure doesn't support per-test TypeScript configs
-    // {
-    //   code: `
-    // type Key = Lowercase<string>;
-    // type Foo = {
-    //   BAR: boolean;
-    //   [key: Lowercase<string>]: number;
-    // };
-    // declare const foo: Foo;
-    // foo['bar'];
-    //   `,
-    //   languageOptions: {
-    //     parserOptions: {
-    //       project: './tsconfig.noPropertyAccessFromIndexSignature.json',
-    //       projectService: false,
-    //       tsconfigRootDir: rootPath,
-    //     },
-    //   },
-    // },
-    // COMMENTED OUT: Test infrastructure doesn't support per-test TypeScript configs
-    // {
-    //   code: `
-    // type ExtraKey = \`extra\${string}\`;
-    //
-    // type Foo = {
-    //   foo: string;
-    //   [extraKey: ExtraKey]: number;
-    // };
-    //
-    // function f<T extends Foo>(x: T) {
-    //   x['extraKey'];
-    // }
-    //   `,
-    //   languageOptions: {
-    //     parserOptions: {
-    //       project: './tsconfig.noPropertyAccessFromIndexSignature.json',
-    //       projectService: false,
-    //       tsconfigRootDir: rootPath,
-    //     },
-    //   },
-    // },
+    {
+      code: `
+    type Foo = {
+      bar: boolean;
+      [key: \`key_\${string}\`]: number;
+    };
+    declare const foo: Foo;
+    foo['key_baz'];
+      `,
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.noPropertyAccessFromIndexSignature.json',
+          projectService: false,
+          tsconfigRootDir: rootPath,
+        },
+      },
+    },
+    {
+      code: `
+    type Key = Lowercase<string>;
+    type Foo = {
+      BAR: boolean;
+      [key: Lowercase<string>]: number;
+    };
+    declare const foo: Foo;
+    foo['bar'];
+      `,
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.noPropertyAccessFromIndexSignature.json',
+          projectService: false,
+          tsconfigRootDir: rootPath,
+        },
+      },
+    },
+    {
+      code: `
+    type ExtraKey = \`extra\${string}\`;
+    
+    type Foo = {
+      foo: string;
+      [extraKey: ExtraKey]: number;
+    };
+    
+    function f<T extends Foo>(x: T) {
+      x['extraKey'];
+    }
+      `,
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.noPropertyAccessFromIndexSignature.json',
+          projectService: false,
+          tsconfigRootDir: rootPath,
+        },
+      },
+    },
   ],
   invalid: [
     {

@@ -1,11 +1,11 @@
-package config
+package ipc
 
 import (
 	"encoding/json"
 	"testing"
 )
 
-func TestProjectPathsUnmarshalJSON(t *testing.T) {
+func TestAPIProjectPathsUnmarshalJSON(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -53,7 +53,7 @@ func TestProjectPathsUnmarshalJSON(t *testing.T) {
 	}
 }
 
-func TestParserOptionsUnmarshalJSON(t *testing.T) {
+func TestAPIParserOptionsUnmarshalJSON(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
