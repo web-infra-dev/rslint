@@ -391,26 +391,3 @@ If you're migrating from ESLint, you can use most of your existing TypeScript-ES
   }
 ]
 ```
-
-## Performance Tips
-
-For optimal performance:
-
-1. **Use specific TypeScript projects**: Include only the `tsconfig.json` files you need
-2. **Ignore unnecessary files**: Use `ignores` to exclude build outputs, dependencies, and generated files
-3. **Consider projectService**: For very large projects, enable `projectService: true`
-4. **Minimize rule scope**: Use `files` patterns to apply rules only where needed
-
-```jsonc
-{
-  "languageOptions": {
-    "parserOptions": {
-      // ✅ Good: Specific projects
-      "project": ["./src/tsconfig.json", "./tests/tsconfig.json"],
-
-      // ❌ Avoid: Too broad
-      "project": ["./**/tsconfig.json"],
-    },
-  },
-}
-```
