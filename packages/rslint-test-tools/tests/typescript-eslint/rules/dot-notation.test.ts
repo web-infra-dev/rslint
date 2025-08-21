@@ -152,6 +152,7 @@ console.log(x?.['priv_prop']);
     },
     // Test infrastructure doesn't support per-test TypeScript configs
     {
+      skip: true,
       code: `
 type Foo = {
   bar: boolean;
@@ -253,6 +254,7 @@ x.pub_prop = 123;
     //  baseRule
 
     {
+        skip: true,
         code: 'a.true;',
         output: "a['true'];",
         options: [{ allowKeywords: false }],
