@@ -152,7 +152,6 @@ console.log(x?.['priv_prop']);
     },
     // Test infrastructure doesn't support per-test TypeScript configs
     {
-      skip: true,
       code: `
 type Foo = {
   bar: boolean;
@@ -171,7 +170,6 @@ foo['key_baz'];
     },
     // Test infrastructure doesn't support per-test TypeScript configs
     {
-      skip: true,
       code: `
 type Key = Lowercase<string>;
 type Foo = {
@@ -191,7 +189,6 @@ foo['bar'];
     },
     // Test infrastructure doesn't support per-test TypeScript configs
     {
-      skip: true,
       code: `
 type ExtraKey = \`extra\${string}\`;
 
@@ -256,7 +253,6 @@ x.pub_prop = 123;
     //  baseRule
 
     {
-        skip: true,
         code: 'a.true;',
         output: "a['true'];",
         options: [{ allowKeywords: false }],
@@ -312,7 +308,6 @@ x.pub_prop = 123;
     },
     // Multi-line test case has line number mismatch between rslint and typescript-eslint
     {
-      skip: true,
       code: noFormat`
 a
   ['SHOUT_CASE'];
@@ -332,7 +327,6 @@ a
     },
     // Multi-line chained expression has line number mismatch
     {
-      skip: true,
       code:
         'getResource()\n' +
         '    .then(function(){})\n' +
@@ -454,7 +448,6 @@ x.prop = 'hello';
     // Test infrastructure doesn't support per-test TypeScript configs
     // This case should not error when noPropertyAccessFromIndexSignature is enabled
     {
-      skip: true,
       code: `
 type Foo = {
   bar: boolean;
@@ -474,7 +467,6 @@ foo.key_baz;
     // Test infrastructure doesn't support per-test TypeScript configs
     // This case should not error when noPropertyAccessFromIndexSignature is enabled
     {
-      skip: true,
       code: `
 type ExtraKey = \`extra\${string}\`;
 
