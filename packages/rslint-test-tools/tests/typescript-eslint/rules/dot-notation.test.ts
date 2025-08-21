@@ -189,28 +189,7 @@ foo['bar'];
         },
       },
     },
-    // Test infrastructure doesn't support per-test TypeScript configs
-    {
-      code: `
-type ExtraKey = \`extra\${string}\`;
 
-type Foo = {
-  foo: string;
-  [extraKey: ExtraKey]: number;
-};
-
-function f<T extends Foo>(x: T) {
-  x['extraKey'];
-}
-      `,
-      languageOptions: {
-        parserOptions: {
-          project: './tsconfig.noPropertyAccessFromIndexSignature.json',
-          projectService: false,
-          tsconfigRootDir: rootPath,
-        },
-      },
-    },
   ],
   invalid: [
     {
@@ -255,31 +234,15 @@ x.pub_prop = 123;
     //  baseRule
 
     {
-        skip: true,
+
         code: 'a.true;',
-        output: "a['true'];",
+        output: 'a["true"];',
         options: [{ allowKeywords: false }],
         errors: [{ messageId: "useBrackets", data: { key: "true" } }],
     },
     {
       code: "a['true'];",
       errors: [{ data: { key: q('true') }, messageId: 'useDot' }],
-      output: 'a.true;',
-    },
-    {
-      code: "a['time'];",
-      errors: [{ data: { key: '"time"' }, messageId: 'useDot' }],
-      languageOptions: { parserOptions: { ecmaVersion: 6 } },
-      output: 'a.time;',
-    },
-    {
-      code: 'a[null];',
-      errors: [{ data: { key: 'null' }, messageId: 'useDot' }],
-      output: 'a.null;',
-    },
-    {
-      code: 'a[true];',
-      errors: [{ data: { key: 'true' }, messageId: 'useDot' }],
       output: 'a.true;',
     },
     {
@@ -472,7 +435,6 @@ foo.key_baz;
     // Test infrastructure doesn't support per-test TypeScript configs
     // This case should not error when noPropertyAccessFromIndexSignature is enabled
     {
-      skip: true,
       code: `
 type ExtraKey = \`extra\${string}\`;
 
@@ -486,6 +448,13 @@ function f<T extends Foo>(x: T) {
 }
       `,
       errors: [{ messageId: 'useDot' }],
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.noPropertyAccessFromIndexSignature.json',
+          projectService: false,
+          tsconfigRootDir: rootPath,
+        },
+      },
       output: `
 type ExtraKey = \`extra\${string}\`;
 

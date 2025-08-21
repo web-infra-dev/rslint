@@ -294,9 +294,9 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			// Option: allow keywords via bracket notation only when allowKeywords is false.
-			// Additionally treat true/false/null as reserved when allowKeywords is false.
-			if !opts.AllowKeywords && (isKeyword(propName) || propName == "null" || propName == "true" || propName == "false") {
+			// Option: allow keywords via bracket notation only when allowKeywords is true.
+			// When allowKeywords is false, we should flag true/false/null for conversion to dot notation.
+			if opts.AllowKeywords && (propName == "null" || propName == "true" || propName == "false") {
 				return
 			}
 
@@ -385,7 +385,7 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 				return
 			}
 			name := pae.Name().Text()
-			if !isKeyword(name) {
+			if !isKeyword(name) && name != "true" && name != "false" && name != "null" {
 				return
 			}
 			// Avoid autofix if comments present (heuristic)
