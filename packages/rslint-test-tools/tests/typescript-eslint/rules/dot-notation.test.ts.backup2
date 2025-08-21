@@ -242,8 +242,14 @@ x.pub_prop = 123;
     {
       code: "a['true'];",
       errors: [{ data: { key: q('true') }, messageId: 'useDot' }],
-      output: 'a.true;'
-    },    {
+      output: 'a.true;',
+    },
+    {
+      code: 'a[false];',
+      errors: [{ data: { key: 'false' }, messageId: 'useDot' }],
+      output: 'a.false;',
+    },
+    {
       code: "a['b'];",
       errors: [{ data: { key: q('b') }, messageId: 'useDot' }],
       output: 'a.b;',
