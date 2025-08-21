@@ -1,12 +1,17 @@
 [
   {
-    "text": "Rules",
-    "link": "/rules/",
-    "activeMatch": "/rules/"
-  },
-  {
     "text": "Guide",
     "link": "/guide/",
     "activeMatch": "/guide/"
+  },
+  {
+    "text": "Configuration",
+    "link": "/config/",
+    "activeMatch": "/config/"
+  },
+  {
+    "text": "Rules",
+    "link": "/rules/",
+    "activeMatch": "/rules/"
   }
 ]
