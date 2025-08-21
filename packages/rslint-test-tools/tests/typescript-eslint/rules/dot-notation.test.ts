@@ -171,6 +171,7 @@ foo['key_baz'];
     },
     // Test infrastructure doesn't support per-test TypeScript configs
     {
+      skip: true,
       code: `
 type Key = Lowercase<string>;
 type Foo = {
@@ -469,6 +470,7 @@ foo.key_baz;
     // Test infrastructure doesn't support per-test TypeScript configs
     // This case should not error when noPropertyAccessFromIndexSignature is enabled
     {
+      skip: true,
       code: `
 type ExtraKey = \`extra\${string}\`;
 
