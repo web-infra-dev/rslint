@@ -38,6 +38,16 @@ export interface LintOptions {
   workingDirectory?: string;
   ruleOptions?: Record<string, string>;
   fileContents?: Record<string, string>; // Map of file paths to their contents for VFS
+  languageOptions?: LanguageOptions; // Override languageOptions from config file
+}
+
+export interface LanguageOptions {
+  parserOptions?: ParserOptions;
+}
+
+export interface ParserOptions {
+  projectService?: boolean;
+  project?: string[] | string;
 }
 
 export interface ApplyFixesRequest {
@@ -189,8 +199,14 @@ export class RSLintService {
    * Run the linter on specified files
    */
   async lint(options: LintOptions = {}): Promise<LintResponse> {
-    const { files, config, workingDirectory, ruleOptions, fileContents } =
-      options;
+    const {
+      files,
+      config,
+      workingDirectory,
+      ruleOptions,
+      fileContents,
+      languageOptions,
+    } = options;
     // Send handshake
     await this.sendMessage('handshake', { version: '1.0.0' });
 
@@ -201,6 +217,7 @@ export class RSLintService {
       workingDirectory,
       ruleOptions,
       fileContents,
+      languageOptions,
       format: 'jsonline',
     });
   }

@@ -57,13 +57,46 @@ type HandshakeResponse struct {
 
 // LintRequest represents a lint request from JS to Go
 type LintRequest struct {
-	Files            []string `json:"files,omitempty"`
-	Config           string   `json:"config,omitempty"` // Path to rslint.json config file
-	Format           string   `json:"format,omitempty"`
-	WorkingDirectory string   `json:"workingDirectory,omitempty"`
+	Files            []string                 `json:"files,omitempty"`
+	Config           string                   `json:"config,omitempty"` // Path to rslint.json config file
+	Format           string                   `json:"format,omitempty"`
+	WorkingDirectory string                   `json:"workingDirectory,omitempty"`
 	// Supports both string level and array [level, options] format
-	RuleOptions  map[string]interface{} `json:"ruleOptions,omitempty"`
-	FileContents map[string]string      `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
+	RuleOptions     map[string]interface{} `json:"ruleOptions,omitempty"`
+	FileContents    map[string]string      `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
+	LanguageOptions *LanguageOptions       `json:"languageOptions,omitempty"` // Override languageOptions from config file
+}
+
+// LanguageOptions contains language-specific configuration options
+type LanguageOptions struct {
+	ParserOptions *ParserOptions `json:"parserOptions,omitempty"`
+}
+
+// ProjectPaths represents project paths that can be either a single string or an array of strings
+type ProjectPaths []string
+
+// UnmarshalJSON implements custom JSON unmarshaling to support both string and string[] formats
+func (p *ProjectPaths) UnmarshalJSON(data []byte) error {
+	// Try to unmarshal as string first
+	var singlePath string
+	if err := json.Unmarshal(data, &singlePath); err == nil {
+		*p = []string{singlePath}
+		return nil
+	}
+
+	// If that fails, try to unmarshal as array of strings
+	var paths []string
+	if err := json.Unmarshal(data, &paths); err != nil {
+		return err
+	}
+	*p = paths
+	return nil
+}
+
+// ParserOptions contains parser-specific configuration
+type ParserOptions struct {
+	ProjectService bool         `json:"projectService"`
+	Project        ProjectPaths `json:"project,omitempty"`
 }
 
 // LintResponse represents a lint response from Go to JS

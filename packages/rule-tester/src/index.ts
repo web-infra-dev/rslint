@@ -173,10 +173,11 @@ export class RuleTester {
           }
           const code =
             typeof validCase === 'string' ? validCase : validCase.code;
-          const isJSX =
+          const languageOptions =
             typeof validCase === 'string'
-              ? false
-              : validCase.languageOptions?.parserOptions?.ecmaFeatures?.jsx;
+              ? undefined
+              : validCase.languageOptions;
+          const isJSX = languageOptions?.parserOptions?.ecmaFeatures?.jsx;
 
           const options =
             typeof validCase === 'string' ? [] : validCase.options || [];
@@ -205,6 +206,7 @@ export class RuleTester {
             ruleOptions: {
               [ruleName]: options,
             },
+            languageOptions,
           });
 
           assert(
@@ -229,7 +231,8 @@ export class RuleTester {
           if (hasOnly && !only) {
             continue;
           }
-          const isJSX = item.languageOptions?.parserOptions?.ecmaFeatures?.jsx;
+          const languageOptions = item.languageOptions;
+          const isJSX = languageOptions?.parserOptions?.ecmaFeatures?.jsx;
           const test_virtual_entry = path.resolve(
             cwd,
             isJSX ? 'virtual.tsx' : 'virtual.ts',
@@ -243,6 +246,7 @@ export class RuleTester {
             ruleOptions: {
               [ruleName]: options,
             },
+            languageOptions,
           });
 
           assert(

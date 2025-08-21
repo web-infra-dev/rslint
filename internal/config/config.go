@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -82,11 +83,33 @@ type LanguageOptions struct {
 	ParserOptions *ParserOptions `json:"parserOptions,omitempty"`
 }
 
+// ProjectPaths represents project paths that can be either a single string or an array of strings
+type ProjectPaths []string
+
+// UnmarshalJSON implements custom JSON unmarshaling to support both string and string[] formats
+func (p *ProjectPaths) UnmarshalJSON(data []byte) error {
+	// Try to unmarshal as string first
+	var singlePath string
+	if err := json.Unmarshal(data, &singlePath); err == nil {
+		*p = []string{singlePath}
+		return nil
+	}
+
+	// If that fails, try to unmarshal as array of strings
+	var paths []string
+	if err := json.Unmarshal(data, &paths); err != nil {
+		return err
+	}
+	*p = paths
+	return nil
+}
+
 // ParserOptions contains parser-specific configuration
 type ParserOptions struct {
-	ProjectService bool     `json:"projectService"`
-	Project        []string `json:"project,omitempty"`
+	ProjectService bool         `json:"projectService"`
+	Project        ProjectPaths `json:"project,omitempty"`
 }
+
 
 // Rules represents the rules configuration
 // This can be extended to include specific rule configurations
