@@ -111,24 +111,6 @@ Array of TypeScript project configuration files. Rslint will lint all files incl
 
 This is especially useful for monorepos where you have multiple TypeScript projects.
 
-##### languageOptions.parserOptions.projectService
-
-- **Type:** `boolean`
-- **Default:** `false`
-
-Whether to use TypeScript's project service for better performance in large projects.
-
-```jsonc
-{
-  "languageOptions": {
-    "parserOptions": {
-      "projectService": true,
-      "project": ["./tsconfig.json"],
-    },
-  },
-}
-```
-
 ### rules
 
 - **Type:** `object`
@@ -258,7 +240,6 @@ Here's a comprehensive configuration example for a typical TypeScript project:
     "languageOptions": {
       "parserOptions": {
         "project": ["./tsconfig.json", "./packages/*/tsconfig.json"],
-        "projectService": false,
       },
     },
 
