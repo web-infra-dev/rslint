@@ -49,7 +49,7 @@
             "built-in",
             "custom"
           ],
-          "default": "local",
+          "default": "built-in",
           "markdownEnumDescriptions": [
             "Use workspace node_modules Rslint binary (may have version incompatibility with extension)",
             "Use extension's built-in Rslint binary (may differ from local @rslint/core diagnostics)",
