@@ -10,6 +10,12 @@ type CodePathState struct {
 	switchContext *SwitchContext
 	tryContext    *TryContext
 	loopContext   *LoopContext
+
+	currentSegments     []*CodePathSegment
+	initialSegment      *CodePathSegment
+	finalSegments       []*CodePathSegment
+	returnedForkContext *ForkContext
+	thrownForkContext   *ForkContext
 }
 
 func NewCodePathState(idGenerator *IdGenerator, onLooped func(fromSegment *CodePathSegment, toSegment *CodePathSegment)) CodePathState {

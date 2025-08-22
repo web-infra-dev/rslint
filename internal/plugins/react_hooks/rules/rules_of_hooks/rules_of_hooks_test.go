@@ -9,14 +9,6 @@ import (
 )
 
 func TestRulesOfHooks(t *testing.T) {
-	errors := make([]rule_tester.InvalidTestCaseError, 6)
-	for i, err := range errors {
-		err.MessageId = "import/no-self-import"
-		err.Line = i + 2
-		err.Column = 1
-		errors[i] = err
-	}
-
 	rule_tester.RunRuleTester(
 		fixtures.GetRootDir(),
 		"tsconfig.json",
