@@ -215,17 +215,20 @@ func (s *Server) handleDocumentDiagnostic(ctx context.Context, params *lsproto.D
 	uriString := string(params.TextDocument.Uri)
 	uri := params.TextDocument.Uri
 	content := s.documents[uri]
+	// Collect diagnostics
+	var lsp_diagnostics []*lsproto.Diagnostic
 
 	// Only process TypeScript/JavaScript files
 	if !isTypeScriptFile(uriString) {
-		return lsproto.DocumentDiagnosticResponse{}, nil
+		return lsproto.RelatedFullDocumentDiagnosticReportOrUnchangedDocumentDiagnosticReport{
+			FullDocumentDiagnosticReport: &lsproto.RelatedFullDocumentDiagnosticReport{
+				Items: lsp_diagnostics,
+			},
+		}, nil
 	}
 
 	// Initialize rule registry with all available rules (ensure it's done once)
 	config.RegisterAllRules()
-
-	// Collect diagnostics
-	var lsp_diagnostics []*lsproto.Diagnostic
 
 	rule_diags, err := runLintWithProjectService(uri, s.projectService, ctx, s.rslintConfig)
 
