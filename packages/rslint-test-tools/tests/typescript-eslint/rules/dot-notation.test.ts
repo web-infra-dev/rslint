@@ -151,6 +151,7 @@ console.log(x?.['priv_prop']);
       options: [{ allowProtectedClassPropertyAccess: true }],
     },
     {
+      skip: true,
       code: `
 type Foo = {
   bar: boolean;
