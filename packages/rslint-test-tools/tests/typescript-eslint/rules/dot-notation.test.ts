@@ -477,7 +477,7 @@ function f<T extends Foo>(x: T) {
       `,
       errors: [{ messageId: 'useDot' }],
       output: `
-type ExtraKey = `extra${string}`;
+type ExtraKey = \`extra\${string}\`;
 
 type Foo = {
   foo: string;
@@ -487,7 +487,7 @@ type Foo = {
 function f<T extends Foo>(x: T) {
   x.extraKey;
 }
-       `,
+      `,
       languageOptions: {
         parserOptions: {
           project: './tsconfig.noPropertyAccessFromIndexSignature.json',
