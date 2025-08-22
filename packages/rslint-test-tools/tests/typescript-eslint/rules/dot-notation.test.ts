@@ -487,7 +487,8 @@ type Foo = {
 function f<T extends Foo>(x: T) {
   x.extraKey;
 }
-      `,      languageOptions: {
+       `,
+      languageOptions: {
         parserOptions: {
           project: './tsconfig.noPropertyAccessFromIndexSignature.json',
           projectService: false,
