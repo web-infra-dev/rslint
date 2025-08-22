@@ -1,4 +1,4 @@
-package code_path_analyzer
+package code_path_analysis
 
 type SwitchContext struct {
 	upper               *SwitchContext

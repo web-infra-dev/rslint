@@ -1,4 +1,4 @@
-package code_path_analyzer
+package code_path_analysis
 
 type ChainContext struct {
 	upper              *ChainContext
@@ -46,6 +46,6 @@ func (s *CodePathState) MakeOptionalNode() {
 // This method is called on entering to the `arguments|property` property of each `(Call|Member)Expression` node.
 func (s *CodePathState) MakeOptionalRight() {
 	if s.chainContext != nil {
-		s.MakeLogicRight()
+		s.MakeLogicalRight()
 	}
 }

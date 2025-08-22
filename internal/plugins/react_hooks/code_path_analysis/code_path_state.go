@@ -1,4 +1,4 @@
-package code_path_analyzer
+package code_path_analysis
 
 type CodePathState struct {
 	idGenerator   *IdGenerator // idGenerator An id generator to generate id for code

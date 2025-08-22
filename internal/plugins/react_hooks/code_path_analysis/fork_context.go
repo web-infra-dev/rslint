@@ -1,4 +1,4 @@
-package code_path_analyzer
+package code_path_analysis
 
 // Manage forking
 type ForkContext struct {

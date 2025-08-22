@@ -1,4 +1,4 @@
-package code_path_analyzer
+package code_path_analysis
 
 // A context for ConditionalExpression, LogicalExpression,
 // AssignmentExpression (logical assignments only), IfStatement, WhileStatement,
@@ -119,7 +119,7 @@ func (s *CodePathState) PopChoiceContext() *ChoiceContext {
 }
 
 // Makes a code path segment of the right-hand operand of a logical expression.
-func (s *CodePathState) MakeLogicRight() {
+func (s *CodePathState) MakeLogicalRight() {
 	context := s.choiceContext
 	forkContext := s.forkContext
 

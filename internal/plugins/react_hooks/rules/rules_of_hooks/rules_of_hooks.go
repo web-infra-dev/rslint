@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	analysis "github.com/web-infra-dev/rslint/internal/plugins/react_hooks/code_path_analysis"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -28,8 +29,24 @@ func isComponentName(name string) bool {
 }
 
 // Helper function to check if a function is a hook
-func isHook(name string) bool {
-	return isHookName(name)
+func isHook(node *ast.Node) bool {
+	if node.Kind == ast.KindIdentifier {
+		return isHookName(node.Name().Text())
+	} else if node.Kind == ast.KindPropertyAccessExpression {
+		name := node.AsPropertyAccessExpression().Name()
+		if name == nil || !isHook(name) {
+			return false
+		}
+
+		expr := node.AsPropertyAccessExpression().Expression
+		if expr == nil || !ast.IsIdentifier(expr) {
+			return false
+		}
+
+		return isPascalCaseNameSpace(expr.AsIdentifier().Text)
+	} else {
+		return false
+	}
 }
 
 // Helper function to get function name from AST node
@@ -66,7 +83,7 @@ func isInsideComponentOrHook(node *ast.Node) bool {
 	for current != nil {
 		if isFunctionLike(current) {
 			name := getFunctionName(current)
-			if name != "" && (isComponentName(name) || isHook(name)) {
+			if name != "" && (isComponentName(name) || isHook(current)) {
 				return true
 			}
 			// TODO: Check for React.forwardRef and React.memo callbacks
@@ -250,75 +267,39 @@ func isTopLevel(node *ast.Node) bool {
 var RulesOfHooksRule = rule.Rule{
 	Name: "react-hooks/rules-of-hooks",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		analyzer = NewAnalyzer
+		codePathReactHooksMapStack := make([]map[*analysis.CodePathSegment][]*ast.Node, 0)
+		codePathSegmentStack := make([]*analysis.CodePathSegment, 0)
+		onCodePathSegmentStart := func(segment *analysis.CodePathSegment, node *ast.Node) {
+			codePathSegmentStack = append(codePathSegmentStack, segment)
+		}
+		onCodePathSegmentEnd := func(segment *analysis.CodePathSegment, node *ast.Node) {
+			codePathSegmentStack = codePathSegmentStack[:len(codePathSegmentStack)-1]
+		}
+		onCodePathStart := func(codePath *analysis.CodePath, node *ast.Node) {
+			codePathReactHooksMapStack = append(
+				codePathReactHooksMapStack,
+				make(map[*analysis.CodePathSegment][]*ast.Node),
+			)
+		}
+		onCodePathEnd := func(codePath *analysis.CodePath, node *ast.Node) {
+
+		}
+		analyzer := analysis.NewCodePathAnalyzer(
+			onCodePathSegmentStart,
+			onCodePathSegmentEnd,
+			onCodePathStart,
+			onCodePathEnd,
+			nil, /*onCodePathSegmentLoop*/
+		)
 		return rule.RuleListeners{
 			rule.WildcardTokenKind: func(node *ast.Node) {
-				analyzer.enterNode(node)
+				analyzer.EnterNode(node)
 			},
 			rule.WildcardExitTokenKind: func(node *ast.Node) {
-				analyzer.leaveNode(node)
+				analyzer.LeaveNode(node)
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
-				isHook, hookName := isHookCall(node)
-				if !isHook {
-					return
-				}
-
-				// Check if it's a "use" call inside try/catch
-				if hookName == "use" && isInsideTryCatch(node) {
-					ctx.ReportNode(node, buildTryCatchUseMessage(hookName))
-					return
-				}
-
-				// Check if inside a class component
-				if isInsideClass(node) {
-					ctx.ReportNode(node, buildClassHookMessage(hookName))
-					return
-				}
-
-				// Check if at top level
-				if isTopLevel(node) {
-					ctx.ReportNode(node, buildTopLevelHookMessage(hookName))
-					return
-				}
-
-				// Check if inside async function
-				if isInsideAsyncFunction(node) {
-					ctx.ReportNode(node, buildAsyncComponentHookMessage(hookName))
-					return
-				}
-
-				// Check if inside a loop (only for non-"use" hooks)
-				if hookName != "use" && isInsideLoop(node) {
-					ctx.ReportNode(node, buildLoopHookMessage(hookName))
-					return
-				}
-
-				// Check if inside conditional (only for non-"use" hooks)
-				if hookName != "use" && isInsideConditional(node) {
-					// TODO: Implement more sophisticated conditional detection
-					// including early returns and complex control flow
-					ctx.ReportNode(node, buildConditionalHookMessage(hookName))
-					return
-				}
-
-				// Check if inside a component or hook
-				if !isInsideComponentOrHook(node) {
-					// TODO: Get the function name for better error message
-					functionName := "unknown"
-					ctx.ReportNode(node, buildFunctionHookMessage(hookName, functionName))
-					return
-				}
-
-				// TODO: Implement more sophisticated checks:
-				// 1. Code path analysis for conditional execution
-				// 2. Early return detection
-				// 3. useEffectEvent handling
-				// 4. React.forwardRef and React.memo callback detection
-				// 5. Better function name extraction
-				// 6. Extract actual hook names from call expressions
-				// 7. Check async modifiers properly
-				// 8. Implement proper identifier text extraction
+				// !!!
 			},
 		}
 	},
@@ -400,4 +381,13 @@ func buildTryCatchUseMessage(hookName string) rule.RuleMessage {
 		Id:          "tryCatchUse",
 		Description: `React Hook "` + hookName + `" cannot be called inside a try/catch block.`,
 	}
+}
+
+// Helper function to check if a name follows PascalCase convention
+func isPascalCaseNameSpace(name string) bool {
+	if len(name) == 0 {
+		return false
+	}
+	// PascalCase names start with uppercase letter
+	return name[0] >= 'A' && name[0] <= 'Z'
 }
