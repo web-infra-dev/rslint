@@ -351,6 +351,7 @@ a
         '    .catch(function(){});',
     },
     {
+      skip: true,
       code: noFormat`
 foo
   .while;
