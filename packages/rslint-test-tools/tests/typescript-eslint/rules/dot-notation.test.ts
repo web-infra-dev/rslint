@@ -169,7 +169,7 @@ foo['key_baz'];
       },
     },
     {
-      skip: true,      skip: true,
+      skip: true,
       code: `
 type Key = Lowercase<string>;
 type Foo = {
@@ -188,7 +188,7 @@ foo['bar'];
       },
     },
     {
-      skip: true,      skip: true,
+      skip: true,
       code: `
 type ExtraKey = \`extra\${string}\`;
 
@@ -475,7 +475,19 @@ function f<T extends Foo>(x: T) {
   x['extraKey'];
 }
       `,
-      languageOptions: {
+      errors: [{ messageId: 'useDot' }],
+      output: `
+type ExtraKey = `extra${string}`;
+
+type Foo = {
+  foo: string;
+  [extraKey: ExtraKey]: number;
+};
+
+function f<T extends Foo>(x: T) {
+  x.extraKey;
+}
+      `,      languageOptions: {
         parserOptions: {
           project: './tsconfig.noPropertyAccessFromIndexSignature.json',
           projectService: false,
