@@ -1,0 +1,55 @@
+[
+  {
+    "language": "javascript",
+    "files": [], // extra files out of tsconfig.json
+    "ignores": [
+      "node_modules/**",
+      "./packages/rslint-test-tools/tests/**/*.test.ts",
+      "packages/rslint/fixtures/**",
+      "packages/rslint-test-tools/tests/**/*.test.ts",
+      "packages/rslint-test-tools/tests/typescript-eslint/rules/prefer-optional-chain/base-cases.ts",
+      "packages/rslint-test-tools/tests/typescript-eslint/rules/naming-convention/cases/createTestCases.ts",
+      "packages/rslint-test-tools/tests/typescript-eslint/areOptionsValid.ts",
+      "packages/rule-tester/src/index.ts"
+    ],
+    "languageOptions": {
+      "parserOptions": {
+        // enable project service for typed linting which will run tsgo language service behind the scene
+        "projectService": false,
+        // FIXME: enable legacy multi tsconfig project
+        // tsgo doesn't support project reference yet, so we have to set config manually
+        // will consider migrate to project service when it's supported
+        "project": [
+          "./packages/rslint/tsconfig.build.json",
+          "./packages/rslint-test-tools/tsconfig.spec.json",
+          "./packages/vscode-extension/tsconfig.build.json",
+          "./packages/rule-tester/tsconfig.build.json",
+          "./packages/vscode-extension/tsconfig.spec.json",
+          "./packages/rslint/fixtures/tsconfig.json"
+        ]
+      }
+    },
+    "rules": {
+      "@typescript-eslint/non-nullable-type-assertion-style": "warn",
+      "@typescript-eslint/promise-function-async": ["warn"],
+      "@typescript-eslint/no-floating-promises": "warn",
+      "@typescript-eslint/no-unsafe-return": "warn",
+      "@typescript-eslint/return-await": "warn",
+      "@typescript-eslint/no-unsafe-member-access": "warn",
+      "@typescript-eslint/no-unsafe-argument": "warn",
+      "@typescript-eslint/no-unsafe-assignment": "warn",
+      "@typescript-eslint/no-unsafe-call": "warn",
+      "@typescript-eslint/no-confusing-void-expression": "warn",
+      "@typescript-eslint/no-redundant-type-constituents": "warn",
+      "@typescript-eslint/no-unsafe-type-assertion": "warn",
+      "@typescript-eslint/no-unsafe-enum-comparison": "warn",
+      "@typescript-eslint/no-unnecessary-type-assertion": "warn",
+      "@typescript-eslint/no-var-requires": "error",
+      "@typescript-eslint/no-empty-function": "error",
+      "@typescript-eslint/no-empty-interface": "error",
+      "@typescript-eslint/no-require-imports": "error",
+      "@typescript-eslint/no-namespace": "error"
+    },
+    "plugins": ["@typescript-eslint"]
+  }
+]
