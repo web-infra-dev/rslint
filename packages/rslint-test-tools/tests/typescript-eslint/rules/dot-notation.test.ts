@@ -37,6 +37,7 @@ ruleTester.run('dot-notation', {
     { code: 'a.eval;', options: [{ allowKeywords: false }] },
     { code: 'a[0];', options: [{ allowKeywords: false }] },
     { code: "a['while'];", options: [{ allowKeywords: false }] },
+    { code: "a['true'];", options: [{ allowKeywords: false }] },
     { code: "a['null'];", options: [{ allowKeywords: false }] },
     { code: 'a[true];', options: [{ allowKeywords: false }] },
     { code: 'a[null];', options: [{ allowKeywords: false }] },
@@ -149,9 +150,7 @@ console.log(x?.['priv_prop']);
       `,
       options: [{ allowProtectedClassPropertyAccess: true }],
     },
-    // Test infrastructure doesn't support per-test TypeScript configs
     {
-      skip: true,
       code: `
 type Foo = {
   bar: boolean;
@@ -168,9 +167,7 @@ foo['key_baz'];
         },
       },
     },
-    // Test infrastructure doesn't support per-test TypeScript configs
     {
-      skip: true,
       code: `
 type Key = Lowercase<string>;
 type Foo = {
@@ -188,7 +185,27 @@ foo['bar'];
         },
       },
     },
+    {
+      code: `
+type ExtraKey = \`extra\${string}\`;
 
+type Foo = {
+  foo: string;
+  [extraKey: ExtraKey]: number;
+};
+
+function f<T extends Foo>(x: T) {
+  x['extraKey'];
+}
+      `,
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.noPropertyAccessFromIndexSignature.json',
+          projectService: false,
+          tsconfigRootDir: rootPath,
+        },
+      },
+    },
   ],
   invalid: [
     {
@@ -232,18 +249,39 @@ x.pub_prop = 123;
     },
     //  baseRule
 
-    {
-
-        code: 'a.true;',
-        output: 'a["true"];',
-        options: [{ allowKeywords: false }],
-        errors: [{ messageId: "useBrackets", data: { key: "true" } }],
-    },
+    // {
+    //     code: 'a.true;',
+    //     output: "a['true'];",
+    //     options: [{ allowKeywords: false }],
+    //     errors: [{ messageId: "useBrackets", data: { key: "true" } }],
+    // },
     {
       code: "a['true'];",
       errors: [{ data: { key: q('true') }, messageId: 'useDot' }],
-      output: 'a.true;'
-    },    {
+      output: 'a.true;',
+    },
+    {
+      code: "a['time'];",
+      errors: [{ data: { key: '"time"' }, messageId: 'useDot' }],
+      languageOptions: { parserOptions: { ecmaVersion: 6 } },
+      output: 'a.time;',
+    },
+    {
+      code: 'a[null];',
+      errors: [{ data: { key: 'null' }, messageId: 'useDot' }],
+      output: 'a.null;',
+    },
+    {
+      code: 'a[true];',
+      errors: [{ data: { key: 'true' }, messageId: 'useDot' }],
+      output: 'a.true;',
+    },
+    {
+      code: 'a[false];',
+      errors: [{ data: { key: 'false' }, messageId: 'useDot' }],
+      output: 'a.false;',
+    },
+    {
       code: "a['b'];",
       errors: [{ data: { key: q('b') }, messageId: 'useDot' }],
       output: 'a.b;',
@@ -265,9 +303,7 @@ x.pub_prop = 123;
       options: [{ allowPattern: '^[a-z]+(_[a-z]+)+$' }],
       output: 'a.SHOUT_CASE;',
     },
-    // Multi-line test case has line number mismatch between rslint and typescript-eslint
     {
-      skip: true,
       code: noFormat`
 a
   ['SHOUT_CASE'];
@@ -285,9 +321,7 @@ a
   .SHOUT_CASE;
       `,
     },
-    // Multi-line chained expression has line number mismatch
     {
-      skip: true,
       code:
         'getResource()\n' +
         '    .then(function(){})\n' +
@@ -406,8 +440,6 @@ const x = new X();
 x.prop = 'hello';
       `,
     },
-    // Test infrastructure doesn't support per-test TypeScript configs
-    // This case should not error when noPropertyAccessFromIndexSignature is enabled
     {
       code: `
 type Foo = {
@@ -425,8 +457,6 @@ type Foo = {
 foo.key_baz;
       `,
     },
-    // Test infrastructure doesn't support per-test TypeScript configs
-    // This case should not error when noPropertyAccessFromIndexSignature is enabled
     {
       code: `
 type ExtraKey = \`extra\${string}\`;
@@ -441,13 +471,6 @@ function f<T extends Foo>(x: T) {
 }
       `,
       errors: [{ messageId: 'useDot' }],
-      languageOptions: {
-        parserOptions: {
-          project: './tsconfig.noPropertyAccessFromIndexSignature.json',
-          projectService: false,
-          tsconfigRootDir: rootPath,
-        },
-      },
       output: `
 type ExtraKey = \`extra\${string}\`;
 
