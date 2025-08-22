@@ -1,4 +1,4 @@
-//go:build !windows
+//go:build linux || darwin || freebsd || netbsd || openbsd || solaris
 
 package main
 
