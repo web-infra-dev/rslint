@@ -294,9 +294,9 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			// Option: allow keywords via bracket notation only when allowKeywords is true.
-			// When allowKeywords is false, we should flag true/false/null for conversion to dot notation.
-			if opts.AllowKeywords && (propName == "null" || propName == "true" || propName == "false") {
+			// Option: allow keywords via bracket notation when allowKeywords is false.
+			// When allowKeywords is false, these keywords should be allowed in bracket notation.
+			if !opts.AllowKeywords && (propName == "null" || propName == "true" || propName == "false") {
 				return
 			}
 
