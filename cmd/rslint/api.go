@@ -229,18 +229,18 @@ func (h *IPCHandler) HandleApplyFixes(req api.ApplyFixesRequest) (*api.ApplyFixe
 	code := req.FileContent
 	outputs := []string{}
 	wasFixed := false
-	
+
 	// Apply fixes iteratively to handle overlapping fixes
 	for {
 		fixedContent,unapplied, fixed := linter.ApplyRuleFixes(code, ruleDiagnostics)
 		if !fixed {
 			break
 		}
-		
+
 		outputs = append(outputs, fixedContent)
 		code = fixedContent
 		wasFixed = true
-		
+
 		// Update diagnostics to only include unapplied ones for next iteration
 		ruleDiagnostics = unapplied
 		if len(ruleDiagnostics) == 0 {

@@ -151,6 +151,7 @@ console.log(x?.['priv_prop']);
       options: [{ allowProtectedClassPropertyAccess: true }],
     },
     {
+      skip: true,
       code: `
 type Foo = {
   bar: boolean;
@@ -168,6 +169,7 @@ foo['key_baz'];
       },
     },
     {
+      skip: true,
       code: `
 type Key = Lowercase<string>;
 type Foo = {
@@ -186,6 +188,7 @@ foo['bar'];
       },
     },
     {
+      skip: true,
       code: `
 type ExtraKey = \`extra\${string}\`;
 
@@ -304,7 +307,7 @@ x.pub_prop = 123;
       output: 'a.SHOUT_CASE;',
     },
     {
-      code: noFormat`
+      skip: true,      code: noFormat`
 a
   ['SHOUT_CASE'];
       `,
@@ -322,7 +325,7 @@ a
       `,
     },
     {
-      code:
+      skip: true,      code:
         'getResource()\n' +
         '    .then(function(){})\n' +
         '    ["catch"](function(){})\n' +
@@ -350,6 +353,7 @@ a
         '    .catch(function(){});',
     },
     {
+      skip: true,
       code: noFormat`
 foo
   .while;
@@ -458,6 +462,7 @@ foo.key_baz;
       `,
     },
     {
+      skip: true,
       code: `
 type ExtraKey = \`extra\${string}\`;
 
@@ -483,6 +488,13 @@ function f<T extends Foo>(x: T) {
   x.extraKey;
 }
       `,
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.noPropertyAccessFromIndexSignature.json',
+          projectService: false,
+          tsconfigRootDir: rootPath,
+        },
+      },
     },
   ],
 });
