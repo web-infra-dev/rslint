@@ -151,7 +151,6 @@ console.log(x?.['priv_prop']);
       options: [{ allowProtectedClassPropertyAccess: true }],
     },
     {
-      skip: true,
       code: `
 type Foo = {
   bar: boolean;
@@ -169,7 +168,6 @@ foo['key_baz'];
       },
     },
     {
-      skip: true,
       code: `
 type Key = Lowercase<string>;
 type Foo = {
@@ -188,7 +186,6 @@ foo['bar'];
       },
     },
     {
-      skip: true,
       code: `
 type ExtraKey = \`extra\${string}\`;
 
