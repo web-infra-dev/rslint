@@ -5,6 +5,15 @@ import path from 'node:path';
 suite('rslint extension', function () {
   this.timeout(50000);
 
+  test('restart command is registered', async () => {
+    // Check that the restart command is available
+    const commands = await vscode.commands.getCommands(true);
+    assert.ok(
+      commands.includes('rslint.restart'),
+      'rslint.restart command should be registered',
+    );
+  });
+
   // Helper function to wait for diagnostics
   async function waitForDiagnostics(
     doc: vscode.TextDocument,

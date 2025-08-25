@@ -48,7 +48,7 @@ export class Extension implements Disposable {
       this.setupStateChangeMonitoring(workspaceRslint, folder.name);
     }
     setupStatusBar(this.context);
-    RegisterCommands(this.context, outputChannel, lspOutputChannel);
+    RegisterCommands(this.context, outputChannel, lspOutputChannel, this);
     this.logger.info('Rslint extension activated successfully');
   }
 
@@ -113,6 +113,30 @@ export class Extension implements Disposable {
 
   public getAllRslintInstances(): Map<string, Rslint> {
     return new Map(this.rslintInstances);
+  }
+
+  public async restartAllInstances(): Promise<void> {
+    this.logger.info('Restarting all Rslint instances...');
+
+    const restartPromises = Array.from(this.rslintInstances.values()).map(
+      async instance => {
+        try {
+          await instance.stop();
+          await instance.start();
+        } catch (err: unknown) {
+          this.logger.error('Error restarting Rslint instance', err);
+          throw err;
+        }
+      },
+    );
+
+    try {
+      await Promise.all(restartPromises);
+      this.logger.info('All Rslint instances restarted successfully');
+    } catch (err: unknown) {
+      this.logger.error('Error restarting some Rslint instances', err);
+      throw err;
+    }
   }
 
   public dispose(): void {
