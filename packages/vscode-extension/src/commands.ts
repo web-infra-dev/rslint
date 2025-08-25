@@ -1,15 +1,30 @@
 import * as vscode from 'vscode';
+import type { Extension } from './Extension';
+
 export function RegisterCommands(
   context: vscode.ExtensionContext,
   outputChannel: vscode.OutputChannel,
   traceOutputChannel: vscode.OutputChannel,
+  extension: Extension,
 ) {
   context.subscriptions.push(
     vscode.commands.registerCommand('rslint.showMenu', showCommands),
   );
-  // context.subscriptions.push(vscode.commands.registerCommand('rslint.restart', async () => {
-  //     await vscode.commands.executeCommand('rslint.restart');
-  // }));
+  context.subscriptions.push(
+    vscode.commands.registerCommand('rslint.restart', async () => {
+      try {
+        await extension.restartAllInstances();
+        vscode.window.showInformationMessage(
+          'Rslint server restarted successfully',
+        );
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        vscode.window.showErrorMessage(
+          `Failed to restart Rslint server: ${message}`,
+        );
+      }
+    }),
+  );
   context.subscriptions.push(
     vscode.commands.registerCommand('rslint.output.focus', () => {
       outputChannel.show();
@@ -28,11 +43,11 @@ async function showCommands(): Promise<void> {
     description: string;
     command: string;
   }[] = [
-    // {
-    //     label: "$(refresh) RestartRslint Server",
-    //     description: "Restart the Rslint language server",
-    //     command: "rslint.restart",
-    // },
+    {
+      label: '$(refresh) Restart Rslint Server',
+      description: 'Restart the Rslint language server',
+      command: 'rslint.restart',
+    },
     {
       label: '$(output) Show Rslint Server Log',
       description: 'Show the Rslint server log',
