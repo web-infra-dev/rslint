@@ -16,6 +16,7 @@ const signalEnv = "RSLINT_STOP"
 func runMain() int {
 	waitForDebugSignal(10000 * time.Millisecond)
 	args := os.Args[1:]
+	log.Printf("args: %v", args)
 	if len(args) > 0 {
 		switch args[0] {
 		case "--lsp":
@@ -24,7 +25,11 @@ func runMain() int {
 		case "--api":
 			// run in API mode for JS API
 			return runAPI()
+		case "--browser":
+			// run in browser mode for browser
+			return runBrowser()
 		}
+
 	}
 	// run in CLI mode for direct command line usage
 	return runCMD()

@@ -1,0 +1,18 @@
+{
+  "name": "@rslint/browser",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build:wasm": "GOOS=wasip1 GOARCH=wasm go build -v -o dist/rslint.wasm ../../cmd/rslint",
+    "build:js": "esbuild src/index.mjs --bundle --outfile=dist/rslint.js --define:process.env.NODE_DEBUG_NATIVE=\\\"wasm\\\"",
+    "build": "pnpm run build:wasm && pnpm run build:js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "rslint for browser",
+  "dependencies": {
+    "@tybys/wasm-util": "0.10.0",
+    "memfs-browser": "3.5"
+  }
+}
