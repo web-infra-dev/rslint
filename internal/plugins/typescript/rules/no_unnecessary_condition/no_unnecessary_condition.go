@@ -211,6 +211,18 @@ func isPossiblyFalsy(typeOfNode *checker.Type) bool {
 		return true
 	}
 
+	// Plain string, number types cannot be falsy (with strict null checks)
+	// They can only be falsy if they're literals with falsy values
+	if utils.IsTypeFlagSet(typeOfNode, checker.TypeFlagsString) ||
+		utils.IsTypeFlagSet(typeOfNode, checker.TypeFlagsNumber) {
+		return false
+	}
+
+	// Boolean type can be true or false, so it could be falsy
+	if utils.IsTypeFlagSet(typeOfNode, checker.TypeFlagsBoolean) {
+		return true
+	}
+
 	// Union types might contain falsy values
 	if utils.IsUnionType(typeOfNode) {
 		for _, unionType := range utils.UnionTypeParts(typeOfNode) {
@@ -221,7 +233,7 @@ func isPossiblyFalsy(typeOfNode *checker.Type) bool {
 		return false
 	}
 
-	// Conservative: most types could potentially be falsy
+	// Conservative: other types could potentially be falsy
 	return true
 }
 
