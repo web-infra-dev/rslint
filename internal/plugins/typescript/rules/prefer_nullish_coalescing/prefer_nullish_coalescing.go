@@ -312,7 +312,13 @@ func isMixedLogicalExpression(node *ast.Node) bool {
 	return false
 }
 
-// getNodeText safely extracts text from a node
+// getNodeText extracts the text corresponding to a node from the given source file.
+// 
+// Safety mechanisms:
+// - Checks if either sourceFile or node is nil, returning an empty string if so.
+// - Retrieves the start and end positions of the node and ensures they are within the bounds of the source text.
+// - If the start position is negative, the end position exceeds the length of the text, or start > end, returns an empty string.
+// - Only returns the substring if all checks pass, preventing panics or out-of-bounds errors.
 func getNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
 	if sourceFile == nil || node == nil {
 		return ""
