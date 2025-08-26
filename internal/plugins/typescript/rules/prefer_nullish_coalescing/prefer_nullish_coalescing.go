@@ -318,12 +318,12 @@ func getNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
 		return ""
 	}
 	text := sourceFile.Text()
-	start := int(node.Pos())
-	end := int(node.End())
-	if start < 0 || end > len(text) || start > end {
+	start := node.Pos()
+	end := node.End()
+	if start < 0 || int(end) > len(text) || start > end {
 		return ""
 	}
-	return text[start:end]
+	return text[int(start):int(end)]
 }
 
 // needsParentheses checks if an expression needs parentheses when used as the right operand of ??
@@ -525,7 +525,8 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 
 				// Check if the if statement body is a simple assignment
 				var assignmentExpr *ast.BinaryExpression
-				if ifStmt.ThenStatement.Kind == ast.KindBlock {
+				switch ifStmt.ThenStatement.Kind {
+				case ast.KindBlock:
 					block := ifStmt.ThenStatement.AsBlock()
 					if block == nil || block.Statements == nil || len(block.Statements.Nodes) != 1 {
 						return
@@ -539,7 +540,7 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 							}
 						}
 					}
-				} else if ifStmt.ThenStatement.Kind == ast.KindExpressionStatement {
+				case ast.KindExpressionStatement:
 					exprStmt := ifStmt.ThenStatement.AsExpressionStatement()
 					if exprStmt != nil && exprStmt.Expression.Kind == ast.KindBinaryExpression {
 						binExpr := exprStmt.Expression.AsBinaryExpression()
