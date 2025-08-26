@@ -155,6 +155,7 @@
     "no_redundant_type_constituents",
     "no_require_imports",
     "no_unnecessary_boolean_literal_compare",
+    "no_unnecessary_condition",
     "no_unnecessary_template_expression",
     "no_unnecessary_type_arguments",
     "no_unnecessary_type_assertion",
@@ -172,6 +173,7 @@
     "non_nullable_type_assertion_style",
     "only_throw_error",
     "prefer_as_const",
+    "prefer_nullish_coalescing",
     "prefer_promise_reject_errors",
     "prefer_reduce_type_parameter",
     "prefer_return_this_type",
@@ -209,6 +211,7 @@
     "no-redundant-type-constituents",
     "no-require-imports",
     "no-unnecessary-boolean-literal-compare",
+    "no-unnecessary-condition",
     "no-unnecessary-template-expression",
     "no-unnecessary-type-arguments",
     "no-unnecessary-type-assertion",
@@ -226,6 +229,7 @@
     "non-nullable-type-assertion-style",
     "only-throw-error",
     "prefer-as-const",
+    "prefer-nullish-coalescing",
     "prefer-promise-reject-errors",
     "prefer-reduce-type-parameter",
     "prefer-return-this-type",
@@ -287,7 +291,6 @@
     "no-shadow",
     "no-this-alias",
     "no-type-alias",
-    "no-unnecessary-condition",
     "no-unnecessary-parameter-property-assignment",
     "no-unnecessary-qualifier",
     "no-unnecessary-type-constraint",
@@ -308,7 +311,6 @@
     "prefer-includes",
     "prefer-literal-enum-member",
     "prefer-namespace-keyword",
-    "prefer-nullish-coalescing",
     "prefer-optional-chain",
     "prefer-readonly",
     "prefer-readonly-parameter-types",
@@ -323,9 +325,9 @@
   ],
   "stats": {
     "totalTsEslintRules": 131,
-    "totalRslintRules": 52,
-    "implementedRulesCount": 52,
-    "missingRulesCount": 79,
-    "implementationPercentage": "39.69"
+    "totalRslintRules": 54,
+    "implementedRulesCount": 54,
+    "missingRulesCount": 77,
+    "implementationPercentage": "41.22"
   }
 }
