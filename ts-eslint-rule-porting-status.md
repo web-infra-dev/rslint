@@ -12,7 +12,6 @@
 
 - `no-non-null-assertion`: Disallows using `!` postfix operator for non-null assertions
 - `no-non-null-asserted-optional-chain`: Prevents using non-null assertions after optional chains
-- `prefer-nullish-coalescing`: Enforces using `??` instead of `||` for nullish coalescing
 - `prefer-optional-chain`: Enforces using optional chaining instead of logical chaining
 - `explicit-function-return-type`: Requires explicit return types on functions and class methods
 - `no-unnecessary-condition`: Prevents conditionals where the type is always truthy or always falsy
