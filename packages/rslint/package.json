@@ -6,14 +6,8 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
-    "./worker": {
-      "import": "./dist/worker.js"
-    },
     "./bin": "./bin/rslint.cjs",
     "./package.json": "./package.json"
-  },
-  "browser": {
-    "./dist/index.js": "./dist/browser.js"
   },
   "type": "module",
   "repository": {
@@ -40,7 +34,7 @@
     "access": "public"
   },
   "license": "MIT",
-  "description": "rslint cli - cross-platform linting service",
+  "description": "rslint core library",
   "publisher": "rslint",
   "keywords": [
     "rslint",
