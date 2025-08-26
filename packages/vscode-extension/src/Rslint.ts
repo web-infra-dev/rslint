@@ -224,9 +224,10 @@ export class Rslint implements Disposable {
 
       try {
         this.logger.debug('Looking for Rslint binary in PnP mode');
-        // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
+        // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
         const yarnPnpApi = require(yarnPnpFile.fsPath);
 
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
         const rslintCorePackage = yarnPnpApi.resolveRequest(
           '@rslint/core/package.json',
           folder.uri.fsPath,
@@ -237,6 +238,7 @@ export class Rslint implements Disposable {
         }
 
         const rslintPlatformPkg = Uri.file(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-type-assertion
           yarnPnpApi.resolveRequest(
             PLATFORM_BIN_REQUEST,
             rslintCorePackage,
