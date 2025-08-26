@@ -1,29 +1,555 @@
 <!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RSLint Playground</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
 
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Document</title>
-</head>
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+          'Ubuntu', 'Cantarell', sans-serif;
+        background: #0d1117;
+        color: #c9d1d9;
+        line-height: 1.6;
+      }
 
-<body>
-  <script type="module">
-    import * as Rslint from './dist/index.mjs';
-    const service = await Rslint.initialize({
-      wasmURL: new URL('./rslint.wasm', import.meta.url).toString(),
-    });
-    const result = await service.lint({
-      config: 'rslint.json',
-      ruleOptions: {
-        '@typescript-eslint/no-unsafe-member-access': 'error',
-      },
-      fileContents: {
-        '/index.ts': 'let a:any; a.b = 10',
-      },
-    });
-    console.log('result:', result);
-  </script>
-</body>
+      .header {
+        background: #161b22;
+        border-bottom: 1px solid #30363d;
+        padding: 1rem 2rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
 
+      .logo {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #58a6ff;
+      }
+
+      .version {
+        color: #8b949e;
+        font-size: 0.9rem;
+      }
+
+      .main-container {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: 1fr auto;
+        height: calc(100vh - 80px);
+        gap: 1px;
+        background: #30363d;
+      }
+
+      .panel {
+        background: #0d1117;
+        padding: 1rem;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #30363d;
+      }
+
+      .panel-title {
+        font-weight: 600;
+        color: #c9d1d9;
+      }
+
+      .panel-actions {
+        display: flex;
+        gap: 0.5rem;
+      }
+
+      .btn {
+        background: #21262d;
+        border: 1px solid #30363d;
+        color: #c9d1d9;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.2s;
+      }
+
+      .btn:hover {
+        background: #30363d;
+        border-color: #58a6ff;
+      }
+
+      .btn-primary {
+        background: #238636;
+        border-color: #238636;
+        color: white;
+      }
+
+      .btn-primary:hover {
+        background: #2ea043;
+        border-color: #2ea043;
+      }
+
+      .code-editor {
+        flex: 1;
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 14px;
+        line-height: 1.5;
+        padding: 1rem;
+        color: #c9d1d9;
+        resize: none;
+        outline: none;
+      }
+
+      .code-editor:focus {
+        border-color: #58a6ff;
+      }
+
+      .config-panel {
+        background: #0d1117;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 1rem;
+        font-size: 0.9rem;
+      }
+
+      .config-group {
+        margin-bottom: 1rem;
+      }
+
+      .config-label {
+        display: block;
+        margin-bottom: 0.5rem;
+        color: #8b949e;
+        font-weight: 500;
+      }
+
+      .config-input {
+        width: 100%;
+        background: #21262d;
+        border: 1px solid #30363d;
+        color: #c9d1d9;
+        padding: 0.5rem;
+        border-radius: 4px;
+        font-size: 0.9rem;
+      }
+
+      .config-input:focus {
+        outline: none;
+        border-color: #58a6ff;
+      }
+
+      .results-panel {
+        grid-column: 1 / -1;
+        background: #0d1117;
+        border-top: 1px solid #30363d;
+        max-height: 300px;
+        overflow-y: auto;
+      }
+
+      .results-header {
+        padding: 1rem;
+        border-bottom: 1px solid #30363d;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .results-title {
+        font-weight: 600;
+        color: #c9d1d9;
+      }
+
+      .results-count {
+        color: #8b949e;
+        font-size: 0.9rem;
+      }
+
+      .results-content {
+        padding: 1rem;
+      }
+
+      .result-item {
+        background: #161b22;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+      }
+
+      .result-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .result-rule {
+        background: #d29922;
+        color: #0d1117;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 600;
+      }
+
+      .result-severity {
+        background: #f85149;
+        color: white;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        font-weight: 600;
+      }
+
+      .result-message {
+        color: #c9d1d9;
+        margin-bottom: 0.5rem;
+      }
+
+      .result-location {
+        color: #8b949e;
+        font-size: 0.9rem;
+        font-family: monospace;
+      }
+
+      .loading {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        color: #8b949e;
+      }
+
+      .spinner {
+        border: 2px solid #30363d;
+        border-top: 2px solid #58a6ff;
+        border-radius: 50%;
+        width: 20px;
+        height: 20px;
+        animation: spin 1s linear infinite;
+        margin-right: 0.5rem;
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .error {
+        color: #f85149;
+        background: #21262d;
+        border: 1px solid #f85149;
+        border-radius: 6px;
+        padding: 1rem;
+        margin: 1rem 0;
+      }
+
+      .success {
+        color: #3fb950;
+        background: #21262d;
+        border: 1px solid #3fb950;
+        border-radius: 6px;
+        padding: 1rem;
+        margin: 1rem 0;
+      }
+
+      @media (max-width: 768px) {
+        .main-container {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto auto auto;
+        }
+
+        .header {
+          padding: 1rem;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="header">
+      <div class="logo">RSLint Playground</div>
+      <div class="version">v1.0.0</div>
+    </div>
+
+    <div class="main-container">
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Code Editor</div>
+          <div class="panel-actions">
+            <button class="btn" onclick="resetCode()">Reset</button>
+            <button class="btn" onclick="formatCode()">Format</button>
+          </div>
+        </div>
+        <textarea
+          id="codeEditor"
+          class="code-editor"
+          placeholder="Enter your TypeScript/JavaScript code here..."
+          spellcheck="false"
+        >
+let a: any;
+a.b = 10;
+
+function example() {
+  const obj: any = { prop: 'value' };
+  return obj.unknownProperty;
+}
+
+const result = example();
+console.log(result);</textarea
+        >
+      </div>
+
+      <div class="panel">
+        <div class="panel-header">
+          <div class="panel-title">Configuration</div>
+          <div class="panel-actions">
+            <button class="btn btn-primary" onclick="runLint()">
+              Run Lint
+            </button>
+          </div>
+        </div>
+        <div class="config-panel">
+          <div class="config-group">
+            <label class="config-label">Language</label>
+            <select id="languageSelect" class="config-input">
+              <option value="typescript">TypeScript</option>
+              <option value="javascript">JavaScript</option>
+            </select>
+          </div>
+
+          <div class="config-group">
+            <label class="config-label">Rules</label>
+            <div style="margin-bottom: 0.5rem">
+              <label style="display: flex; align-items: center; gap: 0.5rem">
+                <input type="checkbox" id="noUnsafeMemberAccess" checked />
+                @typescript-eslint/no-unsafe-member-access
+              </label>
+            </div>
+            <div style="margin-bottom: 0.5rem">
+              <label style="display: flex; align-items: center; gap: 0.5rem">
+                <input type="checkbox" id="noUnsafeAssignment" />
+                @typescript-eslint/no-unsafe-assignment
+              </label>
+            </div>
+            <div style="margin-bottom: 0.5rem">
+              <label style="display: flex; align-items: center; gap: 0.5rem">
+                <input type="checkbox" id="noUnsafeCall" />
+                @typescript-eslint/no-unsafe-call
+              </label>
+            </div>
+          </div>
+
+          <div class="config-group">
+            <label class="config-label">Strict Mode</label>
+            <label style="display: flex; align-items: center; gap: 0.5rem">
+              <input type="checkbox" id="strictMode" checked />
+              Enable strict type checking
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="results-panel">
+        <div class="results-header">
+          <div class="results-title">Linting Results</div>
+          <div class="results-count" id="resultsCount">No results yet</div>
+        </div>
+        <div class="results-content" id="resultsContent">
+          <div class="loading">
+            <div class="spinner"></div>
+            Ready to lint your code
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import * as Rslint from './dist/index.mjs';
+
+      let service = null;
+      let isInitialized = false;
+
+      async function initializeService() {
+        if (isInitialized) return;
+
+        try {
+          showLoading('Initializing RSLint...');
+          service = await Rslint.initialize({
+            wasmURL: new URL('./rslint.wasm', import.meta.url).toString(),
+          });
+          isInitialized = true;
+          showSuccess('RSLint initialized successfully!');
+          setTimeout(() => {
+            showReady();
+          }, 1000);
+        } catch (error) {
+          showError(`Failed to initialize RSLint: ${error.message}`);
+        }
+      }
+
+      function showLoading(message) {
+        const resultsContent = document.getElementById('resultsContent');
+        resultsContent.innerHTML = `
+        <div class="loading">
+          <div class="spinner"></div>
+          ${message}
+        </div>
+      `;
+      }
+
+      function showError(message) {
+        const resultsContent = document.getElementById('resultsContent');
+        resultsContent.innerHTML = `
+        <div class="error">
+          <strong>Error:</strong> ${message}
+        </div>
+      `;
+      }
+
+      function showSuccess(message) {
+        const resultsContent = document.getElementById('resultsContent');
+        resultsContent.innerHTML = `
+        <div class="success">
+          <strong>Success:</strong> ${message}
+        </div>
+      `;
+      }
+
+      function showReady() {
+        const resultsContent = document.getElementById('resultsContent');
+        resultsContent.innerHTML = `
+        <div class="loading">
+          Ready to lint your code
+        </div>
+      `;
+      }
+
+      function showResults(results) {
+        const resultsContent = document.getElementById('resultsContent');
+        const resultsCount = document.getElementById('resultsCount');
+
+        if (!results || results.diagnostics.length === 0) {
+          resultsContent.innerHTML = `
+          <div class="success">
+            <strong>No issues found!</strong> Your code looks good.
+          </div>
+        `;
+          resultsCount.textContent = '0 issues';
+          return;
+        }
+
+        const issues = results.diagnostics
+          .map(
+            diagnostic => `
+        <div class="result-item">
+          <div class="result-header">
+            <span class="result-rule">${diagnostic.ruleName}</span>
+            <span class="result-severity">Error</span>
+          </div>
+          <div class="result-message">${diagnostic.message}</div>
+          <div class="result-location">
+            Line ${diagnostic.range.start.line}, Column ${diagnostic.range.start.column}
+          </div>
+        </div>
+      `,
+          )
+          .join('');
+
+        resultsContent.innerHTML = issues;
+        resultsCount.textContent = `${results.diagnostics.length} issue${results.diagnostics.length !== 1 ? 's' : ''}`;
+      }
+
+      async function runLint() {
+        if (!isInitialized) {
+          await initializeService();
+        }
+
+        try {
+          showLoading('Running linter...');
+
+          const code = document.getElementById('codeEditor').value;
+          const language = document.getElementById('languageSelect').value;
+
+          // Build rule options based on checkboxes
+          const ruleOptions = {};
+          if (document.getElementById('noUnsafeMemberAccess').checked) {
+            ruleOptions['@typescript-eslint/no-unsafe-member-access'] = 'error';
+          }
+          if (document.getElementById('noUnsafeAssignment').checked) {
+            ruleOptions['@typescript-eslint/no-unsafe-assignment'] = 'error';
+          }
+          if (document.getElementById('noUnsafeCall').checked) {
+            ruleOptions['@typescript-eslint/no-unsafe-call'] = 'error';
+          }
+
+          const result = await service.lint({
+            config: 'rslint.json',
+            ruleOptions,
+            fileContents: {
+              '/index.ts': code,
+            },
+          });
+
+          showResults(result);
+        } catch (error) {
+          showError(`Linting failed: ${error.message}`);
+        }
+      }
+
+      function resetCode() {
+        document.getElementById('codeEditor').value = `let a: any;
+a.b = 10;
+
+function example() {
+  const obj: any = { prop: 'value' };
+  return obj.unknownProperty;
+}
+
+const result = example();
+console.log(result);`;
+      }
+
+      function formatCode() {
+        // Simple formatting - in a real implementation, you'd use a proper formatter
+        const editor = document.getElementById('codeEditor');
+        const code = editor.value;
+
+        // Basic indentation fix
+        const lines = code.split('\n');
+        const formatted = lines.map(line => line.trim()).join('\n');
+
+        editor.value = formatted;
+      }
+
+      // Make functions globally available
+      window.runLint = runLint;
+      window.resetCode = resetCode;
+      window.formatCode = formatCode;
+
+      // Initialize on page load
+      initializeService();
+    </script>
+  </body>
 </html>

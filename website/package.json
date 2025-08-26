@@ -3,7 +3,7 @@
   "version": "0.1.9",
   "private": true,
   "scripts": {
-    "build:skip": "rspress build",
+    "build": "rspress build",
     "dev": "rspress dev",
     "preview": "rspress preview"
   },
