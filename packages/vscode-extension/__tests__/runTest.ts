@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import * as path from 'path';
 
 import { runTests } from '@vscode/test-electron';

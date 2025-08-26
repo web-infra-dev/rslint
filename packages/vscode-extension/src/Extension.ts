@@ -56,7 +56,6 @@ export class Extension implements Disposable {
     this.logger.info('Rslint extension deactivating...');
 
     const stopPromises = Array.from(this.rslintInstances.values()).map(
-      // eslint-disable-next-line @typescript-eslint/promise-function-async
       instance => instance.stop(),
     );
 

@@ -25,10 +25,8 @@ function isNode(): boolean {
 function isBrowser(): boolean {
   return (
     typeof globalThis !== 'undefined' &&
-    typeof (globalThis as unknown as { Worker?: unknown }).Worker !==
-      'undefined' &&
-    typeof (globalThis as unknown as { window?: unknown }).window !==
-      'undefined'
+    typeof (globalThis as any).Worker !== 'undefined' &&
+    typeof (globalThis as any).window !== 'undefined'
   );
 }
 

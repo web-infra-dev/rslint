@@ -138,7 +138,6 @@ export class Rslint implements Disposable {
     return this.client;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public onDidChangeState(listener: (event: any) => void): Disposable {
     if (!this.client) {
       throw new Error('Client is not initialized');
@@ -224,10 +223,9 @@ export class Rslint implements Disposable {
 
       try {
         this.logger.debug('Looking for Rslint binary in PnP mode');
-        // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment
+        // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
         const yarnPnpApi = require(yarnPnpFile.fsPath);
 
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call
         const rslintCorePackage = yarnPnpApi.resolveRequest(
           '@rslint/core/package.json',
           folder.uri.fsPath,
@@ -238,7 +236,6 @@ export class Rslint implements Disposable {
         }
 
         const rslintPlatformPkg = Uri.file(
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-type-assertion
           yarnPnpApi.resolveRequest(
             PLATFORM_BIN_REQUEST,
             rslintCorePackage,
