@@ -70,6 +70,34 @@ func parseOptions(options any) NoExplicitAnyOptions {
 }
 
 func isAnyInRestParameter(node *ast.Node) bool {
+	// Check if the any keyword is inside a rest parameter with array type
+	// We need to check if the any is part of an array type in a rest parameter
+	// Valid patterns to ignore: ...args: any[], ...args: readonly any[], ...args: Array<any>, ...args: ReadonlyArray<any>
+	
+	// First check if we're inside an ArrayType
+	inArrayType := false
+	for p := node.Parent; p != nil; p = p.Parent {
+		if p.Kind == ast.KindArrayType {
+			inArrayType = true
+			break
+		}
+		if p.Kind == ast.KindTypeReference {
+			typeRef := p.AsTypeReference()
+			if typeRef != nil && ast.IsIdentifier(typeRef.TypeName) {
+				identifier := typeRef.TypeName.AsIdentifier()
+				if identifier != nil && (identifier.Text == "Array" || identifier.Text == "ReadonlyArray") {
+					inArrayType = true
+					break
+				}
+			}
+		}
+	}
+	
+	if !inArrayType {
+		return false
+	}
+	
+	// Then check if we're in a rest parameter
 	for p := node.Parent; p != nil; p = p.Parent {
 		if p.Kind == ast.KindParameter {
 			param := p.AsParameterDeclaration()
