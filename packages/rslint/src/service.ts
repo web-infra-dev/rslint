@@ -25,10 +25,8 @@ function isNode(): boolean {
 function isBrowser(): boolean {
   return (
     typeof globalThis !== 'undefined' &&
-    // @ts-expect-error - checking for browser environment
     typeof (globalThis as unknown as { Worker?: unknown }).Worker !==
       'undefined' &&
-    // @ts-expect-error - checking for browser environment
     typeof (globalThis as unknown as { window?: unknown }).window !==
       'undefined'
   );
