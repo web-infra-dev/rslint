@@ -84,6 +84,7 @@ export class RuleTester {
           const code =
             typeof validCase === 'string' ? validCase : validCase.code;
 
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
           const options =
             typeof validCase === 'string' ? [] : validCase.options || [];
           const defaultFilename = 'src/virtual.ts';
@@ -99,6 +100,7 @@ export class RuleTester {
               [filename]: code,
             },
             ruleOptions: {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               [ruleName]: options,
             },
           });
@@ -136,6 +138,7 @@ export class RuleTester {
               [filename]: code,
             },
             ruleOptions: {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
               [ruleName]: options,
             },
           });

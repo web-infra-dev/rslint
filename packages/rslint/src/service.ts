@@ -22,15 +22,15 @@ function isNode(): boolean {
   );
 }
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 function isBrowser(): boolean {
   return (
     typeof globalThis !== 'undefined' &&
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     typeof (globalThis as any).Worker !== 'undefined' &&
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     typeof (globalThis as any).window !== 'undefined'
   );
 }
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 /**
  * Factory function to create the appropriate RslintService implementation

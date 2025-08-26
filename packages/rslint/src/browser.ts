@@ -37,6 +37,7 @@ export class BrowserRslintService implements RslintServiceInterface {
       this.worker = new Worker(this.workerUrl);
 
       this.worker.onmessage = event => {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         this.handleWorkerMessage(event.data);
       };
 
@@ -82,6 +83,7 @@ export class BrowserRslintService implements RslintServiceInterface {
     this.pendingMessages.delete(id);
 
     if (kind === 'error') {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       pending.reject(new Error(data.message));
     } else {
       pending.resolve(data);
