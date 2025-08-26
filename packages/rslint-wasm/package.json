@@ -1,0 +1,30 @@
+{
+  "name": "@rslint/wasm",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.mjs",
+  "scripts": {
+    "build:wasm": "GOOS=js GOARCH=wasm go build -o rslint.wasm ../../cmd/rslint",
+    "build:js": "node scripts/build.mjs && tsc -b tsconfig.json",
+    "build": "pnpm run build:wasm && pnpm run build:js"
+  },
+  "files": [
+    "dist/index.mjs",
+    "dist/**.d.ts",
+    "rslint.wasm"
+  ],
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.13.1",
+  "devDependencies": {
+    "@rslint/core": "workspace:*",
+    "@wasmer/wasmfs": "0.12.0",
+    "esbuild": "^0.25.9"
+  },
+  "dependencies": {
+    "buffer": "^6.0.3",
+    "esbuild-plugin-polyfill-node": "*",
+    "memfs": "^4.38.2"
+  }
+}
