@@ -2,9 +2,19 @@
   "name": "@rslint/core",
   "version": "0.1.12",
   "exports": {
-    ".": "./dist/index.js",
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./worker": {
+      "import": "./dist/worker.js"
+    },
     "./bin": "./bin/rslint.cjs",
     "./package.json": "./package.json"
+  },
+  "browser": {
+    "./dist/index.js": "./dist/browser.js"
   },
   "type": "module",
   "repository": {
@@ -21,7 +31,8 @@
     "test:update": "rstest run -u"
   },
   "files": [
-    "bin/rslint.cjs"
+    "bin/rslint.cjs",
+    "dist/"
   ],
   "bin": {
     "rslint": "./bin/rslint.cjs"
@@ -30,13 +41,15 @@
     "access": "public"
   },
   "license": "MIT",
-  "description": "rslint cli",
+  "description": "rslint cli - cross-platform linting service",
   "publisher": "rslint",
   "keywords": [
     "rslint",
     "linter",
     "typescript",
-    "go"
+    "go",
+    "browser",
+    "webworker"
   ],
   "devDependencies": {
     "@types/node": "24.0.14",
