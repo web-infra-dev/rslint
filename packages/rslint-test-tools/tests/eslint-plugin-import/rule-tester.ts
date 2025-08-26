@@ -7,11 +7,13 @@ import { lint } from '@rslint/core';
 export interface ValidTestCase {
   name?: string;
   code: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   options?: any;
   filename?: string | undefined;
   only?: boolean;
   // TODO: support `languageOptions` later
   // languageOptions?: Linter.LanguageOptions | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   settings?: { [name: string]: any } | undefined;
 }
 
@@ -34,6 +36,7 @@ interface TestCaseError {
    * @deprecated `type` is deprecated and will be removed in the next major version.
    */
   type?: string | undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: any;
   line?: number | undefined;
   column?: number | undefined;

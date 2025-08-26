@@ -138,6 +138,7 @@ export class Rslint implements Disposable {
     return this.client;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public onDidChangeState(listener: (event: any) => void): Disposable {
     if (!this.client) {
       throw new Error('Client is not initialized');

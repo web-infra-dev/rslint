@@ -21,6 +21,7 @@ export interface Diagnostic {
   filePath: string;
   range: Range;
   severity?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   suggestions: any[];
 }
 
@@ -68,6 +69,7 @@ interface RSlintOptions {
 }
 
 interface PendingMessage {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   resolve: (data: any) => void;
   reject: (error: Error) => void;
 }
@@ -110,6 +112,7 @@ export class RSLintService {
   /**
    * Send a message to the rslint process
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async sendMessage(kind: string, data: any): Promise<any> {
     return new Promise((resolve, reject) => {
       const id = this.nextMessageId++;
