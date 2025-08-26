@@ -2,10 +2,7 @@
   "name": "@rslint/core",
   "version": "0.1.12",
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    },
+    ".": "./dist/index.js",
     "./bin": "./bin/rslint.cjs",
     "./package.json": "./package.json"
   },
