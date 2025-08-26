@@ -39,7 +39,6 @@ export class NodeRslintService implements RslintServiceInterface {
 
     // Set up binary message reading
     this.process.stdout!.on('data', data => {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       this.handleChunk(data);
     });
     this.chunks = [];
@@ -50,7 +49,6 @@ export class NodeRslintService implements RslintServiceInterface {
   /**
    * Send a message to the rslint process
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async sendMessage(kind: string, data: any): Promise<any> {
     return new Promise((resolve, reject) => {
       const id = this.nextMessageId++;

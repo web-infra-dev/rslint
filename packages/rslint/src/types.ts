@@ -18,7 +18,6 @@ export interface Diagnostic {
   filePath: string;
   range: Range;
   severity?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   suggestions: any[];
 }
 
@@ -66,7 +65,6 @@ export interface RSlintOptions {
 }
 
 export interface PendingMessage {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   resolve: (data: any) => void;
   reject: (error: Error) => void;
 }
@@ -74,13 +72,11 @@ export interface PendingMessage {
 export interface IpcMessage {
   id: number;
   kind: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: any;
 }
 
 // Service interface that all implementations must follow
 export interface RslintServiceInterface {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sendMessage(kind: string, data: any): Promise<any>;
   terminate(): void;
 }
