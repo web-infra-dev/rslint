@@ -3,6 +3,8 @@
   "version": "0.1.12",
   "exports": {
     ".": "./dist/index.js",
+    "./browser": "./dist/browser.js",
+    "./service": "./dist/service.js",
     "./bin": "./bin/rslint.cjs",
     "./package.json": "./package.json"
   },
@@ -21,7 +23,8 @@
     "test:update": "rstest run -u"
   },
   "files": [
-    "bin/rslint.cjs"
+    "bin/rslint.cjs",
+    "dist/"
   ],
   "bin": {
     "rslint": "./bin/rslint.cjs"
@@ -30,13 +33,15 @@
     "access": "public"
   },
   "license": "MIT",
-  "description": "rslint cli",
+  "description": "rslint core library",
   "publisher": "rslint",
   "keywords": [
     "rslint",
     "linter",
     "typescript",
-    "go"
+    "go",
+    "browser",
+    "webworker"
   ],
   "devDependencies": {
     "@types/node": "24.0.14",

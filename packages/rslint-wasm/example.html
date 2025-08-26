@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Document</title>
+</head>
+
+<body>
+  <script type="module">
+    import * as Rslint from './dist/index.mjs';
+    const service = await Rslint.initialize({
+      wasmURL: new URL('./rslint.wasm', import.meta.url).toString(),
+    });
+    const result = await service.lint({
+      config: 'rslint.json',
+      ruleOptions: {
+        '@typescript-eslint/no-unsafe-member-access': 'error',
+      },
+      fileContents: {
+        '/index.ts': 'let a:any; a.b = 10',
+      },
+    });
+    console.log('result:', result);
+  </script>
+</body>
+
+</html>
