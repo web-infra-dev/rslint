@@ -2,6 +2,7 @@ package prefer_nullish_coalescing
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -313,7 +314,7 @@ func isMixedLogicalExpression(node *ast.Node) bool {
 }
 
 // getNodeText extracts the text corresponding to a node from the given source file.
-// 
+//
 // Safety mechanisms:
 // - Checks if either sourceFile or node is nil, returning an empty string if so.
 // - Retrieves the start and end positions of the node and ensures they are within the bounds of the source text.
@@ -326,10 +327,10 @@ func getNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
 	text := sourceFile.Text()
 	start := node.Pos()
 	end := node.End()
-	if start < 0 || int(end) > len(text) || start > end {
+	if start < 0 || end > len(text) || start > end {
 		return ""
 	}
-	return text[int(start):int(end)]
+	return text[start:end]
 }
 
 // needsParentheses checks if an expression needs parentheses when used as the right operand of ??
@@ -405,8 +406,8 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					}
 
 					// Create fix suggestion
-					leftText := getNodeText(ctx.SourceFile, binExpr.Left)
-					rightText := getNodeText(ctx.SourceFile, binExpr.Right)
+					leftText := strings.TrimSpace(getNodeText(ctx.SourceFile, binExpr.Left))
+					rightText := strings.TrimSpace(getNodeText(ctx.SourceFile, binExpr.Right))
 
 					var fixedRightText string
 					if needsParentheses(binExpr.Right) {
@@ -452,8 +453,8 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					}
 
 					// Create fix suggestion
-					leftText := getNodeText(ctx.SourceFile, binExpr.Left)
-					rightText := getNodeText(ctx.SourceFile, binExpr.Right)
+					leftText := strings.TrimSpace(getNodeText(ctx.SourceFile, binExpr.Left))
+					rightText := strings.TrimSpace(getNodeText(ctx.SourceFile, binExpr.Right))
 					replacement := fmt.Sprintf("%s ??= %s", leftText, rightText)
 
 					ctx.ReportNodeWithSuggestions(node, buildPreferNullishOverAssignmentMessage(),
@@ -498,8 +499,8 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				}
 
 				// Create fix suggestion
-				conditionText := getNodeText(ctx.SourceFile, condExpr.Condition)
-				alternateText := getNodeText(ctx.SourceFile, condExpr.WhenFalse)
+				conditionText := strings.TrimSpace(getNodeText(ctx.SourceFile, condExpr.Condition))
+				alternateText := strings.TrimSpace(getNodeText(ctx.SourceFile, condExpr.WhenFalse))
 
 				var fixedAlternateText string
 				if needsParentheses(condExpr.WhenFalse) {
@@ -583,8 +584,8 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				}
 
 				// Create fix suggestion
-				leftText := getNodeText(ctx.SourceFile, assignmentExpr.Left)
-				rightText := getNodeText(ctx.SourceFile, assignmentExpr.Right)
+				leftText := strings.TrimSpace(getNodeText(ctx.SourceFile, assignmentExpr.Left))
+				rightText := strings.TrimSpace(getNodeText(ctx.SourceFile, assignmentExpr.Right))
 				replacement := fmt.Sprintf("%s ??= %s;", leftText, rightText)
 
 				ctx.ReportNodeWithSuggestions(node, buildPreferNullishOverAssignmentMessage(),
