@@ -2,12 +2,17 @@
   "name": "@rslint/wasm",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.mjs",
   "scripts": {
     "build:wasm": "GOOS=js GOARCH=wasm go build -o rslint.wasm ../../cmd/rslint",
-    "build:js": "node scripts/build.mjs",
+    "build:js": "node scripts/build.mjs && tsc -b tsconfig.json",
     "build": "pnpm run build:wasm && pnpm run build:js"
   },
+  "files": [
+    "dist/index.mjs",
+    "dist/**.d.ts",
+    "rslint.wasm"
+  ],
   "keywords": [],
   "author": "",
   "license": "ISC",

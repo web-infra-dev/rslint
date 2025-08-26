@@ -1,3 +1,4 @@
+// @ts-nocheck
 import '../wasm_exec';
 import * as memfs from 'memfs';
 import { Buffer } from 'buffer';
