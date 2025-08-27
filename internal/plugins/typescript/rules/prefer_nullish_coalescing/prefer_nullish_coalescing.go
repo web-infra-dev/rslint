@@ -41,7 +41,7 @@ func parseOptions(options any) PreferNullishCoalescingOptions {
 			Number:  utils.Ref(false),
 			Bigint:  utils.Ref(false),
 		},
-		IgnoreTernaryTests: utils.Ref(false),
+		IgnoreTernaryTests: utils.Ref(true),
 	}
 
 	if options == nil {
@@ -426,7 +426,7 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						}
 					}
 
-					ctx.ReportNodeWithSuggestions(node, buildPreferNullishOverOrMessage(),
+					ctx.ReportNodeWithSuggestions(binExpr.OperatorToken, buildPreferNullishOverOrMessage(),
 						rule.RuleSuggestion{
 							Message:  buildSuggestNullishMessage(),
 							FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)},
@@ -457,7 +457,7 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					rightText := strings.TrimSpace(getNodeText(ctx.SourceFile, binExpr.Right))
 					replacement := fmt.Sprintf("%s ??= %s", leftText, rightText)
 
-					ctx.ReportNodeWithSuggestions(node, buildPreferNullishOverAssignmentMessage(),
+					ctx.ReportNodeWithSuggestions(binExpr.OperatorToken, buildPreferNullishOverAssignmentMessage(),
 						rule.RuleSuggestion{
 							Message:  buildSuggestNullishMessage(),
 							FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)},
@@ -492,6 +492,13 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				// Check various ignore conditions
 				if *opts.IgnoreConditionalTests && isConditionalTest(node) {
 					return
+				}
+
+				// Check if this is a test in a ternary expression
+				if *opts.IgnoreTernaryTests && node.Parent != nil {
+					if condExpr := node.Parent.AsConditionalExpression(); condExpr != nil && condExpr.Condition == node {
+						return
+					}
 				}
 
 				if *opts.IgnoreBooleanCoercion && isBooleanConstructorContext(node) {
