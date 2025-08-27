@@ -121,3 +121,14 @@ Unregistration
 Unregisterations
 jakebailey
 iface
+ldflags
+wasmer
+wasmfs
+saddr
+gojs
+morestack
+nanotime
+nsec
+walltime
+Ptrs
+getsp
