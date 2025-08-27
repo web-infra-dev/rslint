@@ -274,25 +274,18 @@ func isAssignmentContext(node *ast.Node) bool {
 		return false
 	}
 
-	switch node.Kind {
-	case ast.KindVariableDeclaration:
-		return true
-	case ast.KindVariableStatement:
-		return true
-	case ast.KindBinaryExpression:
-		binExpr := node.AsBinaryExpression()
-		return binExpr != nil && binExpr.OperatorToken.Kind == ast.KindEqualsToken
-	}
-
-	// Continue checking parent for assignment context
-	if node.Parent != nil {
-		switch node.Parent.Kind {
+	// Check up to 3 levels to avoid infinite recursion
+	for i := 0; i < 3 && node != nil; i++ {
+		switch node.Kind {
 		case ast.KindVariableDeclaration, ast.KindVariableStatement:
 			return true
 		case ast.KindBinaryExpression:
-			binExpr := node.Parent.AsBinaryExpression()
-			return binExpr != nil && binExpr.OperatorToken.Kind == ast.KindEqualsToken
+			binExpr := node.AsBinaryExpression()
+			if binExpr != nil && binExpr.OperatorToken.Kind == ast.KindEqualsToken {
+				return true
+			}
 		}
+		node = node.Parent
 	}
 
 	return false
@@ -300,37 +293,38 @@ func isAssignmentContext(node *ast.Node) bool {
 
 // isBooleanConstructorContext checks if a node is within a Boolean constructor context
 func isBooleanConstructorContext(node *ast.Node) bool {
-	visited := make(map[*ast.Node]bool)
-	return isBooleanConstructorContextHelper(node, visited)
-}
+	// Check up to 5 levels to avoid infinite recursion
+	for i := 0; i < 5 && node != nil; i++ {
+		parent := node.Parent
+		if parent == nil {
+			return false
+		}
 
-func isBooleanConstructorContextHelper(node *ast.Node, visited map[*ast.Node]bool) bool {
-	parent := node.Parent
-	if parent == nil || visited[parent] {
-		return false
-	}
-	visited[parent] = true
-
-	if parent.Kind == ast.KindCallExpression {
-		callExpr := parent.AsCallExpression()
-		if callExpr != nil && callExpr.Expression.Kind == ast.KindIdentifier {
-			identifier := callExpr.Expression.AsIdentifier()
-			if identifier != nil && identifier.Text == "Boolean" {
-				return true
+		if parent.Kind == ast.KindCallExpression {
+			callExpr := parent.AsCallExpression()
+			if callExpr != nil && callExpr.Expression.Kind == ast.KindIdentifier {
+				identifier := callExpr.Expression.AsIdentifier()
+				if identifier != nil && identifier.Text == "Boolean" {
+					return true
+				}
 			}
 		}
-	}
 
-	// Check parent contexts recursively
-	switch parent.Kind {
-	case ast.KindBinaryExpression:
-		binExpr := parent.AsBinaryExpression()
-		if binExpr != nil && (binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken ||
-			binExpr.OperatorToken.Kind == ast.KindBarBarToken) {
-			return isBooleanConstructorContextHelper(parent, visited)
+		// Only traverse through logical expressions and conditionals
+		switch parent.Kind {
+		case ast.KindBinaryExpression:
+			binExpr := parent.AsBinaryExpression()
+			if binExpr == nil || (binExpr.OperatorToken.Kind != ast.KindAmpersandAmpersandToken &&
+				binExpr.OperatorToken.Kind != ast.KindBarBarToken) {
+				return false
+			}
+		case ast.KindConditionalExpression:
+			// Continue checking
+		default:
+			return false
 		}
-	case ast.KindConditionalExpression:
-		return isBooleanConstructorContextHelper(parent, visited)
+
+		node = parent
 	}
 
 	return false
@@ -338,44 +332,29 @@ func isBooleanConstructorContextHelper(node *ast.Node, visited map[*ast.Node]boo
 
 // isMixedLogicalExpression checks if a logical expression is mixed with && operators
 func isMixedLogicalExpression(node *ast.Node) bool {
-	// Check if this || expression is part of a mixed logical expression with &&
-	return findMixedLogicalOperators(node, make(map[*ast.Node]bool), false, false)
-}
-
-func findMixedLogicalOperators(node *ast.Node, visited map[*ast.Node]bool, foundOr bool, foundAnd bool) bool {
-	if node == nil || visited[node] {
-		return false
-	}
-	visited[node] = true
-
-	if node.Kind == ast.KindBinaryExpression {
-		binExpr := node.AsBinaryExpression()
-		if binExpr != nil {
-			switch binExpr.OperatorToken.Kind {
-			case ast.KindBarBarToken:
-				foundOr = true
-			case ast.KindAmpersandAmpersandToken:
-				foundAnd = true
-			}
-
-			// If we found both || and &&, it's mixed
-			if foundOr && foundAnd {
-				return true
-			}
-
-			// Continue searching in left and right operands
-			if findMixedLogicalOperators(binExpr.Left, visited, foundOr, foundAnd) {
-				return true
-			}
-			if findMixedLogicalOperators(binExpr.Right, visited, foundOr, foundAnd) {
-				return true
+	// Simple check: look for && operators in the parent chain
+	foundOr := false
+	foundAnd := false
+	
+	// Check up to 10 levels to avoid infinite recursion
+	for i := 0; i < 10 && node != nil; i++ {
+		if node.Kind == ast.KindBinaryExpression {
+			binExpr := node.AsBinaryExpression()
+			if binExpr != nil {
+				switch binExpr.OperatorToken.Kind {
+				case ast.KindBarBarToken:
+					foundOr = true
+				case ast.KindAmpersandAmpersandToken:
+					foundAnd = true
+				}
+				
+				// If we found both || and &&, it's mixed
+				if foundOr && foundAnd {
+					return true
+				}
 			}
 		}
-	}
-
-	// Also check parent to see if we're part of a larger mixed expression
-	if node.Parent != nil {
-		return findMixedLogicalOperators(node.Parent, visited, foundOr, foundAnd)
+		node = node.Parent
 	}
 
 	return false
