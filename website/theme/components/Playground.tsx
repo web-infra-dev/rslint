@@ -1,7 +1,7 @@
 import React, { use, useEffect, useRef, useState } from 'react';
 import * as Rslint from '@rslint/wasm';
 
-import './playground.css';
+import './Playground.css';
 const wasmURL = new URL('@rslint/wasm/rslint.wasm', import.meta.url).href;
 console.log(wasmURL);
 
