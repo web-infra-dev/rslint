@@ -1,5 +1,5 @@
 {
-  "name": "website",
+  "name": "@rslint/website",
   "version": "0.1.9",
   "private": true,
   "scripts": {
