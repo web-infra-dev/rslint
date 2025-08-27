@@ -1,5 +1,5 @@
 {
-  "name": "website",
+  "name": "@rslint/website",
   "version": "0.1.9",
   "private": true,
   "scripts": {
@@ -23,6 +23,7 @@
     "tw-animate-css": "^1.3.6"
   },
   "devDependencies": {
+    "@rslint/wasm": "0.1.10",
     "@rsbuild/plugin-sass": "^1.3.5",
     "@rspress/core": "2.0.0-beta.27",
     "@rspress/plugin-llms": "2.0.0-beta.27",

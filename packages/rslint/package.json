@@ -3,6 +3,8 @@
   "version": "0.1.12",
   "exports": {
     ".": "./dist/index.js",
+    "./browser": "./dist/browser.js",
+    "./service": "./dist/service.js",
     "./bin": "./bin/rslint.cjs",
     "./package.json": "./package.json"
   },
