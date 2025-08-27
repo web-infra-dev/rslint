@@ -1,6 +1,9 @@
 package prefer_nullish_coalescing
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -133,6 +136,13 @@ func buildPreferNullishOverTernaryMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "preferNullishOverTernary",
 		Description: "Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.",
+	}
+}
+
+func buildSuggestNullishMessage() rule.RuleMessage {
+	return rule.RuleMessage{
+		Id:          "suggestNullish",
+		Description: "Fix to nullish coalescing operator (`??`).",
 	}
 }
 
@@ -323,6 +333,24 @@ func getNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
 	return text[start:end]
 }
 
+// needsParentheses checks if an expression needs parentheses when used as the right operand of ??
+func needsParentheses(node *ast.Node) bool {
+	switch node.Kind {
+	case ast.KindBinaryExpression:
+		binExpr := node.AsBinaryExpression()
+		if binExpr != nil {
+			// Lower precedence operators need parentheses
+			switch binExpr.OperatorToken.Kind {
+			case ast.KindBarBarToken, ast.KindAmpersandAmpersandToken:
+				return true
+			}
+		}
+	case ast.KindConditionalExpression:
+		return true
+	}
+	return false
+}
+
 // areNodesTextuallyEqual checks if two nodes have the same text content
 func areNodesTextuallyEqual(sourceFile *ast.SourceFile, a, b *ast.Node) bool {
 	if a == nil || b == nil {
@@ -377,8 +405,33 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						return
 					}
 
-					// Report the issue (auto-fix disabled for now)
-					ctx.ReportNode(node, buildPreferNullishOverOrMessage())
+					// Create fix suggestion
+					leftText := strings.TrimSpace(getNodeText(ctx.SourceFile, binExpr.Left))
+					rightText := strings.TrimSpace(getNodeText(ctx.SourceFile, binExpr.Right))
+
+					var fixedRightText string
+					if needsParentheses(binExpr.Right) {
+						fixedRightText = fmt.Sprintf("(%s)", rightText)
+					} else {
+						fixedRightText = rightText
+					}
+
+					replacement := fmt.Sprintf("%s ?? %s", leftText, fixedRightText)
+
+					// Check if the entire expression needs parentheses
+					if node.Parent != nil && node.Parent.Kind == ast.KindBinaryExpression {
+						parentBinExpr := node.Parent.AsBinaryExpression()
+						if parentBinExpr != nil && parentBinExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken {
+							replacement = fmt.Sprintf("(%s)", replacement)
+						}
+					}
+
+					ctx.ReportNodeWithSuggestions(node, buildPreferNullishOverOrMessage(),
+						rule.RuleSuggestion{
+							Message:  buildSuggestNullishMessage(),
+							FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)},
+						},
+					)
 					return
 				}
 
@@ -399,8 +452,17 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						return
 					}
 
-					// Report the issue (auto-fix disabled for now)
-					ctx.ReportNode(node, buildPreferNullishOverAssignmentMessage())
+					// Create fix suggestion
+					leftText := strings.TrimSpace(getNodeText(ctx.SourceFile, binExpr.Left))
+					rightText := strings.TrimSpace(getNodeText(ctx.SourceFile, binExpr.Right))
+					replacement := fmt.Sprintf("%s ??= %s", leftText, rightText)
+
+					ctx.ReportNodeWithSuggestions(node, buildPreferNullishOverAssignmentMessage(),
+						rule.RuleSuggestion{
+							Message:  buildSuggestNullishMessage(),
+							FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)},
+						},
+					)
 				}
 			},
 
@@ -436,8 +498,25 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				// Report the issue (auto-fix disabled for now)
-				ctx.ReportNode(node, buildPreferNullishOverTernaryMessage())
+				// Create fix suggestion
+				conditionText := strings.TrimSpace(getNodeText(ctx.SourceFile, condExpr.Condition))
+				alternateText := strings.TrimSpace(getNodeText(ctx.SourceFile, condExpr.WhenFalse))
+
+				var fixedAlternateText string
+				if needsParentheses(condExpr.WhenFalse) {
+					fixedAlternateText = fmt.Sprintf("(%s)", alternateText)
+				} else {
+					fixedAlternateText = alternateText
+				}
+
+				replacement := fmt.Sprintf("%s ?? %s", conditionText, fixedAlternateText)
+
+				ctx.ReportNodeWithSuggestions(node, buildPreferNullishOverTernaryMessage(),
+					rule.RuleSuggestion{
+						Message:  buildSuggestNullishMessage(),
+						FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)},
+					},
+				)
 			},
 
 			// Handle if statements: if (!a) a = b;
@@ -504,8 +583,17 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				// Report the issue (auto-fix disabled for now)
-				ctx.ReportNode(node, buildPreferNullishOverAssignmentMessage())
+				// Create fix suggestion
+				leftText := strings.TrimSpace(getNodeText(ctx.SourceFile, assignmentExpr.Left))
+				rightText := strings.TrimSpace(getNodeText(ctx.SourceFile, assignmentExpr.Right))
+				replacement := fmt.Sprintf("%s ??= %s;", leftText, rightText)
+
+				ctx.ReportNodeWithSuggestions(node, buildPreferNullishOverAssignmentMessage(),
+					rule.RuleSuggestion{
+						Message:  buildSuggestNullishMessage(),
+						FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)},
+					},
+				)
 			},
 		}
 	},
