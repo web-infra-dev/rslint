@@ -4,7 +4,6 @@ import type {
   LintResponse,
   ApplyFixesRequest,
   ApplyFixesResponse,
-  RSlintOptions,
 } from './types.js';
 
 /**

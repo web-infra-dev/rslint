@@ -3,7 +3,6 @@ package config
 import (
 	"errors"
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/microsoft/typescript-go/shim/tspath"
@@ -33,7 +32,6 @@ func (loader *ConfigLoader) LoadRslintConfig(configPath string) (RslintConfig, s
 	}
 
 	data, ok := loader.fs.ReadFile(configFileName)
-	log.Println("data",data,ok)
 	if !ok {
 		return nil, "", fmt.Errorf("error reading rslint config file %q", configFileName)
 	}

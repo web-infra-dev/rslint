@@ -52,7 +52,7 @@ let decoder = new TextDecoder();
 let servicePromise: Promise<void> | undefined;
 async function ensureServiceIsRunning() {
   if (!servicePromise) {
-    throw new Error('serivce is not running');
+    throw new Error('service is not running');
   } else {
     return await servicePromise;
   }
@@ -131,7 +131,6 @@ async function handleRequest(event: MessageEvent): Promise<void> {
       '/tsconfig.json': JSON.stringify(tsconfig),
       '/index.ts': 'let a:any; a.b = 10',
     });
-    //globalThis.fs = inner_fs.fs;
     let fs = globalThis.fs;
     let process = globalThis.process;
     process.cwd = () => {

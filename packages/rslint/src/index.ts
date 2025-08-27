@@ -12,7 +12,6 @@ export { RSLintService } from './service.js';
 
 // Export specific implementations for advanced usage
 export { NodeRslintService } from './node.js';
-export { BrowserRslintService } from './browser.js';
 
 // For backward compatibility and convenience
 export async function lint(options: LintOptions): Promise<LintResponse> {
