@@ -51,23 +51,24 @@ jobs:
       - name: Unit Test
         run: |
           go test -parallel 8 ./internal/...
-  go-lint:
-    name: Go Lint
+  lint:
+    name: Lint&Check
     runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           submodules: true
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
           go-version: 1.25.0
           cache-name: go-lint
+
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
@@ -79,6 +80,12 @@ jobs:
 
       - name: go fmt
         run: npm run format:go
+
+      - name: Check Spell
+        run: pnpm check-spell
+
+      - name: Lint
+        run: pnpm run lint
 
   test-node:
     name: Test npm packages
@@ -108,7 +115,7 @@ jobs:
         run: pnpm format:check
 
       - name: Build
-        run: pnpm build
+        run: pnpm -r --filter='@rslint/test-tools..,rslint..'  build
 
       - name: TypeCheck
         if: runner.os == 'Linux'
@@ -130,25 +137,40 @@ jobs:
 
       - name: Test on Linux
         if: runner.os == 'Linux'
-        run: xvfb-run -a pnpm -r test
+        run: xvfb-run -a run pnpm -r --filter='@rslint/test-tools..,rslint..' test
 
       - name: Test on non-Linux
         if: runner.os != 'Linux'
-        run: pnpm -r test
+        run: pnpm -r --filter='@rslint/test-tools..,rslint..' test
 
-      - name: Check Spell
-        if: runner.os == 'Linux'
-        run: pnpm check-spell
+  test-wasm:
+    name: Test npm packages
+    runs-on: rspack-ubuntu-22.04-large
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
 
-      - name: Lint
-        if: runner.os == 'Linux'
-        run: pnpm run lint
+      - name: Setup Go
+        uses: ./.github/actions/setup-go
+        with:
+          go-version: ${{ matrix.go-version }}
+          cache-name: test-wasm
 
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+
+      - name: Build
+        run: |
+          pnpm --filter '@rslint/core' build:js
+          pnpm --filter '@rslint/wasm' build
   done:
     needs:
       - test-go
       - test-node
-      - go-lint
+      - lint
+      - test-wasm
     if: always()
     runs-on: ubuntu-latest
     name: CI Done
