@@ -150,7 +150,7 @@ type T = Record<string, A | B>;
 		},
 	}, []rule_tester.InvalidTestCase{
 		{
-			Only: true,
+			Only:   true,
 			Code:   "type T = 1 | 1;",
 			Output: []string{"type T = 1  ;"},
 			Errors: []rule_tester.InvalidTestCaseError{

@@ -57,13 +57,13 @@ type HandshakeResponse struct {
 
 // LintRequest represents a lint request from JS to Go
 type LintRequest struct {
-	Files            []string                 `json:"files,omitempty"`
-	Config           string                   `json:"config,omitempty"` // Path to rslint.json config file
-	Format           string                   `json:"format,omitempty"`
-	WorkingDirectory string                   `json:"workingDirectory,omitempty"`
+	Files            []string `json:"files,omitempty"`
+	Config           string   `json:"config,omitempty"` // Path to rslint.json config file
+	Format           string   `json:"format,omitempty"`
+	WorkingDirectory string   `json:"workingDirectory,omitempty"`
 	// Supports both string level and array [level, options] format
 	RuleOptions     map[string]interface{} `json:"ruleOptions,omitempty"`
-	FileContents    map[string]string      `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
+	FileContents    map[string]string      `json:"fileContents,omitempty"`    // Map of file paths to their contents for VFS
 	LanguageOptions *LanguageOptions       `json:"languageOptions,omitempty"` // Override languageOptions from config file
 }
 
@@ -109,16 +109,16 @@ type LintResponse struct {
 
 // ApplyFixesRequest represents a request to apply fixes from JS to Go
 type ApplyFixesRequest struct {
-	FileContent  string        `json:"fileContent"`  // Current content of the file
-	Diagnostics  []Diagnostic  `json:"diagnostics"`  // Diagnostics with fixes to apply
+	FileContent string       `json:"fileContent"` // Current content of the file
+	Diagnostics []Diagnostic `json:"diagnostics"` // Diagnostics with fixes to apply
 }
 
 // ApplyFixesResponse represents a response after applying fixes
 type ApplyFixesResponse struct {
-	FixedContent []string `json:"fixedContent"` // The content after applying fixes (array of intermediate versions)
-	WasFixed     bool     `json:"wasFixed"`     // Whether any fixes were actually applied
-	AppliedCount int      `json:"appliedCount"` // Number of fixes that were applied
-	UnappliedCount int    `json:"unappliedCount"` // Number of fixes that couldn't be applied
+	FixedContent   []string `json:"fixedContent"`   // The content after applying fixes (array of intermediate versions)
+	WasFixed       bool     `json:"wasFixed"`       // Whether any fixes were actually applied
+	AppliedCount   int      `json:"appliedCount"`   // Number of fixes that were applied
+	UnappliedCount int      `json:"unappliedCount"` // Number of fixes that couldn't be applied
 }
 
 // ErrorResponse represents an error response
@@ -151,9 +151,9 @@ type Diagnostic struct {
 
 // Fix represents a single fix that can be applied
 type Fix struct {
-	Text      string `json:"text"`
-	StartPos  int    `json:"startPos"`  // Character position in the file content
-	EndPos    int    `json:"endPos"`    // Character position in the file content
+	Text     string `json:"text"`
+	StartPos int    `json:"startPos"` // Character position in the file content
+	EndPos   int    `json:"endPos"`   // Character position in the file content
 }
 
 // Handler defines the interface for handling IPC messages
