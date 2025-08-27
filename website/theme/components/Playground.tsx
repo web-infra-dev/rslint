@@ -79,7 +79,6 @@ const Playground: React.FC = () => {
     try {
       setIsLoading(true);
       setStatus('Initializing RSLint...');
-
       const rslintService = await Rslint.initialize({
         wasmURL: wasmURL,
       });

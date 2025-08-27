@@ -228,6 +228,9 @@ importers:
       '@rsbuild/plugin-sass':
         specifier: ^1.3.5
         version: 1.3.5(@rsbuild/core@1.4.15)
+      '@rslint/wasm':
+        specifier: 0.1.10
+        version: 0.1.10(esbuild@0.25.9)
       '@rspress/plugin-llms':
         specifier: 2.0.0-beta.27
         version: 2.0.0-beta.27(@rspress/core@2.0.0-beta.27(@types/react@19.1.10)(acorn@8.15.0))
@@ -1369,6 +1372,9 @@ packages:
     resolution: {integrity: sha512-nW60+iLmV6fkCaE25xpnppISNveAw9z9xySFFcaU2VcpKQ1bGfGns785jlYRGS10E684zG6tL+NIOBS01uPwhQ==}
     peerDependencies:
       '@rsbuild/core': 1.x
+
+  '@rslint/wasm@0.1.10':
+    resolution: {integrity: sha512-p2uQ00Gp5w/i02EUdOw9q8ZSH7VnBuHrgdFj9Rw8V4hH/Ejh1SFiyfPS16tJdRGP++3lEQ2SSFOGjT/oG5gMyQ==}
 
   '@rspack/binding-darwin-arm64@1.4.11':
     resolution: {integrity: sha512-PrmBVhR8MC269jo6uQ+BMy1uwIDx0HAJYLQRQur8gXiehWabUBCRg/d4U9KR7rLzdaSScRyc5JWXR52T7/4MfA==}
@@ -5634,6 +5640,14 @@ snapshots:
       postcss: 8.5.6
       reduce-configs: 1.1.1
       sass-embedded: 1.90.0
+
+  '@rslint/wasm@0.1.10(esbuild@0.25.9)':
+    dependencies:
+      buffer: 6.0.3
+      esbuild-plugin-polyfill-node: 0.3.0(esbuild@0.25.9)
+      memfs: 4.38.2
+    transitivePeerDependencies:
+      - esbuild
 
   '@rspack/binding-darwin-arm64@1.4.11':
     optional: true
