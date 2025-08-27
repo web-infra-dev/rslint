@@ -1,8 +1,6 @@
 package prefer_nullish_coalescing
 
 import (
-	"fmt"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -313,7 +311,7 @@ func isMixedLogicalExpression(node *ast.Node) bool {
 }
 
 // getNodeText extracts the text corresponding to a node from the given source file.
-// 
+//
 // Safety mechanisms:
 // - Checks if either sourceFile or node is nil, returning an empty string if so.
 // - Retrieves the start and end positions of the node and ensures they are within the bounds of the source text.
@@ -404,33 +402,8 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						return
 					}
 
-					// Create fix suggestion
-					leftText := getNodeText(ctx.SourceFile, binExpr.Left)
-					rightText := getNodeText(ctx.SourceFile, binExpr.Right)
-
-					var fixedRightText string
-					if needsParentheses(binExpr.Right) {
-						fixedRightText = fmt.Sprintf("(%s)", rightText)
-					} else {
-						fixedRightText = rightText
-					}
-
-					replacement := fmt.Sprintf("%s ?? %s", leftText, fixedRightText)
-
-					// Check if the entire expression needs parentheses
-					if node.Parent != nil && node.Parent.Kind == ast.KindBinaryExpression {
-						parentBinExpr := node.Parent.AsBinaryExpression()
-						if parentBinExpr != nil && parentBinExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken {
-							replacement = fmt.Sprintf("(%s)", replacement)
-						}
-					}
-
-					ctx.ReportNodeWithSuggestions(node, buildPreferNullishOverOrMessage(),
-						rule.RuleSuggestion{
-							Message:  buildSuggestNullishMessage(),
-							FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)},
-						},
-					)
+					// Report the issue (auto-fix disabled for now)
+					ctx.ReportNode(node, buildPreferNullishOverOrMessage())
 					return
 				}
 
@@ -451,17 +424,8 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						return
 					}
 
-					// Create fix suggestion
-					leftText := getNodeText(ctx.SourceFile, binExpr.Left)
-					rightText := getNodeText(ctx.SourceFile, binExpr.Right)
-					replacement := fmt.Sprintf("%s ??= %s", leftText, rightText)
-
-					ctx.ReportNodeWithSuggestions(node, buildPreferNullishOverAssignmentMessage(),
-						rule.RuleSuggestion{
-							Message:  buildSuggestNullishMessage(),
-							FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)},
-						},
-					)
+					// Report the issue (auto-fix disabled for now)
+					ctx.ReportNode(node, buildPreferNullishOverAssignmentMessage())
 				}
 			},
 
@@ -497,25 +461,8 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				// Create fix suggestion
-				conditionText := getNodeText(ctx.SourceFile, condExpr.Condition)
-				alternateText := getNodeText(ctx.SourceFile, condExpr.WhenFalse)
-
-				var fixedAlternateText string
-				if needsParentheses(condExpr.WhenFalse) {
-					fixedAlternateText = fmt.Sprintf("(%s)", alternateText)
-				} else {
-					fixedAlternateText = alternateText
-				}
-
-				replacement := fmt.Sprintf("%s ?? %s", conditionText, fixedAlternateText)
-
-				ctx.ReportNodeWithSuggestions(node, buildPreferNullishOverTernaryMessage(),
-					rule.RuleSuggestion{
-						Message:  buildSuggestNullishMessage(),
-						FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)},
-					},
-				)
+				// Report the issue (auto-fix disabled for now)
+				ctx.ReportNode(node, buildPreferNullishOverTernaryMessage())
 			},
 
 			// Handle if statements: if (!a) a = b;
@@ -582,17 +529,8 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				// Create fix suggestion
-				leftText := getNodeText(ctx.SourceFile, assignmentExpr.Left)
-				rightText := getNodeText(ctx.SourceFile, assignmentExpr.Right)
-				replacement := fmt.Sprintf("%s ??= %s;", leftText, rightText)
-
-				ctx.ReportNodeWithSuggestions(node, buildPreferNullishOverAssignmentMessage(),
-					rule.RuleSuggestion{
-						Message:  buildSuggestNullishMessage(),
-						FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)},
-					},
-				)
+				// Report the issue (auto-fix disabled for now)
+				ctx.ReportNode(node, buildPreferNullishOverAssignmentMessage())
 			},
 		}
 	},

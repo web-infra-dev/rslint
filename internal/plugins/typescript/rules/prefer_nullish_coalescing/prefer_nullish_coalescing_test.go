@@ -17,10 +17,19 @@ func TestPreferNullishCoalescingRule(t *testing.T) {
 			{Code: `const foo = bar || baz;`},
 		},
 		[]rule_tester.InvalidTestCase{
-			// Basic logical OR cases with nullable types
+			// Basic logical OR cases with nullable types - use more specific typing
 			{
-				Code:     `const foo: string | null = bar || baz;`,
-				Errors:   []rule_tester.InvalidTestCaseError{{MessageId: "preferNullishOverOr", Line: 1, Column: 33, EndLine: 1, EndColumn: 43}},
+				Code: `
+declare const foo: string | null;
+const bar = foo || "default";
+`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "preferNullishOverOr",
+						Line:      3,
+						Column:    13,
+					},
+				},
 				FileName: "test.ts",
 			},
 		},
