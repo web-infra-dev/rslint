@@ -84,9 +84,6 @@ jobs:
       - name: Check Spell
         run: pnpm check-spell
 
-      - name: Lint
-        run: pnpm run lint
-
   test-node:
     name: Test npm packages
     runs-on: ${{ matrix.os }}
@@ -115,7 +112,11 @@ jobs:
         run: pnpm format:check
 
       - name: Build
-        run: pnpm -r --filter='@rslint/test-tools..,rslint...,@typescript-eslint/rule-tester...'  build
+        run: pnpm -r --filter='@rslint/test-tools...'  --filter='rslint...' build
+
+      - name: Dogfooding
+        if: runner.os == 'Linux'
+        run: pnpm run lint
 
       - name: TypeCheck
         if: runner.os == 'Linux'
@@ -137,14 +138,14 @@ jobs:
 
       - name: Test on Linux
         if: runner.os == 'Linux'
-        run: xvfb-run -a run pnpm -r --filter='@rslint/test-tools..,rslint..' test
+        run: xvfb-run -a pnpm -r --filter='@rslint/test-tools...'  --filter='rslint...' test
 
       - name: Test on non-Linux
         if: runner.os != 'Linux'
-        run: pnpm -r --filter='@rslint/test-tools..,rslint..' test
+        run: pnpm -r --filter='@rslint/test-tools...'  --filter='rslint...' test
 
   test-wasm:
-    name: Test npm packages
+    name: Test WASM
     runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout code
