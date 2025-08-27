@@ -16,7 +16,13 @@ async function main() {
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath,
-      launchArgs: ['--disable-extensions', testWorkspace],
+      launchArgs: [
+        '--disable-extensions',
+        testWorkspace,
+        '--disable-features=NetworkService,OutOfBlinkCors',
+        '--disable-integrated-auth',
+        '--auth-server-allowlist="_"',
+      ],
     });
   } catch (err) {
     console.error(err);
