@@ -115,7 +115,7 @@ jobs:
         run: pnpm format:check
 
       - name: Build
-        run: pnpm -r --filter='@rslint/test-tools..,rslint..'  build
+        run: pnpm -r --filter='@rslint/test-tools..,rslint...,@typescript-eslint/rule-tester...'  build
 
       - name: TypeCheck
         if: runner.os == 'Linux'
@@ -155,7 +155,7 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version: 1.25.0
           cache-name: test-wasm
 
       - name: Setup Node.js
