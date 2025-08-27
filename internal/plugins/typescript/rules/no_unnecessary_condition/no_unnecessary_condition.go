@@ -112,14 +112,6 @@ func isNeverType(typeOfNode *checker.Type) bool {
 	return utils.IsTypeFlagSet(typeOfNode, checker.TypeFlagsNever)
 }
 
-func isAnyType(typeOfNode *checker.Type) bool {
-	return utils.IsTypeFlagSet(typeOfNode, checker.TypeFlagsAny)
-}
-
-func isUnknownType(typeOfNode *checker.Type) bool {
-	return utils.IsTypeFlagSet(typeOfNode, checker.TypeFlagsUnknown)
-}
-
 func isNullType(typeOfNode *checker.Type) bool {
 	return utils.IsTypeFlagSet(typeOfNode, checker.TypeFlagsNull)
 }
@@ -130,18 +122,6 @@ func isUndefinedType(typeOfNode *checker.Type) bool {
 
 func isVoidType(typeOfNode *checker.Type) bool {
 	return utils.IsTypeFlagSet(typeOfNode, checker.TypeFlagsVoid)
-}
-
-func isBooleanLiteralType(typeOfNode *checker.Type) bool {
-	return utils.IsTypeFlagSet(typeOfNode, checker.TypeFlagsBooleanLiteral)
-}
-
-func isNumberLiteralType(typeOfNode *checker.Type) bool {
-	return utils.IsTypeFlagSet(typeOfNode, checker.TypeFlagsNumberLiteral)
-}
-
-func isStringLiteralType(typeOfNode *checker.Type) bool {
-	return utils.IsTypeFlagSet(typeOfNode, checker.TypeFlagsStringLiteral)
 }
 
 // Check if type could be nullish (null | undefined)
