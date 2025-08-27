@@ -1,60 +1,19 @@
 import type {
-  RslintServiceInterface,
+  RslintServiceInterface as RslintServiceBackend,
   LintOptions,
   LintResponse,
   ApplyFixesRequest,
   ApplyFixesResponse,
-  RSlintOptions,
 } from './types.js';
-
-// Import implementations
-import { NodeRslintService } from './node.js';
-import { BrowserRslintService } from './browser.js';
-
-/**
- * Environment detection
- */
-function isNode(): boolean {
-  return (
-    typeof process !== 'undefined' &&
-    process.versions != null &&
-    process.versions.node != null
-  );
-}
-
-function isBrowser(): boolean {
-  return (
-    typeof globalThis !== 'undefined' &&
-    typeof (globalThis as any).Worker !== 'undefined' &&
-    typeof (globalThis as any).window !== 'undefined'
-  );
-}
-
-/**
- * Factory function to create the appropriate RslintService implementation
- */
-export function createRslintService(
-  options: RSlintOptions = {},
-): RslintServiceInterface {
-  if (isNode()) {
-    return new NodeRslintService(options);
-  } else if (isBrowser()) {
-    return new BrowserRslintService(options);
-  } else {
-    throw new Error(
-      'Unsupported environment. RslintService requires Node.js or a browser with Web Worker support.',
-    );
-  }
-}
 
 /**
  * Main RslintService class that automatically uses the appropriate implementation
  */
 export class RSLintService {
-  private service: RslintServiceInterface;
+  private service: RslintServiceBackend;
 
-  constructor(options: RSlintOptions = {}) {
-    this.service = createRslintService(options);
+  constructor(service: RslintServiceBackend) {
+    this.service = service;
   }
 
   /**
