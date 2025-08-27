@@ -303,29 +303,43 @@ func isBooleanConstructorContextHelper(node *ast.Node, visited map[*ast.Node]boo
 
 // isMixedLogicalExpression checks if a logical expression is mixed with && operators
 func isMixedLogicalExpression(node *ast.Node) bool {
-	seen := make(map[*ast.Node]bool)
-	queue := []*ast.Node{node.Parent}
+	// Check if this || expression is part of a mixed logical expression with &&
+	return findMixedLogicalOperators(node, make(map[*ast.Node]bool), false, false)
+}
 
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
+func findMixedLogicalOperators(node *ast.Node, visited map[*ast.Node]bool, foundOr bool, foundAnd bool) bool {
+	if node == nil || visited[node] {
+		return false
+	}
+	visited[node] = true
 
-		if current == nil || seen[current] {
-			continue
-		}
-		seen[current] = true
+	if node.Kind == ast.KindBinaryExpression {
+		binExpr := node.AsBinaryExpression()
+		if binExpr != nil {
+			if binExpr.OperatorToken.Kind == ast.KindBarBarToken {
+				foundOr = true
+			} else if binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken {
+				foundAnd = true
+			}
 
-		if current.Kind == ast.KindBinaryExpression {
-			binExpr := current.AsBinaryExpression()
-			if binExpr != nil {
-				if binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken {
-					return true
-				}
-				if binExpr.OperatorToken.Kind == ast.KindBarBarToken {
-					queue = append(queue, current.Parent, binExpr.Left, binExpr.Right)
-				}
+			// If we found both || and &&, it's mixed
+			if foundOr && foundAnd {
+				return true
+			}
+
+			// Continue searching in left and right operands
+			if findMixedLogicalOperators(binExpr.Left, visited, foundOr, foundAnd) {
+				return true
+			}
+			if findMixedLogicalOperators(binExpr.Right, visited, foundOr, foundAnd) {
+				return true
 			}
 		}
+	}
+
+	// Also check parent to see if we're part of a larger mixed expression
+	if node.Parent != nil {
+		return findMixedLogicalOperators(node.Parent, visited, foundOr, foundAnd)
 	}
 
 	return false
