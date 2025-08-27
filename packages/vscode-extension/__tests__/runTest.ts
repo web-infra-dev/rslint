@@ -17,8 +17,11 @@ async function main() {
       extensionDevelopmentPath,
       extensionTestsPath,
       launchArgs: [
-        '--disable-extensions', testWorkspace,
-        '--disable-features=NetworkService,OutOfBlinkCors'
+        '--disable-extensions',
+        testWorkspace,
+        '--disable-features=NetworkService,OutOfBlinkCors',
+        '--disable-integrated-auth',
+        '--auth-server-allowlist="_"',
       ],
     });
   } catch (err) {
