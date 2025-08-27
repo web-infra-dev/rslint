@@ -1,7 +1,7 @@
 import { BrowserRslintService } from '@rslint/core/browser';
-import { RSLintService } from '@rslint/core/service';
+import { RSLintService, Diagnostic } from '@rslint/core/service';
 declare const WEB_WORKER_SOURCE_CODE: string;
-export async function initialize(options: { wasmURL: string }) {
+async function initialize(options: { wasmURL: string }) {
   let blob = new Blob([WEB_WORKER_SOURCE_CODE], { type: 'text/javascript' });
   const service = new RSLintService(
     new BrowserRslintService({
@@ -12,3 +12,5 @@ export async function initialize(options: { wasmURL: string }) {
 
   return service;
 }
+
+export { initialize, type RSLintService, type Diagnostic };
