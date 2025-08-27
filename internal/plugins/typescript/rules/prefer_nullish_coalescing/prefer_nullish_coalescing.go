@@ -233,6 +233,8 @@ func isConditionalTestRecursive(node *ast.Node, visited map[*ast.Node]bool, dept
 	switch parent.Kind {
 	case ast.KindConditionalExpression:
 		condExpr := parent.AsConditionalExpression()
+		// Only consider it a conditional test if this node is DIRECTLY the condition
+		// NOT if it's within a parenthesized expression that becomes the condition
 		if condExpr != nil && condExpr.Condition == node {
 			return true
 		}
@@ -243,11 +245,8 @@ func isConditionalTestRecursive(node *ast.Node, visited map[*ast.Node]bool, dept
 		}
 	case ast.KindWhileStatement, ast.KindDoStatement, ast.KindForStatement:
 		return true
-	case ast.KindParenthesizedExpression:
-		// Check if the parenthesized expression is in a conditional context
-		return isConditionalTestRecursive(parent, visited, depth+1)
 	case ast.KindBinaryExpression:
-		// Check if this is part of a logical expression that leads to a conditional
+		// Only traverse through logical expressions that are directly used as conditions
 		binExpr := parent.AsBinaryExpression()
 		if binExpr != nil && (binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken ||
 			binExpr.OperatorToken.Kind == ast.KindBarBarToken) {
