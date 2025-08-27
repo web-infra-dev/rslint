@@ -156,7 +156,6 @@ export class BrowserRslintService implements RslintServiceInterface {
    * Handle messages from the worker
    */
   private handleResponse(message: IpcMessage): void {
-    console.log('handleResponse', message);
     const { id, kind, data } = message;
     const pending = this.pendingMessages.get(id);
     if (!pending) return;
