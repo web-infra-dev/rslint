@@ -1,0 +1,16 @@
+[
+  {
+    "language": "typescript",
+    "files": ["**/*.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "projectService": false,
+        "project": ["./tsconfig.json"]
+      }
+    },
+    "rules": {
+      "@typescript-eslint/prefer-nullish-coalescing": "error"
+    },
+    "plugins": ["@typescript-eslint"]
+  }
+]

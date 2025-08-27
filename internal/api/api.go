@@ -282,6 +282,7 @@ func (s *Service) handleExit(msg *Message) {
 func (s *Service) handleLint(msg *Message) {
 	var req LintRequest
 	data, err := json.Marshal(msg.Data)
+	
 	if err != nil {
 		s.sendError(msg.ID, fmt.Sprintf("failed to marshal data: %v", err))
 		return
@@ -291,7 +292,6 @@ func (s *Service) handleLint(msg *Message) {
 		s.sendError(msg.ID, fmt.Sprintf("failed to parse lint request: %v", err))
 		return
 	}
-
 	resp, err := s.handler.HandleLint(req)
 	if err != nil {
 		s.sendError(msg.ID, err.Error())

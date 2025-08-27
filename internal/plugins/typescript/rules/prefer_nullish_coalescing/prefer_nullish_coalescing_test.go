@@ -26,9 +26,9 @@ const foo = bar || baz;`,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "preferNullishOverOr",
 					Line:      4,
-					Column:    13,
+					Column:    17,
 					EndLine:   4,
-					EndColumn: 23,
+					EndColumn: 19,
 					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
 						MessageId: "suggestNullish",
 						Output: `
@@ -64,5 +64,73 @@ func TestPreferNullishCoalescingRuleStrictNullChecks(t *testing.T) {
 			},
 		},
 		[]rule_tester.InvalidTestCase{},
+	)
+}
+
+func TestPreferNullishCoalescingRuleIgnoreTernaryTests(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &PreferNullishCoalescingRule,
+		[]rule_tester.ValidTestCase{
+			// Should NOT flag when ignoreTernaryTests is true (default)
+			{
+				Code: `
+declare let x: string | null;
+const result = (x || 'foo') ? null : null;`,
+				Options:  map[string]any{"ignoreTernaryTests": true},
+				FileName: "test.ts",
+			},
+			// Should NOT flag by default (ignoreTernaryTests defaults to true)
+			{
+				Code: `
+declare let x: string | null;
+const result = (x || 'foo') ? null : null;`,
+				FileName: "test.ts",
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			// Should flag when ignoreTernaryTests is false
+			{
+				Code: `
+declare let x: string | null;
+const result = (x || 'foo') ? null : null;`,
+				Options: map[string]any{"ignoreTernaryTests": false},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "preferNullishOverOr",
+					Line:      3,
+					Column:    19,
+					EndLine:   3,
+					EndColumn: 21,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "suggestNullish",
+						Output: `
+declare let x: string | null;
+const result = (x ?? 'foo') ? null : null;`,
+					}},
+				}},
+				FileName: "test.ts",
+			},
+			// Should flag OR in ternary consequent (not in test)
+			{
+				Code: `
+declare let x: string | null;
+declare let condition: boolean;
+const result = condition ? (x || 'foo') : null;`,
+				Options: map[string]any{"ignoreTernaryTests": true},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "preferNullishOverOr",
+					Line:      4,
+					Column:    31,
+					EndLine:   4,
+					EndColumn: 33,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "suggestNullish",
+						Output: `
+declare let x: string | null;
+declare let condition: boolean;
+const result = condition ? (x ?? 'foo') : null;`,
+					}},
+				}},
+				FileName: "test.ts",
+			},
+		},
 	)
 }

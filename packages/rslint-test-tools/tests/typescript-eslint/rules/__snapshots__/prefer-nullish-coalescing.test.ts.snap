@@ -1,0 +1,30 @@
+// Rstest Snapshot v1
+
+exports[`prefer-nullish-coalescing > invalid 1`] = `
+{
+  "code": "
+declare let x: string | null;
+(x || 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

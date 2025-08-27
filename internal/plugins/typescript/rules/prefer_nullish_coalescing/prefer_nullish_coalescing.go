@@ -41,7 +41,7 @@ func parseOptions(options any) PreferNullishCoalescingOptions {
 			Number:  utils.Ref(false),
 			Bigint:  utils.Ref(false),
 		},
-		IgnoreTernaryTests: utils.Ref(false),
+		IgnoreTernaryTests: utils.Ref(true),
 	}
 
 	if options == nil {
@@ -215,25 +215,31 @@ func isMemberAccessLike(node *ast.Node) bool {
 
 // isConditionalTest checks if a node is within a conditional test context
 func isConditionalTest(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil {
+	return isConditionalTestRecursive(node, make(map[*ast.Node]bool), 0)
+}
+
+func isConditionalTestRecursive(node *ast.Node, visited map[*ast.Node]bool, depth int) bool {
+	// Prevent infinite recursion
+	if depth > 10 || node == nil {
 		return false
 	}
 
+	parent := node.Parent
+	if parent == nil || visited[parent] {
+		return false
+	}
+	visited[parent] = true
+
 	switch parent.Kind {
-	case ast.KindBinaryExpression:
-		// Check if this is part of a logical expression
-		binExpr := parent.AsBinaryExpression()
-		if binExpr != nil && (binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken ||
-			binExpr.OperatorToken.Kind == ast.KindBarBarToken) {
-			return isConditionalTest(parent)
-		}
 	case ast.KindConditionalExpression:
 		condExpr := parent.AsConditionalExpression()
 		if condExpr != nil && condExpr.Condition == node {
+			// Check if this ternary is being assigned - if so, it's not a pure conditional test
+			if condExpr.Parent != nil && isAssignmentContext(condExpr.Parent) {
+				return false
+			}
 			return true
 		}
-		return isConditionalTest(parent)
 	case ast.KindIfStatement:
 		ifStmt := parent.AsIfStatement()
 		if ifStmt != nil && ifStmt.Expression == node {
@@ -241,11 +247,45 @@ func isConditionalTest(node *ast.Node) bool {
 		}
 	case ast.KindWhileStatement, ast.KindDoStatement, ast.KindForStatement:
 		return true
+	case ast.KindParenthesizedExpression:
+		// Only traverse parenthesized expressions when looking for conditional contexts
+		// But be careful not to cross assignment boundaries
+		return isConditionalTestRecursive(parent, visited, depth+1)
+	case ast.KindBinaryExpression:
+		// Only traverse through logical expressions that are directly used as conditions
+		binExpr := parent.AsBinaryExpression()
+		if binExpr != nil && (binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken ||
+			binExpr.OperatorToken.Kind == ast.KindBarBarToken) {
+			return isConditionalTestRecursive(parent, visited, depth+1)
+		}
 	case ast.KindPrefixUnaryExpression:
 		prefixExpr := parent.AsPrefixUnaryExpression()
 		if prefixExpr != nil && prefixExpr.Operator == ast.KindExclamationToken {
-			return isConditionalTest(parent)
+			return isConditionalTestRecursive(parent, visited, depth+1)
 		}
+	}
+
+	return false
+}
+
+// isAssignmentContext checks if a node is in an assignment context
+func isAssignmentContext(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+
+	// Check up to 3 levels to avoid infinite recursion
+	for i := 0; i < 3 && node != nil; i++ {
+		switch node.Kind {
+		case ast.KindVariableDeclaration, ast.KindVariableStatement:
+			return true
+		case ast.KindBinaryExpression:
+			binExpr := node.AsBinaryExpression()
+			if binExpr != nil && binExpr.OperatorToken.Kind == ast.KindEqualsToken {
+				return true
+			}
+		}
+		node = node.Parent
 	}
 
 	return false
@@ -253,31 +293,38 @@ func isConditionalTest(node *ast.Node) bool {
 
 // isBooleanConstructorContext checks if a node is within a Boolean constructor context
 func isBooleanConstructorContext(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil {
-		return false
-	}
+	// Check up to 5 levels to avoid infinite recursion
+	for i := 0; i < 5 && node != nil; i++ {
+		parent := node.Parent
+		if parent == nil {
+			return false
+		}
 
-	if parent.Kind == ast.KindCallExpression {
-		callExpr := parent.AsCallExpression()
-		if callExpr != nil && callExpr.Expression.Kind == ast.KindIdentifier {
-			identifier := callExpr.Expression.AsIdentifier()
-			if identifier != nil && identifier.Text == "Boolean" {
-				return true
+		if parent.Kind == ast.KindCallExpression {
+			callExpr := parent.AsCallExpression()
+			if callExpr != nil && callExpr.Expression.Kind == ast.KindIdentifier {
+				identifier := callExpr.Expression.AsIdentifier()
+				if identifier != nil && identifier.Text == "Boolean" {
+					return true
+				}
 			}
 		}
-	}
 
-	// Check parent contexts recursively
-	switch parent.Kind {
-	case ast.KindBinaryExpression:
-		binExpr := parent.AsBinaryExpression()
-		if binExpr != nil && (binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken ||
-			binExpr.OperatorToken.Kind == ast.KindBarBarToken) {
-			return isBooleanConstructorContext(parent)
+		// Only traverse through logical expressions and conditionals
+		switch parent.Kind {
+		case ast.KindBinaryExpression:
+			binExpr := parent.AsBinaryExpression()
+			if binExpr == nil || (binExpr.OperatorToken.Kind != ast.KindAmpersandAmpersandToken &&
+				binExpr.OperatorToken.Kind != ast.KindBarBarToken) {
+				return false
+			}
+		case ast.KindConditionalExpression:
+			// Continue checking
+		default:
+			return false
 		}
-	case ast.KindConditionalExpression:
-		return isBooleanConstructorContext(parent)
+
+		node = parent
 	}
 
 	return false
@@ -285,29 +332,29 @@ func isBooleanConstructorContext(node *ast.Node) bool {
 
 // isMixedLogicalExpression checks if a logical expression is mixed with && operators
 func isMixedLogicalExpression(node *ast.Node) bool {
-	seen := make(map[*ast.Node]bool)
-	queue := []*ast.Node{node.Parent}
-
-	for len(queue) > 0 {
-		current := queue[0]
-		queue = queue[1:]
-
-		if current == nil || seen[current] {
-			continue
-		}
-		seen[current] = true
-
-		if current.Kind == ast.KindBinaryExpression {
-			binExpr := current.AsBinaryExpression()
+	// Simple check: look for && operators in the parent chain
+	foundOr := false
+	foundAnd := false
+	
+	// Check up to 10 levels to avoid infinite recursion
+	for i := 0; i < 10 && node != nil; i++ {
+		if node.Kind == ast.KindBinaryExpression {
+			binExpr := node.AsBinaryExpression()
 			if binExpr != nil {
-				if binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken {
-					return true
+				switch binExpr.OperatorToken.Kind {
+				case ast.KindBarBarToken:
+					foundOr = true
+				case ast.KindAmpersandAmpersandToken:
+					foundAnd = true
 				}
-				if binExpr.OperatorToken.Kind == ast.KindBarBarToken {
-					queue = append(queue, current.Parent, binExpr.Left, binExpr.Right)
+				
+				// If we found both || and &&, it's mixed
+				if foundOr && foundAnd {
+					return true
 				}
 			}
 		}
+		node = node.Parent
 	}
 
 	return false
@@ -397,6 +444,24 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						return
 					}
 
+					// Check if this is a test in a ternary expression
+					if *opts.IgnoreTernaryTests && node.Parent != nil {
+						// Check if direct parent is conditional expression
+						if node.Parent.Kind == ast.KindConditionalExpression {
+							if condExpr := node.Parent.AsConditionalExpression(); condExpr != nil && condExpr.Condition == node {
+								return
+							}
+						}
+						// Check if parent is parenthesized expression inside conditional test
+						if node.Parent.Kind == ast.KindParenthesizedExpression && node.Parent.Parent != nil {
+							if node.Parent.Parent.Kind == ast.KindConditionalExpression {
+								if condExpr := node.Parent.Parent.AsConditionalExpression(); condExpr != nil && condExpr.Condition == node.Parent {
+									return
+								}
+							}
+						}
+					}
+
 					if *opts.IgnoreBooleanCoercion && isBooleanConstructorContext(node) {
 						return
 					}
@@ -426,7 +491,7 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						}
 					}
 
-					ctx.ReportNodeWithSuggestions(node, buildPreferNullishOverOrMessage(),
+					ctx.ReportNodeWithSuggestions(binExpr.OperatorToken, buildPreferNullishOverOrMessage(),
 						rule.RuleSuggestion{
 							Message:  buildSuggestNullishMessage(),
 							FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)},
@@ -448,6 +513,24 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						return
 					}
 
+					// Check if this is a test in a ternary expression
+					if *opts.IgnoreTernaryTests && node.Parent != nil {
+						// Check if direct parent is conditional expression
+						if node.Parent.Kind == ast.KindConditionalExpression {
+							if condExpr := node.Parent.AsConditionalExpression(); condExpr != nil && condExpr.Condition == node {
+								return
+							}
+						}
+						// Check if parent is parenthesized expression inside conditional test
+						if node.Parent.Kind == ast.KindParenthesizedExpression && node.Parent.Parent != nil {
+							if node.Parent.Parent.Kind == ast.KindConditionalExpression {
+								if condExpr := node.Parent.Parent.AsConditionalExpression(); condExpr != nil && condExpr.Condition == node.Parent {
+									return
+								}
+							}
+						}
+					}
+
 					if *opts.IgnoreBooleanCoercion && isBooleanConstructorContext(node) {
 						return
 					}
@@ -457,7 +540,7 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					rightText := strings.TrimSpace(getNodeText(ctx.SourceFile, binExpr.Right))
 					replacement := fmt.Sprintf("%s ??= %s", leftText, rightText)
 
-					ctx.ReportNodeWithSuggestions(node, buildPreferNullishOverAssignmentMessage(),
+					ctx.ReportNodeWithSuggestions(binExpr.OperatorToken, buildPreferNullishOverAssignmentMessage(),
 						rule.RuleSuggestion{
 							Message:  buildSuggestNullishMessage(),
 							FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)},
@@ -492,6 +575,13 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				// Check various ignore conditions
 				if *opts.IgnoreConditionalTests && isConditionalTest(node) {
 					return
+				}
+
+				// Check if this is a test in a ternary expression
+				if *opts.IgnoreTernaryTests && node.Parent != nil && node.Parent.Kind == ast.KindConditionalExpression {
+					if condExpr := node.Parent.AsConditionalExpression(); condExpr != nil && condExpr.Condition == node {
+						return
+					}
 				}
 
 				if *opts.IgnoreBooleanCoercion && isBooleanConstructorContext(node) {
