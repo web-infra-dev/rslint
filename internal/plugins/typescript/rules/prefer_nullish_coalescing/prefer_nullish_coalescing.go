@@ -316,9 +316,10 @@ func findMixedLogicalOperators(node *ast.Node, visited map[*ast.Node]bool, found
 	if node.Kind == ast.KindBinaryExpression {
 		binExpr := node.AsBinaryExpression()
 		if binExpr != nil {
-			if binExpr.OperatorToken.Kind == ast.KindBarBarToken {
+			switch binExpr.OperatorToken.Kind {
+			case ast.KindBarBarToken:
 				foundOr = true
-			} else if binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken {
+			case ast.KindAmpersandAmpersandToken:
 				foundAnd = true
 			}
 
