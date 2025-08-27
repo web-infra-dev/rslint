@@ -1,6 +1,16 @@
-.rspress-doc {
-  max-width: 100% !important;
+.playground-container {
+  display: flex;
+  height: 100vh;
+  background: #ffffff;
 }
-.rspress-doc-container {
-  flex-direction: column !important;
+
+.editor-panel {
+  flex: 5;
+  background: #ffffff;
+  border-right: 1px solid #d0d7de;
+}
+.result-panel {
+  flex: 3;
+  background: #ffffff;
+  border-left: 1px solid #d0d7de;
 }
