@@ -4,7 +4,7 @@
   "description": "rslint wasm package",
   "main": "dist/index.mjs",
   "scripts": {
-    "build:wasm": "GOOS=js GOARCH=wasm go build  -o rslint.wasm -ldflags=\"-s -w\"  ../../cmd/rslint",
+    "build:wasm": "cross-env GOOS=js GOARCH=wasm go build  -o rslint.wasm -ldflags=\"-s -w\"  ../../cmd/rslint",
     "build:js": "node scripts/build.mjs && tsc -b tsconfig.json",
     "build": "pnpm run build:wasm && pnpm run build:js"
   },
@@ -20,13 +20,13 @@
   "devDependencies": {
     "@rslint/core": "workspace:*",
     "@wasmer/wasmfs": "0.12.0",
-    "esbuild": "^0.25.9"
-  },
-  "dependencies": {
+    "esbuild": "^0.25.9",
     "buffer": "^6.0.3",
-    "esbuild-plugin-polyfill-node": "*",
+    "cross-env": "^10.0.0",
+    "esbuild-plugin-polyfill-node": "0.3.0",
     "memfs": "^4.38.2"
   },
+  "dependencies": {},
   "publishConfig": {
     "access": "public"
   }
