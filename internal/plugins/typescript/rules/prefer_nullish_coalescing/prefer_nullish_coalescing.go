@@ -233,9 +233,11 @@ func isConditionalTestRecursive(node *ast.Node, visited map[*ast.Node]bool, dept
 	switch parent.Kind {
 	case ast.KindConditionalExpression:
 		condExpr := parent.AsConditionalExpression()
-		// Only consider it a conditional test if this node is DIRECTLY the condition
-		// NOT if it's within a parenthesized expression that becomes the condition
 		if condExpr != nil && condExpr.Condition == node {
+			// Check if this ternary is being assigned - if so, it's not a pure conditional test
+			if condExpr.Parent != nil && isAssignmentContext(condExpr.Parent) {
+				return false
+			}
 			return true
 		}
 	case ast.KindIfStatement:
@@ -245,6 +247,10 @@ func isConditionalTestRecursive(node *ast.Node, visited map[*ast.Node]bool, dept
 		}
 	case ast.KindWhileStatement, ast.KindDoStatement, ast.KindForStatement:
 		return true
+	case ast.KindParenthesizedExpression:
+		// Only traverse parenthesized expressions when looking for conditional contexts
+		// But be careful not to cross assignment boundaries
+		return isConditionalTestRecursive(parent, visited, depth+1)
 	case ast.KindBinaryExpression:
 		// Only traverse through logical expressions that are directly used as conditions
 		binExpr := parent.AsBinaryExpression()
@@ -256,6 +262,36 @@ func isConditionalTestRecursive(node *ast.Node, visited map[*ast.Node]bool, dept
 		prefixExpr := parent.AsPrefixUnaryExpression()
 		if prefixExpr != nil && prefixExpr.Operator == ast.KindExclamationToken {
 			return isConditionalTestRecursive(parent, visited, depth+1)
+		}
+	}
+
+	return false
+}
+
+// isAssignmentContext checks if a node is in an assignment context
+func isAssignmentContext(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+
+	switch node.Kind {
+	case ast.KindVariableDeclaration:
+		return true
+	case ast.KindVariableStatement:
+		return true
+	case ast.KindBinaryExpression:
+		binExpr := node.AsBinaryExpression()
+		return binExpr != nil && binExpr.OperatorToken.Kind == ast.KindEqualsToken
+	}
+
+	// Continue checking parent for assignment context
+	if node.Parent != nil {
+		switch node.Parent.Kind {
+		case ast.KindVariableDeclaration, ast.KindVariableStatement:
+			return true
+		case ast.KindBinaryExpression:
+			binExpr := node.Parent.AsBinaryExpression()
+			return binExpr != nil && binExpr.OperatorToken.Kind == ast.KindEqualsToken
 		}
 	}
 
