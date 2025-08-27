@@ -108,7 +108,7 @@ jobs:
         run: pnpm format:check
 
       - name: Build
-        run: pnpm build
+        run: pnpm -r --filter='!website' build
 
       - name: TypeCheck
         if: runner.os == 'Linux'
@@ -119,17 +119,6 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y libasound2 libgbm1 libgtk-3-0 libnss3 xvfb
-
-      - name: Setup MSYS2
-        if: runner.os == 'Windows'
-        uses: msys2/setup-msys2@v2
-        id: setup-msys2
-
-      - name: Setup tmate session
-        if: runner.os == 'Windows'
-        uses: mxschmitt/action-tmate@v3
-        with:
-          msys2-location: ${{ steps.setup-msys2.outputs.msys2-location }}
 
       - name: VSCode Test Cache
         uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
@@ -154,6 +143,17 @@ jobs:
       - name: Lint
         if: runner.os == 'Linux'
         run: pnpm run lint
+
+      - name: Setup MSYS2
+        if: ${{ failure() && runner.os == 'Windows'  }}
+        uses: msys2/setup-msys2@v2
+        id: setup-msys2
+
+      - name: Setup tmate session
+        if: ${{ failure() && runner.os == 'Windows'  }}
+        uses: mxschmitt/action-tmate@v3
+        with:
+          msys2-location: ${{ steps.setup-msys2.outputs.msys2-location }}
 
   done:
     needs:
