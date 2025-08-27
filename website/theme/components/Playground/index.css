@@ -1,0 +1,6 @@
+.rspress-doc {
+  max-width: 100% !important;
+}
+.rspress-doc-container {
+  flex-direction: column !important;
+}

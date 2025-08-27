@@ -27,7 +27,7 @@ async function buildBrowser() {
     'utf8',
   );
   await esbuild.build({
-    entryPoints: ['./src/browser.ts'],
+    entryPoints: ['./src/index.ts'],
     outfile: './dist/index.mjs',
     bundle: true,
     platform: 'browser',

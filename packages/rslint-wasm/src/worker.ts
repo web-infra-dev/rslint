@@ -82,7 +82,6 @@ function encodeMessage(message: any): Uint8Array {
  * Handle messages from the main thread
  */
 async function handleRequest(event: MessageEvent): Promise<void> {
-  console.log('handleRequest', event);
   const { id, kind, data } = event.data as IpcMessage;
 
   /**
@@ -134,7 +133,6 @@ async function handleRequest(event: MessageEvent): Promise<void> {
     let fs = globalThis.fs;
     let process = globalThis.process;
     process.cwd = () => {
-      console.log('process.cwd');
       return '/';
     };
 
@@ -165,7 +163,6 @@ async function handleRequest(event: MessageEvent): Promise<void> {
       inner_fs.readFileSync(path, options);
     };
     fs.open = (path, flags, mode, callback) => {
-      console.log('open', path, flags, mode);
       inner_fs.open(path, flags, mode, (err, data) => {
         callback(err, data);
       });
@@ -204,7 +201,6 @@ async function handleRequest(event: MessageEvent): Promise<void> {
           length,
           position as any,
           (err, data, ...rest) => {
-            console.log('read', err, data, rest);
             callback(err, data);
           },
         );
@@ -286,6 +282,3 @@ function handleError(error: ErrorEvent): void {
 // Set up event listeners
 self.addEventListener('message', handleRequest);
 self.addEventListener('error', handleError);
-
-// Initialize the worker
-console.log('Rslint worker started');
