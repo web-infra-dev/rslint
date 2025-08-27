@@ -136,13 +136,6 @@ func buildPreferNullishOverTernaryMessage() rule.RuleMessage {
 	}
 }
 
-func buildSuggestNullishMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "suggestNullish",
-		Description: "Fix to nullish coalescing operator (`??`).",
-	}
-}
-
 // isNullableType checks if a type includes null or undefined
 func isNullableType(t *checker.Type) bool {
 	if utils.IsUnionType(t) {
@@ -324,28 +317,10 @@ func getNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
 	text := sourceFile.Text()
 	start := node.Pos()
 	end := node.End()
-	if start < 0 || int(end) > len(text) || start > end {
+	if start < 0 || end > len(text) || start > end {
 		return ""
 	}
-	return text[int(start):int(end)]
-}
-
-// needsParentheses checks if an expression needs parentheses when used as the right operand of ??
-func needsParentheses(node *ast.Node) bool {
-	switch node.Kind {
-	case ast.KindBinaryExpression:
-		binExpr := node.AsBinaryExpression()
-		if binExpr != nil {
-			// Lower precedence operators need parentheses
-			switch binExpr.OperatorToken.Kind {
-			case ast.KindBarBarToken, ast.KindAmpersandAmpersandToken:
-				return true
-			}
-		}
-	case ast.KindConditionalExpression:
-		return true
-	}
-	return false
+	return text[start:end]
 }
 
 // areNodesTextuallyEqual checks if two nodes have the same text content

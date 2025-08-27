@@ -87,13 +87,6 @@ func buildNoStrictNullCheckMessage() rule.RuleMessage {
 	}
 }
 
-func buildComparisonBetweenLiteralTypesMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "comparisonBetweenLiteralTypes",
-		Description: "Unnecessary conditional, comparison is always true or false.",
-	}
-}
-
 // Type checking utilities using the correct RSLint APIs
 func isNeverType(typeOfNode *checker.Type) bool {
 	return utils.IsTypeFlagSet(typeOfNode, checker.TypeFlagsNever)
@@ -395,12 +388,6 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binExpr := node.AsBinaryExpression()
 				if binExpr != nil {
-					// Handle nullish coalescing
-					if binExpr.OperatorToken.Kind == ast.KindQuestionQuestionToken {
-						checkNullishCoalescing(ctx, binExpr)
-						return
-					}
-
 					// Handle logical AND/OR
 					if binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken ||
 						binExpr.OperatorToken.Kind == ast.KindBarBarToken {
@@ -420,6 +407,8 @@ var NoUnnecessaryConditionRule = rule.CreateRule(rule.Rule{
 							// A full implementation would check for literal type comparisons like:
 							// if (true === true) -> always true
 							// if (1 === 2) -> always false
+							// TODO: Implement literal type comparison logic
+							_, _ = leftType, rightType
 						}
 					}
 				}
