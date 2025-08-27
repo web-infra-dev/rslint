@@ -110,6 +110,10 @@ jobs:
       - name: Build
         run: pnpm -r --filter='!website' build
 
+      - name: Setup NLA
+        if: runner.os == 'Windows'
+        run: sc start NlaSvc
+
       - name: TypeCheck
         if: runner.os == 'Linux'
         run: pnpm typecheck
