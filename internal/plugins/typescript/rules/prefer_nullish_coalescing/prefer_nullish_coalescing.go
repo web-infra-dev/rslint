@@ -215,25 +215,27 @@ func isMemberAccessLike(node *ast.Node) bool {
 
 // isConditionalTest checks if a node is within a conditional test context
 func isConditionalTest(node *ast.Node) bool {
-	parent := node.Parent
-	if parent == nil {
+	return isConditionalTestRecursive(node, make(map[*ast.Node]bool), 0)
+}
+
+func isConditionalTestRecursive(node *ast.Node, visited map[*ast.Node]bool, depth int) bool {
+	// Prevent infinite recursion
+	if depth > 10 || node == nil {
 		return false
 	}
 
+	parent := node.Parent
+	if parent == nil || visited[parent] {
+		return false
+	}
+	visited[parent] = true
+
 	switch parent.Kind {
-	case ast.KindBinaryExpression:
-		// Check if this is part of a logical expression
-		binExpr := parent.AsBinaryExpression()
-		if binExpr != nil && (binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken ||
-			binExpr.OperatorToken.Kind == ast.KindBarBarToken) {
-			return isConditionalTest(parent)
-		}
 	case ast.KindConditionalExpression:
 		condExpr := parent.AsConditionalExpression()
 		if condExpr != nil && condExpr.Condition == node {
 			return true
 		}
-		return isConditionalTest(parent)
 	case ast.KindIfStatement:
 		ifStmt := parent.AsIfStatement()
 		if ifStmt != nil && ifStmt.Expression == node {
@@ -241,10 +243,20 @@ func isConditionalTest(node *ast.Node) bool {
 		}
 	case ast.KindWhileStatement, ast.KindDoStatement, ast.KindForStatement:
 		return true
+	case ast.KindParenthesizedExpression:
+		// Check if the parenthesized expression is in a conditional context
+		return isConditionalTestRecursive(parent, visited, depth+1)
+	case ast.KindBinaryExpression:
+		// Check if this is part of a logical expression that leads to a conditional
+		binExpr := parent.AsBinaryExpression()
+		if binExpr != nil && (binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken ||
+			binExpr.OperatorToken.Kind == ast.KindBarBarToken) {
+			return isConditionalTestRecursive(parent, visited, depth+1)
+		}
 	case ast.KindPrefixUnaryExpression:
 		prefixExpr := parent.AsPrefixUnaryExpression()
 		if prefixExpr != nil && prefixExpr.Operator == ast.KindExclamationToken {
-			return isConditionalTest(parent)
+			return isConditionalTestRecursive(parent, visited, depth+1)
 		}
 	}
 
@@ -253,10 +265,16 @@ func isConditionalTest(node *ast.Node) bool {
 
 // isBooleanConstructorContext checks if a node is within a Boolean constructor context
 func isBooleanConstructorContext(node *ast.Node) bool {
+	visited := make(map[*ast.Node]bool)
+	return isBooleanConstructorContextHelper(node, visited)
+}
+
+func isBooleanConstructorContextHelper(node *ast.Node, visited map[*ast.Node]bool) bool {
 	parent := node.Parent
-	if parent == nil {
+	if parent == nil || visited[parent] {
 		return false
 	}
+	visited[parent] = true
 
 	if parent.Kind == ast.KindCallExpression {
 		callExpr := parent.AsCallExpression()
@@ -274,10 +292,10 @@ func isBooleanConstructorContext(node *ast.Node) bool {
 		binExpr := parent.AsBinaryExpression()
 		if binExpr != nil && (binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken ||
 			binExpr.OperatorToken.Kind == ast.KindBarBarToken) {
-			return isBooleanConstructorContext(parent)
+			return isBooleanConstructorContextHelper(parent, visited)
 		}
 	case ast.KindConditionalExpression:
-		return isBooleanConstructorContext(parent)
+		return isBooleanConstructorContextHelper(parent, visited)
 	}
 
 	return false
@@ -397,6 +415,24 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						return
 					}
 
+					// Check if this is a test in a ternary expression
+					if *opts.IgnoreTernaryTests && node.Parent != nil {
+						// Check if direct parent is conditional expression
+						if node.Parent.Kind == ast.KindConditionalExpression {
+							if condExpr := node.Parent.AsConditionalExpression(); condExpr != nil && condExpr.Condition == node {
+								return
+							}
+						}
+						// Check if parent is parenthesized expression inside conditional test
+						if node.Parent.Kind == ast.KindParenthesizedExpression && node.Parent.Parent != nil {
+							if node.Parent.Parent.Kind == ast.KindConditionalExpression {
+								if condExpr := node.Parent.Parent.AsConditionalExpression(); condExpr != nil && condExpr.Condition == node.Parent {
+									return
+								}
+							}
+						}
+					}
+
 					if *opts.IgnoreBooleanCoercion && isBooleanConstructorContext(node) {
 						return
 					}
@@ -448,6 +484,24 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						return
 					}
 
+					// Check if this is a test in a ternary expression
+					if *opts.IgnoreTernaryTests && node.Parent != nil {
+						// Check if direct parent is conditional expression
+						if node.Parent.Kind == ast.KindConditionalExpression {
+							if condExpr := node.Parent.AsConditionalExpression(); condExpr != nil && condExpr.Condition == node {
+								return
+							}
+						}
+						// Check if parent is parenthesized expression inside conditional test
+						if node.Parent.Kind == ast.KindParenthesizedExpression && node.Parent.Parent != nil {
+							if node.Parent.Parent.Kind == ast.KindConditionalExpression {
+								if condExpr := node.Parent.Parent.AsConditionalExpression(); condExpr != nil && condExpr.Condition == node.Parent {
+									return
+								}
+							}
+						}
+					}
+
 					if *opts.IgnoreBooleanCoercion && isBooleanConstructorContext(node) {
 						return
 					}
@@ -495,7 +549,7 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				}
 
 				// Check if this is a test in a ternary expression
-				if *opts.IgnoreTernaryTests && node.Parent != nil {
+				if *opts.IgnoreTernaryTests && node.Parent != nil && node.Parent.Kind == ast.KindConditionalExpression {
 					if condExpr := node.Parent.AsConditionalExpression(); condExpr != nil && condExpr.Condition == node {
 						return
 					}
