@@ -166,12 +166,27 @@ jobs:
         run: |
           pnpm --filter '@rslint/core' build:js
           pnpm --filter '@rslint/wasm' build
+  website:
+    name: Build Website
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+
+      - name: Build
+        run: pnpm run build:website
   done:
     needs:
       - test-go
       - test-node
       - lint
       - test-wasm
+      - website
     if: always()
     runs-on: ubuntu-latest
     name: CI Done
