@@ -1,0 +1,14 @@
+[
+  {
+    "language": "javascript",
+    "files": ["test-simple-ternary.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "project": ["./tsconfig.json"]
+      }
+    },
+    "rules": {
+      "@typescript-eslint/prefer-nullish-coalescing": "error"
+    }
+  }
+]

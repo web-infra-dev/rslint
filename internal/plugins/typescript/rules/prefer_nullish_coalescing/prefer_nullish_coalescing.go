@@ -1032,9 +1032,21 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				// Check if the target is eligible for nullish coalescing
 				if !skipTypeCheck || isSimplePattern {
 					targetType := ctx.TypeChecker.GetTypeAtLocation(targetNode)
+
+					// For identifiers, also try to get the declared type if the location type isn't nullable
+					// This handles cases where TypeScript might optimize the type
+					if targetNode.Kind == ast.KindIdentifier && !isNullableType(targetType) {
+						// Try getting the symbol's type
+						symbol := ctx.TypeChecker.GetSymbolAtLocation(targetNode)
+						if symbol != nil {
+							declaredType := ctx.TypeChecker.GetTypeOfSymbol(symbol)
+							if declaredType != nil {
+								targetType = declaredType
+							}
+						}
+					}
+
 					if !isTypeEligibleForPreferNullish(targetType, opts) {
-						// Debug: log why type check failed
-						// fmt.Printf("Type check failed for: %s\n", getNodeText(ctx.SourceFile, targetNode))
 						return
 					}
 				}
