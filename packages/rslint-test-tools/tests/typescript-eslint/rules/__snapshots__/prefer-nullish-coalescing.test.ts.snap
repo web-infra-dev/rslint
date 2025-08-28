@@ -695,3 +695,1641 @@ declare let x: object | null | undefined;
   "ruleCount": 1,
 }
 `;
+
+exports[`prefer-nullish-coalescing > invalid 25`] = `
+{
+  "code": "x !== undefined && x !== null ? x : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 26`] = `
+{
+  "code": "x.z[1][this[this.o]]["3"][a.b.c] !== undefined && x.z[1][this[this.o]]["3"][a.b.c] !== null ? x.z[1][this[this.o]]["3"][a.b.c] : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 131,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 27`] = `
+{
+  "code": "x !== undefined && x !== null ? x : (z = y);",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 28`] = `
+{
+  "code": "x !== null && x !== undefined ? x : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 29`] = `
+{
+  "code": "x.z[1][this[this.o]]["3"][a.b.c] !== null && x.z[1][this[this.o]]["3"][a.b.c] !== undefined ? x.z[1][this[this.o]]["3"][a.b.c] : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 131,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 30`] = `
+{
+  "code": "x !== null && x !== undefined ? x : (z = y);",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 31`] = `
+{
+  "code": "x === undefined || x === null ? y : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 32`] = `
+{
+  "code": "x.z[1][this[this.o]]["3"][a.b.c] === undefined || x.z[1][this[this.o]]["3"][a.b.c] === null ? y : x.z[1][this[this.o]]["3"][a.b.c];",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 131,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 33`] = `
+{
+  "code": "x === undefined || x === null ? (z = y) : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 34`] = `
+{
+  "code": "x === null || x === undefined ? y : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 35`] = `
+{
+  "code": "x.z[1][this[this.o]]["3"][a.b.c] === null || x.z[1][this[this.o]]["3"][a.b.c] === undefined ? y : x.z[1][this[this.o]]["3"][a.b.c];",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 131,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 36`] = `
+{
+  "code": "x === null || x === undefined ? (z = y) : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 37`] = `
+{
+  "code": "undefined !== x && x !== null ? x : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 38`] = `
+{
+  "code": "undefined !== x.z[1][this[this.o]]["3"][a.b.c] && x.z[1][this[this.o]]["3"][a.b.c] !== null ? x.z[1][this[this.o]]["3"][a.b.c] : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 131,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 39`] = `
+{
+  "code": "undefined !== x && x !== null ? x : (z = y);",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 40`] = `
+{
+  "code": "null !== x && x !== undefined ? x : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 41`] = `
+{
+  "code": "null !== x.z[1][this[this.o]]["3"][a.b.c] && x.z[1][this[this.o]]["3"][a.b.c] !== undefined ? x.z[1][this[this.o]]["3"][a.b.c] : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 131,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 42`] = `
+{
+  "code": "null !== x && x !== undefined ? x : (z = y);",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 43`] = `
+{
+  "code": "undefined === x || x === null ? y : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 44`] = `
+{
+  "code": "undefined === x.z[1][this[this.o]]["3"][a.b.c] || x.z[1][this[this.o]]["3"][a.b.c] === null ? y : x.z[1][this[this.o]]["3"][a.b.c];",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 131,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 45`] = `
+{
+  "code": "undefined === x || x === null ? (z = y) : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 46`] = `
+{
+  "code": "null === x || x === undefined ? y : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 47`] = `
+{
+  "code": "null === x.z[1][this[this.o]]["3"][a.b.c] || x.z[1][this[this.o]]["3"][a.b.c] === undefined ? y : x.z[1][this[this.o]]["3"][a.b.c];",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 131,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 48`] = `
+{
+  "code": "null === x || x === undefined ? (z = y) : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 49`] = `
+{
+  "code": "x !== undefined && null !== x ? x : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 50`] = `
+{
+  "code": "x.z[1][this[this.o]]["3"][a.b.c] !== undefined && null !== x.z[1][this[this.o]]["3"][a.b.c] ? x.z[1][this[this.o]]["3"][a.b.c] : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 131,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 51`] = `
+{
+  "code": "x !== undefined && null !== x ? x : (z = y);",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 52`] = `
+{
+  "code": "x !== null && undefined !== x ? x : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 53`] = `
+{
+  "code": "x.z[1][this[this.o]]["3"][a.b.c] !== null && undefined !== x.z[1][this[this.o]]["3"][a.b.c] ? x.z[1][this[this.o]]["3"][a.b.c] : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 131,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 54`] = `
+{
+  "code": "x !== null && undefined !== x ? x : (z = y);",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 55`] = `
+{
+  "code": "x === undefined || null === x ? y : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 56`] = `
+{
+  "code": "x.z[1][this[this.o]]["3"][a.b.c] === undefined || null === x.z[1][this[this.o]]["3"][a.b.c] ? y : x.z[1][this[this.o]]["3"][a.b.c];",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 131,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 57`] = `
+{
+  "code": "x === undefined || null === x ? (z = y) : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 58`] = `
+{
+  "code": "x === null || undefined === x ? y : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 59`] = `
+{
+  "code": "x.z[1][this[this.o]]["3"][a.b.c] === null || undefined === x.z[1][this[this.o]]["3"][a.b.c] ? y : x.z[1][this[this.o]]["3"][a.b.c];",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 131,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 60`] = `
+{
+  "code": "x === null || undefined === x ? (z = y) : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 61`] = `
+{
+  "code": "undefined !== x && null !== x ? x : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 62`] = `
+{
+  "code": "undefined !== x.z[1][this[this.o]]["3"][a.b.c] && null !== x.z[1][this[this.o]]["3"][a.b.c] ? x.z[1][this[this.o]]["3"][a.b.c] : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 131,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 63`] = `
+{
+  "code": "undefined !== x && null !== x ? x : (z = y);",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 64`] = `
+{
+  "code": "null !== x && undefined !== x ? x : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 65`] = `
+{
+  "code": "null !== x.z[1][this[this.o]]["3"][a.b.c] && undefined !== x.z[1][this[this.o]]["3"][a.b.c] ? x.z[1][this[this.o]]["3"][a.b.c] : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 131,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 66`] = `
+{
+  "code": "null !== x && undefined !== x ? x : (z = y);",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 67`] = `
+{
+  "code": "undefined === x || null === x ? y : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 68`] = `
+{
+  "code": "undefined === x.z[1][this[this.o]]["3"][a.b.c] || null === x.z[1][this[this.o]]["3"][a.b.c] ? y : x.z[1][this[this.o]]["3"][a.b.c];",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 131,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 69`] = `
+{
+  "code": "undefined === x || null === x ? (z = y) : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 70`] = `
+{
+  "code": "null === x || undefined === x ? y : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 71`] = `
+{
+  "code": "null === x.z[1][this[this.o]]["3"][a.b.c] || undefined === x.z[1][this[this.o]]["3"][a.b.c] ? y : x.z[1][this[this.o]]["3"][a.b.c];",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 131,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 72`] = `
+{
+  "code": "null === x || undefined === x ? (z = y) : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 73`] = `
+{
+  "code": "x != undefined && x != null ? x : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 74`] = `
+{
+  "code": "x.z[1][this[this.o]]["3"][a.b.c] != undefined && x.z[1][this[this.o]]["3"][a.b.c] != null ? x.z[1][this[this.o]]["3"][a.b.c] : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 129,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 75`] = `
+{
+  "code": "x != undefined && x != null ? x : (z = y);",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 76`] = `
+{
+  "code": "x == undefined || x == null ? y : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 77`] = `
+{
+  "code": "x.z[1][this[this.o]]["3"][a.b.c] == undefined || x.z[1][this[this.o]]["3"][a.b.c] == null ? y : x.z[1][this[this.o]]["3"][a.b.c];",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 129,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 78`] = `
+{
+  "code": "x == undefined || x == null ? (z = y) : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 79`] = `
+{
+  "code": "x != undefined && x !== null ? x : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 80`] = `
+{
+  "code": "x.z[1][this[this.o]]["3"][a.b.c] != undefined && x.z[1][this[this.o]]["3"][a.b.c] !== null ? x.z[1][this[this.o]]["3"][a.b.c] : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 130,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 81`] = `
+{
+  "code": "x != undefined && x !== null ? x : (z = y);",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 82`] = `
+{
+  "code": "x == undefined || x === null ? y : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 83`] = `
+{
+  "code": "x.z[1][this[this.o]]["3"][a.b.c] == undefined || x.z[1][this[this.o]]["3"][a.b.c] === null ? y : x.z[1][this[this.o]]["3"][a.b.c];",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 130,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 84`] = `
+{
+  "code": "x == undefined || x === null ? (z = y) : x;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 85`] = `
+{
+  "code": "x !== undefined && x != null ? x : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 86`] = `
+{
+  "code": "x.z[1][this[this.o]]["3"][a.b.c] !== undefined && x.z[1][this[this.o]]["3"][a.b.c] != null ? x.z[1][this[this.o]]["3"][a.b.c] : y;",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 130,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 87`] = `
+{
+  "code": "x !== undefined && x != null ? x : (z = y);",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

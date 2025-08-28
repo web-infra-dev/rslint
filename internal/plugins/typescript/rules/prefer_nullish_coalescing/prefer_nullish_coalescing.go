@@ -480,6 +480,49 @@ func unwrapParentheses(node *ast.Node) *ast.Node {
 	return node
 }
 
+// checksAreDifferentNullishTypes verifies that two check expressions check for different nullish values (one for null, one for undefined)
+func checksAreDifferentNullishTypes(check1, check2 *ast.Node) bool {
+	if check1 == nil || check2 == nil || check1.Kind != ast.KindBinaryExpression || check2.Kind != ast.KindBinaryExpression {
+		return false
+	}
+
+	bin1 := check1.AsBinaryExpression()
+	bin2 := check2.AsBinaryExpression()
+	if bin1 == nil || bin2 == nil {
+		return false
+	}
+
+	// Determine what each check is checking for
+	check1Type := getNullishType(bin1)
+	check2Type := getNullishType(bin2)
+
+	// They must be checking for different nullish types
+	// If both are checking for the same thing (e.g., both "null"), it's not a proper nullish check
+	if check1Type == "" || check2Type == "" || check1Type == check2Type {
+		return false
+	}
+
+	// Return true only if one checks for null and the other checks for undefined
+	return (check1Type == "null" && check2Type == "undefined") || (check1Type == "undefined" && check2Type == "null")
+}
+
+// getNullishType returns "null", "undefined", or "" based on what the binary expression checks for
+func getNullishType(bin *ast.BinaryExpression) string {
+	if bin.Right.Kind == ast.KindNullKeyword {
+		return "null"
+	}
+	if bin.Right.Kind == ast.KindIdentifier && bin.Right.AsIdentifier() != nil && bin.Right.AsIdentifier().Text == "undefined" {
+		return "undefined"
+	}
+	if bin.Left.Kind == ast.KindNullKeyword {
+		return "null"
+	}
+	if bin.Left.Kind == ast.KindIdentifier && bin.Left.AsIdentifier() != nil && bin.Left.AsIdentifier().Text == "undefined" {
+		return "undefined"
+	}
+	return ""
+}
+
 func isExplicitNullishCheck(condition, whenTrue, whenFalse *ast.Node, sourceFile *ast.SourceFile) (bool, *ast.Node) {
 	condition = unwrapParentheses(condition)
 
@@ -491,25 +534,18 @@ func isExplicitNullishCheck(condition, whenTrue, whenFalse *ast.Node, sourceFile
 	if condition.Kind == ast.KindBinaryExpression {
 		binExpr := condition.AsBinaryExpression()
 		if binExpr != nil && binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken {
-			leftTarget1 := getNullishCheckTarget(binExpr.Left, sourceFile, false)
-			rightTarget1 := getNullishCheckTarget(binExpr.Right, sourceFile, false)
-
-			// Try left && right
-			if leftTarget1 != nil && rightTarget1 != nil &&
-				areNodesSemanticallyEqual(leftTarget1, rightTarget1) &&
-				areNodesSemanticallyEqual(leftTarget1, whenTrue) {
-
-				return true, leftTarget1
+			// Check that the two checks are for different nullish types
+			if !checksAreDifferentNullishTypes(binExpr.Left, binExpr.Right) {
+				return false, nil
 			}
-			// Try right && left (allow both orderings)
-			leftTarget2 := getNullishCheckTarget(binExpr.Right, sourceFile, false)
-			rightTarget2 := getNullishCheckTarget(binExpr.Left, sourceFile, false)
 
-			if leftTarget2 != nil && rightTarget2 != nil &&
-				areNodesSemanticallyEqual(leftTarget2, rightTarget2) &&
-				areNodesSemanticallyEqual(leftTarget2, whenTrue) {
+			leftTarget := getNullishCheckTarget(binExpr.Left, sourceFile, false)
+			rightTarget := getNullishCheckTarget(binExpr.Right, sourceFile, false)
 
-				return true, leftTarget2
+			if leftTarget != nil && rightTarget != nil &&
+				areNodesSemanticallyEqual(leftTarget, rightTarget) &&
+				areNodesSemanticallyEqual(leftTarget, whenTrue) {
+				return true, leftTarget
 			}
 		}
 	}
@@ -518,6 +554,13 @@ func isExplicitNullishCheck(condition, whenTrue, whenFalse *ast.Node, sourceFile
 	if condition.Kind == ast.KindBinaryExpression {
 		binExpr := condition.AsBinaryExpression()
 		if binExpr != nil && binExpr.OperatorToken.Kind == ast.KindBarBarToken {
+			// Check that the two checks are for different nullish types
+			different := checksAreDifferentNullishTypes(binExpr.Left, binExpr.Right)
+			if !different {
+				// Don't match if both checks are for the same nullish type
+				return false, nil
+			}
+
 			leftTarget := getNullishCheckTarget(binExpr.Left, sourceFile, true)
 			rightTarget := getNullishCheckTarget(binExpr.Right, sourceFile, true)
 			if leftTarget != nil && rightTarget != nil &&
@@ -528,16 +571,22 @@ func isExplicitNullishCheck(condition, whenTrue, whenFalse *ast.Node, sourceFile
 		}
 	}
 
-	// Pattern 3: x != null or x !== null
+	// Pattern 3: x != null or x !== null (simple single check, not compound)
 	if condition.Kind == ast.KindBinaryExpression {
 		binExpr := condition.AsBinaryExpression()
-		if getNullishCheckTarget(condition, sourceFile, false) != nil &&
-			areNodesSemanticallyEqual(binExpr.Left, whenTrue) {
-			return true, binExpr.Left
+		// Only match simple nullish checks, not compound ones (&&, ||)
+		if binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken ||
+			binExpr.OperatorToken.Kind == ast.KindBarBarToken {
+			return false, nil
 		}
-		if getNullishCheckTarget(condition, sourceFile, true) != nil &&
-			areNodesSemanticallyEqual(binExpr.Left, whenFalse) {
-			return true, binExpr.Left
+
+		target := getNullishCheckTarget(condition, sourceFile, false)
+		if target != nil && areNodesSemanticallyEqual(target, whenTrue) {
+			return true, target
+		}
+		target = getNullishCheckTarget(condition, sourceFile, true)
+		if target != nil && areNodesSemanticallyEqual(target, whenFalse) {
+			return true, target
 		}
 	}
 
@@ -563,6 +612,15 @@ func areNodesSemanticallyEqual(a, b *ast.Node) bool {
 		ea := a.AsElementAccessExpression()
 		eb := b.AsElementAccessExpression()
 		return areNodesSemanticallyEqual(ea.Expression, eb.Expression) && areNodesSemanticallyEqual(ea.ArgumentExpression, eb.ArgumentExpression)
+	case ast.KindThisKeyword:
+		// Both are 'this' keywords
+		return true
+	case ast.KindStringLiteral:
+		// Compare string literals
+		return a.AsStringLiteral().Text == b.AsStringLiteral().Text
+	case ast.KindNumericLiteral:
+		// Compare numeric literals
+		return a.AsNumericLiteral().Text == b.AsNumericLiteral().Text
 	default:
 		return false
 	}
@@ -775,6 +833,15 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						// For explicit null/undefined checks, we know the pattern is safe even if type is 'any'
 						skipTypeCheck = true
 					} else {
+						// Special case: don't match if the condition is a compound expression that checks the same nullish value twice
+						// e.g., x === null || x === null should not trigger the rule
+						if condExpr.Condition.Kind == ast.KindBinaryExpression {
+							binExpr := condExpr.Condition.AsBinaryExpression()
+							if binExpr != nil && (binExpr.OperatorToken.Kind == ast.KindBarBarToken || binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken) {
+								// This is a compound condition that doesn't match our patterns, skip it
+								return
+							}
+						}
 						return
 					}
 				}
