@@ -326,13 +326,10 @@ func isNodeOrParentOf(target, node *ast.Node) bool {
 		return false
 	}
 	current := node
+	// Traverse up from node to see if we reach target
 	for current != nil {
 		if current == target {
 			return true
-		}
-		// Only check up to the target's level
-		if current.Parent == target.Parent {
-			break
 		}
 		current = current.Parent
 	}
