@@ -374,6 +374,38 @@ func isBooleanConstructorContext(node *ast.Node) bool {
 	return false
 }
 
+// isTernaryTest checks if a node is used as the test condition of a ternary expression
+func isTernaryTest(node *ast.Node) bool {
+	if node == nil || node.Parent == nil {
+		return false
+	}
+
+	// Walk up through parentheses
+	current := node
+	for current.Parent != nil {
+		parent := current.Parent
+
+		// If we find a conditional expression, check if we're its condition
+		if parent.Kind == ast.KindConditionalExpression {
+			condExpr := parent.AsConditionalExpression()
+			if condExpr != nil && condExpr.Condition == current {
+				return true
+			}
+		}
+
+		// Continue through parenthesized expressions
+		if parent.Kind == ast.KindParenthesizedExpression {
+			current = parent
+			continue
+		}
+
+		// Stop at other node types
+		break
+	}
+
+	return false
+}
+
 // isMixedLogicalExpression checks if a logical expression is mixed with && operators
 func isMixedLogicalExpression(node *ast.Node) bool {
 	if node == nil {
@@ -845,21 +877,8 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					}
 
 					// Check if this is a test in a ternary expression
-					if *opts.IgnoreTernaryTests && node.Parent != nil {
-						// Check if direct parent is conditional expression
-						if node.Parent.Kind == ast.KindConditionalExpression {
-							if condExpr := node.Parent.AsConditionalExpression(); condExpr != nil && condExpr.Condition == node {
-								return
-							}
-						}
-						// Check if parent is parenthesized expression inside conditional test
-						if node.Parent.Kind == ast.KindParenthesizedExpression && node.Parent.Parent != nil {
-							if node.Parent.Parent.Kind == ast.KindConditionalExpression {
-								if condExpr := node.Parent.Parent.AsConditionalExpression(); condExpr != nil && condExpr.Condition == node.Parent {
-									return
-								}
-							}
-						}
+					if *opts.IgnoreTernaryTests && isTernaryTest(node) {
+						return
 					}
 
 					if *opts.IgnoreBooleanCoercion && isBooleanConstructorContext(node) {
@@ -914,21 +933,8 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					}
 
 					// Check if this is a test in a ternary expression
-					if *opts.IgnoreTernaryTests && node.Parent != nil {
-						// Check if direct parent is conditional expression
-						if node.Parent.Kind == ast.KindConditionalExpression {
-							if condExpr := node.Parent.AsConditionalExpression(); condExpr != nil && condExpr.Condition == node {
-								return
-							}
-						}
-						// Check if parent is parenthesized expression inside conditional test
-						if node.Parent.Kind == ast.KindParenthesizedExpression && node.Parent.Parent != nil {
-							if node.Parent.Parent.Kind == ast.KindConditionalExpression {
-								if condExpr := node.Parent.Parent.AsConditionalExpression(); condExpr != nil && condExpr.Condition == node.Parent {
-									return
-								}
-							}
-						}
+					if *opts.IgnoreTernaryTests && isTernaryTest(node) {
+						return
 					}
 
 					if *opts.IgnoreBooleanCoercion && isBooleanConstructorContext(node) {
@@ -996,9 +1002,9 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 							targetNode = ea.Expression
 						}
 					}
-					// For simple a ? a : b, prefer to report like TS-ESLint.
-					// Skip full primitive-based eligibility; only ensure the type is potentially nullable when available.
-					skipTypeCheck = true
+					// For simple a ? a : b, check if the type is nullable
+					// We need to ensure the type includes null/undefined for this to be a valid nullish coalescing candidate
+					skipTypeCheck = false
 					finalTarget := targetNode
 					for finalTarget != nil && finalTarget.Kind == ast.KindParenthesizedExpression {
 						paren := finalTarget.AsParenthesizedExpression()
@@ -1007,11 +1013,14 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						}
 						finalTarget = paren.Expression
 					}
-					// Check type if available, but don't block reporting (align with TS-ESLint)
+					// Check if type is nullable - this is required for the simple pattern
 					if tt := ctx.TypeChecker.GetTypeAtLocation(finalTarget); tt != nil {
-						// Allow union with null/undefined to pass; if type info degrades, still report like TS-ESLint
-						// Heuristic disabled: align with TS-ESLint by reporting simple pattern regardless of primitive ignores
-						_ = isNullableType(tt) // Check but don't use result to block reporting
+						if !isNullableType(tt) {
+							// Type is not nullable, so this cannot be converted to nullish coalescing
+							return
+						}
+						// Type is nullable, but still need to check eligibility
+						skipTypeCheck = false
 					}
 				} else {
 					// Check for explicit null/undefined check patterns
