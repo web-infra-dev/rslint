@@ -3,18 +3,18 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+
 	"fmt"
 	"go/types"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
+	"golang.org/x/tools/go/packages"
 	"log"
 	"maps"
 	"os"
 	"path"
 	"slices"
 	"strings"
-
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
-	"golang.org/x/tools/go/packages"
 )
 
 const tsgoInternalPrefix = "github.com/microsoft/typescript-go/internal/"
@@ -24,6 +24,25 @@ type ExtraShim struct {
 	ExtraMethods    map[string]([]string)
 	ExtraFields     map[string]([]string)
 	IgnoreFunctions []string
+}
+
+// check whether signature can be exported
+func canBeExported(t types.Signature) bool {
+	if params := t.Params(); params != nil {
+		for i := range params.Len() {
+			ty := params.At(i).Type()
+
+			if ptrType, ok := ty.(*types.Pointer); ok {
+				ty = ptrType.Elem()
+			}
+			if named, ok := ty.(*types.Named); ok {
+				if !named.Obj().Exported() {
+					return false
+				}
+			}
+		}
+	}
+	return true
 }
 
 func main() {
@@ -128,6 +147,10 @@ func main() {
 			if fn.Signature().TypeParams() != nil {
 				// https://github.com/golang/go/issues/60425
 				// linking to functions with generics is not supported in go:linkname
+				return false
+			}
+			if !canBeExported(*fn.Signature()) {
+				log.Printf("Skip unexported %s.%s", fn.Pkg().Name(), fn.Name())
 				return false
 			}
 			name := cases.Title(language.English, cases.NoLower).String(fn.Name())

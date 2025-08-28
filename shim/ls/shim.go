@@ -29,8 +29,6 @@ func ComputeLineStarts(text string) *ls.LineMap
 type Converters = ls.Converters
 type DeclarationInfo = ls.DeclarationInfo
 type Definition = ls.Definition
-//go:linkname DocumentURIToFileName github.com/microsoft/typescript-go/internal/ls.DocumentURIToFileName
-func DocumentURIToFileName(uri lsproto.DocumentUri) string
 var ErrNoSourceFile = ls.ErrNoSourceFile
 var ErrNoTokenAtPosition = ls.ErrNoTokenAtPosition
 type ExportInfo = ls.ExportInfo
@@ -41,6 +39,13 @@ const ExportKindNamed = ls.ExportKindNamed
 //go:linkname FileNameToDocumentURI github.com/microsoft/typescript-go/internal/ls.FileNameToDocumentURI
 func FileNameToDocumentURI(fileName string) lsproto.DocumentUri
 type Host = ls.Host
+type ImpExpKind = ls.ImpExpKind
+const ImpExpKindExport = ls.ImpExpKindExport
+const ImpExpKindImport = ls.ImpExpKindImport
+const ImpExpKindUnknown = ls.ImpExpKindUnknown
+type ImportExportSymbol = ls.ImportExportSymbol
+type ImportTracker = ls.ImportTracker
+type ImportsResult = ls.ImportsResult
 //go:linkname IsInString github.com/microsoft/typescript-go/internal/ls.IsInString
 func IsInString(sourceFile *ast.SourceFile, position int, previousToken *ast.Node) bool
 type JsxAttributeCompletionStyle = ls.JsxAttributeCompletionStyle
@@ -63,10 +68,11 @@ func LanguageKindToScriptKind(languageID lsproto.LanguageKind) core.ScriptKind
 type LanguageService = ls.LanguageService
 type LineMap = ls.LineMap
 type Location = ls.Location
+type LocationAndSymbol = ls.LocationAndSymbol
 //go:linkname NewConverters github.com/microsoft/typescript-go/internal/ls.NewConverters
 func NewConverters(positionEncoding lsproto.PositionEncodingKind, getLineMap func(fileName string) *ls.LineMap) *ls.Converters
 //go:linkname NewLanguageService github.com/microsoft/typescript-go/internal/ls.NewLanguageService
-func NewLanguageService(host ls.Host) *ls.LanguageService
+func NewLanguageService(host ls.Host, converters *ls.Converters) *ls.LanguageService
 type PossibleTypeArgumentInfo = ls.PossibleTypeArgumentInfo
 //go:linkname ProvideWorkspaceSymbols github.com/microsoft/typescript-go/internal/ls.ProvideWorkspaceSymbols
 func ProvideWorkspaceSymbols(ctx context.Context, programs []*compiler.Program, converters *ls.Converters, query string) (lsproto.WorkspaceSymbolResponse, error)

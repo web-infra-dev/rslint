@@ -4,7 +4,6 @@
 package tsoptions
 
 import "github.com/microsoft/typescript-go/internal/ast"
-import "github.com/microsoft/typescript-go/internal/collections"
 import "github.com/microsoft/typescript-go/internal/core"
 import "github.com/microsoft/typescript-go/internal/diagnostics"
 import "github.com/microsoft/typescript-go/internal/tsoptions"
@@ -44,6 +43,7 @@ func CreateDiagnosticForNodeInSourceFile(sourceFile *ast.SourceFile, node *ast.N
 //go:linkname CreateDiagnosticForNodeInSourceFileOrCompilerDiagnostic github.com/microsoft/typescript-go/internal/tsoptions.CreateDiagnosticForNodeInSourceFileOrCompilerDiagnostic
 func CreateDiagnosticForNodeInSourceFileOrCompilerDiagnostic(sourceFile *ast.SourceFile, node *ast.Node, message *diagnostics.Message, args ...any) *ast.Diagnostic
 type DidYouMeanOptionsDiagnostics = tsoptions.DidYouMeanOptionsDiagnostics
+type ExtendedConfigCache = tsoptions.ExtendedConfigCache
 type ExtendedConfigCacheEntry = tsoptions.ExtendedConfigCacheEntry
 type FileExtensionInfo = tsoptions.FileExtensionInfo
 //go:linkname ForEachCompilerOptionValue github.com/microsoft/typescript-go/internal/tsoptions.ForEachCompilerOptionValue
@@ -59,21 +59,27 @@ func GetNameMapFromList(optDecls []*tsoptions.CommandLineOption) *tsoptions.Name
 //go:linkname GetOptionsSyntaxByArrayElementValue github.com/microsoft/typescript-go/internal/tsoptions.GetOptionsSyntaxByArrayElementValue
 func GetOptionsSyntaxByArrayElementValue(objectLiteral *ast.ObjectLiteralExpression, propKey string, elementValue string) *ast.Node
 //go:linkname GetParsedCommandLineOfConfigFile github.com/microsoft/typescript-go/internal/tsoptions.GetParsedCommandLineOfConfigFile
-func GetParsedCommandLineOfConfigFile(configFileName string, options *core.CompilerOptions, sys tsoptions.ParseConfigHost, extendedConfigCache *collections.SyncMap[tspath.Path, *tsoptions.ExtendedConfigCacheEntry]) (*tsoptions.ParsedCommandLine, []*ast.Diagnostic)
+func GetParsedCommandLineOfConfigFile(configFileName string, options *core.CompilerOptions, sys tsoptions.ParseConfigHost, extendedConfigCache tsoptions.ExtendedConfigCache) (*tsoptions.ParsedCommandLine, []*ast.Diagnostic)
 //go:linkname GetParsedCommandLineOfConfigFilePath github.com/microsoft/typescript-go/internal/tsoptions.GetParsedCommandLineOfConfigFilePath
-func GetParsedCommandLineOfConfigFilePath(configFileName string, path tspath.Path, options *core.CompilerOptions, sys tsoptions.ParseConfigHost, extendedConfigCache *collections.SyncMap[tspath.Path, *tsoptions.ExtendedConfigCacheEntry]) (*tsoptions.ParsedCommandLine, []*ast.Diagnostic)
+func GetParsedCommandLineOfConfigFilePath(configFileName string, path tspath.Path, options *core.CompilerOptions, sys tsoptions.ParseConfigHost, extendedConfigCache tsoptions.ExtendedConfigCache) (*tsoptions.ParsedCommandLine, []*ast.Diagnostic)
 //go:linkname GetSupportedExtensionsWithJsonIfResolveJsonModule github.com/microsoft/typescript-go/internal/tsoptions.GetSupportedExtensionsWithJsonIfResolveJsonModule
 func GetSupportedExtensionsWithJsonIfResolveJsonModule(compilerOptions *core.CompilerOptions, supportedExtensions [][]string) [][]string
 //go:linkname GetTsConfigPropArrayElementValue github.com/microsoft/typescript-go/internal/tsoptions.GetTsConfigPropArrayElementValue
 func GetTsConfigPropArrayElementValue(tsConfigSourceFile *ast.SourceFile, propKey string, elementValue string) *ast.StringLiteral
 var InverseJsxOptionMap = tsoptions.InverseJsxOptionMap
 var LibFilesSet = tsoptions.LibFilesSet
+var LibMap = tsoptions.LibMap
 var Libs = tsoptions.Libs
 type NameMap = tsoptions.NameMap
+//go:linkname NewParsedCommandLine github.com/microsoft/typescript-go/internal/tsoptions.NewParsedCommandLine
+func NewParsedCommandLine(compilerOptions *core.CompilerOptions, rootFileNames []string, comparePathsOptions tspath.ComparePathsOptions) *tsoptions.ParsedCommandLine
 //go:linkname NewTsconfigSourceFileFromFilePath github.com/microsoft/typescript-go/internal/tsoptions.NewTsconfigSourceFileFromFilePath
 func NewTsconfigSourceFileFromFilePath(configFileName string, configPath tspath.Path, configSourceText string) *tsoptions.TsConfigSourceFile
 var OptionsDeclarations = tsoptions.OptionsDeclarations
-type OutputDtsAndProjectReference = tsoptions.OutputDtsAndProjectReference
+//go:linkname ParseBuildCommandLine github.com/microsoft/typescript-go/internal/tsoptions.ParseBuildCommandLine
+func ParseBuildCommandLine(commandLine []string, host tsoptions.ParseConfigHost) *tsoptions.ParsedBuildCommandLine
+//go:linkname ParseBuildOptions github.com/microsoft/typescript-go/internal/tsoptions.ParseBuildOptions
+func ParseBuildOptions(key string, value any, allOptions *core.BuildOptions) []*ast.Diagnostic
 //go:linkname ParseCommandLine github.com/microsoft/typescript-go/internal/tsoptions.ParseCommandLine
 func ParseCommandLine(commandLine []string, host tsoptions.ParseConfigHost) *tsoptions.ParsedCommandLine
 type ParseCommandLineWorkerDiagnostics = tsoptions.ParseCommandLineWorkerDiagnostics
@@ -88,8 +94,9 @@ func ParseListTypeOption(opt *tsoptions.CommandLineOption, value string) ([]any,
 func ParseTypeAcquisition(key string, value any, allOptions *core.TypeAcquisition) []*ast.Diagnostic
 //go:linkname ParseWatchOptions github.com/microsoft/typescript-go/internal/tsoptions.ParseWatchOptions
 func ParseWatchOptions(key string, value any, allOptions *core.WatchOptions) []*ast.Diagnostic
+type ParsedBuildCommandLine = tsoptions.ParsedBuildCommandLine
 type ParsedCommandLine = tsoptions.ParsedCommandLine
-type SourceAndProjectReference = tsoptions.SourceAndProjectReference
+type SourceOutputAndProjectReference = tsoptions.SourceOutputAndProjectReference
 //go:linkname TargetToLibMap github.com/microsoft/typescript-go/internal/tsoptions.TargetToLibMap
 func TargetToLibMap() map[core.ScriptTarget]string
 type TsConfigSourceFile = tsoptions.TsConfigSourceFile

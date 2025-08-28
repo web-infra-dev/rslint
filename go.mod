@@ -47,14 +47,16 @@ require (
 
 require (
 	github.com/google/go-cmp v0.7.0 // indirect
+	github.com/klauspost/cpuid/v2 v2.0.9 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
+	github.com/zeebo/xxh3 v1.0.2 // indirect
 	golang.org/x/mod v0.26.0 // indirect
 )
 
 require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/go-json-experiment/json v0.0.0-20250811204210-4789234c3ea1
-	github.com/microsoft/typescript-go v0.0.0-20250814234431-ae2bacc8a459 // indirect
+	github.com/microsoft/typescript-go v0.0.0-20250827194408-bcb8510f109a // indirect
 	golang.org/x/text v0.28.0
 )
