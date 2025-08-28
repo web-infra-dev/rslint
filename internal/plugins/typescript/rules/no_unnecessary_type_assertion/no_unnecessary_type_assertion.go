@@ -219,12 +219,12 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			if node.Kind == ast.KindAsExpression {
 				s := scanner.GetScannerForSourceFile(ctx.SourceFile, expression.End())
 				asKeywordRange := s.TokenRange()
-				
+
 				sourceText := ctx.SourceFile.Text()
 				startPos := asKeywordRange.Pos()
-				
+
 				if startPos > expression.End() && sourceText[startPos-1] == ' ' {
-				if startPos-1 == expression.End() || (startPos-2 >= 0 && sourceText[startPos-2] != ' ') {
+					if startPos-1 == expression.End() || (startPos-2 >= 0 && sourceText[startPos-2] != ' ') {
 						startPos--
 					}
 				}
@@ -309,6 +309,9 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 						isValidNull := !typeIncludesNull || contextualTypeIncludesNull
 						isValidVoid := !typeIncludesVoid || contextualTypeIncludesVoid
 
+						// Only report as unnecessary if ALL nullable types are valid
+						// If the type includes null but the context doesn't accept null,
+						// the assertion is necessary to remove null from the type
 						if isValidUndefined && isValidNull && isValidVoid {
 							ctx.ReportNodeWithFixes(node, buildContextuallyUnnecessaryMessage(), buildRemoveExclamationFix())
 						}

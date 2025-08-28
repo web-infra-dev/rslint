@@ -202,7 +202,7 @@ func isTypeEligibleForPreferNullish(t *checker.Type, opts PreferNullishCoalescin
 			if utils.IsIntersectionType(unionType) {
 				return false // Branded/intersection types should be ignored
 			}
-			
+
 			// Alternative check: if the type doesn't have standard primitive flags but has complex structure
 			if unionFlags == 0 || (unionFlags&^(checker.TypeFlagsStringLike|checker.TypeFlagsNumberLike|checker.TypeFlagsBooleanLike|checker.TypeFlagsBigIntLike)) != 0 {
 				// This might be a complex type like an intersection type that should be ignored
@@ -214,7 +214,7 @@ func isTypeEligibleForPreferNullish(t *checker.Type, opts PreferNullishCoalescin
 		if utils.IsIntersectionType(t) {
 			return false
 		}
-		
+
 		// Alternative check for non-union complex types
 		if flags == 0 || (flags&^(checker.TypeFlagsStringLike|checker.TypeFlagsNumberLike|checker.TypeFlagsBooleanLike|checker.TypeFlagsBigIntLike|checker.TypeFlagsNull|checker.TypeFlagsUndefined)) != 0 {
 			return false
@@ -230,12 +230,12 @@ func isTypeEligibleForPreferNullish(t *checker.Type, opts PreferNullishCoalescin
 				if unionFlags&(checker.TypeFlagsNull|checker.TypeFlagsUndefined) != 0 {
 					continue
 				}
-				
+
 				// Check if this constituent matches ignorable flags
 				if unionFlags&ignorableFlags != 0 {
 					return false
 				}
-				
+
 				// Special handling for intersection types that may contain ignored primitives
 				// Note: intersection types (branded types) may not have the expected primitive flags,
 				// so we need to check for them explicitly when primitive types are being ignored
