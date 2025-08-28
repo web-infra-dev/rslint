@@ -125,17 +125,17 @@ func buildPreferNullishOverOrMessage() rule.RuleMessage {
 	}
 }
 
-func buildPreferNullishOverAssignmentMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "preferNullishOverAssignment",
-		Description: "Prefer using nullish coalescing operator (`??=`) instead of an assignment expression, as it is simpler to read.",
-	}
-}
-
 func buildPreferNullishOverTernaryMessage() rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "preferNullishOverTernary",
-		Description: "Prefer using nullish coalescing operator (`??`) instead of a ternary expression, as it is simpler to read.",
+		Description: "Prefer using nullish coalescing operator (`??`) instead of a ternary expression testing for null/undefined.",
+	}
+}
+
+func buildPreferNullishOverAssignmentMessage() rule.RuleMessage {
+	return rule.RuleMessage{
+		Id:          "preferNullishOverAssignment",
+		Description: "Prefer using nullish coalescing assignment (`??=`) instead of an if statement with a nullish check.",
 	}
 }
 
@@ -166,12 +166,6 @@ func isTypeEligibleForPreferNullish(t *checker.Type, opts PreferNullishCoalescin
 		return false
 	}
 
-	// If the type is any or unknown, we can't make assumptions about the value
-	flags := checker.Type_flags(t)
-	if flags&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 {
-		return false
-	}
-
 	// Check for ignorable flags based on options
 	var ignorableFlags checker.TypeFlags
 	if opts.IgnorePrimitives.Boolean != nil && *opts.IgnorePrimitives.Boolean {
@@ -187,68 +181,55 @@ func isTypeEligibleForPreferNullish(t *checker.Type, opts PreferNullishCoalescin
 		ignorableFlags |= checker.TypeFlagsBigIntLike
 	}
 
-	// Check for complex types that should be ignored (intersection types, branded types, etc.)
-	// Do this check first, as intersection types may not have the expected primitive flags
-	if utils.IsUnionType(t) {
-		for _, unionType := range t.Types() {
+	// If the type is any or unknown and we're ignoring primitives, return false
+	// This matches TypeScript ESLint behavior
+	flags := checker.Type_flags(t)
+	if ignorableFlags != 0 && flags&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 {
+		return false
+	}
+
+	// Check if any type constituents have intersection types with ignored primitives
+	// This handles branded types like (string & { __brand?: any })
+	if ignorableFlags != 0 {
+		constituents := utils.UnionTypeParts(t)
+		for _, constituent := range constituents {
 			// Skip null and undefined types
-			unionFlags := checker.Type_flags(unionType)
-			if unionFlags&(checker.TypeFlagsNull|checker.TypeFlagsUndefined) != 0 {
+			constituentFlags := checker.Type_flags(constituent)
+			if constituentFlags&(checker.TypeFlagsNull|checker.TypeFlagsUndefined) != 0 {
 				continue
 			}
 
-			// Check if this union constituent is an intersection type (branded type)
-			// Use multiple methods to detect intersection/branded types
-			if utils.IsIntersectionType(unionType) {
-				return false // Branded/intersection types should be ignored
+			// Check if this constituent is an intersection type
+			if utils.IsIntersectionType(constituent) {
+				// Check intersection constituents for ignored primitives
+				// This matches the TypeScript ESLint implementation
+				intersectionParts := utils.IntersectionTypeParts(constituent)
+				for _, part := range intersectionParts {
+					partFlags := checker.Type_flags(part)
+					if partFlags&ignorableFlags != 0 {
+						// Found an intersection type containing an ignored primitive
+						return false
+					}
+				}
 			}
-
-			// Alternative check: if the type doesn't have standard primitive flags but has complex structure
-			if unionFlags == 0 || (unionFlags&^(checker.TypeFlagsStringLike|checker.TypeFlagsNumberLike|checker.TypeFlagsBooleanLike|checker.TypeFlagsBigIntLike)) != 0 {
-				// This might be a complex type like an intersection type that should be ignored
-				return false
-			}
-		}
-	} else {
-		// Check if the non-union type is an intersection type
-		if utils.IsIntersectionType(t) {
-			return false
-		}
-
-		// Alternative check for non-union complex types
-		if flags == 0 || (flags&^(checker.TypeFlagsStringLike|checker.TypeFlagsNumberLike|checker.TypeFlagsBooleanLike|checker.TypeFlagsBigIntLike|checker.TypeFlagsNull|checker.TypeFlagsUndefined)) != 0 {
-			return false
 		}
 	}
 
-	// Check if any type constituents match the ignorable flags
+	// Check if any non-intersection constituents match the ignorable flags
 	if ignorableFlags != 0 {
-		if utils.IsUnionType(t) {
-			for _, unionType := range t.Types() {
-				// Skip null and undefined types
-				unionFlags := checker.Type_flags(unionType)
-				if unionFlags&(checker.TypeFlagsNull|checker.TypeFlagsUndefined) != 0 {
-					continue
-				}
-
-				// Check if this constituent matches ignorable flags
-				if unionFlags&ignorableFlags != 0 {
-					return false
-				}
-
-				// Special handling for intersection types that may contain ignored primitives
-				// Note: intersection types (branded types) may not have the expected primitive flags,
-				// so we need to check for them explicitly when primitive types are being ignored
-				if utils.IsIntersectionType(unionType) {
-					// If we're ignoring any primitive types and this is an intersection type,
-					// it's likely a branded type that should be ignored
-					return false
-				}
+		constituents := utils.UnionTypeParts(t)
+		for _, constituent := range constituents {
+			// Skip null and undefined types
+			constituentFlags := checker.Type_flags(constituent)
+			if constituentFlags&(checker.TypeFlagsNull|checker.TypeFlagsUndefined) != 0 {
+				continue
 			}
-		} else {
-			// For non-union types, check if they match ignorable flags
-			if flags&ignorableFlags != 0 {
-				return false
+
+			// If not an intersection type, check if it matches ignorable flags directly
+			if !utils.IsIntersectionType(constituent) {
+				if constituentFlags&ignorableFlags != 0 {
+					return false
+				}
 			}
 		}
 	}
@@ -339,13 +320,14 @@ func isConditionalTest(node *ast.Node) bool {
 
 // isBooleanConstructorContext checks if a node is within a Boolean constructor context
 func isBooleanConstructorContext(node *ast.Node) bool {
-	// Check up to 5 levels to avoid infinite recursion
-	for i := 0; i < 5 && node != nil; i++ {
+	// Check up to 10 levels to avoid infinite recursion
+	for i := 0; i < 10 && node != nil; i++ {
 		parent := node.Parent
 		if parent == nil {
 			return false
 		}
 
+		// Check if we've reached a Boolean constructor call
 		if parent.Kind == ast.KindCallExpression {
 			callExpr := parent.AsCallExpression()
 			if callExpr != nil && callExpr.Expression.Kind == ast.KindIdentifier {
@@ -356,17 +338,27 @@ func isBooleanConstructorContext(node *ast.Node) bool {
 			}
 		}
 
-		// Only traverse through logical expressions and conditionals
+		// Continue traversing through these node types
 		switch parent.Kind {
+		case ast.KindParenthesizedExpression:
+			// Continue through parentheses
 		case ast.KindBinaryExpression:
 			binExpr := parent.AsBinaryExpression()
-			if binExpr == nil || (binExpr.OperatorToken.Kind != ast.KindAmpersandAmpersandToken &&
-				binExpr.OperatorToken.Kind != ast.KindBarBarToken) {
-				return false
+			if binExpr != nil {
+				// Allow traversal through logical and nullish coalescing operators
+				switch binExpr.OperatorToken.Kind {
+				case ast.KindAmpersandAmpersandToken,
+					ast.KindBarBarToken,
+					ast.KindQuestionQuestionToken:
+					// Continue checking
+				default:
+					return false
+				}
 			}
 		case ast.KindConditionalExpression:
-			// Continue checking
+			// Continue checking through ternary
 		default:
+			// Stop traversal for other node types
 			return false
 		}
 
@@ -608,7 +600,7 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					rightText := strings.TrimSpace(getNodeText(ctx.SourceFile, binExpr.Right))
 					replacement := fmt.Sprintf("%s ??= %s", leftText, rightText)
 
-					ctx.ReportNodeWithSuggestions(binExpr.OperatorToken, buildPreferNullishOverAssignmentMessage(),
+					ctx.ReportNodeWithSuggestions(binExpr.OperatorToken, buildPreferNullishOverOrMessage(),
 						rule.RuleSuggestion{
 							Message:  buildSuggestNullishMessage(),
 							FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)},
