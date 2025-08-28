@@ -1,8 +1,0 @@
-{
-  "rules": {
-    "@typescript-eslint/prefer-nullish-coalescing": [
-      "error",
-      { "ignoreTernaryTests": false }
-    ]
-  }
-}
