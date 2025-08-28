@@ -487,16 +487,29 @@ func isExplicitNullishCheck(condition, whenTrue, whenFalse *ast.Node, sourceFile
 		return false, nil
 	}
 
-	// Pattern 1: x !== undefined && x !== null ? x : y
+	// Pattern 1: x !== undefined && x !== null ? x : y (allow both orderings)
 	if condition.Kind == ast.KindBinaryExpression {
 		binExpr := condition.AsBinaryExpression()
 		if binExpr != nil && binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken {
-			leftTarget := getNullishCheckTarget(binExpr.Left, sourceFile, false)
-			rightTarget := getNullishCheckTarget(binExpr.Right, sourceFile, false)
-			if leftTarget != nil && rightTarget != nil &&
-				areNodesTextuallyEqual(sourceFile, leftTarget, rightTarget) &&
-				areNodesTextuallyEqual(sourceFile, leftTarget, whenTrue) {
-				return true, leftTarget
+			leftTarget1 := getNullishCheckTarget(binExpr.Left, sourceFile, false)
+			rightTarget1 := getNullishCheckTarget(binExpr.Right, sourceFile, false)
+
+			// Try left && right
+			if leftTarget1 != nil && rightTarget1 != nil &&
+				areNodesSemanticallyEqual(leftTarget1, rightTarget1) &&
+				areNodesSemanticallyEqual(leftTarget1, whenTrue) {
+
+				return true, leftTarget1
+			}
+			// Try right && left (allow both orderings)
+			leftTarget2 := getNullishCheckTarget(binExpr.Right, sourceFile, false)
+			rightTarget2 := getNullishCheckTarget(binExpr.Left, sourceFile, false)
+
+			if leftTarget2 != nil && rightTarget2 != nil &&
+				areNodesSemanticallyEqual(leftTarget2, rightTarget2) &&
+				areNodesSemanticallyEqual(leftTarget2, whenTrue) {
+
+				return true, leftTarget2
 			}
 		}
 	}
@@ -508,8 +521,8 @@ func isExplicitNullishCheck(condition, whenTrue, whenFalse *ast.Node, sourceFile
 			leftTarget := getNullishCheckTarget(binExpr.Left, sourceFile, true)
 			rightTarget := getNullishCheckTarget(binExpr.Right, sourceFile, true)
 			if leftTarget != nil && rightTarget != nil &&
-				areNodesTextuallyEqual(sourceFile, leftTarget, rightTarget) &&
-				areNodesTextuallyEqual(sourceFile, leftTarget, whenFalse) {
+				areNodesSemanticallyEqual(leftTarget, rightTarget) &&
+				areNodesSemanticallyEqual(leftTarget, whenFalse) {
 				return true, leftTarget
 			}
 		}
@@ -519,16 +532,40 @@ func isExplicitNullishCheck(condition, whenTrue, whenFalse *ast.Node, sourceFile
 	if condition.Kind == ast.KindBinaryExpression {
 		binExpr := condition.AsBinaryExpression()
 		if getNullishCheckTarget(condition, sourceFile, false) != nil &&
-			areNodesTextuallyEqual(sourceFile, binExpr.Left, whenTrue) {
+			areNodesSemanticallyEqual(binExpr.Left, whenTrue) {
 			return true, binExpr.Left
 		}
 		if getNullishCheckTarget(condition, sourceFile, true) != nil &&
-			areNodesTextuallyEqual(sourceFile, binExpr.Left, whenFalse) {
+			areNodesSemanticallyEqual(binExpr.Left, whenFalse) {
 			return true, binExpr.Left
 		}
 	}
 
 	return false, nil
+}
+
+// areNodesSemanticallyEqual checks if two nodes are structurally the same identifier/member access
+func areNodesSemanticallyEqual(a, b *ast.Node) bool {
+	if a == nil || b == nil {
+		return false
+	}
+	if a.Kind != b.Kind {
+		return false
+	}
+	switch a.Kind {
+	case ast.KindIdentifier:
+		return a.AsIdentifier().Text == b.AsIdentifier().Text
+	case ast.KindPropertyAccessExpression:
+		pa := a.AsPropertyAccessExpression()
+		pb := b.AsPropertyAccessExpression()
+		return areNodesSemanticallyEqual(pa.Expression, pb.Expression) && pa.Name().AsIdentifier().Text == pb.Name().AsIdentifier().Text
+	case ast.KindElementAccessExpression:
+		ea := a.AsElementAccessExpression()
+		eb := b.AsElementAccessExpression()
+		return areNodesSemanticallyEqual(ea.Expression, eb.Expression) && areNodesSemanticallyEqual(ea.ArgumentExpression, eb.ArgumentExpression)
+	default:
+		return false
+	}
 }
 
 // getNullishCheckTarget returns the target node if the expression is a nullish check, else nil
@@ -550,9 +587,15 @@ func getNullishCheckTarget(expr *ast.Node, sourceFile *ast.SourceFile, reverse b
 			return nil
 		}
 	}
+	// Check if right side is null or undefined
 	if bin.Right.Kind == ast.KindNullKeyword ||
 		(bin.Right.Kind == ast.KindIdentifier && bin.Right.AsIdentifier() != nil && bin.Right.AsIdentifier().Text == "undefined") {
 		return bin.Left
+	}
+	// Check if left side is null or undefined (handle reversed order)
+	if bin.Left.Kind == ast.KindNullKeyword ||
+		(bin.Left.Kind == ast.KindIdentifier && bin.Left.AsIdentifier() != nil && bin.Left.AsIdentifier().Text == "undefined") {
+		return bin.Right
 	}
 	return nil
 }
@@ -560,6 +603,7 @@ func getNullishCheckTarget(expr *ast.Node, sourceFile *ast.SourceFile, reverse b
 var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 	Name: "prefer-nullish-coalescing",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+
 		opts := parseOptions(options)
 
 		// Check for strict null checks
@@ -717,23 +761,30 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				// 2. Explicit null check: x !== undefined && x !== null ? x : y
 
 				var targetNode *ast.Node
+				var skipTypeCheck bool
 				isSimplePattern := areNodesTextuallyEqual(ctx.SourceFile, condExpr.Condition, condExpr.WhenTrue)
 
 				if isSimplePattern {
 					targetNode = condExpr.Condition
+					skipTypeCheck = false
 				} else {
 					// Check for explicit null/undefined check pattern (both normal and reverse)
-					if ok, t := isExplicitNullishCheck(condExpr.Condition, condExpr.WhenTrue, condExpr.WhenFalse, ctx.SourceFile); ok {
+					isExplicit, t := isExplicitNullishCheck(condExpr.Condition, condExpr.WhenTrue, condExpr.WhenFalse, ctx.SourceFile)
+					if isExplicit {
 						targetNode = t
+						// For explicit null/undefined checks, we know the pattern is safe even if type is 'any'
+						skipTypeCheck = true
 					} else {
 						return
 					}
 				}
 
 				// Check if the target is eligible for nullish coalescing
-				targetType := ctx.TypeChecker.GetTypeAtLocation(targetNode)
-				if !isTypeEligibleForPreferNullish(targetType, opts) {
-					return
+				if !skipTypeCheck {
+					targetType := ctx.TypeChecker.GetTypeAtLocation(targetNode)
+					if !isTypeEligibleForPreferNullish(targetType, opts) {
+						return
+					}
 				}
 
 				// Check various ignore conditions
