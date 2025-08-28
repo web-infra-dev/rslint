@@ -268,6 +268,18 @@ func isConditionalTest(node *ast.Node) bool {
 
 		// If we find a conditional statement, check if we're in its condition
 		switch parent.Kind {
+		case ast.KindConditionalExpression:
+			// Check if we're in the test part of a ternary expression
+			condExpr := parent.AsConditionalExpression()
+			if condExpr != nil && condExpr.Condition != nil {
+				temp := node
+				for temp != nil {
+					if temp == condExpr.Condition {
+						return true
+					}
+					temp = temp.Parent
+				}
+			}
 		case ast.KindIfStatement:
 			// We found an if statement, check if we're in its condition part
 			ifStmt := parent.AsIfStatement()
@@ -1002,26 +1014,9 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 							targetNode = ea.Expression
 						}
 					}
-					// For simple a ? a : b, check if the type is nullable
-					// We need to ensure the type includes null/undefined for this to be a valid nullish coalescing candidate
-					skipTypeCheck = false
-					finalTarget := targetNode
-					for finalTarget != nil && finalTarget.Kind == ast.KindParenthesizedExpression {
-						paren := finalTarget.AsParenthesizedExpression()
-						if paren == nil {
-							break
-						}
-						finalTarget = paren.Expression
-					}
-					// Check if type is nullable - this is required for the simple pattern
-					if tt := ctx.TypeChecker.GetTypeAtLocation(finalTarget); tt != nil {
-						if !isNullableType(tt) {
-							// Type is not nullable, so this cannot be converted to nullish coalescing
-							return
-						}
-						// Type is nullable, but still need to check eligibility
-						skipTypeCheck = false
-					}
+					// For simple a ? a : b, we always report if the type is nullable
+					// This matches TypeScript ESLint behavior
+					skipTypeCheck = true
 				} else {
 					// Check for explicit null/undefined check patterns
 					isExplicit, _ := isExplicitNullishCheck(condExpr.Condition, condExpr.WhenTrue, condExpr.WhenFalse, ctx.SourceFile)
