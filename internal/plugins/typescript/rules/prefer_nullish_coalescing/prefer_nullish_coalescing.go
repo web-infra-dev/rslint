@@ -345,11 +345,12 @@ func isBooleanConstructorContext(node *ast.Node) bool {
 		case ast.KindBinaryExpression:
 			binExpr := parent.AsBinaryExpression()
 			if binExpr != nil {
-				// Allow traversal through logical and nullish coalescing operators
+				// Allow traversal through logical, nullish coalescing, and comma operators
 				switch binExpr.OperatorToken.Kind {
 				case ast.KindAmpersandAmpersandToken,
 					ast.KindBarBarToken,
-					ast.KindQuestionQuestionToken:
+					ast.KindQuestionQuestionToken,
+					ast.KindCommaToken:
 					// Continue checking
 				default:
 					return false
@@ -364,7 +365,6 @@ func isBooleanConstructorContext(node *ast.Node) bool {
 
 		node = parent
 	}
-
 	return false
 }
 
@@ -464,6 +464,79 @@ func areNodesTextuallyEqual(sourceFile *ast.SourceFile, a, b *ast.Node) bool {
 		return false
 	}
 	return getNodeText(sourceFile, a) == getNodeText(sourceFile, b)
+}
+
+// isExplicitNullishCheck checks if the condition is an explicit null/undefined check pattern
+// like: x !== undefined && x !== null or x != null
+func isExplicitNullishCheck(condition, whenTrue *ast.Node, sourceFile *ast.SourceFile) bool {
+	if condition == nil || whenTrue == nil {
+		return false
+	}
+
+	// Check for x != null or x == null pattern
+	if condition.Kind == ast.KindBinaryExpression {
+		binExpr := condition.AsBinaryExpression()
+		if binExpr != nil {
+			// Check for != null or !== undefined patterns
+			if binExpr.OperatorToken.Kind == ast.KindExclamationEqualsToken ||
+				binExpr.OperatorToken.Kind == ast.KindExclamationEqualsEqualsToken {
+				// Check if comparing with null or undefined
+				if binExpr.Right.Kind == ast.KindNullKeyword ||
+					(binExpr.Right.Kind == ast.KindIdentifier && binExpr.Right.AsIdentifier() != nil &&
+						binExpr.Right.AsIdentifier().Text == "undefined") {
+					// Check if left side matches the whenTrue expression
+					return areNodesTextuallyEqual(sourceFile, binExpr.Left, whenTrue)
+				}
+			}
+		}
+	}
+
+	// Check for x !== undefined && x !== null pattern
+	if condition.Kind == ast.KindBinaryExpression {
+		binExpr := condition.AsBinaryExpression()
+		if binExpr != nil && binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken {
+			// Both sides should be inequality checks
+			leftCheck := false
+			rightCheck := false
+			var leftTarget, rightTarget *ast.Node
+
+			if binExpr.Left.Kind == ast.KindBinaryExpression {
+				leftBin := binExpr.Left.AsBinaryExpression()
+				if leftBin != nil &&
+					(leftBin.OperatorToken.Kind == ast.KindExclamationEqualsToken ||
+						leftBin.OperatorToken.Kind == ast.KindExclamationEqualsEqualsToken) {
+					if leftBin.Right.Kind == ast.KindNullKeyword ||
+						(leftBin.Right.Kind == ast.KindIdentifier && leftBin.Right.AsIdentifier() != nil &&
+							leftBin.Right.AsIdentifier().Text == "undefined") {
+						leftCheck = true
+						leftTarget = leftBin.Left
+					}
+				}
+			}
+
+			if binExpr.Right.Kind == ast.KindBinaryExpression {
+				rightBin := binExpr.Right.AsBinaryExpression()
+				if rightBin != nil &&
+					(rightBin.OperatorToken.Kind == ast.KindExclamationEqualsToken ||
+						rightBin.OperatorToken.Kind == ast.KindExclamationEqualsEqualsToken) {
+					if rightBin.Right.Kind == ast.KindNullKeyword ||
+						(rightBin.Right.Kind == ast.KindIdentifier && rightBin.Right.AsIdentifier() != nil &&
+							rightBin.Right.AsIdentifier().Text == "undefined") {
+						rightCheck = true
+						rightTarget = rightBin.Left
+					}
+				}
+			}
+
+			// Both checks present and refer to the same target that matches whenTrue
+			if leftCheck && rightCheck && leftTarget != nil && rightTarget != nil {
+				return areNodesTextuallyEqual(sourceFile, leftTarget, rightTarget) &&
+					areNodesTextuallyEqual(sourceFile, leftTarget, whenTrue)
+			}
+		}
+	}
+
+	return false
 }
 
 var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
@@ -621,14 +694,27 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				}
 
 				// Check if this is a nullish check pattern
-				// Simple case: a ? a : b (where condition and consequent are the same)
-				if !areNodesTextuallyEqual(ctx.SourceFile, condExpr.Condition, condExpr.WhenTrue) {
-					return
+				// Two cases to check:
+				// 1. Simple case: a ? a : b (where condition and consequent are the same)
+				// 2. Explicit null check: x !== undefined && x !== null ? x : y
+
+				var targetNode *ast.Node
+				isSimplePattern := areNodesTextuallyEqual(ctx.SourceFile, condExpr.Condition, condExpr.WhenTrue)
+
+				if isSimplePattern {
+					targetNode = condExpr.Condition
+				} else {
+					// Check for explicit null/undefined check pattern
+					if isExplicitNullishCheck(condExpr.Condition, condExpr.WhenTrue, ctx.SourceFile) {
+						targetNode = condExpr.WhenTrue
+					} else {
+						return
+					}
 				}
 
-				// Check if condition is eligible for nullish coalescing
-				conditionType := ctx.TypeChecker.GetTypeAtLocation(condExpr.Condition)
-				if !isTypeEligibleForPreferNullish(conditionType, opts) {
+				// Check if the target is eligible for nullish coalescing
+				targetType := ctx.TypeChecker.GetTypeAtLocation(targetNode)
+				if !isTypeEligibleForPreferNullish(targetType, opts) {
 					return
 				}
 
@@ -649,7 +735,7 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				}
 
 				// Create fix suggestion
-				conditionText := strings.TrimSpace(getNodeText(ctx.SourceFile, condExpr.Condition))
+				targetText := strings.TrimSpace(getNodeText(ctx.SourceFile, targetNode))
 				alternateText := strings.TrimSpace(getNodeText(ctx.SourceFile, condExpr.WhenFalse))
 
 				var fixedAlternateText string
@@ -659,7 +745,7 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					fixedAlternateText = alternateText
 				}
 
-				replacement := fmt.Sprintf("%s ?? %s", conditionText, fixedAlternateText)
+				replacement := fmt.Sprintf("%s ?? %s", targetText, fixedAlternateText)
 
 				ctx.ReportNodeWithSuggestions(node, buildPreferNullishOverTernaryMessage(),
 					rule.RuleSuggestion{

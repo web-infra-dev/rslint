@@ -28,3 +28,670 @@ declare let x: string | null;
   "ruleCount": 1,
 }
 `;
+
+exports[`prefer-nullish-coalescing > invalid 2`] = `
+{
+  "code": "
+declare let x: string | null;
+(x ||= 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 3`] = `
+{
+  "code": "
+declare let x: number | null;
+(x || 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 4`] = `
+{
+  "code": "
+declare let x: number | null;
+(x ||= 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 5`] = `
+{
+  "code": "
+declare let x: boolean | null;
+(x || 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 6`] = `
+{
+  "code": "
+declare let x: boolean | null;
+(x ||= 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 7`] = `
+{
+  "code": "
+declare let x: object | null;
+(x || 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 8`] = `
+{
+  "code": "
+declare let x: object | null;
+(x ||= 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 9`] = `
+{
+  "code": "
+declare let x: string | undefined;
+(x || 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 10`] = `
+{
+  "code": "
+declare let x: string | undefined;
+(x ||= 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 11`] = `
+{
+  "code": "
+declare let x: number | undefined;
+(x || 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 12`] = `
+{
+  "code": "
+declare let x: number | undefined;
+(x ||= 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 13`] = `
+{
+  "code": "
+declare let x: boolean | undefined;
+(x || 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 14`] = `
+{
+  "code": "
+declare let x: boolean | undefined;
+(x ||= 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 15`] = `
+{
+  "code": "
+declare let x: object | undefined;
+(x || 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 16`] = `
+{
+  "code": "
+declare let x: object | undefined;
+(x ||= 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 17`] = `
+{
+  "code": "
+declare let x: string | null | undefined;
+(x || 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 18`] = `
+{
+  "code": "
+declare let x: string | null | undefined;
+(x ||= 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 19`] = `
+{
+  "code": "
+declare let x: number | null | undefined;
+(x || 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 20`] = `
+{
+  "code": "
+declare let x: number | null | undefined;
+(x ||= 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 21`] = `
+{
+  "code": "
+declare let x: boolean | null | undefined;
+(x || 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 22`] = `
+{
+  "code": "
+declare let x: boolean | null | undefined;
+(x ||= 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 23`] = `
+{
+  "code": "
+declare let x: object | null | undefined;
+(x || 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 24`] = `
+{
+  "code": "
+declare let x: object | null | undefined;
+(x ||= 'foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 4,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
