@@ -1029,9 +1029,9 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					// Check for explicit null/undefined check patterns
 					isExplicit, _ := isExplicitNullishCheck(condExpr.Condition, condExpr.WhenTrue, condExpr.WhenFalse, ctx.SourceFile)
 					if isExplicit {
-						// Do NOT treat combined explicit checks (x !== undefined && x !== null ? x : y) as reportable by default.
-						// TS-ESLint considers this valid; bail out here.
-						return
+						// Combined explicit checks should be reported when ignoreTernaryTests is false
+						skipTypeCheck = true
+						targetNode = condExpr.WhenTrue
 					} else {
 						// Check for single nullish check (x !== undefined when type is string | undefined)
 						isSingle, t := isSingleNullishCheck(condExpr.Condition, condExpr.WhenTrue, condExpr.WhenFalse, ctx)
