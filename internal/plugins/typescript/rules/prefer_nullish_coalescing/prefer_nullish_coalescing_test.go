@@ -128,3 +128,61 @@ const result = condition ? (x ?? 'foo') : null;`,
 		},
 	)
 }
+
+func TestMemberAccessPattern(t *testing.T) {
+	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &PreferNullishCoalescingRule,
+		[]rule_tester.ValidTestCase{
+			// Member access with non-nullable type
+			{
+				Code: `
+declare let obj: { prop: string };
+const result = obj.prop || 'default';`,
+				FileName: "test.ts",
+			},
+		},
+		[]rule_tester.InvalidTestCase{
+			// Member access pattern: obj.prop ? obj.prop : 'default'
+			{
+				Code: `
+declare let obj: { prop: string | null };
+const result = obj.prop ? obj.prop : 'default';`,
+				Options: map[string]any{"ignoreTernaryTests": false},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "preferNullishOverTernary",
+					Line:      3,
+					Column:    16,
+					EndLine:   3,
+					EndColumn: 47,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "suggestNullish",
+						Output: `
+declare let obj: { prop: string | null };
+const result = obj.prop ?? 'default';`,
+					}},
+				}},
+				FileName: "test.ts",
+			},
+			// Negated member access pattern: !obj.prop ? 'default' : obj.prop
+			{
+				Code: `
+declare let obj: { prop: string | null };
+const result = !obj.prop ? 'default' : obj.prop;`,
+				Options: map[string]any{"ignoreTernaryTests": false},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "preferNullishOverTernary",
+					Line:      3,
+					Column:    16,
+					EndLine:   3,
+					EndColumn: 48,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "suggestNullish",
+						Output: `
+declare let obj: { prop: string | null };
+const result = obj.prop ?? 'default';`,
+					}},
+				}},
+				FileName: "test.ts",
+			},
+		},
+	)
+}

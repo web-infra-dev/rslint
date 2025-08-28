@@ -34,14 +34,14 @@ func parseOptions(options any) PreferNullishCoalescingOptions {
 		IgnoreBooleanCoercion:         utils.Ref(false),
 		IgnoreConditionalTests:        utils.Ref(true),
 		IgnoreIfStatements:            utils.Ref(false),
-		IgnoreMixedLogicalExpressions: utils.Ref(true),
+		IgnoreMixedLogicalExpressions: utils.Ref(false),
 		IgnorePrimitives: &PreferNullishPrimitivesOption{
 			Boolean: utils.Ref(false),
 			String:  utils.Ref(false),
 			Number:  utils.Ref(false),
 			Bigint:  utils.Ref(false),
 		},
-		IgnoreTernaryTests: utils.Ref(true),
+		IgnoreTernaryTests: utils.Ref(false),
 	}
 
 	if options == nil {
@@ -252,91 +252,94 @@ func isConditionalTest(node *ast.Node) bool {
 		return false
 	}
 
-	// Walk up the parent chain and check if we eventually find a conditional statement
+	// Walk up the parent chain to check if this node is used as a test condition
 	current := node
-	for current != nil {
+	for current != nil && current.Parent != nil {
 		parent := current.Parent
-		if parent == nil {
-			break
-		}
 
-		// Skip over parenthesized expressions
+		// Skip over parenthesized expressions and logical expressions
 		if parent.Kind == ast.KindParenthesizedExpression {
 			current = parent
 			continue
 		}
 
-		// If we find a conditional statement, check if we're in its condition
-		switch parent.Kind {
-		case ast.KindConditionalExpression:
-			// Check if we're in the test part of a ternary expression
-			condExpr := parent.AsConditionalExpression()
-			if condExpr != nil && condExpr.Condition != nil {
-				temp := node
-				for temp != nil {
-					if temp == condExpr.Condition {
-						return true
-					}
-					temp = temp.Parent
-				}
-			}
-		case ast.KindIfStatement:
-			// We found an if statement, check if we're in its condition part
-			ifStmt := parent.AsIfStatement()
-			if ifStmt != nil && ifStmt.Expression != nil {
-				// Walk up from our original node to see if we reach the if condition
-				temp := node
-				for temp != nil {
-					if temp == ifStmt.Expression {
-						return true
-					}
-					temp = temp.Parent
-				}
-			}
-		case ast.KindWhileStatement:
-			whileStmt := parent.AsWhileStatement()
-			if whileStmt != nil && whileStmt.Expression != nil {
-				temp := node
-				for temp != nil {
-					if temp == whileStmt.Expression {
-						return true
-					}
-					temp = temp.Parent
-				}
-			}
-		case ast.KindDoStatement:
-			doStmt := parent.AsDoStatement()
-			if doStmt != nil && doStmt.Expression != nil {
-				temp := node
-				for temp != nil {
-					if temp == doStmt.Expression {
-						return true
-					}
-					temp = temp.Parent
-				}
-			}
-		case ast.KindForStatement:
-			forStmt := parent.AsForStatement()
-			if forStmt != nil && forStmt.Condition != nil {
-				temp := node
-				for temp != nil {
-					if temp == forStmt.Condition {
-						return true
-					}
-					temp = temp.Parent
-				}
+		// If parent is a logical expression, continue checking up the tree
+		if parent.Kind == ast.KindBinaryExpression {
+			binExpr := parent.AsBinaryExpression()
+			if binExpr != nil && (binExpr.OperatorToken.Kind == ast.KindBarBarToken ||
+				binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken) {
+				current = parent
+				continue
 			}
 		}
 
-		current = parent
+		// Check if we're in a test/condition position
+		switch parent.Kind {
+		case ast.KindConditionalExpression:
+			// In a ternary expression, check if we're the test condition
+			condExpr := parent.AsConditionalExpression()
+			if condExpr != nil && isNodeOrParentOf(condExpr.Condition, current) {
+				return true
+			}
+			// If we're in the consequent or alternate, stop checking
+			return false
+
+		case ast.KindIfStatement:
+			ifStmt := parent.AsIfStatement()
+			if ifStmt != nil && isNodeOrParentOf(ifStmt.Expression, current) {
+				return true
+			}
+			return false
+
+		case ast.KindWhileStatement:
+			whileStmt := parent.AsWhileStatement()
+			if whileStmt != nil && isNodeOrParentOf(whileStmt.Expression, current) {
+				return true
+			}
+			return false
+
+		case ast.KindDoStatement:
+			doStmt := parent.AsDoStatement()
+			if doStmt != nil && isNodeOrParentOf(doStmt.Expression, current) {
+				return true
+			}
+			return false
+
+		case ast.KindForStatement:
+			forStmt := parent.AsForStatement()
+			if forStmt != nil && isNodeOrParentOf(forStmt.Condition, current) {
+				return true
+			}
+			return false
+		}
+
+		// If we hit any other kind of parent, stop checking
+		break
 	}
 
 	return false
 }
 
-// containsNode checks if container contains the target node as a descendant
+// isNodeOrParentOf checks if target is the same as or a parent of node
+func isNodeOrParentOf(target, node *ast.Node) bool {
+	if target == nil || node == nil {
+		return false
+	}
+	current := node
+	for current != nil {
+		if current == target {
+			return true
+		}
+		// Only check up to the target's level
+		if current.Parent == target.Parent {
+			break
+		}
+		current = current.Parent
+	}
+	return false
+}
 
-// isBooleanConstructorContext checks if a node is within a Boolean constructor context
+// isBooleanConstructorContext checks if the node is within a context where it's being coerced to boolean (e.g., Boolean(expr))
 func isBooleanConstructorContext(node *ast.Node) bool {
 	// Check up to 10 levels to avoid infinite recursion
 	for i := 0; i < 10 && node != nil; i++ {
@@ -388,31 +391,43 @@ func isBooleanConstructorContext(node *ast.Node) bool {
 
 // isTernaryTest checks if a node is used as the test condition of a ternary expression
 func isTernaryTest(node *ast.Node) bool {
-	if node == nil || node.Parent == nil {
+	if node == nil {
 		return false
 	}
 
-	// Walk up through parentheses
+	// Walk up the parent chain to find a ternary expression
 	current := node
-	for current.Parent != nil {
+	for current != nil && current.Parent != nil {
 		parent := current.Parent
 
-		// If we find a conditional expression, check if we're its condition
+		// Check if parent is a ternary expression and we're part of its condition
 		if parent.Kind == ast.KindConditionalExpression {
 			condExpr := parent.AsConditionalExpression()
-			if condExpr != nil && condExpr.Condition == current {
-				return true
+			if condExpr != nil {
+				// Check if we're in the condition branch (not whenTrue or whenFalse)
+				// We need to traverse from node up to see if we reach the condition
+				testNode := node
+				maxDepth := 20 // Prevent infinite loops
+				for testNode != nil && maxDepth > 0 {
+					if testNode == condExpr.Condition {
+						return true
+					}
+					if testNode == condExpr.WhenTrue || testNode == condExpr.WhenFalse {
+						// We're in one of the other branches, not the condition
+						return false
+					}
+					if testNode == parent {
+						// We've reached the ternary itself without finding the condition
+						break
+					}
+					testNode = testNode.Parent
+					maxDepth--
+				}
 			}
+			return false
 		}
 
-		// Continue through parenthesized expressions
-		if parent.Kind == ast.KindParenthesizedExpression {
-			current = parent
-			continue
-		}
-
-		// Stop at other node types
-		break
+		current = parent
 	}
 
 	return false
@@ -784,32 +799,104 @@ func isExplicitNullishCheck(condition, whenTrue, whenFalse *ast.Node, sourceFile
 }
 
 // areNodesSemanticallyEqual checks if two nodes are structurally the same identifier/member access
+// This function is more lenient than exact equality - it considers nodes equal if they represent
+// the same member access path, even if one uses optional chaining and the other doesn't.
+// For example: a.b.c and a?.b.c would be considered semantically equal.
 func areNodesSemanticallyEqual(a, b *ast.Node) bool {
 	if a == nil || b == nil {
 		return false
 	}
+
+	// Unwrap parenthesized expressions first
+	a = unwrapParentheses(a)
+	b = unwrapParentheses(b)
+
+	// For property access, check if both access the same property regardless of optional chaining
+	if a.Kind == ast.KindPropertyAccessExpression && b.Kind == ast.KindPropertyAccessExpression {
+		pa := a.AsPropertyAccessExpression()
+		pb := b.AsPropertyAccessExpression()
+		if pa != nil && pb != nil {
+			// Check if the property names match
+			if pa.Name() != nil && pb.Name() != nil {
+				nameA := pa.Name().AsIdentifier()
+				nameB := pb.Name().AsIdentifier()
+				if nameA != nil && nameB != nil && nameA.Text == nameB.Text {
+					// Recursively check the base expressions
+					return areNodesSemanticallyEqual(pa.Expression, pb.Expression)
+				}
+			}
+		}
+		return false
+	}
+
+	// For element access, check if both access with the same key
+	if a.Kind == ast.KindElementAccessExpression && b.Kind == ast.KindElementAccessExpression {
+		ea := a.AsElementAccessExpression()
+		eb := b.AsElementAccessExpression()
+		if ea != nil && eb != nil {
+			// Check if the keys match and base expressions match
+			return areNodesSemanticallyEqual(ea.Expression, eb.Expression) &&
+				areNodesSemanticallyEqual(ea.ArgumentExpression, eb.ArgumentExpression)
+		}
+		return false
+	}
+
+	// Allow property access and element access to match if they access the same member
+	// e.g., obj["prop"] and obj.prop
+	if (a.Kind == ast.KindPropertyAccessExpression && b.Kind == ast.KindElementAccessExpression) ||
+		(a.Kind == ast.KindElementAccessExpression && b.Kind == ast.KindPropertyAccessExpression) {
+		var propName string
+		var baseA, baseB *ast.Node
+
+		if a.Kind == ast.KindPropertyAccessExpression {
+			pa := a.AsPropertyAccessExpression()
+			if pa != nil && pa.Name() != nil && pa.Name().AsIdentifier() != nil {
+				propName = pa.Name().AsIdentifier().Text
+				baseA = pa.Expression
+			}
+			eb := b.AsElementAccessExpression()
+			if eb != nil && eb.ArgumentExpression != nil && eb.ArgumentExpression.Kind == ast.KindStringLiteral {
+				str := eb.ArgumentExpression.AsStringLiteral()
+				if str != nil && str.Text == propName {
+					baseB = eb.Expression
+				}
+			}
+		} else {
+			ea := a.AsElementAccessExpression()
+			if ea != nil && ea.ArgumentExpression != nil && ea.ArgumentExpression.Kind == ast.KindStringLiteral {
+				str := ea.ArgumentExpression.AsStringLiteral()
+				if str != nil {
+					propName = str.Text
+					baseA = ea.Expression
+				}
+			}
+			pb := b.AsPropertyAccessExpression()
+			if pb != nil && pb.Name() != nil && pb.Name().AsIdentifier() != nil {
+				if pb.Name().AsIdentifier().Text == propName {
+					baseB = pb.Expression
+				}
+			}
+		}
+
+		if baseA != nil && baseB != nil {
+			return areNodesSemanticallyEqual(baseA, baseB)
+		}
+		return false
+	}
+
+	// For other node types, require exact kind match
 	if a.Kind != b.Kind {
 		return false
 	}
+
 	switch a.Kind {
 	case ast.KindIdentifier:
 		return a.AsIdentifier().Text == b.AsIdentifier().Text
-	case ast.KindPropertyAccessExpression:
-		pa := a.AsPropertyAccessExpression()
-		pb := b.AsPropertyAccessExpression()
-		return areNodesSemanticallyEqual(pa.Expression, pb.Expression) && pa.Name().AsIdentifier().Text == pb.Name().AsIdentifier().Text
-	case ast.KindElementAccessExpression:
-		ea := a.AsElementAccessExpression()
-		eb := b.AsElementAccessExpression()
-		return areNodesSemanticallyEqual(ea.Expression, eb.Expression) && areNodesSemanticallyEqual(ea.ArgumentExpression, eb.ArgumentExpression)
 	case ast.KindThisKeyword:
-		// Both are 'this' keywords
 		return true
 	case ast.KindStringLiteral:
-		// Compare string literals
 		return a.AsStringLiteral().Text == b.AsStringLiteral().Text
 	case ast.KindNumericLiteral:
-		// Compare numeric literals
 		return a.AsNumericLiteral().Text == b.AsNumericLiteral().Text
 	default:
 		return false
@@ -882,17 +969,15 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						return
 					}
 
-					// Check if this is a test in a ternary expression
-					// This check must come before the conditional test check since ternary tests
-					// are a special case of conditional tests
-					isTernary := isTernaryTest(node)
-					if *opts.IgnoreTernaryTests && isTernary {
+					// Check various ignore conditions
+					// If ignoreConditionalTests is true, ignore all conditional tests
+					if *opts.IgnoreConditionalTests && isConditionalTest(node) {
 						return
 					}
 
-					// Check various ignore conditions
-					// Don't skip ternary tests if ignoreTernaryTests is false, even if ignoreConditionalTests is true
-					if *opts.IgnoreConditionalTests && isConditionalTest(node) && !(!*opts.IgnoreTernaryTests && isTernary) {
+					// Check if this is specifically a test in a ternary expression
+					// Only check this if ignoreConditionalTests is false (otherwise it was already handled above)
+					if !*opts.IgnoreConditionalTests && *opts.IgnoreTernaryTests && isTernaryTest(node) {
 						return
 					}
 
@@ -942,15 +1027,15 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						return
 					}
 
-					// Check if this is a test in a ternary expression
-					isTernary := isTernaryTest(node)
-					if *opts.IgnoreTernaryTests && isTernary {
+					// Check various ignore conditions
+					// If ignoreConditionalTests is true, ignore all conditional tests
+					if *opts.IgnoreConditionalTests && isConditionalTest(node) {
 						return
 					}
 
-					// Check various ignore conditions
-					// Don't skip ternary tests if ignoreTernaryTests is false, even if ignoreConditionalTests is true
-					if *opts.IgnoreConditionalTests && isConditionalTest(node) && !(!*opts.IgnoreTernaryTests && isTernary) {
+					// Check if this is specifically a test in a ternary expression
+					// Only check this if ignoreConditionalTests is false (otherwise it was already handled above)
+					if !*opts.IgnoreConditionalTests && *opts.IgnoreTernaryTests && isTernaryTest(node) {
 						return
 					}
 
@@ -986,19 +1071,39 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				}
 
 				// Check if this is a nullish check pattern
-				// Two cases to check:
+				// Three cases to check:
 				// 1. Simple case: a ? a : b (where condition and consequent are the same)
-				// 2. Explicit null check: x !== undefined && x !== null ? x : y
+				// 2. Negated simple case: !a ? b : a (where negated condition and alternate are the same)
+				// 3. Explicit null check: x !== undefined && x !== null ? x : y
 
 				var targetNode *ast.Node
 				var skipTypeCheck bool
+				var isNegatedPattern bool
 
 				// First check for simple pattern (where condition is exactly whenTrue)
 				// This would catch cases like: x ? x : y  -> x ?? y
 				// Compare after unwrapping parentheses and trimming text
 				condUnwrapped := unwrapParentheses(condExpr.Condition)
 				whenTrueUnwrapped := unwrapParentheses(condExpr.WhenTrue)
+				whenFalseUnwrapped := unwrapParentheses(condExpr.WhenFalse)
 				isSimplePattern := areNodesSemanticallyEqual(condUnwrapped, whenTrueUnwrapped)
+
+				// Check for negated pattern: !x ? y : x
+				if !isSimplePattern && condUnwrapped != nil && condUnwrapped.Kind == ast.KindPrefixUnaryExpression {
+					prefixUnary := condUnwrapped.AsPrefixUnaryExpression()
+					if prefixUnary != nil && prefixUnary.Operator == ast.KindExclamationToken {
+						negatedOperand := unwrapParentheses(prefixUnary.Operand)
+						if areNodesSemanticallyEqual(negatedOperand, whenFalseUnwrapped) {
+							isNegatedPattern = true
+							targetNode = whenFalseUnwrapped
+							// Only proceed for identifier or member access like targets
+							if !isMemberAccessLike(targetNode) {
+								return
+							}
+							skipTypeCheck = false
+						}
+					}
+				}
 
 				if isSimplePattern {
 					// Use the unwrapped whenTrue node for type queries to avoid AST shape issues
@@ -1009,7 +1114,7 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					}
 					// For simple a ? a : b, check if the type is nullable
 					skipTypeCheck = false
-				} else {
+				} else if !isNegatedPattern {
 					// Check for explicit null/undefined check patterns
 					isExplicit, _ := isExplicitNullishCheck(condExpr.Condition, condExpr.WhenTrue, condExpr.WhenFalse, ctx.SourceFile)
 					if isExplicit {
@@ -1033,9 +1138,9 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				if !skipTypeCheck || isSimplePattern {
 					targetType := ctx.TypeChecker.GetTypeAtLocation(targetNode)
 
-					// For identifiers, also try to get the declared type if the location type isn't nullable
+					// For identifiers and property access, also try to get the declared type if the location type isn't nullable
 					// This handles cases where TypeScript might optimize the type
-					if targetNode.Kind == ast.KindIdentifier && !isNullableType(targetType) {
+					if (targetNode.Kind == ast.KindIdentifier || targetNode.Kind == ast.KindPropertyAccessExpression) && !isNullableType(targetType) {
 						// Try getting the symbol's type
 						symbol := ctx.TypeChecker.GetSymbolAtLocation(targetNode)
 						if symbol != nil {
@@ -1058,19 +1163,35 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 
 				// Create fix suggestion
 				// For simple pattern, use the condition/whenTrue for text
-				var targetText string
+				// For negated pattern, swap the order to get x ?? y
+				var targetText, alternateText string
 				if isSimplePattern {
 					targetText = strings.TrimSpace(getNodeText(ctx.SourceFile, condExpr.Condition))
+					alternateText = strings.TrimSpace(getNodeText(ctx.SourceFile, condExpr.WhenFalse))
+				} else if isNegatedPattern {
+					// For !x ? y : x pattern, we want to generate x ?? y
+					targetText = strings.TrimSpace(getNodeText(ctx.SourceFile, condExpr.WhenFalse))
+					alternateText = strings.TrimSpace(getNodeText(ctx.SourceFile, condExpr.WhenTrue))
 				} else {
 					targetText = strings.TrimSpace(getNodeText(ctx.SourceFile, targetNode))
+					alternateText = strings.TrimSpace(getNodeText(ctx.SourceFile, condExpr.WhenFalse))
 				}
-				alternateText := strings.TrimSpace(getNodeText(ctx.SourceFile, condExpr.WhenFalse))
 
 				var fixedAlternateText string
-				if needsParentheses(condExpr.WhenFalse) {
-					fixedAlternateText = fmt.Sprintf("(%s)", alternateText)
+				if isNegatedPattern {
+					// For negated pattern, whenTrue becomes the alternate
+					if needsParentheses(condExpr.WhenTrue) {
+						fixedAlternateText = fmt.Sprintf("(%s)", alternateText)
+					} else {
+						fixedAlternateText = alternateText
+					}
 				} else {
-					fixedAlternateText = alternateText
+					// For other patterns, whenFalse is the alternate
+					if needsParentheses(condExpr.WhenFalse) {
+						fixedAlternateText = fmt.Sprintf("(%s)", alternateText)
+					} else {
+						fixedAlternateText = alternateText
+					}
 				}
 
 				replacement := fmt.Sprintf("%s ?? %s", targetText, fixedAlternateText)
