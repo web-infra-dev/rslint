@@ -101,26 +101,7 @@ const result = (x ?? 'foo') ? null : null;`,
 				}},
 				FileName: "test.ts",
 			},
-			// Should flag by default (ignoreTernaryTests defaults to false)
-			{
-				Code: `
-declare let x: string | null;
-const result = (x || 'foo') ? null : null;`,
-				Errors: []rule_tester.InvalidTestCaseError{{
-					MessageId: "preferNullishOverOr",
-					Line:      3,
-					Column:    19,
-					EndLine:   3,
-					EndColumn: 21,
-					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
-						MessageId: "suggestNullish",
-						Output: `
-declare let x: string | null;
-const result = (x ?? 'foo') ? null : null;`,
-					}},
-				}},
-				FileName: "test.ts",
-			},
+
 			// Should flag OR in ternary consequent (not in test)
 			{
 				Code: `

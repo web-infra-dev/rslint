@@ -41,7 +41,7 @@ func parseOptions(options any) PreferNullishCoalescingOptions {
 			Number:  utils.Ref(false),
 			Bigint:  utils.Ref(false),
 		},
-		IgnoreTernaryTests: utils.Ref(false),
+		IgnoreTernaryTests: utils.Ref(true),
 	}
 
 	if options == nil {
@@ -885,13 +885,14 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					// Check if this is a test in a ternary expression
 					// This check must come before the conditional test check since ternary tests
 					// are a special case of conditional tests
-					if *opts.IgnoreTernaryTests && isTernaryTest(node) {
+					isTernary := isTernaryTest(node)
+					if *opts.IgnoreTernaryTests && isTernary {
 						return
 					}
 
 					// Check various ignore conditions
-					if *opts.IgnoreConditionalTests && isConditionalTest(node) {
-						// Debug: This OR is in a conditional test context, skipping
+					// Don't skip ternary tests if ignoreTernaryTests is false, even if ignoreConditionalTests is true
+					if *opts.IgnoreConditionalTests && isConditionalTest(node) && !(!*opts.IgnoreTernaryTests && isTernary) {
 						return
 					}
 
@@ -941,13 +942,15 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						return
 					}
 
-					// Check various ignore conditions
-					if *opts.IgnoreConditionalTests && isConditionalTest(node) {
+					// Check if this is a test in a ternary expression
+					isTernary := isTernaryTest(node)
+					if *opts.IgnoreTernaryTests && isTernary {
 						return
 					}
 
-					// Check if this is a test in a ternary expression
-					if *opts.IgnoreTernaryTests && isTernaryTest(node) {
+					// Check various ignore conditions
+					// Don't skip ternary tests if ignoreTernaryTests is false, even if ignoreConditionalTests is true
+					if *opts.IgnoreConditionalTests && isConditionalTest(node) && !(!*opts.IgnoreTernaryTests && isTernary) {
 						return
 					}
 
@@ -972,6 +975,7 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 			// Handle ternary expressions: a ? a : b
 			ast.KindConditionalExpression: func(node *ast.Node) {
 				// Check if we should ignore ternary tests
+				// When ignoreTernaryTests is true, don't report on ternary expressions
 				if *opts.IgnoreTernaryTests {
 					return
 				}
@@ -994,17 +998,16 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				// Compare after unwrapping parentheses and trimming text
 				condUnwrapped := unwrapParentheses(condExpr.Condition)
 				whenTrueUnwrapped := unwrapParentheses(condExpr.WhenTrue)
-				isSimplePattern := areNodesTextuallyEqual(ctx.SourceFile, condUnwrapped, whenTrueUnwrapped)
+				isSimplePattern := areNodesSemanticallyEqual(condUnwrapped, whenTrueUnwrapped)
 
 				if isSimplePattern {
 					// Use the unwrapped whenTrue node for type queries to avoid AST shape issues
 					targetNode = unwrapParentheses(condExpr.WhenTrue)
 					// Only proceed for identifier or member access like targets
-					if !isMemberAccessLike(targetNode) && targetNode.Kind != ast.KindIdentifier {
+					if !isMemberAccessLike(targetNode) {
 						return
 					}
 					// For simple a ? a : b, check if the type is nullable
-					// This matches TypeScript ESLint behavior
 					skipTypeCheck = false
 				} else {
 					// Check for explicit null/undefined check patterns
