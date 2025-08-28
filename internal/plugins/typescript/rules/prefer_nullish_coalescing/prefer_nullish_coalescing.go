@@ -882,14 +882,16 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						return
 					}
 
-					// Check various ignore conditions
-					if *opts.IgnoreConditionalTests && isConditionalTest(node) {
-						// Debug: This OR is in a conditional test context, skipping
+					// Check if this is a test in a ternary expression
+					// This check must come before the conditional test check since ternary tests
+					// are a special case of conditional tests
+					if *opts.IgnoreTernaryTests && isTernaryTest(node) {
 						return
 					}
 
-					// Check if this is a test in a ternary expression
-					if *opts.IgnoreTernaryTests && isTernaryTest(node) {
+					// Check various ignore conditions
+					if *opts.IgnoreConditionalTests && isConditionalTest(node) {
+						// Debug: This OR is in a conditional test context, skipping
 						return
 					}
 
@@ -1001,22 +1003,9 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					if !isMemberAccessLike(targetNode) && targetNode.Kind != ast.KindIdentifier {
 						return
 					}
-					// If member/element access, reduce to the root object for type nullability checks
-					switch targetNode.Kind {
-					case ast.KindPropertyAccessExpression:
-						pa := targetNode.AsPropertyAccessExpression()
-						if pa != nil {
-							targetNode = pa.Expression
-						}
-					case ast.KindElementAccessExpression:
-						ea := targetNode.AsElementAccessExpression()
-						if ea != nil {
-							targetNode = ea.Expression
-						}
-					}
-					// For simple a ? a : b, we always report if the type is nullable
+					// For simple a ? a : b, check if the type is nullable
 					// This matches TypeScript ESLint behavior
-					skipTypeCheck = true
+					skipTypeCheck = false
 				} else {
 					// Check for explicit null/undefined check patterns
 					isExplicit, _ := isExplicitNullishCheck(condExpr.Condition, condExpr.WhenTrue, condExpr.WhenFalse, ctx.SourceFile)
@@ -1038,7 +1027,7 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				}
 
 				// Check if the target is eligible for nullish coalescing
-				if !skipTypeCheck {
+				if !skipTypeCheck || isSimplePattern {
 					targetType := ctx.TypeChecker.GetTypeAtLocation(targetNode)
 					if !isTypeEligibleForPreferNullish(targetType, opts) {
 						// Debug: log why type check failed
@@ -1053,7 +1042,13 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				}
 
 				// Create fix suggestion
-				targetText := strings.TrimSpace(getNodeText(ctx.SourceFile, targetNode))
+				// For simple pattern, use the condition/whenTrue for text
+				var targetText string
+				if isSimplePattern {
+					targetText = strings.TrimSpace(getNodeText(ctx.SourceFile, condExpr.Condition))
+				} else {
+					targetText = strings.TrimSpace(getNodeText(ctx.SourceFile, targetNode))
+				}
 				alternateText := strings.TrimSpace(getNodeText(ctx.SourceFile, condExpr.WhenFalse))
 
 				var fixedAlternateText string
