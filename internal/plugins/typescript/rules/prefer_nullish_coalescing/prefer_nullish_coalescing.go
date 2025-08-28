@@ -41,7 +41,7 @@ func parseOptions(options any) PreferNullishCoalescingOptions {
 			Number:  utils.Ref(false),
 			Bigint:  utils.Ref(false),
 		},
-		IgnoreTernaryTests: utils.Ref(true),
+		IgnoreTernaryTests: utils.Ref(false),
 	}
 
 	if options == nil {

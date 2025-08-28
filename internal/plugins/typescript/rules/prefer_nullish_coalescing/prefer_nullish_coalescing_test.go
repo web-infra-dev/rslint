@@ -70,7 +70,7 @@ func TestPreferNullishCoalescingRuleStrictNullChecks(t *testing.T) {
 func TestPreferNullishCoalescingRuleIgnoreTernaryTests(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &PreferNullishCoalescingRule,
 		[]rule_tester.ValidTestCase{
-			// Should NOT flag when ignoreTernaryTests is true (default)
+			// Should NOT flag when ignoreTernaryTests is true
 			{
 				Code: `
 declare let x: string | null;
@@ -78,21 +78,34 @@ const result = (x || 'foo') ? null : null;`,
 				Options:  map[string]any{"ignoreTernaryTests": true},
 				FileName: "test.ts",
 			},
-			// Should NOT flag by default (ignoreTernaryTests defaults to true)
-			{
-				Code: `
-declare let x: string | null;
-const result = (x || 'foo') ? null : null;`,
-				FileName: "test.ts",
-			},
 		},
 		[]rule_tester.InvalidTestCase{
-			// Should flag when ignoreTernaryTests is false
+			// Should flag when ignoreTernaryTests is false (explicit)
 			{
 				Code: `
 declare let x: string | null;
 const result = (x || 'foo') ? null : null;`,
 				Options: map[string]any{"ignoreTernaryTests": false},
+				Errors: []rule_tester.InvalidTestCaseError{{
+					MessageId: "preferNullishOverOr",
+					Line:      3,
+					Column:    19,
+					EndLine:   3,
+					EndColumn: 21,
+					Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+						MessageId: "suggestNullish",
+						Output: `
+declare let x: string | null;
+const result = (x ?? 'foo') ? null : null;`,
+					}},
+				}},
+				FileName: "test.ts",
+			},
+			// Should flag by default (ignoreTernaryTests defaults to false)
+			{
+				Code: `
+declare let x: string | null;
+const result = (x || 'foo') ? null : null;`,
 				Errors: []rule_tester.InvalidTestCaseError{{
 					MessageId: "preferNullishOverOr",
 					Line:      3,
