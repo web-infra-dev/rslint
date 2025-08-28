@@ -268,23 +268,6 @@ func isConditionalTest(node *ast.Node) bool {
 
 		// If we find a conditional statement, check if we're in its condition
 		switch parent.Kind {
-		case ast.KindConditionalExpression:
-			// We found a ternary expression, check if we're in its test part
-			condExpr := parent.AsConditionalExpression()
-			if condExpr != nil && condExpr.Condition != nil {
-				// Check if current (which may be a parenthesized expression) is the condition
-				if current == condExpr.Condition {
-					return true
-				}
-				// Also walk up from our original node to see if we reach the test condition
-				temp := node
-				for temp != nil {
-					if temp == condExpr.Condition {
-						return true
-					}
-					temp = temp.Parent
-				}
-			}
 		case ast.KindIfStatement:
 			// We found an if statement, check if we're in its condition part
 			ifStmt := parent.AsIfStatement()
@@ -505,8 +488,9 @@ func isSingleNullishCheck(condition, whenTrue, whenFalse *ast.Node, ctx rule.Rul
 	var target *ast.Node
 	var checkingFor string // "null" or "undefined"
 
-	// Check for x !== undefined or x !== null (strict inequality)
-	if binExpr.OperatorToken.Kind == ast.KindExclamationEqualsEqualsToken {
+	switch binExpr.OperatorToken.Kind {
+	case ast.KindExclamationEqualsEqualsToken:
+		// Check for x !== undefined or x !== null (strict inequality)
 		if binExpr.Right.Kind == ast.KindIdentifier && binExpr.Right.AsIdentifier() != nil &&
 			binExpr.Right.AsIdentifier().Text == "undefined" {
 			checkingFor = "undefined"
@@ -530,8 +514,8 @@ func isSingleNullishCheck(condition, whenTrue, whenFalse *ast.Node, ctx rule.Rul
 				target = binExpr.Right
 			}
 		}
+	case ast.KindEqualsEqualsEqualsToken:
 		// Check for x === undefined or x === null (strict equality)
-	} else if binExpr.OperatorToken.Kind == ast.KindEqualsEqualsEqualsToken {
 		if binExpr.Right.Kind == ast.KindIdentifier && binExpr.Right.AsIdentifier() != nil &&
 			binExpr.Right.AsIdentifier().Text == "undefined" {
 			checkingFor = "undefined"
@@ -721,7 +705,8 @@ func isExplicitNullishCheck(condition, whenTrue, whenFalse *ast.Node, sourceFile
 		}
 
 		// Check for x != null/undefined or x == null/undefined (loose equality ONLY)
-		if binExpr.OperatorToken.Kind == ast.KindExclamationEqualsToken {
+		switch binExpr.OperatorToken.Kind {
+		case ast.KindExclamationEqualsToken:
 			// x != null or x != undefined ? x : y pattern
 			isNullOrUndefined := binExpr.Right.Kind == ast.KindNullKeyword ||
 				(binExpr.Right.Kind == ast.KindIdentifier && binExpr.Right.AsIdentifier() != nil && binExpr.Right.AsIdentifier().Text == "undefined")
@@ -734,7 +719,7 @@ func isExplicitNullishCheck(condition, whenTrue, whenFalse *ast.Node, sourceFile
 			if isNullOrUndefined && areNodesSemanticallyEqual(binExpr.Right, whenTrue) {
 				return true, binExpr.Right
 			}
-		} else if binExpr.OperatorToken.Kind == ast.KindEqualsEqualsToken {
+		case ast.KindEqualsEqualsToken:
 			// x == null or x == undefined ? y : x pattern
 			isNullOrUndefined := binExpr.Right.Kind == ast.KindNullKeyword ||
 				(binExpr.Right.Kind == ast.KindIdentifier && binExpr.Right.AsIdentifier() != nil && binExpr.Right.AsIdentifier().Text == "undefined")
@@ -966,7 +951,10 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 
 			// Handle ternary expressions: a ? a : b
 			ast.KindConditionalExpression: func(node *ast.Node) {
-				// Do not skip ternary checks for simple pattern; only respect option outside simple detection.
+				// Check if we should ignore ternary tests
+				if *opts.IgnoreTernaryTests {
+					return
+				}
 
 				condExpr := node.AsConditionalExpression()
 				if condExpr == nil {
@@ -996,12 +984,13 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						return
 					}
 					// If member/element access, reduce to the root object for type nullability checks
-					if targetNode.Kind == ast.KindPropertyAccessExpression {
+					switch targetNode.Kind {
+					case ast.KindPropertyAccessExpression:
 						pa := targetNode.AsPropertyAccessExpression()
 						if pa != nil {
 							targetNode = pa.Expression
 						}
-					} else if targetNode.Kind == ast.KindElementAccessExpression {
+					case ast.KindElementAccessExpression:
 						ea := targetNode.AsElementAccessExpression()
 						if ea != nil {
 							targetNode = ea.Expression
@@ -1018,12 +1007,11 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						}
 						finalTarget = paren.Expression
 					}
+					// Check type if available, but don't block reporting (align with TS-ESLint)
 					if tt := ctx.TypeChecker.GetTypeAtLocation(finalTarget); tt != nil {
 						// Allow union with null/undefined to pass; if type info degrades, still report like TS-ESLint
-						if !isNullableType(tt) {
-							// Heuristic disabled: align with TS-ESLint by reporting simple pattern regardless of primitive ignores
-							// Proceed without blocking
-						}
+						// Heuristic disabled: align with TS-ESLint by reporting simple pattern regardless of primitive ignores
+						_ = isNullableType(tt) // Check but don't use result to block reporting
 					}
 				} else {
 					// Check for explicit null/undefined check patterns
@@ -1056,17 +1044,6 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				}
 
 				// Check various ignore conditions
-				if *opts.IgnoreConditionalTests && isConditionalTest(node) {
-					return
-				}
-
-				// Check if this is a test in a ternary expression
-				if *opts.IgnoreTernaryTests && node.Parent != nil && node.Parent.Kind == ast.KindConditionalExpression {
-					if condExpr := node.Parent.AsConditionalExpression(); condExpr != nil && condExpr.Condition == node {
-						return
-					}
-				}
-
 				if *opts.IgnoreBooleanCoercion && isBooleanConstructorContext(node) {
 					return
 				}
