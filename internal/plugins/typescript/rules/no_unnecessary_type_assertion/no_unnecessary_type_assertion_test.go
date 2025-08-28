@@ -397,8 +397,7 @@ function Test(props: { id?: null | string | number }) {
   return <div key={props.id!} />;
 }
       `,
-			Tsx:  true,
-			Skip: true, // TODO: Fix this test - it's incorrectly reporting the assertion as unnecessary
+			Tsx: true,
 		},
 		{Code: `
 declare const foo: any;
