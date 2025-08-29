@@ -1,4 +1,4 @@
-module github.com/microsoft/typescript-go/shim/lsp/lsproto
+module github.com/microsoft/typescript-go/shim/api/encoder
 
 go 1.25
 
