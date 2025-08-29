@@ -156,3 +156,8 @@ npm/*/rslint.exe
 
 # go cache
 packages/rslint/pkg/
+
+# Analysis tools and generated files
+compare-rules.js
+rule-comparison.json
+ts-eslint-rule-porting-status.md

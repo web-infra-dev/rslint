@@ -1,0 +1,44 @@
+{
+  "numFailedTestSuites": 1,
+  "numFailedTests": 0,
+  "numPassedTestSuites": 0,
+  "numPassedTests": 0,
+  "numPendingTestSuites": 0,
+  "numPendingTests": 0,
+  "numRuntimeErrorTestSuites": 1,
+  "numTodoTests": 0,
+  "numTotalTestSuites": 1,
+  "numTotalTests": 0,
+  "openHandles": [],
+  "snapshot": {
+    "added": 0,
+    "didUpdate": false,
+    "failure": false,
+    "filesAdded": 0,
+    "filesRemoved": 0,
+    "filesRemovedList": [],
+    "filesUnmatched": 0,
+    "filesUpdated": 0,
+    "matched": 0,
+    "total": 0,
+    "unchecked": 0,
+    "uncheckedKeysByFile": [],
+    "unmatched": 0,
+    "updated": 0
+  },
+  "startTime": 1756351124990,
+  "success": false,
+  "testResults": [
+    {
+      "assertionResults": [],
+      "coverage": {},
+      "endTime": 1756351125269,
+      "message": "  ● Test suite failed to run\n\n    SyntaxError: /Users/bytedance/dev/rslint/packages/rslint-test-tools/tests/typescript-eslint/rules/prefer-nullish-coalescing.test.ts: Unexpected token, expected \"from\" (1:12)\n\n    > 1 | import type {\n        |             ^\n      2 |   InvalidTestCase,\n      3 |   ValidTestCase,\n      4 | } from '@typescript-eslint/rule-tester';\n\n      at constructor (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/parser/src/parse-error.ts:95:45)\n      at Parser.toParseError [as raise] (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/parser/src/tokenizer/index.ts:1503:19)\n      at Parser.raise [as unexpected] (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/parser/src/tokenizer/index.ts:1543:16)\n      at Parser.unexpected [as expectContextual] (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/parser/src/parser/util.ts:114:12)\n      at Parser.expectContextual [as parseImportSpecifiersAndAfter] (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/parser/src/parser/statement.ts:3174:10)\n      at Parser.parseImportSpecifiersAndAfter [as parseImport] (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/parser/src/parser/statement.ts:3142:17)\n      at Parser.parseImport [as parseStatementContent] (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/parser/src/parser/statement.ts:642:25)\n      at Parser.parseStatementContent [as parseStatementLike] (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/parser/src/parser/statement.ts:477:17)\n      at Parser.parseStatementLike [as parseModuleItem] (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/parser/src/parser/statement.ts:414:17)\n      at Parser.parseModuleItem [as parseBlockOrModuleBlockBody] (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/parser/src/parser/statement.ts:1438:16)\n      at Parser.parseBlockOrModuleBlockBody [as parseBlockBody] (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/parser/src/parser/statement.ts:1412:10)\n      at Parser.parseBlockBody [as parseProgram] (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/parser/src/parser/statement.ts:229:10)\n      at Parser.parseProgram [as parseTopLevel] (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/parser/src/parser/statement.ts:203:25)\n      at Parser.parseTopLevel [as parse] (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/parser/src/parser/index.ts:93:10)\n      at parse (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/parser/src/index.ts:92:38)\n      at parser (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/core/src/parser/index.ts:28:19)\n          at parser.next (<anonymous>)\n      at normalizeFile (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/core/src/transformation/normalize-file.ts:49:24)\n          at normalizeFile.next (<anonymous>)\n      at run (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/core/src/transformation/index.ts:40:36)\n          at run.next (<anonymous>)\n      at transform (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/core/src/transform.ts:29:20)\n          at transform.next (<anonymous>)\n      at evaluateSync (../../.npm/_npx/b8d86e6551a4f492/node_modules/gensync/index.js:251:28)\n      at sync (../../.npm/_npx/b8d86e6551a4f492/node_modules/gensync/index.js:89:14)\n      at fn (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/core/src/errors/rewrite-stack-trace.ts:99:14)\n      at transformSync (../../.npm/_npx/b8d86e6551a4f492/node_modules/@babel/core/src/transform.ts:66:52)\n      at ScriptTransformer.transformSource (../../.npm/_npx/b8d86e6551a4f492/node_modules/@jest/transform/build/index.js:422:31)\n      at ScriptTransformer._transformAndBuildScript (../../.npm/_npx/b8d86e6551a4f492/node_modules/@jest/transform/build/index.js:519:40)\n      at ScriptTransformer.transform (../../.npm/_npx/b8d86e6551a4f492/node_modules/@jest/transform/build/index.js:558:19)\n",
+      "name": "/Users/bytedance/dev/rslint/packages/rslint-test-tools/tests/typescript-eslint/rules/prefer-nullish-coalescing.test.ts",
+      "startTime": 1756351125269,
+      "status": "failed",
+      "summary": ""
+    }
+  ],
+  "wasInterrupted": false
+}
