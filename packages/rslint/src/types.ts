@@ -27,6 +27,7 @@ export interface LintResponse {
   fileCount: number;
   ruleCount: number;
   duration: string;
+  encodedSourceFiles?: Record<string, number[]>; // Binary encoded source files as number array
 }
 
 export interface LintOptions {
@@ -36,6 +37,7 @@ export interface LintOptions {
   ruleOptions?: Record<string, string>;
   fileContents?: Record<string, string>; // Map of file paths to their contents for VFS
   languageOptions?: LanguageOptions; // Override languageOptions from config file
+  includeEncodedSourceFiles?: boolean; // Whether to include encoded source files in response
 }
 
 export interface LanguageOptions {

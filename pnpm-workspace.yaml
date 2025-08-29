@@ -2,3 +2,7 @@ packages:
   - 'packages/*'
   - 'npm/*'
   - 'website'
+  - 'typescript-go/_packages/ast'
+  - 'typescript-go/_packages/api'
+overrides:
+  '@typescript/ast': 'workspace:*'

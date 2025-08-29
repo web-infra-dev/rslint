@@ -1,6 +1,7 @@
 import { lint, applyFixes } from '@rslint/core';
 import { describe, test, expect } from '@rstest/core';
 import path from 'node:path';
+import { RemoteSourceFile,Node } from '@rslint/api';
 
 describe('lint api', async t => {
   let cwd = path.resolve(import.meta.dirname, '../fixtures');
@@ -43,7 +44,7 @@ describe('lint api', async t => {
 describe('applyFixes api', async t => {
   let cwd = path.resolve(import.meta.dirname, '../fixtures');
 
-  test.only('apply fixes with real diagnostics', async t => {
+  test('apply fixes with real diagnostics', async t => {
     // Since the linter isn't working as expected, let's simulate what real diagnostics would look like
     // This test simulates the scenario where we have diagnostics from a previous lint operation
     let config = path.resolve(
@@ -93,5 +94,30 @@ const y = x as string;`;
       input: fileContent,
       output: result.fixedContent,
     }).toMatchSnapshot();
+  });
+});
+
+describe('encoded source files', async t => {
+  let cwd = path.resolve(import.meta.dirname, '../fixtures');
+  let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
+  const fileContent = `let x: string = "hello";const y = x as string;`;
+  test('encoded source files', async t => {
+    const diags = await lint({
+      config: path.resolve(import.meta.dirname, '../fixtures/rslint.virtual.json'),
+      workingDirectory: cwd,
+      ruleOptions: {
+        '@typescript-eslint/no-unnecessary-type-assertion': 'error',
+      },
+      includeEncodedSourceFiles: true,
+      fileContents: {
+        [virtual_entry]: fileContent,
+      },
+    });
+    const content = diags.encodedSourceFiles['src/virtual.ts'];
+    let buffer = new Uint8Array(content);
+    const sourceFile = new  RemoteSourceFile(buffer, new TextDecoder())
+    
+    const source = sourceFile.text
+    expect(source).toBe(fileContent)
   });
 });
