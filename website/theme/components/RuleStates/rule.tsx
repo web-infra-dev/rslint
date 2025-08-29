@@ -58,7 +58,7 @@ const fetcher = async (url: string): Promise<RuleManifest> => {
 };
 
 function getRuleUrl(rule: Rule): string {
-  if (rule.group === '@typescript-eslint/eslint-plugin') {
+  if (rule.group === '@typescript-eslint') {
     return `https://typescript-eslint.io/rules/${rule.name}`;
   }
   // https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/no-self-import.md
