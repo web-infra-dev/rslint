@@ -16,6 +16,11 @@ type OverlayVFS struct {
 	VirtualFiles map[string]string
 }
 
+// Chtimes implements vfs.FS.
+func (vfs *OverlayVFS) Chtimes(path string, aTime time.Time, mTime time.Time) error {
+	panic("unimplemented")
+}
+
 var _ vfs.FS = (*OverlayVFS)(nil)
 
 func (vfs *OverlayVFS) UseCaseSensitiveFileNames() bool {
