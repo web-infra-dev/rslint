@@ -74,7 +74,7 @@ export const Editor = ({
       scrollBeyondLastLine: false,
     });
     editor.onDidChangeModelContent(() => {
-      onChange(editorRef.current?.getValue() || '');
+      onChange(editor.getValue() || '');
     });
     editorRef.current = editor;
 
