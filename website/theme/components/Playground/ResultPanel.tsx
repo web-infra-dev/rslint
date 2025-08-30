@@ -13,7 +13,6 @@ export interface Diagnostic {
 interface ResultPanelProps {
   diagnostics: Diagnostic[];
   ast?: string;
-  isLoading: boolean;
   error?: string;
   fixedCode?: string;
   typeInfo?: string;
@@ -22,7 +21,7 @@ interface ResultPanelProps {
 type TabType = 'lint' | 'fixed' | 'ast' | 'type';
 
 export const ResultPanel: React.FC<ResultPanelProps> = props => {
-  const { diagnostics, ast, isLoading, error, fixedCode, typeInfo } = props;
+  const { diagnostics, ast, error, fixedCode, typeInfo } = props;
   const [activeTab, setActiveTab] = useState<TabType>('lint');
 
   return (
@@ -47,13 +46,6 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
       </div>
 
       <div className="result-content">
-        {isLoading && (
-          <div className="loading-state">
-            <div className="spinner"></div>
-            <span>Analyzing code...</span>
-          </div>
-        )}
-
         {error && (
           <div className="error-message">
             <div className="error-icon">⚠️</div>
@@ -63,7 +55,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
           </div>
         )}
 
-        {!isLoading && !error && activeTab === 'lint' && (
+        {!error && activeTab === 'lint' && (
           <div className="lint-results">
             {diagnostics.length === 0 ? (
               <div className="success-message">
@@ -91,7 +83,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
           </div>
         )}
 
-        {!isLoading && !error && activeTab === 'ast' && (
+        {!error && activeTab === 'ast' && (
           <div className="ast-view">
             {ast ? (
               <div className="code-block-wrapper">

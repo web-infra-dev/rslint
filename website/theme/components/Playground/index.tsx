@@ -48,17 +48,15 @@ Program {
 const Playground: React.FC = () => {
   const editorRef = useRef<EditorRef | null>(null);
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [ast, setAst] = useState<string | undefined>();
 
   async function runLint() {
     try {
-      setIsLoading(true);
       setError(undefined);
 
       const service = await ensureService();
-      const code = editorRef.current?.getValue() || 'let a:any; a.b = 10;';
+      const code = editorRef.current?.getValue() ?? '';
 
       const result = await service.lint({
         fileContents: {
@@ -99,8 +97,6 @@ const Playground: React.FC = () => {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       setError(`Linting failed: ${errorMessage}`);
-    } finally {
-      setIsLoading(false);
     }
   }
 
@@ -113,12 +109,7 @@ const Playground: React.FC = () => {
       <div className="editor-panel">
         <Editor ref={editorRef} onChange={() => runLint()} />
       </div>
-      <ResultPanel
-        diagnostics={diagnostics}
-        ast={ast}
-        isLoading={isLoading}
-        error={error}
-      />
+      <ResultPanel diagnostics={diagnostics} ast={ast} error={error} />
     </div>
   );
 };

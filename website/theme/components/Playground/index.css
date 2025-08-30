@@ -1,16 +1,16 @@
 .playground-container {
   display: flex;
-  height: 100vh;
+  height: calc(100vh - 72px);
   background: #ffffff;
+  overflow: hidden;
 }
 
 .editor-panel {
   flex: 5;
   background: #ffffff;
-  border-right: 1px solid #d0d7de;
 }
+
 .result-panel {
   flex: 3;
   background: #ffffff;
-  border-left: 1px solid #d0d7de;
 }

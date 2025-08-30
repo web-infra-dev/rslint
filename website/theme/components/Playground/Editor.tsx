@@ -2,8 +2,8 @@ import React, { useRef, useEffect, forwardRef, Ref, createRef } from 'react';
 import * as monaco from 'monaco-editor';
 import { type Diagnostic } from '@rslint/wasm';
 import './Editor.css';
-// @ts-ignore
-self.MonacoEnvironment = {
+
+window.MonacoEnvironment = {
   getWorker: function (moduleId, label) {
     if (label === 'typescript' || label === 'javascript') {
       return new Worker(
@@ -18,10 +18,12 @@ self.MonacoEnvironment = {
     );
   },
 };
+
 export interface EditorRef {
   getValue: () => string | undefined;
   attachDiag: (diags: Diagnostic[]) => void;
 }
+
 export const Editor = ({
   ref,
   onChange,
@@ -30,13 +32,13 @@ export const Editor = ({
   onChange: (value: string) => void;
 }) => {
   const divEl = useRef<HTMLDivElement>(null);
-  let editor =
+  const editorRef =
     useRef<import('monaco-editor').editor.IStandaloneCodeEditor>(null);
   // get value from editor using forwardRef
   React.useImperativeHandle(ref, () => ({
-    getValue: () => editor.current?.getValue(),
+    getValue: () => editorRef.current?.getValue(),
     attachDiag: (diags: Diagnostic[]) => {
-      const model = editor.current?.getModel();
+      const model = editorRef.current?.getModel();
 
       if (model) {
         const markers = diags.map(diag => {
@@ -61,22 +63,23 @@ export const Editor = ({
   }));
 
   useEffect(() => {
-    if (divEl.current) {
-      editor.current = monaco.editor.create(divEl.current, {
-        value: ['let a:any; a.b = 10;'].join('\n'),
-        language: 'typescript',
-        hover: {
-          enabled: true,
-          delay: 100,
-          above: false,
-        },
-      });
-      editor.current.onDidChangeModelContent(() => {
-        onChange(editor.current?.getValue() || '');
-      });
+    if (!divEl.current) {
+      return;
     }
+
+    const editor = monaco.editor.create(divEl.current, {
+      value: ['let a: any;', 'a.b = 10;'].join('\n'),
+      language: 'typescript',
+      automaticLayout: true,
+      scrollBeyondLastLine: false,
+    });
+    editor.onDidChangeModelContent(() => {
+      onChange(editorRef.current?.getValue() || '');
+    });
+    editorRef.current = editor;
+
     return () => {
-      editor.current?.dispose();
+      editor.dispose();
     };
   }, []);
   return <div className="editor-container" ref={divEl}></div>;
