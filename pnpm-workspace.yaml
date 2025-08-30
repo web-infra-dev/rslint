@@ -6,3 +6,4 @@ packages:
   - 'typescript-go/_packages/api'
 overrides:
   '@typescript/ast': 'workspace:*'
+ignoreDepScripts: true

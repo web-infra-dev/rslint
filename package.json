@@ -31,7 +31,7 @@
     "format:go": "golangci-lint fmt ./cmd/... ./internal/...",
     "prepare": "husky",
     "migrate:tests": "sg scan -r ast-grep-rule.yml ./packages/rslint-test-tools/tests/typescript-eslint/rules/**/*.test.ts --update-all",
-    "postinstall": "./scripts/apply-tsgo-path.sh"
+    "patch:tsgo": "./scripts/apply-tsgo-path.sh"
   },
   "devDependencies": {
     "@rslint/core": "workspace:*",
