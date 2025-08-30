@@ -64,7 +64,7 @@ var RulesOfHooksRule = rule.Rule{
 				}
 
 				segmentID := segment.ID()
-				if paths, exists := countPathsFromStartCache[segmentID]; exists {
+				if paths, exists := countPathsFromStartCache[segmentID]; exists && paths != nil {
 					return paths
 				}
 
@@ -98,7 +98,9 @@ var RulesOfHooksRule = rule.Rule{
 					}
 				}
 
-				if segment.Reachable() || paths.Cmp(big.NewInt(0)) > 0 {
+				if segment.Reachable() && paths.Cmp(big.NewInt(0)) == 0 {
+					countPathsFromStartCache[segmentID] = nil
+				} else {
 					countPathsFromStartCache[segmentID] = paths
 				}
 
@@ -318,14 +320,16 @@ var RulesOfHooksRule = rule.Rule{
 					// Check if we're in a valid context for hooks
 					if isDirectlyInsideComponentOrHook {
 						// Check for async function
-						if isAsyncFunction(codePathNode) {
+						if isInsideAsyncFunction(codePathNode) {
 							ctx.ReportNode(hook, buildAsyncComponentHookMessage(hookText))
 							continue
 						}
 
+						pathsCmp := pathsFromStartToEnd.Cmp(allPathsFromStartToEnd)
+
 						// Check for conditional calls (except use() and do-while loops)
 						if !isCyclic &&
-							pathsFromStartToEnd.Cmp(allPathsFromStartToEnd) != 0 &&
+							pathsCmp != 0 &&
 							!isUseHook &&
 							!isInsideDoWhileLoop(hook) {
 							var message rule.RuleMessage
@@ -341,10 +345,18 @@ var RulesOfHooksRule = rule.Rule{
 						if isInsideClass(codePathNode) {
 							ctx.ReportNode(hook, buildClassHookMessage(hookText))
 						} else if codePathFunctionName != "" {
+							// Custom message if we found an invalid function name.kj
 							ctx.ReportNode(hook, buildFunctionHookMessage(hookText, codePathFunctionName))
 						} else if isTopLevel(codePathNode) {
+							// These are dangerous if you have inline requires enabled.
 							ctx.ReportNode(hook, buildTopLevelHookMessage(hookText))
 						} else if isSomewhereInsideComponentOrHook && !isUseHook {
+							// Assume in all other cases the user called a hook in some
+							// random function callback. This should usually be true for
+							// anonymous function expressions. Hopefully this is clarifying
+							// enough in the common case that the incorrect message in
+							// uncommon cases doesn't matter.
+							// `use(...)` can be called in callbacks.
 							ctx.ReportNode(hook, buildGenericHookMessage(hookText))
 						}
 					}
@@ -569,16 +581,52 @@ func getFunctionName(node *ast.Node) string {
 		// Function declaration or function expression names win over any
 		// assignment statements or other renames.
 		return node.AsFunctionDeclaration().Name().Text()
+	case ast.KindFunctionExpression:
+		name := node.AsFunctionExpression().Name()
+		if name != nil {
+			return node.AsFunctionExpression().Name().Text()
+		}
 	case ast.KindArrowFunction:
-		// const useHook = () => {};
-		return node.AsArrowFunction().Text()
+		if node.Parent != nil {
+			switch node.Parent.Kind {
+			case ast.KindVariableDeclaration, // const useHook = () => {};
+				ast.KindShorthandPropertyAssignment, // ({k = () => { useState(); }} = {});
+				ast.KindBindingElement,              // const {j = () => { useState(); }} = {};
+				ast.KindPropertyAssignment:          // ({f: () => { useState(); }});
+				if ast.IsInExpressionContext(node) {
+					return node.Parent.Name().Text()
+				}
+			case ast.KindBinaryExpression:
+				if node.Parent.AsBinaryExpression().Right == node {
+					left := node.Parent.AsBinaryExpression().Left
+					switch left.Kind {
+					case ast.KindIdentifier:
+						// e = () => { useState(); };
+						return left.AsIdentifier().Text
+					case ast.KindPropertyAccessExpression:
+						// Namespace.useHook = () => { useState(); };
+						return left.AsPropertyAccessExpression().Name().Text()
+					}
+				}
+			}
+		}
+		return ""
 	case ast.KindMethodDeclaration:
+		// NOTE: We could also support `ClassProperty` and `MethodDefinition`
+		// here to be pedantic. However, hooks in a class are an anti-pattern. So
+		// we don't allow it to error early.
+		//
+		// class {useHook = () => {}}
+		// class {useHook() {}}
+		if ast.GetContainingClass(node) != nil {
+			return ""
+		}
+
 		// {useHook: () => {}}
 		// {useHook() {}}
-		return node.AsMethodDeclaration().Text()
-	default:
-		return ""
+		return node.AsMethodDeclaration().Name().Text()
 	}
+	return ""
 }
 
 // Helper function to check if node is inside a component or hook
@@ -588,10 +636,10 @@ func isInsideComponentOrHook(node *ast.Node) bool {
 	current := node
 	for current != nil {
 		functionName := getFunctionName(current)
-		if isComponentName(functionName) || isHookName(functionName) {
+		if functionName != "" && (isComponentName(functionName) || isHookName(functionName)) {
 			return true
 		}
-		if isForwardRefCallback(node) || isMemoCallback(node) {
+		if isForwardRefCallback(current) || isMemoCallback(current) {
 			return true
 		}
 		current = current.Parent
@@ -666,22 +714,10 @@ func isInsideClass(node *ast.Node) bool {
 
 // Helper function to check if node is inside an async function
 func isInsideAsyncFunction(node *ast.Node) bool {
-	current := node.Parent
+	current := node
 	for current != nil {
-		if isFunctionLike(current) {
-			// TODO: Check if function has async modifier
-			// This requires checking the modifiers array
-			// For now, check specific function types
-			if current.Kind == ast.KindFunctionDeclaration {
-				funcDecl := current.AsFunctionDeclaration()
-				if funcDecl != nil {
-					// TODO: Check for async modifier in modifiers
-					return false // placeholder
-				}
-			} else if current.Kind == ast.KindArrowFunction {
-				// TODO: Check for async modifier
-				return false // placeholder
-			}
+		if isAsyncFunction(current) {
+			return true
 		}
 		current = current.Parent
 	}
@@ -756,14 +792,15 @@ func isHookCall(node *ast.Node) (bool, string) {
 
 // Helper function to check if node is at top level
 func isTopLevel(node *ast.Node) bool {
-	current := node.Parent
-	for current != nil {
-		if isFunctionLike(current) {
-			return false
-		}
-		current = current.Parent
-	}
-	return true
+	// current := node.Parent
+	// for current != nil {
+	// 	if isFunctionLike(current) {
+	// 		return false
+	// 	}
+	// 	current = current.Parent
+	// }
+	// return true
+	return node.Kind == ast.KindSourceFile
 }
 
 // Helper function to check if a call expression is a React function
@@ -864,8 +901,9 @@ func isInsideDoWhileLoop(node *ast.Node) bool {
 
 // Helper function to check if function is async
 func isAsyncFunction(node *ast.Node) bool {
-	// This is a simplified implementation
-	// You would check the modifiers for async keyword
+	if isFunctionLike(node) {
+		return ast.HasSyntacticModifier(node, ast.ModifierFlagsAsync)
+	}
 	return false
 }
 
@@ -919,8 +957,7 @@ func getScope(node *ast.Node) *ast.Node {
 
 // Helper function to record all useEffectEvent functions (simplified)
 func recordAllUseEffectEventFunctions(scope *ast.Node) {
-	// This is a simplified implementation
-	// In a real implementation, you would traverse the scope and find all useEffectEvent declarations
+	// !!! useEffectEvent
 }
 
 // Helper function to check if we're inside a component or hook (from scope context)

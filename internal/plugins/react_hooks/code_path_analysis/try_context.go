@@ -27,8 +27,8 @@ func NewTryContext(state *CodePathState, hasFinalizer bool) *TryContext {
 }
 
 // Creates a context object of TryStatement and stacks it.
-func (s *CodePathState) PushTryContext(hasFinalizer bool) *TryContext {
-	return NewTryContext(s, hasFinalizer)
+func (s *CodePathState) PushTryContext(hasFinalizer bool) {
+	s.tryContext = NewTryContext(s, hasFinalizer)
 }
 
 // PopTryContext pops the last context of TryStatement and finalizes it.
@@ -63,12 +63,16 @@ func (s *CodePathState) PopTryContext() {
 		returnCtx := s.getReturnContext()
 		if returnCtx != nil {
 			returnCtx.returnedForkContext.Add(leavingSegments)
+		} else {
+			s.addReturnedSegments(leavingSegments)
 		}
 	}
 	if !thrown.IsEmpty() {
 		throwCtx := s.getThrowContext()
 		if throwCtx != nil {
 			throwCtx.thrownForkContext.Add(leavingSegments)
+		} else {
+			s.addThrownSegments(leavingSegments)
 		}
 	}
 
@@ -223,6 +227,8 @@ func (s *CodePathState) MakeThrow() {
 		throwCtx := s.getThrowContext()
 		if throwCtx != nil {
 			throwCtx.thrownForkContext.Add(forkContext.Head())
+		} else {
+			s.addThrownSegments(forkContext.Head())
 		}
 		forkContext.ReplaceHead(forkContext.MakeUnreachable(-1, -1))
 	}

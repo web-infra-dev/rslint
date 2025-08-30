@@ -198,10 +198,10 @@ func (analyzer *CodePathAnalyzer) preprocess(node *ast.Node) {
 			state.MakeForInOfBody()
 		}
 
-	case ast.KindBindingElement:
+	case ast.KindParameter:
 		// Handle assignment patterns (destructuring with defaults)
-		bindingElem := parent.AsBindingElement()
-		if bindingElem.Initializer == node {
+		parameterDecl := parent.AsParameterDeclaration()
+		if parameterDecl.Initializer == node {
 			state.PushForkContext(nil)
 			state.ForkBypassPath()
 			state.ForkPath()
@@ -234,7 +234,10 @@ func (analyzer *CodePathAnalyzer) processCodePathToEnter(node *ast.Node) {
 	case ast.KindSourceFile:
 		analyzer.startCodePath("program", node)
 
-	case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction:
+	case ast.KindFunctionDeclaration,
+		ast.KindFunctionExpression,
+		ast.KindArrowFunction,
+		ast.KindMethodDeclaration:
 		analyzer.startCodePath("function", node)
 
 	case ast.KindClassStaticBlockDeclaration:
@@ -304,7 +307,7 @@ func (analyzer *CodePathAnalyzer) processCodePathToEnter(node *ast.Node) {
 		label := getLabel(node)
 		state.PushLoopContext(ForOfStatement, label)
 	case ast.KindLabeledStatement:
-		if !isBreakableType(node.Body().Kind) {
+		if !isBreakableType(node.AsLabeledStatement().Statement.Kind) {
 			state.PushBreakContext(false, node.Label().Text())
 		}
 	default:
@@ -334,7 +337,7 @@ func (analyzer *CodePathAnalyzer) processCodePathToExit(node *ast.Node) {
 		binExpr := node.AsBinaryExpression()
 		if isHandledLogicalOperator(binExpr.OperatorToken.Kind) ||
 			isLogicalAssignmentOperator(binExpr.OperatorToken.Kind) {
-			state.PopBreakContext()
+			state.PopChoiceContext()
 		}
 
 	case ast.KindSwitchStatement:
@@ -398,12 +401,13 @@ func (analyzer *CodePathAnalyzer) processCodePathToExit(node *ast.Node) {
 	case ast.KindWhileStatement, ast.KindDoStatement, ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement:
 		state.PopLoopContext()
 
-	case ast.KindBindingElement:
-		state.PopForkContext()
+	case ast.KindParameter:
+		if node.Initializer() != nil {
+			state.PopForkContext()
+		}
 
 	case ast.KindLabeledStatement:
-		labeledStmt := node.AsLabeledStatement()
-		if !isBreakableType(labeledStmt.Body().Kind) {
+		if !isBreakableType(node.AsLabeledStatement().Statement.Kind) {
 			state.PopBreakContext()
 		}
 
@@ -423,7 +427,8 @@ func (analyzer *CodePathAnalyzer) postprocess(node *ast.Node) {
 		ast.KindFunctionDeclaration,
 		ast.KindFunctionExpression,
 		ast.KindArrowFunction,
-		ast.KindClassStaticBlockDeclaration:
+		ast.KindClassStaticBlockDeclaration,
+		ast.KindMethodDeclaration:
 		analyzer.endCodePath(node)
 
 	// The `arguments.length >= 1` case is in `preprocess` function.

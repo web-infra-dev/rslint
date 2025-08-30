@@ -133,6 +133,8 @@ func (s *CodePathState) MakeReturn() {
 		returnCtx := s.getReturnContext()
 		if returnCtx != nil {
 			returnCtx.returnedForkContext.Add(forkContext.Head())
+		} else {
+			s.addReturnedSegments(forkContext.Head())
 		}
 		forkContext.ReplaceHead(forkContext.MakeUnreachable(-1, -1))
 	}

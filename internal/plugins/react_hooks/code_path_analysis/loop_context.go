@@ -97,18 +97,22 @@ func NewLoopContextForForOfStatement(state *CodePathState, label string) *LoopCo
 }
 
 // Creates a context object of a loop statement and stacks it.
-func (s *CodePathState) PushLoopContext(kind LoopStatementKind, label string) *LoopContext {
+func (s *CodePathState) PushLoopContext(kind LoopStatementKind, label string) {
+	s.PushBreakContext(true, label)
 	switch kind {
 	case WhileStatement:
-		return NewLoopContextForWhileStatement(s, label)
+		s.PushChoiceContext("loop", false)
+		s.loopContext = NewLoopContextForWhileStatement(s, label)
 	case DoWhileStatement:
-		return NewLoopContextForDoWhileStatement(s, label)
+		s.PushChoiceContext("loop", false)
+		s.loopContext = NewLoopContextForDoWhileStatement(s, label)
 	case ForStatement:
-		return NewLoopContextForForStatement(s, label)
+		s.PushChoiceContext("loop", false)
+		s.loopContext = NewLoopContextForForStatement(s, label)
 	case ForInStatement:
-		return NewLoopContextForForInStatement(s, label)
+		s.loopContext = NewLoopContextForForInStatement(s, label)
 	case ForOfStatement:
-		return NewLoopContextForForOfStatement(s, label)
+		s.loopContext = NewLoopContextForForOfStatement(s, label)
 	default:
 		panic("unknown statement kind")
 	}
@@ -127,7 +131,7 @@ func (s *CodePathState) PopLoopContext() {
 	case WhileStatement, ForStatement:
 		{
 			s.PopChoiceContext()
-			s.MakeLooped(forkContext.Head(), context.upper.continueDestSegments)
+			s.MakeLooped(forkContext.Head(), context.continueDestSegments)
 		}
 	case DoWhileStatement:
 		{

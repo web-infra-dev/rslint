@@ -134,7 +134,7 @@ func (s *CodePathState) addReturnedSegments(segments []*CodePathSegment) {
 
 func (s *CodePathState) addThrownSegments(segments []*CodePathSegment) {
 	for _, segment := range segments {
-		s.returnedSegments = append(s.thrownSegments, segment)
+		s.thrownSegments = append(s.thrownSegments, segment)
 
 		for _, returnSegment := range s.returnedSegments {
 			if returnSegment == segment {
