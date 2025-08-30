@@ -48,13 +48,13 @@ Program {
 const Playground: React.FC = () => {
   const editorRef = useRef<EditorRef | null>(null);
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
+  const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [ast, setAst] = useState<string | undefined>();
 
   async function runLint() {
     try {
       setError(undefined);
-
       const service = await ensureService();
       const code = editorRef.current?.getValue() ?? '';
 
@@ -67,6 +67,7 @@ const Playground: React.FC = () => {
           '@typescript-eslint/no-unsafe-member-access': 'error',
         },
       });
+      setInitialized(true);
 
       // Convert diagnostics to the expected format
       const convertedDiagnostics: Diagnostic[] = result.diagnostics.map(
@@ -109,7 +110,12 @@ const Playground: React.FC = () => {
       <div className="editor-panel">
         <Editor ref={editorRef} onChange={() => runLint()} />
       </div>
-      <ResultPanel diagnostics={diagnostics} ast={ast} error={error} />
+      <ResultPanel
+        initialized={initialized}
+        diagnostics={diagnostics}
+        ast={ast}
+        error={error}
+      />
     </div>
   );
 };
