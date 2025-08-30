@@ -1,0 +1,36 @@
+diff --git a/_packages/api/src/api.ts b/_packages/api/src/api.ts
+index fbfc32391..f8487d67c 100644
+--- a/_packages/api/src/api.ts
++++ b/_packages/api/src/api.ts
+@@ -16,7 +16,7 @@ import type {
+     TypeResponse,
+ } from "./proto.ts";
+ 
+-export { SymbolFlags, TypeFlags };
++export { SymbolFlags, TypeFlags, RemoteSourceFile, type Node };
+ 
+ export interface APIOptions {
+     tsserverPath: string;
+diff --git a/_packages/api/src/client.ts b/_packages/api/src/client.ts
+index 2c9e21e44..a7f59ac2e 100644
+--- a/_packages/api/src/client.ts
++++ b/_packages/api/src/client.ts
+@@ -29,12 +29,12 @@ export class Client {
+         );
+ 
+         if (options.fs) {
+-            for (const [key, callback] of Object.entries(options.fs)) {
+-                this.channel.registerCallback(key, (_, arg) => {
+-                    const result = callback(JSON.parse(arg));
+-                    return JSON.stringify(result) ?? "";
+-                });
+-            }
++            // for (const [key, callback] of Object.entries(options.fs)) {
++            //     this.channel.registerCallback(key, (_, arg) => {
++            //         const result = callback(JSON.parse(arg));
++            //         return JSON.stringify(result) ?? "";
++            //     });
++            // }
+         }
+     }
+ 

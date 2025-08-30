@@ -49,3 +49,6 @@ runs:
           ~/.cache/go-build
           ~/Library/Caches/go-build
           ~/AppData/Local/go-build
+
+    - name: Patch tsgo
+      run: npm run patch:tsgo

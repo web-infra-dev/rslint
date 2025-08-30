@@ -128,10 +128,14 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		programs = append(programs, program)
 	}
 
-	// Collect diagnostics
+	// Collect diagnostics and source files
 	var diagnostics []api.Diagnostic
 	var diagnosticsLock sync.Mutex
 	errorsCount := 0
+	
+	// Track source files for encoding
+	sourceFiles := make(map[string]*ast.SourceFile)
+	var sourceFilesLock sync.Mutex
 
 	// Create collector function
 	diagnosticCollector := func(d rule.RuleDiagnostic) {
@@ -181,6 +185,12 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 
 		diagnostics = append(diagnostics, diagnostic)
 		errorsCount++
+		
+		// Track source file for encoding
+		sourceFilesLock.Lock()
+		filePath := tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions)
+		sourceFiles[filePath] = d.SourceFile
+		sourceFilesLock.Unlock()
 	}
 
 	// Run linter
@@ -209,13 +219,30 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	if diagnostics == nil {
 		diagnostics = []api.Diagnostic{}
 	}
+	
 	// Create response
-	return &api.LintResponse{
+	response := &api.LintResponse{
 		Diagnostics: diagnostics,
 		ErrorCount:  errorsCount,
 		FileCount:   int(lintedFilesCount),
 		RuleCount:   len(rulesWithOptions),
-	}, nil
+	}
+	// Only include encoded source files if requested
+	if req.IncludeEncodedSourceFiles {
+		encodedSourceFiles := make(map[string]api.ByteArray)
+		for filePath, sourceFile := range sourceFiles {
+			encoded, err := api.EncodeAST(sourceFile, filePath)
+			
+			if err != nil {
+				// Log error but don't fail the entire request
+				fmt.Fprintf(os.Stderr, "warning: failed to encode source file %s: %v\n", filePath, err)
+				continue
+			}
+			encodedSourceFiles[filePath] = encoded
+		}
+		response.EncodedSourceFiles = encodedSourceFiles
+	}
+	return response, nil
 }
 
 // HandleApplyFixes handles apply fixes requests in IPC mode
