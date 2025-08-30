@@ -1,4 +1,5 @@
 **/dist
+**/.rslib
 **/coverage
 **/.vscode
 **/.nyc_output

@@ -349,7 +349,7 @@ describe('CLI Configuration Tests', () => {
             },
           },
           rules: {
-            'no-unsafe-member-access': 'error',
+            '@typescript-eslint/no-unsafe-member-access': 'error',
           },
           plugins: ['@typescript-eslint'],
         },
@@ -391,7 +391,7 @@ describe('CLI Configuration Tests', () => {
             },
           },
           rules: {
-            'no-unsafe-member-access': 'error',
+            '@typescript-eslint/no-unsafe-member-access': 'error',
           },
           plugins: ['@typescript-eslint'],
         },
