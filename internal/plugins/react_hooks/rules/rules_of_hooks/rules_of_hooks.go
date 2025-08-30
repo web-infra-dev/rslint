@@ -345,7 +345,7 @@ var RulesOfHooksRule = rule.Rule{
 						if isInsideClass(codePathNode) {
 							ctx.ReportNode(hook, buildClassHookMessage(hookText))
 						} else if codePathFunctionName != "" {
-							// Custom message if we found an invalid function name.kj
+							// Custom message if we found an invalid function name.
 							ctx.ReportNode(hook, buildFunctionHookMessage(hookText, codePathFunctionName))
 						} else if isTopLevel(codePathNode) {
 							// These are dangerous if you have inline requires enabled.
@@ -656,49 +656,6 @@ func isFunctionLike(node *ast.Node) bool {
 		kind == ast.KindMethodDeclaration
 }
 
-// Helper function to check if node is inside a loop
-// func isInsideLoop(node *ast.Node) bool {
-// 	current := node.Parent
-// 	for current != nil {
-// 		kind := current.Kind
-// 		if kind == ast.KindForStatement ||
-// 			kind == ast.KindForInStatement ||
-// 			kind == ast.KindForOfStatement ||
-// 			kind == ast.KindWhileStatement ||
-// 			kind == ast.KindDoStatement {
-// 			return true
-// 		}
-// 		current = current.Parent
-// 	}
-// 	return false
-// }
-
-// Helper function to check if node is inside a conditional
-// func isInsideConditional(node *ast.Node) bool {
-// 	current := node.Parent
-// 	for current != nil {
-// 		kind := current.Kind
-// 		if kind == ast.KindIfStatement ||
-// 			kind == ast.KindConditionalExpression {
-// 			return true
-// 		}
-// 		// TODO: Check for logical operators (&& || ??)
-// 		if kind == ast.KindBinaryExpression {
-// 			binExpr := current.AsBinaryExpression()
-// 			if binExpr != nil {
-// 				op := binExpr.OperatorToken.Kind
-// 				if op == ast.KindAmpersandAmpersandToken ||
-// 					op == ast.KindBarBarToken ||
-// 					op == ast.KindQuestionQuestionToken {
-// 					return true
-// 				}
-// 			}
-// 		}
-// 		current = current.Parent
-// 	}
-// 	return false
-// }
-
 // Helper function to check if node is inside a class
 func isInsideClass(node *ast.Node) bool {
 	current := node.Parent
@@ -742,64 +699,8 @@ func isUseIdentifier(node *ast.Node) bool {
 	return isReactFunction(node, "use")
 }
 
-// Helper function to check if call expression is a hook call
-// func isHookCall(node *ast.Node) (bool, string) {
-// 	if node.Kind != ast.KindCallExpression {
-// 		return false, ""
-// 	}
-
-// 	callExpr := node.AsCallExpression()
-// 	if callExpr == nil {
-// 		return false, ""
-// 	}
-
-// 	// Get the callee and extract the hook name
-// 	// Handle different call patterns:
-// 	// - useHook()
-// 	// - React.useHook()
-// 	// - obj.useHook()
-// 	callee := callExpr.Expression
-// 	if callee == nil {
-// 		return false, ""
-// 	}
-
-// 	switch callee.Kind {
-// 	case ast.KindIdentifier:
-// 		// Direct call: useHook()
-// 		identifier := callee.AsIdentifier()
-// 		if identifier != nil {
-// 			name := scanner.GetTextOfNode(&identifier.Node)
-// 			if isHookName(name) {
-// 				return true, name
-// 			}
-// 		}
-// 	case ast.KindPropertyAccessExpression:
-// 		// Property access: React.useHook(), obj.useHook()
-// 		propAccess := callee.AsPropertyAccessExpression()
-// 		if propAccess != nil {
-// 			nameNode := propAccess.Name()
-// 			if nameNode != nil {
-// 				name := scanner.GetTextOfNode(nameNode)
-// 				if isHookName(name) {
-// 					return true, name
-// 				}
-// 			}
-// 		}
-// 	}
-
-// 	return false, ""
-// }
-
 // Helper function to check if node is at top level
 func isTopLevel(node *ast.Node) bool {
-	// current := node.Parent
-	// for current != nil {
-	// 	if isFunctionLike(current) {
-	// 		return false
-	// 	}
-	// 	current = current.Parent
-	// }
-	// return true
 	return node.Kind == ast.KindSourceFile
 }
 
