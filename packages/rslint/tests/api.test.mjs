@@ -1,7 +1,7 @@
 import { lint, applyFixes } from '@rslint/core';
 import { describe, test, expect } from '@rstest/core';
 import path from 'node:path';
-import { RemoteSourceFile,Node } from '@rslint/api';
+import { RemoteSourceFile, Node } from '@rslint/api';
 
 describe('lint api', async t => {
   let cwd = path.resolve(import.meta.dirname, '../fixtures');
@@ -103,7 +103,10 @@ describe('encoded source files', async t => {
   const fileContent = `let x: string = "hello";const y = x as string;`;
   test('encoded source files', async t => {
     const diags = await lint({
-      config: path.resolve(import.meta.dirname, '../fixtures/rslint.virtual.json'),
+      config: path.resolve(
+        import.meta.dirname,
+        '../fixtures/rslint.virtual.json',
+      ),
       workingDirectory: cwd,
       ruleOptions: {
         '@typescript-eslint/no-unnecessary-type-assertion': 'error',
@@ -116,10 +119,10 @@ describe('encoded source files', async t => {
     const content = diags.encodedSourceFiles['src/virtual.ts'];
     // decode content from base64 to uint8array
     const buffer = Uint8Array.from(atob(content), c => c.charCodeAt(0));
-    
-    const sourceFile = new RemoteSourceFile(buffer, new TextDecoder())
-    
-    const source = sourceFile.text
-    expect(source).toBe(fileContent)
+
+    const sourceFile = new RemoteSourceFile(buffer, new TextDecoder());
+
+    const source = sourceFile.text;
+    expect(source).toBe(fileContent);
   });
 });
