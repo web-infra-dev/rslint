@@ -117,7 +117,7 @@ describe('encoded source files', async t => {
     // decode content from base64 to uint8array
     const buffer = Uint8Array.from(atob(content), c => c.charCodeAt(0));
     
-    const sourceFile = new  RemoteSourceFile(buffer, new TextDecoder())
+    const sourceFile = new RemoteSourceFile(buffer, new TextDecoder())
     
     const source = sourceFile.text
     expect(source).toBe(fileContent)
