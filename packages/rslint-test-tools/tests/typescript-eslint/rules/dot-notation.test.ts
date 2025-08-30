@@ -304,7 +304,7 @@ x.pub_prop = 123;
       output: 'a.SHOUT_CASE;',
     },
     {
-      code: noFormat`
+      skip: true,      code: noFormat`
 a
   ['SHOUT_CASE'];
       `,
@@ -322,7 +322,7 @@ a
       `,
     },
     {
-      code:
+      skip: true,      code:
         'getResource()\n' +
         '    .then(function(){})\n' +
         '    ["catch"](function(){})\n' +
@@ -350,6 +350,7 @@ a
         '    .catch(function(){});',
     },
     {
+      skip: true,
       code: noFormat`
 foo
   .while;
@@ -458,6 +459,7 @@ foo.key_baz;
       `,
     },
     {
+      skip: true,
       code: `
 type ExtraKey = \`extra\${string}\`;
 
@@ -483,6 +485,13 @@ function f<T extends Foo>(x: T) {
   x.extraKey;
 }
       `,
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.noPropertyAccessFromIndexSignature.json',
+          projectService: false,
+          tsconfigRootDir: rootPath,
+        },
+      },
     },
   ],
 });

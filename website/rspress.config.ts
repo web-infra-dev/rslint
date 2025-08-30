@@ -36,6 +36,8 @@ export default defineConfig({
     // exclude document fragments from routes
     exclude: ['**/zh/shared/**', '**/en/shared/**', './theme'],
   },
+  globalStyles: path.join(__dirname, 'styles/index.css'),
+  ssg: false,
   themeConfig: {
     socialLinks: [
       {
@@ -64,6 +66,15 @@ export default defineConfig({
     pluginLlms(),
   ],
   builderConfig: {
+    tools: {
+      rspack(config) {
+        config.ignoreWarnings = [
+          {
+            module: /editorSimpleWorker\.js/,
+          },
+        ];
+      },
+    },
     plugins: [
       pluginSass(),
       pluginGoogleAnalytics({

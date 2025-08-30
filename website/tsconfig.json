@@ -12,11 +12,13 @@
     "moduleResolution": "bundler",
     "useDefineForClassFields": true,
     "allowImportingTsExtensions": true,
+    "baseUrl": ".",
     "paths": {
       "@theme": ["./theme"],
       "@components/*": ["./theme/components/*"],
       "@zh/*": ["./docs/zh/*"],
       "@en/*": ["./docs/en/*"],
+      "@/*": ["./*"],
       "i18n": ["./i18n.json"]
     }
   },

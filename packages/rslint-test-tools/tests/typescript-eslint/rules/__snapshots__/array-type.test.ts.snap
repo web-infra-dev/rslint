@@ -2,6 +2,7 @@
 
 exports[`array-type > invalid 1`] = `
 {
+  "code": "let a: Array<number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<number>' is forbidden. Use 'number[]' instead.",
@@ -21,12 +22,14 @@ exports[`array-type > invalid 1`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: number[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 2`] = `
 {
+  "code": "let a: Array<string | number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
@@ -46,12 +49,14 @@ exports[`array-type > invalid 2`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: (string | number)[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 3`] = `
 {
+  "code": "let a: ReadonlyArray<number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'ReadonlyArray<number>' is forbidden. Use 'readonly number[]' instead.",
@@ -71,12 +76,14 @@ exports[`array-type > invalid 3`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: readonly number[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 4`] = `
 {
+  "code": "let a: ReadonlyArray<string | number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'ReadonlyArray<T>' is forbidden. Use 'readonly T[]' instead.",
@@ -96,12 +103,14 @@ exports[`array-type > invalid 4`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: readonly (string | number)[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 5`] = `
 {
+  "code": "let a: Array<number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<number>' is forbidden. Use 'number[]' instead.",
@@ -121,12 +130,14 @@ exports[`array-type > invalid 5`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: number[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 6`] = `
 {
+  "code": "let a: Array<string | number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
@@ -146,12 +157,14 @@ exports[`array-type > invalid 6`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: (string | number)[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 7`] = `
 {
+  "code": "let a: ReadonlyArray<number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'ReadonlyArray<number>' is forbidden. Use 'readonly number[]' instead.",
@@ -171,12 +184,14 @@ exports[`array-type > invalid 7`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: readonly number[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 8`] = `
 {
+  "code": "let a: ReadonlyArray<string | number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'ReadonlyArray<T>' is forbidden. Use 'readonly T[]' instead.",
@@ -196,12 +211,14 @@ exports[`array-type > invalid 8`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: readonly (string | number)[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 9`] = `
 {
+  "code": "let a: Array<number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<number>' is forbidden. Use 'number[]' instead.",
@@ -221,12 +238,14 @@ exports[`array-type > invalid 9`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: number[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 10`] = `
 {
+  "code": "let a: Array<string | number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
@@ -246,12 +265,14 @@ exports[`array-type > invalid 10`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: (string | number)[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 11`] = `
 {
+  "code": "let a: ReadonlyArray<number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'ReadonlyArray<number>' is forbidden for simple types. Use 'readonly number[]' instead.",
@@ -271,12 +292,14 @@ exports[`array-type > invalid 11`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: readonly number[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 12`] = `
 {
+  "code": "let a: readonly (string | number)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'readonly T[]' is forbidden for non-simple types. Use 'ReadonlyArray<T>' instead.",
@@ -296,12 +319,14 @@ exports[`array-type > invalid 12`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: ReadonlyArray<string | number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 13`] = `
 {
+  "code": "let a: Array<number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<number>' is forbidden. Use 'number[]' instead.",
@@ -321,12 +346,14 @@ exports[`array-type > invalid 13`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: number[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 14`] = `
 {
+  "code": "let a: Array<string | number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
@@ -346,12 +373,14 @@ exports[`array-type > invalid 14`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: (string | number)[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 15`] = `
 {
+  "code": "let a: readonly number[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'readonly number[]' is forbidden. Use 'ReadonlyArray<number>' instead.",
@@ -371,12 +400,14 @@ exports[`array-type > invalid 15`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: ReadonlyArray<number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 16`] = `
 {
+  "code": "let a: readonly (string | number)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'readonly T[]' is forbidden. Use 'ReadonlyArray<T>' instead.",
@@ -396,12 +427,14 @@ exports[`array-type > invalid 16`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: ReadonlyArray<string | number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 17`] = `
 {
+  "code": "let a: Array<number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<number>' is forbidden for simple types. Use 'number[]' instead.",
@@ -421,12 +454,14 @@ exports[`array-type > invalid 17`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: number[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 18`] = `
 {
+  "code": "let a: (string | number)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
@@ -446,12 +481,14 @@ exports[`array-type > invalid 18`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: Array<string | number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 19`] = `
 {
+  "code": "let a: ReadonlyArray<number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'ReadonlyArray<number>' is forbidden for simple types. Use 'readonly number[]' instead.",
@@ -471,12 +508,14 @@ exports[`array-type > invalid 19`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: readonly number[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 20`] = `
 {
+  "code": "let a: readonly (string | number)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'readonly T[]' is forbidden for non-simple types. Use 'ReadonlyArray<T>' instead.",
@@ -496,12 +535,14 @@ exports[`array-type > invalid 20`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: ReadonlyArray<string | number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 21`] = `
 {
+  "code": "let a: Array<number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<number>' is forbidden for simple types. Use 'number[]' instead.",
@@ -521,12 +562,14 @@ exports[`array-type > invalid 21`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: number[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 22`] = `
 {
+  "code": "let a: (string | number)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
@@ -546,12 +589,14 @@ exports[`array-type > invalid 22`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: Array<string | number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 23`] = `
 {
+  "code": "let a: ReadonlyArray<number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'ReadonlyArray<number>' is forbidden. Use 'readonly number[]' instead.",
@@ -571,12 +616,14 @@ exports[`array-type > invalid 23`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: readonly number[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 24`] = `
 {
+  "code": "let a: ReadonlyArray<string | number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'ReadonlyArray<T>' is forbidden. Use 'readonly T[]' instead.",
@@ -596,12 +643,14 @@ exports[`array-type > invalid 24`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: readonly (string | number)[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 25`] = `
 {
+  "code": "let a: Array<number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<number>' is forbidden for simple types. Use 'number[]' instead.",
@@ -621,12 +670,14 @@ exports[`array-type > invalid 25`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: number[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 26`] = `
 {
+  "code": "let a: (string | number)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
@@ -646,12 +697,14 @@ exports[`array-type > invalid 26`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: Array<string | number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 27`] = `
 {
+  "code": "let a: ReadonlyArray<number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'ReadonlyArray<number>' is forbidden for simple types. Use 'readonly number[]' instead.",
@@ -671,12 +724,14 @@ exports[`array-type > invalid 27`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: readonly number[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 28`] = `
 {
+  "code": "let a: readonly (string | number)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'readonly T[]' is forbidden for non-simple types. Use 'ReadonlyArray<T>' instead.",
@@ -696,12 +751,14 @@ exports[`array-type > invalid 28`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: ReadonlyArray<string | number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 29`] = `
 {
+  "code": "let a: Array<number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<number>' is forbidden for simple types. Use 'number[]' instead.",
@@ -721,12 +778,14 @@ exports[`array-type > invalid 29`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: number[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 30`] = `
 {
+  "code": "let a: (string | number)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
@@ -746,12 +805,14 @@ exports[`array-type > invalid 30`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: Array<string | number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 31`] = `
 {
+  "code": "let a: readonly number[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'readonly number[]' is forbidden. Use 'ReadonlyArray<number>' instead.",
@@ -771,12 +832,14 @@ exports[`array-type > invalid 31`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: ReadonlyArray<number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 32`] = `
 {
+  "code": "let a: readonly (string | number)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'readonly T[]' is forbidden. Use 'ReadonlyArray<T>' instead.",
@@ -796,12 +859,14 @@ exports[`array-type > invalid 32`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: ReadonlyArray<string | number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 33`] = `
 {
+  "code": "let a: number[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'number[]' is forbidden. Use 'Array<number>' instead.",
@@ -821,12 +886,14 @@ exports[`array-type > invalid 33`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: Array<number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 34`] = `
 {
+  "code": "let a: (string | number)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
@@ -846,12 +913,14 @@ exports[`array-type > invalid 34`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: Array<string | number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 35`] = `
 {
+  "code": "let a: readonly number[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'readonly number[]' is forbidden. Use 'ReadonlyArray<number>' instead.",
@@ -871,12 +940,14 @@ exports[`array-type > invalid 35`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: ReadonlyArray<number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 36`] = `
 {
+  "code": "let a: readonly (string | number)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'readonly T[]' is forbidden. Use 'ReadonlyArray<T>' instead.",
@@ -896,12 +967,14 @@ exports[`array-type > invalid 36`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: ReadonlyArray<string | number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 37`] = `
 {
+  "code": "let a: number[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'number[]' is forbidden. Use 'Array<number>' instead.",
@@ -921,12 +994,14 @@ exports[`array-type > invalid 37`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: Array<number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 38`] = `
 {
+  "code": "let a: (string | number)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
@@ -946,12 +1021,14 @@ exports[`array-type > invalid 38`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: Array<string | number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 39`] = `
 {
+  "code": "let a: ReadonlyArray<number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'ReadonlyArray<number>' is forbidden. Use 'readonly number[]' instead.",
@@ -971,12 +1048,14 @@ exports[`array-type > invalid 39`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: readonly number[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 40`] = `
 {
+  "code": "let a: ReadonlyArray<string | number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'ReadonlyArray<T>' is forbidden. Use 'readonly T[]' instead.",
@@ -996,12 +1075,14 @@ exports[`array-type > invalid 40`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: readonly (string | number)[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 41`] = `
 {
+  "code": "let a: number[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'number[]' is forbidden. Use 'Array<number>' instead.",
@@ -1021,12 +1102,14 @@ exports[`array-type > invalid 41`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: Array<number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 42`] = `
 {
+  "code": "let a: (string | number)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
@@ -1046,12 +1129,14 @@ exports[`array-type > invalid 42`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: Array<string | number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 43`] = `
 {
+  "code": "let a: ReadonlyArray<number> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'ReadonlyArray<number>' is forbidden for simple types. Use 'readonly number[]' instead.",
@@ -1071,12 +1156,14 @@ exports[`array-type > invalid 43`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: readonly number[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 44`] = `
 {
+  "code": "let a: readonly (string | number)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'readonly T[]' is forbidden for non-simple types. Use 'ReadonlyArray<T>' instead.",
@@ -1096,12 +1183,14 @@ exports[`array-type > invalid 44`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: ReadonlyArray<string | number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 45`] = `
 {
+  "code": "let a: number[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'number[]' is forbidden. Use 'Array<number>' instead.",
@@ -1121,12 +1210,14 @@ exports[`array-type > invalid 45`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: Array<number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 46`] = `
 {
+  "code": "let a: (string | number)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
@@ -1146,12 +1237,14 @@ exports[`array-type > invalid 46`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: Array<string | number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 47`] = `
 {
+  "code": "let a: readonly number[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'readonly number[]' is forbidden. Use 'ReadonlyArray<number>' instead.",
@@ -1171,12 +1264,14 @@ exports[`array-type > invalid 47`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: ReadonlyArray<number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 48`] = `
 {
+  "code": "let a: readonly (string | number)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'readonly T[]' is forbidden. Use 'ReadonlyArray<T>' instead.",
@@ -1196,12 +1291,14 @@ exports[`array-type > invalid 48`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: ReadonlyArray<string | number> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 49`] = `
 {
+  "code": "let a: bigint[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'bigint[]' is forbidden. Use 'Array<bigint>' instead.",
@@ -1221,12 +1318,14 @@ exports[`array-type > invalid 49`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: Array<bigint> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 50`] = `
 {
+  "code": "let a: (string | bigint)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
@@ -1246,12 +1345,14 @@ exports[`array-type > invalid 50`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: Array<string | bigint> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 51`] = `
 {
+  "code": "let a: ReadonlyArray<bigint> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'ReadonlyArray<bigint>' is forbidden for simple types. Use 'readonly bigint[]' instead.",
@@ -1271,12 +1372,14 @@ exports[`array-type > invalid 51`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: readonly bigint[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 52`] = `
 {
+  "code": "let a: (string | bigint)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
@@ -1296,12 +1399,14 @@ exports[`array-type > invalid 52`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: Array<string | bigint> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 53`] = `
 {
+  "code": "let a: readonly bigint[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'readonly bigint[]' is forbidden. Use 'ReadonlyArray<bigint>' instead.",
@@ -1321,12 +1426,14 @@ exports[`array-type > invalid 53`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: ReadonlyArray<bigint> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 54`] = `
 {
+  "code": "let a: readonly (string | bigint)[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'readonly T[]' is forbidden. Use 'ReadonlyArray<T>' instead.",
@@ -1346,12 +1453,14 @@ exports[`array-type > invalid 54`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: ReadonlyArray<string | bigint> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 55`] = `
 {
+  "code": "let a: { foo: Array<Bar> }[] = [];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<Bar>' is forbidden. Use 'Bar[]' instead.",
@@ -1371,12 +1480,14 @@ exports[`array-type > invalid 55`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: { foo: Bar[] }[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 56`] = `
 {
+  "code": "let a: Array<{ foo: Bar[] }> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'Bar[]' is forbidden. Use 'Array<Bar>' instead.",
@@ -1396,12 +1507,14 @@ exports[`array-type > invalid 56`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: Array<{ foo: Array<Bar> }> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 57`] = `
 {
+  "code": "let a: Array<{ foo: Foo | Bar[] }> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'Bar[]' is forbidden. Use 'Array<Bar>' instead.",
@@ -1421,12 +1534,14 @@ exports[`array-type > invalid 57`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let a: Array<{ foo: Foo | Array<Bar> }> = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 58`] = `
 {
+  "code": "function foo(a: Array<Bar>): Array<Bar> {}",
   "diagnostics": [
     {
       "message": "Array type using 'Array<Bar>' is forbidden. Use 'Bar[]' instead.",
@@ -1461,12 +1576,14 @@ exports[`array-type > invalid 58`] = `
   ],
   "errorCount": 2,
   "fileCount": 1,
+  "output": "function foo(a: Bar[]): Bar[] {}",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 59`] = `
 {
+  "code": "let x: Array<undefined> = [undefined] as undefined[];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<undefined>' is forbidden for simple types. Use 'undefined[]' instead.",
@@ -1486,12 +1603,14 @@ exports[`array-type > invalid 59`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let x: undefined[] = [undefined] as undefined[];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 60`] = `
 {
+  "code": "let y: string[] = <Array<string>>['2'];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<string>' is forbidden for simple types. Use 'string[]' instead.",
@@ -1511,12 +1630,14 @@ exports[`array-type > invalid 60`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let y: string[] = <string[]>['2'];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 61`] = `
 {
+  "code": "let z: Array = [3, '4'];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<any>' is forbidden for simple types. Use 'any[]' instead.",
@@ -1536,12 +1657,14 @@ exports[`array-type > invalid 61`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let z: any[] = [3, '4'];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 62`] = `
 {
+  "code": "let ya = [[1, '2']] as [number, string][];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
@@ -1561,12 +1684,14 @@ exports[`array-type > invalid 62`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let ya = [[1, '2']] as Array<[number, string]>;",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 63`] = `
 {
+  "code": "type Arr<T> = Array<T>;",
   "diagnostics": [
     {
       "message": "Array type using 'Array<T>' is forbidden for simple types. Use 'T[]' instead.",
@@ -1586,12 +1711,17 @@ exports[`array-type > invalid 63`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "type Arr<T> = T[];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 64`] = `
 {
+  "code": "
+// Ignore user defined aliases
+let yyyy: Arr<Array<Arr<string>>[]> = [[[['2']]]];
+      ",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
@@ -1611,12 +1741,24 @@ exports[`array-type > invalid 64`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+// Ignore user defined aliases
+let yyyy: Arr<Array<Array<Arr<string>>>> = [[[['2']]]];
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 65`] = `
 {
+  "code": "
+interface ArrayClass<T> {
+  foo: Array<T>;
+  bar: T[];
+  baz: Arr<T>;
+  xyz: this[];
+}
+      ",
   "diagnostics": [
     {
       "message": "Array type using 'Array<T>' is forbidden for simple types. Use 'T[]' instead.",
@@ -1636,12 +1778,25 @@ exports[`array-type > invalid 65`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+interface ArrayClass<T> {
+  foo: T[];
+  bar: T[];
+  baz: Arr<T>;
+  xyz: this[];
+}
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 66`] = `
 {
+  "code": "
+function barFunction(bar: ArrayClass<String>[]) {
+  return bar.map(e => e.bar);
+}
+      ",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
@@ -1661,12 +1816,18 @@ exports[`array-type > invalid 66`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+function barFunction(bar: Array<ArrayClass<String>>) {
+  return bar.map(e => e.bar);
+}
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 67`] = `
 {
+  "code": "let barVar: ((c: number) => number)[];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
@@ -1686,12 +1847,14 @@ exports[`array-type > invalid 67`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let barVar: Array<(c: number) => number>;",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 68`] = `
 {
+  "code": "type barUnion = (string | number | boolean)[];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
@@ -1711,12 +1874,14 @@ exports[`array-type > invalid 68`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "type barUnion = Array<string | number | boolean>;",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 69`] = `
 {
+  "code": "type barIntersection = (string & number)[];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
@@ -1736,12 +1901,14 @@ exports[`array-type > invalid 69`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "type barIntersection = Array<string & number>;",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 70`] = `
 {
+  "code": "let v: Array<fooName.BarType> = [{ bar: 'bar' }];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<fooName.BarType>' is forbidden for simple types. Use 'fooName.BarType[]' instead.",
@@ -1761,12 +1928,14 @@ exports[`array-type > invalid 70`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let v: fooName.BarType[] = [{ bar: 'bar' }];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 71`] = `
 {
+  "code": "let w: fooName.BazType<string>[] = [['baz']];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
@@ -1786,12 +1955,14 @@ exports[`array-type > invalid 71`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let w: Array<fooName.BazType<string>> = [['baz']];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 72`] = `
 {
+  "code": "let x: Array<undefined> = [undefined] as undefined[];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<undefined>' is forbidden. Use 'undefined[]' instead.",
@@ -1811,12 +1982,14 @@ exports[`array-type > invalid 72`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let x: undefined[] = [undefined] as undefined[];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 73`] = `
 {
+  "code": "let y: string[] = <Array<string>>['2'];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<string>' is forbidden. Use 'string[]' instead.",
@@ -1836,12 +2009,14 @@ exports[`array-type > invalid 73`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let y: string[] = <string[]>['2'];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 74`] = `
 {
+  "code": "let z: Array = [3, '4'];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<any>' is forbidden. Use 'any[]' instead.",
@@ -1861,12 +2036,14 @@ exports[`array-type > invalid 74`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let z: any[] = [3, '4'];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 75`] = `
 {
+  "code": "type Arr<T> = Array<T>;",
   "diagnostics": [
     {
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
@@ -1886,12 +2063,17 @@ exports[`array-type > invalid 75`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "type Arr<T> = T[];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 76`] = `
 {
+  "code": "
+// Ignore user defined aliases
+let yyyy: Arr<Array<Arr<string>>[]> = [[[['2']]]];
+      ",
   "diagnostics": [
     {
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
@@ -1911,12 +2093,23 @@ exports[`array-type > invalid 76`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+// Ignore user defined aliases
+let yyyy: Arr<Arr<string>[][]> = [[[['2']]]];
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 77`] = `
 {
+  "code": "
+interface ArrayClass<T> {
+  foo: Array<T>;
+  bar: T[];
+  baz: Arr<T>;
+}
+      ",
   "diagnostics": [
     {
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
@@ -1936,12 +2129,24 @@ exports[`array-type > invalid 77`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+interface ArrayClass<T> {
+  foo: T[];
+  bar: T[];
+  baz: Arr<T>;
+}
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 78`] = `
 {
+  "code": "
+function fooFunction(foo: Array<ArrayClass<string>>) {
+  return foo.map(e => e.foo);
+}
+      ",
   "diagnostics": [
     {
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
@@ -1961,12 +2166,18 @@ exports[`array-type > invalid 78`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+function fooFunction(foo: ArrayClass<string>[]) {
+  return foo.map(e => e.foo);
+}
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 79`] = `
 {
+  "code": "let fooVar: Array<(c: number) => number>;",
   "diagnostics": [
     {
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
@@ -1986,12 +2197,14 @@ exports[`array-type > invalid 79`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let fooVar: ((c: number) => number)[];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 80`] = `
 {
+  "code": "type fooUnion = Array<string | number | boolean>;",
   "diagnostics": [
     {
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
@@ -2011,12 +2224,14 @@ exports[`array-type > invalid 80`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "type fooUnion = (string | number | boolean)[];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 81`] = `
 {
+  "code": "type fooIntersection = Array<string & number>;",
   "diagnostics": [
     {
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
@@ -2036,12 +2251,14 @@ exports[`array-type > invalid 81`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "type fooIntersection = (string & number)[];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 82`] = `
 {
+  "code": "let x: Array;",
   "diagnostics": [
     {
       "message": "Array type using 'Array<any>' is forbidden. Use 'any[]' instead.",
@@ -2061,12 +2278,14 @@ exports[`array-type > invalid 82`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let x: any[];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 83`] = `
 {
+  "code": "let x: Array<>;",
   "diagnostics": [
     {
       "message": "Array type using 'Array<any>' is forbidden. Use 'any[]' instead.",
@@ -2086,12 +2305,14 @@ exports[`array-type > invalid 83`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let x: any[];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 84`] = `
 {
+  "code": "let x: Array;",
   "diagnostics": [
     {
       "message": "Array type using 'Array<any>' is forbidden for simple types. Use 'any[]' instead.",
@@ -2111,12 +2332,14 @@ exports[`array-type > invalid 84`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let x: any[];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 85`] = `
 {
+  "code": "let x: Array<>;",
   "diagnostics": [
     {
       "message": "Array type using 'Array<any>' is forbidden for simple types. Use 'any[]' instead.",
@@ -2136,12 +2359,14 @@ exports[`array-type > invalid 85`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let x: any[];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 86`] = `
 {
+  "code": "let x: Array<number> = [1] as number[];",
   "diagnostics": [
     {
       "message": "Array type using 'number[]' is forbidden. Use 'Array<number>' instead.",
@@ -2161,12 +2386,14 @@ exports[`array-type > invalid 86`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let x: Array<number> = [1] as Array<number>;",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 87`] = `
 {
+  "code": "let y: string[] = <Array<string>>['2'];",
   "diagnostics": [
     {
       "message": "Array type using 'string[]' is forbidden. Use 'Array<string>' instead.",
@@ -2186,12 +2413,14 @@ exports[`array-type > invalid 87`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let y: Array<string> = <Array<string>>['2'];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 88`] = `
 {
+  "code": "let ya = [[1, '2']] as [number, string][];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
@@ -2211,12 +2440,17 @@ exports[`array-type > invalid 88`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let ya = [[1, '2']] as Array<[number, string]>;",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 89`] = `
 {
+  "code": "
+// Ignore user defined aliases
+let yyyy: Arr<Array<Arr<string>>[]> = [[[['2']]]];
+      ",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
@@ -2236,12 +2470,23 @@ exports[`array-type > invalid 89`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+// Ignore user defined aliases
+let yyyy: Arr<Array<Array<Arr<string>>>> = [[[['2']]]];
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 90`] = `
 {
+  "code": "
+interface ArrayClass<T> {
+  foo: Array<T>;
+  bar: T[];
+  baz: Arr<T>;
+}
+      ",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
@@ -2261,12 +2506,24 @@ exports[`array-type > invalid 90`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+interface ArrayClass<T> {
+  foo: Array<T>;
+  bar: Array<T>;
+  baz: Arr<T>;
+}
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 91`] = `
 {
+  "code": "
+function barFunction(bar: ArrayClass<String>[]) {
+  return bar.map(e => e.bar);
+}
+      ",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
@@ -2286,12 +2543,18 @@ exports[`array-type > invalid 91`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+function barFunction(bar: Array<ArrayClass<String>>) {
+  return bar.map(e => e.bar);
+}
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 92`] = `
 {
+  "code": "let barVar: ((c: number) => number)[];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
@@ -2311,12 +2574,14 @@ exports[`array-type > invalid 92`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "let barVar: Array<(c: number) => number>;",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 93`] = `
 {
+  "code": "type barUnion = (string | number | boolean)[];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
@@ -2336,12 +2601,14 @@ exports[`array-type > invalid 93`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "type barUnion = Array<string | number | boolean>;",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 94`] = `
 {
+  "code": "type barIntersection = (string & number)[];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
@@ -2361,12 +2628,18 @@ exports[`array-type > invalid 94`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "type barIntersection = Array<string & number>;",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 95`] = `
 {
+  "code": "
+interface FooInterface {
+  '.bar': { baz: string[] };
+}
+      ",
   "diagnostics": [
     {
       "message": "Array type using 'string[]' is forbidden. Use 'Array<string>' instead.",
@@ -2386,12 +2659,18 @@ exports[`array-type > invalid 95`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+interface FooInterface {
+  '.bar': { baz: Array<string> };
+}
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 96`] = `
 {
+  "code": "type Unwrap<T> = T extends Array<infer E> ? E : T;",
   "diagnostics": [
     {
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
@@ -2411,12 +2690,14 @@ exports[`array-type > invalid 96`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "type Unwrap<T> = T extends (infer E)[] ? E : T;",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 97`] = `
 {
+  "code": "type Unwrap<T> = T extends (infer E)[] ? E : T;",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
@@ -2436,12 +2717,14 @@ exports[`array-type > invalid 97`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "type Unwrap<T> = T extends Array<infer E> ? E : T;",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 98`] = `
 {
+  "code": "type Foo = ReadonlyArray<object>[];",
   "diagnostics": [
     {
       "message": "Array type using 'ReadonlyArray<object>' is forbidden. Use 'readonly object[]' instead.",
@@ -2461,12 +2744,14 @@ exports[`array-type > invalid 98`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "type Foo = (readonly object[])[];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 99`] = `
 {
+  "code": "const foo: Array<new (...args: any[]) => void> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
@@ -2486,12 +2771,14 @@ exports[`array-type > invalid 99`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "const foo: (new (...args: any[]) => void)[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 100`] = `
 {
+  "code": "const foo: ReadonlyArray<new (...args: any[]) => void> = [];",
   "diagnostics": [
     {
       "message": "Array type using 'ReadonlyArray<T>' is forbidden. Use 'readonly T[]' instead.",
@@ -2511,12 +2798,14 @@ exports[`array-type > invalid 100`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "const foo: readonly (new (...args: any[]) => void)[] = [];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 101`] = `
 {
+  "code": "const x: Readonly<string[]> = ['a', 'b'];",
   "diagnostics": [
     {
       "message": "Array type using 'Readonly<string[]>' is forbidden. Use 'readonly string[][]' instead.",
@@ -2536,12 +2825,14 @@ exports[`array-type > invalid 101`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "const x: readonly string[] = ['a', 'b'];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 102`] = `
 {
+  "code": "declare function foo<E extends Readonly<string[]>>(extra: E): E;",
   "diagnostics": [
     {
       "message": "Array type using 'Readonly<string[]>' is forbidden for simple types. Use 'readonly string[][]' instead.",
@@ -2561,12 +2852,14 @@ exports[`array-type > invalid 102`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "declare function foo<E extends readonly string[]>(extra: E): E;",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 103`] = `
 {
+  "code": "type Conditional<T> = Array<T extends string ? string : number>;",
   "diagnostics": [
     {
       "message": "Array type using 'Array<T>' is forbidden. Use 'T[]' instead.",
@@ -2586,12 +2879,14 @@ exports[`array-type > invalid 103`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "type Conditional<T> = (T extends string ? string : number)[];",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 104`] = `
 {
+  "code": "type Conditional<T> = (T extends string ? string : number)[];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden for non-simple types. Use 'Array<T>' instead.",
@@ -2611,12 +2906,14 @@ exports[`array-type > invalid 104`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "type Conditional<T> = Array<T extends string ? string : number>;",
   "ruleCount": 1,
 }
 `;
 
 exports[`array-type > invalid 105`] = `
 {
+  "code": "type Conditional<T> = (T extends string ? string : number)[];",
   "diagnostics": [
     {
       "message": "Array type using 'T[]' is forbidden. Use 'Array<T>' instead.",
@@ -2636,6 +2933,7 @@ exports[`array-type > invalid 105`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "type Conditional<T> = Array<T extends string ? string : number>;",
   "ruleCount": 1,
 }
 `;

@@ -2,7 +2,7 @@
   "name": "rslint",
   "displayName": "Rslint",
   "description": "Language support for Rslint",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "icon": "images/icon.png",
   "private": true,
   "publisher": "rstack",
@@ -49,7 +49,7 @@
             "built-in",
             "custom"
           ],
-          "default": "local",
+          "default": "built-in",
           "markdownEnumDescriptions": [
             "Use workspace node_modules Rslint binary (may have version incompatibility with extension)",
             "Use extension's built-in Rslint binary (may differ from local @rslint/core diagnostics)",

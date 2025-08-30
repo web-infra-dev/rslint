@@ -1,6 +1,6 @@
 {
   "name": "rslint-monorepo",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "private": true,
   "description": "Rslint Monorepo",
   "homepage": "https://github.com/web-infra-dev/rslint#readme",
@@ -15,6 +15,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "build:npm": "zx scripts/build-npm.mjs",
+    "build:website": "pnpm -F @rslint/website... -r build",
     "check-spell": "pnpx cspell",
     "version": "zx scripts/version.mjs",
     "release": "pnpm publish -r --no-git-checks",

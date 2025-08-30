@@ -1,0 +1,1791 @@
+// Rstest Snapshot v1
+
+exports[`no-explicit-any > invalid 1`] = `
+{
+  "code": "const number: any = 1;",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 2`] = `
+{
+  "code": "function generic(): any {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 3`] = `
+{
+  "code": "function generic(): Array<any> {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 4`] = `
+{
+  "code": "function generic(): any[] {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 5`] = `
+{
+  "code": "function generic(param: Array<any>): number {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 6`] = `
+{
+  "code": "function generic(param: any[]): number {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 7`] = `
+{
+  "code": "function generic(param: Array<any>): Array<any> {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 8`] = `
+{
+  "code": "function generic(): Array<Array<any>> {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 9`] = `
+{
+  "code": "function generic(): Array<any[]> {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 10`] = `
+{
+  "code": "
+class Greeter {
+  constructor(param: Array<any>) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 28,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 11`] = `
+{
+  "code": "
+class Greeter {
+  message: any;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 12`] = `
+{
+  "code": "
+class Greeter {
+  message: Array<any>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 13`] = `
+{
+  "code": "
+class Greeter {
+  message: any[];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 14`] = `
+{
+  "code": "
+class Greeter {
+  message: Array<Array<any>>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 24,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 15`] = `
+{
+  "code": "
+class Greeter {
+  message: Array<any[]>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 16`] = `
+{
+  "code": "
+interface Greeter {
+  message: any;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 17`] = `
+{
+  "code": "
+interface Greeter {
+  message: Array<any>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 18`] = `
+{
+  "code": "
+interface Greeter {
+  message: any[];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 19`] = `
+{
+  "code": "
+interface Greeter {
+  message: Array<Array<any>>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 24,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 20`] = `
+{
+  "code": "
+interface Greeter {
+  message: Array<any[]>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 21`] = `
+{
+  "code": "
+type obj = {
+  message: any;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 22`] = `
+{
+  "code": "
+type obj = {
+  message: Array<any>;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 23`] = `
+{
+  "code": "
+type obj = {
+  message: any[];
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 24`] = `
+{
+  "code": "
+type obj = {
+  message: Array<Array<any>>;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 24,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 25`] = `
+{
+  "code": "
+type obj = {
+  message: Array<any[]>;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 26`] = `
+{
+  "code": "
+type obj = {
+  message: string | any;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 27`] = `
+{
+  "code": "
+type obj = {
+  message: string | Array<any>;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 27,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 28`] = `
+{
+  "code": "
+type obj = {
+  message: string | any[];
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 29`] = `
+{
+  "code": "
+type obj = {
+  message: string | Array<Array<any>>;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 33,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 30`] = `
+{
+  "code": "
+type obj = {
+  message: string | Array<any[]>;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 27,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 31`] = `
+{
+  "code": "
+type obj = {
+  message: string & any;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 32`] = `
+{
+  "code": "
+type obj = {
+  message: string & Array<any>;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 27,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 33`] = `
+{
+  "code": "
+type obj = {
+  message: string & any[];
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 34`] = `
+{
+  "code": "
+type obj = {
+  message: string & Array<Array<any>>;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 33,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 35`] = `
+{
+  "code": "
+type obj = {
+  message: string & Array<any[]>;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 27,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 36`] = `
+{
+  "code": "class Foo<t = any> extends Bar<any> {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 37`] = `
+{
+  "code": "abstract class Foo<t = any> extends Bar<any> {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 38`] = `
+{
+  "code": "abstract class Foo<t = any> implements Bar<any>, Baz<any> {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 54,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 39`] = `
+{
+  "code": "new Foo<any>();",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 40`] = `
+{
+  "code": "Foo<any>();",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 41`] = `
+{
+  "code": "
+function test<T extends Partial<any>>() {}
+const test = <T extends Partial<any>>() => {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 2,
+        },
+        "start": {
+          "column": 33,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 33,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 42`] = `
+{
+  "code": "
+        function foo(a: number, ...rest: any[]): void {
+          return;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 2,
+        },
+        "start": {
+          "column": 42,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 43`] = `
+{
+  "code": "type Any = any;",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 44`] = `
+{
+  "code": "function foo5(...args: any) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 45`] = `
+{
+  "code": "const bar5 = function (...args: any) {};",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 46`] = `
+{
+  "code": "const baz5 = (...args: any) => {};",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 47`] = `
+{
+  "code": "
+interface Qux5 {
+  (...args: any): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 48`] = `
+{
+  "code": "function quux5(fn: (...args: any) => void): void {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 49`] = `
+{
+  "code": "function quuz5(): (...args: any) => void {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 50`] = `
+{
+  "code": "type Fred5 = (...args: any) => void;",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 51`] = `
+{
+  "code": "type Corge5 = new (...args: any) => void;",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 52`] = `
+{
+  "code": "
+interface Grault5 {
+  new (...args: any): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 53`] = `
+{
+  "code": "
+interface Garply5 {
+  f(...args: any): void;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 54`] = `
+{
+  "code": "declare function waldo5(...args: any): void;",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 55`] = `
+{
+  "code": "type Keys = keyof any;",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 56`] = `
+{
+  "code": "
+const integer = <
+  TKey extends keyof any,
+  TTarget extends { [K in TKey]: number },
+>(
+  target: TTarget,
+  key: TKey,
+) => {
+  /* ... */
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 57`] = `
+{
+  "code": "// fixToUnknown: true
+type Keys = keyof any;",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 2,
+        },
+        "start": {
+          "column": 19,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "// fixToUnknown: true
+type Keys = PropertyKey;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 58`] = `
+{
+  "code": "
+// fixToUnknown: true
+const integer = <
+  TKey extends keyof any,
+  TTarget extends { [K in TKey]: number },
+>(
+  target: TTarget,
+  key: TKey,
+) => {
+  /* ... */
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 4,
+        },
+        "start": {
+          "column": 22,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+// fixToUnknown: true
+const integer = <
+  TKey extends PropertyKey,
+  TTarget extends { [K in TKey]: number },
+>(
+  target: TTarget,
+  key: TKey,
+) => {
+  /* ... */
+};
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-explicit-any > invalid 59`] = `
+{
+  "code": "
+// fixToUnknown: true
+const number: any = 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected any. Specify a different type.",
+      "messageId": "unexpectedAny",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-explicit-any",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+// fixToUnknown: true
+const number: unknown = 1;
+      ",
+  "ruleCount": 1,
+}
+`;

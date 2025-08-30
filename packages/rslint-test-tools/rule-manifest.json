@@ -70,6 +70,12 @@
       "failing_case": []
     },
     {
+      "name": "no-explicit-any",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
       "name": "no-floating-promises",
       "group": "@typescript-eslint",
       "status": "partial-test",

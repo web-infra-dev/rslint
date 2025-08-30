@@ -2,13 +2,13 @@ package main
 
 import (
 	"fmt"
-
 	"os"
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
@@ -62,8 +62,38 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	rslintconfig.RegisterAllRules()
 
 	// Load rslint configuration and determine which tsconfig files to use
-	_, tsConfigs, configDirectory := rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
+	rslintConfig, tsConfigs, configDirectory := rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
 
+	// Merge languageOptions from request with config file if provided
+	if req.LanguageOptions != nil && len(rslintConfig) > 0 {
+		// Convert API LanguageOptions to config LanguageOptions
+		configLanguageOptions := &rslintconfig.LanguageOptions{}
+		if req.LanguageOptions.ParserOptions != nil {
+			configLanguageOptions.ParserOptions = &rslintconfig.ParserOptions{
+				ProjectService: req.LanguageOptions.ParserOptions.ProjectService,
+				Project:        rslintconfig.ProjectPaths(req.LanguageOptions.ParserOptions.Project),
+			}
+		}
+
+		// Override languageOptions for the first config entry
+		rslintConfig[0].LanguageOptions = configLanguageOptions
+
+		// Re-extract tsconfig files with updated languageOptions
+		overrideTsconfigs := []string{}
+		for _, entry := range rslintConfig {
+			if entry.LanguageOptions != nil && entry.LanguageOptions.ParserOptions != nil {
+				for _, config := range entry.LanguageOptions.ParserOptions.Project {
+					tsconfigPath := tspath.ResolvePath(configDirectory, config)
+					if fs.FileExists(tsconfigPath) {
+						overrideTsconfigs = append(overrideTsconfigs, tsconfigPath)
+					}
+				}
+			}
+		}
+		if len(overrideTsconfigs) > 0 {
+			tsConfigs = overrideTsconfigs
+		}
+	}
 	type RuleWithOption struct {
 		rule   rule.Rule
 		option interface{}
@@ -132,6 +162,23 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 			},
 		}
 
+		// Add fixes if available
+		if d.FixesPtr != nil && len(*d.FixesPtr) > 0 {
+			var fixes []api.Fix
+			for _, fix := range *d.FixesPtr {
+				// Convert TextRange to character positions
+				startPos := fix.Range.Pos()
+				endPos := fix.Range.End()
+
+				fixes = append(fixes, api.Fix{
+					Text:     fix.Text,
+					StartPos: startPos,
+					EndPos:   endPos,
+				})
+			}
+			diagnostic.Fixes = fixes
+		}
+
 		diagnostics = append(diagnostics, diagnostic)
 		errorsCount++
 	}
@@ -168,6 +215,78 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		ErrorCount:  errorsCount,
 		FileCount:   int(lintedFilesCount),
 		RuleCount:   len(rulesWithOptions),
+	}, nil
+}
+
+// HandleApplyFixes handles apply fixes requests in IPC mode
+func (h *IPCHandler) HandleApplyFixes(req api.ApplyFixesRequest) (*api.ApplyFixesResponse, error) {
+	// Convert API diagnostics to rule diagnostics for use with linter.ApplyRuleFixes
+	var ruleDiagnostics []rule.RuleDiagnostic
+
+	for _, clientDiag := range req.Diagnostics {
+		if len(clientDiag.Fixes) == 0 {
+			continue
+		}
+
+		// Convert API fixes to rule fixes
+		var ruleFixes []rule.RuleFix
+		for _, clientFix := range clientDiag.Fixes {
+			// Create TextRange from start and end positions
+			textRange := core.NewTextRange(clientFix.StartPos, clientFix.EndPos)
+
+			ruleFix := rule.RuleFix{
+				Text:  clientFix.Text,
+				Range: textRange,
+			}
+			ruleFixes = append(ruleFixes, ruleFix)
+		}
+
+		// Create rule diagnostic
+		ruleDiag := rule.RuleDiagnostic{
+			Range:    core.NewTextRange(0, 0), // Not used by ApplyRuleFixes
+			RuleName: clientDiag.RuleName,
+			Message: rule.RuleMessage{
+				Id:          clientDiag.MessageId,
+				Description: clientDiag.Message,
+			},
+			FixesPtr: &ruleFixes,
+		}
+
+		ruleDiagnostics = append(ruleDiagnostics, ruleDiag)
+	}
+
+	// Use linter.ApplyRuleFixes to apply the fixes
+	code := req.FileContent
+	outputs := []string{}
+	wasFixed := false
+
+	// Apply fixes iteratively to handle overlapping fixes
+	for {
+		fixedContent, unapplied, fixed := linter.ApplyRuleFixes(code, ruleDiagnostics)
+		if !fixed {
+			break
+		}
+
+		outputs = append(outputs, fixedContent)
+		code = fixedContent
+		wasFixed = true
+
+		// Update diagnostics to only include unapplied ones for next iteration
+		ruleDiagnostics = unapplied
+		if len(ruleDiagnostics) == 0 {
+			break
+		}
+	}
+
+	// Count applied and unapplied fixes
+	appliedCount := len(req.Diagnostics) - len(ruleDiagnostics)
+	unappliedCount := len(ruleDiagnostics)
+
+	return &api.ApplyFixesResponse{
+		FixedContent:   outputs,
+		WasFixed:       wasFixed,
+		AppliedCount:   appliedCount,
+		UnappliedCount: unappliedCount,
 	}, nil
 }
 

@@ -1,5 +1,16 @@
 // Rstest Snapshot v1
 
+exports[`applyFixes api > apply fixes with real diagnostics 1`] = `
+{
+  "input": "let x: string = "hello";
+const y = x as string;",
+  "output": [
+    "let x: string = "hello";
+const y = x;",
+  ],
+}
+`;
+
 exports[`lint api > diag snapshot 1`] = `
 {
   "diagnostics": [],
