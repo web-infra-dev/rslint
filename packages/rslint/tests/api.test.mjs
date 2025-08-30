@@ -114,7 +114,9 @@ describe('encoded source files', async t => {
       },
     });
     const content = diags.encodedSourceFiles['src/virtual.ts'];
-    let buffer = new Uint8Array(content);
+    // decode content from base64 to uint8array
+    const buffer = Uint8Array.from(atob(content), c => c.charCodeAt(0));
+    
     const sourceFile = new  RemoteSourceFile(buffer, new TextDecoder())
     
     const source = sourceFile.text

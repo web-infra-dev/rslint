@@ -104,14 +104,6 @@ type ParserOptions struct {
 }
 type ByteArray []byte
 
-func (a ByteArray) MarshalJSON() ([]byte, error) {
-    arr := make([]int, len(a))
-    for i, v := range a {
-        arr[i] = int(v)
-    }
-    return json.Marshal(arr)
-}
-
 // LintResponse represents a lint response from Go to JS
 type LintResponse struct {
 	Diagnostics      []Diagnostic           `json:"diagnostics"`
