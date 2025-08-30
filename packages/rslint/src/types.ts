@@ -27,7 +27,7 @@ export interface LintResponse {
   fileCount: number;
   ruleCount: number;
   duration: string;
-  encodedSourceFiles?: Record<string, number[]>; // Binary encoded source files as number array
+  encodedSourceFiles?: Record<string, string>; // Binary encoded source files as base64-encoded strings
 }
 
 export interface LintOptions {
