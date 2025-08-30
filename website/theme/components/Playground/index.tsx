@@ -48,17 +48,15 @@ Program {
 const Playground: React.FC = () => {
   const editorRef = useRef<EditorRef | null>(null);
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [ast, setAst] = useState<string | undefined>();
 
   async function runLint() {
     try {
-      setIsLoading(true);
       setError(undefined);
-
       const service = await ensureService();
-      const code = editorRef.current?.getValue() || 'let a:any; a.b = 10;';
+      const code = editorRef.current?.getValue() ?? '';
 
       const result = await service.lint({
         fileContents: {
@@ -69,6 +67,7 @@ const Playground: React.FC = () => {
           '@typescript-eslint/no-unsafe-member-access': 'error',
         },
       });
+      setInitialized(true);
 
       // Convert diagnostics to the expected format
       const convertedDiagnostics: Diagnostic[] = result.diagnostics.map(
@@ -99,8 +98,6 @@ const Playground: React.FC = () => {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       setError(`Linting failed: ${errorMessage}`);
-    } finally {
-      setIsLoading(false);
     }
   }
 
@@ -114,9 +111,9 @@ const Playground: React.FC = () => {
         <Editor ref={editorRef} onChange={() => runLint()} />
       </div>
       <ResultPanel
+        initialized={initialized}
         diagnostics={diagnostics}
         ast={ast}
-        isLoading={isLoading}
         error={error}
       />
     </div>
