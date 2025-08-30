@@ -139,13 +139,13 @@ func (s *CodePathState) MakeFinallyBlock() {
 	// This segment will leave at the end of this finally block.
 	segments := forkContext.MakeNext(-1, -1)
 
-	for i := 0; i < forkContext.count; i++ {
+	for i := range forkContext.count {
 		prevSegsOfLeavingSegment := []*CodePathSegment{headOfLeavingSegments[i]}
 
-		for j := 0; j < len(returned.segmentsList); j++ {
+		for j := range len(returned.segmentsList) {
 			prevSegsOfLeavingSegment = append(prevSegsOfLeavingSegment, returned.segmentsList[j][i])
 		}
-		for j := 0; j < len(thrown.segmentsList); j++ {
+		for j := range len(thrown.segmentsList) {
 			prevSegsOfLeavingSegment = append(prevSegsOfLeavingSegment, thrown.segmentsList[j][i])
 		}
 

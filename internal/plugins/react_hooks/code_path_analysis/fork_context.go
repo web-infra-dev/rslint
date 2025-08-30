@@ -102,7 +102,7 @@ func (fc *ForkContext) makeSegments(begin int, end int, create func(id string, a
 
 	segments := make([]*CodePathSegment, 0)
 
-	for i := 0; i < fc.count; i++ {
+	for i := range fc.count {
 		allPrevSegments := make([]*CodePathSegment, 0)
 		for j := normalizedBegin; j <= normalizedEnd; j++ {
 			allPrevSegments = append(allPrevSegments, list[j][i])
@@ -122,7 +122,7 @@ func (fc *ForkContext) mergeExtraSegments(segments []*CodePathSegment) []*CodePa
 		merged := make([]*CodePathSegment, 0)
 
 		length := len(currentSegments) / 2
-		for i := 0; i < length; i++ {
+		for i := range length {
 			segment := NewNextCodePathSegment(
 				fc.idGenerator.Next(),
 				[]*CodePathSegment{
@@ -185,7 +185,7 @@ func removeSegment(segments []*CodePathSegment, target *CodePathSegment) []*Code
 // If there is the "default" chunk before other cases, the order is different
 // between node's and running's.
 func RemoveConnection(prevSegments []*CodePathSegment, nextSegments []*CodePathSegment) {
-	for i := 0; i < len(prevSegments); i++ {
+	for i := range prevSegments {
 		prevSegment := prevSegments[i]
 		nextSegment := nextSegments[i]
 

@@ -193,7 +193,7 @@ func (s *CodePathState) MakeWhileBody() {
 	}
 
 	// Update state.
-	if context.test != true {
+	if !context.test {
 		context.brokenForkContext.AddAll(choiceContext.falseForkContext)
 	}
 	forkContext.ReplaceHead(choiceContext.trueForkContext.MakeNext(0, -1))

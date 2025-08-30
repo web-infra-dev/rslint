@@ -80,7 +80,7 @@ func (s *CodePathState) PopSwitchContext() {
 	}
 
 	// Pops the segment context stack until the entry segment.
-	for i := 0; i < context.countForks; i++ {
+	for range context.countForks {
 		s.forkContext = s.forkContext.upper
 	}
 
