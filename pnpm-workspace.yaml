@@ -2,3 +2,9 @@ packages:
   - 'packages/*'
   - 'npm/*'
   - 'website'
+  - 'typescript-go/_packages/ast'
+  - 'typescript-go/_packages/api'
+overrides:
+  '@typescript/ast': 'workspace:*'
+  '@typescript/libsyncrpc': 'github:microsoft/libsyncrpc#1580683e84cc177abdbbe83cf34f40605b7349f7'
+ignoreDepScripts: true
