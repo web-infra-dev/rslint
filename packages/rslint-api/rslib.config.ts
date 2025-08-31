@@ -12,6 +12,11 @@ export default defineConfig({
   source: {
     tsconfigPath: './tsconfig.build.json',
   },
+  resolve: {
+    alias: {
+      '@typescript/libsyncrpc': false,
+    },
+  },
   tools: {
     rspack(config) {
       if (!config.resolve?.conditionNames) {
