@@ -23,7 +23,7 @@
     "publish:ovsx": "zx scripts/publish-marketplace.mjs --marketplace=ovsx",
     "format": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --write .",
     "format:check": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --check .",
-    "test": "pnpm -r test",
+    "test": "pnpm -r --filter=!@typescript/api --filter=!@typescript/ast --filter='@rslint/test-tools...' --filter='rslint...' test",
     "test:go": "go test ./internal/...",
     "typecheck": "pnpm tsc -b tsconfig.json",
     "lint": "rslint",
