@@ -49,3 +49,7 @@ runs:
           ~/.cache/go-build
           ~/Library/Caches/go-build
           ~/AppData/Local/go-build
+
+    - name: Patch tsgo
+      shell: bash
+      run: ./scripts/apply-tsgo-path.sh

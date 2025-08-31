@@ -27,6 +27,7 @@ export class RSLintService {
       ruleOptions,
       fileContents,
       languageOptions,
+      includeEncodedSourceFiles,
     } = options;
 
     // Send handshake
@@ -40,6 +41,7 @@ export class RSLintService {
       ruleOptions,
       fileContents,
       languageOptions,
+      includeEncodedSourceFiles,
       format: 'jsonline',
     });
   }
