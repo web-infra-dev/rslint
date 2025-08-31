@@ -16,5 +16,8 @@
     "@typescript/api": "workspace:*",
     "@rslib/core": "0.12.4",
     "@types/node": "24.3.0"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
