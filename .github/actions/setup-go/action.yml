@@ -52,4 +52,4 @@ runs:
 
     - name: Patch tsgo
       shell: bash
-      run: npm run patch:tsgo
+      run: ./scripts/apply-tsgo-path.sh
