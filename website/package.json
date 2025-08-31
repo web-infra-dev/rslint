@@ -23,7 +23,8 @@
     "tw-animate-css": "^1.3.6"
   },
   "devDependencies": {
-    "@rslint/wasm": "0.1.11",
+    "@rslint/wasm": "0.1.12",
+    "@rslint/api": "0.1.12",
     "@rsbuild/plugin-sass": "^1.3.5",
     "@rspress/core": "2.0.0-beta.27",
     "@rspress/plugin-llms": "2.0.0-beta.27",
