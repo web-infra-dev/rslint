@@ -13,7 +13,7 @@
   },
   "license": "MIT",
   "scripts": {
-    "build": "pnpm -r --filter='@rslint/test-tools...' --filter='rslint...' build",
+    "build": "pnpm -r --filter=!@typescript/api --filter=!@typescript/ast --filter='@rslint/test-tools...' --filter='rslint...' build",
     "build:npm": "zx scripts/build-npm.mjs",
     "build:website": "pnpm -F @rslint/website... -r build",
     "check-spell": "pnpx cspell",
