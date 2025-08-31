@@ -54,13 +54,6 @@
   "engines": {
     "pnpm": ">=10"
   },
-  "pnpm": {
-    "ignoreScripts": {
-      "@typescript/libsyncrpc": [
-        "prepare"
-      ]
-    }
-  },
   "files": [],
   "dependencies": {
     "@types/react": "^19.1.9"
