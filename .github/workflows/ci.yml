@@ -138,11 +138,11 @@ jobs:
 
       - name: Test on Linux
         if: runner.os == 'Linux'
-        run: xvfb-run -a pnpm -r --filter='@rslint/test-tools...'  --filter='rslint...' test
+        run: xvfb-run -a pnpm run test
 
       - name: Test on non-Linux
         if: runner.os != 'Linux'
-        run: pnpm -r --filter='@rslint/test-tools...'  --filter='rslint...' test
+        run: pnpm run test
 
   test-wasm:
     name: Test WASM
