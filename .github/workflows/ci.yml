@@ -112,7 +112,7 @@ jobs:
         run: pnpm format:check
 
       - name: Build
-        run: pnpm -r --filter='@rslint/test-tools...' --filter='rslint...' build
+        run: pnpm run build
 
       - name: Dogfooding
         if: runner.os == 'Linux'
