@@ -271,11 +271,11 @@ importers:
         specifier: ^1.3.5
         version: 1.3.5(@rsbuild/core@1.4.15)
       '@rslint/api':
-        specifier: 0.1.12
-        version: 0.1.12
+        specifier: workspace:*
+        version: link:../packages/rslint-api
       '@rslint/wasm':
-        specifier: 0.1.12
-        version: 0.1.12
+        specifier: workspace:*
+        version: link:../packages/rslint-wasm
       '@rspress/plugin-llms':
         specifier: 2.0.0-beta.27
         version: 2.0.0-beta.27(@rspress/core@2.0.0-beta.27(@types/react@19.1.10)(acorn@8.15.0))
@@ -1636,12 +1636,6 @@ packages:
         optional: true
       typescript:
         optional: true
-
-  '@rslint/api@0.1.12':
-    resolution: {integrity: sha512-AExituZoqJy+guLDAg0egjRqm43swb+qjv5chDrBm7tbvDbCGsVcrrZ3xh8u4AQQvEY4eo2q7IZyBkntvtrY4w==}
-
-  '@rslint/wasm@0.1.12':
-    resolution: {integrity: sha512-CpHDsdqSoOeyiNAUnzdHh7wJDBgoD6C/8HHSmAOTtaXoTXh4vi92Xk6q6BOdazkNw9uJoQqy/SQrA3Q9E3IW7g==}
 
   '@rspack/binding-darwin-arm64@1.4.11':
     resolution: {integrity: sha512-PrmBVhR8MC269jo6uQ+BMy1uwIDx0HAJYLQRQur8gXiehWabUBCRg/d4U9KR7rLzdaSScRyc5JWXR52T7/4MfA==}
@@ -6326,12 +6320,6 @@ snapshots:
     optionalDependencies:
       '@microsoft/api-extractor': 7.52.11(@types/node@24.3.0)
       typescript: 5.9.2
-
-  '@rslint/api@0.1.12': {}
-
-  '@rslint/wasm@0.1.12':
-    dependencies:
-      '@rslint/core': link:packages/rslint
 
   '@rspack/binding-darwin-arm64@1.4.11':
     optional: true
