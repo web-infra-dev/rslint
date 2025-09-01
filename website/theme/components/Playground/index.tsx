@@ -2,6 +2,7 @@ import React, { use, useEffect, useRef, useState } from 'react';
 import * as Rslint from '@rslint/wasm';
 import { Editor, EditorRef } from './Editor';
 import { ResultPanel, Diagnostic } from './ResultPanel';
+import { Spinner } from '../ui/spinner';
 import './index.css';
 import { RemoteSourceFile, type Node, SyntaxKind } from '@rslint/api';
 
@@ -10,9 +11,9 @@ let rslintService: Rslint.RSLintService | null = null;
 
 async function ensureService() {
   if (!rslintService) {
-    rslintService = await Rslint.initialize({
-      wasmURL: wasmURL,
-    });
+      rslintService = await Rslint.initialize({
+        wasmURL: wasmURL,
+      });
   }
   return rslintService;
 }
@@ -23,6 +24,7 @@ const Playground: React.FC = () => {
   const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [ast, setAst] = useState<string | undefined>();
+  const [isLoading, setIsLoading] = useState(false);
 
   async function runLint() {
     try {
@@ -95,7 +97,12 @@ const Playground: React.FC = () => {
       setError(`Linting failed: ${errorMessage}`);
     }
   }
-
+  useEffect(() => {
+    setIsLoading(true);
+    ensureService().finally(() => {
+      setIsLoading(false);
+    })
+  },void [])
   useEffect(() => {
     runLint();
   }, []);
@@ -105,6 +112,14 @@ const Playground: React.FC = () => {
       <div className="editor-panel">
         <Editor ref={editorRef} onChange={() => runLint()} />
       </div>
+      {isLoading && (
+        <div className="loading-overlay">
+          <div className="loading-content">
+            <Spinner size="lg" />
+            <p className="loading-text">Loading RSLint WASM...</p>
+          </div>
+        </div>
+      )}
       <ResultPanel
         initialized={initialized}
         diagnostics={diagnostics}
