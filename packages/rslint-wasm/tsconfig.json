@@ -1,8 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "customConditions": ["@typescript/source"]
-  },
+
   "references": [
     {
       "path": "./tsconfig.build.json"
