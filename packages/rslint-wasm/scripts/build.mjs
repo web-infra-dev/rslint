@@ -18,6 +18,7 @@ async function buildWorker() {
     write: true,
     format: 'iife',
     sourcemap: 'inline',
+    conditions: ['@typescript/source'],
     plugins: [polyfillNode()],
   });
 }
@@ -34,6 +35,7 @@ async function buildBrowser() {
     target: 'es2020',
     format: 'esm',
     splitting: false,
+    conditions: ['@typescript/source'],
     define: {
       WEB_WORKER_SOURCE_CODE: JSON.stringify(WEB_WORKER_SOURCE_CODE),
     },
