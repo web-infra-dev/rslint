@@ -15,7 +15,7 @@
   "scripts": {
     "build": "pnpm -r --filter=!@typescript/api --filter=!@typescript/ast --filter='@rslint/test-tools...' --filter='rslint...' build",
     "build:npm": "zx scripts/build-npm.mjs",
-    "build:website": "pnpm --filter=!@typescript/api --filter=!@typescript/ast --filter @rslint/website... -r build",
+    "build:website": "./scripts/apply-tsgo-path.sh && pnpm --filter=!@typescript/api --filter=!@typescript/ast --filter @rslint/website... -r build",
     "check-spell": "pnpx cspell",
     "version": "zx scripts/version.mjs",
     "release": "pnpm publish -r --no-git-checks",
