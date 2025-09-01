@@ -2,9 +2,18 @@
   "name": "@rslint/core",
   "version": "0.1.12",
   "exports": {
-    ".": "./dist/index.js",
-    "./browser": "./dist/browser.js",
-    "./service": "./dist/service.js",
+    ".": {
+      "@typescript/source": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./browser": {
+      "@typescript/source": "./src/browser.ts",
+      "default": "./dist/browser.js"
+    },
+    "./service": {
+      "@typescript/source": "./src/service.ts",
+      "default": "./dist/service.js"
+    },
     "./bin": "./bin/rslint.cjs",
     "./package.json": "./package.json"
   },
