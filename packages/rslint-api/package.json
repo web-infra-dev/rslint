@@ -1,0 +1,23 @@
+{
+  "name": "@rslint/api",
+  "version": "0.1.12",
+  "description": "Rslint AST library",
+  "main": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "rslib build",
+    "compile": "tsc -p tsconfig.build.json"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.13.1",
+  "devDependencies": {
+    "@typescript/api": "workspace:*",
+    "@rslib/core": "0.12.4",
+    "@types/node": "24.3.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "extends": ["../../tsconfig.build.json"],
+  "compilerOptions": {
+    "customConditions": ["@typescript/source"],
+    "skipLibCheck": true,
+    "types": ["node"],
+    "lib": ["esnext", "dom"],
+    "noImplicitReturns": false,
+    "noImplicitOverride": false
+  },
+
+  "include": ["src/**/*.ts"],
+  "references": []
+}

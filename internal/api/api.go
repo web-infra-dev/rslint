@@ -10,6 +10,9 @@ import (
 	"io"
 	"os"
 	"sync"
+
+	"github.com/microsoft/typescript-go/shim/api/encoder"
+	"github.com/microsoft/typescript-go/shim/ast"
 )
 
 // Protocol implements a binary message protocol similar to esbuild:
@@ -65,6 +68,7 @@ type LintRequest struct {
 	RuleOptions     map[string]interface{} `json:"ruleOptions,omitempty"`
 	FileContents    map[string]string      `json:"fileContents,omitempty"`    // Map of file paths to their contents for VFS
 	LanguageOptions *LanguageOptions       `json:"languageOptions,omitempty"` // Override languageOptions from config file
+	IncludeEncodedSourceFiles bool         `json:"includeEncodedSourceFiles,omitempty"` // Whether to include encoded source files in response
 }
 
 // LanguageOptions contains language-specific configuration options
@@ -98,13 +102,15 @@ type ParserOptions struct {
 	ProjectService bool         `json:"projectService"`
 	Project        ProjectPaths `json:"project,omitempty"`
 }
+type ByteArray []byte
 
 // LintResponse represents a lint response from Go to JS
 type LintResponse struct {
-	Diagnostics []Diagnostic `json:"diagnostics"`
-	ErrorCount  int          `json:"errorCount"`
-	FileCount   int          `json:"fileCount"`
-	RuleCount   int          `json:"ruleCount"`
+	Diagnostics      []Diagnostic           `json:"diagnostics"`
+	ErrorCount       int                    `json:"errorCount"`
+	FileCount        int                    `json:"fileCount"`
+	RuleCount        int                    `json:"ruleCount"`
+	EncodedSourceFiles map[string]ByteArray    `json:"encodedSourceFiles,omitempty"`
 }
 
 // ApplyFixesRequest represents a request to apply fixes from JS to Go
@@ -336,6 +342,8 @@ func (s *Service) sendResponse(id int, data interface{}) {
 	}
 }
 
+
+
 // sendError sends an error message
 func (s *Service) sendError(id int, message string) {
 	msg := &Message{
@@ -351,4 +359,8 @@ func (s *Service) sendError(id int, message string) {
 // IsIPCMode returns true if the process is in IPC mode
 func IsIPCMode() bool {
 	return os.Getenv("RSLINT_IPC") == "1"
+}
+
+func EncodeAST(sourceFile *ast.SourceFile, id string) ([]byte, error) {
+	return encoder.EncodeSourceFile(sourceFile, id)
 }
