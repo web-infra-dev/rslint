@@ -24,11 +24,6 @@
     {
       matchDepTypes: ['peerDependencies'],
       enabled: false,
-    },
-    {
-      matchPackageNames: ['pnpm'],
-      matchUpdateTypes: ['patch'],
-      enabled: false,
-    },
+    }
   ]
 }
