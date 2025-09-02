@@ -431,53 +431,6 @@ func isWithinStatementCondition(node *ast.Node) bool {
     return false
 }
 
-// isWithinCoalesceConditional returns true if the node is under a `??` expression
-// that itself is used as the condition of an if/while/do/for statement.
-func isWithinCoalesceConditional(node *ast.Node) bool {
-    if node == nil {
-        return false
-    }
-    // Find nearest ancestor nullish coalescing expression
-    var coalesce *ast.Node
-    for p := node.Parent; p != nil; p = p.Parent {
-        if p.Kind == ast.KindBinaryExpression {
-            if pb := p.AsBinaryExpression(); pb != nil && pb.OperatorToken.Kind == ast.KindQuestionQuestionToken {
-                coalesce = p
-                break
-            }
-        }
-    }
-    if coalesce == nil {
-        return false
-    }
-    // Check if that coalesce expression is used in a conditional position
-    for p := coalesce.Parent; p != nil; p = p.Parent {
-        switch p.Kind {
-        case ast.KindIfStatement:
-            if ifStmt := p.AsIfStatement(); ifStmt != nil {
-                return isNodeOrParentOf(ifStmt.Expression, coalesce) || isNodeWithin(ifStmt.Expression, coalesce)
-            }
-            return false
-        case ast.KindWhileStatement:
-            if whileStmt := p.AsWhileStatement(); whileStmt != nil {
-                return isNodeOrParentOf(whileStmt.Expression, coalesce) || isNodeWithin(whileStmt.Expression, coalesce)
-            }
-            return false
-        case ast.KindDoStatement:
-            if doStmt := p.AsDoStatement(); doStmt != nil {
-                return isNodeOrParentOf(doStmt.Expression, coalesce) || isNodeWithin(doStmt.Expression, coalesce)
-            }
-            return false
-        case ast.KindForStatement:
-            if forStmt := p.AsForStatement(); forStmt != nil {
-                return isNodeOrParentOf(forStmt.Condition, coalesce) || isNodeWithin(forStmt.Condition, coalesce)
-            }
-            return false
-        }
-    }
-    return false
-}
-
 // isNodeOrParentOf checks if target is the same as or a parent of node
 func isNodeOrParentOf(target, node *ast.Node) bool {
 	if target == nil || node == nil {
@@ -554,23 +507,6 @@ func isBooleanConstructorContext(node *ast.Node) bool {
 	return false
 }
 
-// isTernaryTest checks if a node is a ternary expression that is itself used as a test condition
-// This is different from a logical expression that happens to be inside a ternary condition
-func isTernaryTest(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-
-	// Only ternary expressions themselves can be "ternary tests"
-	if node.Kind != ast.KindConditionalExpression {
-		return false
-	}
-
-	// Check if this ternary expression is used as a test condition in another construct
-	// (like if statements, while loops, etc.)
-	return isConditionalTest(node) || isDirectlyInStatementCondition(node)
-}
-
 // isWithinTernaryTestCondition checks if a node is within the test condition of a ternary expression
 func isWithinTernaryTestCondition(node *ast.Node) bool {
 	if node == nil {
@@ -586,8 +522,9 @@ func isWithinTernaryTestCondition(node *ast.Node) bool {
 		if parent.Kind == ast.KindConditionalExpression {
 			condExpr := parent.AsConditionalExpression()
 			if condExpr != nil {
-				// Check if the original node is within the condition branch
-				if isNodeWithin(condExpr.Condition, node) {
+				// Check if the current node (which could be a parent of the original) is the condition
+				// or if the original node is within the condition branch
+				if condExpr.Condition == current || isNodeWithin(condExpr.Condition, node) {
 					return true
 				}
 				// If we're in whenTrue or whenFalse, we're not in the condition
@@ -1229,6 +1166,7 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 							}
 						}
                     // Stop climbing at statement boundaries, and do a textual fallback
+                    shouldBreak := false
                     switch p.Kind {
                     case ast.KindIfStatement:
                         if ifs := p.AsIfStatement(); ifs != nil {
@@ -1236,27 +1174,30 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
                                 return
                             }
                         }
-                        break
+                        shouldBreak = true
                     case ast.KindWhileStatement:
                         if ws := p.AsWhileStatement(); ws != nil {
                             if strings.Contains(getNodeText(ctx.SourceFile, ws.Expression), "??") {
                                 return
                             }
                         }
-                        break
+                        shouldBreak = true
                     case ast.KindDoStatement:
                         if ds := p.AsDoStatement(); ds != nil {
                             if strings.Contains(getNodeText(ctx.SourceFile, ds.Expression), "??") {
                                 return
                             }
                         }
-                        break
+                        shouldBreak = true
                     case ast.KindForStatement:
                         if fs := p.AsForStatement(); fs != nil {
                             if strings.Contains(getNodeText(ctx.SourceFile, fs.Condition), "??") {
                                 return
                             }
                         }
+                        shouldBreak = true
+                    }
+                    if shouldBreak {
                         break
                     }
 					}
@@ -1273,15 +1214,13 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
                         return
                     }
                     
-                    // Debug: Check if we're incorrectly identifying ternary test conditions
-                    if isWithinTernaryTestCondition(node) {
-                        // This should only ignore when ignoreTernaryTests is explicitly true
-                        // If ignoreTernaryTests is false or nil, we should still flag the OR
-                        // So we don't return here unless ignoreTernaryTests is true (handled above)
-                    }
-                    
                     // For non-ternary conditional tests, check ignoreConditionalTests
-                    if opts.IgnoreConditionalTests != nil && *opts.IgnoreConditionalTests && (isDirectlyInStatementCondition(node) || isConditionalTest(node) || isWithinStatementCondition(node)) {
+                    // BUT: Don't apply ignoreConditionalTests to ternary test conditions since they have their own option
+                    // Only apply ignoreConditionalTests if we're NOT in a ternary test condition
+                    // (ternary test conditions are handled by ignoreTernaryTests)
+                    if opts.IgnoreConditionalTests != nil && *opts.IgnoreConditionalTests && 
+                       !isWithinTernaryTestCondition(node) &&
+                       (isDirectlyInStatementCondition(node) || isConditionalTest(node) || isWithinStatementCondition(node)) {
                         return
                     }
 
@@ -1347,7 +1286,11 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
                     }
                     
                     // For non-ternary conditional tests, check ignoreConditionalTests
-                    if opts.IgnoreConditionalTests != nil && *opts.IgnoreConditionalTests && (isDirectlyInStatementCondition(node) || isConditionalTest(node)) {
+                    // Only apply ignoreConditionalTests if we're NOT in a ternary test condition
+                    // (ternary test conditions are handled by ignoreTernaryTests)
+                    if opts.IgnoreConditionalTests != nil && *opts.IgnoreConditionalTests && 
+                       !isWithinTernaryTestCondition(node) &&
+                       (isDirectlyInStatementCondition(node) || isConditionalTest(node)) {
                         return
                     }
 
