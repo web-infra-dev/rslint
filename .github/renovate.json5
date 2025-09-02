@@ -1,0 +1,34 @@
+{
+  $schema: 'https://docs.renovatebot.com/renovate-schema.json',
+  extends: [
+    'config:recommended',
+    'schedule:weekly',
+    'helpers:pinGitHubActionDigests',
+  ],
+  ignorePaths: ['**/tests/**', '**/node_modules/**', '**/typescript-go/**'],
+  packageRules: [
+    // Use chore as semantic commit type for commit messages
+    {
+      semanticCommitType: 'chore',
+      // always bump package.json
+      rangeStrategy: 'bump',
+      matchPackageNames: ['*'],
+    },
+    {
+      groupName: 'all patch dependencies',
+      groupSlug: 'all-patch',
+      matchUpdateTypes: ['patch'],
+      matchPackageNames: ['*'],
+    },
+    // manually update peer dependencies
+    {
+      matchDepTypes: ['peerDependencies'],
+      enabled: false,
+    },
+    {
+      matchPackageNames: ['pnpm'],
+      matchUpdateTypes: ['patch'],
+      enabled: false,
+    },
+  ]
+}
