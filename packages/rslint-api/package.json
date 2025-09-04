@@ -1,6 +1,6 @@
 {
   "name": "@rslint/api",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "Rslint AST library",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
