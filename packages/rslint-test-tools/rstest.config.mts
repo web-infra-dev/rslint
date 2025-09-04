@@ -4,6 +4,9 @@ export default defineConfig({
   testEnvironment: 'node',
   globals: true,
   include: [
+    // cli
+    './tests/cli/basic.test.ts',
+
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
 
