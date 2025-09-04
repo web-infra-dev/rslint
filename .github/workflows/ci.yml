@@ -11,6 +11,10 @@ permissions:
   contents: read
   # Optional: allow read access to pull requests. Use with `only-new-issues` option.
   pull-requests: read
+  # Required: allow writing check results and annotations
+  checks: write
+  # Required: allow updating commit statuses
+  statuses: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
@@ -116,7 +120,7 @@ jobs:
 
       - name: Dogfooding
         if: runner.os == 'Linux'
-        run: pnpm run lint
+        run: pnpm run lint --format github
 
       - name: TypeCheck
         if: runner.os == 'Linux'
