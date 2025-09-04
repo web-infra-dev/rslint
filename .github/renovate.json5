@@ -6,6 +6,7 @@
     'helpers:pinGitHubActionDigests',
   ],
   ignorePaths: ['**/tests/**', '**/node_modules/**', '**/typescript-go/**'],
+  cloneSubmodules: true,
   packageRules: [
     // Use chore as semantic commit type for commit messages
     {
