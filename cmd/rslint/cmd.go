@@ -97,6 +97,16 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 
 // print as [Workflow commands for GitHub Actions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands) format
 func printDiagnosticGitHub(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions) {
+	var severity string
+	switch d.Severity {
+	case rule.SeverityError:
+		severity = "error"
+	case rule.SeverityWarning:
+		severity = "warning"
+	default:
+		severity = "notice"
+	}
+
 	diagnosticStart := d.Range.Pos()
 	diagnosticEnd := d.Range.End()
 
@@ -106,7 +116,7 @@ func printDiagnosticGitHub(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOp
 	filePath := tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions)
 	output := fmt.Sprintf(
 		"::%s file=%s,line=%d,endLine=%d,col=%d,endColumn=%d,title=%s::%s\n",
-		d.Severity.String(),
+		severity,
 		escapeProperty(filePath),
 		startLine+1,
 		endLine+1,

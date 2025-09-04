@@ -224,6 +224,7 @@ describe('CLI Configuration Tests', () => {
             },
           },
           rules: {
+            '@typescript-eslint/no-explicit-any': 'warn',
             '@typescript-eslint/no-unsafe-member-access': 'error',
           },
           plugins: ['@typescript-eslint'],
@@ -253,7 +254,7 @@ describe('CLI Configuration Tests', () => {
 
       expect(lines.length).toBe(2);
       expect(lines[0]).toBe(
-        '::error file=test%3A%25%2C%0D%0Afile.ts,line=2,endLine=2,col=16,endColumn=19,title=@typescript-eslint/no-explicit-any::Unexpected any. Specify a different type.',
+        '::warning file=test%3A%25%2C%0D%0Afile.ts,line=2,endLine=2,col=16,endColumn=19,title=@typescript-eslint/no-explicit-any::Unexpected any. Specify a different type.',
       );
       expect(lines[1]).toBe(
         '::error file=test%3A%25%2C%0D%0Afile.ts,line=3,endLine=3,col=11,endColumn=12,title=@typescript-eslint/no-unsafe-member-access::Unsafe member access .b on an `any` value.',
