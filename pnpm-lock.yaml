@@ -280,8 +280,8 @@ importers:
         specifier: 2.0.0-beta.27
         version: 2.0.0-beta.27(@rspress/core@2.0.0-beta.27(@types/react@19.1.10)(acorn@8.15.0))
       '@rstack-dev/doc-ui':
-        specifier: 1.10.9
-        version: 1.10.9(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
+        specifier: 1.11.0
+        version: 1.11.0(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
       '@tailwindcss/postcss':
         specifier: ^4.1.11
         version: 4.1.11
@@ -1846,8 +1846,8 @@ packages:
     resolution: {integrity: sha512-8j4dpZLT/JnyjUl+bVM/oMHYz55G/MnxuDkKuZjBYeQNwMVSddiX0ytbHjFgxVRaC7bCX2ZXTY1OdX4SNJ6qdQ==}
     engines: {node: '>=18.0.0'}
 
-  '@rstack-dev/doc-ui@1.10.9':
-    resolution: {integrity: sha512-H3ceWWcBZq7vw6If1nUH1eJ95vp17wUC9It87GjRNdQNHQEihO+yQ6sop+71olpRJt5ztgTM8Q5QczULyps1xA==}
+  '@rstack-dev/doc-ui@1.11.0':
+    resolution: {integrity: sha512-5GZ8EwvmKj8LXomEElC4GhDlDW2SazCeHbA+ieacJrlcGduuiJXGTBzVA2rNnPLjAb41H0esuy0aH0skRIQAqA==}
 
   '@rstest/core@0.3.2':
     resolution: {integrity: sha512-bb6hciMqE9S0XYerYc9gA5oJq9RvS3Kdr8/wU/K++ZQumy35A8NOJno7L7/MudyQPTqTuHzPXQjKk4mOAlsCww==}
@@ -6538,7 +6538,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@rstack-dev/doc-ui@1.10.9(react-dom@19.1.1(react@19.1.1))(react@19.1.1)':
+  '@rstack-dev/doc-ui@1.11.0(react-dom@19.1.1(react@19.1.1))(react@19.1.1)':
     dependencies:
       framer-motion: 12.23.12(react-dom@19.1.1(react@19.1.1))(react@19.1.1)
     transitivePeerDependencies:
