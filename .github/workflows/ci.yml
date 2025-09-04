@@ -120,7 +120,7 @@ jobs:
 
       - name: Dogfooding
         if: runner.os == 'Linux'
-        run: pnpm run lint -- --format github
+        run: pnpm run lint --format github
 
       - name: TypeCheck
         if: runner.os == 'Linux'
