@@ -13,6 +13,8 @@ Build the project:
 ```bash
 # init typescript-go submodule
 git submodule update --init --recursive
+# apply patch to tsgo
+./scripts/apply-tsgo-patch.sh
 pnpm install
 pnpm build
 ```

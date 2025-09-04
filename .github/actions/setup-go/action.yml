@@ -52,4 +52,4 @@ runs:
 
     - name: Patch tsgo
       shell: bash
-      run: ./scripts/apply-tsgo-path.sh
+      run: ./scripts/apply-tsgo-patch.sh
