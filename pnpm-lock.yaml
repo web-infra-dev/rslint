@@ -268,8 +268,8 @@ importers:
         version: 1.3.6
     devDependencies:
       '@rsbuild/plugin-sass':
-        specifier: ^1.3.5
-        version: 1.3.5(@rsbuild/core@1.4.15)
+        specifier: ^1.4.0
+        version: 1.4.0(@rsbuild/core@1.4.15)
       '@rslint/api':
         specifier: workspace:*
         version: link:../packages/rslint-api
@@ -1619,8 +1619,8 @@ packages:
     peerDependencies:
       '@rsbuild/core': 1.x
 
-  '@rsbuild/plugin-sass@1.3.5':
-    resolution: {integrity: sha512-nW60+iLmV6fkCaE25xpnppISNveAw9z9xySFFcaU2VcpKQ1bGfGns785jlYRGS10E684zG6tL+NIOBS01uPwhQ==}
+  '@rsbuild/plugin-sass@1.4.0':
+    resolution: {integrity: sha512-2XcrXUwJftWsWURsvGKKXc7A4yEAUdVkw+K95Qrfmy5E5IfARik0Ko3TFB1828wdvhZ1OFLvDQEzONCIyQV1yg==}
     peerDependencies:
       '@rsbuild/core': 1.x
 
@@ -6277,7 +6277,7 @@ snapshots:
     transitivePeerDependencies:
       - webpack-hot-middleware
 
-  '@rsbuild/plugin-sass@1.3.5(@rsbuild/core@1.4.15)':
+  '@rsbuild/plugin-sass@1.4.0(@rsbuild/core@1.4.15)':
     dependencies:
       '@rsbuild/core': 1.4.15
       deepmerge: 4.3.1
