@@ -24,6 +24,6 @@
     {
       matchDepTypes: ['peerDependencies'],
       enabled: false,
-    }
-  ]
+    },
+  ],
 }
