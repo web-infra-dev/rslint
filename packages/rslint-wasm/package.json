@@ -16,7 +16,11 @@
   ],
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/web-infra-dev/rslint"
+  },
   "packageManager": "pnpm@10.13.1",
   "devDependencies": {
     "@rslint/core": "workspace:*",
