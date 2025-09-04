@@ -16,8 +16,8 @@
   "scripts": {
     "build": "tsc -b tsconfig.build.json --force",
     "dev": "tsc -b tsconfig.build.json --force --watch",
-    "test": "rstest run --testTimeout=0",
-    "test:update": "rstest run -u --testTimeout=0"
+    "test": "rstest run --testTimeout=0 --passWithNoTests",
+    "test:update": "rstest run -u --testTimeout=0 --passWithNoTests"
   },
   "files": [
     "dist"
