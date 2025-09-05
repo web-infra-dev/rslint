@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "rslib build",
-    "compile": "tsc -p tsconfig.build.json"
+    "compile": "tsgo -p tsconfig.build.json"
   },
   "keywords": [],
   "author": "",
