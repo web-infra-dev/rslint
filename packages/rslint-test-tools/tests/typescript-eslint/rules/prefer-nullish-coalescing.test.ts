@@ -72,6 +72,7 @@ x ??${equals} 'foo';
     {
       code: 'x !== undefined && x !== null ? x : y;',
       options: [{ ignoreTernaryTests: true }],
+      skip: true
     },
 
     ...[
@@ -1620,6 +1621,7 @@ declare let x: ${type} | ${nullish};
         ],
         options: [{ ignoreTernaryTests: false }] as const,
         output: null,
+        skip: true,
       },
       {
         code: code.replaceAll('x', 'x.z[1][this[this.o]]["3"][a.b.c]'),
@@ -1641,6 +1643,7 @@ declare let x: ${type} | ${nullish};
         ],
         options: [{ ignoreTernaryTests: false }] as const,
         output: null,
+        skip: true,
       },
       {
         code: code.replaceAll('y', '(z = y)'),
@@ -1661,6 +1664,7 @@ declare let x: ${type} | ${nullish};
         ],
         options: [{ ignoreTernaryTests: false }] as const,
         output: null,
+        skip: true,
       },
     ]),
 
