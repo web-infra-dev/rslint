@@ -14,8 +14,8 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "tsc -b tsconfig.build.json --force",
-    "dev": "tsc -b tsconfig.build.json --force --watch",
+    "build": "tsgo -b tsconfig.build.json --force",
+    "dev": "tsgo -b tsconfig.build.json --force --watch",
     "test": "rstest run --testTimeout=0 --passWithNoTests",
     "test:update": "rstest run -u --testTimeout=0 --passWithNoTests"
   },

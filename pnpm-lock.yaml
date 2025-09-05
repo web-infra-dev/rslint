@@ -21,6 +21,9 @@ importers:
       '@rstest/core':
         specifier: ^0.3.2
         version: 0.3.2
+      '@typescript/native-preview':
+        specifier: latest
+        version: 7.0.0-dev.20250904.1
       husky:
         specifier: ^9.1.7
         version: 9.1.7
@@ -2184,6 +2187,53 @@ packages:
     resolution: {tarball: https://codeload.github.com/microsoft/libsyncrpc/tar.gz/1580683e84cc177abdbbe83cf34f40605b7349f7}
     version: 0.0.0
     engines: {node: '>= 10.16.0 < 11 || >= 11.8.0 < 12 || >= 12.0.0'}
+
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20250904.1':
+    resolution: {integrity: sha512-1rt4DhERW1VM4OwWYVIrCp1k1S4kpZAxzbCnprNinVJInhHexY2K0FFD9IGXKWSRANHg/OmJRQYTEoDKM6pqNw==}
+    engines: {node: '>=20.6.0'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20250904.1':
+    resolution: {integrity: sha512-d2DMQnsXAkZDDk9bU/FhY/D74tbMAkboIGb+hq7kIIgOVcxOswhwLFZ/ajW/9NTesktz8Z14t40Ber+/Pny25A==}
+    engines: {node: '>=20.6.0'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20250904.1':
+    resolution: {integrity: sha512-+fv13RDSk+7wFYY846q5ig7X6G07JT7wbajk6p4rELXTIfS1c6gRHGhODETCfFVaPziP4IlvqyinNP8F8wc9uQ==}
+    engines: {node: '>=20.6.0'}
+    cpu: [arm64]
+    os: [linux]
+
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20250904.1':
+    resolution: {integrity: sha512-YyfTK1SGmfeDJv6G3vSmVxjM914Xio7O57NzRKOyEQnmBT5tdXTzeWgkjrUh1jE8wCUu0f0ZZ+xDTwgys+E2ug==}
+    engines: {node: '>=20.6.0'}
+    cpu: [arm]
+    os: [linux]
+
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20250904.1':
+    resolution: {integrity: sha512-BjWJI42cUUilIyQHZpQQeSjC/Ifj/UaIf4oj6lRHDcg5qgLHWe5bAUxuNjE6i7wi+TTN9YxUvBDkMAcm/hI8wg==}
+    engines: {node: '>=20.6.0'}
+    cpu: [x64]
+    os: [linux]
+
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20250904.1':
+    resolution: {integrity: sha512-rPv/mVaneZTuFESk/zDg3dFiZjpdipVMcLaF10Ns1fIyWdZ0ja79Ufm1eCFbk8KFNEX2dEx+vFEvD9n4bhEneg==}
+    engines: {node: '>=20.6.0'}
+    cpu: [arm64]
+    os: [win32]
+
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20250904.1':
+    resolution: {integrity: sha512-+twwqKYEv5UdZX5FRaBo0bDQgw/uPQjU3hqaqaO0Dhp1Ou8Ce4oi5hgwauB1j29JwBbvOi9/yoEcjsjT2Wsaxw==}
+    engines: {node: '>=20.6.0'}
+    cpu: [x64]
+    os: [win32]
+
+  '@typescript/native-preview@7.0.0-dev.20250904.1':
+    resolution: {integrity: sha512-IzPzhumNsWsIg4Kmt0y+0b2BBtsvD17rDmKj78yNeU3AsuA6xignQ5eDkFtRmLdGPVZwa8Yg5zPcJRFln98Ocw==}
+    engines: {node: '>=20.6.0'}
+    hasBin: true
 
   '@typespec/ts-http-runtime@0.3.0':
     resolution: {integrity: sha512-sOx1PKSuFwnIl7z4RN0Ls7N9AQawmR9r66eI5rFCzLDIs8HTIYrIpH9QjYWoX0lkgGrkLxXhi4QnK7MizPRrIg==}
@@ -6947,6 +6997,37 @@ snapshots:
       eslint-visitor-keys: 4.2.1
 
   '@typescript/libsyncrpc@https://codeload.github.com/microsoft/libsyncrpc/tar.gz/1580683e84cc177abdbbe83cf34f40605b7349f7': {}
+
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20250904.1':
+    optional: true
+
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20250904.1':
+    optional: true
+
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20250904.1':
+    optional: true
+
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20250904.1':
+    optional: true
+
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20250904.1':
+    optional: true
+
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20250904.1':
+    optional: true
+
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20250904.1':
+    optional: true
+
+  '@typescript/native-preview@7.0.0-dev.20250904.1':
+    optionalDependencies:
+      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20250904.1
+      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20250904.1
+      '@typescript/native-preview-linux-arm': 7.0.0-dev.20250904.1
+      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20250904.1
+      '@typescript/native-preview-linux-x64': 7.0.0-dev.20250904.1
+      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20250904.1
+      '@typescript/native-preview-win32-x64': 7.0.0-dev.20250904.1
 
   '@typespec/ts-http-runtime@0.3.0':
     dependencies:
