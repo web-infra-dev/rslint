@@ -84,5 +84,5 @@
 
  ---
  
- For more context, see `architecture.md` and `Agents.md` at the repo root.
+ For more context, see `architecture.md` and `AGENTS.md` at the repo root.
 
