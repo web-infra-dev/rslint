@@ -40,7 +40,7 @@
     "prettier": "3.5.0",
     "typescript": "5.8.3",
     "zx": "8.7.1",
-    "@typescript/native-preview": "latest"
+    "@typescript/native-preview": "7.0.0-dev.20250904.1"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
