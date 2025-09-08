@@ -96,6 +96,7 @@
     "ovsx": "^0.10.5",
     "rimraf": "6.0.1",
     "typescript": "^5.0.0",
+    "@typescript/native-preview": "7.0.0-dev.20250904.1",
     "vscode-languageclient": "^9.0.1",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.12"
