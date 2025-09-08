@@ -10,7 +10,7 @@
   },
   "scripts": {
     "build": "rslib build",
-    "compile": "tsc -p tsconfig.build.json"
+    "compile": "tsgo -p tsconfig.build.json"
   },
   "keywords": [],
   "author": "",
@@ -19,7 +19,8 @@
   "devDependencies": {
     "@typescript/api": "workspace:*",
     "@rslib/core": "0.12.4",
-    "@types/node": "24.3.0"
+    "@types/node": "24.3.0",
+    "@typescript/native-preview": "7.0.0-dev.20250904.1"
   },
   "publishConfig": {
     "access": "public"

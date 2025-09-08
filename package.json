@@ -25,7 +25,7 @@
     "format:check": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --check .",
     "test": "pnpm -r --filter=!@typescript/api --filter=!@typescript/ast --filter='@rslint/test-tools...' --filter='rslint...' test",
     "test:go": "go test ./internal/...",
-    "typecheck": "pnpm tsc -b tsconfig.json",
+    "typecheck": "pnpm tsgo -b tsconfig.json",
     "lint": "rslint",
     "lint:go": "golangci-lint run ./cmd/... ./internal/...",
     "format:go": "golangci-lint fmt ./cmd/... ./internal/...",
@@ -39,7 +39,8 @@
     "lint-staged": "^16.1.2",
     "prettier": "3.5.0",
     "typescript": "5.8.3",
-    "zx": "8.7.1"
+    "zx": "8.7.1",
+    "@typescript/native-preview": "7.0.0-dev.20250904.1"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
