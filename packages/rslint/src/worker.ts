@@ -89,7 +89,9 @@ function sendToRslint(kind: string, data: unknown): unknown {
       if (hasProp(data, 'diagnostics')) diagnostics = data.diagnostics;
       const fixedContent =
         typeof fileContent === 'string' ? [fileContent] : [''];
-      const unappliedCount = Array.isArray(diagnostics) ? diagnostics.length : 0;
+      const unappliedCount = Array.isArray(diagnostics)
+        ? diagnostics.length
+        : 0;
       // Simulate apply fixes response
       return {
         fixedContent,
@@ -111,7 +113,7 @@ function sendToRslint(kind: string, data: unknown): unknown {
 /**
  * Handle messages from the main thread
  */
-async function handleMessage(evt: MessageEvent): Promise<void> {
+function handleMessage(evt: MessageEvent): void {
   const raw = evt.data as unknown;
   if (!isIpcMessage(raw)) {
     return;
@@ -125,7 +127,7 @@ async function handleMessage(evt: MessageEvent): Promise<void> {
     }
 
     // Send message to rslint and get response
-    const response = await Promise.resolve(sendToRslint(kind, data));
+    const response = sendToRslint(kind, data);
 
     // Send response back to main thread
     self.postMessage({
@@ -165,7 +167,7 @@ function handleError(error: ErrorEvent): void {
 }
 
 self.addEventListener('message', evt => {
-  void handleMessage(evt);
+  handleMessage(evt);
 });
 self.addEventListener('error', handleError);
 
