@@ -1,88 +1,51 @@
- # AGENTS.md — Agent Instructions for rslint
+# Repository Guidelines
 
- These instructions apply to the entire repository unless a more deeply nested AGENTS.md overrides them.
+This document summarizes how to work on rslint effectively and consistently.
 
- ## Scope and Priorities
+## Project Structure & Module Organization
 
- - Do the minimum necessary, high-quality change to satisfy the task.
- - Preserve existing public/CLI behavior unless explicitly asked to change it.
- - Do not introduce unrelated changes or refactors.
- - Match existing code style and structure; prefer local patterns and utilities.
- - Avoid adding new external dependencies without explicit request.
+- `cmd/rslint/`: CLI entry (default), IPC API (`--api`), LSP (`--lsp`).
+- `internal/config/`: Config types/loader, rule registry and registration.
+- `internal/linter/`: Linter engine, traversal, and fix application.
+- `internal/rule/`: Rule framework, diagnostics, disable manager, listeners.
+- `internal/plugins/typescript/`: `@typescript-eslint` rules under `rules/<rule>/`.
+- `internal/plugins/import/`: `eslint-plugin-import` registration.
+- `internal/utils/`: JSONC, overlay VFS, TS program creation, helpers.
+- `internal/lsp/`: Language Server integration. Also see `website/` and `packages/` for UI/tooling.
 
- ## How to Run
+## Build, Test, and Development Commands
 
- - CLI: `go run ./cmd/rslint [--config rslint.jsonc] [--fix] [--format default|jsonline|github] [--quiet] [--max-warnings N]`
- - LSP: `go run ./cmd/rslint --lsp`
- - IPC API: `go run ./cmd/rslint --api` (length‑prefixed JSON over stdio)
- - Go tests: `pnpm run test:go`
- - JS build: `pnpm build`
- - JS tests: `pnpm run test`
- - Lint Go: `pnpm run lint:go`
- - Format JS/TS/MD/CSS: `pnpm run format`
+- Build JS/TS: `pnpm build`
+- Run Go tests: `pnpm run test:go`
+- Run JS tests: `pnpm run test`
+- Run Check Spell: `pnpm run check-spell`
+- Lint Go: `pnpm run lint:go` | Format JS/TS/MD: `pnpm run format`
+- CLI: `go run ./cmd/rslint --help`
+  - Examples: `go run ./cmd/rslint --config rslint.jsonc`, `--fix`, `--format default|jsonline|github`, `--quiet`, `--max-warnings 0`
+- LSP: `go run ./cmd/rslint --lsp` | IPC API: `go run ./cmd/rslint --api`
 
- ## Repository Layout (essentials)
+## Coding Style & Naming Conventions
 
- - `cmd/rslint/` — CLI, IPC (`--api`), and LSP (`--lsp`) entrypoints
- - `internal/config/` — Config types/loader, rule registry, registration
- - `internal/linter/` — Linter core and fix application
- - `internal/rule/` — Rule framework, diagnostics, disable manager, listener kinds
- - `internal/plugins/typescript/` — `@typescript-eslint` rules (`rules/` subfolders)
- - `internal/plugins/import/` — `eslint-plugin-import` registration and recommended set
- - `internal/utils/` — JSONC, overlay VFS, TS program creation, helpers
- - `internal/lsp/` — Language Server integration
+- Go uses gofmt/goimports; keep functions focused and small.
+- TS/JS/MD/CSS use Prettier via `pnpm run format`.
+- Rules: `internal/plugins/typescript/rules/<rule>/`; tests: `<rule>_test.go`.
+- Prefer table-driven tests and existing helpers in `internal/utils`.
 
- See `architecture.md` for a broader overview.
+## Testing Guidelines
 
- ## Configuration
+- Co-locate Go tests with implementation; name files `*_test.go` and functions `TestXxx`.
+- Keep tests minimal and behavior-focused; avoid unrelated scenarios.
+- Run `pnpm run test:go` (Go) and `pnpm run test` (JS) before submitting.
 
- - Config files: `rslint.json` or `rslint.jsonc` (JSONC supported)
- - Rules accept ESLint-compatible formats: string level, `{ level, options }` object, or `[level, options?]` array
- - Plugins: `"@typescript-eslint"`, `"eslint-plugin-import"`
- - Ignores: glob patterns matched with doublestar against normalized paths
+## Commit & Pull Request Guidelines
 
- ## Implementing/Modifying Rules (Go)
+- Use Conventional Commits: `feat:`, `fix:`, `chore:`, `docs:`, `ci:`, etc.
+- PRs should be small, with clear description, repro steps, and linked issues.
+- Include examples (commands or code) and update docs when behavior changes.
+- Preserve existing CLI behavior unless a change is explicitly requested.
 
- - Place TypeScript plugin rules under `internal/plugins/typescript/rules/<rule>/`.
- - Implement a `rule.Rule` with `Run(ctx, options) RuleListeners`.
- - Listener kinds from `internal/rule/rule.go`:
-   - On-enter: `ast.KindX`
-   - On-exit: `rule.ListenerOnExit(ast.KindX)`
-   - Allow‑pattern aware: `rule.ListenerOnAllowPattern/ListenerOnNotAllowPattern`
- - Use `RuleContext` (SourceFile, Program, TypeChecker, DisableManager) and report via provided helpers.
- - Register new rules in `internal/config/config.go` within `RegisterAllRules()`.
+## Architecture & Configuration Tips
 
- ## Diagnostics and Fixes
-
- - Use `RuleMessage{ Id, Description }`.
- - Provide fixes as `RuleFix{ Text, Range }` and/or suggestions (`RuleSuggestion`).
- - The CLI `--fix` applies non‑overlapping edits with `internal/linter/ApplyRuleFixes`.
-
- ## Concurrency & Traversal
-
- - The linter walks each file once and dispatches to all registered listeners.
- - Allow‑pattern contexts are propagated for assignment LHS, array/object patterns, spreads, and property values.
- - CLI uses a work group to parallelize across programs/files; `--singleThreaded` disables parallelism.
-
- ## Testing
-
- - Prefer small, table‑driven tests colocated with rules: `<rule>_test.go`.
- - Keep tests focused on changed behavior; do not add unrelated tests.
- - Run `pnpm run test:go` locally before completing.
-
- ## Do / Don’t
-
- Do:
- - Use existing helpers in `internal/utils` and typescript‑go shims.
- - Keep changes narrow and consistent with surrounding code.
- - Update `architecture.md` and this file only if the behavior or guidance changes.
-
- Don’t:
- - Rename or move files/packages unless requested.
- - Introduce new dependencies or large refactors without approval.
- - Change CLI flags or output formats unless explicitly asked.
-
- ---
- 
- For more context, see `architecture.md` and `Agents.md` at the repo root.
-
+- rslint loads `rslint.json`/`rslint.jsonc`; rules accept ESLint-style levels/options.
+- The linter walks each file once and dispatches to registered listeners; `--singleThreaded` disables parallelism.
+- Use `--format github` in CI to emit GitHub workflow annotations.
