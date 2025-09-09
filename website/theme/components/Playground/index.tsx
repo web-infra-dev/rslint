@@ -65,6 +65,8 @@ const Playground: React.FC = () => {
         kind: string;
         pos: number;
         end: number;
+        text: string;
+        identifier?: string;
         [key: string]: any;
       }
 
@@ -73,6 +75,7 @@ const Playground: React.FC = () => {
         const astBuffer = result.encodedSourceFiles!['index.ts'];
         const buffer = Uint8Array.from(atob(astBuffer), c => c.charCodeAt(0));
         const source = new RemoteSourceFile(buffer, new TextDecoder());
+        const sourceText = source.text ?? '';
 
         function serializeNode(
           node: Node,
@@ -83,6 +86,7 @@ const Playground: React.FC = () => {
               kind: SyntaxKind[node.kind],
               pos: node.pos,
               end: node.end,
+              text: sourceText.slice(node.pos, node.end),
             };
           seen.add(node);
 
@@ -90,7 +94,12 @@ const Playground: React.FC = () => {
             kind: SyntaxKind[node.kind],
             pos: node.pos,
             end: node.end,
+            text: sourceText.slice(node.pos, node.end),
           };
+          const identifier = (node as any).escapedText ?? (node as any).text;
+          if (identifier !== undefined) {
+            base.identifier = String(identifier);
+          }
 
           for (const key in node as any) {
             if (key === 'parent') continue;
