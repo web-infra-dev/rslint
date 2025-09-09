@@ -22,10 +22,6 @@ function isIpcMessage(value: unknown): value is IpcMessage {
 
 // Global state for the worker
 let rslintProcess: unknown = null;
-let pendingMessages = new Map<
-  number,
-  { resolve: (data: unknown) => void; reject: (error: Error) => void }
->();
 
 /**
  * Initialize the rslint process (could be WASM or other browser-compatible implementation)
@@ -152,18 +148,13 @@ function handleMessage(evt: MessageEvent): void {
  */
 function handleError(error: ErrorEvent): void {
   console.error('Worker error:', error);
-
-  // Send error to main thread for all pending messages
-  for (const [id, pending] of pendingMessages) {
-    self.postMessage({
-      id,
-      kind: 'error',
-      data: {
-        message: `Worker error: ${error.message}`,
-      },
-    });
-  }
-  pendingMessages.clear();
+  self.postMessage({
+    id: -1,
+    kind: 'error',
+    data: {
+      message: `Worker error: ${error.message}`,
+    },
+  });
 }
 
 self.addEventListener('message', evt => {
