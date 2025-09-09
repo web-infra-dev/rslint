@@ -67,7 +67,7 @@ export class RSLintService {
    */
   async close(): Promise<void> {
     return new Promise(resolve => {
-      this.service.sendMessage('exit', {}).finally(() => {
+      void this.service.sendMessage('exit', {}).finally(() => {
         this.service.terminate();
         resolve();
       });

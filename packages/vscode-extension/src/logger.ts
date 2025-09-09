@@ -49,11 +49,7 @@ export class Logger {
     this.log(LogLevel.WARN, message, ...args);
   }
 
-  public error(
-    message: string,
-    error?: Error | unknown,
-    ...args: unknown[]
-  ): void {
+  public error(message: string, error?: unknown, ...args: unknown[]): void {
     if (error instanceof Error) {
       this.log(
         LogLevel.ERROR,
