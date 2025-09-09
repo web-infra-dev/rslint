@@ -257,10 +257,7 @@ export class Rslint implements Disposable {
         }
 
         const rslintPlatformPath = rslintCorePackage
-          ? resolver?.(
-              PLATFORM_BIN_REQUEST,
-              rslintCorePackage,
-            ) ?? null
+          ? (resolver?.(PLATFORM_BIN_REQUEST, rslintCorePackage) ?? null)
           : null;
         if (!rslintPlatformPath) {
           continue;
