@@ -38,7 +38,7 @@ export class NodeRslintService implements RslintServiceInterface {
     });
 
     // Set up binary message reading
-    this.process.stdout!.on('data', data => {
+    this.process.stdout!.on('data', (data: Buffer) => {
       this.handleChunk(data);
     });
     this.chunks = [];
@@ -49,7 +49,7 @@ export class NodeRslintService implements RslintServiceInterface {
   /**
    * Send a message to the rslint process
    */
-  async sendMessage(kind: string, data: any): Promise<any> {
+  async sendMessage(kind: string, data: unknown): Promise<unknown> {
     return new Promise((resolve, reject) => {
       const id = this.nextMessageId++;
       const message: IpcMessage = { id, kind, data };
@@ -100,8 +100,10 @@ export class NodeRslintService implements RslintServiceInterface {
 
       // Handle the message
       try {
-        const parsed: IpcMessage = JSON.parse(message);
-        this.handleMessage(parsed);
+        const raw = JSON.parse(message) as unknown;
+        if (NodeRslintService.isIpcMessage(raw)) {
+          this.handleMessage(raw);
+        }
       } catch (err) {
         console.error('Error parsing message:', err);
       }
@@ -111,6 +113,12 @@ export class NodeRslintService implements RslintServiceInterface {
       this.chunkSize = this.chunks[0].length;
       this.expectedSize = null;
     }
+  }
+
+  private static isIpcMessage(value: unknown): value is IpcMessage {
+    if (!value || typeof value !== 'object') return false;
+    const obj = value as { id?: unknown; kind?: unknown };
+    return typeof obj.id === 'number' && typeof obj.kind === 'string';
   }
 
   /**
@@ -124,7 +132,13 @@ export class NodeRslintService implements RslintServiceInterface {
     this.pendingMessages.delete(id);
 
     if (kind === 'error') {
-      pending.reject(new Error(data.message));
+      let msg = 'Unknown error';
+      if (data && typeof data === 'object') {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const m = (data as Record<string, unknown>).message;
+        if (typeof m === 'string') msg = m;
+      }
+      pending.reject(new Error(msg));
     } else {
       pending.resolve(data);
     }

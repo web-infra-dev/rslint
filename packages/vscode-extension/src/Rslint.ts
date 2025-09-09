@@ -138,7 +138,9 @@ export class Rslint implements Disposable {
     return this.client;
   }
 
-  public onDidChangeState(listener: (event: any) => void): Disposable {
+  public onDidChangeState(
+    listener: (event: { oldState: State; newState: State }) => void,
+  ): Disposable {
     if (!this.client) {
       throw new Error('Client is not initialized');
     }
@@ -224,23 +226,46 @@ export class Rslint implements Disposable {
       try {
         this.logger.debug('Looking for Rslint binary in PnP mode');
         // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-        const yarnPnpApi = require(yarnPnpFile.fsPath);
+        const yarnPnpApiUnknown: unknown = require(yarnPnpFile.fsPath);
 
-        const rslintCorePackage = yarnPnpApi.resolveRequest(
-          '@rslint/core/package.json',
-          folder.uri.fsPath,
-        );
+        const getResolveRequest = (
+          api: unknown,
+        ): ((request: string, issuer: string) => string | null) | null => {
+          if (
+            typeof api === 'object' &&
+            api !== null &&
+            // avoid dot-notation error by using hasOwnProperty
+            Object.prototype.hasOwnProperty.call(api, 'resolveRequest')
+          ) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+            const fn = (api as { resolveRequest?: unknown }).resolveRequest;
+            if (typeof fn === 'function') {
+              // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+              return fn as (request: string, issuer: string) => string | null;
+            }
+          }
+          return null;
+        };
+
+        const resolver = getResolveRequest(yarnPnpApiUnknown);
+        const rslintCorePackage = resolver
+          ? resolver('@rslint/core/package.json', folder.uri.fsPath)
+          : null;
 
         if (!rslintCorePackage) {
           continue;
         }
 
-        const rslintPlatformPkg = Uri.file(
-          yarnPnpApi.resolveRequest(
-            PLATFORM_BIN_REQUEST,
-            rslintCorePackage,
-          ) as string,
-        );
+        const rslintPlatformPath = rslintCorePackage
+          ? resolver?.(
+              PLATFORM_BIN_REQUEST,
+              rslintCorePackage,
+            ) ?? null
+          : null;
+        if (!rslintPlatformPath) {
+          continue;
+        }
+        const rslintPlatformPkg = Uri.file(rslintPlatformPath);
 
         if (await fileExists(rslintPlatformPkg)) {
           this.logger.debug(

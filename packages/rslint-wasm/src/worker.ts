@@ -1,4 +1,5 @@
 // @ts-nocheck
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-type-assertion, @typescript-eslint/no-misused-promises, @typescript-eslint/promise-function-async, @typescript-eslint/no-floating-promises */
 import '../wasm_exec';
 import * as memfs from 'memfs';
 import { Buffer } from 'buffer';

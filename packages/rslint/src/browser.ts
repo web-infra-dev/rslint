@@ -33,18 +33,21 @@ export class BrowserRslintService implements RslintServiceInterface {
     // In browser, we need to use a web worker that can run the rslint binary
     // This would typically be a WASM version or a worker that can spawn processes
     this.workerUrl = options.workerUrl;
-    this.ensureWorker(options.wasmUrl);
+    void this.ensureWorker(options.wasmUrl);
   }
 
   /**
    * Initialize the web worker
    */
-  private async ensureWorker(wasmUrl: string): Promise<Worker> {
+  private ensureWorker(wasmUrl: string): Worker {
     if (!this.worker) {
       this.worker = new Worker(this.workerUrl, { name: 'rslint-worker.js' });
 
-      this.worker.onmessage = event => {
-        this.handlePacket(event.data);
+      this.worker.onmessage = (event: MessageEvent) => {
+        const data: unknown = event.data;
+        if (data instanceof Uint8Array) {
+          this.handlePacket(data);
+        }
       };
 
       this.worker.onerror = error => {
@@ -100,8 +103,10 @@ export class BrowserRslintService implements RslintServiceInterface {
 
       // Handle the message
       try {
-        const parsed: IpcMessage = JSON.parse(message);
-        this.handleResponse(parsed);
+        const raw = JSON.parse(message) as unknown;
+        if (BrowserRslintService.isIpcMessage(raw)) {
+          this.handleResponse(raw);
+        }
       } catch (err) {
         console.error('Error parsing message:', err);
       }
@@ -136,10 +141,16 @@ export class BrowserRslintService implements RslintServiceInterface {
     return combined;
   }
 
+  private static isIpcMessage(value: unknown): value is IpcMessage {
+    if (!value || typeof value !== 'object') return false;
+    const obj = value as { id?: unknown; kind?: unknown };
+    return typeof obj.id === 'number' && typeof obj.kind === 'string';
+  }
+
   /**
    * Send a message to the worker
    */
-  async sendMessage(kind: string, data: any): Promise<any> {
+  async sendMessage(kind: string, data: unknown): Promise<unknown> {
     return new Promise((resolve, reject) => {
       const id = this.nextMessageId++;
       const message: IpcMessage = { id, kind, data };
@@ -163,7 +174,13 @@ export class BrowserRslintService implements RslintServiceInterface {
     this.pendingMessages.delete(id);
 
     if (kind === 'error') {
-      pending.reject(new Error(data.message));
+      let msg = 'Unknown error';
+      if (data && typeof data === 'object') {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
+        const m = (data as Record<string, unknown>).message;
+        if (typeof m === 'string') msg = m;
+      }
+      pending.reject(new Error(msg));
     } else {
       pending.resolve(data);
     }

@@ -1,6 +1,6 @@
 // FIXME: temporary workaround for test
-export type MessageIds = any;
-export type Options = any;
+export type MessageIds = unknown;
+export type Options = unknown;
 type MemberType = string;
 export const defaultOrder: MemberType[] = [
   // Index signature

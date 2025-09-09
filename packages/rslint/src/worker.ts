@@ -5,24 +5,32 @@
  * This worker handles communication with the rslint binary or WASM implementation
  */
 
-interface IpcMessage {
-  id: number;
-  kind: string;
-  data: any;
+import type { IpcMessage } from './types.js';
+
+function hasProp<K extends string>(
+  obj: unknown,
+  key: K,
+): obj is Record<K, unknown> {
+  return typeof obj === 'object' && obj !== null && key in obj;
+}
+
+function isIpcMessage(value: unknown): value is IpcMessage {
+  if (!value || typeof value !== 'object') return false;
+  const obj = value as { id?: unknown; kind?: unknown };
+  return typeof obj.id === 'number' && typeof obj.kind === 'string';
 }
 
 // Global state for the worker
-let rslintProcess: any = null;
-let nextMessageId = 1;
+let rslintProcess: unknown = null;
 let pendingMessages = new Map<
   number,
-  { resolve: (data: any) => void; reject: (error: Error) => void }
+  { resolve: (data: unknown) => void; reject: (error: Error) => void }
 >();
 
 /**
  * Initialize the rslint process (could be WASM or other browser-compatible implementation)
  */
-async function initializeRslint(): Promise<void> {
+function initializeRslint(): void {
   try {
     // In a real implementation, this would load the rslint WASM module
     // or initialize a browser-compatible version of rslint
@@ -42,7 +50,7 @@ async function initializeRslint(): Promise<void> {
 /**
  * Send a message to the rslint process
  */
-async function sendToRslint(kind: string, data: any): Promise<any> {
+function sendToRslint(kind: string, data: unknown): unknown {
   if (!rslintProcess) {
     throw new Error('Rslint process not initialized');
   }
@@ -54,24 +62,42 @@ async function sendToRslint(kind: string, data: any): Promise<any> {
     case 'handshake':
       return { version: '1.0.0', status: 'ok' };
 
-    case 'lint':
+    case 'lint': {
+      let files: unknown = undefined;
+      if (hasProp(data, 'files')) {
+        files = data.files;
+      }
+      const fileCount = Array.isArray(files)
+        ? files.length
+        : typeof files === 'string'
+          ? 1
+          : 0;
       // Simulate linting response
       return {
         diagnostics: [],
         errorCount: 0,
-        fileCount: data.files?.length || 0,
+        fileCount,
         ruleCount: 0,
         duration: '0ms',
       };
+    }
 
-    case 'applyFixes':
+    case 'applyFixes': {
+      let fileContent: unknown = undefined;
+      let diagnostics: unknown = undefined;
+      if (hasProp(data, 'fileContent')) fileContent = data.fileContent;
+      if (hasProp(data, 'diagnostics')) diagnostics = data.diagnostics;
+      const fixedContent =
+        typeof fileContent === 'string' ? [fileContent] : [''];
+      const unappliedCount = Array.isArray(diagnostics) ? diagnostics.length : 0;
       // Simulate apply fixes response
       return {
-        fixedContent: [data.fileContent],
+        fixedContent,
         wasFixed: false,
         appliedCount: 0,
-        unappliedCount: data.diagnostics?.length || 0,
+        unappliedCount,
       };
+    }
 
     case 'exit':
       rslintProcess = null;
@@ -85,17 +111,21 @@ async function sendToRslint(kind: string, data: any): Promise<any> {
 /**
  * Handle messages from the main thread
  */
-async function handleMessage(event: MessageEvent): Promise<void> {
-  const { id, kind, data } = event.data as IpcMessage;
+async function handleMessage(evt: MessageEvent): Promise<void> {
+  const raw = evt.data as unknown;
+  if (!isIpcMessage(raw)) {
+    return;
+  }
+  const { id, kind, data } = raw;
 
   try {
     // Ensure rslint is initialized
     if (!rslintProcess && kind !== 'exit') {
-      await initializeRslint();
+      initializeRslint();
     }
 
     // Send message to rslint and get response
-    const response = await sendToRslint(kind, data);
+    const response = await Promise.resolve(sendToRslint(kind, data));
 
     // Send response back to main thread
     self.postMessage({
@@ -134,8 +164,9 @@ function handleError(error: ErrorEvent): void {
   pendingMessages.clear();
 }
 
-// Set up event listeners
-self.addEventListener('message', handleMessage);
+self.addEventListener('message', evt => {
+  void handleMessage(evt);
+});
 self.addEventListener('error', handleError);
 
 // Initialize the worker

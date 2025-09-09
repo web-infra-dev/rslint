@@ -1,4 +1,4 @@
 // FIXME: temporary workaround for test
-export type MessageIds = any;
-export type MessageId = any;
-export type Options = any;
+export type MessageIds = unknown;
+export type MessageId = unknown;
+export type Options = unknown;

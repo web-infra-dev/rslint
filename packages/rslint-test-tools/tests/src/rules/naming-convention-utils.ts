@@ -1,8 +1,8 @@
 // FIXME: temporary workaround for test
-export type MessageIds = any;
-export type Options = any;
-export type PredefinedFormatsString = any;
-export type Selector = any;
+export type MessageIds = unknown;
+export type Options = unknown;
+export type PredefinedFormatsString = unknown;
+export type Selector = unknown;
 export const selectorTypeToMessageString = (selector: Selector): string => {
   return selector;
 };

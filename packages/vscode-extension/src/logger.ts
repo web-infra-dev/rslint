@@ -51,7 +51,7 @@ export class Logger {
 
   public error(
     message: string,
-    error?: Error | unknown,
+    error?: unknown,
     ...args: unknown[]
   ): void {
     if (error instanceof Error) {

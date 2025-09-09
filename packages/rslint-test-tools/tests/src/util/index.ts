@@ -3,4 +3,4 @@ export const readonlynessOptionsDefaults = {
   treatMethodsAsReadonly: false,
 };
 
-export const collectVariables: any = {};
+export const collectVariables: unknown = {};

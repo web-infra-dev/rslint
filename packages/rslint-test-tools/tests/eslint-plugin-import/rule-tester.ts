@@ -7,12 +7,12 @@ import { lint } from '@rslint/core';
 export interface ValidTestCase {
   name?: string;
   code: string;
-  options?: any;
+  options?: unknown[];
   filename?: string | undefined;
   only?: boolean;
   // TODO: support `languageOptions` later
   // languageOptions?: Linter.LanguageOptions | undefined;
-  settings?: { [name: string]: any } | undefined;
+  settings?: Record<string, unknown> | undefined;
 }
 
 interface SuggestionOutput {
@@ -34,7 +34,7 @@ interface TestCaseError {
    * @deprecated `type` is deprecated and will be removed in the next major version.
    */
   type?: string | undefined;
-  data?: any;
+  data?: Record<string, unknown> | undefined;
   line?: number | undefined;
   column?: number | undefined;
   endLine?: number | undefined;

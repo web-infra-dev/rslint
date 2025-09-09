@@ -34,6 +34,7 @@ export class RSLintService {
     await this.service.sendMessage('handshake', { version: '1.0.0' });
 
     // Send lint request
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return this.service.sendMessage('lint', {
       files,
       config,
@@ -43,7 +44,7 @@ export class RSLintService {
       languageOptions,
       includeEncodedSourceFiles,
       format: 'jsonline',
-    });
+    }) as Promise<LintResponse>;
   }
 
   /**
@@ -56,10 +57,11 @@ export class RSLintService {
     await this.service.sendMessage('handshake', { version: '1.0.0' });
 
     // Send apply fixes request
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-type-assertion
     return this.service.sendMessage('applyFixes', {
       fileContent,
       diagnostics,
-    });
+    }) as Promise<ApplyFixesResponse>;
   }
 
   /**
@@ -67,7 +69,7 @@ export class RSLintService {
    */
   async close(): Promise<void> {
     return new Promise(resolve => {
-      this.service.sendMessage('exit', {}).finally(() => {
+      void this.service.sendMessage('exit', {}).finally(() => {
         this.service.terminate();
         resolve();
       });
