@@ -42,13 +42,18 @@ var NoWebpackLoaderSyntax = rule.Rule{
 				if expr.Kind != ast.KindIdentifier || expr.AsIdentifier().Text != "require" {
 					return
 				}
+				// ensure there is at least one argument
+				if len(callExpression.Arguments.Nodes) == 0 {
+					return
+				}
 				arg := callExpression.Arguments.Nodes[0]
 				if arg.Kind != ast.KindStringLiteral {
 					return
 				}
 				modulePath := arg.AsStringLiteral().Text
 				if hasWebpackLoaderSyntax(modulePath) {
-					ctx.ReportNode(node, buildRuleMessage(modulePath))
+					// report at the string literal argument location for accuracy
+					ctx.ReportNode(arg, buildRuleMessage(modulePath))
 				}
 			},
 		}
