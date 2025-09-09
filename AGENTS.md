@@ -49,3 +49,14 @@ This document summarizes how to work on rslint effectively and consistently.
 - rslint loads `rslint.json`/`rslint.jsonc`; rules accept ESLint-style levels/options.
 - The linter walks each file once and dispatches to registered listeners; `--singleThreaded` disables parallelism.
 - Use `--format github` in CI to emit GitHub workflow annotations.
+
+## Fix CI
+
+- Sync deps: `pnpm install` in repo root.
+- Lint/spell: `pnpm run lint:go`, `pnpm run check-spell`.
+- Tests: `pnpm run test:go` and `pnpm run test` (JS/TS).
+- Build types: `pnpm build` to surface TS type errors.
+- Format: `pnpm run format`
+- If Go formatting/lint fails, apply gofmt/goimports in your editor or run your usual formatter, then re-run the checks above.
+- If cspell reports legit words, add them to `cspell.config.cjs` dictionary.
+- Re-run the full sequence locally until all commands pass before pushing.
