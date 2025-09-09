@@ -56,6 +56,15 @@
   height: calc(100% - 46px);
 }
 
+.loading-state {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #656d76;
+}
+
 .lint-results {
   height: calc(100% - 8px);
 }
