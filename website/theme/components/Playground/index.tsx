@@ -62,31 +62,67 @@ const Playground: React.FC = () => {
       setDiagnostics(convertedDiagnostics);
       editorRef.current?.attachDiag(result.diagnostics);
       interface ASTNode {
-        type: string;
-        start: number;
+        kind: string;
+        pos: number;
         end: number;
-        name?: string;
-        children?: ASTNode[];
+        [key: string]: any;
       }
 
-      // Generate AST
+      // Generate AST with full node information
       try {
         const astBuffer = result.encodedSourceFiles!['index.ts'];
         const buffer = Uint8Array.from(atob(astBuffer), c => c.charCodeAt(0));
         const source = new RemoteSourceFile(buffer, new TextDecoder());
-        // Convert a RemoteNode (from tsgo/rslint-api) to a minimal ESTree node
-        function RemoteNodeToEstree(node: Node): ASTNode {
-          return {
-            type: SyntaxKind[node.kind],
-            start: node.pos,
+
+        function serializeNode(
+          node: Node,
+          seen = new WeakSet<Node>(),
+        ): ASTNode {
+          if (seen.has(node))
+            return {
+              kind: SyntaxKind[node.kind],
+              pos: node.pos,
+              end: node.end,
+            };
+          seen.add(node);
+
+          const base: Record<string, any> = {
+            kind: SyntaxKind[node.kind],
+            pos: node.pos,
             end: node.end,
-            children: node.forEachChild((child: Node) => {
-              return RemoteNodeToEstree(child);
-            }),
           };
+
+          for (const key in node as any) {
+            if (key === 'parent') continue;
+            const value = (node as any)[key];
+            if (typeof value === 'function') continue;
+            if (value && typeof value === 'object') {
+              if (Array.isArray(value)) {
+                base[key] = value.map(v =>
+                  v && typeof v === 'object' && 'kind' in v
+                    ? serializeNode(v, seen)
+                    : v,
+                );
+              } else if ('kind' in value) {
+                base[key] = serializeNode(value as Node, seen);
+              } else {
+                base[key] = value;
+              }
+            } else {
+              base[key] = value;
+            }
+          }
+
+          const children = node.forEachChild((child: Node) =>
+            serializeNode(child, seen),
+          );
+          if (children && children.length > 0) {
+            base.children = children;
+          }
+          return base as ASTNode;
         }
 
-        const astData = JSON.stringify(RemoteNodeToEstree(source), null, 2);
+        const astData = JSON.stringify(serializeNode(source), null, 2);
         setAst(astData);
       } catch (astError) {
         console.warn('AST generation failed:', astError);
