@@ -15,11 +15,15 @@ This document summarizes how to work on rslint effectively and consistently.
 
 ## Build, Test, and Development Commands
 
+- Setup submodule and patch: `git submodule update --init --recursive && ./scripts/apply-tsgo-patch.sh`
+- Install Deps: `pnpm install`
 - Build JS/TS: `pnpm build`
 - Run Go tests: `pnpm run test:go`
 - Run JS tests: `pnpm run test`
 - Run Check Spell: `pnpm run check-spell`
-- Lint Go: `pnpm run lint:go` | Format JS/TS/MD: `pnpm run format`
+- Lint Go: `pnpm run lint:go`
+- Lint JS: `pnpm run lint`
+- Format JS/TS/MD: `pnpm run format`
 - CLI: `go run ./cmd/rslint --help`
   - Examples: `go run ./cmd/rslint --config rslint.jsonc`, `--fix`, `--format default|jsonline|github`, `--quiet`, `--max-warnings 0`
 - LSP: `go run ./cmd/rslint --lsp` | IPC API: `go run ./cmd/rslint --api`
@@ -49,14 +53,3 @@ This document summarizes how to work on rslint effectively and consistently.
 - rslint loads `rslint.json`/`rslint.jsonc`; rules accept ESLint-style levels/options.
 - The linter walks each file once and dispatches to registered listeners; `--singleThreaded` disables parallelism.
 - Use `--format github` in CI to emit GitHub workflow annotations.
-
-## Fix CI
-
-- Sync deps: `pnpm install` in repo root.
-- Lint/spell: `pnpm run lint:go`, `pnpm run check-spell`.
-- Tests: `pnpm run test:go` and `pnpm run test` (JS/TS).
-- Build types: `pnpm build` to surface TS type errors.
-- Format: `pnpm run format`
-- If Go formatting/lint fails, apply gofmt/goimports in your editor or run your usual formatter, then re-run the checks above.
-- If cspell reports legit words, add them to `cspell.config.cjs` dictionary.
-- Re-run the full sequence locally until all commands pass before pushing.
