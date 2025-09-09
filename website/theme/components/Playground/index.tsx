@@ -23,10 +23,12 @@ const Playground: React.FC = () => {
   const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState<string | undefined>();
   const [ast, setAst] = useState<string | undefined>();
+  const [loading, setLoading] = useState(true);
 
   async function runLint() {
     try {
       setError(undefined);
+      if (!initialized) setLoading(true);
       const service = await ensureService();
       const code = editorRef.current?.getValue() ?? '';
 
@@ -93,6 +95,8 @@ const Playground: React.FC = () => {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : String(err);
       setError(`Linting failed: ${errorMessage}`);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -110,6 +114,7 @@ const Playground: React.FC = () => {
         diagnostics={diagnostics}
         ast={ast}
         error={error}
+        loading={loading}
       />
     </div>
   );

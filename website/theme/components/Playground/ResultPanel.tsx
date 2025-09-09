@@ -17,12 +17,14 @@ interface ResultPanelProps {
   error?: string;
   fixedCode?: string;
   typeInfo?: string;
+  loading?: boolean;
 }
 
 type TabType = 'lint' | 'fixed' | 'ast' | 'type';
 
 export const ResultPanel: React.FC<ResultPanelProps> = props => {
-  const { diagnostics, ast, error, initialized, fixedCode, typeInfo } = props;
+  const { diagnostics, ast, error, initialized, fixedCode, typeInfo, loading } =
+    props;
   const [activeTab, setActiveTab] = useState<TabType>('lint');
 
   return (
@@ -100,7 +102,23 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
             </div>
           )}
         </div>
-      ) : null}
+      ) : (
+        <div className="result-content">
+          {loading ? (
+            <div className="loading-state">
+              <div className="spinner"></div>
+              <div>Loading WASM...</div>
+            </div>
+          ) : error ? (
+            <div className="error-message">
+              <div className="error-icon">⚠️</div>
+              <div className="error-text">
+                <strong>Error:</strong> {error}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 };
