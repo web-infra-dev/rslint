@@ -67,6 +67,7 @@ const Playground: React.FC = () => {
         end: number;
         name?: string;
         children?: ASTNode[];
+        text?: string;
       }
 
       // Generate AST
@@ -75,11 +76,13 @@ const Playground: React.FC = () => {
         const buffer = Uint8Array.from(atob(astBuffer), c => c.charCodeAt(0));
         const source = new RemoteSourceFile(buffer, new TextDecoder());
         // Convert a RemoteNode (from tsgo/rslint-api) to a minimal ESTree node
+        
         function RemoteNodeToEstree(node: Node): ASTNode {
           return {
             type: SyntaxKind[node.kind],
             start: node.pos,
             end: node.end,
+            text: node.text,
             children: node.forEachChild((child: Node) => {
               return RemoteNodeToEstree(child);
             }),
