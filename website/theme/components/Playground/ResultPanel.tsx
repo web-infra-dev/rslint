@@ -97,7 +97,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
             onClick={() => setActiveTab('ast')}
             title="AST"
           >
-            AST
+            AST(tsgo)
           </div>
         </div>
       </div>
