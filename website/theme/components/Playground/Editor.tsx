@@ -34,6 +34,55 @@ export const Editor = ({
   const divEl = useRef<HTMLDivElement>(null);
   const editorRef =
     useRef<import('monaco-editor').editor.IStandaloneCodeEditor>(null);
+  const urlUpdateTimer = useRef<number | null>(null);
+
+  function decodeParam(value: string | null): string | null {
+    if (!value) return null;
+    try {
+      return decodeURIComponent(value);
+    } catch {
+      return value;
+    }
+  }
+
+  function getInitialCode(): string {
+    if (typeof window === 'undefined') {
+      return ['let a: any;', 'a.b = 10;'].join('\n');
+    }
+    const { search, hash } = window.location;
+    const searchParams = new URLSearchParams(search);
+    // URLSearchParams.get already decodes percent-encoding
+    const fromSearch = searchParams.get('code');
+    if (fromSearch != null) return fromSearch;
+    // Also support hash like #code=...
+    if (hash && hash.startsWith('#')) {
+      const hashParams = new URLSearchParams(hash.slice(1));
+      const fromHash = hashParams.get('code');
+      if (fromHash != null) return fromHash;
+    }
+    return ['let a: any;', 'a.b = 10;'].join('\n');
+  }
+
+  function scheduleSerializeToUrl(value: string) {
+    if (typeof window === 'undefined') return;
+    if (urlUpdateTimer.current) {
+      window.clearTimeout(urlUpdateTimer.current);
+      urlUpdateTimer.current = null;
+    }
+    urlUpdateTimer.current = window.setTimeout(() => {
+      try {
+        const url = new URL(window.location.href);
+        url.searchParams.set('code', value);
+        // Remove any code=... from hash if present to avoid ambiguity
+        if (url.hash && url.hash.includes('code=')) {
+          url.hash = '';
+        }
+        window.history.replaceState(null, '', url.toString());
+      } catch {
+        // ignore URL update errors
+      }
+    }, 300);
+  }
   // get value from editor using forwardRef
   React.useImperativeHandle(ref, () => ({
     getValue: () => editorRef.current?.getValue(),
@@ -68,15 +117,24 @@ export const Editor = ({
     }
 
     const editor = monaco.editor.create(divEl.current, {
-      value: ['let a: any;', 'a.b = 10;'].join('\n'),
+      value: getInitialCode(),
       language: 'typescript',
       automaticLayout: true,
       scrollBeyondLastLine: false,
     });
-    editor.onDidChangeModelContent(() => {
-      onChange(editor.getValue() || '');
-    });
+    // Ensure ref is set before first onChange so parent can read value
     editorRef.current = editor;
+    // Trigger initial onChange + URL sync with initial value
+    {
+      const initialVal = editor.getValue() || '';
+      onChange(initialVal);
+      scheduleSerializeToUrl(initialVal);
+    }
+    editor.onDidChangeModelContent(() => {
+      const val = editor.getValue() || '';
+      onChange(val);
+      scheduleSerializeToUrl(val);
+    });
 
     return () => {
       editor.dispose();
