@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './ResultPanel.css';
 
 export interface Diagnostic {
@@ -25,7 +25,61 @@ type TabType = 'lint' | 'fixed' | 'ast' | 'type';
 export const ResultPanel: React.FC<ResultPanelProps> = props => {
   const { diagnostics, ast, error, initialized, fixedCode, typeInfo, loading } =
     props;
-  const [activeTab, setActiveTab] = useState<TabType>('lint');
+  const [activeTab, setActiveTab] = useState<TabType>(() => {
+    if (typeof window === 'undefined') return 'lint';
+    const params = new URLSearchParams(window.location.search);
+    let tab = params.get('tab');
+    if (!tab && window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.slice(1));
+      tab = hashParams.get('tab');
+    }
+    if (tab === 'lint' || tab === 'ast' || tab === 'fixed' || tab === 'type') {
+      return tab as TabType;
+    }
+    return 'lint';
+  });
+
+  // Keep the URL in sync with the selected tab
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', activeTab);
+      if (url.hash && new URLSearchParams(url.hash.slice(1)).has('tab')) {
+        url.hash = '';
+      }
+      window.history.replaceState(null, '', url.toString());
+    } catch {
+      // ignore URL update errors
+    }
+  }, [activeTab]);
+
+  // Respond to browser navigation updating the tab
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handler = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        let tab = params.get('tab');
+        if (!tab && window.location.hash) {
+          const hashParams = new URLSearchParams(window.location.hash.slice(1));
+          tab = hashParams.get('tab');
+        }
+        if (
+          tab === 'lint' ||
+          tab === 'ast' ||
+          tab === 'fixed' ||
+          tab === 'type'
+        ) {
+          setActiveTab(tab as TabType);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    window.addEventListener('popstate', handler);
+    return () => window.removeEventListener('popstate', handler);
+  }, []);
 
   return (
     <div className="result-panel">
