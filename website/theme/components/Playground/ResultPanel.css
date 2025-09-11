@@ -1,5 +1,9 @@
 .result-header {
   background: #f6f8fa;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px 0 8px;
 }
 
 .result-tabs {
@@ -31,6 +35,12 @@
 }
 .tab-icon {
   font-size: 1.1em;
+}
+
+/* Actions area pinned to top-right of the header */
+.result-actions {
+  display: flex;
+  align-items: center;
 }
 
 .spinner {

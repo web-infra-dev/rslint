@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { Button } from '@components/ui/button';
+import { Share2Icon, CheckIcon } from 'lucide-react';
 import './ResultPanel.css';
 
 export interface Diagnostic {
@@ -209,6 +211,19 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
     });
   }, [astTree]);
 
+  // Share button state and handler
+  const [shareCopied, setShareCopied] = useState(false);
+  async function copyShareUrl() {
+    try {
+      const url = window.location.href;
+      await copyToClipboard(url);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 1500);
+    } catch (e) {
+      console.warn('Share failed', e);
+    }
+  }
+
   return (
     <div className="result-panel">
       <div className="result-header">
@@ -227,6 +242,22 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
           >
             AST(tsgo)
           </div>
+        </div>
+        <div className="result-actions">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => copyShareUrl()}
+            title={shareCopied ? 'Copied link' : 'Copy shareable link'}
+          >
+            {shareCopied ? (
+              <CheckIcon className="size-4" />
+            ) : (
+              <Share2Icon className="size-4" />
+            )}
+            {shareCopied ? 'Copied' : 'Share'}
+          </Button>
         </div>
       </div>
 
@@ -308,3 +339,23 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
     </div>
   );
 };
+
+function copyToClipboard(text: string) {
+  if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
+  return new Promise<void>((resolve, reject) => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'absolute';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      resolve();
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
