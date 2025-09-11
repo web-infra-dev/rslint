@@ -13,18 +13,40 @@ export interface Diagnostic {
 interface ResultPanelProps {
   diagnostics: Diagnostic[];
   ast?: string;
+  astTree?: ASTNode;
   initialized?: boolean;
   error?: string;
   fixedCode?: string;
   typeInfo?: string;
   loading?: boolean;
+  onAstNodeSelect?: (start: number, end: number) => void;
+  selectedAstNodeRange?: { start: number; end: number };
 }
 
 type TabType = 'lint' | 'fixed' | 'ast' | 'type';
 
+interface ASTNode {
+  type: string;
+  start: number;
+  end: number;
+  name?: string;
+  text?: string;
+  children?: ASTNode[];
+}
+
 export const ResultPanel: React.FC<ResultPanelProps> = props => {
-  const { diagnostics, ast, error, initialized, fixedCode, typeInfo, loading } =
-    props;
+  const {
+    diagnostics,
+    ast,
+    astTree,
+    error,
+    initialized,
+    fixedCode,
+    typeInfo,
+    loading,
+    onAstNodeSelect,
+    selectedAstNodeRange,
+  } = props;
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     if (typeof window === 'undefined') return 'lint';
     const params = new URLSearchParams(window.location.search);
@@ -80,6 +102,112 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
     window.addEventListener('popstate', handler);
     return () => window.removeEventListener('popstate', handler);
   }, []);
+
+  // AST tree view state
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  function nodeId(n: ASTNode) {
+    return `${n.type}:${n.start}-${n.end}`;
+  }
+
+  function toggleNode(n: ASTNode) {
+    const id = nodeId(n);
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function clickNode(n: ASTNode) {
+    setSelectedId(nodeId(n));
+    onAstNodeSelect?.(n.start, n.end);
+  }
+
+  function isExpandable(n?: ASTNode) {
+    return !!(n && n.children && n.children.length);
+  }
+
+  const renderNode = (n: ASTNode, depth = 0) => {
+    const id = nodeId(n);
+    const open = expanded.has(id);
+    const hasKids = isExpandable(n);
+    const preview = n.text ? n.text.replace(/\s+/g, ' ').slice(0, 40) : '';
+    return (
+      <div key={id} className="ast-node" style={{ paddingLeft: depth * 14 }}>
+        <div
+          className={`ast-node-row ${selectedId === id ? 'selected' : ''}`}
+          onClick={() => clickNode(n)}
+        >
+          {hasKids ? (
+            <button
+              className={`twisty ${open ? 'open' : ''}`}
+              onClick={e => {
+                e.stopPropagation();
+                toggleNode(n);
+              }}
+              aria-label={open ? 'Collapse' : 'Expand'}
+            />
+          ) : (
+            <span className="twisty placeholder" />
+          )}
+          <span className="node-type">{n.type}</span>
+          <span className="node-range">
+            [{n.start}, {n.end}]
+          </span>
+          {preview && <span className="node-preview">“{preview}”</span>}
+        </div>
+        {open && hasKids && (
+          <div className="ast-children">
+            {n.children!.map(child => renderNode(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // When selection in editor changes, select smallest covering AST node and expand its ancestors
+  useEffect(() => {
+    if (!astTree || !selectedAstNodeRange) return;
+    const { start, end } = selectedAstNodeRange;
+
+    let best: { node: ASTNode; depth: number; path: ASTNode[] } | null = null;
+
+    function visit(node: ASTNode, depth: number, path: ASTNode[]) {
+      if (node.start <= start && node.end >= end) {
+        if (!best || depth > best.depth) {
+          best = { node, depth, path: [...path, node] };
+        }
+        if (node.children) {
+          for (const c of node.children) visit(c, depth + 1, [...path, node]);
+        }
+      }
+    }
+    visit(astTree, 0, []);
+    if (best) {
+      const id = nodeId(best.node);
+      setSelectedId(id);
+      setExpanded(prev => {
+        const next = new Set(prev);
+        for (const p of best!.path) next.add(nodeId(p));
+        return next;
+      });
+    }
+  }, [selectedAstNodeRange, astTree]);
+
+  // Auto-expand root when a new tree arrives
+  useEffect(() => {
+    if (!astTree) return;
+    const id = nodeId(astTree);
+    setExpanded(prev => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, [astTree]);
 
   return (
     <div className="result-panel">
@@ -144,7 +272,11 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
 
           {!error && activeTab === 'ast' && (
             <div className="ast-view">
-              {ast ? (
+              {astTree ? (
+                <div className="ast-tree" role="tree">
+                  {renderNode(astTree)}
+                </div>
+              ) : ast ? (
                 <div className="code-block-wrapper">
                   <pre className="ast-content">{ast}</pre>
                 </div>

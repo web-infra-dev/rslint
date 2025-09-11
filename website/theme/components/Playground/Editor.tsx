@@ -22,14 +22,17 @@ window.MonacoEnvironment = {
 export interface EditorRef {
   getValue: () => string | undefined;
   attachDiag: (diags: Diagnostic[]) => void;
+  revealRangeByOffset: (start: number, end: number) => void;
 }
 
 export const Editor = ({
   ref,
   onChange,
+  onSelectionChange,
 }: {
-  ref: Ref<{ getValue: () => string | undefined }>;
+  ref: Ref<EditorRef>;
   onChange: (value: string) => void;
+  onSelectionChange?: (start: number, end: number) => void;
 }) => {
   const divEl = useRef<HTMLDivElement>(null);
   const editorRef =
@@ -84,6 +87,8 @@ export const Editor = ({
     }, 300);
   }
   // get value from editor using forwardRef
+  const astHighlightDecorationIds = useRef<string[]>([]);
+
   React.useImperativeHandle(ref, () => ({
     getValue: () => editorRef.current?.getValue(),
     attachDiag: (diags: Diagnostic[]) => {
@@ -108,6 +113,44 @@ export const Editor = ({
         // attach warning to text
         monaco.editor.setModelMarkers(model, 'rslint', markers);
       }
+    },
+    revealRangeByOffset: (start: number, end: number) => {
+      const editor = editorRef.current;
+      const model = editor?.getModel();
+      if (!editor || !model) return;
+      const startPos = model.getPositionAt(Math.max(0, start));
+      const endPos = model.getPositionAt(Math.max(start, end));
+      const range = new monaco.Range(
+        startPos.lineNumber,
+        startPos.column,
+        endPos.lineNumber,
+        endPos.column,
+      );
+
+      editor.setSelection(range);
+      editor.revealRangeInCenter(range, 0 /* Immediate */);
+
+      // Apply a transient decoration for highlighting
+      if (astHighlightDecorationIds.current.length) {
+        astHighlightDecorationIds.current = editor.deltaDecorations(
+          astHighlightDecorationIds.current,
+          [],
+        );
+      }
+      astHighlightDecorationIds.current = editor.deltaDecorations(
+        [],
+        [
+          {
+            range,
+            options: {
+              inlineClassName: 'ast-node-highlight',
+              stickiness:
+                monaco.editor.TrackedRangeStickiness
+                  .NeverGrowsWhenTypingAtEdges,
+            },
+          },
+        ],
+      );
     },
   }));
 
@@ -135,8 +178,28 @@ export const Editor = ({
       onChange(val);
       scheduleSerializeToUrl(val);
     });
+    // Selection change -> report offsets
+    const selDisposable = editor.onDidChangeCursorSelection(() => {
+      const model = editor.getModel();
+      if (!model) return;
+      const sel = editor.getSelection();
+      if (!sel) return;
+      const startOffset = model.getOffsetAt({
+        lineNumber: sel.startLineNumber,
+        column: sel.startColumn,
+      });
+      const endOffset = model.getOffsetAt({
+        lineNumber: sel.endLineNumber,
+        column: sel.endColumn,
+      });
+      onSelectionChange?.(
+        Math.min(startOffset, endOffset),
+        Math.max(startOffset, endOffset),
+      );
+    });
 
     return () => {
+      selDisposable.dispose();
       editor.dispose();
     };
   }, []);
