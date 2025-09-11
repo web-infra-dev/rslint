@@ -53,3 +53,11 @@ This document summarizes how to work on rslint effectively and consistently.
 - rslint loads `rslint.json`/`rslint.jsonc`; rules accept ESLint-style levels/options.
 - The linter walks each file once and dispatches to registered listeners; `--singleThreaded` disables parallelism.
 - Use `--format github` in CI to emit GitHub workflow annotations.
+
+## Website UI Guidelines (shadcn/ui)
+
+- Prefer shadcn/ui components from `@components/ui/*` (e.g., `button`, `toggle-group`, `alert`, `card`, `table`) over custom elements.
+- Minimize custom CSS. Use component variants, utility classes, and existing styles instead of adding new selectors when possible.
+- Icons: use `lucide-react` for consistent iconography (e.g., import `{ Share2Icon, CheckIcon } from 'lucide-react'`).
+- Keep layout simple: compose shadcn primitives and flex utilities for alignment instead of bespoke CSS blocks.
+- Only add custom CSS for domain‑specific visuals that primitives can’t express (e.g., AST tree expanders), and keep it scoped.
