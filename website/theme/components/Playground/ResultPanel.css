@@ -1,36 +1,15 @@
 .result-header {
   background: #f6f8fa;
-}
-
-.result-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-}
-
-.result-tab {
-  font-size: 0.8rem;
-  padding: 8px 12px;
-
-  background: transparent;
-  cursor: pointer;
-  border-radius: 6px 6px 0 0;
   display: flex;
   align-items: center;
-  gap: 0.4em;
+  justify-content: space-between;
+  padding: 4px 8px 0 8px;
 }
-.result-tab:hover {
-  color: #24292f;
-  background: #e2e8f0;
-}
-.result-tab.active {
-  background: #fff;
-  color: #0969da;
-  border-bottom: 2px solid #0969da;
-  z-index: 1;
-}
-.tab-icon {
-  font-size: 1.1em;
+
+/* Actions area pinned to top-right of the header */
+.result-actions {
+  display: flex;
+  align-items: center;
 }
 
 .spinner {
@@ -69,41 +48,7 @@
   height: calc(100% - 8px);
 }
 
-/* Messages */
-.error-message,
-.success-message {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  border-radius: 6px;
-  margin-bottom: 1rem;
-}
-
-.error-message {
-  background: #ffebe9;
-  border: 1px solid #ff8182;
-  color: #cf222e;
-}
-
-.success-message {
-  background: #ddf4d8;
-  border: 1px solid #4ac26b;
-  color: #116329;
-}
-
-.error-icon,
-.success-icon {
-  font-size: 1.25rem;
-  flex-shrink: 0;
-}
-
-.error-text,
-.success-text {
-  flex: 1;
-  font-size: 0.875rem;
-  line-height: 1.4;
-}
+/* Shadcn Alert used for messages */
 
 /* Diagnostics */
 .diagnostics-list {

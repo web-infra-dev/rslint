@@ -144,3 +144,4 @@ Prettier
 ESLint
 colocate
 co-locate
+shadcn
