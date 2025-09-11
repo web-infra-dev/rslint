@@ -1,21 +1,26 @@
 {
   "name": "@rslint/api",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "Rslint AST library",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/web-infra-dev/rslint"
+  },
   "scripts": {
     "build": "rslib build",
-    "compile": "tsc -p tsconfig.build.json"
+    "compile": "tsgo -p tsconfig.build.json"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "packageManager": "pnpm@10.13.1",
   "devDependencies": {
     "@typescript/api": "workspace:*",
     "@rslib/core": "0.12.4",
-    "@types/node": "24.3.0"
+    "@types/node": "24.3.0",
+    "@typescript/native-preview": "7.0.0-dev.20250904.1"
   },
   "publishConfig": {
     "access": "public"

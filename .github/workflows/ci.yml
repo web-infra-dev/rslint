@@ -11,6 +11,10 @@ permissions:
   contents: read
   # Optional: allow read access to pull requests. Use with `only-new-issues` option.
   pull-requests: read
+  # Required: allow writing check results and annotations
+  checks: write
+  # Required: allow updating commit statuses
+  statuses: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
@@ -28,18 +32,18 @@ jobs:
       matrix:
         runner:
           [
-            rspack-ubuntu-22.04-large-new,
-            rspack-windows-2022-large-new,
-            rspack-darwin-14-medium-new,
+            rspack-ubuntu-22.04-large,
+            rspack-windows-2022-large,
+            rspack-darwin-14-medium,
           ]
         go-version: ['1.25.0']
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
         with:
           submodules: true
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
 
@@ -53,10 +57,10 @@ jobs:
           go test -parallel 8 ./internal/...
   lint:
     name: Lint&Check
-    runs-on: rspack-ubuntu-22.04-large-new
+    runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
         with:
           submodules: true
 
@@ -70,7 +74,7 @@ jobs:
           cache-name: go-lint
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
         with:
           version: v2.4.0
           args: --timeout=5m ./cmd/... ./internal/...
@@ -90,11 +94,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [rspack-ubuntu-22.04-large-new, windows-latest]
+        os: [rspack-ubuntu-22.04-large, windows-latest]
         go-version: ['1.25.0']
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
         with:
           submodules: true
 
@@ -116,7 +120,7 @@ jobs:
 
       - name: Dogfooding
         if: runner.os == 'Linux'
-        run: pnpm run lint
+        run: pnpm run lint --format github
 
       - name: TypeCheck
         if: runner.os == 'Linux'
@@ -146,10 +150,10 @@ jobs:
 
   test-wasm:
     name: Test WASM
-    runs-on: rspack-ubuntu-22.04-large-new
+    runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
         with:
           submodules: true
 
@@ -171,7 +175,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
         with:
           submodules: true
 

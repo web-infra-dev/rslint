@@ -49,7 +49,7 @@ jobs:
     name: ${{ inputs.dry_run == true && 'Dry Run - NPM Packages' || 'Publish NPM Packages' }}
     needs: [build]
     runs-on: ubuntu-22.04
-    environment: npm
+    environment: release
     permissions:
       # For push git tags
       contents: write
@@ -67,14 +67,14 @@ jobs:
           fi
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
         with:
           fetch-depth: 1
           ref: ${{ github.event.inputs.branch }}
           submodules: true
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
       # Update npm to the latest version to enable OIDC
@@ -90,7 +90,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Download Artifact
-        uses: actions/download-artifact@v4.1.7
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           path: binaries
 
@@ -111,9 +111,10 @@ jobs:
     name: ${{ inputs.dry_run == true && 'Dry Run - VSCode Extensions' || 'Publish VSCode Extensions' }}
     needs: [build]
     runs-on: rspack-ubuntu-22.04-large
+    environment: release
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
         with:
           fetch-depth: 1
           ref: ${{ github.event.inputs.branch }}
@@ -123,7 +124,7 @@ jobs:
         uses: ./.github/actions/setup-node
 
       - name: Download Artifact
-        uses: actions/download-artifact@v4.1.7
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           path: binaries
 
@@ -146,7 +147,7 @@ jobs:
             fi
           fi
       - name: Upload VSCE artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           path: packages/vscode-extension/rslint-*.vsix
 
@@ -155,9 +156,10 @@ jobs:
     name: ${{ inputs.dry_run == true && 'Dry Run - Open VSX Extensions' || 'Publish Open VSX Extensions' }}
     needs: [build]
     runs-on: ubuntu-22.04
+    environment: release
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
         with:
           fetch-depth: 1
           ref: ${{ github.event.inputs.branch }}
@@ -167,7 +169,7 @@ jobs:
         uses: ./.github/actions/setup-node
 
       - name: Download Artifact
-        uses: actions/download-artifact@v4.1.7
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           path: binaries
 
@@ -206,14 +208,14 @@ jobs:
     runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
         with:
           fetch-depth: 1
           ref: ${{ github.event.inputs.branch }}
           submodules: true
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
 
@@ -230,7 +232,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Download Artifact
-        uses: actions/download-artifact@v4.1.7
+        uses: actions/download-artifact@65a9edc5881444af0b9093a5e628f2fe47ea3b2e # v4.1.7
         with:
           path: binaries
 
@@ -304,14 +306,14 @@ jobs:
     runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
         with:
           fetch-depth: 1
           ref: ${{ github.event.inputs.branch }}
           submodules: true
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
 
@@ -332,7 +334,7 @@ jobs:
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint ./cmd/rslint
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint
           path: ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint

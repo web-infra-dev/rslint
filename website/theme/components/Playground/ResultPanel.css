@@ -56,6 +56,15 @@
   height: calc(100% - 46px);
 }
 
+.loading-state {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #656d76;
+}
+
 .lint-results {
   height: calc(100% - 8px);
 }
@@ -175,6 +184,82 @@
 /* AST View */
 .ast-view {
   height: 100%;
+}
+
+.ast-tree {
+  height: 100%;
+  overflow: auto;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  background: #fff;
+  padding: 6px 6px 10px 6px;
+}
+
+.ast-node-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Helvetica,
+    Arial,
+    Apple Color Emoji,
+    Segoe UI Emoji,
+    Segoe UI Symbol;
+  font-size: 12px;
+}
+.ast-node-row:hover {
+  background: #f6f8fa;
+}
+.ast-node-row.selected {
+  background: #e7f3ff;
+  outline: 1px solid #96c7ff;
+}
+
+.twisty {
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 6px solid #57606a;
+  background: transparent;
+  padding: 0;
+  margin-right: 2px;
+  cursor: pointer;
+}
+.twisty.open {
+  transform: rotate(90deg);
+}
+.twisty.placeholder {
+  width: 10px;
+  height: 10px;
+  border: none;
+}
+
+.node-type {
+  font-weight: 600;
+  color: #24292f;
+}
+.node-range {
+  color: #57606a;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+}
+.node-preview {
+  color: #6e7781;
+  margin-left: 6px;
+}
+
+.ast-children {
+  margin-left: 14px;
 }
 
 .ast-content {

@@ -25,10 +25,10 @@
   "devDependencies": {
     "@rslint/wasm": "workspace:*",
     "@rslint/api": "workspace:*",
-    "@rsbuild/plugin-sass": "^1.3.5",
+    "@rsbuild/plugin-sass": "^1.4.0",
     "@rspress/core": "2.0.0-beta.27",
     "@rspress/plugin-llms": "2.0.0-beta.27",
-    "@rstack-dev/doc-ui": "1.10.9",
+    "@rstack-dev/doc-ui": "1.11.0",
     "@tailwindcss/postcss": "^4.1.11",
     "@types/node": "^22.8.1",
     "@types/react": "19.1.10",

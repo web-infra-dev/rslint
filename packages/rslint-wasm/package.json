@@ -1,12 +1,12 @@
 {
   "name": "@rslint/wasm",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "rslint wasm package",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "scripts": {
     "build:wasm": "cross-env GOOS=js GOARCH=wasm go build  -o rslint.wasm -ldflags=\"-s -w\"  ../../cmd/rslint",
-    "build:js": "node scripts/build.mjs && tsc -b tsconfig.json",
+    "build:js": "node scripts/build.mjs && tsgo -b tsconfig.json",
     "build": "pnpm run build:wasm && pnpm run build:js"
   },
   "files": [
@@ -16,7 +16,11 @@
   ],
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/web-infra-dev/rslint"
+  },
   "packageManager": "pnpm@10.13.1",
   "devDependencies": {
     "@rslint/core": "workspace:*",
@@ -27,7 +31,8 @@
     "cross-env": "^10.0.0",
     "esbuild-plugin-polyfill-node": "0.3.0",
     "memfs": "^4.38.2",
-    "prebundle": "1.4.1"
+    "prebundle": "1.4.1",
+    "@typescript/native-preview": "7.0.0-dev.20250904.1"
   },
   "dependencies": {
     "@rslint/core": "workspace:*"

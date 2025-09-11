@@ -1,5 +1,5 @@
 #!/bin/bash
 
-# apply tsgo path
+# apply tsgo patch
 cd typescript-go
 git apply ../__patches__/typescript-go.patch
