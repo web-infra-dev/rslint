@@ -1,0 +1,12 @@
+'release: feature':
+  - '/^(feat|types|style)/'
+'release: bug fix':
+  - '/^fix/'
+'release: performance':
+  - '/^perf/'
+'release: breaking change':
+  - '/^breaking change/'
+'release: document':
+  - '/^docs/'
+'release: refactor':
+  - '/^refactor/'
