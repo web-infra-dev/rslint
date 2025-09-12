@@ -1,4 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { Button } from '@components/ui/button';
+import { Share2Icon, CheckIcon } from 'lucide-react';
+// Removed ToggleGroup in favor of Button to match Share style
+import { Alert, AlertDescription, AlertTitle } from '@components/ui/alert';
+import { AlertCircleIcon } from 'lucide-react';
 import './ResultPanel.css';
 
 export interface Diagnostic {
@@ -209,47 +214,77 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
     });
   }, [astTree]);
 
+  // Share button state and handler
+  const [shareCopied, setShareCopied] = useState(false);
+  async function copyShareUrl() {
+    try {
+      const url = window.location.href;
+      await copyToClipboard(url);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 1500);
+    } catch (e) {
+      console.warn('Share failed', e);
+    }
+  }
+
   return (
     <div className="result-panel">
       <div className="result-header">
-        <div className="result-tabs">
-          <div
-            className={`result-tab ${activeTab === 'lint' ? 'active' : ''}`}
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant={activeTab === 'lint' ? 'default' : 'outline'}
+            size="sm"
             onClick={() => setActiveTab('lint')}
-            title="Errors"
+            aria-pressed={activeTab === 'lint'}
           >
             Errors
-          </div>
-          <div
-            className={`result-tab ${activeTab === 'ast' ? 'active' : ''}`}
+          </Button>
+          <Button
+            type="button"
+            variant={activeTab === 'ast' ? 'default' : 'outline'}
+            size="sm"
             onClick={() => setActiveTab('ast')}
-            title="AST"
+            aria-pressed={activeTab === 'ast'}
           >
-            AST(tsgo)
-          </div>
+            AST
+          </Button>
+        </div>
+        <div className="result-actions">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => copyShareUrl()}
+            title={shareCopied ? 'Copied link' : 'Copy shareable link'}
+          >
+            {shareCopied ? (
+              <CheckIcon className="size-4" />
+            ) : (
+              <Share2Icon className="size-4" />
+            )}
+            {shareCopied ? 'Copied' : 'Share'}
+          </Button>
         </div>
       </div>
 
       {initialized ? (
         <div className="result-content">
           {error && (
-            <div className="error-message">
-              <div className="error-icon">⚠️</div>
-              <div className="error-text">
-                <strong>Error:</strong> {error}
-              </div>
-            </div>
+            <Alert variant="destructive">
+              <AlertCircleIcon />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
           )}
 
           {!error && activeTab === 'lint' && (
             <div className="lint-results">
               {diagnostics.length === 0 ? (
-                <div className="success-message">
-                  <div className="success-icon">✅</div>
-                  <div className="success-text">
-                    <strong>No issues found!</strong> Your code looks good.
-                  </div>
-                </div>
+                <Alert>
+                  <AlertTitle>No issues found!</AlertTitle>
+                  <AlertDescription>Your code looks good.</AlertDescription>
+                </Alert>
               ) : (
                 <div className="diagnostics-list">
                   {diagnostics.map((diagnostic, index) => (
@@ -308,3 +343,24 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
     </div>
   );
 };
+
+function copyToClipboard(text: string) {
+  if (navigator.clipboard?.writeText)
+    return navigator.clipboard.writeText(text);
+  return new Promise<void>((resolve, reject) => {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'absolute';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      resolve();
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
