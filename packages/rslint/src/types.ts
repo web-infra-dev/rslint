@@ -47,6 +47,8 @@ export interface LanguageOptions {
 export interface ParserOptions {
   projectService?: boolean;
   project?: string[] | string;
+  // Used by tests to redirect tsconfig resolution without changing the project entries.
+  tsconfigRootDir?: string;
 }
 
 export interface ApplyFixesRequest {
