@@ -19,6 +19,7 @@ interface ResultPanelProps {
   diagnostics: Diagnostic[];
   ast?: string;
   astTree?: ASTNode;
+  tsAstTree?: ASTNode;
   initialized?: boolean;
   error?: string;
   fixedCode?: string;
@@ -26,9 +27,10 @@ interface ResultPanelProps {
   loading?: boolean;
   onAstNodeSelect?: (start: number, end: number) => void;
   selectedAstNodeRange?: { start: number; end: number };
+  onRequestTsAst?: () => void;
 }
 
-type TabType = 'lint' | 'fixed' | 'ast' | 'type';
+type TabType = 'lint' | 'fixed' | 'ast' | 'ast_ts' | 'type';
 
 interface ASTNode {
   type: string;
@@ -44,6 +46,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
     diagnostics,
     ast,
     astTree,
+    tsAstTree,
     error,
     initialized,
     fixedCode,
@@ -51,6 +54,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
     loading,
     onAstNodeSelect,
     selectedAstNodeRange,
+    onRequestTsAst,
   } = props;
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     if (typeof window === 'undefined') return 'lint';
@@ -60,7 +64,13 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
       const hashParams = new URLSearchParams(window.location.hash.slice(1));
       tab = hashParams.get('tab');
     }
-    if (tab === 'lint' || tab === 'ast' || tab === 'fixed' || tab === 'type') {
+    if (
+      tab === 'lint' ||
+      tab === 'ast' ||
+      tab === 'ast_ts' ||
+      tab === 'fixed' ||
+      tab === 'type'
+    ) {
       return tab as TabType;
     }
     return 'lint';
@@ -81,6 +91,13 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
     }
   }, [activeTab]);
 
+  // Notify parent when TS AST tab is opened (including initial state)
+  useEffect(() => {
+    if (activeTab === 'ast_ts') {
+      onRequestTsAst?.();
+    }
+  }, [activeTab]);
+
   // Respond to browser navigation updating the tab
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -95,6 +112,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
         if (
           tab === 'lint' ||
           tab === 'ast' ||
+          tab === 'ast_ts' ||
           tab === 'fixed' ||
           tab === 'type'
         ) {
@@ -108,9 +126,12 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
     return () => window.removeEventListener('popstate', handler);
   }, []);
 
-  // AST tree view state
+  // AST tree view state (tsgo)
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // AST tree view state (TypeScript)
+  const [tsExpanded, setTsExpanded] = useState<Set<string>>(() => new Set());
+  const [tsSelectedId, setTsSelectedId] = useState<string | null>(null);
 
   function nodeId(n: ASTNode) {
     return `${n.type}:${n.start}-${n.end}`;
@@ -171,6 +192,54 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
     );
   };
 
+  // TypeScript AST rendering (separate selection/expansion state)
+  function tsNodeId(n: ASTNode) {
+    return `ts:${n.type}:${n.start}-${n.end}`;
+  }
+  function renderTsNode(n: ASTNode, depth = 0) {
+    const id = tsNodeId(n);
+    const open = tsExpanded.has(id);
+    const hasKids = isExpandable(n);
+    const preview = n.text ? n.text.replace(/\s+/g, ' ').slice(0, 40) : '';
+    return (
+      <div key={id} className="ast-node" style={{ paddingLeft: depth * 2 }}>
+        <div
+          className={`ast-node-row ${tsSelectedId === id ? 'selected' : ''}`}
+          onClick={() => {
+            setTsSelectedId(id);
+            onAstNodeSelect?.(n.start, n.end);
+          }}
+        >
+          {hasKids && (
+            <button
+              className={`twisty ${open ? 'open' : ''}`}
+              onClick={e => {
+                e.stopPropagation();
+                setTsExpanded(prev => {
+                  const next = new Set(prev);
+                  if (next.has(id)) next.delete(id);
+                  else next.add(id);
+                  return next;
+                });
+              }}
+              aria-label={open ? 'Collapse' : 'Expand'}
+            />
+          )}
+          <span className="node-type">{n.type}</span>
+          <span className="node-range">
+            [{n.start}, {n.end}]
+          </span>
+          {preview && <span className="node-preview">“{preview}”</span>}
+        </div>
+        {open && hasKids && (
+          <div className="ast-children">
+            {n.children!.map(child => renderTsNode(child, depth + 1))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // When selection in editor changes, select smallest covering AST node and expand its ancestors
   useEffect(() => {
     if (!astTree || !selectedAstNodeRange) return;
@@ -200,17 +269,52 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
     }
   }, [selectedAstNodeRange, astTree]);
 
-  // Auto-expand root when a new tree arrives
+  // Auto-expand roots when new trees arrive
   useEffect(() => {
-    if (!astTree) return;
-    const id = nodeId(astTree);
-    setExpanded(prev => {
-      if (prev.has(id)) return prev;
-      const next = new Set(prev);
-      next.add(id);
-      return next;
-    });
-  }, [astTree]);
+    if (astTree) {
+      const id = nodeId(astTree);
+      setExpanded(prev => {
+        if (prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.add(id);
+        return next;
+      });
+    }
+    if (tsAstTree) {
+      const id = tsNodeId(tsAstTree);
+      setTsExpanded(prev => {
+        if (prev.has(id)) return prev;
+        const next = new Set(prev);
+        next.add(id);
+        return next;
+      });
+    }
+  }, [astTree, tsAstTree]);
+
+  // Selection sync for TS AST
+  useEffect(() => {
+    if (!tsAstTree || !selectedAstNodeRange) return;
+    const { start, end } = selectedAstNodeRange;
+    let best: { node: ASTNode; depth: number; path: ASTNode[] } | null = null;
+    function visit(node: ASTNode, depth: number, path: ASTNode[]) {
+      if (node.start <= start && node.end >= end) {
+        if (!best || depth > best.depth)
+          best = { node, depth, path: [...path, node] };
+        if (node.children)
+          for (const c of node.children) visit(c, depth + 1, [...path, node]);
+      }
+    }
+    visit(tsAstTree, 0, []);
+    if (best) {
+      const id = tsNodeId(best.node);
+      setTsSelectedId(id);
+      setTsExpanded(prev => {
+        const next = new Set(prev);
+        for (const p of best!.path) next.add(tsNodeId(p));
+        return next;
+      });
+    }
+  }, [selectedAstNodeRange, tsAstTree]);
 
   // Share button state and handler
   const [shareCopied, setShareCopied] = useState(false);
@@ -245,7 +349,19 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
             onClick={() => setActiveTab('ast')}
             aria-pressed={activeTab === 'ast'}
           >
-            AST
+            AST (tsgo)
+          </Button>
+          <Button
+            type="button"
+            variant={activeTab === 'ast_ts' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => {
+              setActiveTab('ast_ts');
+              onRequestTsAst?.();
+            }}
+            aria-pressed={activeTab === 'ast_ts'}
+          >
+            AST (TypeScript)
           </Button>
         </div>
         <div className="result-actions">
@@ -316,6 +432,22 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
               ) : (
                 <div className="empty-state">
                   <div className="empty-text">AST will be displayed here</div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!error && activeTab === 'ast_ts' && (
+            <div className="ast-view">
+              {tsAstTree ? (
+                <div className="ast-tree" role="tree">
+                  {renderTsNode(tsAstTree)}
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <div className="empty-text">
+                    TypeScript AST will be displayed here
+                  </div>
                 </div>
               )}
             </div>
