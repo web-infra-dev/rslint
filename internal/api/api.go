@@ -99,8 +99,10 @@ func (p *ProjectPaths) UnmarshalJSON(data []byte) error {
 
 // ParserOptions contains parser-specific configuration
 type ParserOptions struct {
-	ProjectService bool         `json:"projectService"`
-	Project        ProjectPaths `json:"project,omitempty"`
+    ProjectService bool         `json:"projectService"`
+    Project        ProjectPaths `json:"project,omitempty"`
+    // Optional root directory to resolve tsconfig paths against (matches @typescript-eslint tests)
+    TsconfigRootDir string      `json:"tsconfigRootDir,omitempty"`
 }
 type ByteArray []byte
 
