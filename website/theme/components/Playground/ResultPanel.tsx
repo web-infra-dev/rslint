@@ -141,12 +141,12 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
     const hasKids = isExpandable(n);
     const preview = n.text ? n.text.replace(/\s+/g, ' ').slice(0, 40) : '';
     return (
-      <div key={id} className="ast-node" style={{ paddingLeft: depth * 14 }}>
+      <div key={id} className="ast-node" style={{ paddingLeft: depth * 2 }}>
         <div
           className={`ast-node-row ${selectedId === id ? 'selected' : ''}`}
           onClick={() => clickNode(n)}
         >
-          {hasKids ? (
+          {hasKids && (
             <button
               className={`twisty ${open ? 'open' : ''}`}
               onClick={e => {
@@ -155,8 +155,6 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
               }}
               aria-label={open ? 'Collapse' : 'Expand'}
             />
-          ) : (
-            <span className="twisty placeholder" />
           )}
           <span className="node-type">{n.type}</span>
           <span className="node-range">
