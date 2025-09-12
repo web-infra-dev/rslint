@@ -225,12 +225,16 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, skipFile
 
 				return false
 			}
-			file.Node.ForEachChild(childVisitor)
-			clear(registeredListeners)
-		}
+            // Allow rules to handle file-level logic
+            runListeners(ast.KindSourceFile, &file.Node)
+            file.Node.ForEachChild(childVisitor)
+            // Notify exit of the SourceFile after traversing children
+            runListeners(rule.ListenerOnExit(ast.KindSourceFile), &file.Node)
+            clear(registeredListeners)
+        }
 
-	}
-	return lintedFileCount
+    }
+    return lintedFileCount
 }
 
 type RuleHandler = func(sourceFile *ast.SourceFile) []ConfiguredRule
