@@ -148,6 +148,12 @@
       "failing_case": []
     },
     {
+      "name": "no-unnecessary-condition",
+      "group": "@typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
       "name": "no-unnecessary-template-expression",
       "group": "@typescript-eslint",
       "status": "partial-test",
