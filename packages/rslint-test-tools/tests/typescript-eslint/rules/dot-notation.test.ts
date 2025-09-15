@@ -304,7 +304,7 @@ x.pub_prop = 123;
       output: 'a.SHOUT_CASE;',
     },
     {
-      skip: true,      code: noFormat`
+      code: noFormat`
 a
   ['SHOUT_CASE'];
       `,
@@ -322,7 +322,7 @@ a
       `,
     },
     {
-      skip: true,      code:
+      code:
         'getResource()\n' +
         '    .then(function(){})\n' +
         '    ["catch"](function(){})\n' +
@@ -350,7 +350,6 @@ a
         '    .catch(function(){});',
     },
     {
-      skip: true,
       code: noFormat`
 foo
   .while;
@@ -459,7 +458,6 @@ foo.key_baz;
       `,
     },
     {
-      skip: true,
       code: `
 type ExtraKey = \`extra\${string}\`;
 
