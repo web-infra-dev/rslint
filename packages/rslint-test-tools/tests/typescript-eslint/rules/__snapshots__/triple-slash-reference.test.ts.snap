@@ -1,0 +1,137 @@
+// Rstest Snapshot v1
+
+exports[`triple-slash-reference > invalid 1`] = `
+{
+  "code": "
+/// <reference types="foo" />
+import * as foo from 'foo';
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not use a triple slash reference for foo, use \`import\` style instead.",
+      "messageId": "tripleSlashReference",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/triple-slash-reference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`triple-slash-reference > invalid 2`] = `
+{
+  "code": "
+/// <reference types="foo" />
+import foo = require('foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not use a triple slash reference for foo, use \`import\` style instead.",
+      "messageId": "tripleSlashReference",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/triple-slash-reference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`triple-slash-reference > invalid 3`] = `
+{
+  "code": "/// <reference path="foo" />",
+  "diagnostics": [
+    {
+      "message": "Do not use a triple slash reference for foo, use \`import\` style instead.",
+      "messageId": "tripleSlashReference",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/triple-slash-reference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`triple-slash-reference > invalid 4`] = `
+{
+  "code": "/// <reference types="foo" />",
+  "diagnostics": [
+    {
+      "message": "Do not use a triple slash reference for foo, use \`import\` style instead.",
+      "messageId": "tripleSlashReference",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/triple-slash-reference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`triple-slash-reference > invalid 5`] = `
+{
+  "code": "/// <reference lib="foo" />",
+  "diagnostics": [
+    {
+      "message": "Do not use a triple slash reference for foo, use \`import\` style instead.",
+      "messageId": "tripleSlashReference",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/triple-slash-reference",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
