@@ -36,11 +36,11 @@
     "@rslint/core": "workspace:*",
     "@rstest/core": "^0.3.2",
     "husky": "^9.1.7",
-    "lint-staged": "^16.1.2",
+    "lint-staged": "^16.1.6",
     "prettier": "3.5.0",
     "typescript": "5.8.3",
     "zx": "8.7.1",
-    "@typescript/native-preview": "7.0.0-dev.20250904.1"
+    "@typescript/native-preview": "7.0.0-dev.20250920.1"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
@@ -56,6 +56,6 @@
   },
   "files": [],
   "dependencies": {
-    "@types/react": "^19.1.9"
+    "@types/react": "^19.1.13"
   }
 }
