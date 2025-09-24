@@ -12,31 +12,31 @@ import (
 // with spaces, preserving newlines and overall string length so that
 // byte offsets remain aligned with the original source.
 func maskBlockComments(s string) string {
-    b := []byte(s)
-    n := len(b)
-    for i := 0; i+1 < n; i++ {
-        if b[i] == '/' && b[i+1] == '*' {
-            // inside block comment
-            j := i + 2
-            for j+1 < n {
-                // preserve newlines for correct line/column mapping
-                if b[j] != '\n' && b[j] != '\r' {
-                    b[j] = ' '
-                }
-                if b[j] == '*' && b[j+1] == '/' {
-                    // mask the opening and closing too
-                    b[i] = ' '
-                    b[i+1] = ' '
-                    b[j] = ' '
-                    b[j+1] = ' '
-                    i = j + 1
-                    break
-                }
-                j++
-            }
-        }
-    }
-    return string(b)
+	b := []byte(s)
+	n := len(b)
+	for i := 0; i+1 < n; i++ {
+		if b[i] == '/' && b[i+1] == '*' {
+			// inside block comment
+			j := i + 2
+			for j+1 < n {
+				// preserve newlines for correct line/column mapping
+				if b[j] != '\n' && b[j] != '\r' {
+					b[j] = ' '
+				}
+				if b[j] == '*' && b[j+1] == '/' {
+					// mask the opening and closing too
+					b[i] = ' '
+					b[i+1] = ' '
+					b[j] = ' '
+					b[j+1] = ' '
+					i = j + 1
+					break
+				}
+				j++
+			}
+		}
+	}
+	return string(b)
 }
 
 type tripleSlashRef struct {
@@ -131,26 +131,26 @@ var TripleSlashReferenceRule = rule.CreateRule(rule.Rule{
 				firstStmtPos = sf.Statements.Nodes[0].Pos()
 			}
 
-            // Scan only the header (text before the first statement).
-            // Do not fall back to scanning the whole file; upstream limits
-            // detection to actual header directives to avoid false positives
-            // inside strings or templates.
-            scan := text[:firstStmtPos]
-            // (?m) multiline: match from the start of a line optional spaces then /// <reference ...>
-            // Before scanning, mask out any block comments so triple-slash
-            // inside /* ... */ does not get detected.
-            scanMasked := maskBlockComments(scan)
-            lineRe := regexp.MustCompile(`(?m)^[ \t]*///[ \t]*<reference[ \t]*(types|path|lib)[ \t]*=[ \t]*["']([^"']+)["']`)
-            idxs := lineRe.FindAllStringSubmatchIndex(scanMasked, -1)
-            for _, m := range idxs {
-                if len(m) < 6 {
-                    continue
-                }
-                start := m[0]
-                end := m[1]
-                kind := scanMasked[m[2]:m[3]]
-                mod := scanMasked[m[4]:m[5]]
-                tr := core.NewTextRange(start, end)
+			// Scan only the header (text before the first statement).
+			// Do not fall back to scanning the whole file; upstream limits
+			// detection to actual header directives to avoid false positives
+			// inside strings or templates.
+			scan := text[:firstStmtPos]
+			// (?m) multiline: match from the start of a line optional spaces then /// <reference ...>
+			// Before scanning, mask out any block comments so triple-slash
+			// inside /* ... */ does not get detected.
+			scanMasked := maskBlockComments(scan)
+			lineRe := regexp.MustCompile(`(?m)^[ \t]*///[ \t]*<reference[ \t]*(types|path|lib)[ \t]*=[ \t]*["']([^"']+)["']`)
+			idxs := lineRe.FindAllStringSubmatchIndex(scanMasked, -1)
+			for _, m := range idxs {
+				if len(m) < 6 {
+					continue
+				}
+				start := m[0]
+				end := m[1]
+				kind := scanMasked[m[2]:m[3]]
+				mod := scanMasked[m[4]:m[5]]
+				tr := core.NewTextRange(start, end)
 
 				switch kind {
 				case "types":
