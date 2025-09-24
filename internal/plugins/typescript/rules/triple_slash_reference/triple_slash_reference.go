@@ -131,14 +131,11 @@ var TripleSlashReferenceRule = rule.CreateRule(rule.Rule{
 				firstStmtPos = sf.Statements.Nodes[0].Pos()
 			}
 
-			// Scan header for triple-slash references. In some cases the
-			// first statement position can be 0; fall back to scanning the
-			// whole file to ensure we catch standalone directives.
-			header := text[:firstStmtPos]
-			scan := header
-			if firstStmtPos == 0 {
-				scan = text
-			}
+            // Scan only the header (text before the first statement).
+            // Do not fall back to scanning the whole file; upstream limits
+            // detection to actual header directives to avoid false positives
+            // inside strings or templates.
+            scan := text[:firstStmtPos]
             // (?m) multiline: match from the start of a line optional spaces then /// <reference ...>
             // Before scanning, mask out any block comments so triple-slash
             // inside /* ... */ does not get detected.
