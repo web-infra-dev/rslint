@@ -8,6 +8,37 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
+// maskBlockComments replaces the contents of block comments (/* ... */)
+// with spaces, preserving newlines and overall string length so that
+// byte offsets remain aligned with the original source.
+func maskBlockComments(s string) string {
+    b := []byte(s)
+    n := len(b)
+    for i := 0; i+1 < n; i++ {
+        if b[i] == '/' && b[i+1] == '*' {
+            // inside block comment
+            j := i + 2
+            for j+1 < n {
+                // preserve newlines for correct line/column mapping
+                if b[j] != '\n' && b[j] != '\r' {
+                    b[j] = ' '
+                }
+                if b[j] == '*' && b[j+1] == '/' {
+                    // mask the opening and closing too
+                    b[i] = ' '
+                    b[i+1] = ' '
+                    b[j] = ' '
+                    b[j+1] = ' '
+                    i = j + 1
+                    break
+                }
+                j++
+            }
+        }
+    }
+    return string(b)
+}
+
 type tripleSlashRef struct {
 	importName string
 	rng        core.TextRange
@@ -108,18 +139,21 @@ var TripleSlashReferenceRule = rule.CreateRule(rule.Rule{
 			if firstStmtPos == 0 {
 				scan = text
 			}
-			// (?m) multiline: match from the start of a line optional spaces then /// <reference ...>
-			lineRe := regexp.MustCompile(`(?m)^[ \t]*///[ \t]*<reference[ \t]*(types|path|lib)[ \t]*=[ \t]*["']([^"']+)["']`)
-			idxs := lineRe.FindAllStringSubmatchIndex(scan, -1)
-			for _, m := range idxs {
-				if len(m) < 6 {
-					continue
-				}
-				start := m[0]
-				end := m[1]
-				kind := scan[m[2]:m[3]]
-				mod := scan[m[4]:m[5]]
-				tr := core.NewTextRange(start, end)
+            // (?m) multiline: match from the start of a line optional spaces then /// <reference ...>
+            // Before scanning, mask out any block comments so triple-slash
+            // inside /* ... */ does not get detected.
+            scanMasked := maskBlockComments(scan)
+            lineRe := regexp.MustCompile(`(?m)^[ \t]*///[ \t]*<reference[ \t]*(types|path|lib)[ \t]*=[ \t]*["']([^"']+)["']`)
+            idxs := lineRe.FindAllStringSubmatchIndex(scanMasked, -1)
+            for _, m := range idxs {
+                if len(m) < 6 {
+                    continue
+                }
+                start := m[0]
+                end := m[1]
+                kind := scanMasked[m[2]:m[3]]
+                mod := scanMasked[m[4]:m[5]]
+                tr := core.NewTextRange(start, end)
 
 				switch kind {
 				case "types":
