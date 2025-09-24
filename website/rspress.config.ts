@@ -70,7 +70,7 @@ export default defineConfig({
       rspack(config) {
         config.ignoreWarnings = [
           {
-            module: /editorSimpleWorker\.js/,
+            module: /(editorSimpleWorker|typescript)\.js/,
           },
         ];
       },

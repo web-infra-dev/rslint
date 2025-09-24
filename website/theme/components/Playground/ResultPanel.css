@@ -161,7 +161,7 @@
   font-size: 12px;
 }
 .ast-node-row:hover {
-  background: #f6f8fa;
+  background: #f3f4f6;
 }
 .ast-node-row.selected {
   background: #e7f3ff;
@@ -173,7 +173,7 @@
   height: 0;
   border-top: 5px solid transparent;
   border-bottom: 5px solid transparent;
-  border-left: 6px solid #57606a;
+  border-left: 6px solid #8c959f;
   background: transparent;
   padding: 0;
   margin-right: 2px;
@@ -182,29 +182,26 @@
 .twisty.open {
   transform: rotate(90deg);
 }
-.twisty.placeholder {
-  width: 10px;
-  height: 10px;
-  border: none;
-}
+/* no placeholder for twisty when no children */
 
 .node-type {
   font-weight: 600;
-  color: #24292f;
+  color: #1f6feb;
 }
 .node-range {
-  color: #57606a;
+  color: #8c959f;
   font-family:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
     'Courier New', monospace;
 }
 .node-preview {
-  color: #6e7781;
+  color: #8c959f;
   margin-left: 6px;
+  font-style: italic;
 }
 
 .ast-children {
-  margin-left: 14px;
+  margin-left: 10px;
 }
 
 .ast-content {
