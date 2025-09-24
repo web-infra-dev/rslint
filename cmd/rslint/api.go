@@ -43,57 +43,82 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	}
 	currentDirectory = tspath.NormalizePath(currentDirectory)
 
-	// Create filesystem
-	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	allowedFiles := []string{}
-	// Apply file contents if provided
-	if len(req.FileContents) > 0 {
-		fileContents := make(map[string]string, len(req.FileContents))
-		for k, v := range req.FileContents {
-			normalizePath := tspath.NormalizePath(k)
-			fileContents[normalizePath] = v
-			allowedFiles = append(allowedFiles, normalizePath)
-		}
-		fs = utils.NewOverlayVFS(fs, fileContents)
-
-	}
+    // Create filesystem
+    fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+    allowedFiles := []string{}
+    // Apply file contents if provided (support remapping to tsconfigRootDir when specified)
+    if len(req.FileContents) > 0 {
+        fileContents := make(map[string]string, len(req.FileContents))
+        var remapRoot string
+        if req.LanguageOptions != nil && req.LanguageOptions.ParserOptions != nil && req.LanguageOptions.ParserOptions.TsconfigRootDir != "" {
+            remapRoot = tspath.ResolvePath(currentDirectory, req.LanguageOptions.ParserOptions.TsconfigRootDir)
+        }
+        for k, v := range req.FileContents {
+            original := tspath.NormalizePath(k)
+            target := original
+            if remapRoot != "" {
+                // Remap to tsconfigRootDir while preserving the file name
+                base := tspath.GetBaseFileName(original)
+                target = tspath.ResolvePath(remapRoot, base)
+            }
+            fileContents[target] = v
+            allowedFiles = append(allowedFiles, target)
+        }
+        fs = utils.NewOverlayVFS(fs, fileContents)
+    }
 
 	// Initialize rule registry with all available rules
 	rslintconfig.RegisterAllRules()
 
-	// Load rslint configuration and determine which tsconfig files to use
-	rslintConfig, tsConfigs, configDirectory := rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
+    // Load rslint configuration and determine which tsconfig files to use
+    rslintConfig, tsConfigs, configDirectory := rslintconfig.LoadConfigurationWithFallback(req.Config, currentDirectory, fs)
 
-	// Merge languageOptions from request with config file if provided
-	if req.LanguageOptions != nil && len(rslintConfig) > 0 {
-		// Convert API LanguageOptions to config LanguageOptions
-		configLanguageOptions := &rslintconfig.LanguageOptions{}
-		if req.LanguageOptions.ParserOptions != nil {
-			configLanguageOptions.ParserOptions = &rslintconfig.ParserOptions{
-				ProjectService: req.LanguageOptions.ParserOptions.ProjectService,
-				Project:        rslintconfig.ProjectPaths(req.LanguageOptions.ParserOptions.Project),
-			}
-		}
+    // Merge languageOptions from request with config file if provided
+    if req.LanguageOptions != nil && len(rslintConfig) > 0 {
+        // Merge into existing languageOptions rather than replacing wholesale
+        var baseLang *rslintconfig.LanguageOptions
+        if len(rslintConfig) > 0 && rslintConfig[0].LanguageOptions != nil {
+            baseLang = rslintConfig[0].LanguageOptions
+        } else {
+            baseLang = &rslintconfig.LanguageOptions{}
+        }
+        if baseLang.ParserOptions == nil {
+            baseLang.ParserOptions = &rslintconfig.ParserOptions{}
+        }
+        if req.LanguageOptions.ParserOptions != nil {
+            baseLang.ParserOptions.ProjectService = req.LanguageOptions.ParserOptions.ProjectService
+            // Only override project paths if present on the request; otherwise keep config file values
+            if len(req.LanguageOptions.ParserOptions.Project) > 0 {
+                baseLang.ParserOptions.Project = rslintconfig.ProjectPaths(req.LanguageOptions.ParserOptions.Project)
+            }
+        }
+        // Write back merged options
+        rslintConfig[0].LanguageOptions = baseLang
 
-		// Override languageOptions for the first config entry
-		rslintConfig[0].LanguageOptions = configLanguageOptions
+        // If a tsconfigRootDir is provided, override the configDirectory used to resolve tsconfigs
+        if req.LanguageOptions.ParserOptions != nil && req.LanguageOptions.ParserOptions.TsconfigRootDir != "" {
+            // Resolve relative to current working directory
+            configDirectory = tspath.ResolvePath(currentDirectory, req.LanguageOptions.ParserOptions.TsconfigRootDir)
+        }
 
-		// Re-extract tsconfig files with updated languageOptions
-		overrideTsconfigs := []string{}
-		for _, entry := range rslintConfig {
-			if entry.LanguageOptions != nil && entry.LanguageOptions.ParserOptions != nil {
-				for _, config := range entry.LanguageOptions.ParserOptions.Project {
-					tsconfigPath := tspath.ResolvePath(configDirectory, config)
-					if fs.FileExists(tsconfigPath) {
-						overrideTsconfigs = append(overrideTsconfigs, tsconfigPath)
-					}
-				}
-			}
-		}
-		if len(overrideTsconfigs) > 0 {
-			tsConfigs = overrideTsconfigs
-		}
-	}
+        // Re-extract tsconfig files with the possibly-updated languageOptions and/or configDirectory
+        // Prefer explicit project entries from the (possibly overridden) config entry above.
+        recomputedTsConfigs := []string{}
+        for _, entry := range rslintConfig {
+            if entry.LanguageOptions == nil || entry.LanguageOptions.ParserOptions == nil {
+                continue
+            }
+            for _, cfg := range entry.LanguageOptions.ParserOptions.Project {
+                tsconfigPath := tspath.ResolvePath(configDirectory, cfg)
+                if fs.FileExists(tsconfigPath) {
+                    recomputedTsConfigs = append(recomputedTsConfigs, tsconfigPath)
+                }
+            }
+        }
+        if len(recomputedTsConfigs) > 0 {
+            tsConfigs = recomputedTsConfigs
+        }
+    }
 	type RuleWithOption struct {
 		rule   rule.Rule
 		option interface{}
@@ -128,10 +153,14 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		programs = append(programs, program)
 	}
 
-	// Collect diagnostics
+	// Collect diagnostics and source files
 	var diagnostics []api.Diagnostic
 	var diagnosticsLock sync.Mutex
 	errorsCount := 0
+
+	// Track source files for encoding
+	sourceFiles := make(map[string]*ast.SourceFile)
+	var sourceFilesLock sync.Mutex
 
 	// Create collector function
 	diagnosticCollector := func(d rule.RuleDiagnostic) {
@@ -181,6 +210,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 
 		diagnostics = append(diagnostics, diagnostic)
 		errorsCount++
+
 	}
 
 	// Run linter
@@ -190,6 +220,11 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		allowedFiles,
 		utils.ExcludePaths,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+			// Track source file for encoding
+			sourceFilesLock.Lock()
+			filePath := tspath.ConvertToRelativePath(sourceFile.FileName(), comparePathOptions)
+			sourceFiles[filePath] = sourceFile
+			sourceFilesLock.Unlock()
 			return utils.Map(rulesWithOptions, func(r RuleWithOption) linter.ConfiguredRule {
 
 				return linter.ConfiguredRule{
@@ -209,13 +244,30 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	if diagnostics == nil {
 		diagnostics = []api.Diagnostic{}
 	}
+
 	// Create response
-	return &api.LintResponse{
+	response := &api.LintResponse{
 		Diagnostics: diagnostics,
 		ErrorCount:  errorsCount,
 		FileCount:   int(lintedFilesCount),
 		RuleCount:   len(rulesWithOptions),
-	}, nil
+	}
+	// Only include encoded source files if requested
+	if req.IncludeEncodedSourceFiles {
+		encodedSourceFiles := make(map[string]api.ByteArray)
+		for filePath, sourceFile := range sourceFiles {
+			encoded, err := api.EncodeAST(sourceFile, filePath)
+
+			if err != nil {
+				// Log error but don't fail the entire request
+				fmt.Fprintf(os.Stderr, "warning: failed to encode source file %s: %v\n", filePath, err)
+				continue
+			}
+			encodedSourceFiles[filePath] = encoded
+		}
+		response.EncodedSourceFiles = encodedSourceFiles
+	}
+	return response, nil
 }
 
 // HandleApplyFixes handles apply fixes requests in IPC mode

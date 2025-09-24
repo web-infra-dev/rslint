@@ -11,6 +11,7 @@ import (
 	"runtime/pprof"
 	"runtime/trace"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 	"unicode"
@@ -87,9 +88,61 @@ func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions 
 		printDiagnosticDefault(d, w, comparePathOptions)
 	case "jsonline":
 		printDiagnosticJsonLine(d, w, comparePathOptions)
+	case "github":
+		printDiagnosticGitHub(d, w, comparePathOptions)
 	default:
 		panic("not supported format " + format)
 	}
+}
+
+// print as [Workflow commands for GitHub Actions](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands) format
+func printDiagnosticGitHub(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions) {
+	var severity string
+	switch d.Severity {
+	case rule.SeverityError:
+		severity = "error"
+	case rule.SeverityWarning:
+		severity = "warning"
+	default:
+		severity = "notice"
+	}
+
+	diagnosticStart := d.Range.Pos()
+	diagnosticEnd := d.Range.End()
+
+	startLine, startColumn := scanner.GetLineAndCharacterOfPosition(d.SourceFile, diagnosticStart)
+	endLine, endColumn := scanner.GetLineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
+
+	filePath := tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions)
+	output := fmt.Sprintf(
+		"::%s file=%s,line=%d,endLine=%d,col=%d,endColumn=%d,title=%s::%s\n",
+		severity,
+		escapeProperty(filePath),
+		startLine+1,
+		endLine+1,
+		startColumn+1,
+		endColumn+1,
+		d.RuleName,
+		escapeData(d.Message.Description),
+	)
+	w.WriteString(output)
+}
+
+func escapeData(str string) string {
+	// https://github.com/biomejs/biome/blob/4416573f4d709047a28407d99381810b7bc7dcc7/crates/biome_diagnostics/src/display_github.rs#L85C4-L85C15
+	str = strings.ReplaceAll(str, "%", "%25")
+	str = strings.ReplaceAll(str, "\r", "%0D")
+	str = strings.ReplaceAll(str, "\n", "%0A")
+	return str
+}
+func escapeProperty(str string) string {
+	// https://github.com/biomejs/biome/blob/4416573f4d709047a28407d99381810b7bc7dcc7/crates/biome_diagnostics/src/display_github.rs#L103
+	str = strings.ReplaceAll(str, "%", "%25")
+	str = strings.ReplaceAll(str, "\r", "%0D")
+	str = strings.ReplaceAll(str, "\n", "%0A")
+	str = strings.ReplaceAll(str, ":", "%3A")
+	str = strings.ReplaceAll(str, ",", "%2C")
+	return str
 }
 
 // print as [jsonline](https://jsonlines.org/) format which can be used for lsp
@@ -316,7 +369,7 @@ Usage:
 Options:
   --init				Initialize a default config in the current directory.
   --config PATH         Which rslint config file to use. Defaults to rslint.json.
-  --format FORMAT       Output format: default | jsonline
+  --format FORMAT       Output format: default | jsonline | github
   --fix                 Automatically fix problems
   --no-color            Disable colored output
   --force-color         Force colored output

@@ -1,6 +1,6 @@
 {
   "name": "@rslint/test-tools",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "type": "module",
   "main": "src/index.ts",
   "private": true,
@@ -17,7 +17,7 @@
     "@rslint/core": "workspace:*",
     "@typescript-eslint/rule-tester": "workspace:*",
     "@typescript-eslint/utils": "workspace:*",
-    "@rstest/core": "0.1.0",
+    "@rstest/core": "0.3.2",
     "@typescript-eslint/parser": "8.39.0"
   },
   "publishConfig": {

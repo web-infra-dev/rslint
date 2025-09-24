@@ -1,5 +1,12 @@
 .editor-container {
-  min-height: 600px;
+  flex: 1;
+  height: 100%;
   border: 1px solid #eee;
-  border-radius: 4px;
+}
+
+/* Highlight used when clicking AST nodes */
+.monaco-editor .ast-node-highlight {
+  background: rgba(198, 228, 255, 0.65);
+  outline: 1px solid #0969da;
+  border-radius: 2px;
 }

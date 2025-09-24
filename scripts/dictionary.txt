@@ -132,3 +132,16 @@ nsec
 walltime
 Ptrs
 getsp
+libsyncrpc
+gofmt
+goimports
+jsonc
+GitHub
+github
+LSP
+IPC
+Prettier
+ESLint
+colocate
+co-locate
+shadcn

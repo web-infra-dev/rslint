@@ -11,6 +11,10 @@ permissions:
   contents: read
   # Optional: allow read access to pull requests. Use with `only-new-issues` option.
   pull-requests: read
+  # Required: allow writing check results and annotations
+  checks: write
+  # Required: allow updating commit statuses
+  statuses: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
@@ -35,11 +39,11 @@ jobs:
         go-version: ['1.25.0']
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
         with:
           submodules: true
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
 
@@ -56,7 +60,7 @@ jobs:
     runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
         with:
           submodules: true
 
@@ -70,7 +74,7 @@ jobs:
           cache-name: go-lint
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v8
+        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
         with:
           version: v2.4.0
           args: --timeout=5m ./cmd/... ./internal/...
@@ -94,7 +98,7 @@ jobs:
         go-version: ['1.25.0']
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
         with:
           submodules: true
 
@@ -112,11 +116,11 @@ jobs:
         run: pnpm format:check
 
       - name: Build
-        run: pnpm -r --filter='@rslint/test-tools...' --filter='rslint...' build
+        run: pnpm run build
 
       - name: Dogfooding
         if: runner.os == 'Linux'
-        run: pnpm run lint
+        run: pnpm run lint --format github
 
       - name: TypeCheck
         if: runner.os == 'Linux'
@@ -138,18 +142,18 @@ jobs:
 
       - name: Test on Linux
         if: runner.os == 'Linux'
-        run: xvfb-run -a pnpm -r --filter='@rslint/test-tools...'  --filter='rslint...' test
+        run: xvfb-run -a pnpm run test
 
       - name: Test on non-Linux
         if: runner.os != 'Linux'
-        run: pnpm -r --filter='@rslint/test-tools...'  --filter='rslint...' test
+        run: pnpm run test
 
   test-wasm:
     name: Test WASM
     runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
         with:
           submodules: true
 
@@ -166,12 +170,27 @@ jobs:
         run: |
           pnpm --filter '@rslint/core' build:js
           pnpm --filter '@rslint/wasm' build
+  website:
+    name: Build Website
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
+        with:
+          submodules: true
+
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+
+      - name: Build
+        run: pnpm run build:website
   done:
     needs:
       - test-go
       - test-node
       - lint
       - test-wasm
+      - website
     if: always()
     runs-on: ubuntu-latest
     name: CI Done

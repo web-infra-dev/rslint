@@ -1,11 +1,11 @@
 #!/usr/bin/env -S bash -euxo pipefail
 
-pushd typescript-go
-git switch main
-git reset --hard origin/main
-git pull --prune
-popd
-git add ./typescript-go
+# pushd typescript-go
+# git switch main
+# git reset --hard origin/main
+# git pull --prune
+# popd
+# git add ./typescript-go
 
 go work sync
 
