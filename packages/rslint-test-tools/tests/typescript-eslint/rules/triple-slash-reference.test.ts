@@ -104,13 +104,8 @@ ruleTester.run('triple-slash-reference', {
       code: "import foo = require('foo');",
       options: [{ types: 'prefer-import' }],
     },
-    {
-      code: `
-        /// <reference types="foo" />
-        import * as bar from 'bar';
-      `,
-      options: [{ types: 'prefer-import' }],
-    },
+    // Upstream: prefer-import should report any triple-slash types directive,
+    // regardless of whether an unrelated import exists.
     {
       code: `
         /*

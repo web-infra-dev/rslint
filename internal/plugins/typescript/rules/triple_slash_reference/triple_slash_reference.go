@@ -73,8 +73,7 @@ var TripleSlashReferenceRule = rule.CreateRule(rule.Rule{
     Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
         opts := normalizeOptions(options)
 
-        // Collected references when types === 'prefer-import'
-        references := []tripleSlashRef{}
+        // Parse header comments once per file
         parsed := false
 
         parseHeaderComments := func() {
@@ -101,27 +100,33 @@ var TripleSlashReferenceRule = rule.CreateRule(rule.Rule{
                 firstStmtPos = sf.Statements.Nodes[0].Pos()
             }
 
-            // Fallback approach: scan raw header text for triple-slash references
+            // Scan header for triple-slash references. In some cases the
+            // first statement position can be 0; fall back to scanning the
+            // whole file to ensure we catch standalone directives.
             header := text[:firstStmtPos]
+            scan := header
+            if firstStmtPos == 0 {
+                scan = text
+            }
             // (?m) multiline: match from the start of a line optional spaces then /// <reference ...>
             lineRe := regexp.MustCompile(`(?m)^[ \t]*///[ \t]*<reference[ \t]*(types|path|lib)[ \t]*=[ \t]*["']([^"']+)["']`)
-            idxs := lineRe.FindAllStringSubmatchIndex(header, -1)
+            idxs := lineRe.FindAllStringSubmatchIndex(scan, -1)
             for _, m := range idxs {
                 if len(m) < 6 {
                     continue
                 }
                 start := m[0]
                 end := m[1]
-                kind := header[m[2]:m[3]]
-                mod := header[m[4]:m[5]]
+                kind := scan[m[2]:m[3]]
+                mod := scan[m[4]:m[5]]
                 tr := core.NewTextRange(start, end)
 
                 switch kind {
                 case "types":
-                    if opts.Types == "never" {
+                    // Upstream behavior: report immediately for both
+                    // "never" and "prefer-import".
+                    if opts.Types == "never" || opts.Types == "prefer-import" {
                         ctx.ReportRange(tr, buildMessage(mod))
-                    } else if opts.Types == "prefer-import" {
-                        references = append(references, tripleSlashRef{importName: mod, rng: tr})
                     }
                 case "path":
                     if opts.Path == "never" {
@@ -136,67 +141,9 @@ var TripleSlashReferenceRule = rule.CreateRule(rule.Rule{
         }
 
         return rule.RuleListeners{
-            // Handle file-level triple-slash directives (reports for never cases)
+            // Handle file-level triple-slash directives
             ast.KindSourceFile: func(node *ast.Node) {
                 parseHeaderComments()
-            },
-            // import x from '...'
-            ast.KindImportDeclaration: func(node *ast.Node) {
-                parseHeaderComments()
-                if len(references) == 0 && opts.Types == "prefer-import" {
-                    // Fallback: scan entire file for types references
-                    text := ctx.SourceFile.Text()
-                    lineRe := regexp.MustCompile(`(?m)^[ \t]*///[ \t]*<reference[ \t]*types[ \t]*=[ \t]*["']([^"']+)["']`)
-                    idxs := lineRe.FindAllStringSubmatchIndex(text, -1)
-                    for _, m := range idxs {
-                        if len(m) < 4 {
-                            continue
-                        }
-                        start := m[0]
-                        end := m[1]
-                        mod := text[m[2]:m[3]]
-                        references = append(references, tripleSlashRef{importName: mod, rng: core.NewTextRange(start, end)})
-                    }
-                }
-                spec := node.ModuleSpecifier()
-                if spec == nil || spec.Kind != ast.KindStringLiteral {
-                    return
-                }
-                name := spec.AsStringLiteral().Text
-                for _, r := range references {
-                    if r.importName == name {
-                        ctx.ReportRange(r.rng, buildMessage(r.importName))
-                    }
-                }
-            },
-
-            // import x = require('...') — match ExternalModuleReference
-            ast.KindExternalModuleReference: func(node *ast.Node) {
-                parseHeaderComments()
-                if len(references) == 0 && opts.Types == "prefer-import" {
-                    text := ctx.SourceFile.Text()
-                    lineRe := regexp.MustCompile(`(?m)^[ \t]*///[ \t]*<reference[ \t]*types[ \t]*=[ \t]*["']([^"']+)["']`)
-                    idxs := lineRe.FindAllStringSubmatchIndex(text, -1)
-                    for _, m := range idxs {
-                        if len(m) < 4 {
-                            continue
-                        }
-                        start := m[0]
-                        end := m[1]
-                        mod := text[m[2]:m[3]]
-                        references = append(references, tripleSlashRef{importName: mod, rng: core.NewTextRange(start, end)})
-                    }
-                }
-                emr := node.AsExternalModuleReference()
-                if emr.Expression == nil || emr.Expression.Kind != ast.KindStringLiteral {
-                    return
-                }
-                name := emr.Expression.AsStringLiteral().Text
-                for _, r := range references {
-                    if r.importName == name {
-                        ctx.ReportRange(r.rng, buildMessage(r.importName))
-                    }
-                }
             },
         }
     },
