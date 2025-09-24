@@ -7,10 +7,9 @@ run:
 
 linters:
   default: none
-  disable:
-    - depguard
-    - errcheck
-    - paralleltest
+  # Avoid conflicting with enabled linters below; leaving disable empty
+  # prevents errors like "linter X can't be disabled and enabled at one moment".
+  disable: []
   enable:
     # Enabled
     - asasalint
