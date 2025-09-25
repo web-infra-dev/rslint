@@ -40,10 +40,7 @@ func maskBlockComments(s string) string {
 	return string(b)
 }
 
-type tripleSlashRef struct {
-	importName string
-	rng        core.TextRange
-}
+// Note: no per-file state needed beyond immediate reports
 
 func buildMessage(module string) rule.RuleMessage {
 	return rule.RuleMessage{
@@ -132,7 +129,7 @@ var TripleSlashReferenceRule = rule.CreateRule(rule.Rule{
             for comment := range scanner.GetLeadingCommentRanges(&ast.NodeFactory{}, fullText, start) {
                 // slice the comment text and mask any nested block comments (safety)
                 ctext := maskBlockComments(fullText[comment.Pos():comment.End()])
-                if loc := lineRe.FindStringSubmatchIndex(ctext); loc != nil && len(loc) >= 6 {
+                if loc := lineRe.FindStringSubmatchIndex(ctext); len(loc) >= 6 {
                     kind := ctext[loc[2]:loc[3]]
                     mod := ctext[loc[4]:loc[5]]
                     // Convert to absolute range in file text by offsetting with comment.Pos()

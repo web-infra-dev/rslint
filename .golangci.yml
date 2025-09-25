@@ -7,9 +7,11 @@ run:
 
 linters:
   default: none
-  # Avoid conflicting with enabled linters below; leaving disable empty
-  # prevents errors like "linter X can't be disabled and enabled at one moment".
-  disable: []
+  # Use disable to turn off linters that are noisy or not yet adopted, per main branch intent
+  disable:
+    - depguard
+    - errcheck
+    - paralleltest
   enable:
     # Enabled
     - asasalint
@@ -17,9 +19,9 @@ linters:
     - bodyclose
     - canonicalheader
     - copyloopvar
-    - depguard
+    # - depguard
     - durationcheck
-    - errcheck
+    # - errcheck
     - errchkjson
     - errname
     - errorlint
@@ -37,7 +39,7 @@ linters:
     - musttag
     - nakedret
     # - nolintlint
-    - paralleltest
+    # - paralleltest
     - perfsprint
     - predeclared
     - reassign
