@@ -1,9 +1,9 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
+    "bytes"
+    json "github.com/go-json-experiment/json"
+    "fmt"
 	"go/types"
 	"golang.org/x/text/cases"
 	"golang.org/x/text/language"

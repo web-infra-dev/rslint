@@ -1,7 +1,7 @@
 package config
 
 import (
-	"encoding/json"
+    json "github.com/go-json-experiment/json"
 	"testing"
 )
 

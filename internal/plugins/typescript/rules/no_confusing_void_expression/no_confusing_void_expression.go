@@ -1,8 +1,8 @@
 package no_confusing_void_expression
 
 import (
-	"encoding/json"
-	"github.com/microsoft/typescript-go/shim/ast"
+    json "github.com/go-json-experiment/json"
+    "github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"

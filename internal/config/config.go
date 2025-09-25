@@ -1,8 +1,8 @@
 package config
 
 import (
-	"encoding/json"
-	"fmt"
+    json "github.com/go-json-experiment/json"
+    "fmt"
 	"os"
 	"path/filepath"
 	"strings"

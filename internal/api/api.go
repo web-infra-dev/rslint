@@ -4,7 +4,7 @@ package ipc
 import (
 	"bufio"
 	"encoding/binary"
-	"encoding/json"
+	json "github.com/go-json-experiment/json"
 	"errors"
 	"fmt"
 	"io"

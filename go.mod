@@ -3,6 +3,8 @@ module github.com/web-infra-dev/rslint
 go 1.25.0
 
 replace (
+	github.com/microsoft/typescript-go/shim/api => ./shim/api
+	github.com/microsoft/typescript-go/shim/api/encoder => ./shim/api/encoder
 	github.com/microsoft/typescript-go/shim/ast => ./shim/ast
 	github.com/microsoft/typescript-go/shim/bundled => ./shim/bundled
 	github.com/microsoft/typescript-go/shim/checker => ./shim/checker
@@ -18,13 +20,12 @@ replace (
 	github.com/microsoft/typescript-go/shim/vfs => ./shim/vfs
 	github.com/microsoft/typescript-go/shim/vfs/cachedvfs => ./shim/vfs/cachedvfs
 	github.com/microsoft/typescript-go/shim/vfs/osvfs => ./shim/vfs/osvfs
-	github.com/microsoft/typescript-go/shim/api => ./shim/api
-	github.com/microsoft/typescript-go/shim/api/encoder => ./shim/api/encoder
 )
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.9.1
 	github.com/fatih/color v1.18.0
+	github.com/microsoft/typescript-go/shim/api/encoder v0.0.0
 	github.com/microsoft/typescript-go/shim/ast v0.0.0
 	github.com/microsoft/typescript-go/shim/bundled v0.0.0
 	github.com/microsoft/typescript-go/shim/checker v0.0.0
@@ -40,8 +41,6 @@ require (
 	github.com/microsoft/typescript-go/shim/vfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/cachedvfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/osvfs v0.0.0
-	github.com/microsoft/typescript-go/shim/api v0.0.0
-	github.com/microsoft/typescript-go/shim/api/encoder v0.0.0
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
 	golang.org/x/sync v0.16.0
 	golang.org/x/sys v0.35.0
