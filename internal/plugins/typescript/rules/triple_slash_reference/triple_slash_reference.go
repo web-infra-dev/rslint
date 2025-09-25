@@ -1,11 +1,12 @@
 package triple_slash_reference
 
 import (
-	"regexp"
+    "regexp"
 
-	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/web-infra-dev/rslint/internal/rule"
+    "github.com/microsoft/typescript-go/shim/ast"
+    "github.com/microsoft/typescript-go/shim/core"
+    "github.com/microsoft/typescript-go/shim/scanner"
+    "github.com/web-infra-dev/rslint/internal/rule"
 )
 
 // maskBlockComments replaces the contents of block comments (/* ... */)
@@ -123,52 +124,35 @@ var TripleSlashReferenceRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			text := sf.Text()
-
-			// Determine the position of the first statement to restrict to file header comments
-			firstStmtPos := len(text)
-			if sf.Statements != nil && len(sf.Statements.Nodes) > 0 {
-				firstStmtPos = sf.Statements.Nodes[0].Pos()
-			}
-
-			// Scan only the header (text before the first statement).
-			// Do not fall back to scanning the whole file; upstream limits
-			// detection to actual header directives to avoid false positives
-			// inside strings or templates.
-			scan := text[:firstStmtPos]
-			// (?m) multiline: match from the start of a line optional spaces then /// <reference ...>
-			// Before scanning, mask out any block comments so triple-slash
-			// inside /* ... */ does not get detected.
-			scanMasked := maskBlockComments(scan)
-			lineRe := regexp.MustCompile(`(?m)^[ \t]*///[ \t]*<reference[ \t]*(types|path|lib)[ \t]*=[ \t]*["']([^"']+)["']`)
-			idxs := lineRe.FindAllStringSubmatchIndex(scanMasked, -1)
-			for _, m := range idxs {
-				if len(m) < 6 {
-					continue
-				}
-				start := m[0]
-				end := m[1]
-				kind := scanMasked[m[2]:m[3]]
-				mod := scanMasked[m[4]:m[5]]
-				tr := core.NewTextRange(start, end)
-
-				switch kind {
-				case "types":
-					// Upstream behavior: report immediately for both
-					// "never" and "prefer-import".
-					if opts.Types == "never" || opts.Types == "prefer-import" {
-						ctx.ReportRange(tr, buildMessage(mod))
-					}
-				case "path":
-					if opts.Path == "never" {
-						ctx.ReportRange(tr, buildMessage(mod))
-					}
-				case "lib":
-					if opts.Lib == "never" {
-						ctx.ReportRange(tr, buildMessage(mod))
-					}
-				}
-			}
+            fullText := sf.Text()
+            // Look only at leading comments before the first token (header area)
+            start := len(scanner.GetShebang(fullText))
+            // Match triple-slash reference directives within individual leading comments
+            lineRe := regexp.MustCompile(`(?m)^[ \t]*///[ \t]*<reference[ \t]*(types|path|lib)[ \t]*=[ \t]*["']([^"']+)["']`)
+            for comment := range scanner.GetLeadingCommentRanges(&ast.NodeFactory{}, fullText, start) {
+                // slice the comment text and mask any nested block comments (safety)
+                ctext := maskBlockComments(fullText[comment.Pos():comment.End()])
+                if loc := lineRe.FindStringSubmatchIndex(ctext); loc != nil && len(loc) >= 6 {
+                    kind := ctext[loc[2]:loc[3]]
+                    mod := ctext[loc[4]:loc[5]]
+                    // Convert to absolute range in file text by offsetting with comment.Pos()
+                    tr := core.NewTextRange(comment.Pos()+loc[0], comment.Pos()+loc[1])
+                    switch kind {
+                    case "types":
+                        if opts.Types == "never" || opts.Types == "prefer-import" {
+                            ctx.ReportRange(tr, buildMessage(mod))
+                        }
+                    case "path":
+                        if opts.Path == "never" {
+                            ctx.ReportRange(tr, buildMessage(mod))
+                        }
+                    case "lib":
+                        if opts.Lib == "never" {
+                            ctx.ReportRange(tr, buildMessage(mod))
+                        }
+                    }
+                }
+            }
 		}
 
 		return rule.RuleListeners{
