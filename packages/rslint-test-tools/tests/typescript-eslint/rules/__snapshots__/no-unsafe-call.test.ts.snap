@@ -1,0 +1,331 @@
+// Rstest Snapshot v1
+
+exports[`no-unsafe-call > invalid 1`] = `
+{
+  "code": "
+function foo(x: any) {
+  x();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`any\` typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 2`] = `
+{
+  "code": "
+function foo(x: any) {
+  x?.();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`any\` typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 3`] = `
+{
+  "code": "
+function foo(x: any) {
+  x.a.b.c.d.e.f.g();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`any\` typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 4`] = `
+{
+  "code": "
+function foo(x: any) {
+  x.a.b.c.d.e.f.g?.();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`any\` typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 5`] = `
+{
+  "code": "
+function foo(x: { a: any }) {
+  x.a();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`any\` typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 6`] = `
+{
+  "code": "
+function foo(x: { a: any }) {
+  x?.a();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`any\` typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 7`] = `
+{
+  "code": "
+function foo(x: { a: any }) {
+  x.a?.();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`any\` typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 8`] = `
+{
+  "code": "
+function foo(x: any) {
+  new x();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe construction of a(n) \`any\` typed value.",
+      "messageId": "unsafeNew",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 9`] = `
+{
+  "code": "
+function foo(x: { a: any }) {
+  new x.a();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe construction of a(n) \`any\` typed value.",
+      "messageId": "unsafeNew",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 10`] = `
+{
+  "code": "
+function foo(x: any) {
+  x\`foo\`;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe use of a(n) \`any\` typed template tag.",
+      "messageId": "unsafeTemplateTag",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 11`] = `
+{
+  "code": "
+function foo(x: { tag: any }) {
+  x.tag\`foo\`;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe use of a(n) \`any\` typed template tag.",
+      "messageId": "unsafeTemplateTag",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

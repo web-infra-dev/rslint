@@ -1,0 +1,31 @@
+// Rstest Snapshot v1
+
+exports[`use-unknown-in-catch-callback-variable > invalid 1`] = `
+{
+  "code": "
+Promise.resolve().catch((err: Error) => {
+  throw err;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer the safe \`: unknown\` for a \`catch\` callback variable.",
+      "messageId": "useUnknown",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 2,
+        },
+        "start": {
+          "column": 26,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/use-unknown-in-catch-callback-variable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

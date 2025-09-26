@@ -1,0 +1,121 @@
+// Rstest Snapshot v1
+
+exports[`require-array-sort-compare > invalid 1`] = `
+{
+  "code": "
+        function f(a: Array<any>) {
+          a.sort();
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 2`] = `
+{
+  "code": "
+        function f(a: number[]) {
+          a.sort();
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 3`] = `
+{
+  "code": "
+        function f(a: number[]) {
+          a.sort();
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-array-sort-compare > invalid 4`] = `
+{
+  "code": "
+        function f(a: number | number[]) {
+          if (Array.isArray(a)) a.sort();
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Require 'compare' argument.",
+      "messageId": "requireCompare",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 3,
+        },
+        "start": {
+          "column": 33,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-array-sort-compare",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

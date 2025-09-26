@@ -1,0 +1,237 @@
+// Rstest Snapshot v1
+
+exports[`no-unsafe-return > invalid 1`] = `
+{
+  "code": "
+function foo() {
+  return 1 as any;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 2`] = `
+{
+  "code": "
+function foo() {
+  return Object.create(null);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 3`] = `
+{
+  "code": "
+const foo = () => {
+  return 1 as any;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 4`] = `
+{
+  "code": "const foo = () => Object.create(null);",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 5`] = `
+{
+  "code": "
+function foo() {
+  return [] as any[];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any[]\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 6`] = `
+{
+  "code": "
+function foo() {
+  return [] as Array<any>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any[]\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 7`] = `
+{
+  "code": "
+function foo() {
+  return [] as readonly any[];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any[]\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 8`] = `
+{
+  "code": "
+function foo() {
+  return [] as Readonly<any[]>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any[]\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

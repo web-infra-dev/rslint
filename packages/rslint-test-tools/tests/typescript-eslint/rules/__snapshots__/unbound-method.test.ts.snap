@@ -1,0 +1,646 @@
+// Rstest Snapshot v1
+
+exports[`unbound-method > invalid 1`] = `
+{
+  "code": "
+class Console {
+  log(str) {
+    process.stdout.write(str);
+  }
+}
+
+const console = new Console();
+
+Promise.resolve().then(console.log);
+      ",
+  "diagnostics": [
+    {
+      "message": "Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.",
+      "messageId": "unboundWithoutThisAnnotation",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 10,
+        },
+        "start": {
+          "column": 24,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/unbound-method",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unbound-method > invalid 2`] = `
+{
+  "code": "
+import { console } from './class';
+const x = console.log;
+      ",
+  "diagnostics": [
+    {
+      "message": "Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.",
+      "messageId": "unboundWithoutThisAnnotation",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/unbound-method",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unbound-method > invalid 3`] = `
+{
+  "code": "
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+
+function foo(arg: ContainsMethods | null) {
+  const unbound = arg?.unbound;
+  arg.unbound += 1;
+  arg?.unbound as any;
+}
+      
+  ",
+  "diagnostics": [
+    {
+      "message": "Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.",
+      "messageId": "unboundWithoutThisAnnotation",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 20,
+        },
+        "start": {
+          "column": 19,
+          "line": 20,
+        },
+      },
+      "ruleName": "@typescript-eslint/unbound-method",
+    },
+    {
+      "message": "Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.",
+      "messageId": "unboundWithoutThisAnnotation",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 21,
+        },
+        "start": {
+          "column": 3,
+          "line": 21,
+        },
+      },
+      "ruleName": "@typescript-eslint/unbound-method",
+    },
+    {
+      "message": "Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.",
+      "messageId": "unboundWithoutThisAnnotation",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 22,
+        },
+        "start": {
+          "column": 3,
+          "line": 22,
+        },
+      },
+      "ruleName": "@typescript-eslint/unbound-method",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unbound-method > invalid 4`] = `
+{
+  "code": "
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+const unbound = instance.unbound;
+  ",
+  "diagnostics": [
+    {
+      "message": "Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.",
+      "messageId": "unboundWithoutThisAnnotation",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 18,
+        },
+        "start": {
+          "column": 17,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/unbound-method",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unbound-method > invalid 5`] = `
+{
+  "code": "
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+const unboundStatic = ContainsMethods.unboundStatic;
+  ",
+  "diagnostics": [
+    {
+      "message": "Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.",
+      "messageId": "unboundWithoutThisAnnotation",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 18,
+        },
+        "start": {
+          "column": 23,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/unbound-method",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unbound-method > invalid 6`] = `
+{
+  "code": "
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+const { unbound } = instance;
+  ",
+  "diagnostics": [
+    {
+      "message": "Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.",
+      "messageId": "unboundWithoutThisAnnotation",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 18,
+        },
+        "start": {
+          "column": 9,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/unbound-method",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unbound-method > invalid 7`] = `
+{
+  "code": "
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+const { unboundStatic } = ContainsMethods;
+  ",
+  "diagnostics": [
+    {
+      "message": "Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.",
+      "messageId": "unboundWithoutThisAnnotation",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 18,
+        },
+        "start": {
+          "column": 9,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/unbound-method",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unbound-method > invalid 8`] = `
+{
+  "code": "
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+<any>instance.unbound;
+  ",
+  "diagnostics": [
+    {
+      "message": "Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.",
+      "messageId": "unboundWithoutThisAnnotation",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 18,
+        },
+        "start": {
+          "column": 6,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/unbound-method",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unbound-method > invalid 9`] = `
+{
+  "code": "
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.unbound as any;
+  ",
+  "diagnostics": [
+    {
+      "message": "Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.",
+      "messageId": "unboundWithoutThisAnnotation",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 18,
+        },
+        "start": {
+          "column": 1,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/unbound-method",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unbound-method > invalid 10`] = `
+{
+  "code": "
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+<any>ContainsMethods.unboundStatic;
+  ",
+  "diagnostics": [
+    {
+      "message": "Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.",
+      "messageId": "unboundWithoutThisAnnotation",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 18,
+        },
+        "start": {
+          "column": 6,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/unbound-method",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unbound-method > invalid 11`] = `
+{
+  "code": "
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+ContainsMethods.unboundStatic as any;
+  ",
+  "diagnostics": [
+    {
+      "message": "Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.",
+      "messageId": "unboundWithoutThisAnnotation",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 18,
+        },
+        "start": {
+          "column": 1,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/unbound-method",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unbound-method > invalid 12`] = `
+{
+  "code": "
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.unbound || 0;
+  ",
+  "diagnostics": [
+    {
+      "message": "Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.",
+      "messageId": "unboundWithoutThisAnnotation",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 18,
+        },
+        "start": {
+          "column": 1,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/unbound-method",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unbound-method > invalid 13`] = `
+{
+  "code": "
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+ContainsMethods.unboundStatic || 0;
+  ",
+  "diagnostics": [
+    {
+      "message": "Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.",
+      "messageId": "unboundWithoutThisAnnotation",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 18,
+        },
+        "start": {
+          "column": 1,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/unbound-method",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`unbound-method > invalid 14`] = `
+{
+  "code": "
+class ContainsMethods {
+  bound?: () => void;
+  unbound?(): void;
+
+  static boundStatic?: () => void;
+  static unboundStatic?(): void;
+}
+
+let instance = new ContainsMethods();
+
+const arith = {
+  double(this: void, x: number): number {
+    return x * 2;
+  }
+};
+
+instance.unbound ? instance.unbound : null
+  ",
+  "diagnostics": [
+    {
+      "message": "Avoid referencing unbound methods which may cause unintentional scoping of \`this\`.
+If your function does not access \`this\`, you can annotate it with \`this: void\`, or consider using an arrow function instead.",
+      "messageId": "unboundWithoutThisAnnotation",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 18,
+        },
+        "start": {
+          "column": 20,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/unbound-method",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

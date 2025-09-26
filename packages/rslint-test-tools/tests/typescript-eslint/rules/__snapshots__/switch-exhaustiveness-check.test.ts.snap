@@ -1,0 +1,125 @@
+// Rstest Snapshot v1
+
+exports[`switch-exhaustiveness-check > invalid 1`] = `
+{
+  "code": "
+declare const value: 'literal';
+switch (value) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 2`] = `
+{
+  "code": "
+declare const value: 'literal' & { _brand: true };
+switch (value) {
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 3`] = `
+{
+  "code": "
+declare const value: ('literal' & { _brand: true }) | 1;
+switch (value) {
+  case 'literal':
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`switch-exhaustiveness-check > invalid 4`] = `
+{
+  "code": "
+declare const value: '1' | '2' | number;
+switch (value) {
+  case '1':
+    break;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Switch is not exhaustive",
+      "messageId": "switchIsNotExhaustive",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/switch-exhaustiveness-check",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

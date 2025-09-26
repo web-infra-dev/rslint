@@ -163,27 +163,16 @@ func isNullableType(t *checker.Type) bool {
 
 // isTypeEligibleForPreferNullish checks if a type is eligible for nullish coalescing conversion
 func isTypeEligibleForPreferNullish(t *checker.Type, opts PreferNullishCoalescingOptions) bool {
-    // 'any' is considered eligible since it may be nullish at runtime
-    flagsAll := checker.Type_flags(t)
-    if flagsAll&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 {
-        return true
-    }
-    // First check if the type is nullable (contains null or undefined)
+    // Only consider types explicitly nullable (contain null or undefined)
+    // This prevents flagging expressions like `bar || baz` when `bar` is `any`/`unknown`.
     if !isNullableType(t) {
         return false
     }
-    
-    // For any/unknown types, only consider them eligible if they're explicitly nullable
-    // This prevents flagging cases like `const foo = bar || baz;` where bar has inferred any type
-    if flagsAll&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 {
-        // Only eligible if it's a union type that explicitly includes null/undefined
-        return utils.IsUnionType(t)
-    }
 
-	// Check for ignorable flags based on options
-	var ignorableFlags checker.TypeFlags
-	if opts.IgnorePrimitives.Boolean != nil && *opts.IgnorePrimitives.Boolean {
-		ignorableFlags |= checker.TypeFlagsBooleanLike
+    // Check for ignorable flags based on options
+    var ignorableFlags checker.TypeFlags
+    if opts.IgnorePrimitives.Boolean != nil && *opts.IgnorePrimitives.Boolean {
+        ignorableFlags |= checker.TypeFlagsBooleanLike
 	}
 	if opts.IgnorePrimitives.String != nil && *opts.IgnorePrimitives.String {
 		ignorableFlags |= checker.TypeFlagsStringLike
@@ -195,12 +184,12 @@ func isTypeEligibleForPreferNullish(t *checker.Type, opts PreferNullishCoalescin
 		ignorableFlags |= checker.TypeFlagsBigIntLike
 	}
 
-	// If the type is any or unknown and we're ignoring primitives, return false
-	// This matches TypeScript ESLint behavior
-	flags := checker.Type_flags(t)
-	if ignorableFlags != 0 && flags&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 {
-		return false
-	}
+    // If the type is any or unknown and we're ignoring primitives, return false
+    // (Defensive: after the nullable check above, `any` alone won't reach here.)
+    flags := checker.Type_flags(t)
+    if ignorableFlags != 0 && flags&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 {
+        return false
+    }
 
 	// Check if any type constituents have intersection types with ignored primitives
 	// This handles branded types like (string & { __brand?: any })
@@ -1242,10 +1231,44 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 		}
 
 		return rule.RuleListeners{
-			// Handle logical OR expressions: a || b
+			// Handle logical OR and logical OR assignment expressions
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				binExpr := node.AsBinaryExpression()
 				if binExpr == nil {
+					return
+				}
+
+				// Handle logical OR assignment: a ||= b -> a ??= b
+				if binExpr.OperatorToken.Kind == ast.KindBarBarEqualsToken {
+					// Check if left operand is eligible for nullish coalescing
+					leftType := ctx.TypeChecker.GetTypeAtLocation(binExpr.Left)
+					// Fallback to declared type if the location type isn't nullable
+					if !isNullableType(leftType) && (binExpr.Left.Kind == ast.KindIdentifier || binExpr.Left.Kind == ast.KindPropertyAccessExpression) {
+						if sym := ctx.TypeChecker.GetSymbolAtLocation(binExpr.Left); sym != nil {
+							if declType := ctx.TypeChecker.GetTypeOfSymbol(sym); declType != nil {
+								leftType = declType
+							}
+						}
+					}
+
+					if !isTypeEligibleForPreferNullish(leftType, opts) {
+						return
+					}
+
+					leftText := strings.TrimSpace(getNodeText(ctx.SourceFile, binExpr.Left))
+					rightText := strings.TrimSpace(getNodeText(ctx.SourceFile, binExpr.Right))
+					replacement := fmt.Sprintf("%s ??= %s", leftText, rightText)
+
+					// Report precisely on the '||=' operator token
+					opStart := findOperatorStart(ctx.SourceFile, binExpr.Left, "||=")
+					opRange := core.NewTextRange(opStart, opStart+3)
+					// Match typescript-eslint: use the same message id as logical OR case
+					ctx.ReportRangeWithSuggestions(opRange, buildPreferNullishOverOrMessage(),
+						rule.RuleSuggestion{
+							Message:  buildSuggestNullishMessage(),
+							FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)},
+						},
+					)
 					return
 				}
 
@@ -1339,8 +1362,15 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
                     inStmtCondDirect := isDirectlyInStatementCondition(node)
                     inStmtCondViaTernary := isWithinConditionalExpressionInStatementCondition(node)
                     if opts.IgnoreConditionalTests != nil && *opts.IgnoreConditionalTests {
-                        if inTernary || inStmtCondDirect || inStmtCondViaTernary {
+                        // Always ignore statement conditions when enabled
+                        if inStmtCondDirect || inStmtCondViaTernary {
                             return
+                        }
+                        // For ternary test positions: allow an explicit override via ignoreTernaryTests: false
+                        if inTernary {
+                            if !(opts.IgnoreTernaryTests != nil && !*opts.IgnoreTernaryTests) {
+                                return
+                            }
                         }
                     }
 
@@ -1659,7 +1689,7 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 						exprStmt := block.Statements.Nodes[0].AsExpressionStatement()
 						if exprStmt != nil && exprStmt.Expression.Kind == ast.KindBinaryExpression {
 							binExpr := exprStmt.Expression.AsBinaryExpression()
-							if binExpr != nil && binExpr.OperatorToken.Kind == ast.KindEqualsToken {
+							if binExpr != nil && (binExpr.OperatorToken.Kind == ast.KindEqualsToken || binExpr.OperatorToken.Kind == ast.KindBarBarEqualsToken || binExpr.OperatorToken.Kind == ast.KindQuestionQuestionEqualsToken) {
 								assignmentExpr = binExpr
 							}
 						}
@@ -1668,7 +1698,7 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					exprStmt := ifStmt.ThenStatement.AsExpressionStatement()
 					if exprStmt != nil && exprStmt.Expression.Kind == ast.KindBinaryExpression {
 						binExpr := exprStmt.Expression.AsBinaryExpression()
-						if binExpr != nil && binExpr.OperatorToken.Kind == ast.KindEqualsToken {
+						if binExpr != nil && (binExpr.OperatorToken.Kind == ast.KindEqualsToken || binExpr.OperatorToken.Kind == ast.KindBarBarEqualsToken || binExpr.OperatorToken.Kind == ast.KindQuestionQuestionEqualsToken) {
 							assignmentExpr = binExpr
 						}
 					}
