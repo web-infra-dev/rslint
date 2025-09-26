@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+    "strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
@@ -123,18 +124,41 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		rule   rule.Rule
 		option interface{}
 	}
-	rulesWithOptions := []RuleWithOption{}
-	// filter rule based on request.RuleOptions
-	if len(req.RuleOptions) > 0 {
-		for _, r := range rslintconfig.GlobalRuleRegistry.GetAllRules() {
-			if option, ok := req.RuleOptions[r.Name]; ok {
-				rulesWithOptions = append(rulesWithOptions, RuleWithOption{
-					rule:   r,
-					option: option,
-				})
-			}
-		}
-	}
+    rulesWithOptions := []RuleWithOption{}
+    // filter rule based on request.RuleOptions (accept both prefixed and unprefixed names)
+    if len(req.RuleOptions) > 0 {
+        for _, r := range rslintconfig.GlobalRuleRegistry.GetAllRules() {
+            // Build candidate keys to match more flexibly
+            name := r.Name // may already be prefixed (e.g., @typescript-eslint/xxx)
+            unprefixed := name
+            if strings.HasPrefix(name, "@typescript-eslint/") {
+                unprefixed = strings.TrimPrefix(name, "@typescript-eslint/")
+            }
+            prefixed := name
+            if !strings.HasPrefix(name, "@typescript-eslint/") {
+                prefixed = "@typescript-eslint/" + name
+            }
+
+            var (
+                option interface{}
+                ok bool
+            )
+            // Try exact name first
+            if option, ok = req.RuleOptions[name]; !ok {
+                // Try prefixed form
+                if option, ok = req.RuleOptions[prefixed]; !ok {
+                    // Try unprefixed form
+                    option, ok = req.RuleOptions[unprefixed]
+                }
+            }
+            if ok {
+                rulesWithOptions = append(rulesWithOptions, RuleWithOption{
+                    rule:   r,
+                    option: option,
+                })
+            }
+        }
+    }
 
 	// Create compiler host
 	host := utils.CreateCompilerHost(configDirectory, fs)
