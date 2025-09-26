@@ -256,9 +256,9 @@ func isMemberAccessLike(node *ast.Node) bool {
 
 // isConditionalTest checks if a node is within a conditional test context
 func isConditionalTest(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
+    if node == nil {
+        return false
+    }
 
 	// Walk up the parent chain to check if this node is used as a test condition
 	current := node
@@ -271,53 +271,75 @@ func isConditionalTest(node *ast.Node) bool {
 			continue
 		}
 		
-		// If parent is a logical expression, continue checking up the tree
-		if parent.Kind == ast.KindBinaryExpression {
-			binExpr := parent.AsBinaryExpression()
-			if binExpr != nil && (binExpr.OperatorToken.Kind == ast.KindBarBarToken || 
-			                       binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken) {
-				current = parent
-				continue
-			}
-		}
+        // If parent is a logical expression, continue checking up the tree
+        if parent.Kind == ast.KindBinaryExpression {
+            binExpr := parent.AsBinaryExpression()
+            if binExpr != nil {
+                switch binExpr.OperatorToken.Kind {
+                case ast.KindBarBarToken, ast.KindAmpersandAmpersandToken, ast.KindCommaToken:
+                    current = parent
+                    continue
+                }
+            }
+        }
 
-		// Check if we're in a test/condition position
-		switch parent.Kind {
-		case ast.KindConditionalExpression:
-			// In a ternary expression, check if we're the test condition
-			condExpr := parent.AsConditionalExpression()
-			if condExpr != nil && isNodeWithin(condExpr.Condition, current) {
-				return true
-			}
-			// If we're in the consequent or alternate, stop checking
-			return false
+        // Allow climbing through boolean negation in conditional tests
+        if parent.Kind == ast.KindPrefixUnaryExpression {
+            if pu := parent.AsPrefixUnaryExpression(); pu != nil && pu.Operator == ast.KindExclamationToken {
+                current = parent
+                continue
+            }
+        }
+
+        // Check if we're in a test/condition position
+        switch parent.Kind {
+        case ast.KindConditionalExpression:
+            // In a ternary expression, check if we're the test condition
+            condExpr := parent.AsConditionalExpression()
+            if condExpr != nil {
+                if isNodeWithin(condExpr.Condition, current) {
+                    // fmt.Println("isConditionalTest: within ConditionalExpression condition")
+                    return true
+                }
+                // If we are inside whenTrue/whenFalse, climb to the ternary and keep checking upwards.
+                if isNodeWithin(condExpr.WhenTrue, current) || isNodeWithin(condExpr.WhenFalse, current) {
+                    current = parent
+                    continue
+                }
+            }
+            // Unknown relation to ternary; stop.
+            return false
 			
 		case ast.KindIfStatement:
 			ifStmt := parent.AsIfStatement()
-			if ifStmt != nil && isNodeWithin(ifStmt.Expression, current) {
-				return true
-			}
+            if ifStmt != nil && isNodeWithin(ifStmt.Expression, current) {
+                // fmt.Println("isConditionalTest: within IfStatement condition")
+                return true
+            }
 			return false
 			
 		case ast.KindWhileStatement:
 			whileStmt := parent.AsWhileStatement()
-			if whileStmt != nil && isNodeWithin(whileStmt.Expression, current) {
-				return true
-			}
+            if whileStmt != nil && isNodeWithin(whileStmt.Expression, current) {
+                // fmt.Println("isConditionalTest: within WhileStatement condition")
+                return true
+            }
 			return false
 			
 		case ast.KindDoStatement:
 			doStmt := parent.AsDoStatement()
-			if doStmt != nil && isNodeWithin(doStmt.Expression, current) {
-				return true
-			}
+            if doStmt != nil && isNodeWithin(doStmt.Expression, current) {
+                // fmt.Println("isConditionalTest: within DoStatement condition")
+                return true
+            }
 			return false
 			
 		case ast.KindForStatement:
 			forStmt := parent.AsForStatement()
-			if forStmt != nil && isNodeWithin(forStmt.Condition, current) {
-				return true
-			}
+            if forStmt != nil && isNodeWithin(forStmt.Condition, current) {
+                // fmt.Println("isConditionalTest: within ForStatement condition")
+                return true
+            }
 			return false
 		}
 
@@ -1205,45 +1227,61 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 
 		return rule.RuleListeners{
 			// Handle logical OR and logical OR assignment expressions
-			ast.KindBinaryExpression: func(node *ast.Node) {
-				binExpr := node.AsBinaryExpression()
-				if binExpr == nil {
-					return
-				}
-
-				// Handle logical OR assignment: a ||= b -> a ??= b
-				if binExpr.OperatorToken.Kind == ast.KindBarBarEqualsToken {
-					// Check if left operand is eligible for nullish coalescing
-                    leftType := ctx.TypeChecker.GetTypeAtLocation(binExpr.Left)
-					// Fallback to declared type if the location type isn't nullable
-					if !isNullableType(leftType) && (binExpr.Left.Kind == ast.KindIdentifier || binExpr.Left.Kind == ast.KindPropertyAccessExpression) {
-						if sym := ctx.TypeChecker.GetSymbolAtLocation(binExpr.Left); sym != nil {
-							if declType := ctx.TypeChecker.GetTypeOfSymbol(sym); declType != nil {
-								leftType = declType
-							}
-						}
-					}
-
-					if !isTypeEligibleForPreferNullish(leftType, opts) {
+				ast.KindBinaryExpression: func(node *ast.Node) {
+					binExpr := node.AsBinaryExpression()
+					if binExpr == nil {
 						return
 					}
 
-					leftText := strings.TrimSpace(getNodeText(ctx.SourceFile, binExpr.Left))
-					rightText := strings.TrimSpace(getNodeText(ctx.SourceFile, binExpr.Right))
-					replacement := fmt.Sprintf("%s ??= %s", leftText, rightText)
+                    // If configured to ignore conditional tests, short-circuit for any
+                    // binary expression used as a conditional test (includes ternary and
+                    // statement conditions). This matches typescript-eslint defaults.
+                    if opts.IgnoreConditionalTests != nil && *opts.IgnoreConditionalTests && isConditionalTest(node) {
+                        return
+                    }
 
-					// Report precisely on the '||=' operator token
-					opStart := findOperatorStart(ctx.SourceFile, binExpr.Left, "||=")
-					opRange := core.NewTextRange(opStart, opStart+3)
-					// Match typescript-eslint: use the same message id as logical OR case
-					ctx.ReportRangeWithSuggestions(opRange, buildPreferNullishOverOrMessage(),
-						rule.RuleSuggestion{
-							Message:  buildSuggestNullishMessage(),
-							FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)},
-						},
-					)
-					return
-				}
+                // Handle logical OR assignment: a ||= b -> a ??= b
+                if binExpr.OperatorToken.Kind == ast.KindBarBarEqualsToken {
+                    // Respect ignoreConditionalTests for any conditional test context
+                    if opts.IgnoreConditionalTests != nil && *opts.IgnoreConditionalTests && isConditionalTest(node) {
+                        return
+                    }
+
+                    // Check if left operand is eligible for nullish coalescing
+                    leftType := ctx.TypeChecker.GetTypeAtLocation(binExpr.Left)
+                    // Fallback to declared type if the location type isn't nullable
+                    if !isNullableType(leftType) && (binExpr.Left.Kind == ast.KindIdentifier || binExpr.Left.Kind == ast.KindPropertyAccessExpression) {
+                        if sym := ctx.TypeChecker.GetSymbolAtLocation(binExpr.Left); sym != nil {
+                            if declType := ctx.TypeChecker.GetTypeOfSymbol(sym); declType != nil {
+                                leftType = declType
+                            }
+                        }
+                    }
+
+                    // Skip unknown for OR-assignment cases (align with @typescript-eslint)
+                    if (checker.Type_flags(leftType) & checker.TypeFlagsUnknown) != 0 {
+                        return
+                    }
+                    if !isTypeEligibleForPreferNullish(leftType, opts) {
+                        return
+                    }
+
+                    leftText := strings.TrimSpace(getNodeText(ctx.SourceFile, binExpr.Left))
+                    rightText := strings.TrimSpace(getNodeText(ctx.SourceFile, binExpr.Right))
+                    replacement := fmt.Sprintf("%s ??= %s", leftText, rightText)
+
+                    // Report precisely on the '||=' operator token
+                    opStart := findOperatorStart(ctx.SourceFile, binExpr.Left, "||=")
+                    opRange := core.NewTextRange(opStart, opStart+3)
+                    // Match typescript-eslint: use the same message id as logical OR case
+                    ctx.ReportRangeWithSuggestions(opRange, buildPreferNullishOverOrMessage(),
+                        rule.RuleSuggestion{
+                            Message:  buildSuggestNullishMessage(),
+                            FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, node, replacement)},
+                        },
+                    )
+                    return
+                }
 
 				// Handle logical OR expressions: a || b
 				if binExpr.OperatorToken.Kind == ast.KindBarBarToken {
@@ -1321,6 +1359,14 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
                             }
                         }
                     }
+                    // Unknown handling for OR cases: generally skip, unless RHS is `any`.
+                    if (checker.Type_flags(leftType) & checker.TypeFlagsUnknown) != 0 {
+                        // If right is explicit any, allow reporting to prefer `??`.
+                        rType := ctx.TypeChecker.GetTypeAtLocation(anchorBin.Right)
+                        if (checker.Type_flags(rType) & checker.TypeFlagsAny) == 0 {
+                            return
+                        }
+                    }
                     // If type is any/unknown due to missing declaration (implicit any), do not flag.
                     if (checker.Type_flags(leftType)&(checker.TypeFlagsAny|checker.TypeFlagsUnknown)) != 0 {
                         if ctx.TypeChecker.GetSymbolAtLocation(anchorBin.Left) == nil {
@@ -1332,26 +1378,9 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
                         return
                     }
 
-                    // Check various ignore conditions with precedence rules:
-                    // - If ignoreConditionalTests is true: ignore both statement and ternary tests,
-                    //   unless ignoreTernaryTests is explicitly false (override to enable ternary checks).
-                    // - If ignoreConditionalTests is false: do not ignore either context regardless of ignoreTernaryTests.
-                    // - Otherwise (no explicit setting): respect ignoreTernaryTests for ternary-only ignoring.
-                    inTernary := isWithinTernaryTestCondition(node)
-                    inStmtCondDirect := isDirectlyInStatementCondition(node)
-                    inStmtCondViaTernary := isWithinConditionalExpressionInStatementCondition(node)
-                    if opts.IgnoreConditionalTests != nil && *opts.IgnoreConditionalTests {
-                        // Always ignore statement conditions when enabled
-                        if inStmtCondDirect || inStmtCondViaTernary {
-                            return
-                        }
-                        // For ternary test positions: allow an explicit override via ignoreTernaryTests: false
-                        if inTernary {
-                            // De Morgan's law to satisfy linter: !(A && !B) -> (A == nil || B)
-                            if opts.IgnoreTernaryTests == nil || (opts.IgnoreTernaryTests != nil && *opts.IgnoreTernaryTests) {
-                                return
-                            }
-                        }
+                    // Simplified semantics: ignore any conditional test (statement or ternary) when enabled
+                    if opts.IgnoreConditionalTests != nil && *opts.IgnoreConditionalTests && isConditionalTest(node) {
+                        return
                     }
 
 					if opts.IgnoreBooleanCoercion != nil && *opts.IgnoreBooleanCoercion && isBooleanConstructorContext(node) {
@@ -1418,14 +1447,10 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				if binExpr.OperatorToken.Kind == ast.KindBarBarEqualsToken {
 					// Check various ignore conditions (precedence handled below)
 
-                    // Same ignore precedence for logical OR assignment in conditions
+                    // Simplified semantics: ignore any conditional test (statement or ternary) when enabled
                     inTernary := isWithinTernaryTestCondition(node)
-                    inStmtCondDirect := isDirectlyInStatementCondition(node)
-                    inStmtCondViaTernary := isWithinConditionalExpressionInStatementCondition(node)
-                    if opts.IgnoreConditionalTests != nil && *opts.IgnoreConditionalTests {
-                        if inTernary || inStmtCondDirect || inStmtCondViaTernary {
-                            return
-                        }
+                    if opts.IgnoreConditionalTests != nil && *opts.IgnoreConditionalTests && isConditionalTest(node) {
+                        return
                     }
 
 					// After ignore handling, check eligibility. In ternary-test context we err on the
@@ -1438,6 +1463,10 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 							}
 						}
 					}
+                    // Skip unknown for OR-assignment (align with @typescript-eslint)
+                    if (checker.Type_flags(leftType) & checker.TypeFlagsUnknown) != 0 {
+                        return
+                    }
                     // If type is any/unknown due to missing declaration (implicit any), do not flag.
                     if (checker.Type_flags(leftType)&(checker.TypeFlagsAny|checker.TypeFlagsUnknown)) != 0 {
                         if ctx.TypeChecker.GetSymbolAtLocation(binExpr.Left) == nil {
@@ -1579,11 +1608,17 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
                             }
                         }
 
-                        // If type is any/unknown due to missing declaration (implicit any), do not flag.
-                        if (checker.Type_flags(targetType)&(checker.TypeFlagsAny|checker.TypeFlagsUnknown)) != 0 {
+                        flags := checker.Type_flags(targetType)
+                        // Do not flag implicit-any (no symbol), as before.
+                        if (flags&(checker.TypeFlagsAny|checker.TypeFlagsUnknown)) != 0 {
                             if ctx.TypeChecker.GetSymbolAtLocation(targetNode) == nil {
                                 return
                             }
+                        }
+                        // Do not flag explicit `any` in ternary path (treat as valid),
+                        // but still allow `unknown` to report, matching typescript-eslint.
+                        if flags&checker.TypeFlagsAny != 0 {
+                            return
                         }
 
 					if !isTypeEligibleForPreferNullish(targetType, opts) {
@@ -1597,27 +1632,8 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				}
 
 
-				// Guard: only report on ternary patterns when the subject type is clearly nullable,
-				// not when it's 'any' or 'unknown'. Determine the subject based on the pattern.
-				{
-					var subject *ast.Node
-					if isSimplePattern {
-						subject = condUnwrapped
-					} else if isNegatedPattern {
-						subject = whenFalseUnwrapped
-					} else if targetNode != nil {
-						subject = targetNode
-					}
-					if subject != nil {
-						typ := ctx.TypeChecker.GetTypeAtLocation(subject)
-						if typ != nil {
-							flags := checker.Type_flags(typ)
-							if flags&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 {
-								return
-							}
-						}
-					}
-				}
+                // Note: do not early-return for explicit any/unknown here;
+                // unknown/any subjects should still report, matching typescript-eslint.
 
 				// Create fix suggestion
 				// For simple pattern, use the condition/whenTrue for text
@@ -1673,9 +1689,9 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				// Check if the if statement body is a simple assignment
-				var assignmentExpr *ast.BinaryExpression
-				switch ifStmt.ThenStatement.Kind {
+            // Check if the if statement body is a simple assignment
+            var assignmentExpr *ast.BinaryExpression
+            switch ifStmt.ThenStatement.Kind {
 				case ast.KindBlock:
 					block := ifStmt.ThenStatement.AsBlock()
 					if block == nil || block.Statements == nil || len(block.Statements.Nodes) != 1 {
@@ -1700,34 +1716,85 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					}
 				}
 
-				if assignmentExpr == nil || !isMemberAccessLike(assignmentExpr.Left) {
-					return
-				}
+            // Unwrap potential parentheses around the left side of the assignment
+            assignLeft := assignmentExpr.Left
+            assignLeft = unwrapParentheses(assignLeft)
+            if assignmentExpr == nil || !isMemberAccessLike(assignLeft) {
+                return
+            }
 
 				// Check if the condition is a simple nullish check for the same variable
-				var conditionTarget *ast.Node
-				if ifStmt.Expression.Kind == ast.KindPrefixUnaryExpression {
-					prefixExpr := ifStmt.Expression.AsPrefixUnaryExpression()
-					if prefixExpr != nil && prefixExpr.Operator == ast.KindExclamationToken {
-						conditionTarget = prefixExpr.Operand
-					}
-				} else {
-					// Handle other nullish check patterns like: if (a == null || a == undefined)
-					conditionTarget = ifStmt.Expression
-				}
+            var conditionTarget *ast.Node
+            explicitNullishEquality := false
+            // Normalize condition by unwrapping extraneous parentheses
+            condExprNode := unwrapParentheses(ifStmt.Expression)
+            if condExprNode.Kind == ast.KindPrefixUnaryExpression {
+                prefixExpr := condExprNode.AsPrefixUnaryExpression()
+                if prefixExpr != nil && prefixExpr.Operator == ast.KindExclamationToken {
+                    conditionTarget = prefixExpr.Operand
+                }
+            } else if condExprNode.Kind == ast.KindBinaryExpression {
+                // Handle explicit nullish equality checks like:
+                // if (a === undefined || a === null)
+                bin := condExprNode.AsBinaryExpression()
+                if bin == nil {
+                    return
+                }
+                // Single equality check
+                if bin.OperatorToken.Kind == ast.KindEqualsEqualsEqualsToken || bin.OperatorToken.Kind == ast.KindEqualsEqualsToken {
+                    if t := getNullishCheckTarget(condExprNode, ctx.SourceFile, true); t != nil {
+                        conditionTarget = t
+                        explicitNullishEquality = true
+                    } else {
+                        return
+                    }
+                } else if bin.OperatorToken.Kind == ast.KindBarBarToken {
+                    // Combined checks: a === undefined || a === null
+                    leftT := getNullishCheckTarget(bin.Left, ctx.SourceFile, true)
+                    rightT := getNullishCheckTarget(bin.Right, ctx.SourceFile, true)
+                    if leftT == nil || rightT == nil {
+                        return
+                    }
+                    if areNodesSemanticallyEqual(leftT, rightT) {
+                        conditionTarget = leftT
+                        explicitNullishEquality = true
+                    } else {
+                        return
+                    }
+                } else {
+                    // Do not convert inequality or other operators
+                    return
+                }
+            } else {
+                // Not a recognized nullish test for assignment conversion
+                return
+            }
 
-				if conditionTarget == nil || !areNodesTextuallyEqual(ctx.SourceFile, conditionTarget, assignmentExpr.Left) {
-					return
-				}
+            if conditionTarget == nil {
+                return
+            }
+            // Compare by text or by symbol to be robust to parentheses/casts
+            sameText := areNodesTextuallyEqual(ctx.SourceFile, conditionTarget, assignLeft)
+            sameSymbol := false
+            if symA := ctx.TypeChecker.GetSymbolAtLocation(conditionTarget); symA != nil {
+                if symB := ctx.TypeChecker.GetSymbolAtLocation(assignLeft); symB != nil {
+                    sameSymbol = symA == symB
+                }
+            }
+            if !(sameText || sameSymbol) {
+                return
+            }
 
-				// Check if left operand is eligible for nullish coalescing
-				leftType := ctx.TypeChecker.GetTypeAtLocation(assignmentExpr.Left)
-				if !isTypeEligibleForPreferNullish(leftType, opts) {
-					return
-				}
+            // For implicit truthiness check (!a), only proceed if the target type is nullable.
+            if !explicitNullishEquality {
+                t := ctx.TypeChecker.GetTypeAtLocation(conditionTarget)
+                if t == nil || !isNullableType(t) {
+                    return
+                }
+            }
 
 				// Create fix suggestion
-				leftText := strings.TrimSpace(getNodeText(ctx.SourceFile, assignmentExpr.Left))
+            leftText := strings.TrimSpace(getNodeText(ctx.SourceFile, assignLeft))
 				rightText := strings.TrimSpace(getNodeText(ctx.SourceFile, assignmentExpr.Right))
 				replacement := fmt.Sprintf("%s ??= %s;", leftText, rightText)
 

@@ -15052,3 +15052,751 @@ declare let y: number;
   "ruleCount": 1,
 }
 `;
+
+exports[`prefer-nullish-coalescing > invalid 500`] = `
+{
+  "code": "
+declare let x: unknown;
+declare let y: number;
+x ? x : y;
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 501`] = `
+{
+  "code": "
+declare let x: { n: unknown };
+!x.n ? y : x.n;
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 502`] = `
+{
+  "code": "
+declare let x: { a: string } | null;
+
+x?.['a'] != null ? x['a'] : 'foo';
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 503`] = `
+{
+  "code": "
+declare let x: { a: string } | null;
+
+x?.['a'] != null ? x.a : 'foo';
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 504`] = `
+{
+  "code": "
+declare let x: { a: string } | null;
+
+x?.a != null ? x['a'] : 'foo';
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 505`] = `
+{
+  "code": "
+const a = 'b';
+declare let x: { a: string; b: string } | null;
+
+x?.[a] != null ? x[a] : 'foo';
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a ternary expression testing for null/undefined.",
+      "messageId": "preferNullishOverTernary",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 5,
+        },
+        "start": {
+          "column": 1,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 506`] = `
+{
+  "code": "
+declare let foo: { a: string } | null;
+declare function makeFoo(): { a: string };
+
+function lazyInitialize() {
+  if (!foo) {
+    foo = makeFoo();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing assignment (\`??=\`) instead of an if statement with a nullish check.",
+      "messageId": "preferNullishOverAssignment",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 507`] = `
+{
+  "code": "
+declare let foo: { a: string } | null;
+declare function makeFoo(): { a: string };
+
+function lazyInitialize() {
+  if (foo == null) {
+    foo = makeFoo();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing assignment (\`??=\`) instead of an if statement with a nullish check.",
+      "messageId": "preferNullishOverAssignment",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 508`] = `
+{
+  "code": "
+declare let foo: { a: string } | null;
+declare function makeFoo(): { a: string };
+
+function lazyInitialize() {
+  if (foo == null) {
+    foo ??= makeFoo();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing assignment (\`??=\`) instead of an if statement with a nullish check.",
+      "messageId": "preferNullishOverAssignment",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 509`] = `
+{
+  "code": "
+declare let foo: { a: string } | null;
+declare function makeFoo(): { a: string };
+
+function lazyInitialize() {
+  if (foo == null) {
+    foo ||= makeFoo();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing assignment (\`??=\`) instead of an if statement with a nullish check.",
+      "messageId": "preferNullishOverAssignment",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 510`] = `
+{
+  "code": "
+declare let foo: { a: string } | null;
+declare function makeFoo(): { a: string };
+
+function lazyInitialize() {
+  if (foo === null) {
+    foo = makeFoo();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing assignment (\`??=\`) instead of an if statement with a nullish check.",
+      "messageId": "preferNullishOverAssignment",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 511`] = `
+{
+  "code": "
+declare let foo: { a: string } | null;
+declare function makeFoo(): { a: string };
+
+function lazyInitialize() {
+  if (foo == null) foo = makeFoo();
+  const bar = 42;
+  return bar;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing assignment (\`??=\`) instead of an if statement with a nullish check.",
+      "messageId": "preferNullishOverAssignment",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 512`] = `
+{
+  "code": "
+declare let foo: { a: string } | null;
+declare function makeFoo(): { a: string };
+
+function lazyInitialize() {
+  if (foo == null) foo ??= makeFoo();
+  const bar = 42;
+  return bar;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing assignment (\`??=\`) instead of an if statement with a nullish check.",
+      "messageId": "preferNullishOverAssignment",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 513`] = `
+{
+  "code": "
+declare let foo: { a: string } | null;
+declare function makeFoo(): { a: string };
+
+function lazyInitialize() {
+  if (foo == null) foo ||= makeFoo();
+  const bar = 42;
+  return bar;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing assignment (\`??=\`) instead of an if statement with a nullish check.",
+      "messageId": "preferNullishOverAssignment",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+    {
+      "message": "Prefer using nullish coalescing operator (\`??\`) instead of a logical or (\`||\`), as it is a safer operator.",
+      "messageId": "preferNullishOverOr",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 6,
+        },
+        "start": {
+          "column": 24,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 514`] = `
+{
+  "code": "
+declare let foo: { a: string } | undefined;
+declare function makeFoo(): { a: string };
+
+function lazyInitialize() {
+  if (foo === undefined) {
+    foo = makeFoo();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing assignment (\`??=\`) instead of an if statement with a nullish check.",
+      "messageId": "preferNullishOverAssignment",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 515`] = `
+{
+  "code": "
+declare let foo: { a: string } | null | undefined;
+declare function makeFoo(): { a: string };
+
+function lazyInitialize() {
+  if (foo === undefined || foo === null) {
+    foo = makeFoo();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing assignment (\`??=\`) instead of an if statement with a nullish check.",
+      "messageId": "preferNullishOverAssignment",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 516`] = `
+{
+  "code": "
+declare let foo: { a: string } | null;
+declare function makeFoo(): string;
+
+function lazyInitialize() {
+  if (foo.a == null) {
+    foo.a = makeFoo();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing assignment (\`??=\`) instead of an if statement with a nullish check.",
+      "messageId": "preferNullishOverAssignment",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 517`] = `
+{
+  "code": "
+declare let foo: { a: string } | null;
+declare function makeFoo(): string;
+
+function lazyInitialize() {
+  if (foo?.a == null) {
+    foo.a = makeFoo();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing assignment (\`??=\`) instead of an if statement with a nullish check.",
+      "messageId": "preferNullishOverAssignment",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 518`] = `
+{
+  "code": "
+declare let foo: string | null;
+declare function makeFoo(): string;
+
+function lazyInitialize() {
+  if (foo == null) {
+    // comment
+    foo = makeFoo();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing assignment (\`??=\`) instead of an if statement with a nullish check.",
+      "messageId": "preferNullishOverAssignment",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 519`] = `
+{
+  "code": "
+declare let foo: string | null;
+declare function makeFoo(): string;
+
+if (foo == null) {
+  // comment before 1
+  /* comment before 2 */
+  /* comment before 3
+    which is multiline
+  */
+  /**
+   * comment before 4
+   * which is also multiline
+   */
+  foo = makeFoo(); // comment inline
+  // comment after 1
+  /* comment after 2 */
+  /* comment after 3
+    which is multiline
+  */
+  /**
+   * comment after 4
+   * which is also multiline
+   */
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing assignment (\`??=\`) instead of an if statement with a nullish check.",
+      "messageId": "preferNullishOverAssignment",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 25,
+        },
+        "start": {
+          "column": 1,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-nullish-coalescing > invalid 520`] = `
+{
+  "code": "
+declare let foo: string | null;
+declare function makeFoo(): string;
+
+if (foo == null) /* comment before 1 */ /* comment before 2 */ foo = makeFoo(); // comment inline
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer using nullish coalescing assignment (\`??=\`) instead of an if statement with a nullish check.",
+      "messageId": "preferNullishOverAssignment",
+      "range": {
+        "end": {
+          "column": 80,
+          "line": 5,
+        },
+        "start": {
+          "column": 1,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
