@@ -169,7 +169,7 @@ func isTypeEligibleForPreferNullish(t *checker.Type, opts PreferNullishCoalescin
     if flagsAll&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 {
         return true
     }
-    // Otherwise, require explicit nullishness (null or undefined) in the type.
+    // Otherwise, require the type to explicitly include null or undefined.
     if !isNullableType(t) {
         return false
     }
