@@ -163,8 +163,13 @@ func isNullableType(t *checker.Type) bool {
 
 // isTypeEligibleForPreferNullish checks if a type is eligible for nullish coalescing conversion
 func isTypeEligibleForPreferNullish(t *checker.Type, opts PreferNullishCoalescingOptions) bool {
-    // Only consider types explicitly nullable (contain null or undefined)
-    // This prevents flagging expressions like `bar || baz` when `bar` is `any`/`unknown`.
+    // Treat any/unknown as eligible to match typescript-eslint behavior.
+    // Many codebases use truthiness on `any` and the rule should surface it.
+    flagsAll := checker.Type_flags(t)
+    if flagsAll&(checker.TypeFlagsAny|checker.TypeFlagsUnknown) != 0 {
+        return true
+    }
+    // Otherwise, require explicit nullishness (null or undefined) in the type.
     if !isNullableType(t) {
         return false
     }
@@ -620,40 +625,7 @@ func hasAndOperator(node *ast.Node) bool {
 }
 
 // findRootOrExpression climbs up through chained `||` binary expressions to the topmost one.
-func findRootOrExpression(node *ast.Node) *ast.Node {
-    root := node
-    for root.Parent != nil && root.Parent.Kind == ast.KindBinaryExpression {
-        if parentBin := root.Parent.AsBinaryExpression(); parentBin != nil && parentBin.OperatorToken.Kind == ast.KindBarBarToken {
-            root = root.Parent
-        } else {
-            break
-        }
-    }
-    return root
-}
-
-// findLeftmostOrExpression walks down the left side of a chained `||` expression
-// to locate the leftmost `||` operator in the chain.
-func findLeftmostOrExpression(node *ast.Node) *ast.Node {
-    // Start from the root `||` expression
-    cur := findRootOrExpression(node)
-    for cur != nil && cur.Kind == ast.KindBinaryExpression {
-        bin := cur.AsBinaryExpression()
-        if bin == nil || bin.OperatorToken.Kind != ast.KindBarBarToken {
-            break
-        }
-        // If the left child is also a `||` expression, continue descending left
-        if bin.Left != nil && bin.Left.Kind == ast.KindBinaryExpression {
-            leftBin := bin.Left.AsBinaryExpression()
-            if leftBin != nil && leftBin.OperatorToken.Kind == ast.KindBarBarToken {
-                cur = bin.Left
-                continue
-            }
-        }
-        break
-    }
-    return cur
-}
+// (removed) findRootOrExpression and findLeftmostOrExpression were unused helpers.
 
 // hasOrAncestor returns true if there is a parent `||` above the given node
 func hasOrAncestor(node *ast.Node) bool {
@@ -1225,10 +1197,11 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
             isStrictNullChecks = false
         }
 
-		if !isStrictNullChecks && (opts.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing == nil || !*opts.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing) {
-			ctx.ReportRange(core.NewTextRange(0, 0), buildNoStrictNullCheckMessage())
-			return rule.RuleListeners{}
-		}
+        if !isStrictNullChecks && (opts.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing == nil || !*opts.AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing) {
+            // Report the configuration issue but continue to register listeners,
+            // matching typescript-eslint which still runs the rule.
+            ctx.ReportRange(core.NewTextRange(0, 0), buildNoStrictNullCheckMessage())
+        }
 
 		return rule.RuleListeners{
 			// Handle logical OR and logical OR assignment expressions
@@ -1241,7 +1214,7 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				// Handle logical OR assignment: a ||= b -> a ??= b
 				if binExpr.OperatorToken.Kind == ast.KindBarBarEqualsToken {
 					// Check if left operand is eligible for nullish coalescing
-					leftType := ctx.TypeChecker.GetTypeAtLocation(binExpr.Left)
+                    leftType := ctx.TypeChecker.GetTypeAtLocation(binExpr.Left)
 					// Fallback to declared type if the location type isn't nullable
 					if !isNullableType(leftType) && (binExpr.Left.Kind == ast.KindIdentifier || binExpr.Left.Kind == ast.KindPropertyAccessExpression) {
 						if sym := ctx.TypeChecker.GetSymbolAtLocation(binExpr.Left); sym != nil {
@@ -1348,10 +1321,16 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
                             }
                         }
                     }
+                    // If type is any/unknown due to missing declaration (implicit any), do not flag.
+                    if (checker.Type_flags(leftType)&(checker.TypeFlagsAny|checker.TypeFlagsUnknown)) != 0 {
+                        if ctx.TypeChecker.GetSymbolAtLocation(anchorBin.Left) == nil {
+                            return
+                        }
+                    }
 
-					if !isTypeEligibleForPreferNullish(leftType, opts) {
-						return
-					}
+                    if !isTypeEligibleForPreferNullish(leftType, opts) {
+                        return
+                    }
 
                     // Check various ignore conditions with precedence rules:
                     // - If ignoreConditionalTests is true: ignore both statement and ternary tests,
@@ -1368,7 +1347,8 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
                         }
                         // For ternary test positions: allow an explicit override via ignoreTernaryTests: false
                         if inTernary {
-                            if !(opts.IgnoreTernaryTests != nil && !*opts.IgnoreTernaryTests) {
+                            // De Morgan's law to satisfy linter: !(A && !B) -> (A == nil || B)
+                            if opts.IgnoreTernaryTests == nil || (opts.IgnoreTernaryTests != nil && *opts.IgnoreTernaryTests) {
                                 return
                             }
                         }
@@ -1458,9 +1438,18 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 							}
 						}
 					}
-					if !isTypeEligibleForPreferNullish(leftType, opts) && !inTernary {
-						return
-					}
+                    // If type is any/unknown due to missing declaration (implicit any), do not flag.
+                    if (checker.Type_flags(leftType)&(checker.TypeFlagsAny|checker.TypeFlagsUnknown)) != 0 {
+                        if ctx.TypeChecker.GetSymbolAtLocation(binExpr.Left) == nil {
+                            if !inTernary { // only allow in ternary context per upstream behavior
+                                return
+                            }
+                        }
+                    }
+
+                    if !isTypeEligibleForPreferNullish(leftType, opts) && !inTernary {
+                        return
+                    }
 
 					if opts.IgnoreBooleanCoercion != nil && *opts.IgnoreBooleanCoercion && isBooleanConstructorContext(node) {
 						return
@@ -1573,22 +1562,29 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					}
 				}
 
-				// Check if the target is eligible for nullish coalescing
-				if !skipTypeCheck || isSimplePattern {
-					targetType := ctx.TypeChecker.GetTypeAtLocation(targetNode)
+                    // Check if the target is eligible for nullish coalescing
+                    if !skipTypeCheck || isSimplePattern {
+                        targetType := ctx.TypeChecker.GetTypeAtLocation(targetNode)
 
 					// For identifiers and property access, also try to get the declared type if the location type isn't nullable
 					// This handles cases where TypeScript might optimize the type
-					if (targetNode.Kind == ast.KindIdentifier || targetNode.Kind == ast.KindPropertyAccessExpression) && !isNullableType(targetType) {
-						// Try getting the symbol's type
-						symbol := ctx.TypeChecker.GetSymbolAtLocation(targetNode)
-						if symbol != nil {
-							declaredType := ctx.TypeChecker.GetTypeOfSymbol(symbol)
-							if declaredType != nil {
-								targetType = declaredType
-							}
-						}
-					}
+                        if (targetNode.Kind == ast.KindIdentifier || targetNode.Kind == ast.KindPropertyAccessExpression) && !isNullableType(targetType) {
+                            // Try getting the symbol's type
+                            symbol := ctx.TypeChecker.GetSymbolAtLocation(targetNode)
+                            if symbol != nil {
+                                declaredType := ctx.TypeChecker.GetTypeOfSymbol(symbol)
+                                if declaredType != nil {
+                                    targetType = declaredType
+                                }
+                            }
+                        }
+
+                        // If type is any/unknown due to missing declaration (implicit any), do not flag.
+                        if (checker.Type_flags(targetType)&(checker.TypeFlagsAny|checker.TypeFlagsUnknown)) != 0 {
+                            if ctx.TypeChecker.GetSymbolAtLocation(targetNode) == nil {
+                                return
+                            }
+                        }
 
 					if !isTypeEligibleForPreferNullish(targetType, opts) {
 						return
