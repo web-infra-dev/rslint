@@ -41,8 +41,8 @@ func parseOptions(options any) PreferNullishCoalescingOptions {
             Number:  utils.Ref(false),
             Bigint:  utils.Ref(false),
         },
-        // Default: do not ignore ternary tests unless explicitly configured.
-        IgnoreTernaryTests: utils.Ref(false),
+        // Default: ignore ternary tests (matches typescript-eslint default via ignoreConditionalTests)
+        IgnoreTernaryTests: utils.Ref(true),
     }
 
 	if options == nil {
@@ -1237,7 +1237,11 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
                     // binary expression used as a conditional test (includes ternary and
                     // statement conditions). This matches typescript-eslint defaults.
                     if opts.IgnoreConditionalTests != nil && *opts.IgnoreConditionalTests && isConditionalTest(node) {
-                        return
+                        // Allow explicit override: when inside a ternary test and ignoreTernaryTests is false,
+                        // do not ignore (report as usual).
+                        if !(isWithinTernaryTestCondition(node) && opts.IgnoreTernaryTests != nil && !*opts.IgnoreTernaryTests) {
+                            return
+                        }
                     }
 
                 // Handle logical OR assignment: a ||= b -> a ??= b
@@ -1285,6 +1289,22 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 
 				// Handle logical OR expressions: a || b
 				if binExpr.OperatorToken.Kind == ast.KindBarBarToken {
+                    // Local guard for ternary test contexts in case the global check missed it
+                    if opts.IgnoreConditionalTests != nil && *opts.IgnoreConditionalTests {
+                        for p := node; p != nil; p = p.Parent {
+                            if p.Kind == ast.KindConditionalExpression {
+                                if ce := p.AsConditionalExpression(); ce != nil && isNodeWithin(ce.Condition, node) {
+                                    if !(opts.IgnoreTernaryTests != nil && !*opts.IgnoreTernaryTests) {
+                                        return
+                                    }
+                                }
+                                break
+                            }
+                            if p.Kind != ast.KindParenthesizedExpression && p.Kind != ast.KindBinaryExpression && p.Kind != ast.KindPrefixUnaryExpression {
+                                break
+                            }
+                        }
+                    }
 					// If this OR is the left child of a parent OR whose right subtree contains '&&'
 					// and that parent has no OR ancestor (i.e., it's the top of the chain like `a || b || c && d`),
 					// skip reporting here because the parent will emit both diagnostics in order.
@@ -1374,7 +1394,8 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
                         }
                     }
 
-                    if !isTypeEligibleForPreferNullish(leftType, opts) {
+                    inTernaryOverride := isWithinTernaryTestCondition(node) && opts.IgnoreTernaryTests != nil && !*opts.IgnoreTernaryTests
+                    if !isTypeEligibleForPreferNullish(leftType, opts) && !inTernaryOverride {
                         return
                     }
 
@@ -1506,6 +1527,48 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 				if condExpr == nil {
 					return
 				}
+
+                // If global conditional tests are ignored but ternary tests are explicitly allowed
+                // via ignoreTernaryTests: false, flag `||` inside the ternary test condition.
+                // This mirrors the override behavior and avoids double-reporting when
+                // IgnoreConditionalTests is false (the OR listener will handle it).
+                if opts.IgnoreConditionalTests != nil && *opts.IgnoreConditionalTests && opts.IgnoreTernaryTests != nil && !*opts.IgnoreTernaryTests {
+                    condUnwrapped := unwrapParentheses(condExpr.Condition)
+                    if condUnwrapped != nil && condUnwrapped.Kind == ast.KindBinaryExpression {
+                        be := condUnwrapped.AsBinaryExpression()
+                        if be != nil && be.OperatorToken.Kind == ast.KindBarBarToken {
+                            // Determine left type with fallback to declared type
+                            lt := ctx.TypeChecker.GetTypeAtLocation(be.Left)
+                            if !isNullableType(lt) && (be.Left.Kind == ast.KindIdentifier || be.Left.Kind == ast.KindPropertyAccessExpression) {
+                                if sym := ctx.TypeChecker.GetSymbolAtLocation(be.Left); sym != nil {
+                                    if declType := ctx.TypeChecker.GetTypeOfSymbol(sym); declType != nil {
+                                        lt = declType
+                                    }
+                                }
+                            }
+                            // Only report when eligible
+                            if isTypeEligibleForPreferNullish(lt, opts) {
+                                opStart := findOperatorStart(ctx.SourceFile, be.Left, "||")
+                                opRange := core.NewTextRange(opStart, opStart+2)
+                                // Build replacement text similar to OR path
+                                leftText := strings.TrimSpace(getNodeText(ctx.SourceFile, be.Left))
+                                rightText := strings.TrimSpace(getNodeText(ctx.SourceFile, be.Right))
+                                fixedRight := rightText
+                                if needsParentheses(be.Right) {
+                                    fixedRight = fmt.Sprintf("(%s)", rightText)
+                                }
+                                replacement := fmt.Sprintf("%s ?? %s", leftText, fixedRight)
+                                ctx.ReportRangeWithSuggestions(opRange, buildPreferNullishOverOrMessage(),
+                                    rule.RuleSuggestion{
+                                        Message:  buildSuggestNullishMessage(),
+                                        FixesArr: []rule.RuleFix{rule.RuleFixReplace(ctx.SourceFile, condUnwrapped, replacement)},
+                                    },
+                                )
+                                // Continue with other ternary patterns as well
+                            }
+                        }
+                    }
+                }
 
 				// Check if this is a nullish check pattern
 				// Three cases to check:
@@ -1716,10 +1779,13 @@ var PreferNullishCoalescingRule = rule.CreateRule(rule.Rule{
 					}
 				}
 
+            // Guard for missing or non-binary assignment in then-branch
+            if assignmentExpr == nil {
+                return
+            }
             // Unwrap potential parentheses around the left side of the assignment
-            assignLeft := assignmentExpr.Left
-            assignLeft = unwrapParentheses(assignLeft)
-            if assignmentExpr == nil || !isMemberAccessLike(assignLeft) {
+            assignLeft := unwrapParentheses(assignmentExpr.Left)
+            if !isMemberAccessLike(assignLeft) {
                 return
             }
 
