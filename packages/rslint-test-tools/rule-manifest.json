@@ -246,7 +246,13 @@
     {
       "name": "prefer-as-const",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "prefer-nullish-coalescing",
+      "group": "@typescript-eslint",
+      "status": "full",
       "failing_case": []
     },
     {

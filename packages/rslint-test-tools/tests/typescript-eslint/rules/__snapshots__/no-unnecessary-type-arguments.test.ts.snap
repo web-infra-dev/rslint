@@ -1,0 +1,298 @@
+// Rstest Snapshot v1
+
+exports[`no-unnecessary-type-arguments > invalid 1`] = `
+{
+  "code": "
+function f<T = number>() {}
+f<number>();
+      ",
+  "diagnostics": [
+    {
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "messageId": "unnecessaryTypeParameter",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-arguments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function f<T = number>() {}
+f();
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-arguments > invalid 2`] = `
+{
+  "code": "
+function g<T = number, U = string>() {}
+g<string, string>();
+      ",
+  "diagnostics": [
+    {
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "messageId": "unnecessaryTypeParameter",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-arguments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function g<T = number, U = string>() {}
+g<string>();
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-arguments > invalid 3`] = `
+{
+  "code": "
+function f<T = number>(templates: TemplateStringsArray, arg: T) {}
+f<number>\`\${1}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "messageId": "unnecessaryTypeParameter",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-arguments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function f<T = number>(templates: TemplateStringsArray, arg: T) {}
+f\`\${1}\`;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-arguments > invalid 4`] = `
+{
+  "code": "
+class C<T = number> {}
+function h(c: C<number>) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "messageId": "unnecessaryTypeParameter",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-arguments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class C<T = number> {}
+function h(c: C) {}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-arguments > invalid 5`] = `
+{
+  "code": "
+class C<T = number> {}
+new C<number>();
+      ",
+  "diagnostics": [
+    {
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "messageId": "unnecessaryTypeParameter",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-arguments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class C<T = number> {}
+new C();
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-arguments > invalid 6`] = `
+{
+  "code": "
+class C<T = number> {}
+class D extends C<number> {}
+      ",
+  "diagnostics": [
+    {
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "messageId": "unnecessaryTypeParameter",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 19,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-arguments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class C<T = number> {}
+class D extends C {}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-arguments > invalid 7`] = `
+{
+  "code": "
+interface I<T = number> {}
+class Impl implements I<number> {}
+      ",
+  "diagnostics": [
+    {
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "messageId": "unnecessaryTypeParameter",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 25,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-arguments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+interface I<T = number> {}
+class Impl implements I {}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-arguments > invalid 8`] = `
+{
+  "code": "
+class Foo<T = number> {}
+const foo = new Foo<number>();
+      ",
+  "diagnostics": [
+    {
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "messageId": "unnecessaryTypeParameter",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-arguments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Foo<T = number> {}
+const foo = new Foo();
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-arguments > invalid 9`] = `
+{
+  "code": "
+interface Bar<T = string> {}
+class Foo<T = number> implements Bar<string> {}
+      ",
+  "diagnostics": [
+    {
+      "message": "This is the default value for this type parameter, so it can be omitted.",
+      "messageId": "unnecessaryTypeParameter",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 3,
+        },
+        "start": {
+          "column": 38,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-arguments",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+interface Bar<T = string> {}
+class Foo<T = number> implements Bar {}
+      ",
+  "ruleCount": 1,
+}
+`;
