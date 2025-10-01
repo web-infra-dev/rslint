@@ -1,9 +1,9 @@
 package utils
 
 import (
-	"encoding/json"
+    json "github.com/go-json-experiment/json"
 
-	"github.com/tailscale/hujson"
+    "github.com/tailscale/hujson"
 )
 
 // ParseJSONC parses JSONC (JSON with Comments) using hujson library
