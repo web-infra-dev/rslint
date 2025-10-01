@@ -219,12 +219,12 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			if node.Kind == ast.KindAsExpression {
 				s := scanner.GetScannerForSourceFile(ctx.SourceFile, expression.End())
 				asKeywordRange := s.TokenRange()
-				
+
 				sourceText := ctx.SourceFile.Text()
 				startPos := asKeywordRange.Pos()
-				
+
 				if startPos > expression.End() && sourceText[startPos-1] == ' ' {
-				if startPos-1 == expression.End() || (startPos-2 >= 0 && sourceText[startPos-2] != ' ') {
+					if startPos-1 == expression.End() || (startPos-2 >= 0 && sourceText[startPos-2] != ' ') {
 						startPos--
 					}
 				}
