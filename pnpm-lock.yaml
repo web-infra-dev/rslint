@@ -204,8 +204,8 @@ importers:
         specifier: 0.25.7
         version: 0.25.7
       fast-glob:
-        specifier: 3.2.12
-        version: 3.2.12
+        specifier: 3.3.3
+        version: 3.3.3
       mocha:
         specifier: 10.8.2
         version: 10.8.2
@@ -3048,10 +3048,6 @@ packages:
 
   fast-extend@1.0.2:
     resolution: {integrity: sha512-XXA9RmlPatkFKUzqVZAFth18R4Wo+Xug/S+C7YlYA3xrXwfPlW3dqNwOb4hvQo7wZJ2cNDYhrYuPzVOfHy5/uQ==}
-
-  fast-glob@3.2.12:
-    resolution: {integrity: sha512-DVj4CQIYYow0BlaelwK1pHl5n5cRSJfM60UA0zK891sVInoPri2Ekj7+e1CT3/3qxXenpI+nBBmQAcJPJgaj4w==}
-    engines: {node: '>=8.6.0'}
 
   fast-glob@3.3.3:
     resolution: {integrity: sha512-7MptL8U0cqcFdzIzwOTHoilX9x5BrNqye7Z/LuC7kCMRio1EMSyqRK3BEAUD7sXRq4iT4AzTVuZdhgQ2TCvYLg==}
@@ -7993,14 +7989,6 @@ snapshots:
   fast-deep-equal@3.1.3: {}
 
   fast-extend@1.0.2: {}
-
-  fast-glob@3.2.12:
-    dependencies:
-      '@nodelib/fs.stat': 2.0.5
-      '@nodelib/fs.walk': 1.2.8
-      glob-parent: 5.1.2
-      merge2: 1.4.1
-      micromatch: 4.0.8
 
   fast-glob@3.3.3:
     dependencies:
