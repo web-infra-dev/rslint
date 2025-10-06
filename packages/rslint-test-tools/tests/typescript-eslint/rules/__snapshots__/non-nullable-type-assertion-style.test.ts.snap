@@ -1,0 +1,322 @@
+// Rstest Snapshot v1
+
+exports[`non-nullable-type-assertion-style > invalid 1`] = `
+{
+  "code": "
+declare const maybe: string | undefined;
+const bar = maybe as string;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use a ! assertion to more succinctly remove null and undefined from the type.",
+      "messageId": "preferNonNullAssertion",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/non-nullable-type-assertion-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+declare const maybe: string | undefined;
+const bar = maybe!;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`non-nullable-type-assertion-style > invalid 2`] = `
+{
+  "code": "
+declare const maybe: string | null;
+const bar = maybe as string;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use a ! assertion to more succinctly remove null and undefined from the type.",
+      "messageId": "preferNonNullAssertion",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/non-nullable-type-assertion-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+declare const maybe: string | null;
+const bar = maybe!;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`non-nullable-type-assertion-style > invalid 3`] = `
+{
+  "code": "
+declare const maybe: string | null | undefined;
+const bar = maybe as string;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use a ! assertion to more succinctly remove null and undefined from the type.",
+      "messageId": "preferNonNullAssertion",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/non-nullable-type-assertion-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+declare const maybe: string | null | undefined;
+const bar = maybe!;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`non-nullable-type-assertion-style > invalid 4`] = `
+{
+  "code": "
+type Type = { value: string };
+declare const maybe: Type | undefined;
+const bar = maybe as Type;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use a ! assertion to more succinctly remove null and undefined from the type.",
+      "messageId": "preferNonNullAssertion",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 4,
+        },
+        "start": {
+          "column": 13,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/non-nullable-type-assertion-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Type = { value: string };
+declare const maybe: Type | undefined;
+const bar = maybe!;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`non-nullable-type-assertion-style > invalid 5`] = `
+{
+  "code": "
+interface Interface {
+  value: string;
+}
+declare const maybe: Interface | undefined;
+const bar = maybe as Interface;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use a ! assertion to more succinctly remove null and undefined from the type.",
+      "messageId": "preferNonNullAssertion",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 6,
+        },
+        "start": {
+          "column": 13,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/non-nullable-type-assertion-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+interface Interface {
+  value: string;
+}
+declare const maybe: Interface | undefined;
+const bar = maybe!;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`non-nullable-type-assertion-style > invalid 6`] = `
+{
+  "code": "
+type T = string | null;
+declare const x: T;
+
+const y = x as NonNullable<T>;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use a ! assertion to more succinctly remove null and undefined from the type.",
+      "messageId": "preferNonNullAssertion",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/non-nullable-type-assertion-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type T = string | null;
+declare const x: T;
+
+const y = x!;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`non-nullable-type-assertion-style > invalid 7`] = `
+{
+  "code": "
+type T = string | null | undefined;
+declare const x: T;
+
+const y = x as NonNullable<T>;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use a ! assertion to more succinctly remove null and undefined from the type.",
+      "messageId": "preferNonNullAssertion",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/non-nullable-type-assertion-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type T = string | null | undefined;
+declare const x: T;
+
+const y = x!;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`non-nullable-type-assertion-style > invalid 8`] = `
+{
+  "code": "
+declare function nullablePromise(): Promise<string | null>;
+
+async function fn(): Promise<string> {
+  return (await nullablePromise()) as string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use a ! assertion to more succinctly remove null and undefined from the type.",
+      "messageId": "preferNonNullAssertion",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 5,
+        },
+        "start": {
+          "column": 10,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/non-nullable-type-assertion-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+declare function nullablePromise(): Promise<string | null>;
+
+async function fn(): Promise<string> {
+  return (await nullablePromise())!;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`non-nullable-type-assertion-style > invalid 9`] = `
+{
+  "code": "
+declare const a: string | null;
+
+const b = (a || undefined) as string;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use a ! assertion to more succinctly remove null and undefined from the type.",
+      "messageId": "preferNonNullAssertion",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/non-nullable-type-assertion-style",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+declare const a: string | null;
+
+const b = (a || undefined)!;
+      ",
+  "ruleCount": 1,
+}
+`;

@@ -1,0 +1,702 @@
+// Rstest Snapshot v1
+
+exports[`no-misused-spread > invalid 1`] = `
+{
+  "code": "const a = [...'test'];",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on a string can mishandle special characters, as can \`.split("")\`.
+'- \`...\` produces Unicode code points, which will decompose complex emojis into individual emojis- .split("") produces UTF-16 code units, which breaks rich characters in many languagesConsider using \`Intl.Segmenter\` for locale-aware string decomposition.Otherwise, if you don't need to preserve emojis or other non-Ascii characters, disable this lint rule on this line or configure the 'allow' rule option.",
+      "messageId": "noStringSpread",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 2`] = `
+{
+  "code": "
+        function withText<Text extends string>(text: Text) {
+          return [...text];
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on a string can mishandle special characters, as can \`.split("")\`.
+'- \`...\` produces Unicode code points, which will decompose complex emojis into individual emojis- .split("") produces UTF-16 code units, which breaks rich characters in many languagesConsider using \`Intl.Segmenter\` for locale-aware string decomposition.Otherwise, if you don't need to preserve emojis or other non-Ascii characters, disable this lint rule on this line or configure the 'allow' rule option.",
+      "messageId": "noStringSpread",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 19,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 3`] = `
+{
+  "code": "
+        const test = 'hello';
+        const a = [...test];
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on a string can mishandle special characters, as can \`.split("")\`.
+'- \`...\` produces Unicode code points, which will decompose complex emojis into individual emojis- .split("") produces UTF-16 code units, which breaks rich characters in many languagesConsider using \`Intl.Segmenter\` for locale-aware string decomposition.Otherwise, if you don't need to preserve emojis or other non-Ascii characters, disable this lint rule on this line or configure the 'allow' rule option.",
+      "messageId": "noStringSpread",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 4`] = `
+{
+  "code": "
+        const test = \`he\${'ll'}o\`;
+        const a = [...test];
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on a string can mishandle special characters, as can \`.split("")\`.
+'- \`...\` produces Unicode code points, which will decompose complex emojis into individual emojis- .split("") produces UTF-16 code units, which breaks rich characters in many languagesConsider using \`Intl.Segmenter\` for locale-aware string decomposition.Otherwise, if you don't need to preserve emojis or other non-Ascii characters, disable this lint rule on this line or configure the 'allow' rule option.",
+      "messageId": "noStringSpread",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 5`] = `
+{
+  "code": "
+        declare const test: string;
+        const a = [...test];
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on a string can mishandle special characters, as can \`.split("")\`.
+'- \`...\` produces Unicode code points, which will decompose complex emojis into individual emojis- .split("") produces UTF-16 code units, which breaks rich characters in many languagesConsider using \`Intl.Segmenter\` for locale-aware string decomposition.Otherwise, if you don't need to preserve emojis or other non-Ascii characters, disable this lint rule on this line or configure the 'allow' rule option.",
+      "messageId": "noStringSpread",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 6`] = `
+{
+  "code": "
+        declare const test: string | number[];
+        const a = [...test];
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on a string can mishandle special characters, as can \`.split("")\`.
+'- \`...\` produces Unicode code points, which will decompose complex emojis into individual emojis- .split("") produces UTF-16 code units, which breaks rich characters in many languagesConsider using \`Intl.Segmenter\` for locale-aware string decomposition.Otherwise, if you don't need to preserve emojis or other non-Ascii characters, disable this lint rule on this line or configure the 'allow' rule option.",
+      "messageId": "noStringSpread",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 7`] = `
+{
+  "code": "
+        declare const test: string & { __brand: 'test' };
+        const a = [...test];
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on a string can mishandle special characters, as can \`.split("")\`.
+'- \`...\` produces Unicode code points, which will decompose complex emojis into individual emojis- .split("") produces UTF-16 code units, which breaks rich characters in many languagesConsider using \`Intl.Segmenter\` for locale-aware string decomposition.Otherwise, if you don't need to preserve emojis or other non-Ascii characters, disable this lint rule on this line or configure the 'allow' rule option.",
+      "messageId": "noStringSpread",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 8`] = `
+{
+  "code": "
+        declare const test: number | (boolean | (string & { __brand: true }));
+        const a = [...test];
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on a string can mishandle special characters, as can \`.split("")\`.
+'- \`...\` produces Unicode code points, which will decompose complex emojis into individual emojis- .split("") produces UTF-16 code units, which breaks rich characters in many languagesConsider using \`Intl.Segmenter\` for locale-aware string decomposition.Otherwise, if you don't need to preserve emojis or other non-Ascii characters, disable this lint rule on this line or configure the 'allow' rule option.",
+      "messageId": "noStringSpread",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 9`] = `
+{
+  "code": "
+        declare function getString(): string;
+        const a = [...getString()];
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on a string can mishandle special characters, as can \`.split("")\`.
+'- \`...\` produces Unicode code points, which will decompose complex emojis into individual emojis- .split("") produces UTF-16 code units, which breaks rich characters in many languagesConsider using \`Intl.Segmenter\` for locale-aware string decomposition.Otherwise, if you don't need to preserve emojis or other non-Ascii characters, disable this lint rule on this line or configure the 'allow' rule option.",
+      "messageId": "noStringSpread",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 10`] = `
+{
+  "code": "
+        declare function textIdentity(...args: string[]);
+
+        declare const text: string;
+
+        textIdentity(...text);
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on a string can mishandle special characters, as can \`.split("")\`.
+'- \`...\` produces Unicode code points, which will decompose complex emojis into individual emojis- .split("") produces UTF-16 code units, which breaks rich characters in many languagesConsider using \`Intl.Segmenter\` for locale-aware string decomposition.Otherwise, if you don't need to preserve emojis or other non-Ascii characters, disable this lint rule on this line or configure the 'allow' rule option.",
+      "messageId": "noStringSpread",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 6,
+        },
+        "start": {
+          "column": 22,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 11`] = `
+{
+  "code": "
+        declare function textIdentity(...args: string[]);
+
+        declare const text: string;
+
+        textIdentity(...text, 'and', ...text);
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on a string can mishandle special characters, as can \`.split("")\`.
+'- \`...\` produces Unicode code points, which will decompose complex emojis into individual emojis- .split("") produces UTF-16 code units, which breaks rich characters in many languagesConsider using \`Intl.Segmenter\` for locale-aware string decomposition.Otherwise, if you don't need to preserve emojis or other non-Ascii characters, disable this lint rule on this line or configure the 'allow' rule option.",
+      "messageId": "noStringSpread",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 6,
+        },
+        "start": {
+          "column": 22,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+    {
+      "message": "Using the spread operator on a string can mishandle special characters, as can \`.split("")\`.
+'- \`...\` produces Unicode code points, which will decompose complex emojis into individual emojis- .split("") produces UTF-16 code units, which breaks rich characters in many languagesConsider using \`Intl.Segmenter\` for locale-aware string decomposition.Otherwise, if you don't need to preserve emojis or other non-Ascii characters, disable this lint rule on this line or configure the 'allow' rule option.",
+      "messageId": "noStringSpread",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 6,
+        },
+        "start": {
+          "column": 38,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 12`] = `
+{
+  "code": "
+        declare function textIdentity(...args: string[]);
+
+        function withText<Text extends string>(text: Text) {
+          textIdentity(...text);
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on a string can mishandle special characters, as can \`.split("")\`.
+'- \`...\` produces Unicode code points, which will decompose complex emojis into individual emojis- .split("") produces UTF-16 code units, which breaks rich characters in many languagesConsider using \`Intl.Segmenter\` for locale-aware string decomposition.Otherwise, if you don't need to preserve emojis or other non-Ascii characters, disable this lint rule on this line or configure the 'allow' rule option.",
+      "messageId": "noStringSpread",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 5,
+        },
+        "start": {
+          "column": 24,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 13`] = `
+{
+  "code": "
+        declare function getString<T extends string>(): T;
+        const a = [...getString()];
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on a string can mishandle special characters, as can \`.split("")\`.
+'- \`...\` produces Unicode code points, which will decompose complex emojis into individual emojis- .split("") produces UTF-16 code units, which breaks rich characters in many languagesConsider using \`Intl.Segmenter\` for locale-aware string decomposition.Otherwise, if you don't need to preserve emojis or other non-Ascii characters, disable this lint rule on this line or configure the 'allow' rule option.",
+      "messageId": "noStringSpread",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 14`] = `
+{
+  "code": "
+        declare function getString(): string & { __brand: 'test' };
+        const a = [...getString()];
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on a string can mishandle special characters, as can \`.split("")\`.
+'- \`...\` produces Unicode code points, which will decompose complex emojis into individual emojis- .split("") produces UTF-16 code units, which breaks rich characters in many languagesConsider using \`Intl.Segmenter\` for locale-aware string decomposition.Otherwise, if you don't need to preserve emojis or other non-Ascii characters, disable this lint rule on this line or configure the 'allow' rule option.",
+      "messageId": "noStringSpread",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 15`] = `
+{
+  "code": "const o = { ...[1, 2, 3] };",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on an array in an object will result in a list of indices.",
+      "messageId": "noArraySpreadInObject",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 16`] = `
+{
+  "code": "
+        const arr = [1, 2, 3];
+        const o = { ...arr };
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on an array in an object will result in a list of indices.",
+      "messageId": "noArraySpreadInObject",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 17`] = `
+{
+  "code": "
+        const arr = [1, 2, 3] as const;
+        const o = { ...arr };
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on an array in an object will result in a list of indices.",
+      "messageId": "noArraySpreadInObject",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 18`] = `
+{
+  "code": "
+        declare const arr: number[];
+        const o = { ...arr };
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on an array in an object will result in a list of indices.",
+      "messageId": "noArraySpreadInObject",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 19`] = `
+{
+  "code": "
+        declare const arr: readonly number[];
+        const o = { ...arr };
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on an array in an object will result in a list of indices.",
+      "messageId": "noArraySpreadInObject",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 20`] = `
+{
+  "code": "
+        declare const arr: number[] | string[];
+        const o = { ...arr };
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on an array in an object will result in a list of indices.",
+      "messageId": "noArraySpreadInObject",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 21`] = `
+{
+  "code": "
+        declare const arr: number[] & string[];
+        const o = { ...arr };
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on an array in an object will result in a list of indices.",
+      "messageId": "noArraySpreadInObject",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 22`] = `
+{
+  "code": "
+        declare function getArray(): number[];
+        const o = { ...getArray() };
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on an array in an object will result in a list of indices.",
+      "messageId": "noArraySpreadInObject",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-spread > invalid 23`] = `
+{
+  "code": "
+        declare function getArray(): readonly number[];
+        const o = { ...getArray() };
+      ",
+  "diagnostics": [
+    {
+      "message": "Using the spread operator on an array in an object will result in a list of indices.",
+      "messageId": "noArraySpreadInObject",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-spread",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

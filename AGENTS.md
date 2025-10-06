@@ -61,3 +61,12 @@ This document summarizes how to work on rslint effectively and consistently.
 - Icons: use `lucide-react` for consistent iconography (e.g., import `{ Share2Icon, CheckIcon } from 'lucide-react'`).
 - Keep layout simple: compose shadcn primitives and flex utilities for alignment instead of bespoke CSS blocks.
 - Only add custom CSS for domain‑specific visuals that primitives can’t express (e.g., AST tree expanders), and keep it scoped.
+
+## Submodule Policy: typescript-go (DO NOT EDIT)
+
+- Never edit files inside the `typescript-go/` directory directly. It is a Git submodule that tracks the upstream TypeScript-Go shim.
+- If behavior changes are required, prefer upstreaming fixes or using our patch script rather than local edits.
+  - Keep the submodule commit pinned to match the commit used on `upstream/main` unless the change is intentional.
+  - To sync: `git submodule update --init --recursive` and verify `git ls-tree HEAD typescript-go` matches `git ls-tree upstream/main typescript-go`.
+  - To apply our maintained patches, run: `./scripts/apply-tsgo-patch.sh` after updating the submodule.
+  - Do not commit arbitrary changes inside `typescript-go/`; any modifications must come from submodule updates or scripted patches.
