@@ -10,6 +10,7 @@
 typescript-go/
 packages/vscode-extension/.vscode-test-out
 packages/vscode-extension/.vscode-test
+.rslib
 packages/rslint-test-tools/tests/typescript-eslint/fixtures
 packages/rslint-test-tools/tests/typescript-eslint/rules
 packages/rslint/pkg/
