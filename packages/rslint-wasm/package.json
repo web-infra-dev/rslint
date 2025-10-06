@@ -24,7 +24,7 @@
   "packageManager": "pnpm@10.13.1",
   "devDependencies": {
     "@rslint/core": "workspace:*",
-    "@microsoft/api-extractor": "7.52.11",
+    "@microsoft/api-extractor": "7.53.0",
     "@wasmer/wasmfs": "0.12.0",
     "esbuild": "^0.25.9",
     "buffer": "^6.0.3",
