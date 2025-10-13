@@ -91,7 +91,7 @@
     "@vscode/test-electron": "2.4.1",
     "@vscode/vsce": "3.6.0",
     "esbuild": "0.25.7",
-    "fast-glob": "3.2.12",
+    "fast-glob": "3.3.3",
     "mocha": "10.8.2",
     "ovsx": "^0.10.5",
     "rimraf": "6.0.1",
