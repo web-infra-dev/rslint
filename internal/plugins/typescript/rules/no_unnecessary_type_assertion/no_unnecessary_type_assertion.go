@@ -266,9 +266,29 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 
 				t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, expression)
 
+				// Special-case: when a non-null assertion appears within a JSX attribute initializer,
+				// do not mark it as unnecessary if the original expression type includes null/undefined.
+				// JSX attribute contextual typing can mask nullish constituents, but semantically the
+				// assertion is often required to satisfy the attribute's declared type.
+				isInJsxAttribute := func(n *ast.Node) bool {
+					for p := n.Parent; p != nil; p = p.Parent {
+						if p.Kind == ast.KindJsxAttribute {
+							return true
+						}
+					}
+					return false
+				}
+
 				var tFlags checker.TypeFlags
 				for _, part := range utils.UnionTypeParts(t) {
 					tFlags |= checker.Type_flags(part)
+				}
+
+				// In JSX attribute initializers, treat non-null assertions as necessary when the
+				// operand type can be null. Undefined alone is allowed for optional attributes,
+				// so do not suppress on undefined-only unions.
+				if isInJsxAttribute(node) && (tFlags&checker.TypeFlagsNull) != 0 {
+					return
 				}
 
 				if tFlags&(checker.TypeFlagsAny|checker.TypeFlagsUnknown|

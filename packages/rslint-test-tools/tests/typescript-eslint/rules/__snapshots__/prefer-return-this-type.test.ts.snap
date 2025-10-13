@@ -1,0 +1,446 @@
+// Rstest Snapshot v1
+
+exports[`prefer-return-this-type > invalid 1`] = `
+{
+  "code": "
+class Foo {
+  f(): Foo {
+    return this;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use \`this\` type instead.",
+      "messageId": "useThisType",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-return-this-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Foo {
+  f(): this {
+    return this;
+  }
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-return-this-type > invalid 2`] = `
+{
+  "code": "
+class Foo {
+  f = function (): Foo {
+    return this;
+  };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use \`this\` type instead.",
+      "messageId": "useThisType",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-return-this-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Foo {
+  f = function (): this {
+    return this;
+  };
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-return-this-type > invalid 3`] = `
+{
+  "code": "
+class Foo {
+  f(): Foo {
+    const self = this;
+    return self;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use \`this\` type instead.",
+      "messageId": "useThisType",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-return-this-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Foo {
+  f(): this {
+    const self = this;
+    return self;
+  }
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-return-this-type > invalid 4`] = `
+{
+  "code": "
+class Foo {
+  f = (): Foo => {
+    return this;
+  };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use \`this\` type instead.",
+      "messageId": "useThisType",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-return-this-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Foo {
+  f = (): this => {
+    return this;
+  };
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-return-this-type > invalid 5`] = `
+{
+  "code": "
+class Foo {
+  f = (): Foo => {
+    const self = this;
+    return self;
+  };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use \`this\` type instead.",
+      "messageId": "useThisType",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-return-this-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Foo {
+  f = (): this => {
+    const self = this;
+    return self;
+  };
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-return-this-type > invalid 6`] = `
+{
+  "code": "
+class Foo {
+  f = (): Foo => this;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use \`this\` type instead.",
+      "messageId": "useThisType",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-return-this-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Foo {
+  f = (): this => this;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-return-this-type > invalid 7`] = `
+{
+  "code": "
+class Foo {
+  accessor f = (): Foo => {
+    return this;
+  };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use \`this\` type instead.",
+      "messageId": "useThisType",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-return-this-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Foo {
+  accessor f = (): this => {
+    return this;
+  };
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-return-this-type > invalid 8`] = `
+{
+  "code": "
+class Foo {
+  accessor f = (): Foo => this;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use \`this\` type instead.",
+      "messageId": "useThisType",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-return-this-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Foo {
+  accessor f = (): this => this;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-return-this-type > invalid 9`] = `
+{
+  "code": "
+class Foo {
+  f1(): Foo | undefined {
+    return this;
+  }
+  f2(): this | undefined {
+    return this;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use \`this\` type instead.",
+      "messageId": "useThisType",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-return-this-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Foo {
+  f1(): this | undefined {
+    return this;
+  }
+  f2(): this | undefined {
+    return this;
+  }
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-return-this-type > invalid 10`] = `
+{
+  "code": "
+class Foo {
+  bar(): Foo | undefined {
+    if (Math.random() > 0.5) {
+      return this;
+    }
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use \`this\` type instead.",
+      "messageId": "useThisType",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-return-this-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Foo {
+  bar(): this | undefined {
+    if (Math.random() > 0.5) {
+      return this;
+    }
+  }
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-return-this-type > invalid 11`] = `
+{
+  "code": "
+class Foo {
+  bar(num: 1 | 2): Foo {
+    switch (num) {
+      case 1:
+        return this;
+      case 2:
+        return this;
+    }
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use \`this\` type instead.",
+      "messageId": "useThisType",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-return-this-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Foo {
+  bar(num: 1 | 2): this {
+    switch (num) {
+      case 1:
+        return this;
+      case 2:
+        return this;
+    }
+  }
+}
+      ",
+  "ruleCount": 1,
+}
+`;
