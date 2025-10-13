@@ -1,7 +1,8 @@
 package utils
 
 import (
-	"encoding/json"
+    json "github.com/go-json-experiment/json"
+	"reflect"
 	"testing"
 )
 
@@ -102,15 +103,14 @@ func TestParseJSONC(t *testing.T) {
 				return
 			}
 
-			if !tt.wantErr {
-				// Compare the results
-				expectedJSON, _ := json.Marshal(tt.expected)
-				resultJSON, _ := json.Marshal(result)
-
-				if string(expectedJSON) != string(resultJSON) {
-					t.Errorf("ParseJSONC() = %v, want %v", string(resultJSON), string(expectedJSON))
-				}
-			}
+            if !tt.wantErr {
+                // Compare the results structurally to avoid key-order differences
+                if !reflect.DeepEqual(result, tt.expected) {
+                    expectedJSON, _ := json.Marshal(tt.expected)
+                    resultJSON, _ := json.Marshal(result)
+                    t.Errorf("ParseJSONC() = %v, want %v", string(resultJSON), string(expectedJSON))
+                }
+            }
 		})
 	}
 }

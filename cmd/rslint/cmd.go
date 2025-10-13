@@ -1,9 +1,9 @@
 package main
 
 import (
-	"bufio"
-	"encoding/json"
-	"flag"
+    "bufio"
+    json "github.com/go-json-experiment/json"
+    "flag"
 	"fmt"
 	"math"
 	"os"

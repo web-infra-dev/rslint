@@ -1,9 +1,9 @@
 package no_floating_promises
 
 import (
-	"encoding/json"
+    json "github.com/go-json-experiment/json"
 
-	"github.com/microsoft/typescript-go/shim/ast"
+    "github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"

@@ -4,8 +4,12 @@ export default defineConfig({
   lib: [
     {
       format: 'esm',
+      // Avoid using api-extractor to bundle d.ts as it
+      // pulls in the typescript-go submodule sources and
+      // triggers extractor internal errors. Generate plain
+      // declarations instead.
       dts: {
-        bundle: true,
+        bundle: false,
       },
     },
   ],
