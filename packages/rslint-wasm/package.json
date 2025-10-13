@@ -28,7 +28,7 @@
     "@wasmer/wasmfs": "0.12.0",
     "esbuild": "^0.25.9",
     "buffer": "^6.0.3",
-    "cross-env": "^10.0.0",
+    "cross-env": "^10.1.0",
     "esbuild-plugin-polyfill-node": "0.3.0",
     "memfs": "^4.38.2",
     "prebundle": "1.4.1",
