@@ -34,13 +34,13 @@
   },
   "devDependencies": {
     "@rslint/core": "workspace:*",
-    "@rstest/core": "^0.5.0",
+    "@rstest/core": "^0.5.2",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.2",
     "prettier": "3.5.0",
     "typescript": "5.8.3",
     "zx": "8.7.1",
-    "@typescript/native-preview": "7.0.0-dev.20250904.1"
+    "@typescript/native-preview": "7.0.0-dev.20251018.1"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
