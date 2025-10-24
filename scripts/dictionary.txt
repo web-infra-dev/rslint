@@ -145,3 +145,5 @@ ESLint
 colocate
 co-locate
 shadcn
+subtests
+testdata
