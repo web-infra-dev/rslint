@@ -1,0 +1,31 @@
+# TypeScript-ESLint Rules to Implement
+# This is an example batch file for generating TypeScript-ESLint rules
+# Usage: go run scripts/generate-rule.go -batch scripts/examples/typescript-eslint-rules.txt -plugin typescript-eslint -fetch
+
+# Popular TypeScript-ESLint rules that are commonly used
+
+# Type Safety Rules
+ban-types
+no-inferrable-types
+consistent-type-assertions
+consistent-type-definitions
+no-non-null-assertion
+
+# Code Quality Rules
+explicit-function-return-type
+explicit-module-boundary-types
+naming-convention
+no-shadow
+no-use-before-define
+
+# Best Practices
+prefer-for-of
+prefer-includes
+prefer-nullish-coalescing
+prefer-optional-chain
+prefer-readonly
+
+# Stylistic Rules
+consistent-indexed-object-style
+member-delimiter-style
+type-annotation-spacing

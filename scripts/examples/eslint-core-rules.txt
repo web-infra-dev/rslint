@@ -1,0 +1,32 @@
+# ESLint Core Rules to Implement
+# This is an example batch file for generating core ESLint rules
+# Usage: go run scripts/generate-rule.go -batch scripts/examples/eslint-core-rules.txt -plugin "" -fetch
+
+# Possible Errors
+no-console
+no-debugger
+no-dupe-args
+no-dupe-keys
+no-duplicate-case
+no-empty
+no-extra-semi
+no-unreachable
+
+# Best Practices
+curly
+eqeqeq
+no-eval
+no-implied-eval
+no-new-func
+no-return-await
+no-self-compare
+no-useless-return
+
+# Variables
+no-undef
+no-undefined
+no-unused-expressions
+
+# Stylistic Issues
+prefer-const
+prefer-template

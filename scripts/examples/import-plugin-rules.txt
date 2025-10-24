@@ -1,0 +1,29 @@
+# ESLint Import Plugin Rules to Implement
+# This is an example batch file for generating import plugin rules
+# Usage: go run scripts/generate-rule.go -batch scripts/examples/import-plugin-rules.txt -plugin import -fetch
+
+# Helpful warnings
+no-unresolved
+named
+default
+namespace
+no-absolute-path
+no-dynamic-require
+no-internal-modules
+no-relative-packages
+
+# Module systems
+no-commonjs
+no-amd
+no-nodejs-modules
+
+# Static analysis
+no-cycle
+no-deprecated
+
+# Style guide
+first
+exports-last
+newline-after-import
+no-duplicates
+order
