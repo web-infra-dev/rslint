@@ -110,7 +110,7 @@ jobs:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - VSCode Extensions' || 'Publish VSCode Extensions' }}
     needs: [build]
-    runs-on: rspack-ubuntu-22.04-large
+    runs-on: ubuntu-latest
     environment: release
     steps:
       - name: Checkout
@@ -155,7 +155,7 @@ jobs:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - Open VSX Extensions' || 'Publish Open VSX Extensions' }}
     needs: [build]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     environment: release
     steps:
       - name: Checkout
@@ -205,7 +205,7 @@ jobs:
             node_arch: x64
             node_os: linux
 
-    runs-on: rspack-ubuntu-22.04-large
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4
@@ -303,7 +303,7 @@ jobs:
             goarch: arm64
             node_arch: arm64
             node_os: win32
-    runs-on: rspack-ubuntu-22.04-large
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955 # v4

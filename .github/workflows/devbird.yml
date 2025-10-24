@@ -5,43 +5,42 @@ on:
   workflow_dispatch:
     inputs:
       devbird_api_url:
-        description: "The URL of the DevBird instance"
+        description: 'The URL of the DevBird instance'
         type: string
         required: false
         default: 'https://devbird.api.delino.io'
 
       prompt:
-        description: "Instructions for DevBird. Can be a direct prompt or custom template."
+        description: 'Instructions for DevBird. Can be a direct prompt or custom template.'
         type: string
         required: true
-    
+
       base_branch:
-        description: "The branch to use as the base/source when creating new branches (defaults to repository default branch)"
+        description: 'The branch to use as the base/source when creating new branches (defaults to repository default branch)'
         type: string
         required: false
         default: 'main'
-      
+
       agent:
-          description: "The agent to use for the action. Can be 'claude_code', 'gemini_cli', 'codex_cli' or 'opencode'"
-          type: choice
-          default: 'claude_code'
-          options:
-            - claude_code
-            - gemini_cli
-            - codex_cli
-            - opencode
-            - crush_cli
-            - github_copilot_cli
-              
+        description: "The agent to use for the action. Can be 'claude_code', 'gemini_cli', 'codex_cli' or 'opencode'"
+        type: choice
+        default: 'claude_code'
+        options:
+          - claude_code
+          - gemini_cli
+          - codex_cli
+          - opencode
+          - crush_cli
+          - github_copilot_cli
+
       agent_model:
-        description: "The (optional) model to use for the agent"
+        description: 'The (optional) model to use for the agent'
         type: string
         required: false
         default: ''
 
-      
       devbird_workflow_execution_token:
-        description: "The token to use for the DevBird task"
+        description: 'The token to use for the DevBird task'
         type: string
         required: false
         default: ''
@@ -55,11 +54,11 @@ on:
           - plan
 
       task_title:
-        description: "The title of the DevBird task"
+        description: 'The title of the DevBird task'
         type: string
         required: false
         default: ''
-    
+
 jobs:
   devbird:
     runs-on: 'ubuntu-latest'
@@ -72,7 +71,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-     
+
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
