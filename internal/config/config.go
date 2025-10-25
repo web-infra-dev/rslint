@@ -21,6 +21,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_empty_function"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_empty_interface"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_explicit_any"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_extraneous_class"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_invalid_void_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_floating_promises"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_for_in_array"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_implied_eval"
@@ -30,6 +32,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_mixed_enums"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_namespace"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_redundant_type_constituents"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_this_alias"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_require_imports"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unnecessary_boolean_literal_compare"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unnecessary_template_expression"
@@ -342,6 +345,8 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/no-explicit-any", no_explicit_any.NoExplicitAnyRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-empty-function", no_empty_function.NoEmptyFunctionRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-empty-interface", no_empty_interface.NoEmptyInterfaceRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-extraneous-class", no_extraneous_class.NoExtraneousClassRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-invalid-void-type", no_invalid_void_type.NoInvalidVoidTypeRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-floating-promises", no_floating_promises.NoFloatingPromisesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-for-in-array", no_for_in_array.NoForInArrayRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-implied-eval", no_implied_eval.NoImpliedEvalRule)
@@ -351,6 +356,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/no-mixed-enums", no_mixed_enums.NoMixedEnumsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-namespace", no_namespace.NoNamespaceRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-redundant-type-constituents", no_redundant_type_constituents.NoRedundantTypeConstituentsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-this-alias", no_this_alias.NoThisAliasRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-require-imports", no_require_imports.NoRequireImportsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unnecessary-boolean-literal-compare", no_unnecessary_boolean_literal_compare.NoUnnecessaryBooleanLiteralCompareRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-unnecessary-template-expression", no_unnecessary_template_expression.NoUnnecessaryTemplateExpressionRule)
