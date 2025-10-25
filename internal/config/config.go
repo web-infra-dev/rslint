@@ -67,6 +67,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/use_unknown_in_catch_callback_variable"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules/dot_notation"
+	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
+	"github.com/web-infra-dev/rslint/internal/rules/no_async_promise_executor"
+	"github.com/web-infra-dev/rslint/internal/rules/no_await_in_loop"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -329,6 +332,7 @@ func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConf
 func RegisterAllRules() {
 	registerAllTypeScriptEslintPluginRules()
 	registerAllEslintImportPluginRules()
+	registerAllCoreEslintRules()
 }
 
 // registerAllTypeScriptEslintPluginRules registers all available rules in the global registry
@@ -395,6 +399,13 @@ func registerAllEslintImportPluginRules() {
 	for _, rule := range importPlugin.GetAllRules() {
 		GlobalRuleRegistry.Register(rule.Name, rule)
 	}
+}
+
+// registerAllCoreEslintRules registers core ESLint rules
+func registerAllCoreEslintRules() {
+	GlobalRuleRegistry.Register("getter-return", getter_return.GetterReturnRule)
+	GlobalRuleRegistry.Register("no-async-promise-executor", no_async_promise_executor.NoAsyncPromiseExecutorRule)
+	GlobalRuleRegistry.Register("no-await-in-loop", no_await_in_loop.NoAwaitInLoopRule)
 }
 
 // getAllTypeScriptEslintPluginRules returns all registered rules (for backward compatibility when no config is provided)
