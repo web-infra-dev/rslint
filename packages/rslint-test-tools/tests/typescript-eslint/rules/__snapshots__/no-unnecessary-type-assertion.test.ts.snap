@@ -1,0 +1,249 @@
+// Rstest Snapshot v1
+
+exports[`no-unnecessary-type-assertion > invalid 1`] = `
+{
+  "code": "const foo = <3>3;",
+  "diagnostics": [
+    {
+      "message": "This assertion is unnecessary since it does not change the type of the expression.",
+      "messageId": "unnecessaryAssertion",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const foo = 3;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-assertion > invalid 2`] = `
+{
+  "code": "const foo = 3 as 3;",
+  "diagnostics": [
+    {
+      "message": "This assertion is unnecessary since it does not change the type of the expression.",
+      "messageId": "unnecessaryAssertion",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const foo = 3;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-assertion > invalid 3`] = `
+{
+  "code": "
+        type Foo = 3;
+        const foo = <Foo>3;
+      ",
+  "diagnostics": [
+    {
+      "message": "This assertion is unnecessary since it does not change the type of the expression.",
+      "messageId": "unnecessaryAssertion",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        type Foo = 3;
+        const foo = 3;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-assertion > invalid 4`] = `
+{
+  "code": "
+        type Foo = 3;
+        const foo = 3 as Foo;
+      ",
+  "diagnostics": [
+    {
+      "message": "This assertion is unnecessary since it does not change the type of the expression.",
+      "messageId": "unnecessaryAssertion",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        type Foo = 3;
+        const foo = 3;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-assertion > invalid 5`] = `
+{
+  "code": "
+const foo = 3;
+const bar = foo!;
+      ",
+  "diagnostics": [
+    {
+      "message": "This assertion is unnecessary since it does not change the type of the expression.",
+      "messageId": "unnecessaryAssertion",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+const foo = 3;
+const bar = foo;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-assertion > invalid 6`] = `
+{
+  "code": "
+const foo = (3 + 5) as number;
+      ",
+  "diagnostics": [
+    {
+      "message": "This assertion is unnecessary since it does not change the type of the expression.",
+      "messageId": "unnecessaryAssertion",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+const foo = (3 + 5);
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-assertion > invalid 7`] = `
+{
+  "code": "
+const foo = <number>(3 + 5);
+      ",
+  "diagnostics": [
+    {
+      "message": "This assertion is unnecessary since it does not change the type of the expression.",
+      "messageId": "unnecessaryAssertion",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+const foo = (3 + 5);
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-type-assertion > invalid 8`] = `
+{
+  "code": "
+type Foo = number;
+const foo = (3 + 5) as Foo;
+      ",
+  "diagnostics": [
+    {
+      "message": "This assertion is unnecessary since it does not change the type of the expression.",
+      "messageId": "unnecessaryAssertion",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo = number;
+const foo = (3 + 5);
+      ",
+  "ruleCount": 1,
+}
+`;

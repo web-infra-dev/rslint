@@ -1,0 +1,233 @@
+// Rstest Snapshot v1
+
+exports[`related-getter-setter-pairs > invalid 1`] = `
+{
+  "code": "
+interface Example {
+  get value(): string | undefined;
+  set value(newValue: string);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "\`get()\` type should be assignable to its equivalent \`set()\` type.",
+      "messageId": "mismatch",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/related-getter-setter-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`related-getter-setter-pairs > invalid 2`] = `
+{
+  "code": "
+interface Example {
+  get value(): number;
+  set value(newValue: string);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "\`get()\` type should be assignable to its equivalent \`set()\` type.",
+      "messageId": "mismatch",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/related-getter-setter-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`related-getter-setter-pairs > invalid 3`] = `
+{
+  "code": "
+type Example = {
+  get value(): number;
+  set value(newValue: string);
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "\`get()\` type should be assignable to its equivalent \`set()\` type.",
+      "messageId": "mismatch",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/related-getter-setter-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`related-getter-setter-pairs > invalid 4`] = `
+{
+  "code": "
+class Example {
+  get value(): boolean {
+    return true;
+  }
+  set value(newValue: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "\`get()\` type should be assignable to its equivalent \`set()\` type.",
+      "messageId": "mismatch",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/related-getter-setter-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`related-getter-setter-pairs > invalid 5`] = `
+{
+  "code": "
+type GetType = { a: string; b: string };
+
+declare class Foo {
+  get a(): GetType;
+
+  set a(x: { c: string });
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "\`get()\` type should be assignable to its equivalent \`set()\` type.",
+      "messageId": "mismatch",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 5,
+        },
+        "start": {
+          "column": 12,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/related-getter-setter-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`related-getter-setter-pairs > invalid 6`] = `
+{
+  "code": "
+type GetType = { a: string; b: string };
+
+type SetTypeUnused = { c: string };
+
+declare class Foo {
+  get a(): GetType;
+
+  set a(x: { c: string });
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "\`get()\` type should be assignable to its equivalent \`set()\` type.",
+      "messageId": "mismatch",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 7,
+        },
+        "start": {
+          "column": 12,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/related-getter-setter-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`related-getter-setter-pairs > invalid 7`] = `
+{
+  "code": "
+type GetType = { a: string; b: string };
+
+type SetType = { c: string };
+
+declare class Foo {
+  get a(): GetType;
+
+  set a(x: SetType);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "\`get()\` type should be assignable to its equivalent \`set()\` type.",
+      "messageId": "mismatch",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 7,
+        },
+        "start": {
+          "column": 12,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/related-getter-setter-pairs",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
