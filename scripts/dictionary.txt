@@ -16,6 +16,7 @@ cachedvfs
 catchable
 clazz
 clientrc
+constantness
 clippy
 cpuprof
 dirxml
@@ -31,6 +32,7 @@ flaggable
 fltr
 foobarbaz
 foopy
+fooa
 foos
 foox
 fooz

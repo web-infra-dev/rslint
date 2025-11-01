@@ -83,6 +83,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_cond_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_const_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constant_binary_expression"
+	"github.com/web-infra-dev/rslint/internal/rules/no_constant_condition"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -435,6 +436,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-cond-assign", no_cond_assign.NoCondAssignRule)
 	GlobalRuleRegistry.Register("no-const-assign", no_const_assign.NoConstAssignRule)
 	GlobalRuleRegistry.Register("no-constant-binary-expression", no_constant_binary_expression.NoConstantBinaryExpressionRule)
+	GlobalRuleRegistry.Register("no-constant-condition", no_constant_condition.NoConstantConditionRule)
 }
 
 // getAllTypeScriptEslintPluginRules returns all registered rules (for backward compatibility when no config is provided)
