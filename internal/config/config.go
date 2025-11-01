@@ -82,6 +82,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_compare_neg_zero"
 	"github.com/web-infra-dev/rslint/internal/rules/no_cond_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_const_assign"
+	"github.com/web-infra-dev/rslint/internal/rules/no_constant_binary_expression"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -433,6 +434,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-compare-neg-zero", no_compare_neg_zero.NoCompareNegZeroRule)
 	GlobalRuleRegistry.Register("no-cond-assign", no_cond_assign.NoCondAssignRule)
 	GlobalRuleRegistry.Register("no-const-assign", no_const_assign.NoConstAssignRule)
+	GlobalRuleRegistry.Register("no-constant-binary-expression", no_constant_binary_expression.NoConstantBinaryExpressionRule)
 }
 
 // getAllTypeScriptEslintPluginRules returns all registered rules (for backward compatibility when no config is provided)

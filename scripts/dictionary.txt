@@ -57,6 +57,7 @@ myfunc
 nolint
 noregabi
 notcool
+nullishness
 objectbindingpattern
 objectliteralexpression
 osvfs
