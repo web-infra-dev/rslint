@@ -154,5 +154,6 @@ scaffolding
 autofix
 autofixes
 kebab
+kumiko
 PascalCase
 tmpl
