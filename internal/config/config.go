@@ -80,6 +80,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_await_in_loop"
 	"github.com/web-infra-dev/rslint/internal/rules/no_class_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_compare_neg_zero"
+	"github.com/web-infra-dev/rslint/internal/rules/no_cond_assign"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -429,6 +430,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-await-in-loop", no_await_in_loop.NoAwaitInLoopRule)
 	GlobalRuleRegistry.Register("no-class-assign", no_class_assign.NoClassAssignRule)
 	GlobalRuleRegistry.Register("no-compare-neg-zero", no_compare_neg_zero.NoCompareNegZeroRule)
+	GlobalRuleRegistry.Register("no-cond-assign", no_cond_assign.NoCondAssignRule)
 }
 
 // getAllTypeScriptEslintPluginRules returns all registered rules (for backward compatibility when no config is provided)
