@@ -19,7 +19,7 @@
   "devDependencies": {
     "@typescript/api": "workspace:*",
     "@rslib/core": "0.15.0",
-    "@types/node": "24.3.0",
+    "@types/node": "24.10.0",
     "@typescript/native-preview": "7.0.0-dev.20250904.1"
   },
   "publishConfig": {

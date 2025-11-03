@@ -53,7 +53,7 @@
     "webworker"
   ],
   "devDependencies": {
-    "@types/node": "24.0.14",
+    "@types/node": "24.10.0",
     "typescript": "5.8.3",
     "@rslint/api": "workspace:*",
     "@typescript/native-preview": "7.0.0-dev.20250904.1"

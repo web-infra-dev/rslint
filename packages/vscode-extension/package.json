@@ -85,7 +85,7 @@
   "devDependencies": {
     "@rslint/core": "workspace:*",
     "@types/mocha": "10.0.9",
-    "@types/node": "24.0.14",
+    "@types/node": "24.10.0",
     "@types/vscode": "^1.74.0",
     "@vscode/test-cli": "0.0.11",
     "@vscode/test-electron": "2.4.1",

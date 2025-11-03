@@ -13,7 +13,7 @@
   "license": "ISC",
   "description": "",
   "devDependencies": {
-    "@types/node": "24.0.14",
+    "@types/node": "24.10.0",
     "@rslint/core": "workspace:*",
     "@typescript-eslint/rule-tester": "workspace:*",
     "@typescript-eslint/utils": "workspace:*",
