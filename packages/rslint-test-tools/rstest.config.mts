@@ -23,6 +23,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-empty-function.test.ts',
     './tests/typescript-eslint/rules/no-empty-interface.test.ts',
     './tests/typescript-eslint/rules/no-explicit-any.test.ts',
+    './tests/typescript-eslint/rules/no-floating-promises.test.ts',
     './tests/typescript-eslint/rules/no-require-imports.test.ts',
     // too many autofix errors
     './tests/typescript-eslint/rules/no-duplicate-type-constituents.test.ts',
