@@ -16,7 +16,6 @@ cachedvfs
 catchable
 clazz
 clientrc
-constantness
 clippy
 cpuprof
 dirxml
@@ -32,7 +31,6 @@ flaggable
 fltr
 foobarbaz
 foopy
-fooa
 foos
 foox
 fooz
@@ -59,7 +57,6 @@ myfunc
 nolint
 noregabi
 notcool
-nullishness
 objectbindingpattern
 objectliteralexpression
 osvfs
@@ -148,12 +145,3 @@ ESLint
 colocate
 co-locate
 shadcn
-subtests
-testdata
-scaffolding
-autofix
-autofixes
-kebab
-kumiko
-PascalCase
-tmpl
