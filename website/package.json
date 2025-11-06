@@ -30,7 +30,7 @@
     "@rspress/plugin-llms": "2.0.0-beta.27",
     "@rstack-dev/doc-ui": "1.11.0",
     "@tailwindcss/postcss": "^4.1.11",
-    "@types/node": "^22.8.1",
+    "@types/node": "^22.19.0",
     "@types/react": "19.1.10",
     "@types/react-dom": "^19.1.7",
     "react": "^19.1.1",
