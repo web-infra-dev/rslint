@@ -42,71 +42,20 @@ func isAssignmentOperator(node *ast.Node) bool {
 	// Check for all assignment operators
 	switch binary.OperatorToken.Kind {
 	case ast.KindEqualsToken, // =
-		ast.KindPlusEqualsToken,              // +=
-		ast.KindMinusEqualsToken,             // -=
-		ast.KindAsteriskEqualsToken,          // *=
-		ast.KindSlashEqualsToken,             // /=
-		ast.KindPercentEqualsToken,           // %=
-		ast.KindAsteriskAsteriskEqualsToken,  // **=
-		ast.KindLessThanLessThanEqualsToken,  // <<=
-		ast.KindGreaterThanGreaterThanEqualsToken,        // >>=
+		ast.KindPlusEqualsToken,                              // +=
+		ast.KindMinusEqualsToken,                             // -=
+		ast.KindAsteriskEqualsToken,                          // *=
+		ast.KindSlashEqualsToken,                             // /=
+		ast.KindPercentEqualsToken,                           // %=
+		ast.KindAsteriskAsteriskEqualsToken,                  // **=
+		ast.KindLessThanLessThanEqualsToken,                  // <<=
+		ast.KindGreaterThanGreaterThanEqualsToken,            // >>=
 		ast.KindGreaterThanGreaterThanGreaterThanEqualsToken, // >>>=
-		ast.KindAmpersandEqualsToken,         // &=
-		ast.KindBarEqualsToken,               // |=
-		ast.KindCaretEqualsToken:             // ^=
+		ast.KindAmpersandEqualsToken,                         // &=
+		ast.KindBarEqualsToken,                               // |=
+		ast.KindCaretEqualsToken:                             // ^=
 		return true
 	}
-	return false
-}
-
-// isLogicalOperator checks if a binary expression uses a logical operator (&&, ||)
-func isLogicalOperator(node *ast.Node) bool {
-	if node == nil || node.Kind != ast.KindBinaryExpression {
-		return false
-	}
-
-	binary := node.AsBinaryExpression()
-	if binary == nil || binary.OperatorToken == nil {
-		return false
-	}
-
-	// Check for logical operators
-	switch binary.OperatorToken.Kind {
-	case ast.KindAmpersandAmpersandToken, // &&
-		ast.KindBarBarToken: // ||
-		return true
-	}
-	return false
-}
-
-// isConditionalTestExpression checks if a node is a test expression in a conditional statement
-func isConditionalTestExpression(node, parent *ast.Node) bool {
-	if parent == nil {
-		return false
-	}
-
-	switch parent.Kind {
-	case ast.KindIfStatement:
-		ifStmt := parent.AsIfStatement()
-		return ifStmt != nil && ifStmt.Expression != nil && ifStmt.Expression == node
-
-	case ast.KindWhileStatement:
-		whileStmt := parent.AsWhileStatement()
-		return whileStmt != nil && whileStmt.Expression != nil && whileStmt.Expression == node
-
-	case ast.KindDoStatement:
-		doStmt := parent.AsDoStatement()
-		return doStmt != nil && doStmt.Expression != nil && doStmt.Expression == node
-
-	case ast.KindForStatement:
-		forStmt := parent.AsForStatement()
-		return forStmt != nil && forStmt.Condition != nil && forStmt.Condition == node
-
-	case ast.KindConditionalExpression:
-		condExpr := parent.AsConditionalExpression()
-		return condExpr != nil && condExpr.Condition != nil && condExpr.Condition == node
-	}
-
 	return false
 }
 
@@ -163,33 +112,6 @@ func getConditionalTypeName(node *ast.Node) string {
 		return "a conditional expression"
 	}
 	return ""
-}
-
-// isParenthesized checks if a node is wrapped in parentheses
-// This is a simplified check - in a real implementation, we'd need to check the source tokens
-func isParenthesized(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-
-	// Check if the node is wrapped in a ParenthesizedExpression
-	return node.Kind == ast.KindParenthesizedExpression
-}
-
-// countParentheses counts the number of parentheses wrapping a node
-func countParentheses(node, parent *ast.Node) int {
-	count := 0
-	current := parent
-
-	// Walk up the tree counting ParenthesizedExpression nodes
-	for current != nil && current.Kind == ast.KindParenthesizedExpression {
-		count++
-		// In a real implementation, we'd traverse up the AST
-		// For now, we return the count we have
-		break
-	}
-
-	return count
 }
 
 // NoCondAssignRule disallows assignment operators in conditional expressions
@@ -266,10 +188,11 @@ var NoCondAssignRule = rule.CreateRule(rule.Rule{
 				}
 
 				// Apply the rule based on mode
-				if mode == "always" {
+				switch mode {
+				case "always":
 					// Always report assignments in conditionals
 					ctx.ReportNode(node, buildUnexpectedMessage(getConditionalTypeName(conditionalAncestor)))
-				} else if mode == "except-parens" {
+				case "except-parens":
 					// In "except-parens" mode, assignments are allowed if:
 					// 1. They are nested in any expression (like ||, &&, ===, etc.)
 					// 2. OR they are wrapped in double parentheses (for most conditionals)
@@ -291,12 +214,10 @@ var NoCondAssignRule = rule.CreateRule(rule.Rule{
 						current = current.Parent
 					}
 
-
-					var isProperlyParenthesized bool
 					// NOTE: In the TypeScript-Go AST, it appears that ((a = b)) only creates
 					// one ParenthesizedExpression node, not two. So we only require >= 1 parenthesis level.
 					// This differs from how ESLint checks by counting actual token positions.
-					isProperlyParenthesized = parenLevels >= 1
+					isProperlyParenthesized := parenLevels >= 1
 
 					if !isProperlyParenthesized {
 						ctx.ReportNode(node, buildMissingMessage())

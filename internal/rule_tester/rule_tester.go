@@ -20,39 +20,39 @@ import (
 )
 
 type ValidTestCase struct {
-	Code     string
-	FileName string
-	Only     bool
-	Skip     bool
-	Options  any
-	TSConfig string
-	Tsx      bool
+	Code     string `json:"code"`
+	FileName string `json:"fileName"`
+	Only     bool   `json:"only"`
+	Skip     bool   `json:"skip"`
+	Options  any    `json:"options"`
+	TSConfig string `json:"tsConfig"`
+	Tsx      bool   `json:"tsx"`
 }
 
 type InvalidTestCaseError struct {
-	MessageId   string
-	Line        int
-	Column      int
-	EndLine     int
-	EndColumn   int
-	Suggestions []InvalidTestCaseSuggestion
+	MessageId   string                      `json:"messageId"`
+	Line        int                         `json:"line"`
+	Column      int                         `json:"column"`
+	EndLine     int                         `json:"endLine"`
+	EndColumn   int                         `json:"endColumn"`
+	Suggestions []InvalidTestCaseSuggestion `json:"suggestions"`
 }
 
 type InvalidTestCaseSuggestion struct {
-	MessageId string
-	Output    string
+	MessageId string `json:"messageId"`
+	Output    string `json:"output"`
 }
 
 type InvalidTestCase struct {
-	Code     string
-	FileName string
-	Only     bool
-	Skip     bool
-	Output   []string
-	Errors   []InvalidTestCaseError
-	TSConfig string
-	Options  any
-	Tsx      bool
+	Code     string                 `json:"code"`
+	FileName string                 `json:"fileName"`
+	Only     bool                   `json:"only"`
+	Skip     bool                   `json:"skip"`
+	Output   []string               `json:"output"`
+	Errors   []InvalidTestCaseError `json:"errors"`
+	TSConfig string                 `json:"tsConfig"`
+	Options  any                    `json:"options"`
+	Tsx      bool                   `json:"tsx"`
 }
 
 // TestSuite represents a complete test suite that can be loaded from JSON
@@ -75,21 +75,21 @@ type ESLintTestCase struct {
 // ESLintInvalidTestCase represents invalid test cases from ESLint format
 type ESLintInvalidTestCase struct {
 	ESLintTestCase
-	Output      string              `json:"output,omitempty"`
-	Errors      []ESLintError       `json:"errors"`
-	Suggestions []ESLintSuggestion  `json:"suggestions,omitempty"`
+	Output      string             `json:"output,omitempty"`
+	Errors      []ESLintError      `json:"errors"`
+	Suggestions []ESLintSuggestion `json:"suggestions,omitempty"`
 }
 
 // ESLintError represents an error in ESLint format
 type ESLintError struct {
-	Message     string              `json:"message,omitempty"`
-	MessageId   string              `json:"messageId,omitempty"`
-	Type        string              `json:"type,omitempty"`
-	Line        int                 `json:"line,omitempty"`
-	Column      int                 `json:"column,omitempty"`
-	EndLine     int                 `json:"endLine,omitempty"`
-	EndColumn   int                 `json:"endColumn,omitempty"`
-	Suggestions []ESLintSuggestion  `json:"suggestions,omitempty"`
+	Message     string             `json:"message,omitempty"`
+	MessageId   string             `json:"messageId,omitempty"`
+	Type        string             `json:"type,omitempty"`
+	Line        int                `json:"line,omitempty"`
+	Column      int                `json:"column,omitempty"`
+	EndLine     int                `json:"endLine,omitempty"`
+	EndColumn   int                `json:"endColumn,omitempty"`
+	Suggestions []ESLintSuggestion `json:"suggestions,omitempty"`
 }
 
 // ESLintSuggestion represents a suggestion in ESLint format

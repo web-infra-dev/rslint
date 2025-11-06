@@ -72,11 +72,12 @@ var NoInvalidVoidTypeRule = rule.CreateRule(rule.Rule{
 			hasNever := false
 
 			for _, typeNode := range union.Types.Nodes {
-				if typeNode.Kind == ast.KindVoidKeyword {
+				switch typeNode.Kind {
+				case ast.KindVoidKeyword:
 					hasVoid = true
-				} else if typeNode.Kind == ast.KindNeverKeyword {
+				case ast.KindNeverKeyword:
 					hasNever = true
-				} else {
+				default:
 					// Has other types, not a void | never union
 					return false
 				}

@@ -34,7 +34,7 @@ var NoAsyncPromiseExecutorRule = rule.CreateRule(rule.Rule{
 
 				// Get the arguments
 				args := node.Arguments()
-				if args == nil || len(args) == 0 {
+				if len(args) == 0 {
 					return
 				}
 

@@ -49,10 +49,7 @@ func isInLoop(node *ast.Node) bool {
 
 		// Check if we're in a loop initializer position (which is allowed)
 		if isLoopNode(current) {
-			if isInLoopInitializer(node, current) {
-				return false
-			}
-			return true
+			return !isInLoopInitializer(node, current)
 		}
 
 		// Stop if we hit a function boundary (functions create new async contexts)

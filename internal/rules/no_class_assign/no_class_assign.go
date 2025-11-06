@@ -210,12 +210,13 @@ func getClassSymbol(classNode *ast.Node, ctx *rule.RuleContext) *ast.Symbol {
 		return nil
 	}
 
-	if classNode.Kind == ast.KindClassDeclaration {
+	switch classNode.Kind {
+	case ast.KindClassDeclaration:
 		classDecl := classNode.AsClassDeclaration()
 		if classDecl != nil && classDecl.Name() != nil {
 			return ctx.TypeChecker.GetSymbolAtLocation(classDecl.Name())
 		}
-	} else if classNode.Kind == ast.KindClassExpression {
+	case ast.KindClassExpression:
 		classExpr := classNode.AsClassExpression()
 		if classExpr != nil && classExpr.Name() != nil {
 			return ctx.TypeChecker.GetSymbolAtLocation(classExpr.Name())

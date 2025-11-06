@@ -84,8 +84,8 @@ func checkGetterReturn(ctx rule.RuleContext, node *ast.Node, opts Options) {
 
 // returnAnalysisResult holds the result of control flow analysis
 type returnAnalysisResult struct {
-	hasNoReturns    bool // true if there are no return statements with values
-	allPathsReturn  bool // true if all code paths return a value
+	hasNoReturns   bool // true if there are no return statements with values
+	allPathsReturn bool // true if all code paths return a value
 }
 
 // analyzeReturnPaths performs control flow analysis on a function body
@@ -301,9 +301,10 @@ func checkDescriptorForGetter(ctx rule.RuleContext, descriptor *ast.Node, opts O
 			var propNameNode *ast.Node
 			if prop.Name() != nil {
 				propNameNode = prop.Name()
-				if propNameNode.Kind == ast.KindIdentifier {
+				switch propNameNode.Kind {
+				case ast.KindIdentifier:
 					propName = propNameNode.Text()
-				} else if propNameNode.Kind == ast.KindStringLiteral {
+				case ast.KindStringLiteral:
 					propName = propNameNode.Text()
 					// Remove quotes
 					if len(propName) >= 2 {
@@ -315,9 +316,10 @@ func checkDescriptorForGetter(ctx rule.RuleContext, descriptor *ast.Node, opts O
 			if propName == "get" {
 				// Found a getter
 				var getterFunc *ast.Node
-				if prop.Kind == ast.KindPropertyAssignment {
+				switch prop.Kind {
+				case ast.KindPropertyAssignment:
 					getterFunc = prop.Initializer()
-				} else if prop.Kind == ast.KindMethodDeclaration {
+				case ast.KindMethodDeclaration:
 					getterFunc = prop
 				}
 

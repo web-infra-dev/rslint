@@ -71,12 +71,13 @@ var NoDuplicateEnumValuesRule = rule.CreateRule(rule.Rule{
 						displayValue := valueStr
 
 						// For string literals and template literals, display the actual string content
-						if initializer.Kind == ast.KindStringLiteral {
+						switch initializer.Kind {
+						case ast.KindStringLiteral:
 							strLit := initializer.AsStringLiteral()
 							if strLit != nil {
 								displayValue = strLit.Text
 							}
-						} else if initializer.Kind == ast.KindNoSubstitutionTemplateLiteral {
+						case ast.KindNoSubstitutionTemplateLiteral:
 							tmplLit := initializer.AsNoSubstitutionTemplateLiteral()
 							if tmplLit != nil {
 								// Remove backticks for display

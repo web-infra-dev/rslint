@@ -19,10 +19,10 @@ var ConsistentReturnRule = rule.CreateRule(rule.Rule{
 
 // functionInfo tracks information about a function's return statements
 type functionInfo struct {
-	node                *ast.Node
-	hasReturnWithValue  bool
+	node                  *ast.Node
+	hasReturnWithValue    bool
 	hasReturnWithoutValue bool
-	isVoidOrPromiseVoid bool
+	isVoidOrPromiseVoid   bool
 }
 
 func run(ctx rule.RuleContext, options any) rule.RuleListeners {
@@ -71,7 +71,7 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 		// Check if it's an object type (Promise<T>)
 		if utils.IsObjectType(typeToCheck) {
 			typeArgs := checker.Checker_getTypeArguments(typeChecker, typeToCheck)
-			if typeArgs != nil && len(typeArgs) > 0 {
+			if len(typeArgs) > 0 {
 				awaitedType := typeArgs[0]
 				if utils.IsIntrinsicVoidType(awaitedType) {
 					return true

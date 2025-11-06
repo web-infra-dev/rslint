@@ -2,7 +2,6 @@ package consistent_generic_constructors
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -212,102 +211,5 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 			// BindingElement doesn't have a Type field, it can only have an initializer
 			checkNode(node, nil, bindingElem.Initializer, true)
 		},
-	}
-}
-
-// createConstructorFixes creates fixes to move type arguments from type annotation to constructor
-func createConstructorFixes(ctx rule.RuleContext, node *ast.Node, typeAnnotation *ast.Node, newExpr *ast.NewExpression, typeRef *ast.TypeReferenceNode) []rule.RuleFix {
-	sourceText := ctx.SourceFile.Text()
-
-	// Get type arguments text from type annotation
-	if typeRef.TypeArguments == nil || len(typeRef.TypeArguments.Nodes) == 0 {
-		return nil
-	}
-
-	typeArgsStart := typeRef.TypeArguments.Pos()
-	typeArgsEnd := typeRef.TypeArguments.End()
-	typeArgsText := sourceText[typeArgsStart:typeArgsEnd]
-
-	// Find where to insert in constructor (after the constructor identifier)
-	insertNode := newExpr.Expression
-
-	return []rule.RuleFix{
-		// Remove type arguments from type annotation
-		rule.RuleFixReplaceRange(core.NewTextRange(typeArgsStart, typeArgsEnd), ""),
-		// Add type arguments to constructor
-		rule.RuleFixInsertAfter(insertNode, typeArgsText),
-	}
-}
-
-// createTypeAnnotationFixes creates fixes to move type arguments from constructor to type annotation
-func createTypeAnnotationFixes(ctx rule.RuleContext, node *ast.Node, typeAnnotation *ast.Node, newExpr *ast.NewExpression, typeRef *ast.TypeReferenceNode) []rule.RuleFix {
-	sourceText := ctx.SourceFile.Text()
-
-	// Get type arguments text from constructor
-	if newExpr.TypeArguments == nil || len(newExpr.TypeArguments.Nodes) == 0 {
-		return nil
-	}
-
-	typeArgsStart := newExpr.TypeArguments.Pos()
-	typeArgsEnd := newExpr.TypeArguments.End()
-	typeArgsText := sourceText[typeArgsStart:typeArgsEnd]
-
-	// If there's no type annotation, we need to add it
-	if typeAnnotation == nil {
-		// Get the name node based on node kind
-		var nameNode *ast.Node
-
-		switch node.Kind {
-		case ast.KindVariableDeclaration:
-			varDecl := node.AsVariableDeclaration()
-			if varDecl != nil {
-				nameNode = varDecl.Name()
-			}
-		case ast.KindParameter:
-			param := node.AsParameterDeclaration()
-			if param != nil {
-				nameNode = param.Name()
-			}
-		case ast.KindPropertyDeclaration:
-			propDecl := node.AsPropertyDeclaration()
-			if propDecl != nil {
-				nameNode = propDecl.Name()
-			}
-		case ast.KindBindingElement:
-			bindingElem := node.AsBindingElement()
-			if bindingElem != nil {
-				nameNode = bindingElem.Name()
-			}
-		}
-
-		if nameNode == nil {
-			return nil
-		}
-
-		// Get constructor name
-		calleeIdent := newExpr.Expression.AsIdentifier()
-		if calleeIdent == nil {
-			return nil
-		}
-		constructorName := calleeIdent.Text
-
-		// Create type annotation and remove type args from constructor
-		return []rule.RuleFix{
-			// Add type annotation after variable name
-			rule.RuleFixInsertAfter(nameNode.AsNode(), ": "+constructorName+typeArgsText),
-			// Remove type arguments from constructor
-			rule.RuleFixReplaceRange(core.NewTextRange(typeArgsStart, typeArgsEnd), ""),
-		}
-	}
-
-	// Find where to insert in type annotation (after the type name)
-	insertNode := typeRef.TypeName
-
-	// Create fixes: add to type annotation, remove from constructor
-	return []rule.RuleFix{
-		// Add type arguments to type annotation
-		rule.RuleFixInsertAfter(insertNode, typeArgsText),
-		// Remove type arguments from constructor
-		rule.RuleFixReplaceRange(core.NewTextRange(typeArgsStart, typeArgsEnd), ""),
 	}
 }

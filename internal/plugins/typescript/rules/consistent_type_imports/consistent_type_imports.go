@@ -84,16 +84,6 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 		// This is a simplified version - a full implementation would require
 		// tracking all references to imported symbols throughout the file
 
-		// Check if there are any named bindings
-		if importClause.Name() != nil || importClause.NamedBindings != nil {
-			// For 'type-imports' preference, we would need to check if imports
-			// are only used in type positions
-			// This is complex and requires symbol resolution and reference tracking
-			// For this initial implementation, we'll report a basic message
-
-			// Note: Full implementation would analyze each imported symbol's usage
-			// to determine if it's only used in type contexts
-		}
 	}
 
 	checkTSImportType := func(node *ast.Node) {

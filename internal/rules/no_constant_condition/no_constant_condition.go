@@ -76,8 +76,8 @@ func getBooleanValue(node *ast.Node) *bool {
 		text := node.Text()
 		// Check for 0n, 0x0n, 0b0n, 0o0n, etc. (case-insensitive for hex prefix)
 		if text == "0n" || text == "0x0n" || text == "0X0n" ||
-		   text == "0b0n" || text == "0B0n" ||
-		   text == "0o0n" || text == "0O0n" {
+			text == "0b0n" || text == "0B0n" ||
+			text == "0o0n" || text == "0O0n" {
 			f := false
 			return &f
 		}
@@ -119,10 +119,10 @@ func isLogicalIdentity(node *ast.Node, operator ast.Kind) bool {
 	// Check literals
 	boolVal := getBooleanValue(node)
 	if boolVal != nil {
-		if operator == ast.KindBarBarToken && *boolVal == true {
+		if operator == ast.KindBarBarToken && *boolVal {
 			return true
 		}
-		if operator == ast.KindAmpersandAmpersandToken && *boolVal == false {
+		if operator == ast.KindAmpersandAmpersandToken && !*boolVal {
 			return true
 		}
 	}
@@ -702,13 +702,6 @@ func getTestExpression(node *ast.Node) *ast.Node {
 		}
 	}
 
-	return nil
-}
-
-// findEnclosingLoop walks up the tree to find the enclosing loop (if any)
-func findEnclosingLoop(ctx *rule.RuleContext, node *ast.Node) *ast.Node {
-	// We need to track ancestors - use the context's ancestor tracking if available
-	// For now, we'll return nil as we need a different approach
 	return nil
 }
 

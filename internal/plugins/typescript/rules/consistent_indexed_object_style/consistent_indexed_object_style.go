@@ -1,8 +1,6 @@
 package consistent_indexed_object_style
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -208,11 +206,7 @@ func isRecordType(typeRef *ast.TypeReferenceNode) bool {
 
 	// First type argument should be string, number, or symbol
 	firstArg := typeRef.TypeArguments.Nodes[0]
-	if !isValidRecordKeyType(firstArg) {
-		return false
-	}
-
-	return true
+	return isValidRecordKeyType(firstArg)
 }
 
 // isValidRecordKeyType checks if a type is a valid key type for Record
@@ -457,16 +451,4 @@ func isCircularTypeReference(typeLiteralNode *ast.Node, valueType *ast.Node) boo
 	}
 
 	return false
-}
-
-// getSourceText safely extracts text from source file
-func getSourceText(ctx rule.RuleContext, start, end int) string {
-	if ctx.SourceFile == nil {
-		return ""
-	}
-	sourceText := ctx.SourceFile.Text()
-	if start < 0 || end > len(sourceText) || start > end {
-		return ""
-	}
-	return strings.TrimSpace(sourceText[start:end])
 }

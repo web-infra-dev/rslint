@@ -180,23 +180,6 @@ func getVariableName(node *ast.Node) string {
 	return ""
 }
 
-// getTestVariableName extracts the variable name from a test condition
-func getTestVariableName(testExpr *ast.Node, onLeft bool) string {
-	if testExpr == nil || testExpr.Kind != ast.KindBinaryExpression {
-		return ""
-	}
-
-	binary := testExpr.AsBinaryExpression()
-	if binary == nil {
-		return ""
-	}
-
-	if onLeft {
-		return getVariableName(binary.Left)
-	}
-	return getVariableName(binary.Right)
-}
-
 // getExpectedDirection determines the expected direction based on the comparison operator
 // Returns: 1 for increasing, -1 for decreasing, 0 for unknown
 func getExpectedDirection(testExpr *ast.Node, counterOnLeft bool) int {

@@ -16,9 +16,9 @@ const (
 type LiteralAssertion string
 
 const (
-	LiteralAssertionAllow         LiteralAssertion = "allow"
-	LiteralAssertionNever         LiteralAssertion = "never"
-	LiteralAssertionAllowAsParam  LiteralAssertion = "allow-as-parameter"
+	LiteralAssertionAllow        LiteralAssertion = "allow"
+	LiteralAssertionNever        LiteralAssertion = "never"
+	LiteralAssertionAllowAsParam LiteralAssertion = "allow-as-parameter"
 )
 
 type ConsistentTypeAssertionsOptions struct {
@@ -59,12 +59,13 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 
 		var typeNode *ast.Node
 
-		if node.Kind == ast.KindAsExpression {
+		switch node.Kind {
+		case ast.KindAsExpression:
 			asExpr := node.AsAsExpression()
 			if asExpr != nil {
 				typeNode = asExpr.Type
 			}
-		} else if node.Kind == ast.KindTypeAssertionExpression {
+		case ast.KindTypeAssertionExpression:
 			typeAssertion := node.AsTypeAssertion()
 			if typeAssertion != nil {
 				typeNode = typeAssertion.Type
@@ -399,8 +400,8 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 	}
 
 	return rule.RuleListeners{
-		ast.KindAsExpression:             checkAsExpression,
-		ast.KindTypeAssertionExpression:  checkTypeAssertion,
+		ast.KindAsExpression:            checkAsExpression,
+		ast.KindTypeAssertionExpression: checkTypeAssertion,
 	}
 }
 

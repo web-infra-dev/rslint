@@ -98,7 +98,7 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 		if shouldReport {
 			// Calculate position (approximate - this is simplified)
 			pos := 0
-			for i := 0; i < lineNum; i++ {
+			for i := range lineNum {
 				pos += len(lines[i]) + 1 // +1 for newline
 			}
 

@@ -97,7 +97,7 @@ func (f *CommonFixtures) Import(specifiers string, from string) string {
 
 // Export generates an export statement
 func (f *CommonFixtures) Export(what string) string {
-	return fmt.Sprintf("export %s", what)
+	return "export " + what
 }
 
 // Const generates a const declaration

@@ -332,7 +332,7 @@ func analyzeCallbackReturns(body *ast.Node, allowImplicit bool) callbackReturnRe
 	}
 
 	// If we have no return with value at all (and empty returns don't count unless allowImplicit)
-	if !hasReturnWithValue && !(allowImplicit && hasReturnWithoutValue) {
+	if !hasReturnWithValue && (!allowImplicit || !hasReturnWithoutValue) {
 		return callbackReturnResult{
 			hasNoReturns:       true,
 			allPathsReturn:     false,
@@ -507,30 +507,6 @@ func blockReturnsValue(node *ast.Node) bool {
 	return false
 }
 
-// hasReturnWithValue checks if a node contains a return statement with a value
-func hasReturnWithValue(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-
-	// Direct return statement
-	if node.Kind == ast.KindReturnStatement {
-		return node.Expression() != nil
-	}
-
-	// Block statement - check all statements
-	if node.Kind == ast.KindBlock {
-		statements := node.Statements()
-		for _, stmt := range statements {
-			if stmt != nil && stmt.Kind == ast.KindReturnStatement && stmt.Expression() != nil {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
 // ArrayCallbackReturnRule enforces return statements in callbacks of array methods
 var ArrayCallbackReturnRule = rule.CreateRule(rule.Rule{
 	Name: "array-callback-return",
@@ -563,7 +539,7 @@ var ArrayCallbackReturnRule = rule.CreateRule(rule.Rule{
 
 				// Get the callback argument
 				args := node.Arguments()
-				if args == nil || len(args) == 0 {
+				if len(args) == 0 {
 					return
 				}
 
