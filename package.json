@@ -27,6 +27,8 @@
     "test:go": "go test ./internal/...",
     "typecheck": "pnpm tsgo -b tsconfig.json",
     "lint": "rslint",
+    "lint:go": "golangci-lint run ./cmd/... ./internal/...",
+    "format:go": "golangci-lint fmt ./cmd/... ./internal/...",
     "prepare": "husky",
     "migrate:tests": "sg scan -r ast-grep-rule.yml ./packages/rslint-test-tools/tests/typescript-eslint/rules/**/*.test.ts --update-all"
   },
@@ -34,7 +36,7 @@
     "@rslint/core": "workspace:*",
     "@rstest/core": "^0.5.0",
     "husky": "^9.1.7",
-    "lint-staged": "^16.1.2",
+    "lint-staged": "^16.2.6",
     "prettier": "3.5.0",
     "typescript": "5.8.3",
     "zx": "8.7.1",
