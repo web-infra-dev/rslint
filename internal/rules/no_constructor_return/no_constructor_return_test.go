@@ -17,11 +17,11 @@ func TestNoConstructorReturnRule(t *testing.T) {
 		[]rule_tester.ValidTestCase{
 			// Regular functions with return statements are allowed
 			{Code: `function fn() { return }`},
-			{Code: `function fn(kumiko) { if (kumiko) { return kumiko } }`},
+			{Code: `function fn(value) { if (value) { return value } }`},
 			{Code: `const fn = function () { return }`},
-			{Code: `const fn = function () { if (kumiko) { return kumiko } }`},
+			{Code: `const fn = function () { if (value) { return value } }`},
 			{Code: `const fn = () => { return }`},
-			{Code: `const fn = () => { if (kumiko) { return kumiko } }`},
+			{Code: `const fn = () => { if (value) { return value } }`},
 
 			// Classes without constructors or with empty constructors
 			{Code: `class C {  }`},

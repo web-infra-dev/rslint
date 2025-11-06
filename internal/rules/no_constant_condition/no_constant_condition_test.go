@@ -79,7 +79,7 @@ func TestNoConstantConditionRule(t *testing.T) {
 			{Code: "if (`${a}`) {};"},
 			{Code: "if (`${foo()}`) {};"},
 			{Code: "if (`${a === 'b' && b==='a'}`) {};"},
-			{Code: "if (`foo${a}` === 'fooa');"},
+			{Code: "if (`app${le}` === 'apple');"},
 
 			// Unary operators with logical expressions
 			{Code: `if (+(a || true));`},
@@ -657,7 +657,7 @@ func TestNoConstantConditionRule(t *testing.T) {
 				},
 			},
 			{
-				Code: `while(true);`,
+				Code:    `while(true);`,
 				Options: map[string]interface{}{"checkLoops": "all"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
@@ -864,21 +864,21 @@ func TestNoConstantConditionRule(t *testing.T) {
 
 			// Loop options - checkLoops: "all"
 			{
-				Code: `while(x = 1);`,
+				Code:    `while(x = 1);`,
 				Options: map[string]interface{}{"checkLoops": "all"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
-				Code: `do{ }while(x = 1)`,
+				Code:    `do{ }while(x = 1)`,
 				Options: map[string]interface{}{"checkLoops": "all"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
-				Code: `for (;true;) {};`,
+				Code:    `for (;true;) {};`,
 				Options: map[string]interface{}{"checkLoops": "all"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
@@ -887,70 +887,70 @@ func TestNoConstantConditionRule(t *testing.T) {
 
 			// Generator functions with constant conditions
 			{
-				Code: `function* foo(){while(true){} yield 'foo';}`,
+				Code:    `function* foo(){while(true){} yield 'foo';}`,
 				Options: map[string]interface{}{"checkLoops": "all"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
-				Code: `function* foo(){while(true){} yield 'foo';}`,
+				Code:    `function* foo(){while(true){} yield 'foo';}`,
 				Options: map[string]interface{}{"checkLoops": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
-				Code: `function* foo(){while(true){if (true) {yield 'foo';}}}`,
+				Code:    `function* foo(){while(true){if (true) {yield 'foo';}}}`,
 				Options: map[string]interface{}{"checkLoops": "all"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
-				Code: `function* foo(){while(true){if (true) {yield 'foo';}}}`,
+				Code:    `function* foo(){while(true){if (true) {yield 'foo';}}}`,
 				Options: map[string]interface{}{"checkLoops": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
-				Code: `function* foo(){while(true){yield 'foo';} while(true) {}}`,
+				Code:    `function* foo(){while(true){yield 'foo';} while(true) {}}`,
 				Options: map[string]interface{}{"checkLoops": "all"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
-				Code: `function* foo(){while(true){yield 'foo';} while(true) {}}`,
+				Code:    `function* foo(){while(true){yield 'foo';} while(true) {}}`,
 				Options: map[string]interface{}{"checkLoops": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
-				Code: `var a = function* foo(){while(true){} yield 'foo';}`,
+				Code:    `var a = function* foo(){while(true){} yield 'foo';}`,
 				Options: map[string]interface{}{"checkLoops": "all"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
-				Code: `var a = function* foo(){while(true){} yield 'foo';}`,
+				Code:    `var a = function* foo(){while(true){} yield 'foo';}`,
 				Options: map[string]interface{}{"checkLoops": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
-				Code: `while (true) { function* foo() {yield;}}`,
+				Code:    `while (true) { function* foo() {yield;}}`,
 				Options: map[string]interface{}{"checkLoops": "all"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
-				Code: `while (true) { function* foo() {yield;}}`,
+				Code:    `while (true) { function* foo() {yield;}}`,
 				Options: map[string]interface{}{"checkLoops": true},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
@@ -975,14 +975,14 @@ func TestNoConstantConditionRule(t *testing.T) {
 				},
 			},
 			{
-				Code: `function foo() {while (true) {function* bar() {while (true) {yield;}}}}`,
+				Code:    `function foo() {while (true) {function* bar() {while (true) {yield;}}}}`,
 				Options: map[string]interface{}{"checkLoops": "all"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},
 				},
 			},
 			{
-				Code: `function foo() {while (true) {const bar = function*() {while (true) {yield;}}}}`,
+				Code:    `function foo() {while (true) {const bar = function*() {while (true) {yield;}}}}`,
 				Options: map[string]interface{}{"checkLoops": "all"},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected"},

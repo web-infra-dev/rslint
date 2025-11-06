@@ -45,9 +45,9 @@ var NoDuplicateEnumValuesRule = rule.CreateRule(rule.Rule{
 							isLiteral = true
 						}
 					case ast.KindNoSubstitutionTemplateLiteral:
-						tmplLit := initializer.AsNoSubstitutionTemplateLiteral()
-						if tmplLit != nil {
-							valueStr = tmplLit.Text
+						templateLit := initializer.AsNoSubstitutionTemplateLiteral()
+						if templateLit != nil {
+							valueStr = templateLit.Text
 							isLiteral = true
 						}
 					case ast.KindPrefixUnaryExpression:
@@ -78,10 +78,10 @@ var NoDuplicateEnumValuesRule = rule.CreateRule(rule.Rule{
 								displayValue = strLit.Text
 							}
 						case ast.KindNoSubstitutionTemplateLiteral:
-							tmplLit := initializer.AsNoSubstitutionTemplateLiteral()
-							if tmplLit != nil {
+							templateLit := initializer.AsNoSubstitutionTemplateLiteral()
+							if templateLit != nil {
 								// Remove backticks for display
-								displayValue = tmplLit.Text
+								displayValue = templateLit.Text
 								if len(displayValue) >= 2 && displayValue[0] == '`' && displayValue[len(displayValue)-1] == '`' {
 									displayValue = displayValue[1 : len(displayValue)-1]
 								}
