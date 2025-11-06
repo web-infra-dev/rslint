@@ -2,9 +2,16 @@
 
 exports[`no-floating-promises > invalid 1`] = `
 {
+  "code": "
+async function test() {
+  Promise.resolve('value');
+  Promise.resolve('value').then(() => {});
+  Promise.resolve('value').catch();
+  Promise.resolve('value').finally();
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -20,7 +27,6 @@ exports[`no-floating-promises > invalid 1`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -36,7 +42,6 @@ exports[`no-floating-promises > invalid 1`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -52,7 +57,6 @@ exports[`no-floating-promises > invalid 1`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -76,9 +80,30 @@ exports[`no-floating-promises > invalid 1`] = `
 
 exports[`no-floating-promises > invalid 2`] = `
 {
+  "code": "
+const doSomething = async (
+  obj1: { a?: { b?: { c?: () => Promise<void> } } },
+  obj2: { a?: { b?: { c: () => Promise<void> } } },
+  obj3: { a?: { b: { c?: () => Promise<void> } } },
+  obj4: { a: { b: { c?: () => Promise<void> } } },
+  obj5: { a?: () => { b?: { c?: () => Promise<void> } } },
+  obj6?: { a: { b: { c?: () => Promise<void> } } },
+  callback?: () => Promise<void>,
+): Promise<void> => {
+  obj1.a?.b?.c?.();
+  obj2.a?.b?.c();
+  obj3.a?.b.c?.();
+  obj4.a.b.c?.();
+  obj5.a?.().b?.c?.();
+  obj6?.a.b.c?.();
+
+  callback?.();
+};
+
+doSomething();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -94,7 +119,6 @@ exports[`no-floating-promises > invalid 2`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -110,7 +134,6 @@ exports[`no-floating-promises > invalid 2`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -126,7 +149,6 @@ exports[`no-floating-promises > invalid 2`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -142,7 +164,6 @@ exports[`no-floating-promises > invalid 2`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -158,7 +179,6 @@ exports[`no-floating-promises > invalid 2`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -174,7 +194,6 @@ exports[`no-floating-promises > invalid 2`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -190,7 +209,6 @@ exports[`no-floating-promises > invalid 2`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -214,9 +232,12 @@ exports[`no-floating-promises > invalid 2`] = `
 
 exports[`no-floating-promises > invalid 3`] = `
 {
+  "code": "
+declare const myTag: (strings: TemplateStringsArray) => Promise<void>;
+myTag\`abc\`;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -240,9 +261,12 @@ exports[`no-floating-promises > invalid 3`] = `
 
 exports[`no-floating-promises > invalid 4`] = `
 {
+  "code": "
+declare const myTag: (strings: TemplateStringsArray) => Promise<void>;
+myTag\`abc\`.then(() => {});
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -266,9 +290,12 @@ exports[`no-floating-promises > invalid 4`] = `
 
 exports[`no-floating-promises > invalid 5`] = `
 {
+  "code": "
+declare const myTag: (strings: TemplateStringsArray) => Promise<void>;
+myTag\`abc\`.finally(() => {});
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -292,9 +319,13 @@ exports[`no-floating-promises > invalid 5`] = `
 
 exports[`no-floating-promises > invalid 6`] = `
 {
+  "code": "
+async function test() {
+  Promise.resolve('value');
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -318,9 +349,16 @@ exports[`no-floating-promises > invalid 6`] = `
 
 exports[`no-floating-promises > invalid 7`] = `
 {
+  "code": "
+async function test() {
+  Promise.reject(new Error('message'));
+  Promise.reject(new Error('message')).then(() => {});
+  Promise.reject(new Error('message')).catch();
+  Promise.reject(new Error('message')).finally();
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -336,7 +374,6 @@ exports[`no-floating-promises > invalid 7`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -352,7 +389,6 @@ exports[`no-floating-promises > invalid 7`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -368,7 +404,6 @@ exports[`no-floating-promises > invalid 7`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -392,9 +427,15 @@ exports[`no-floating-promises > invalid 7`] = `
 
 exports[`no-floating-promises > invalid 8`] = `
 {
+  "code": "
+async function test() {
+  (async () => true)();
+  (async () => true)().then(() => {});
+  (async () => true)().catch();
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -410,7 +451,6 @@ exports[`no-floating-promises > invalid 8`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -426,7 +466,6 @@ exports[`no-floating-promises > invalid 8`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -450,9 +489,18 @@ exports[`no-floating-promises > invalid 8`] = `
 
 exports[`no-floating-promises > invalid 9`] = `
 {
+  "code": "
+async function test() {
+  async function returnsPromise() {}
+
+  returnsPromise();
+  returnsPromise().then(() => {});
+  returnsPromise().catch();
+  returnsPromise().finally();
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -468,7 +516,6 @@ exports[`no-floating-promises > invalid 9`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -484,7 +531,6 @@ exports[`no-floating-promises > invalid 9`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -500,7 +546,6 @@ exports[`no-floating-promises > invalid 9`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -524,9 +569,14 @@ exports[`no-floating-promises > invalid 9`] = `
 
 exports[`no-floating-promises > invalid 10`] = `
 {
+  "code": "
+async function test() {
+  Math.random() > 0.5 ? Promise.resolve() : null;
+  Math.random() > 0.5 ? null : Promise.resolve();
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -542,7 +592,6 @@ exports[`no-floating-promises > invalid 10`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -566,9 +615,15 @@ exports[`no-floating-promises > invalid 10`] = `
 
 exports[`no-floating-promises > invalid 11`] = `
 {
+  "code": "
+async function test() {
+  Promise.resolve(), 123;
+  123, Promise.resolve();
+  123, Promise.resolve(), 123;
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -584,7 +639,6 @@ exports[`no-floating-promises > invalid 11`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -600,7 +654,6 @@ exports[`no-floating-promises > invalid 11`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -624,9 +677,13 @@ exports[`no-floating-promises > invalid 11`] = `
 
 exports[`no-floating-promises > invalid 12`] = `
 {
+  "code": "
+async function test() {
+  void Promise.resolve();
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
       "messageId": "floating",
       "range": {
@@ -650,9 +707,14 @@ exports[`no-floating-promises > invalid 12`] = `
 
 exports[`no-floating-promises > invalid 13`] = `
 {
+  "code": "
+async function test() {
+  const promise = new Promise((resolve, reject) => resolve('value'));
+  promise;
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
       "messageId": "floating",
       "range": {
@@ -676,9 +738,14 @@ exports[`no-floating-promises > invalid 13`] = `
 
 exports[`no-floating-promises > invalid 14`] = `
 {
+  "code": "
+async function returnsPromise() {
+  return 'value';
+}
+void returnsPromise();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
       "messageId": "floating",
       "range": {
@@ -702,9 +769,14 @@ exports[`no-floating-promises > invalid 14`] = `
 
 exports[`no-floating-promises > invalid 15`] = `
 {
+  "code": "
+async function returnsPromise() {
+  return 'value';
+}
+void /* ... */ returnsPromise();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
       "messageId": "floating",
       "range": {
@@ -728,9 +800,14 @@ exports[`no-floating-promises > invalid 15`] = `
 
 exports[`no-floating-promises > invalid 16`] = `
 {
+  "code": "
+async function returnsPromise() {
+  return 'value';
+}
+1, returnsPromise();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
       "messageId": "floating",
       "range": {
@@ -754,9 +831,14 @@ exports[`no-floating-promises > invalid 16`] = `
 
 exports[`no-floating-promises > invalid 17`] = `
 {
+  "code": "
+async function returnsPromise() {
+  return 'value';
+}
+bool ? returnsPromise() : null;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
       "messageId": "floating",
       "range": {
@@ -780,9 +862,14 @@ exports[`no-floating-promises > invalid 17`] = `
 
 exports[`no-floating-promises > invalid 18`] = `
 {
+  "code": "
+async function test() {
+  const obj = { foo: Promise.resolve() };
+  obj.foo;
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -806,9 +893,13 @@ exports[`no-floating-promises > invalid 18`] = `
 
 exports[`no-floating-promises > invalid 19`] = `
 {
+  "code": "
+async function test() {
+  new Promise(resolve => resolve());
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -832,9 +923,18 @@ exports[`no-floating-promises > invalid 19`] = `
 
 exports[`no-floating-promises > invalid 20`] = `
 {
+  "code": "
+declare const promiseValue: Promise<number>;
+
+async function test() {
+  promiseValue;
+  promiseValue.then(() => {});
+  promiseValue.catch();
+  promiseValue.finally();
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -850,7 +950,6 @@ exports[`no-floating-promises > invalid 20`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -866,7 +965,6 @@ exports[`no-floating-promises > invalid 20`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -882,7 +980,6 @@ exports[`no-floating-promises > invalid 20`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -906,9 +1003,15 @@ exports[`no-floating-promises > invalid 20`] = `
 
 exports[`no-floating-promises > invalid 21`] = `
 {
+  "code": "
+declare const promiseUnion: Promise<number> | number;
+
+async function test() {
+  promiseUnion;
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -932,9 +1035,17 @@ exports[`no-floating-promises > invalid 21`] = `
 
 exports[`no-floating-promises > invalid 22`] = `
 {
+  "code": "
+declare const promiseIntersection: Promise<number> & number;
+
+async function test() {
+  promiseIntersection;
+  promiseIntersection.then(() => {});
+  promiseIntersection.catch();
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -950,7 +1061,6 @@ exports[`no-floating-promises > invalid 22`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -966,7 +1076,6 @@ exports[`no-floating-promises > invalid 22`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -990,9 +1099,19 @@ exports[`no-floating-promises > invalid 22`] = `
 
 exports[`no-floating-promises > invalid 23`] = `
 {
+  "code": "
+async function test() {
+  class CanThen extends Promise<number> {}
+  const canThen: CanThen = Foo.resolve(2);
+
+  canThen;
+  canThen.then(() => {});
+  canThen.catch();
+  canThen.finally();
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1008,7 +1127,6 @@ exports[`no-floating-promises > invalid 23`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1024,7 +1142,6 @@ exports[`no-floating-promises > invalid 23`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1040,7 +1157,6 @@ exports[`no-floating-promises > invalid 23`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1064,9 +1180,21 @@ exports[`no-floating-promises > invalid 23`] = `
 
 exports[`no-floating-promises > invalid 24`] = `
 {
+  "code": "
+async function test() {
+  class CatchableThenable {
+    then(callback: () => void, callback: () => void): CatchableThenable {
+      return new CatchableThenable();
+    }
+  }
+  const thenable = new CatchableThenable();
+
+  thenable;
+  thenable.then(() => {});
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1082,7 +1210,6 @@ exports[`no-floating-promises > invalid 24`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1106,9 +1233,30 @@ exports[`no-floating-promises > invalid 24`] = `
 
 exports[`no-floating-promises > invalid 25`] = `
 {
+  "code": "
+// https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/promise-polyfill/index.d.ts
+// Type definitions for promise-polyfill 6.0
+// Project: https://github.com/taylorhakes/promise-polyfill
+// Definitions by: Steve Jenkins <https://github.com/skysteve>
+//                 Daniel Cassidy <https://github.com/djcsdy>
+// Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped
+
+interface PromisePolyfillConstructor extends PromiseConstructor {
+  _immediateFn?: (handler: (() => void) | string) => void;
+}
+
+declare const PromisePolyfill: PromisePolyfillConstructor;
+
+async function test() {
+  const promise = new PromisePolyfill(() => {});
+
+  promise;
+  promise.then(() => {});
+  promise.catch();
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1124,7 +1272,6 @@ exports[`no-floating-promises > invalid 25`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1140,7 +1287,6 @@ exports[`no-floating-promises > invalid 25`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1164,9 +1310,13 @@ exports[`no-floating-promises > invalid 25`] = `
 
 exports[`no-floating-promises > invalid 26`] = `
 {
+  "code": "
+        (async () => {
+          await something();
+        })();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1190,9 +1340,13 @@ exports[`no-floating-promises > invalid 26`] = `
 
 exports[`no-floating-promises > invalid 27`] = `
 {
+  "code": "
+        (async () => {
+          something();
+        })();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1216,9 +1370,9 @@ exports[`no-floating-promises > invalid 27`] = `
 
 exports[`no-floating-promises > invalid 28`] = `
 {
+  "code": "(async function foo() {})();",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1242,9 +1396,13 @@ exports[`no-floating-promises > invalid 28`] = `
 
 exports[`no-floating-promises > invalid 29`] = `
 {
+  "code": "
+        function foo() {
+          (async function bar() {})();
+        }
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1268,9 +1426,16 @@ exports[`no-floating-promises > invalid 29`] = `
 
 exports[`no-floating-promises > invalid 30`] = `
 {
+  "code": "
+        const foo = () =>
+          new Promise(res => {
+            (async function () {
+              await res(1);
+            })();
+          });
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1294,9 +1459,13 @@ exports[`no-floating-promises > invalid 30`] = `
 
 exports[`no-floating-promises > invalid 31`] = `
 {
+  "code": "
+        (async function () {
+          await res(1);
+        })();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1320,9 +1489,13 @@ exports[`no-floating-promises > invalid 31`] = `
 
 exports[`no-floating-promises > invalid 32`] = `
 {
+  "code": "
+        (async function () {
+          Promise.resolve();
+        })();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1346,9 +1519,17 @@ exports[`no-floating-promises > invalid 32`] = `
 
 exports[`no-floating-promises > invalid 33`] = `
 {
+  "code": "
+declare const promiseIntersection: Promise<number> & number;
+(async function () {
+  promiseIntersection;
+  promiseIntersection.then(() => {});
+  promiseIntersection.catch();
+  promiseIntersection.finally();
+})();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1364,7 +1545,6 @@ exports[`no-floating-promises > invalid 33`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1380,7 +1560,6 @@ exports[`no-floating-promises > invalid 33`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1396,7 +1575,6 @@ exports[`no-floating-promises > invalid 33`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1420,9 +1598,16 @@ exports[`no-floating-promises > invalid 33`] = `
 
 exports[`no-floating-promises > invalid 34`] = `
 {
+  "code": "
+async function foo() {
+  const myPromise = async () => void 0;
+  const condition = true;
+
+  void condition || myPromise();
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1446,9 +1631,16 @@ exports[`no-floating-promises > invalid 34`] = `
 
 exports[`no-floating-promises > invalid 35`] = `
 {
+  "code": "
+async function foo() {
+  const myPromise = async () => void 0;
+  const condition = true;
+
+  (await condition) && myPromise();
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
       "messageId": "floating",
       "range": {
@@ -1472,9 +1664,16 @@ exports[`no-floating-promises > invalid 35`] = `
 
 exports[`no-floating-promises > invalid 36`] = `
 {
+  "code": "
+async function foo() {
+  const myPromise = async () => void 0;
+  const condition = true;
+
+  condition && myPromise();
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1498,9 +1697,16 @@ exports[`no-floating-promises > invalid 36`] = `
 
 exports[`no-floating-promises > invalid 37`] = `
 {
+  "code": "
+async function foo() {
+  const myPromise = async () => void 0;
+  const condition = false;
+
+  condition || myPromise();
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1524,9 +1730,16 @@ exports[`no-floating-promises > invalid 37`] = `
 
 exports[`no-floating-promises > invalid 38`] = `
 {
+  "code": "
+async function foo() {
+  const myPromise = async () => void 0;
+  const condition = null;
+
+  condition ?? myPromise();
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1550,9 +1763,15 @@ exports[`no-floating-promises > invalid 38`] = `
 
 exports[`no-floating-promises > invalid 39`] = `
 {
+  "code": "
+async function foo() {
+  const myPromise = Promise.resolve(true);
+  let condition = true;
+  condition && myPromise;
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
       "messageId": "floating",
       "range": {
@@ -1576,9 +1795,15 @@ exports[`no-floating-promises > invalid 39`] = `
 
 exports[`no-floating-promises > invalid 40`] = `
 {
+  "code": "
+async function foo() {
+  const myPromise = Promise.resolve(true);
+  let condition = false;
+  condition || myPromise;
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
       "messageId": "floating",
       "range": {
@@ -1602,9 +1827,15 @@ exports[`no-floating-promises > invalid 40`] = `
 
 exports[`no-floating-promises > invalid 41`] = `
 {
+  "code": "
+async function foo() {
+  const myPromise = Promise.resolve(true);
+  let condition = null;
+  condition ?? myPromise;
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
       "messageId": "floating",
       "range": {
@@ -1628,9 +1859,16 @@ exports[`no-floating-promises > invalid 41`] = `
 
 exports[`no-floating-promises > invalid 42`] = `
 {
+  "code": "
+async function foo() {
+  const myPromise = async () => void 0;
+  const condition = false;
+
+  condition || condition || myPromise();
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1654,9 +1892,23 @@ exports[`no-floating-promises > invalid 42`] = `
 
 exports[`no-floating-promises > invalid 43`] = `
 {
+  "code": "
+declare const maybeCallable: string | (() => void);
+declare const definitelyCallable: () => void;
+Promise.resolve().then(() => {}, undefined);
+Promise.resolve().then(() => {}, null);
+Promise.resolve().then(() => {}, 3);
+Promise.resolve().then(() => {}, maybeCallable);
+Promise.resolve().then(() => {}, definitelyCallable);
+
+Promise.resolve().catch(undefined);
+Promise.resolve().catch(null);
+Promise.resolve().catch(3);
+Promise.resolve().catch(maybeCallable);
+Promise.resolve().catch(definitelyCallable);
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator. A rejection handler that is not a function will be ignored.",
       "messageId": "floatingUselessRejectionHandlerVoid",
       "range": {
@@ -1672,7 +1924,6 @@ exports[`no-floating-promises > invalid 43`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator. A rejection handler that is not a function will be ignored.",
       "messageId": "floatingUselessRejectionHandlerVoid",
       "range": {
@@ -1688,7 +1939,6 @@ exports[`no-floating-promises > invalid 43`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator. A rejection handler that is not a function will be ignored.",
       "messageId": "floatingUselessRejectionHandlerVoid",
       "range": {
@@ -1704,7 +1954,6 @@ exports[`no-floating-promises > invalid 43`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator. A rejection handler that is not a function will be ignored.",
       "messageId": "floatingUselessRejectionHandlerVoid",
       "range": {
@@ -1720,7 +1969,6 @@ exports[`no-floating-promises > invalid 43`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator. A rejection handler that is not a function will be ignored.",
       "messageId": "floatingUselessRejectionHandlerVoid",
       "range": {
@@ -1736,7 +1984,6 @@ exports[`no-floating-promises > invalid 43`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator. A rejection handler that is not a function will be ignored.",
       "messageId": "floatingUselessRejectionHandlerVoid",
       "range": {
@@ -1752,7 +1999,6 @@ exports[`no-floating-promises > invalid 43`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator. A rejection handler that is not a function will be ignored.",
       "messageId": "floatingUselessRejectionHandlerVoid",
       "range": {
@@ -1768,7 +2014,6 @@ exports[`no-floating-promises > invalid 43`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator. A rejection handler that is not a function will be ignored.",
       "messageId": "floatingUselessRejectionHandlerVoid",
       "range": {
@@ -1792,9 +2037,11 @@ exports[`no-floating-promises > invalid 43`] = `
 
 exports[`no-floating-promises > invalid 44`] = `
 {
+  "code": "
+Promise.reject() || 3;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -1818,9 +2065,11 @@ exports[`no-floating-promises > invalid 44`] = `
 
 exports[`no-floating-promises > invalid 45`] = `
 {
+  "code": "
+void Promise.resolve().then(() => {}, undefined);
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
       "messageId": "floatingUselessRejectionHandler",
       "range": {
@@ -1844,9 +2093,12 @@ exports[`no-floating-promises > invalid 45`] = `
 
 exports[`no-floating-promises > invalid 46`] = `
 {
+  "code": "
+declare const maybeCallable: string | (() => void);
+Promise.resolve().then(() => {}, maybeCallable);
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
       "messageId": "floatingUselessRejectionHandler",
       "range": {
@@ -1870,9 +2122,23 @@ exports[`no-floating-promises > invalid 46`] = `
 
 exports[`no-floating-promises > invalid 47`] = `
 {
+  "code": "
+declare const maybeCallable: string | (() => void);
+declare const definitelyCallable: () => void;
+Promise.resolve().then(() => {}, undefined);
+Promise.resolve().then(() => {}, null);
+Promise.resolve().then(() => {}, 3);
+Promise.resolve().then(() => {}, maybeCallable);
+Promise.resolve().then(() => {}, definitelyCallable);
+
+Promise.resolve().catch(undefined);
+Promise.resolve().catch(null);
+Promise.resolve().catch(3);
+Promise.resolve().catch(maybeCallable);
+Promise.resolve().catch(definitelyCallable);
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
       "messageId": "floatingUselessRejectionHandler",
       "range": {
@@ -1888,7 +2154,6 @@ exports[`no-floating-promises > invalid 47`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
       "messageId": "floatingUselessRejectionHandler",
       "range": {
@@ -1904,7 +2169,6 @@ exports[`no-floating-promises > invalid 47`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
       "messageId": "floatingUselessRejectionHandler",
       "range": {
@@ -1920,7 +2184,6 @@ exports[`no-floating-promises > invalid 47`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
       "messageId": "floatingUselessRejectionHandler",
       "range": {
@@ -1936,7 +2199,6 @@ exports[`no-floating-promises > invalid 47`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
       "messageId": "floatingUselessRejectionHandler",
       "range": {
@@ -1952,7 +2214,6 @@ exports[`no-floating-promises > invalid 47`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
       "messageId": "floatingUselessRejectionHandler",
       "range": {
@@ -1968,7 +2229,6 @@ exports[`no-floating-promises > invalid 47`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
       "messageId": "floatingUselessRejectionHandler",
       "range": {
@@ -1984,7 +2244,6 @@ exports[`no-floating-promises > invalid 47`] = `
       "ruleName": "@typescript-eslint/no-floating-promises",
     },
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler. A rejection handler that is not a function will be ignored.",
       "messageId": "floatingUselessRejectionHandler",
       "range": {
@@ -2008,9 +2267,11 @@ exports[`no-floating-promises > invalid 47`] = `
 
 exports[`no-floating-promises > invalid 48`] = `
 {
+  "code": "
+Promise.reject() || 3;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
       "messageId": "floating",
       "range": {
@@ -2034,9 +2295,11 @@ exports[`no-floating-promises > invalid 48`] = `
 
 exports[`no-floating-promises > invalid 49`] = `
 {
+  "code": "
+Promise.reject().finally(() => {});
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -2060,9 +2323,13 @@ exports[`no-floating-promises > invalid 49`] = `
 
 exports[`no-floating-promises > invalid 50`] = `
 {
+  "code": "
+Promise.reject()
+  .finally(() => {})
+  .finally(() => {});
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, or end with a call to .then with a rejection handler.",
       "messageId": "floating",
       "range": {
@@ -2086,9 +2353,14 @@ exports[`no-floating-promises > invalid 50`] = `
 
 exports[`no-floating-promises > invalid 51`] = `
 {
+  "code": "
+Promise.reject()
+  .finally(() => {})
+  .finally(() => {})
+  .finally(() => {});
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -2112,9 +2384,13 @@ exports[`no-floating-promises > invalid 51`] = `
 
 exports[`no-floating-promises > invalid 52`] = `
 {
+  "code": "
+Promise.reject()
+  .then(() => {})
+  .finally(() => {});
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -2138,9 +2414,12 @@ exports[`no-floating-promises > invalid 52`] = `
 
 exports[`no-floating-promises > invalid 53`] = `
 {
+  "code": "
+declare const returnsPromise: () => Promise<void> | null;
+returnsPromise()?.finally(() => {});
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -2164,9 +2443,12 @@ exports[`no-floating-promises > invalid 53`] = `
 
 exports[`no-floating-promises > invalid 54`] = `
 {
+  "code": "
+const promiseIntersection: Promise<number> & number;
+promiseIntersection.finally(() => {});
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -2190,9 +2472,11 @@ exports[`no-floating-promises > invalid 54`] = `
 
 exports[`no-floating-promises > invalid 55`] = `
 {
+  "code": "
+Promise.resolve().finally(() => {}), 123;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -2216,9 +2500,11 @@ exports[`no-floating-promises > invalid 55`] = `
 
 exports[`no-floating-promises > invalid 56`] = `
 {
+  "code": "
+(async () => true)().finally();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -2242,9 +2528,11 @@ exports[`no-floating-promises > invalid 56`] = `
 
 exports[`no-floating-promises > invalid 57`] = `
 {
+  "code": "
+Promise.reject(new Error('message')).finally(() => {});
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -2268,9 +2556,15 @@ exports[`no-floating-promises > invalid 57`] = `
 
 exports[`no-floating-promises > invalid 58`] = `
 {
+  "code": "
+function _<T, S extends Array<T | Promise<T>>>(
+  maybePromiseArray: S | undefined,
+): void {
+  maybePromiseArray?.[0];
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -2294,9 +2588,11 @@ exports[`no-floating-promises > invalid 58`] = `
 
 exports[`no-floating-promises > invalid 59`] = `
 {
+  "code": "
+[1, 2, 3].map(() => Promise.reject());
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
       "messageId": "floatingPromiseArrayVoid",
       "range": {
@@ -2320,9 +2616,12 @@ exports[`no-floating-promises > invalid 59`] = `
 
 exports[`no-floating-promises > invalid 60`] = `
 {
+  "code": "
+declare const array: unknown[];
+array.map(() => Promise.reject());
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
       "messageId": "floatingPromiseArrayVoid",
       "range": {
@@ -2346,9 +2645,12 @@ exports[`no-floating-promises > invalid 60`] = `
 
 exports[`no-floating-promises > invalid 61`] = `
 {
+  "code": "
+declare const promiseArray: Array<Promise<unknown>>;
+void promiseArray;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar.",
       "messageId": "floatingPromiseArray",
       "range": {
@@ -2372,9 +2674,14 @@ exports[`no-floating-promises > invalid 61`] = `
 
 exports[`no-floating-promises > invalid 62`] = `
 {
+  "code": "
+declare const promiseArray: Array<Promise<unknown>>;
+async function f() {
+  await promiseArray;
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar.",
       "messageId": "floatingPromiseArray",
       "range": {
@@ -2398,9 +2705,11 @@ exports[`no-floating-promises > invalid 62`] = `
 
 exports[`no-floating-promises > invalid 63`] = `
 {
+  "code": "
+[1, 2, Promise.reject(), 3];
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
       "messageId": "floatingPromiseArrayVoid",
       "range": {
@@ -2424,9 +2733,11 @@ exports[`no-floating-promises > invalid 63`] = `
 
 exports[`no-floating-promises > invalid 64`] = `
 {
+  "code": "
+[1, 2, Promise.reject().catch(() => {}), 3];
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
       "messageId": "floatingPromiseArrayVoid",
       "range": {
@@ -2450,9 +2761,14 @@ exports[`no-floating-promises > invalid 64`] = `
 
 exports[`no-floating-promises > invalid 65`] = `
 {
+  "code": "
+const data = ['test'];
+data.map(async () => {
+  await new Promise((_res, rej) => setTimeout(rej, 1000));
+});
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
       "messageId": "floatingPromiseArrayVoid",
       "range": {
@@ -2476,9 +2792,15 @@ exports[`no-floating-promises > invalid 65`] = `
 
 exports[`no-floating-promises > invalid 66`] = `
 {
+  "code": "
+function _<T, S extends Array<T | Array<T | Promise<T>>>>(
+  maybePromiseArrayArray: S | undefined,
+): void {
+  maybePromiseArrayArray?.[0];
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
       "messageId": "floatingPromiseArrayVoid",
       "range": {
@@ -2502,9 +2824,13 @@ exports[`no-floating-promises > invalid 66`] = `
 
 exports[`no-floating-promises > invalid 67`] = `
 {
+  "code": "
+function f<T extends Array<Promise<number>>>(a: T): void {
+  a;
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
       "messageId": "floatingPromiseArrayVoid",
       "range": {
@@ -2528,9 +2854,12 @@ exports[`no-floating-promises > invalid 67`] = `
 
 exports[`no-floating-promises > invalid 68`] = `
 {
+  "code": "
+declare const a: Array<Promise<number>> | undefined;
+a;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
       "messageId": "floatingPromiseArrayVoid",
       "range": {
@@ -2554,9 +2883,13 @@ exports[`no-floating-promises > invalid 68`] = `
 
 exports[`no-floating-promises > invalid 69`] = `
 {
+  "code": "
+function f<T extends Array<Promise<number>>>(a: T | undefined): void {
+  a;
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
       "messageId": "floatingPromiseArrayVoid",
       "range": {
@@ -2580,9 +2913,11 @@ exports[`no-floating-promises > invalid 69`] = `
 
 exports[`no-floating-promises > invalid 70`] = `
 {
+  "code": "
+[Promise.reject()] as const;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
       "messageId": "floatingPromiseArrayVoid",
       "range": {
@@ -2606,9 +2941,12 @@ exports[`no-floating-promises > invalid 70`] = `
 
 exports[`no-floating-promises > invalid 71`] = `
 {
+  "code": "
+declare function cursed(): [Promise<number>, Promise<string>];
+cursed();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
       "messageId": "floatingPromiseArrayVoid",
       "range": {
@@ -2632,9 +2970,17 @@ exports[`no-floating-promises > invalid 71`] = `
 
 exports[`no-floating-promises > invalid 72`] = `
 {
+  "code": "
+[
+  'Type Argument number ',
+  1,
+  'is not',
+  Promise.resolve(),
+  'but it still is flagged',
+] as const;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
       "messageId": "floatingPromiseArrayVoid",
       "range": {
@@ -2658,9 +3004,14 @@ exports[`no-floating-promises > invalid 72`] = `
 
 exports[`no-floating-promises > invalid 73`] = `
 {
+  "code": "
+        declare const arrayOrPromiseTuple:
+          | Array<number>
+          | [number, number, Promise<unknown>, string];
+        arrayOrPromiseTuple;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
       "messageId": "floatingPromiseArrayVoid",
       "range": {
@@ -2684,9 +3035,12 @@ exports[`no-floating-promises > invalid 73`] = `
 
 exports[`no-floating-promises > invalid 74`] = `
 {
+  "code": "
+        declare const okArrayOrPromiseArray: Array<number> | Array<Promise<unknown>>;
+        okArrayOrPromiseArray;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
       "messageId": "floatingPromiseArrayVoid",
       "range": {
@@ -2710,9 +3064,24 @@ exports[`no-floating-promises > invalid 74`] = `
 
 exports[`no-floating-promises > invalid 75`] = `
 {
+  "code": "
+interface UnsafeThenable<T> {
+  then<TResult1 = T, TResult2 = never>(
+    onfulfilled?:
+      | ((value: T) => TResult1 | UnsafeThenable<TResult1>)
+      | undefined
+      | null,
+    onrejected?:
+      | ((reason: any) => TResult2 | UnsafeThenable<TResult2>)
+      | undefined
+      | null,
+  ): UnsafeThenable<TResult1 | TResult2>;
+}
+let promise: UnsafeThenable<number> = Promise.resolve(5);
+promise;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -2736,9 +3105,13 @@ exports[`no-floating-promises > invalid 75`] = `
 
 exports[`no-floating-promises > invalid 76`] = `
 {
+  "code": "
+class SafePromise<T> extends Promise<T> {}
+let promise: SafePromise<number> = Promise.resolve(5);
+promise.catch();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -2762,9 +3135,13 @@ exports[`no-floating-promises > invalid 76`] = `
 
 exports[`no-floating-promises > invalid 77`] = `
 {
+  "code": "
+class UnsafePromise<T> extends Promise<T> {}
+let promise: () => UnsafePromise<number> = async () => 5;
+promise().finally();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -2788,9 +3165,13 @@ exports[`no-floating-promises > invalid 77`] = `
 
 exports[`no-floating-promises > invalid 78`] = `
 {
+  "code": "
+type UnsafePromise = Promise<number> & { hey?: string };
+let promise: UnsafePromise = Promise.resolve(5);
+0 ? promise.catch() : 2;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -2814,9 +3195,13 @@ exports[`no-floating-promises > invalid 78`] = `
 
 exports[`no-floating-promises > invalid 79`] = `
 {
+  "code": "
+type UnsafePromise = Promise<number> & { hey?: string };
+let promise: () => UnsafePromise = async () => 5;
+null ?? promise().catch();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -2840,9 +3225,13 @@ exports[`no-floating-promises > invalid 79`] = `
 
 exports[`no-floating-promises > invalid 80`] = `
 {
+  "code": "
+type Foo<T> = Promise<T> & { hey?: string };
+declare const arrayOrPromiseTuple: Foo<unknown>[];
+arrayOrPromiseTuple;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
       "messageId": "floatingPromiseArrayVoid",
       "range": {
@@ -2866,9 +3255,14 @@ exports[`no-floating-promises > invalid 80`] = `
 
 exports[`no-floating-promises > invalid 81`] = `
 {
+  "code": "
+type SafePromise = Promise<number> & { hey?: string };
+let foo: SafePromise = Promise.resolve(1);
+let bar = [Promise.resolve(2), foo];
+bar;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
       "messageId": "floatingPromiseArrayVoid",
       "range": {
@@ -2892,9 +3286,13 @@ exports[`no-floating-promises > invalid 81`] = `
 
 exports[`no-floating-promises > invalid 82`] = `
 {
+  "code": "
+type Foo<T> = Promise<T> & { hey?: string };
+declare const arrayOrPromiseTuple: [Foo<unknown>, 5];
+arrayOrPromiseTuple;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "An array of Promises may be unintentional. Consider handling the promises' fulfillment or rejection with Promise.all or similar, or explicitly marking the expression as ignored with the \`void\` operator.",
       "messageId": "floatingPromiseArrayVoid",
       "range": {
@@ -2918,9 +3316,13 @@ exports[`no-floating-promises > invalid 82`] = `
 
 exports[`no-floating-promises > invalid 83`] = `
 {
+  "code": "
+type SafePromise = Promise<number> & { __linterBrands?: string };
+declare const myTag: (strings: TemplateStringsArray) => SafePromise;
+myTag\`abc\`;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -2944,9 +3346,13 @@ exports[`no-floating-promises > invalid 83`] = `
 
 exports[`no-floating-promises > invalid 84`] = `
 {
+  "code": "
+        declare function unsafe(...args: unknown[]): Promise<void>;
+
+        unsafe('...', () => {});
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -2970,9 +3376,13 @@ exports[`no-floating-promises > invalid 84`] = `
 
 exports[`no-floating-promises > invalid 85`] = `
 {
+  "code": "
+        declare function it(...args: unknown[]): Promise<void>;
+
+        it('...', () => {}).then(() => {});
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -2996,9 +3406,13 @@ exports[`no-floating-promises > invalid 85`] = `
 
 exports[`no-floating-promises > invalid 86`] = `
 {
+  "code": "
+        declare function it(...args: unknown[]): Promise<void>;
+
+        it('...', () => {}).finally(() => {});
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -3022,9 +3436,12 @@ exports[`no-floating-promises > invalid 86`] = `
 
 exports[`no-floating-promises > invalid 87`] = `
 {
+  "code": "
+declare const createPromise: () => PromiseLike<number>;
+createPromise();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -3048,9 +3465,17 @@ exports[`no-floating-promises > invalid 87`] = `
 
 exports[`no-floating-promises > invalid 88`] = `
 {
+  "code": "
+interface MyThenable {
+  then(onFulfilled: () => void, onRejected: () => void): MyThenable;
+}
+
+declare function createMyThenable(): MyThenable;
+
+createMyThenable();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -3074,9 +3499,12 @@ exports[`no-floating-promises > invalid 88`] = `
 
 exports[`no-floating-promises > invalid 89`] = `
 {
+  "code": "
+declare const createPromise: () => Promise<number>;
+createPromise();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -3100,9 +3528,13 @@ exports[`no-floating-promises > invalid 89`] = `
 
 exports[`no-floating-promises > invalid 90`] = `
 {
+  "code": "
+class MyPromise<T> extends Promise<T> {}
+declare const createMyPromise: () => MyPromise<number>;
+createMyPromise();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -3126,9 +3558,15 @@ exports[`no-floating-promises > invalid 90`] = `
 
 exports[`no-floating-promises > invalid 91`] = `
 {
+  "code": "
+class MyPromise<T> extends Promise<T> {
+  additional: string;
+}
+declare const createMyPromise: () => MyPromise<number>;
+createMyPromise();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -3152,9 +3590,14 @@ exports[`no-floating-promises > invalid 91`] = `
 
 exports[`no-floating-promises > invalid 92`] = `
 {
+  "code": "
+declare const x: any;
+function* generator(): Generator<number, void, Promise<number>> {
+  yield x;
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -3178,9 +3621,14 @@ exports[`no-floating-promises > invalid 92`] = `
 
 exports[`no-floating-promises > invalid 93`] = `
 {
+  "code": "
+declare const x: Generator<number, Promise<number>, void>;
+function* generator(): Generator<number, void, void> {
+  yield* x;
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -3204,9 +3652,12 @@ exports[`no-floating-promises > invalid 93`] = `
 
 exports[`no-floating-promises > invalid 94`] = `
 {
+  "code": "
+const value = {};
+value as Promise<number>;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -3230,9 +3681,11 @@ exports[`no-floating-promises > invalid 94`] = `
 
 exports[`no-floating-promises > invalid 95`] = `
 {
+  "code": "
+({}) as Promise<number> & number;
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -3256,9 +3709,11 @@ exports[`no-floating-promises > invalid 95`] = `
 
 exports[`no-floating-promises > invalid 96`] = `
 {
+  "code": "
+({}) as Promise<number> & { yolo?: string };
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -3282,9 +3737,11 @@ exports[`no-floating-promises > invalid 96`] = `
 
 exports[`no-floating-promises > invalid 97`] = `
 {
+  "code": "
+<Promise<number>>{};
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -3308,9 +3765,11 @@ exports[`no-floating-promises > invalid 97`] = `
 
 exports[`no-floating-promises > invalid 98`] = `
 {
+  "code": "
+Promise.reject('foo').then();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -3334,9 +3793,11 @@ exports[`no-floating-promises > invalid 98`] = `
 
 exports[`no-floating-promises > invalid 99`] = `
 {
+  "code": "
+Promise.reject('foo').finally();
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
       "messageId": "floatingVoid",
       "range": {
@@ -3353,41 +3814,6 @@ exports[`no-floating-promises > invalid 99`] = `
     },
   ],
   "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-floating-promises > invalid 100`] = `
-{
-  "diagnostics": [
-    {
-      "filePath": "src/virtual.ts",
-      "message": "Promises must be awaited, end with a call to .catch, end with a call to .then with a rejection handler or be explicitly marked as ignored with the \`void\` operator.",
-      "messageId": "floatingVoid",
-      "range": {
-        "end": {
-          "column": 48,
-          "line": 2,
-        },
-        "start": {
-          "column": 1,
-          "line": 2,
-        },
-      },
-      "ruleName": "@typescript-eslint/no-floating-promises",
-    },
-  ],
-  "errorCount": 1,
-  "fileCount": 1,
-  "ruleCount": 1,
-}
-`;
-
-exports[`no-floating-promises > invalid 101`] = `
-{
-  "diagnostics": [],
-  "errorCount": 0,
   "fileCount": 1,
   "ruleCount": 1,
 }

@@ -12,7 +12,7 @@ export interface ValidTestCase {
   only?: boolean;
   // TODO: support `languageOptions` later
   // languageOptions?: Linter.LanguageOptions | undefined;
-  settings?: { [name: string]: any } | undefined;
+  settings?: Record<string, any> | undefined;
 }
 
 interface SuggestionOutput {

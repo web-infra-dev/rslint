@@ -1,6 +1,9 @@
 package rule_tester
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"sync"
@@ -17,39 +20,89 @@ import (
 )
 
 type ValidTestCase struct {
-	Code     string
-	FileName string
-	Only     bool
-	Skip     bool
-	Options  any
-	TSConfig string
-	Tsx      bool
+	Code     string `json:"code"`
+	FileName string `json:"fileName"`
+	Only     bool   `json:"only"`
+	Skip     bool   `json:"skip"`
+	Options  any    `json:"options"`
+	TSConfig string `json:"tsConfig"`
+	Tsx      bool   `json:"tsx"`
 }
 
 type InvalidTestCaseError struct {
-	MessageId   string
-	Line        int
-	Column      int
-	EndLine     int
-	EndColumn   int
-	Suggestions []InvalidTestCaseSuggestion
+	MessageId   string                      `json:"messageId"`
+	Line        int                         `json:"line"`
+	Column      int                         `json:"column"`
+	EndLine     int                         `json:"endLine"`
+	EndColumn   int                         `json:"endColumn"`
+	Suggestions []InvalidTestCaseSuggestion `json:"suggestions"`
 }
 
 type InvalidTestCaseSuggestion struct {
-	MessageId string
-	Output    string
+	MessageId string `json:"messageId"`
+	Output    string `json:"output"`
 }
 
 type InvalidTestCase struct {
-	Code     string
-	FileName string
-	Only     bool
-	Skip     bool
-	Output   []string
-	Errors   []InvalidTestCaseError
-	TSConfig string
-	Options  any
-	Tsx      bool
+	Code     string                 `json:"code"`
+	FileName string                 `json:"fileName"`
+	Only     bool                   `json:"only"`
+	Skip     bool                   `json:"skip"`
+	Output   []string               `json:"output"`
+	Errors   []InvalidTestCaseError `json:"errors"`
+	TSConfig string                 `json:"tsConfig"`
+	Options  any                    `json:"options"`
+	Tsx      bool                   `json:"tsx"`
+}
+
+// TestSuite represents a complete test suite that can be loaded from JSON
+type TestSuite struct {
+	Valid   []ValidTestCase   `json:"valid"`
+	Invalid []InvalidTestCase `json:"invalid"`
+}
+
+// ESLintTestCase represents test cases from ESLint format
+type ESLintTestCase struct {
+	Code     string                 `json:"code"`
+	Filename string                 `json:"filename,omitempty"`
+	Options  []interface{}          `json:"options,omitempty"`
+	Settings map[string]interface{} `json:"settings,omitempty"`
+	Only     bool                   `json:"only,omitempty"`
+	Skip     bool                   `json:"skip,omitempty"`
+	Parser   string                 `json:"parser,omitempty"`
+}
+
+// ESLintInvalidTestCase represents invalid test cases from ESLint format
+type ESLintInvalidTestCase struct {
+	ESLintTestCase
+	Output      string             `json:"output,omitempty"`
+	Errors      []ESLintError      `json:"errors"`
+	Suggestions []ESLintSuggestion `json:"suggestions,omitempty"`
+}
+
+// ESLintError represents an error in ESLint format
+type ESLintError struct {
+	Message     string             `json:"message,omitempty"`
+	MessageId   string             `json:"messageId,omitempty"`
+	Type        string             `json:"type,omitempty"`
+	Line        int                `json:"line,omitempty"`
+	Column      int                `json:"column,omitempty"`
+	EndLine     int                `json:"endLine,omitempty"`
+	EndColumn   int                `json:"endColumn,omitempty"`
+	Suggestions []ESLintSuggestion `json:"suggestions,omitempty"`
+}
+
+// ESLintSuggestion represents a suggestion in ESLint format
+type ESLintSuggestion struct {
+	MessageId string `json:"messageId,omitempty"`
+	Desc      string `json:"desc,omitempty"`
+	Output    string `json:"output,omitempty"`
+}
+
+// ESLintTestSuite represents a complete ESLint test suite
+type ESLintTestSuite struct {
+	Valid   []ESLintTestCase        `json:"valid"`
+	Invalid []ESLintInvalidTestCase `json:"invalid"`
 }
 
 func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Rule, validTestCases []ValidTestCase, invalidTestCases []InvalidTestCase) {
@@ -225,4 +278,165 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 			}
 		})
 	}
+}
+
+// LoadTestSuiteFromJSON loads test cases from a JSON file
+func LoadTestSuiteFromJSON(filePath string) (*TestSuite, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var suite TestSuite
+	if err := json.Unmarshal(data, &suite); err != nil {
+		return nil, err
+	}
+
+	return &suite, nil
+}
+
+// LoadESLintTestSuiteFromJSON loads ESLint-format test cases from a JSON file
+func LoadESLintTestSuiteFromJSON(filePath string) (*ESLintTestSuite, error) {
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	var suite ESLintTestSuite
+	if err := json.Unmarshal(data, &suite); err != nil {
+		return nil, err
+	}
+
+	return &suite, nil
+}
+
+// ConvertESLintTestCase converts an ESLint test case to our internal format
+func ConvertESLintTestCase(tc ESLintTestCase) ValidTestCase {
+	var options any
+	if len(tc.Options) > 0 {
+		// If single option, unwrap it; otherwise keep as array
+		if len(tc.Options) == 1 {
+			options = tc.Options[0]
+		} else {
+			options = tc.Options
+		}
+	}
+
+	fileName := "file.ts"
+	tsx := false
+	if tc.Filename != "" {
+		fileName = tc.Filename
+		if filepath.Ext(fileName) == ".tsx" || filepath.Ext(fileName) == ".jsx" {
+			tsx = true
+		}
+	}
+
+	return ValidTestCase{
+		Code:     tc.Code,
+		FileName: fileName,
+		Only:     tc.Only,
+		Skip:     tc.Skip,
+		Options:  options,
+		Tsx:      tsx,
+	}
+}
+
+// ConvertESLintInvalidTestCase converts an ESLint invalid test case to our internal format
+func ConvertESLintInvalidTestCase(tc ESLintInvalidTestCase) InvalidTestCase {
+	var options any
+	if len(tc.Options) > 0 {
+		if len(tc.Options) == 1 {
+			options = tc.Options[0]
+		} else {
+			options = tc.Options
+		}
+	}
+
+	fileName := "file.ts"
+	tsx := false
+	if tc.Filename != "" {
+		fileName = tc.Filename
+		if filepath.Ext(fileName) == ".tsx" || filepath.Ext(fileName) == ".jsx" {
+			tsx = true
+		}
+	}
+
+	// Convert errors
+	errors := make([]InvalidTestCaseError, len(tc.Errors))
+	for i, err := range tc.Errors {
+		suggestions := make([]InvalidTestCaseSuggestion, len(err.Suggestions))
+		for j, sug := range err.Suggestions {
+			suggestions[j] = InvalidTestCaseSuggestion{
+				MessageId: sug.MessageId,
+				Output:    sug.Output,
+			}
+		}
+
+		errors[i] = InvalidTestCaseError{
+			MessageId:   err.MessageId,
+			Line:        err.Line,
+			Column:      err.Column,
+			EndLine:     err.EndLine,
+			EndColumn:   err.EndColumn,
+			Suggestions: suggestions,
+		}
+	}
+
+	// Handle output
+	var output []string
+	if tc.Output != "" {
+		output = []string{tc.Output}
+	}
+
+	return InvalidTestCase{
+		Code:     tc.Code,
+		FileName: fileName,
+		Only:     tc.Only,
+		Skip:     tc.Skip,
+		Output:   output,
+		Errors:   errors,
+		Options:  options,
+		Tsx:      tsx,
+	}
+}
+
+// ConvertESLintTestSuite converts an entire ESLint test suite to our internal format
+func ConvertESLintTestSuite(suite *ESLintTestSuite) *TestSuite {
+	valid := make([]ValidTestCase, len(suite.Valid))
+	for i, tc := range suite.Valid {
+		valid[i] = ConvertESLintTestCase(tc)
+	}
+
+	invalid := make([]InvalidTestCase, len(suite.Invalid))
+	for i, tc := range suite.Invalid {
+		invalid[i] = ConvertESLintInvalidTestCase(tc)
+	}
+
+	return &TestSuite{
+		Valid:   valid,
+		Invalid: invalid,
+	}
+}
+
+// RunRuleTesterFromJSON loads and runs tests from a JSON file
+func RunRuleTesterFromJSON(rootDir string, tsconfigPath string, testFilePath string, t *testing.T, r *rule.Rule) error {
+	suite, err := LoadTestSuiteFromJSON(testFilePath)
+	if err != nil {
+		return err
+	}
+
+	RunRuleTester(rootDir, tsconfigPath, t, r, suite.Valid, suite.Invalid)
+	return nil
+}
+
+// RunRuleTesterFromESLintJSON loads and runs ESLint-format tests from a JSON file
+func RunRuleTesterFromESLintJSON(rootDir string, tsconfigPath string, testFilePath string, t *testing.T, r *rule.Rule) error {
+	eslintSuite, err := LoadESLintTestSuiteFromJSON(testFilePath)
+	if err != nil {
+		return err
+	}
+
+	suite := ConvertESLintTestSuite(eslintSuite)
+	RunRuleTester(rootDir, tsconfigPath, t, r, suite.Valid, suite.Invalid)
+	return nil
 }

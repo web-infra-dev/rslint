@@ -145,3 +145,6 @@ ESLint
 colocate
 co-locate
 shadcn
+Nullishness
+constantness
+testdata
