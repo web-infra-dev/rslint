@@ -7,8 +7,10 @@ import (
 )
 
 type ClassMethodsUseThisOptions struct {
-	ExceptMethods          []string `json:"exceptMethods"`
-	EnforceForClassFields  bool     `json:"enforceForClassFields"`
+	ExceptMethods                         []string `json:"exceptMethods"`
+	EnforceForClassFields                 bool     `json:"enforceForClassFields"`
+	IgnoreClassesThatImplementAnInterface interface{} `json:"ignoreClassesThatImplementAnInterface"`
+	IgnoreOverrideMethods                 bool     `json:"ignoreOverrideMethods"`
 }
 
 type scopeInfo struct {
@@ -23,6 +25,8 @@ var ClassMethodsUseThisRule = rule.CreateRule(rule.Rule{
 		opts := ClassMethodsUseThisOptions{
 			ExceptMethods:         []string{},
 			EnforceForClassFields: true,
+			IgnoreClassesThatImplementAnInterface: false,
+			IgnoreOverrideMethods: false,
 		}
 
 		// Parse options
@@ -47,6 +51,12 @@ var ClassMethodsUseThisRule = rule.CreateRule(rule.Rule{
 				if enforceForClassFields, ok := optsMap["enforceForClassFields"].(bool); ok {
 					opts.EnforceForClassFields = enforceForClassFields
 				}
+				if ignoreClasses, ok := optsMap["ignoreClassesThatImplementAnInterface"]; ok {
+					opts.IgnoreClassesThatImplementAnInterface = ignoreClasses
+				}
+				if ignoreOverride, ok := optsMap["ignoreOverrideMethods"].(bool); ok {
+					opts.IgnoreOverrideMethods = ignoreOverride
+				}
 			}
 		}
 
@@ -70,6 +80,101 @@ var ClassMethodsUseThisRule = rule.CreateRule(rule.Rule{
 				current = current.Parent
 			}
 			return false
+		}
+
+		// Helper to get the parent class node
+		getParentClass := func(node *ast.Node) *ast.Node {
+			current := node.Parent
+			for current != nil {
+				if current.Kind == ast.KindClassDeclaration || current.Kind == ast.KindClassExpression {
+					return current
+				}
+				current = current.Parent
+			}
+			return nil
+		}
+
+		// Helper to check if a class implements an interface
+		classImplementsInterface := func(classNode *ast.Node) bool {
+			if classNode == nil {
+				return false
+			}
+
+			heritageClauses := utils.GetHeritageClauses(classNode)
+			if heritageClauses == nil || len(heritageClauses.Nodes) == 0 {
+				return false
+			}
+
+			for _, clauseNode := range heritageClauses.Nodes {
+				clause := clauseNode.AsHeritageClause()
+				if clause != nil && clause.Token == ast.KindImplementsKeyword {
+					return true
+				}
+			}
+			return false
+		}
+
+		// Helper to check if member should be ignored based on ignoreClassesThatImplementAnInterface option
+		shouldIgnoreInterfaceImpl := func(node *ast.Node) bool {
+			if opts.IgnoreClassesThatImplementAnInterface == nil || opts.IgnoreClassesThatImplementAnInterface == false {
+				return false
+			}
+
+			classNode := getParentClass(node)
+			if !classImplementsInterface(classNode) {
+				return false
+			}
+
+			// If option is true, ignore all members of classes that implement interfaces
+			if boolVal, ok := opts.IgnoreClassesThatImplementAnInterface.(bool); ok && boolVal {
+				return true
+			}
+
+			// If option is "public-fields", only ignore public members
+			if strVal, ok := opts.IgnoreClassesThatImplementAnInterface.(string); ok && strVal == "public-fields" {
+				// Check if the member is private or protected
+				hasPrivateModifier := ast.HasSyntacticModifier(node, ast.ModifierFlagsPrivate)
+				hasProtectedModifier := ast.HasSyntacticModifier(node, ast.ModifierFlagsProtected)
+				isPrivateName := false
+
+				// Check if it's a private name (starts with #)
+				if node.Kind == ast.KindMethodDeclaration {
+					if method := node.AsMethodDeclaration(); method != nil && method.Name() != nil {
+						_, nameType := utils.GetNameFromMember(ctx.SourceFile, method.Name())
+						isPrivateName = nameType == utils.MemberNameTypePrivate
+					}
+				} else if node.Kind == ast.KindPropertyDeclaration {
+					if prop := node.AsPropertyDeclaration(); prop != nil && prop.Name() != nil {
+						_, nameType := utils.GetNameFromMember(ctx.SourceFile, prop.Name())
+						isPrivateName = nameType == utils.MemberNameTypePrivate
+					}
+				} else if node.Kind == ast.KindGetAccessor {
+					if accessor := node.AsGetAccessorDeclaration(); accessor != nil && accessor.Name() != nil {
+						_, nameType := utils.GetNameFromMember(ctx.SourceFile, accessor.Name())
+						isPrivateName = nameType == utils.MemberNameTypePrivate
+					}
+				} else if node.Kind == ast.KindSetAccessor {
+					if accessor := node.AsSetAccessorDeclaration(); accessor != nil && accessor.Name() != nil {
+						_, nameType := utils.GetNameFromMember(ctx.SourceFile, accessor.Name())
+						isPrivateName = nameType == utils.MemberNameTypePrivate
+					}
+				}
+
+				// If it's private or protected, don't ignore it (check it)
+				if hasPrivateModifier || hasProtectedModifier || isPrivateName {
+					return false
+				}
+
+				// It's a public member, so ignore it
+				return true
+			}
+
+			return false
+		}
+
+		// Helper to check if member has override modifier
+		hasOverrideModifier := func(node *ast.Node) bool {
+			return ast.HasSyntacticModifier(node, ast.ModifierFlagsOverride)
 		}
 
 		// Get method name for display
@@ -178,6 +283,16 @@ var ClassMethodsUseThisRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
+			// Skip if has override modifier and ignoreOverrideMethods is true
+			if opts.IgnoreOverrideMethods && hasOverrideModifier(node) {
+				return
+			}
+
+			// Skip if in a class that implements an interface and should be ignored
+			if shouldIgnoreInterfaceImpl(node) {
+				return
+			}
+
 			// Check if method is in except list
 			var methodName string
 			if node.Kind == ast.KindMethodDeclaration {
@@ -254,6 +369,16 @@ var ClassMethodsUseThisRule = rule.CreateRule(rule.Rule{
 
 			// Skip if not in a class
 			if !isInClass(parent) {
+				return
+			}
+
+			// Skip if has override modifier and ignoreOverrideMethods is true
+			if opts.IgnoreOverrideMethods && hasOverrideModifier(parent) {
+				return
+			}
+
+			// Skip if in a class that implements an interface and should be ignored
+			if shouldIgnoreInterfaceImpl(parent) {
 				return
 			}
 
