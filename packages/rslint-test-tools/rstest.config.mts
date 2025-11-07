@@ -36,7 +36,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/ban-tslint-comment.test.ts',
     './tests/typescript-eslint/rules/class-methods-use-this/class-methods-use-this-core.test.ts',
     './tests/typescript-eslint/rules/class-methods-use-this/class-methods-use-this.test.ts',
-    // './tests/typescript-eslint/rules/consistent-generic-constructors.test.ts',
+    './tests/typescript-eslint/rules/consistent-generic-constructors.test.ts',
     // './tests/typescript-eslint/rules/consistent-indexed-object-style.test.ts',
     // './tests/typescript-eslint/rules/consistent-return.test.ts',
     // './tests/typescript-eslint/rules/consistent-type-assertions.test.ts',
