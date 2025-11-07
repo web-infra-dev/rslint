@@ -168,6 +168,7 @@ type RuleContext struct {
 	DisableManager             *DisableManager
 	ReportRange                func(textRange core.TextRange, msg RuleMessage)
 	ReportRangeWithSuggestions func(textRange core.TextRange, msg RuleMessage, suggestions ...RuleSuggestion)
+	ReportRangeWithFixes       func(textRange core.TextRange, msg RuleMessage, fixes ...RuleFix)
 	ReportNode                 func(node *ast.Node, msg RuleMessage)
 	ReportNodeWithFixes        func(node *ast.Node, msg RuleMessage, fixes ...RuleFix)
 	ReportNodeWithSuggestions  func(node *ast.Node, msg RuleMessage, suggestions ...RuleSuggestion)
