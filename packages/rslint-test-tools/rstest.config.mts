@@ -33,7 +33,7 @@ export default defineConfig({
     // Additional tests (commented out)
     // typescript-eslint - additional rules
     './tests/typescript-eslint/rules/ban-ts-comment.test.ts',
-    // './tests/typescript-eslint/rules/ban-tslint-comment.test.ts',
+    './tests/typescript-eslint/rules/ban-tslint-comment.test.ts',
     // './tests/typescript-eslint/rules/class-methods-use-this/class-methods-use-this-core.test.ts',
     // './tests/typescript-eslint/rules/class-methods-use-this/class-methods-use-this.test.ts',
     // './tests/typescript-eslint/rules/consistent-generic-constructors.test.ts',
