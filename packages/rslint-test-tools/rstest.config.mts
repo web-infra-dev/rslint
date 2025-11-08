@@ -44,7 +44,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/consistent-type-exports.test.ts',
     // './tests/typescript-eslint/rules/consistent-type-imports.test.ts',
     './tests/typescript-eslint/rules/default-param-last.test.ts',
-    // './tests/typescript-eslint/rules/explicit-function-return-type.test.ts',
+    './tests/typescript-eslint/rules/explicit-function-return-type.test.ts',
     // './tests/typescript-eslint/rules/explicit-member-accessibility.test.ts',
     // './tests/typescript-eslint/rules/explicit-module-boundary-types.test.ts',
     // './tests/typescript-eslint/rules/init-declarations.test.ts',
