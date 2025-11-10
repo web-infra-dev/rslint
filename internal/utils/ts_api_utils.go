@@ -55,13 +55,34 @@ func IsTypeParameter(t *checker.Type) bool {
 	return IsTypeFlagSet(t, checker.TypeFlagsTypeParameter)
 }
 func IsBooleanLiteralType(t *checker.Type) bool {
-	return IsTypeFlagSet(t, checker.TypeFlagsBoolean)
+	return IsTypeFlagSet(t, checker.TypeFlagsBooleanLiteral)
 }
-func IsTrueLiteralType(t *checker.Type) bool {
-	return IsBooleanLiteralType(t) && IsIntrinsicType(t) && t.AsIntrinsicType().IntrinsicName() == "true"
+func IsTrueLiteralType(typeChecker *checker.Checker, t *checker.Type) bool {
+	if !IsBooleanLiteralType(t) {
+		return false
+	}
+	// For boolean literals, check if it's specifically the 'true' type
+	// by checking if it's an intrinsic type with name "true"
+	if IsIntrinsicType(t) && t.AsIntrinsicType().IntrinsicName() == "true" {
+		return true
+	}
+	// Fallback: use TypeToString to distinguish true from false
+	// This works because true and false have different string representations
+	typeStr := typeChecker.TypeToString(t)
+	return typeStr == "true"
 }
-func IsFalseLiteralType(t *checker.Type) bool {
-	return IsBooleanLiteralType(t) && IsIntrinsicType(t) && t.AsIntrinsicType().IntrinsicName() == "false"
+func IsFalseLiteralType(typeChecker *checker.Checker, t *checker.Type) bool {
+	if !IsBooleanLiteralType(t) {
+		return false
+	}
+	// For boolean literals, check if it's specifically the 'false' type
+	// by checking if it's an intrinsic type with name "false"
+	if IsIntrinsicType(t) && t.AsIntrinsicType().IntrinsicName() == "false" {
+		return true
+	}
+	// Fallback: use TypeToString to distinguish true from false
+	typeStr := typeChecker.TypeToString(t)
+	return typeStr == "false"
 }
 
 func GetCallSignatures(typeChecker *checker.Checker, t *checker.Type) []*checker.Signature {
