@@ -1,0 +1,1205 @@
+// Rstest Snapshot v1
+
+exports[`class-methods-use-this > invalid 1`] = `
+{
+  "code": "
+class Foo {
+  method() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 2`] = `
+{
+  "code": "
+class Foo {
+  private method() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 3`] = `
+{
+  "code": "
+class Foo {
+  protected method() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 4`] = `
+{
+  "code": "
+class Foo {
+  accessor method = () => {};
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 5`] = `
+{
+  "code": "
+class Foo {
+  private accessor method = () => {};
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 3,
+        },
+        "start": {
+          "column": 29,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 6`] = `
+{
+  "code": "
+class Foo {
+  protected accessor method = () => {};
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 3,
+        },
+        "start": {
+          "column": 31,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 7`] = `
+{
+  "code": "
+class Foo {
+  #method() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private method #method.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 8`] = `
+{
+  "code": "
+class Foo {
+  get getter(): number {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 9`] = `
+{
+  "code": "
+class Foo {
+  private get getter(): number {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 10`] = `
+{
+  "code": "
+class Foo {
+  protected get getter(): number {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 11`] = `
+{
+  "code": "
+class Foo {
+  get #getter(): number {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private getter #getter.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 12`] = `
+{
+  "code": "
+class Foo {
+  set setter(b: number) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 13`] = `
+{
+  "code": "
+class Foo {
+  private set setter(b: number) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 14`] = `
+{
+  "code": "
+class Foo {
+  protected set setter(b: number) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 15`] = `
+{
+  "code": "
+class Foo {
+  set #setter(b: number) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private setter #setter.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 16`] = `
+{
+  "code": "
+class Foo implements Bar {
+  method() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 17`] = `
+{
+  "code": "
+class Foo implements Bar {
+  #method() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private method #method.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 18`] = `
+{
+  "code": "
+class Foo implements Bar {
+  private method() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 19`] = `
+{
+  "code": "
+class Foo implements Bar {
+  protected method() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 20`] = `
+{
+  "code": "
+class Foo implements Bar {
+  get getter(): number {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 21`] = `
+{
+  "code": "
+class Foo implements Bar {
+  get #getter(): number {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private getter #getter.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 22`] = `
+{
+  "code": "
+class Foo implements Bar {
+  private get getter(): number {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 23`] = `
+{
+  "code": "
+class Foo implements Bar {
+  protected get getter(): number {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 24`] = `
+{
+  "code": "
+class Foo implements Bar {
+  set setter(v: number) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 25`] = `
+{
+  "code": "
+class Foo implements Bar {
+  set #setter(v: number) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private setter #setter.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 26`] = `
+{
+  "code": "
+class Foo implements Bar {
+  private set setter(v: number) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 27`] = `
+{
+  "code": "
+class Foo implements Bar {
+  protected set setter(v: number) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 28`] = `
+{
+  "code": "
+class Foo {
+  override method() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 29`] = `
+{
+  "code": "
+class Foo {
+  override get getter(): number {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 30`] = `
+{
+  "code": "
+class Foo {
+  override set setter(v: number) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 31`] = `
+{
+  "code": "
+class Foo implements Bar {
+  override method() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 32`] = `
+{
+  "code": "
+class Foo implements Bar {
+  override get getter(): number {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class getter 'getter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 33`] = `
+{
+  "code": "
+class Foo implements Bar {
+  override set setter(v: number) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class setter 'setter'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 34`] = `
+{
+  "code": "
+class Foo implements Bar {
+  property = () => {};
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'property'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 35`] = `
+{
+  "code": "
+class Foo implements Bar {
+  #property = () => {};
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class private method #property.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 36`] = `
+{
+  "code": "
+class Foo {
+  override property = () => {};
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'property'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 23,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 37`] = `
+{
+  "code": "
+class Foo implements Bar {
+  override property = () => {};
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'property'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 23,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 38`] = `
+{
+  "code": "
+class Foo implements Bar {
+  private property = () => {};
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'property'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 39`] = `
+{
+  "code": "
+class Foo implements Bar {
+  protected property = () => {};
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'property'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 24,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class-methods-use-this > invalid 40`] = `
+{
+  "code": "
+function fn() {
+  this.foo = 303;
+
+  class Foo {
+    method() {}
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected 'this' to be used by class method 'method'.",
+      "messageId": "missingThis",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/class-methods-use-this",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
