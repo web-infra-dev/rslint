@@ -36,6 +36,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_empty_function"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_empty_interface"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_explicit_any"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_extra_non_null_assertion"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_extraneous_class"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_floating_promises"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_for_in_array"
@@ -394,6 +395,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/no-duplicate-enum-values", no_duplicate_enum_values.NoDuplicateEnumValuesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-duplicate-type-constituents", no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-explicit-any", no_explicit_any.NoExplicitAnyRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-extra-non-null-assertion", no_extra_non_null_assertion.NoExtraNonNullAssertionRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-empty-function", no_empty_function.NoEmptyFunctionRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-empty-interface", no_empty_interface.NoEmptyInterfaceRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-extraneous-class", no_extraneous_class.NoExtraneousClassRule)
