@@ -33,18 +33,18 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_empty_interface"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_explicit_any"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_extraneous_class"
-	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_invalid_void_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_floating_promises"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_for_in_array"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_implied_eval"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_invalid_void_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_meaningless_void_operator"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_misused_promises"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_misused_spread"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_mixed_enums"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_namespace"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_redundant_type_constituents"
-	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_this_alias"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_require_imports"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_this_alias"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unnecessary_boolean_literal_compare"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unnecessary_template_expression"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_unnecessary_type_arguments"
@@ -94,6 +94,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_constant_binary_expression"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constant_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constructor_return"
+	"github.com/web-infra-dev/rslint/internal/rules/no_debugger"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -457,6 +458,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-constant-binary-expression", no_constant_binary_expression.NoConstantBinaryExpressionRule)
 	GlobalRuleRegistry.Register("no-constant-condition", no_constant_condition.NoConstantConditionRule)
 	GlobalRuleRegistry.Register("no-constructor-return", no_constructor_return.NoConstructorReturnRule)
+	GlobalRuleRegistry.Register("no-debugger", no_debugger.NoDebuggerRule)
 }
 
 // getAllTypeScriptEslintPluginRules returns all registered rules (for backward compatibility when no config is provided)
