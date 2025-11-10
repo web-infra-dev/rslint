@@ -28,7 +28,73 @@
       "failing_case": []
     },
     {
+      "name": "ban-ts-comment",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "ban-types",
+      "group": "@typescript-eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
       "name": "class-literal-property-style",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "consistent-generic-constructors",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "consistent-indexed-object-style",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "consistent-return",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "consistent-type-assertions",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "consistent-type-definitions",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "consistent-type-exports",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "consistent-type-imports",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "default-param-last",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "dot-notation",
       "group": "@typescript-eslint",
       "status": "full",
       "failing_case": []
@@ -42,11 +108,17 @@
     {
       "name": "no-base-to-string",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "no-confusing-void-expression",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "no-duplicate-enum-values",
       "group": "@typescript-eslint",
       "status": "full",
       "failing_case": []
@@ -76,15 +148,21 @@
       "failing_case": []
     },
     {
+      "name": "no-extraneous-class",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
       "name": "no-floating-promises",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "no-for-in-array",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
@@ -94,27 +172,33 @@
       "failing_case": []
     },
     {
+      "name": "no-invalid-void-type",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
       "name": "no-meaningless-void-operator",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "no-misused-promises",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "no-misused-spread",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "no-mixed-enums",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
@@ -126,7 +210,7 @@
     {
       "name": "no-redundant-type-constituents",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
@@ -142,75 +226,81 @@
       "failing_case": []
     },
     {
+      "name": "no-this-alias",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
       "name": "no-unnecessary-boolean-literal-compare",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "no-unnecessary-template-expression",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "no-unnecessary-type-arguments",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "no-unnecessary-type-assertion",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "no-unsafe-argument",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "no-unsafe-assignment",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "no-unsafe-call",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "no-unsafe-enum-comparison",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "no-unsafe-member-access",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "no-unsafe-return",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "no-unsafe-type-assertion",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "no-unsafe-unary-minus",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
@@ -222,109 +312,133 @@
     {
       "name": "no-useless-empty-export",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "no-var-requires",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "no-webpack-loader-syntax",
+      "group": "eslint-plugin-import",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "non-nullable-type-assertion-style",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "only-throw-error",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "prefer-as-const",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "prefer-promise-reject-errors",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "prefer-readonly-parameter-types",
+      "group": "@typescript-eslint",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "prefer-reduce-type-parameter",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "prefer-return-this-type",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "promise-function-async",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "related-getter-setter-pairs",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "require-array-sort-compare",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "require-await",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "restrict-plus-operands",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "restrict-template-expressions",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "return-await",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "switch-exhaustiveness-check",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "triple-slash-reference",
+      "group": "@typescript-eslint",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "unbound-method",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "unified-signatures",
+      "group": "@typescript-eslint",
+      "status": "full",
       "failing_case": []
     },
     {
       "name": "use-unknown-in-catch-callback-variable",
       "group": "@typescript-eslint",
-      "status": "partial-test",
+      "status": "full",
       "failing_case": []
     }
   ]
