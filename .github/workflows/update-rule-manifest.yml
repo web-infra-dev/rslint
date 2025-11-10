@@ -17,14 +17,14 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20.19.5
+          node-version: '24'
 
       - name: Check for rule changes
         id: diff
         run: |
           git fetch origin main
-          git diff --name-only HEAD~10 HEAD | grep '^internal/rules/' || echo '' > changed_rules.txt
-          git diff --name-status HEAD~10 HEAD | grep '^internal/rules/' || echo '' > changed_rules_status.txt
+          git diff --name-only HEAD~10 HEAD | grep '^internal/plugins/' || echo '' > changed_rules.txt
+          git diff --name-status HEAD~10 HEAD | grep '^internal/plugins/' || echo '' > changed_rules_status.txt
 
       - name: Generate rule-manifest.json if rules changed
         if: ${{ hashFiles('changed_rules.txt') != '' }}
