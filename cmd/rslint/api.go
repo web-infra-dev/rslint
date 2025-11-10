@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"sort"
 	"sync"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -219,6 +220,16 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	if diagnostics == nil {
 		diagnostics = []api.Diagnostic{}
 	}
+	// sort diagnostics
+	sort.Slice(diagnostics, func(i, j int) bool {
+		if diagnostics[i].FilePath != diagnostics[j].FilePath {
+			return diagnostics[i].FilePath < diagnostics[j].FilePath
+		}
+		if diagnostics[i].Range.Start.Line != diagnostics[j].Range.Start.Line {
+			return diagnostics[i].Range.Start.Line < diagnostics[j].Range.Start.Line
+		}
+		return diagnostics[i].Range.Start.Column < diagnostics[j].Range.Start.Column
+	})
 
 	// Create response
 	response := &api.LintResponse{
