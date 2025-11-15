@@ -32,7 +32,7 @@
     "esbuild-plugin-polyfill-node": "0.3.0",
     "memfs": "^4.49.0",
     "prebundle": "1.4.1",
-    "@typescript/native-preview": "7.0.0-dev.20250904.1"
+    "@typescript/native-preview": "7.0.0-dev.20251115.1"
   },
   "dependencies": {
     "@rslint/core": "workspace:*"
