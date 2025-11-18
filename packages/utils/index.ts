@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export const AST_NODE_TYPES: any = {};
 export enum AST_TOKEN_TYPES {
   Identifier,
