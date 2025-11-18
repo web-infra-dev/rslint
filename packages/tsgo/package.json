@@ -1,0 +1,17 @@
+{
+  "name": "@rslint/tsgo",
+  "version": "0.0.4",
+  "description": "custom tsgo binary",
+  "files": ["lib"],
+  "main": "index.js",
+  "scripts": {
+     "build": "cp -r ../../typescript-go/built/local ./lib"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  }
+}
