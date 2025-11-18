@@ -10,8 +10,7 @@ import "github.com/microsoft/typescript-go/internal/project"
 import _ "unsafe"
 
 type API = api.API
-type APIHost = api.APIHost
-type APIOptions = api.APIOptions
+type APIInit = api.APIInit
 type Callback = api.Callback
 const CallbackDirectoryExists = api.CallbackDirectoryExists
 const CallbackFileExists = api.CallbackFileExists
@@ -60,7 +59,7 @@ const MethodLoadProject = api.MethodLoadProject
 const MethodParseConfigFile = api.MethodParseConfigFile
 const MethodRelease = api.MethodRelease
 //go:linkname NewAPI github.com/microsoft/typescript-go/internal/api.NewAPI
-func NewAPI(host api.APIHost, options api.APIOptions) *api.API
+func NewAPI(init *api.APIInit) *api.API
 //go:linkname NewProjectResponse github.com/microsoft/typescript-go/internal/api.NewProjectResponse
 func NewProjectResponse(project *project.Project) *api.ProjectResponse
 //go:linkname NewServer github.com/microsoft/typescript-go/internal/api.NewServer

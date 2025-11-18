@@ -5,7 +5,9 @@
   "files": ["lib"],
   "main": "index.js",
   "scripts": {
-     "build": "cp -r ../../typescript-go/built/local ./lib"
+     "build:bin": "go build -o ./lib/tsgo ../../cmd/tsgo/main.go",
+     "build:tsgo": "cp -r ../../typescript-go/built/local ./lib",
+     "build": "pnpm run build:tsgo && pnpm run build:bin"
   },
   "keywords": [],
   "author": "",
