@@ -5,7 +5,6 @@ package checker
 
 import "context"
 import "github.com/microsoft/typescript-go/internal/ast"
-import "github.com/microsoft/typescript-go/internal/binder"
 import "github.com/microsoft/typescript-go/internal/checker"
 import "github.com/microsoft/typescript-go/internal/collections"
 import "github.com/microsoft/typescript-go/internal/core"
@@ -29,10 +28,6 @@ const AccessFlagsPersistent = checker.AccessFlagsPersistent
 const AccessFlagsReportDeprecated = checker.AccessFlagsReportDeprecated
 const AccessFlagsSuppressNoImplicitAnyError = checker.AccessFlagsSuppressNoImplicitAnyError
 const AccessFlagsWriting = checker.AccessFlagsWriting
-type AccessKind = checker.AccessKind
-const AccessKindRead = checker.AccessKindRead
-const AccessKindReadWrite = checker.AccessKindReadWrite
-const AccessKindWrite = checker.AccessKindWrite
 type AliasSymbolLinks = checker.AliasSymbolLinks
 type ArrayLiteralLinks = checker.ArrayLiteralLinks
 type ArrayToSingleTypeMapper = checker.ArrayToSingleTypeMapper
@@ -193,7 +188,6 @@ type extra_Checker struct {
   argumentsSymbol *ast.Symbol
   requireSymbol *ast.Symbol
   unknownSymbol *ast.Symbol
-  resolvingSymbol *ast.Symbol
   unresolvedSymbols map[string]*ast.Symbol
   errorTypes map[string]*checker.Type
   globalThisSymbol *ast.Symbol
@@ -421,7 +415,7 @@ type extra_Checker struct {
   couldContainTypeVariables func(*checker.Type) bool
   isStringIndexSignatureOnlyType func(*checker.Type) bool
   markNodeAssignments func(*ast.Node) bool
-  emitResolver extra_emitResolver
+  emitResolver *checker.EmitResolver
   emitResolverOnce sync.Once
   _jsxNamespace string
   _jsxFactoryEntity *ast.Node
@@ -432,16 +426,6 @@ type extra_Checker struct {
   activeTypeMappersCaches []map[string]*checker.Type
   ambientModulesOnce sync.Once
   ambientModules []*ast.Symbol
-}
-type extra_emitResolver struct {
-  checker *checker.Checker
-  checkerMu sync.Mutex
-  isValueAliasDeclaration func(node *ast.Node) bool
-  aliasMarkingVisitor func(node *ast.Node) bool
-  referenceResolver binder.ReferenceResolver
-  jsxLinks core.LinkStore[*ast.Node, checker.JSXLinks]
-  declarationLinks core.LinkStore[*ast.Node, checker.DeclarationLinks]
-  declarationFileLinks core.LinkStore[*ast.Node, checker.DeclarationFileLinks]
 }
 func Checker_numberType(v *checker.Checker) *checker.Type {
   return ((*extra_Checker)(unsafe.Pointer(v))).numberType
@@ -500,6 +484,7 @@ const ElementFlagsRequired = checker.ElementFlagsRequired
 const ElementFlagsRest = checker.ElementFlagsRest
 const ElementFlagsVariable = checker.ElementFlagsVariable
 const ElementFlagsVariadic = checker.ElementFlagsVariadic
+type EmitResolver = checker.EmitResolver
 type EnumLiteralKey = checker.EnumLiteralKey
 type EnumMemberLinks = checker.EnumMemberLinks
 type EnumRelationKey = checker.EnumRelationKey
@@ -540,8 +525,6 @@ func GetDeclarationModifierFlagsFromSymbol(s *ast.Symbol) ast.ModifierFlags
 func GetResolvedSignatureForSignatureHelp(node *ast.Node, argumentCount int, c *checker.Checker) (*checker.Signature, []*checker.Signature)
 //go:linkname GetSingleVariableOfVariableStatement github.com/microsoft/typescript-go/internal/checker.GetSingleVariableOfVariableStatement
 func GetSingleVariableOfVariableStatement(node *ast.Node) *ast.Node
-//go:linkname HasModifier github.com/microsoft/typescript-go/internal/checker.HasModifier
-func HasModifier(node *ast.Node, flags ast.ModifierFlags) bool
 type Host = checker.Host
 type IndexFlags = checker.IndexFlags
 const IndexFlagsNoIndexSignatures = checker.IndexFlagsNoIndexSignatures
@@ -708,6 +691,7 @@ func NewNodeBuilder(ch *checker.Checker, e *printer.EmitContext) *checker.NodeBu
 func NewSymbolTrackerImpl(context *checker.NodeBuilderContext, tracker nodebuilder.SymbolTracker, tchost checker.Host) *checker.SymbolTrackerImpl
 type NodeBuilder = checker.NodeBuilder
 type NodeBuilderContext = checker.NodeBuilderContext
+type NodeBuilderImpl = checker.NodeBuilderImpl
 type NodeBuilderLinks = checker.NodeBuilderLinks
 type NodeBuilderSymbolLinks = checker.NodeBuilderSymbolLinks
 type NodeCheckFlags = checker.NodeCheckFlags
@@ -887,7 +871,6 @@ const SignatureKindConstruct = checker.SignatureKindConstruct
 type SignatureLinks = checker.SignatureLinks
 type SignatureToSignatureDeclarationOptions = checker.SignatureToSignatureDeclarationOptions
 type SimpleTypeMapper = checker.SimpleTypeMapper
-type SingleSignatureType = checker.SingleSignatureType
 //go:linkname SkipAlias github.com/microsoft/typescript-go/internal/checker.SkipAlias
 func SkipAlias(symbol *ast.Symbol, checker *checker.Checker) *ast.Symbol
 //go:linkname SkipTypeChecking github.com/microsoft/typescript-go/internal/checker.SkipTypeChecking
@@ -919,6 +902,8 @@ const TernaryMaybe = checker.TernaryMaybe
 const TernaryTrue = checker.TernaryTrue
 const TernaryUnknown = checker.TernaryUnknown
 type TrackedSymbolArgs = checker.TrackedSymbolArgs
+//go:linkname TryGetModuleSpecifierFromDeclaration github.com/microsoft/typescript-go/internal/checker.TryGetModuleSpecifierFromDeclaration
+func TryGetModuleSpecifierFromDeclaration(node *ast.Node) *ast.Node
 type TupleElementInfo = checker.TupleElementInfo
 type TupleNormalizer = checker.TupleNormalizer
 type TupleType = checker.TupleType
@@ -1159,6 +1144,7 @@ type TypeReference = checker.TypeReference
 type TypeResolution = checker.TypeResolution
 type TypeSystemEntity = checker.TypeSystemEntity
 type TypeSystemPropertyName = checker.TypeSystemPropertyName
+const TypeSystemPropertyNameAliasTarget = checker.TypeSystemPropertyNameAliasTarget
 const TypeSystemPropertyNameDeclaredType = checker.TypeSystemPropertyNameDeclaredType
 const TypeSystemPropertyNameInitializerIsUndefined = checker.TypeSystemPropertyNameInitializerIsUndefined
 const TypeSystemPropertyNameResolvedBaseConstraint = checker.TypeSystemPropertyNameResolvedBaseConstraint

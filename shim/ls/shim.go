@@ -8,14 +8,18 @@ import "github.com/microsoft/typescript-go/internal/ast"
 import "github.com/microsoft/typescript-go/internal/compiler"
 import "github.com/microsoft/typescript-go/internal/core"
 import "github.com/microsoft/typescript-go/internal/ls"
+import "github.com/microsoft/typescript-go/internal/ls/lsconv"
 import "github.com/microsoft/typescript-go/internal/lsp/lsproto"
 import _ "unsafe"
 
+type AddAsTypeOnly = ls.AddAsTypeOnly
+const AddAsTypeOnlyAllowed = ls.AddAsTypeOnlyAllowed
+const AddAsTypeOnlyNotAllowed = ls.AddAsTypeOnlyNotAllowed
+const AddAsTypeOnlyRequired = ls.AddAsTypeOnlyRequired
+type AutoImportData = ls.AutoImportData
+type CachedSymbolExportInfo = ls.CachedSymbolExportInfo
 type CandidateOrTypeInfo = ls.CandidateOrTypeInfo
-//go:linkname ComparePositions github.com/microsoft/typescript-go/internal/ls.ComparePositions
-func ComparePositions(pos lsproto.Position, other lsproto.Position) int
-//go:linkname CompareRanges github.com/microsoft/typescript-go/internal/ls.CompareRanges
-func CompareRanges(lsRange *lsproto.Range, other *lsproto.Range) int
+type CompletionItemData = ls.CompletionItemData
 type CompletionKind = ls.CompletionKind
 const CompletionKindGlobal = ls.CompletionKindGlobal
 const CompletionKindMemberLike = ls.CompletionKindMemberLike
@@ -24,29 +28,44 @@ const CompletionKindObjectPropertyDeclaration = ls.CompletionKindObjectPropertyD
 const CompletionKindPropertyAccess = ls.CompletionKindPropertyAccess
 const CompletionKindString = ls.CompletionKindString
 type CompletionsTriggerCharacter = ls.CompletionsTriggerCharacter
-//go:linkname ComputeLineStarts github.com/microsoft/typescript-go/internal/ls.ComputeLineStarts
-func ComputeLineStarts(text string) *ls.LineMap
-type Converters = ls.Converters
 type DeclarationInfo = ls.DeclarationInfo
 type Definition = ls.Definition
-//go:linkname DocumentURIToFileName github.com/microsoft/typescript-go/internal/ls.DocumentURIToFileName
-func DocumentURIToFileName(uri lsproto.DocumentUri) string
+type DefinitionKind = ls.DefinitionKind
 var ErrNoSourceFile = ls.ErrNoSourceFile
 var ErrNoTokenAtPosition = ls.ErrNoTokenAtPosition
 type ExportInfo = ls.ExportInfo
+type ExportInfoMap = ls.ExportInfoMap
+type ExportInfoMapKey = ls.ExportInfoMapKey
 type ExportKind = ls.ExportKind
 const ExportKindDefault = ls.ExportKindDefault
 const ExportKindExportEquals = ls.ExportKindExportEquals
+const ExportKindModule = ls.ExportKindModule
 const ExportKindNamed = ls.ExportKindNamed
-//go:linkname FileNameToDocumentURI github.com/microsoft/typescript-go/internal/ls.FileNameToDocumentURI
-func FileNameToDocumentURI(fileName string) lsproto.DocumentUri
+const ExportKindUMD = ls.ExportKindUMD
+type FixAddToExistingImportInfo = ls.FixAddToExistingImportInfo
 type Host = ls.Host
+type ImpExpKind = ls.ImpExpKind
+const ImpExpKindExport = ls.ImpExpKindExport
+const ImpExpKindImport = ls.ImpExpKindImport
+const ImpExpKindUnknown = ls.ImpExpKindUnknown
+type Import = ls.Import
+type ImportExportSymbol = ls.ImportExportSymbol
+type ImportFix = ls.ImportFix
+type ImportFixKind = ls.ImportFixKind
+const ImportFixKindAddNew = ls.ImportFixKindAddNew
+const ImportFixKindAddToExisting = ls.ImportFixKindAddToExisting
+const ImportFixKindJsdocTypeImport = ls.ImportFixKindJsdocTypeImport
+const ImportFixKindPromoteTypeOnly = ls.ImportFixKindPromoteTypeOnly
+const ImportFixKindUseNamespace = ls.ImportFixKindUseNamespace
+type ImportKind = ls.ImportKind
+const ImportKindCommonJS = ls.ImportKindCommonJS
+const ImportKindDefault = ls.ImportKindDefault
+const ImportKindNamed = ls.ImportKindNamed
+const ImportKindNamespace = ls.ImportKindNamespace
+type ImportTracker = ls.ImportTracker
+type ImportsResult = ls.ImportsResult
 //go:linkname IsInString github.com/microsoft/typescript-go/internal/ls.IsInString
 func IsInString(sourceFile *ast.SourceFile, position int, previousToken *ast.Node) bool
-type JsxAttributeCompletionStyle = ls.JsxAttributeCompletionStyle
-const JsxAttributeCompletionStyleAuto = ls.JsxAttributeCompletionStyleAuto
-const JsxAttributeCompletionStyleBraces = ls.JsxAttributeCompletionStyleBraces
-const JsxAttributeCompletionStyleNone = ls.JsxAttributeCompletionStyleNone
 type KeywordCompletionFilters = ls.KeywordCompletionFilters
 const KeywordCompletionFiltersAll = ls.KeywordCompletionFiltersAll
 const KeywordCompletionFiltersClassElementKeywords = ls.KeywordCompletionFiltersClassElementKeywords
@@ -58,21 +77,24 @@ const KeywordCompletionFiltersNone = ls.KeywordCompletionFiltersNone
 const KeywordCompletionFiltersTypeAssertionKeywords = ls.KeywordCompletionFiltersTypeAssertionKeywords
 const KeywordCompletionFiltersTypeKeyword = ls.KeywordCompletionFiltersTypeKeyword
 const KeywordCompletionFiltersTypeKeywords = ls.KeywordCompletionFiltersTypeKeywords
-//go:linkname LanguageKindToScriptKind github.com/microsoft/typescript-go/internal/ls.LanguageKindToScriptKind
-func LanguageKindToScriptKind(languageID lsproto.LanguageKind) core.ScriptKind
 type LanguageService = ls.LanguageService
-type LineMap = ls.LineMap
-type Location = ls.Location
-//go:linkname NewConverters github.com/microsoft/typescript-go/internal/ls.NewConverters
-func NewConverters(positionEncoding lsproto.PositionEncodingKind, getLineMap func(fileName string) *ls.LineMap) *ls.Converters
+type LocationAndSymbol = ls.LocationAndSymbol
+type ModuleReference = ls.ModuleReference
+type ModuleReferenceKind = ls.ModuleReferenceKind
+const ModuleReferenceKindImplicit = ls.ModuleReferenceKindImplicit
+const ModuleReferenceKindImport = ls.ModuleReferenceKindImport
+const ModuleReferenceKindReference = ls.ModuleReferenceKindReference
+//go:linkname NewExportInfoMap github.com/microsoft/typescript-go/internal/ls.NewExportInfoMap
+func NewExportInfoMap(globalsTypingCacheLocation string) *ls.ExportInfoMap
 //go:linkname NewLanguageService github.com/microsoft/typescript-go/internal/ls.NewLanguageService
-func NewLanguageService(host ls.Host) *ls.LanguageService
+func NewLanguageService(program *compiler.Program, host ls.Host) *ls.LanguageService
 type PossibleTypeArgumentInfo = ls.PossibleTypeArgumentInfo
 //go:linkname ProvideWorkspaceSymbols github.com/microsoft/typescript-go/internal/ls.ProvideWorkspaceSymbols
-func ProvideWorkspaceSymbols(ctx context.Context, programs []*compiler.Program, converters *ls.Converters, query string) (lsproto.WorkspaceSymbolResponse, error)
+func ProvideWorkspaceSymbols(ctx context.Context, programs []*compiler.Program, converters *lsconv.Converters, query string) (lsproto.WorkspaceSymbolResponse, error)
+type Qualification = ls.Qualification
 //go:linkname RangeContainsRange github.com/microsoft/typescript-go/internal/ls.RangeContainsRange
 func RangeContainsRange(r1 core.TextRange, r2 core.TextRange) bool
-type Script = ls.Script
+type ReferenceEntry = ls.ReferenceEntry
 type ScriptElementKind = ls.ScriptElementKind
 const ScriptElementKindAlias = ls.ScriptElementKindAlias
 const ScriptElementKindCallSignatureElement = ls.ScriptElementKindCallSignatureElement
@@ -136,6 +158,7 @@ const ScriptElementKindVariableAwaitUsingElement = ls.ScriptElementKindVariableA
 const ScriptElementKindVariableElement = ls.ScriptElementKindVariableElement
 const ScriptElementKindVariableUsingElement = ls.ScriptElementKindVariableUsingElement
 const ScriptElementKindWarning = ls.ScriptElementKindWarning
+type SortText = ls.SortText
 const SortTextAutoImportSuggestions = ls.SortTextAutoImportSuggestions
 const SortTextClassMemberSnippets = ls.SortTextClassMemberSnippets
 const SortTextGlobalsOrKeywords = ls.SortTextGlobalsOrKeywords
@@ -152,5 +175,5 @@ const SourceSwitchCases = ls.SourceSwitchCases
 const SourceThisProperty = ls.SourceThisProperty
 const SourceTypeOnlyAlias = ls.SourceTypeOnlyAlias
 type SymbolAndEntries = ls.SymbolAndEntries
+type SymbolExportInfo = ls.SymbolExportInfo
 var TriggerCharacters = ls.TriggerCharacters
-type UserPreferences = ls.UserPreferences
