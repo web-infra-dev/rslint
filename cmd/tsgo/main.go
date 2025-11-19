@@ -1,38 +1,39 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"log"
 	"os"
 
+	"github.com/fxamacker/cbor/v2"
+	"github.com/microsoft/typescript-go/shim/api"
 	"github.com/microsoft/typescript-go/shim/api/encoder"
-	"github.com/microsoft/typescript-go/shim/api/protocol"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
-	"gotest.tools/v3/internal/source"
 )
 
 type EncodedSourceFile = []byte
 type CheckResult = struct {
 	ModuleList  []string            `json:"module_list"`
 	SourceFiles []EncodedSourceFile `json:"source_files"`
+	RootFiles   []string            `json:"root_files"`
 }
 
 func main() {
-	log.Println("tsgo")
 	os.Exit(runMain())
 }
 func runMain() int {
 	var (
-		config string
-		help   bool
+		config   string
+		help     bool
+		api_mode bool
 	)
 	flag.StringVar(&config, "config", "", "path to tsconfig.json")
 	flag.BoolVar(&help, "help", false, "show help")
+	flag.BoolVar(&api_mode, "api", true, "api mode")
 	flag.Parse()
 	if help {
 		flag.Usage()
@@ -58,22 +59,28 @@ func runMain() int {
 		return 1
 	}
 	checkResult := CheckResult{}
+	checkResult.RootFiles = program.CommandLine().FileNames()
 
 	for _, file := range program.GetSourceFiles() {
-		checkResult.ModuleList = append(checkResult.ModuleList, string(file.Path()))
-		sourceFile = file.AsSourceFile();
-		encodedSourceFile := encoder.EncodeSourceFile(
-			protocol.FileHandle(sourceFile)
-		)
+		checkResult.ModuleList = append(checkResult.ModuleList, string(file.FileName()))
+		sourceFile := file.AsSourceFile()
+		encodedSourceFile, err := encoder.EncodeSourceFile(sourceFile, string(api.FileHandle(sourceFile)))
+		if err != nil {
+			log.Printf("error encoding source file %v: %v", file.Path(), err)
+			return 1
+		}
+
 		checkResult.SourceFiles = append(checkResult.SourceFiles, encodedSourceFile)
 	}
-	//log.Printf("module_list len: %v", checkResult)
-	//result, err := cbor.Marshal(checkResult)
-	result, err := json.Marshal(checkResult)
+	result, err := cbor.Marshal(checkResult)
 	if err != nil {
 		log.Printf("error marshaling checkResult: %v", err)
 		return 1
 	}
-	log.Printf("vvvvv %v", result)
+	_, err = os.Stdout.Write(result)
+	if err != nil {
+		log.Printf("error writing result to stdout: %v", err)
+		return 1
+	}
 	return 0
 }
