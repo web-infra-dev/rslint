@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"log"
 	"os"
@@ -9,6 +10,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/api"
 	"github.com/microsoft/typescript-go/shim/api/encoder"
 	"github.com/microsoft/typescript-go/shim/bundled"
+	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
@@ -20,6 +22,28 @@ type CheckResult = struct {
 	ModuleList  []string            `json:"module_list"`
 	SourceFiles []EncodedSourceFile `json:"source_files"`
 	RootFiles   []string            `json:"root_files"`
+	SymbolTable SymbolTable         `json:"symbol_table"`
+	TypeTable   TypeTable           `json:"type_table"`
+}
+
+func CreateProgram(config string) (*compiler.Program, error) {
+	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
+	currentDirectory, err := os.Getwd()
+	if err != nil {
+		return nil, err
+	}
+	currentDirectory = tspath.NormalizePath(currentDirectory)
+	host := utils.CreateCompilerHost(currentDirectory, fs)
+	program, err := utils.CreateProgram(
+		true,
+		fs,
+		currentDirectory,
+		config,
+		host)
+	if err != nil {
+		return nil, err
+	}
+	return program, nil
 }
 
 func main() {
@@ -39,31 +63,22 @@ func runMain() int {
 		flag.Usage()
 		return 0
 	}
-	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))
-	currentDirectory, err := os.Getwd()
+	program, err := CreateProgram(config)
+	tc, done := program.GetTypeChecker(context.Background())
+	defer done()
 	if err != nil {
-
-		log.Printf("error getting current directory: %v", err)
-		return 1
-	}
-	currentDirectory = tspath.NormalizePath(currentDirectory)
-	host := utils.CreateCompilerHost(currentDirectory, fs)
-	program, err := utils.CreateProgram(
-		true,
-		fs,
-		currentDirectory,
-		config,
-		host)
-	if err != nil {
-		log.Printf("error create Ts program: %v", err)
+		log.Printf("error creating program: %v", err)
 		return 1
 	}
 	checkResult := CheckResult{}
+	checkResult.SymbolTable = SymbolTable{}
+	checkResult.TypeTable = TypeTable{}
 	checkResult.RootFiles = program.CommandLine().FileNames()
 
-	for _, file := range program.GetSourceFiles() {
+	for sourcefileId, file := range program.GetSourceFiles() {
 		checkResult.ModuleList = append(checkResult.ModuleList, string(file.FileName()))
 		sourceFile := file.AsSourceFile()
+
 		encodedSourceFile, err := encoder.EncodeSourceFile(sourceFile, string(api.FileHandle(sourceFile)))
 		if err != nil {
 			log.Printf("error encoding source file %v: %v", file.Path(), err)
@@ -71,6 +86,7 @@ func runMain() int {
 		}
 
 		checkResult.SourceFiles = append(checkResult.SourceFiles, encodedSourceFile)
+		CollectSemanticInFile(tc, file, &checkResult.SymbolTable, &checkResult.TypeTable, sourcefileId)
 	}
 	result, err := cbor.Marshal(checkResult)
 	if err != nil {
