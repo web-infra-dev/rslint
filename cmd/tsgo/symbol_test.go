@@ -12,9 +12,8 @@ func TestCollectSymbolTable(t *testing.T) {
 		t.Fatalf("Failed to create program: %v", err)
 	}
 
-	symbolTable, typeTable := CollectSemantic(program)
-	t.Logf("symbol_table:%v\n", symbolTable)
-	t.Logf("type_table:%v\n", typeTable)
+	semantic := CollectSemantic(program)
+	t.Logf("symbol_table:%+v\n", semantic)
 
 	// expectedSymbols := []string{
 	// 	"myFunction",
