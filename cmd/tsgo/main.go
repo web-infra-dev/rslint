@@ -22,8 +22,7 @@ type CheckResult = struct {
 	ModuleList  []string            `json:"module_list"`
 	SourceFiles []EncodedSourceFile `json:"source_files"`
 	RootFiles   []string            `json:"root_files"`
-	SymbolTable SymbolTable         `json:"symbol_table"`
-	TypeTable   TypeTable           `json:"type_table"`
+	Semantic    Semantic            `json:"semantic"`
 }
 
 func CreateProgram(config string) (*compiler.Program, error) {
@@ -71,9 +70,9 @@ func runMain() int {
 		return 1
 	}
 	checkResult := CheckResult{}
-	checkResult.SymbolTable = SymbolTable{}
-	checkResult.TypeTable = TypeTable{}
 	checkResult.RootFiles = program.CommandLine().FileNames()
+	checkResult.Semantic = NewSemantic()
+	initPrimitiveTypes(tc, &checkResult.Semantic)
 
 	for sourcefileId, file := range program.GetSourceFiles() {
 		checkResult.ModuleList = append(checkResult.ModuleList, string(file.FileName()))
@@ -86,8 +85,10 @@ func runMain() int {
 		}
 
 		checkResult.SourceFiles = append(checkResult.SourceFiles, encodedSourceFile)
-		CollectSemanticInFile(tc, file, &checkResult.SymbolTable, &checkResult.TypeTable, sourcefileId)
+
+		CollectSemanticInFile(tc, file, &checkResult.Semantic, sourcefileId)
 	}
+
 	result, err := cbor.Marshal(checkResult)
 	if err != nil {
 		log.Printf("error marshaling checkResult: %v", err)
