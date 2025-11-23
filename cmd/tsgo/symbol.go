@@ -16,7 +16,7 @@ type NodeReference struct {
 }
 type SymbolInfo struct {
 	Id         int    `json:"id"`
-	Name       string `json:"name"`
+	Name       []byte `json:"name"`
 	Flags      int    `json:"flags"`
 	CheckFlags int    `json:"check_flags"`
 }
@@ -52,18 +52,19 @@ func CollectSemantic(program *compiler.Program) Semantic {
 
 // primitive types from https://github.com/quininer/typescript-go/blob/da56f163200ee7880c2134cf821ef08372383f7b/internal/checker/checker.go#L892
 type PrimTypes struct {
-	String checker.TypeId `json:"string"`
-	// any       checker.TypeId
-	// error     checker.TypeId
-	// unknown   checker.TypeId
-	// undefined checker.TypeId
-	// null      checker.TypeId
-	// number    checker.TypeId
-	// bigint    checker.TypeId
-	// false     checker.TypeId
-	// true      checker.TypeId
-	// void      checker.TypeId
-	// bool      checker.TypeId
+	String    checker.TypeId `json:"string"`
+	Any       checker.TypeId `json:"any"`
+	Error     checker.TypeId `json:"error"`
+	Unknown   checker.TypeId `json:"unknown"`
+	Undefined checker.TypeId `json:"undefined"`
+	Null      checker.TypeId `json:"null"`
+	Number    checker.TypeId `json:"number"`
+	Bigint    checker.TypeId `json:"bigint"`
+	False     checker.TypeId `json:"false"`
+	True      checker.TypeId `json:"true"`
+	Void      checker.TypeId `json:"void"`
+	Bool      checker.TypeId `json:"bool"`
+	Never     checker.TypeId `json:"never"`
 }
 type Semantic struct {
 	Symtab    map[ast.SymbolId]SymbolInfo     `json:"symtab"`
@@ -84,7 +85,16 @@ func NewSemantic() Semantic {
 }
 func initPrimitiveTypes(tc *checker.Checker, semantic *Semantic) {
 	semantic.Primtypes = PrimTypes{
-		String: tc.GetStringType().Id(),
+		String:    tc.GetStringType().Id(),
+		Number:    tc.GetNumberType().Id(),
+		Any:       tc.GetAnyType().Id(),
+		Error:     tc.GetErrorType().Id(),
+		Unknown:   tc.GetUnknownType().Id(),
+		Undefined: tc.GetUndefinedType().Id(),
+		Null:      tc.GetNullType().Id(),
+		Void:      tc.GetVoidType().Id(),
+		Bool:      tc.GetBooleanType().Id(),
+		Never:     tc.GetNeverType().Id(),
 	}
 }
 func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *Semantic, sourceFileId int) {
@@ -113,7 +123,7 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 					type_id := ty.Id()
 					semantic.Symtab[sym_id] = SymbolInfo{
 						Id:         int(sym_id),
-						Name:       symbol.Name,
+						Name:       []byte(symbol.Name),
 						Flags:      int(symbol.Flags),
 						CheckFlags: int(symbol.CheckFlags),
 					}
