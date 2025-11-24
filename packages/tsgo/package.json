@@ -1,13 +1,15 @@
 {
   "name": "@rslint/tsgo",
-  "version": "0.0.7",
+  "version": "0.0.9",
   "description": "custom tsgo binary",
-  "files": ["lib"],
+  "files": [
+    "lib"
+  ],
   "main": "index.js",
   "scripts": {
-     "build:bin": "go build -o ./lib/tsgo ../../cmd/tsgo",
-     "build:tsgo": "cp -r ../../typescript-go/built/local ./lib",
-     "build": "pnpm run build:tsgo && pnpm run build:bin"
+    "build:bin": "go build -o ./lib/tsgo ../../cmd/tsgo",
+    "build:tsgo": "cp -r ../../typescript-go/built/local ./lib",
+    "build": "pnpm run build:tsgo && pnpm run build:bin"
   },
   "keywords": [],
   "author": "",
