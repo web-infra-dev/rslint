@@ -89,7 +89,7 @@
     "@types/vscode": "^1.74.0",
     "@vscode/test-cli": "0.0.11",
     "@vscode/test-electron": "2.4.1",
-    "@vscode/vsce": "3.6.0",
+    "@vscode/vsce": "3.7.1",
     "esbuild": "0.25.7",
     "fast-glob": "3.3.3",
     "mocha": "10.8.2",
