@@ -5,6 +5,7 @@ const path = require('path');
 
 // Plugins root directory
 const PLUGINS_DIR = path.join(__dirname, '../internal/plugins');
+const CORE_RULES_DIR = path.join(__dirname, '../internal/rules');
 const TEST_CONFIG_PATH = path.join(
   __dirname,
   '../packages/rslint-test-tools/rstest.config.mts',
@@ -17,6 +18,16 @@ const MANIFEST_PATH = path.join(
   __dirname,
   '../packages/rslint-test-tools/rule-manifest.json',
 );
+
+function getCoreRuleEntries() {
+  // Collect rule directories from internal/rules/*
+  if (!fs.existsSync(CORE_RULES_DIR)) return [];
+
+  return fs
+    .readdirSync(CORE_RULES_DIR, { withFileTypes: true })
+    .filter(d => d.isDirectory() && !d.name.startsWith('.'))
+    .map(d => ({ rule: d.name, group: 'eslint' }));
+}
 
 function getPluginRuleEntries() {
   // Collect rule directories from internal/plugins/{plugin}/rules/*
@@ -137,10 +148,10 @@ function getSkipCases(rule) {
 
 function buildManifest() {
   const included = getIncludedRules();
-  const pluginEntries = getPluginRuleEntries();
-  const ruleSet = new Set(pluginEntries.map(e => e.rule));
+  const ruleEntries = [...getPluginRuleEntries(), ...getCoreRuleEntries()];
+  const ruleSet = new Set(ruleEntries.map(e => e.rule));
   const ruleToGroup = new Map();
-  for (const e of pluginEntries) ruleToGroup.set(e.rule, e.group);
+  for (const e of ruleEntries) ruleToGroup.set(e.rule, e.group);
   const rules = Array.from(ruleSet)
     .sort((a, b) => a.localeCompare(b))
     .map(rule => {

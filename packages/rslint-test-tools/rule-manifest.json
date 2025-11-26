@@ -7,6 +7,12 @@
       "failing_case": []
     },
     {
+      "name": "array-callback-return",
+      "group": "eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
       "name": "array-type",
       "group": "@typescript-eslint",
       "status": "partial-impl",
@@ -88,6 +94,12 @@
       "failing_case": []
     },
     {
+      "name": "constructor-super",
+      "group": "eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
       "name": "default-param-last",
       "group": "@typescript-eslint",
       "status": "full",
@@ -100,9 +112,33 @@
       "failing_case": []
     },
     {
+      "name": "for-direction",
+      "group": "eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "getter-return",
+      "group": "eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
       "name": "no-array-delete",
       "group": "@typescript-eslint",
       "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "no-async-promise-executor",
+      "group": "eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no-await-in-loop",
+      "group": "eslint",
+      "status": "partial-test",
       "failing_case": []
     },
     {
@@ -112,9 +148,57 @@
       "failing_case": []
     },
     {
+      "name": "no-class-assign",
+      "group": "eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no-compare-neg-zero",
+      "group": "eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no-cond-assign",
+      "group": "eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
       "name": "no-confusing-void-expression",
       "group": "@typescript-eslint",
       "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "no-const-assign",
+      "group": "eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no-constant-binary-expression",
+      "group": "eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no-constant-condition",
+      "group": "eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no-constructor-return",
+      "group": "eslint",
+      "status": "partial-test",
+      "failing_case": []
+    },
+    {
+      "name": "no-debugger",
+      "group": "eslint",
+      "status": "partial-test",
       "failing_case": []
     },
     {
