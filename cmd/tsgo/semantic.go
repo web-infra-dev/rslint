@@ -2,28 +2,39 @@ package main
 
 import (
 	"context"
-
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
 )
 
+type CString = []byte
+type SourceFileId = int
+
 // NodeReference uniquely identifies a node by file name and span.
 type NodeReference struct {
-	SourceFileId int `json:"sourcefile_id"`
-	Start        int `json:"start"`
-	End          int `json:"end"`
+	SourceFileId SourceFileId `json:"sourcefile_id"`
+	Start        int          `json:"start"`
+	End          int          `json:"end"`
 }
 type SymbolInfo struct {
-	Id         int    `json:"id"`
-	Name       []byte `json:"name"`
-	Flags      int    `json:"flags"`
-	CheckFlags int    `json:"check_flags"`
+	Id         ast.SymbolId `json:"id"`
+	Name       CString      `json:"name"`
+	Flags      int          `json:"flags"`
+	CheckFlags int          `json:"check_flags"`
 }
-
+type TypeExtra struct {
+	Name map[int]CString      `json:"name"`
+	Func map[int]FunctionData `json:"func"`
+}
+type FunctionData struct {
+	Signatures []FuncSignature `json:"signatures"`
+}
+type FuncSignature struct {
+	Result checker.TypeId `json:"result"`
+}
 type TypeInfo struct {
-	Id    int `json:"id"`
-	Flags int `json:"flags"`
+	Id    checker.TypeId `json:"id"`
+	Flags int            `json:"flags"`
 }
 type SymbolTable = map[NodeReference]SymbolInfo
 type TypeTable = map[NodeReference]TypeInfo
@@ -31,12 +42,7 @@ type TypeTable = map[NodeReference]TypeInfo
 // collect_symbol_table walks every AST node in the program once and records the
 // symbol (if any) associated with that node keyed by its file/span tuple.
 func CollectSemantic(program *compiler.Program) Semantic {
-	semantic := Semantic{
-		Symtab:   make(map[ast.SymbolId]SymbolInfo),
-		Typetab:  make(map[checker.TypeId]TypeInfo),
-		Sym2type: make(map[ast.SymbolId]checker.TypeId),
-		Node2sym: make(map[NodeReference]ast.SymbolId),
-	}
+	semantic := NewSemantic()
 	if program == nil {
 		return semantic
 	}
@@ -67,11 +73,14 @@ type PrimTypes struct {
 	Never     checker.TypeId `json:"never"`
 }
 type Semantic struct {
-	Symtab    map[ast.SymbolId]SymbolInfo     `json:"symtab"`
-	Typetab   map[checker.TypeId]TypeInfo     `json:"typetab"`
-	Sym2type  map[ast.SymbolId]checker.TypeId `json:"sym2type"`
-	Node2sym  map[NodeReference]ast.SymbolId  `json:"node2sym"`
-	Primtypes PrimTypes                       `json:"primtypes"`
+	Symtab    map[ast.SymbolId]SymbolInfo      `json:"symtab"`
+	Typetab   map[checker.TypeId]TypeInfo      `json:"typetab"`
+	Sym2type  map[ast.SymbolId]checker.TypeId  `json:"sym2type"`
+	Node2sym  map[NodeReference]ast.SymbolId   `json:"node2sym"`
+	Node2type map[NodeReference]checker.TypeId `json:"node2type"`
+	Primtypes PrimTypes                        `json:"primtypes"`
+	TypeExtra TypeExtra                        `json:"type_extra"`
+	FuncData  FunctionData                     `json:"func_data"`
 }
 
 func NewSemantic() Semantic {
@@ -80,7 +89,15 @@ func NewSemantic() Semantic {
 		Typetab:   make(map[checker.TypeId]TypeInfo),
 		Sym2type:  make(map[ast.SymbolId]checker.TypeId),
 		Node2sym:  make(map[NodeReference]ast.SymbolId),
+		Node2type: make(map[NodeReference]checker.TypeId),
 		Primtypes: PrimTypes{},
+		TypeExtra: TypeExtra{
+			Name: make(map[int]CString),
+			Func: make(map[int]FunctionData),
+		},
+		FuncData: FunctionData{
+			Signatures: []FuncSignature{},
+		},
 	}
 }
 func initPrimitiveTypes(tc *checker.Checker, semantic *Semantic) {
@@ -122,17 +139,34 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 					sym_id := ast.GetSymbolId(symbol)
 					type_id := ty.Id()
 					semantic.Symtab[sym_id] = SymbolInfo{
-						Id:         int(sym_id),
+						Id:         sym_id,
 						Name:       []byte(symbol.Name),
 						Flags:      int(symbol.Flags),
 						CheckFlags: int(symbol.CheckFlags),
 					}
 					semantic.Typetab[type_id] = TypeInfo{
-						Id:    int(type_id),
+						Id:    type_id,
 						Flags: int(ty.Flags()),
 					}
+					semantic.TypeExtra.Name[int(type_id)] = []byte(tc.TypeToString(ty))
+					callSignatures := tc.GetCallSignatures(ty)
+					signatures := []FuncSignature{}
+					if len(callSignatures) > 0 {
+						for _, sig := range callSignatures {
+							returnType := checker.Checker_getReturnTypeOfSignature(tc, sig)
+							signatures = append(signatures, FuncSignature{
+								Result: returnType.Id(),
+							})
+
+						}
+						semantic.TypeExtra.Func[int(type_id)] = FunctionData{
+							Signatures: signatures,
+						}
+					}
+
 					semantic.Sym2type[sym_id] = type_id
 					(semantic.Node2sym)[key] = sym_id
+					semantic.Node2type[key] = type_id
 
 				}
 
