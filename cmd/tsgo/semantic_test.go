@@ -5,15 +5,15 @@ import (
 )
 
 func TestCollectSymbolTable(t *testing.T) {
-	t.Log("start")
+	//t.Log("start")
 	test_config := "fixture/tsconfig.json"
 	program, err := CreateProgram(test_config)
 	if err != nil {
 		t.Fatalf("Failed to create program: %v", err)
 	}
 
-	semantic := CollectSemantic(program)
-	t.Logf("symbol_table:%+v\n", semantic)
+	CollectSemantic(program)
+	//t.Logf("symbol_table:%+v\n", semantic)
 
 	// expectedSymbols := []string{
 	// 	"myFunction",
