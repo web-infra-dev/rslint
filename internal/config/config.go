@@ -39,6 +39,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_implied_eval"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_invalid_void_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_meaningless_void_operator"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_misused_new"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_misused_promises"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_misused_spread"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_mixed_enums"
@@ -391,6 +392,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/no-for-in-array", no_for_in_array.NoForInArrayRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-implied-eval", no_implied_eval.NoImpliedEvalRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-meaningless-void-operator", no_meaningless_void_operator.NoMeaninglessVoidOperatorRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-misused-new", no_misused_new.NoMisusedNewRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-misused-promises", no_misused_promises.NoMisusedPromisesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-misused-spread", no_misused_spread.NoMisusedSpreadRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-mixed-enums", no_mixed_enums.NoMixedEnumsRule)
