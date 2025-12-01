@@ -94,7 +94,7 @@
     "fast-glob": "3.3.3",
     "mocha": "10.8.2",
     "ovsx": "^0.10.5",
-    "rimraf": "6.0.1",
+    "rimraf": "6.1.2",
     "typescript": "^5.0.0",
     "@typescript/native-preview": "7.0.0-dev.20250904.1",
     "vscode-languageclient": "^9.0.1",
