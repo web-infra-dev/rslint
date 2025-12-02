@@ -23,6 +23,17 @@ type CheckResult = struct {
 	SourceFiles []EncodedSourceFile `json:"source_files"`
 	RootFiles   []string            `json:"root_files"`
 	Semantic    Semantic            `json:"semantic"`
+	Diagnostics []Diagnostics       `json:"diagnostics"`
+}
+type Location = struct {
+	Start int32 `json:"start"`
+	End   int32 `json:"end"`
+}
+type Diagnostics = struct {
+	Message  string   `json:"message"`
+	Category int32    `json:"category"`
+	File     int32    `json:"file"`
+	Loc      Location `json:"loc"`
 }
 
 func CreateProgram(config string) (*compiler.Program, error) {
@@ -48,6 +59,25 @@ func CreateProgram(config string) (*compiler.Program, error) {
 func main() {
 	os.Exit(runMain())
 }
+
+func getDiagnostics(program *compiler.Program, fileMap *map[string]int32) []Diagnostics {
+	diagnostics := program.GetSemanticDiagnostics(context.Background(), nil)
+	diagnostics = append(diagnostics, program.GetGlobalDiagnostics(context.Background())...)
+	diagnostics = append(diagnostics, program.GetOptionsDiagnostics(context.Background())...)
+	diags := []Diagnostics{}
+	for _, diag := range diagnostics {
+		diags = append(diags, Diagnostics{
+			Message:  diag.Message(),
+			Category: int32(diag.Category()),
+			File:     (*fileMap)[diag.File().FileName()],
+			Loc: Location{
+				Start: int32(diag.Pos()),
+				End:   int32(diag.End()),
+			},
+		})
+	}
+	return diags
+}
 func runMain() int {
 	var (
 		config   string
@@ -72,9 +102,11 @@ func runMain() int {
 	checkResult := CheckResult{}
 	checkResult.RootFiles = program.CommandLine().FileNames()
 	checkResult.Semantic = NewSemantic()
-	initPrimitiveTypes(tc, &checkResult.Semantic)
 
+	initPrimitiveTypes(tc, &checkResult.Semantic)
+	fileMap := make(map[string]int32)
 	for sourcefileId, file := range program.GetSourceFiles() {
+		fileMap[string(file.FileName())] = int32(sourcefileId)
 		checkResult.ModuleList = append(checkResult.ModuleList, string(file.FileName()))
 		sourceFile := file.AsSourceFile()
 
@@ -88,6 +120,7 @@ func runMain() int {
 
 		CollectSemanticInFile(tc, file, &checkResult.Semantic, sourcefileId)
 	}
+	checkResult.Diagnostics = getDiagnostics(program, &fileMap)
 
 	result, err := cbor.Marshal(checkResult)
 	if err != nil {
