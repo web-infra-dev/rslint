@@ -17,62 +17,62 @@ func TestCwdHandling(t *testing.T) {
 	defer t.Chdir(originalCwd) // Restore after test completes
 
 	tests := []struct {
-		name         string
-		filePath     string
-		patterns     []string
-		shouldIgnore bool
-		description  string
+		name        string
+		filePath    string
+		patterns    []string
+		shouldMatch bool
+		description string
 	}{
 		{
-			name:         "Relative path matching",
-			filePath:     "src/component.ts",
-			patterns:     []string{"src/**"},
-			shouldIgnore: true,
-			description:  "Relative paths should match relative patterns",
+			name:        "Relative path matching",
+			filePath:    "src/component.ts",
+			patterns:    []string{"src/**"},
+			shouldMatch: true,
+			description: "Relative paths should match relative patterns",
 		},
 		{
-			name:         "Absolute path to relative path matching",
-			filePath:     filepath.Join(originalCwd, "src/component.ts"),
-			patterns:     []string{"src/**"},
-			shouldIgnore: true,
-			description:  "Absolute paths should be converted to relative paths before matching",
+			name:        "Absolute path to relative path matching",
+			filePath:    filepath.Join(originalCwd, "src/component.ts"),
+			patterns:    []string{"src/**"},
+			shouldMatch: true,
+			description: "Absolute paths should be converted to relative paths before matching",
 		},
 		{
-			name:         "node_modules recursive matching",
-			filePath:     "node_modules/package/deep/file.js",
-			patterns:     []string{"node_modules/**"},
-			shouldIgnore: true,
-			description:  "Recursive patterns should match deeply nested files",
+			name:        "node_modules recursive matching",
+			filePath:    "node_modules/package/deep/file.js",
+			patterns:    []string{"node_modules/**"},
+			shouldMatch: true,
+			description: "Recursive patterns should match deeply nested files",
 		},
 		{
-			name:         "Test file pattern matching",
-			filePath:     "src/utils/helper.test.ts",
-			patterns:     []string{"**/*.test.ts"},
-			shouldIgnore: true,
-			description:  "Global recursive patterns should match test files in any location",
+			name:        "Test file pattern matching",
+			filePath:    "src/utils/helper.test.ts",
+			patterns:    []string{"**/*.test.ts"},
+			shouldMatch: true,
+			description: "Global recursive patterns should match test files in any location",
 		},
 		{
-			name:         "Non-matching file",
-			filePath:     "src/component.ts",
-			patterns:     []string{"dist/**", "*.log"},
-			shouldIgnore: false,
-			description:  "Files not matching any pattern should not be ignored",
+			name:        "Non-matching file",
+			filePath:    "src/component.ts",
+			patterns:    []string{"dist/**", "*.log"},
+			shouldMatch: false,
+			description: "Files not matching any pattern should not be ignored",
 		},
 		{
-			name:         "Cross-platform path handling",
-			filePath:     "src\\windows\\style\\path.ts",
-			patterns:     []string{"src/**"},
-			shouldIgnore: true,
-			description:  "Windows style paths should be handled correctly",
+			name:        "Cross-platform path handling",
+			filePath:    "src\\windows\\style\\path.ts",
+			patterns:    []string{"src/**"},
+			shouldMatch: true,
+			description: "Windows style paths should be handled correctly",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isFileIgnored(tt.filePath, tt.patterns)
-			if result != tt.shouldIgnore {
-				t.Errorf("%s: isFileIgnored(%q, %v) = %v, expected %v",
-					tt.description, tt.filePath, tt.patterns, result, tt.shouldIgnore)
+			result := isFileMatched(tt.filePath, tt.patterns)
+			if result != tt.shouldMatch {
+				t.Errorf("%s: isFileMatched(%q, %v) = %v, expected %v",
+					tt.description, tt.filePath, tt.patterns, result, tt.shouldMatch)
 			}
 		})
 	}
