@@ -19,11 +19,16 @@ import (
 
 type EncodedSourceFile = []byte
 type CheckResult = struct {
-	ModuleList  []string            `json:"module_list"`
-	SourceFiles []EncodedSourceFile `json:"source_files"`
-	RootFiles   []string            `json:"root_files"`
-	Semantic    Semantic            `json:"semantic"`
-	Diagnostics []Diagnostics       `json:"diagnostics"`
+	ModuleList      []string            `json:"module_list"`
+	SourceFiles     []EncodedSourceFile `json:"source_files"`
+	RootFiles       []string            `json:"root_files"`
+	Semantic        Semantic            `json:"semantic"`
+	Diagnostics     []Diagnostics       `json:"diagnostics"`
+	SourceFileExtra []SourceFileExtra   `json:"source_file_extra"`
+}
+type SourceFileExtra = struct {
+	HasExternalModuleIndicator bool `json:"has_external_module_indicator"`
+	HasCommonJSModuleIndicator bool `json:"has_common_js_module_indicator"`
 }
 type Location = struct {
 	Start int32 `json:"start"`
@@ -102,6 +107,7 @@ func runMain() int {
 	checkResult := CheckResult{}
 	checkResult.RootFiles = program.CommandLine().FileNames()
 	checkResult.Semantic = NewSemantic()
+	checkResult.SourceFileExtra = []SourceFileExtra{}
 
 	initPrimitiveTypes(tc, &checkResult.Semantic)
 	fileMap := make(map[string]int32)
@@ -115,7 +121,10 @@ func runMain() int {
 			log.Printf("error encoding source file %v: %v", file.Path(), err)
 			return 1
 		}
-
+		checkResult.SourceFileExtra = append(checkResult.SourceFileExtra, SourceFileExtra{
+			HasExternalModuleIndicator: sourceFile.ExternalModuleIndicator != nil,
+			HasCommonJSModuleIndicator: sourceFile.CommonJSModuleIndicator != nil,
+		})
 		checkResult.SourceFiles = append(checkResult.SourceFiles, encodedSourceFile)
 
 		CollectSemanticInFile(tc, file, &checkResult.Semantic, sourcefileId)
