@@ -150,8 +150,8 @@ importers:
         specifier: 0.3.0
         version: 0.3.0(esbuild@0.27.0)
       memfs:
-        specifier: ^4.49.0
-        version: 4.49.0
+        specifier: ^4.51.1
+        version: 4.51.1
       prebundle:
         specifier: 1.6.0
         version: 1.6.0(typescript@5.9.2)
@@ -3612,8 +3612,8 @@ packages:
   memfs@3.0.4:
     resolution: {integrity: sha512-OcZEzwX9E5AoY8SXjuAvw0DbIAYwUzV/I236I8Pqvrlv7sL/Y0E9aRCon05DhaV8pg1b32uxj76RgW0s5xjHBA==}
 
-  memfs@4.49.0:
-    resolution: {integrity: sha512-L9uC9vGuc4xFybbdOpRLoOAOq1YEBBsocCs5NVW32DfU+CZWWIn3OVF+lB8Gp4ttBVSMazwrTrjv8ussX/e3VQ==}
+  memfs@4.51.1:
+    resolution: {integrity: sha512-Eyt3XrufitN2ZL9c/uIRMyDwXanLI88h/L3MoWqNY747ha3dMR9dWqp8cRT5ntjZ0U1TNuq4U91ZXK0sMBjYOQ==}
 
   merge2@1.4.1:
     resolution: {integrity: sha512-8q7VEgMJW4J8tcfVPy8g09NcQwZdbwFEqhe/WZkoIzjn/3TGDwtOCYtXGxA3O8tPzpczCCDgv+P2P5y00ZJOOg==}
@@ -8544,7 +8544,7 @@ snapshots:
       fast-extend: 1.0.2
       fs-monkey: 0.3.3
 
-  memfs@4.49.0:
+  memfs@4.51.1:
     dependencies:
       '@jsonjoy.com/json-pack': 1.11.0(tslib@2.8.1)
       '@jsonjoy.com/util': 1.9.0(tslib@2.8.1)

@@ -30,7 +30,7 @@
     "buffer": "^6.0.3",
     "cross-env": "^10.1.0",
     "esbuild-plugin-polyfill-node": "0.3.0",
-    "memfs": "^4.49.0",
+    "memfs": "^4.51.1",
     "prebundle": "1.6.0",
     "@typescript/native-preview": "7.0.0-dev.20250904.1"
   },
