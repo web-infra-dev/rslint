@@ -96,6 +96,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_constant_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constructor_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_debugger"
+	"github.com/web-infra-dev/rslint/internal/rules/no_sparse_arrays"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -461,6 +462,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-constant-condition", no_constant_condition.NoConstantConditionRule)
 	GlobalRuleRegistry.Register("no-constructor-return", no_constructor_return.NoConstructorReturnRule)
 	GlobalRuleRegistry.Register("no-debugger", no_debugger.NoDebuggerRule)
+	GlobalRuleRegistry.Register("no-sparse-arrays", no_sparse_arrays.NoSparseArraysRule)
 }
 
 // getAllTypeScriptEslintPluginRules returns all registered rules (for backward compatibility when no config is provided)
