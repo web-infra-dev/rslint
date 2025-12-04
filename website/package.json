@@ -41,6 +41,6 @@
     "rspress-plugin-sitemap": "^1.2.0",
     "tailwindcss": "^4.1.11",
     "typescript": "^5.9.2",
-    "monaco-editor": "0.54.0"
+    "monaco-editor": "0.55.1"
   }
 }
