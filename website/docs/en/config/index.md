@@ -49,6 +49,25 @@ The configuration file contains an array of configuration entries. Each entry de
 
 ## Configuration Options
 
+### files
+
+- **Type:** `string[]`
+- **Default:** `[]`
+
+An array of glob patterns for files and directories to include during linting. If omitted, all files are included.
+
+```jsonc
+{
+  "files": ["./src/**", "./tests/**"],
+}
+```
+
+Patterns support:
+
+- **Glob patterns**: `*.js`, `**/*.ts`
+- **Directory patterns**: `src/**`, `tests/**`
+- **Negation**: `!important.ts` (when used with other patterns)
+
 ### ignores
 
 - **Type:** `string[]`
