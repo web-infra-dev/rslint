@@ -1,6 +1,6 @@
 {
   "name": "@rslint/wasm",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "rslint wasm package",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
