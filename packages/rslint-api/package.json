@@ -18,9 +18,9 @@
   "packageManager": "pnpm@10.13.1",
   "devDependencies": {
     "@typescript/api": "workspace:*",
-    "@rslib/core": "0.18.0",
+    "@rslib/core": "0.18.3",
     "@types/node": "24.3.0",
-    "@typescript/native-preview": "7.0.0-dev.20250904.1"
+    "@typescript/native-preview": "7.0.0-dev.20251206.1"
   },
   "publishConfig": {
     "access": "public"
