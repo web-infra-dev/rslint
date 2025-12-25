@@ -3,6 +3,7 @@ package no_misused_new
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 /**
@@ -34,7 +35,8 @@ var NoMisusedNewRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				if node.Name().Text() != "new" {
+				nodeNameText, _ := utils.GetNameFromMember(ctx.SourceFile, node.Name())
+				if nodeNameText != "new" {
 					return
 				}
 				// If the function body exists, it's valid for this rule.
@@ -62,7 +64,8 @@ var NoMisusedNewRule = rule.CreateRule(rule.Rule{
 				}
 			},
 			ast.KindMethodSignature: func(node *ast.Node) {
-				if node.Name().Text() == "constructor" {
+				nodeNameText, _ := utils.GetNameFromMember(ctx.SourceFile, node.Name())
+				if nodeNameText == "constructor" {
 					ctx.ReportNode(node, rule.RuleMessage{
 						Id:          "errorMessageInterface",
 						Description: "interfaces cannot be constructed, only classes.",
