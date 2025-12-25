@@ -195,3 +195,93 @@ interface I {
   "ruleCount": 1,
 }
 `;
+
+exports[`no-misused-new > invalid 7`] = `
+{
+  "code": "
+class C {
+  ['new'](): C;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Class cannot have method named \`new\`.",
+      "messageId": "errorMessageClass",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-new > invalid 8`] = `
+{
+  "code": "
+declare abstract class C {
+  ['new'](): C;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Class cannot have method named \`new\`.",
+      "messageId": "errorMessageClass",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-misused-new > invalid 9`] = `
+{
+  "code": "
+interface I {
+  ['constructor'](): '';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "interfaces cannot be constructed, only classes.",
+      "messageId": "errorMessageInterface",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-misused-new",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
