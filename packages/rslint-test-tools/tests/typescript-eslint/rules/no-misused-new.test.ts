@@ -72,6 +72,21 @@ interface foo {
   new <T>(): 'x';
 }
     `,
+    `
+class C {
+  ['constructor']() {};
+}
+    `,
+    `
+declare abstract class C {
+  ['constructor']() {};
+}
+    `,
+    `
+interface I {
+  ['new'](): I;
+}
+    `,
   ],
   invalid: [
     {
@@ -156,6 +171,48 @@ declare abstract class C {
       code: `
 interface I {
   constructor(): '';
+}
+      `,
+      errors: [
+        {
+          column: 3,
+          line: 3,
+          messageId: 'errorMessageInterface',
+        },
+      ],
+    },
+    {
+      code: `
+class C {
+  ['new'](): C;
+}
+      `,
+      errors: [
+        {
+          column: 3,
+          line: 3,
+          messageId: 'errorMessageClass',
+        },
+      ],
+    },
+    {
+      code: `
+declare abstract class C {
+  ['new'](): C;
+}
+      `,
+      errors: [
+        {
+          column: 3,
+          line: 3,
+          messageId: 'errorMessageClass',
+        },
+      ],
+    },
+    {
+      code: `
+interface I {
+  ['constructor'](): '';
 }
       `,
       errors: [

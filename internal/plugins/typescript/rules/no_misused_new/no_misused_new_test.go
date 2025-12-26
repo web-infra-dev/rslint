@@ -170,5 +170,62 @@ func TestNoMisusedNewRule(t *testing.T) {
 				},
 			},
 		},
+		{
+			Code: `
+				class C {
+					['constructor']() {};
+				}
+			`,
+		},
+		{
+			Code: `
+				class C {
+				  ['new'](): C;
+				}
+			`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "errorMessageClass",
+				},
+			},
+		},
+		{
+			Code: `
+				declare abstract class C {
+				  ['constructor']() {};
+				}
+			`,
+		},
+		{
+			Code: `
+				declare abstract class C {
+				  ['new'](): C;
+				}
+			`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "errorMessageClass",
+				},
+			},
+		},
+		{
+			Code: `
+				interface I {
+					['new'](): I;
+				}
+			`,
+		},
+		{
+			Code: `
+				interface I {
+				  ['constructor'](): '';
+				}
+			`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "errorMessageInterface",
+				},
+			},
+		},
 	})
 }
