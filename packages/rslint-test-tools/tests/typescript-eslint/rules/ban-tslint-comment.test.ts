@@ -1,8 +1,16 @@
 import { RuleTester } from '@typescript-eslint/rule-tester';
 
+import { getFixturesRootDir } from '../RuleTester';
 
-
-const ruleTester = new RuleTester();
+const rootDir = getFixturesRootDir();
+const ruleTester = new RuleTester({
+  languageOptions: {
+    parserOptions: {
+      project: './tsconfig.json',
+      tsconfigRootDir: rootDir,
+    },
+  },
+});
 
 ruleTester.run('ban-tslint-comment', {
   valid: [
@@ -20,6 +28,24 @@ ruleTester.run('ban-tslint-comment', {
     },
     {
       code: '/* another comment that mentions tslint */',
+    },
+    {
+      code: '// This project used to use tslint',
+    },
+    {
+      code: '/* We migrated from tslint to eslint */',
+    },
+    {
+      code: '// tslint is deprecated',
+    },
+    {
+      code: '/* tslint was a linter */',
+    },
+    {
+      code: '// about tslint:disable',
+    },
+    {
+      code: '/* discussing tslint:enable */',
     },
   ],
   invalid: [
