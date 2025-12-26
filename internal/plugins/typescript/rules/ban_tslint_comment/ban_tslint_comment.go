@@ -84,18 +84,14 @@ func checkComment(ctx rule.RuleContext, commentText string, commentStart int, is
 	if isMultiLine {
 		// For multi-line comments, remove /* and */ and check the content
 		contentToCheck = commentText
-		if strings.HasPrefix(contentToCheck, "/*") {
-			contentToCheck = contentToCheck[2:]
-		}
-		if strings.HasSuffix(contentToCheck, "*/") {
-			contentToCheck = contentToCheck[:len(contentToCheck)-2]
-		}
+		contentToCheck = strings.TrimPrefix(contentToCheck, "/*")
+		contentToCheck = strings.TrimSuffix(contentToCheck, "*/")
+		contentToCheck = strings.TrimSpace(contentToCheck)
 	} else {
 		// For single-line comments, remove // and check the content
 		contentToCheck = commentText
-		if strings.HasPrefix(contentToCheck, "//") {
-			contentToCheck = contentToCheck[2:]
-		}
+		contentToCheck = strings.TrimPrefix(contentToCheck, "//")
+		contentToCheck = strings.TrimSpace(contentToCheck)
 	}
 
 	// Check if the content matches TSLint directive pattern
