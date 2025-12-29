@@ -119,6 +119,37 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 		return
 	}
 
+	recordType := func(ty *checker.Type) checker.TypeId {
+		if ty == nil {
+			return 0
+		}
+
+		typeID := ty.Id()
+		if _, exists := semantic.Typetab[typeID]; !exists {
+			semantic.Typetab[typeID] = TypeInfo{
+				Id:    typeID,
+				Flags: int(ty.Flags()),
+			}
+			semantic.TypeExtra.Name[int(typeID)] = []byte(tc.TypeToString(ty))
+			callSignatures := tc.GetCallSignatures(ty)
+			if len(callSignatures) > 0 {
+				signatures := []FuncSignature{}
+				for _, sig := range callSignatures {
+					returnType := checker.Checker_getReturnTypeOfSignature(tc, sig)
+					signatures = append(signatures, FuncSignature{
+						Result: returnType.Id(),
+					})
+
+				}
+				semantic.TypeExtra.Func[int(typeID)] = FunctionData{
+					Signatures: signatures,
+				}
+			}
+		}
+
+		return typeID
+	}
+
 	var visit func(node *ast.Node)
 	visit = func(node *ast.Node) {
 		if node == nil {
@@ -127,46 +158,34 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 
 		// Skip synthetic nodes without stable positions.
 		if node.Pos() >= 0 && node.End() >= 0 {
+			key := NodeReference{
+				SourceFileId: sourceFileId,
+				Start:        node.Pos(),
+				End:          node.End(),
+			}
+			// typescript will panic if we pass typeDeclaration to GetTypeAtLocation
+			if !ast.IsTypeDeclaration(node) {
+				if tyAtNode := tc.GetTypeAtLocation(node); tyAtNode != nil {
+					if typeID := recordType(tyAtNode); typeID != 0 {
+						semantic.Node2type[key] = typeID
+					}
+				}
+			}
 
 			if symbol := tc.GetSymbolAtLocation(node); symbol != nil {
 
 				if ty := tc.GetTypeOfSymbol(symbol); ty != nil {
-					key := NodeReference{
-						SourceFileId: sourceFileId,
-						Start:        node.Pos(),
-						End:          node.End(),
-					}
+					typeID := recordType(ty)
 					sym_id := ast.GetSymbolId(symbol)
-					type_id := ty.Id()
 					semantic.Symtab[sym_id] = SymbolInfo{
 						Id:         sym_id,
 						Name:       []byte(symbol.Name),
 						Flags:      int(symbol.Flags),
 						CheckFlags: int(symbol.CheckFlags),
 					}
-					semantic.Typetab[type_id] = TypeInfo{
-						Id:    type_id,
-						Flags: int(ty.Flags()),
-					}
-					semantic.TypeExtra.Name[int(type_id)] = []byte(tc.TypeToString(ty))
-					callSignatures := tc.GetCallSignatures(ty)
-					signatures := []FuncSignature{}
-					if len(callSignatures) > 0 {
-						for _, sig := range callSignatures {
-							returnType := checker.Checker_getReturnTypeOfSignature(tc, sig)
-							signatures = append(signatures, FuncSignature{
-								Result: returnType.Id(),
-							})
-
-						}
-						semantic.TypeExtra.Func[int(type_id)] = FunctionData{
-							Signatures: signatures,
-						}
-					}
-
-					semantic.Sym2type[sym_id] = type_id
+					semantic.Sym2type[sym_id] = typeID
 					(semantic.Node2sym)[key] = sym_id
-					semantic.Node2type[key] = type_id
+					semantic.Node2type[key] = typeID
 
 				}
 
