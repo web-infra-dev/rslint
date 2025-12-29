@@ -43,7 +43,7 @@ require (
 	github.com/microsoft/typescript-go/shim/api v0.0.0
 	github.com/microsoft/typescript-go/shim/api/encoder v0.0.0
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
-	golang.org/x/sync v0.16.0
+	golang.org/x/sync v0.19.0
 	golang.org/x/sys v0.35.0
 	golang.org/x/tools v0.35.0
 	gotest.tools/v3 v3.5.2
