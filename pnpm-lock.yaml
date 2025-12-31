@@ -34,8 +34,8 @@ importers:
         specifier: 3.7.4
         version: 3.7.4
       typescript:
-        specifier: 5.8.3
-        version: 5.8.3
+        specifier: 5.9.3
+        version: 5.9.3
       zx:
         specifier: 8.8.5
         version: 8.8.5
@@ -64,8 +64,8 @@ importers:
         specifier: 7.0.0-dev.20250904.1
         version: 7.0.0-dev.20250904.1
       typescript:
-        specifier: 5.8.3
-        version: 5.8.3
+        specifier: 5.9.3
+        version: 5.9.3
     optionalDependencies:
       '@rslint/darwin-arm64':
         specifier: workspace:*
@@ -90,7 +90,7 @@ importers:
     devDependencies:
       '@rslib/core':
         specifier: 0.18.0
-        version: 0.18.0(@microsoft/api-extractor@7.55.1(@types/node@24.3.0))(@typescript/native-preview@7.0.0-dev.20250904.1)(typescript@5.9.2)
+        version: 0.18.0(@microsoft/api-extractor@7.55.1(@types/node@24.3.0))(@typescript/native-preview@7.0.0-dev.20250904.1)(typescript@5.9.3)
       '@types/node':
         specifier: 24.3.0
         version: 24.3.0
@@ -114,7 +114,7 @@ importers:
         version: 24.0.14
       '@typescript-eslint/parser':
         specifier: 8.48.1
-        version: 8.48.1(eslint@9.32.0(jiti@2.6.1))(typescript@5.9.2)
+        version: 8.48.1(eslint@9.32.0(jiti@2.6.1))(typescript@5.9.3)
       '@typescript-eslint/rule-tester':
         specifier: workspace:*
         version: link:../rule-tester
@@ -154,7 +154,7 @@ importers:
         version: 4.51.1
       prebundle:
         specifier: 1.6.0
-        version: 1.6.0(typescript@5.9.2)
+        version: 1.6.0(typescript@5.9.3)
 
   packages/rule-tester:
     dependencies:
@@ -169,8 +169,8 @@ importers:
         specifier: 7.0.0-dev.20250904.1
         version: 7.0.0-dev.20250904.1
       typescript:
-        specifier: 5.8.3
-        version: 5.8.3
+        specifier: 5.9.3
+        version: 5.9.3
 
   packages/utils: {}
 
@@ -216,8 +216,8 @@ importers:
         specifier: 6.1.2
         version: 6.1.2
       typescript:
-        specifier: ^5.0.0
-        version: 5.8.3
+        specifier: ^5.9.3
+        version: 5.9.3
       vscode-languageclient:
         specifier: ^9.0.1
         version: 9.0.1
@@ -4765,13 +4765,13 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
-  typescript@5.8.3:
-    resolution: {integrity: sha512-p1diW6TqL9L07nNxvRMM7hMMw4c5XOo/1ibL4aAIGmSAt9slTE1Xgw5KWuof2uTOvCg9BY7ZRi+GaF+7sfgPeQ==}
+  typescript@5.9.2:
+    resolution: {integrity: sha512-CWBzXQrc/qOkhidw1OzBTQuYRbfyxDXJMVJ1XNwUHGROVmuaeiEm3OslpZ1RV96d7SKKjZKrSJu3+t/xlw3R9A==}
     engines: {node: '>=14.17'}
     hasBin: true
 
-  typescript@5.9.2:
-    resolution: {integrity: sha512-CWBzXQrc/qOkhidw1OzBTQuYRbfyxDXJMVJ1XNwUHGROVmuaeiEm3OslpZ1RV96d7SKKjZKrSJu3+t/xlw3R9A==}
+  typescript@5.9.3:
+    resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
     engines: {node: '>=14.17'}
     hasBin: true
 
@@ -4921,6 +4921,7 @@ packages:
   whatwg-encoding@3.1.1:
     resolution: {integrity: sha512-6qN4hJdMwfYBtE3YBTTHhoeuUrDBPZmbQaxWAqSALV/MeEnR5z1xd8UKud2RAkFoPkmB+hli1TZSnyi84xz1vQ==}
     engines: {node: '>=18'}
+    deprecated: Use @exodus/bytes instead for a more spec-conformant and faster implementation
 
   whatwg-mimetype@4.0.0:
     resolution: {integrity: sha512-QaKxh0eNIi2mE9p2vEdzfagOKHCcj1pJ56EEHGQOVxp8r9/iszLUUV7v89x9O1p/T+NlTM5W7jW6+cz4Fq1YVg==}
@@ -6082,13 +6083,13 @@ snapshots:
       reduce-configs: 1.1.1
       sass-embedded: 1.90.0
 
-  '@rslib/core@0.18.0(@microsoft/api-extractor@7.55.1(@types/node@24.3.0))(@typescript/native-preview@7.0.0-dev.20250904.1)(typescript@5.9.2)':
+  '@rslib/core@0.18.0(@microsoft/api-extractor@7.55.1(@types/node@24.3.0))(@typescript/native-preview@7.0.0-dev.20250904.1)(typescript@5.9.3)':
     dependencies:
       '@rsbuild/core': 1.6.6
-      rsbuild-plugin-dts: 0.18.0(@microsoft/api-extractor@7.55.1(@types/node@24.3.0))(@rsbuild/core@1.6.6)(@typescript/native-preview@7.0.0-dev.20250904.1)(typescript@5.9.2)
+      rsbuild-plugin-dts: 0.18.0(@microsoft/api-extractor@7.55.1(@types/node@24.3.0))(@rsbuild/core@1.6.6)(@typescript/native-preview@7.0.0-dev.20250904.1)(typescript@5.9.3)
     optionalDependencies:
       '@microsoft/api-extractor': 7.55.1(@types/node@24.3.0)
-      typescript: 5.9.2
+      typescript: 5.9.3
     transitivePeerDependencies:
       - '@typescript/native-preview'
 
@@ -6682,24 +6683,24 @@ snapshots:
 
   '@types/vscode@1.102.0': {}
 
-  '@typescript-eslint/parser@8.48.1(eslint@9.32.0(jiti@2.6.1))(typescript@5.9.2)':
+  '@typescript-eslint/parser@8.48.1(eslint@9.32.0(jiti@2.6.1))(typescript@5.9.3)':
     dependencies:
       '@typescript-eslint/scope-manager': 8.48.1
       '@typescript-eslint/types': 8.48.1
-      '@typescript-eslint/typescript-estree': 8.48.1(typescript@5.9.2)
+      '@typescript-eslint/typescript-estree': 8.48.1(typescript@5.9.3)
       '@typescript-eslint/visitor-keys': 8.48.1
       debug: 4.4.1(supports-color@8.1.1)
       eslint: 9.32.0(jiti@2.6.1)
-      typescript: 5.9.2
+      typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
 
-  '@typescript-eslint/project-service@8.48.1(typescript@5.9.2)':
+  '@typescript-eslint/project-service@8.48.1(typescript@5.9.3)':
     dependencies:
-      '@typescript-eslint/tsconfig-utils': 8.48.1(typescript@5.9.2)
+      '@typescript-eslint/tsconfig-utils': 8.48.1(typescript@5.9.3)
       '@typescript-eslint/types': 8.48.1
       debug: 4.4.1(supports-color@8.1.1)
-      typescript: 5.9.2
+      typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
 
@@ -6708,24 +6709,24 @@ snapshots:
       '@typescript-eslint/types': 8.48.1
       '@typescript-eslint/visitor-keys': 8.48.1
 
-  '@typescript-eslint/tsconfig-utils@8.48.1(typescript@5.9.2)':
+  '@typescript-eslint/tsconfig-utils@8.48.1(typescript@5.9.3)':
     dependencies:
-      typescript: 5.9.2
+      typescript: 5.9.3
 
   '@typescript-eslint/types@8.48.1': {}
 
-  '@typescript-eslint/typescript-estree@8.48.1(typescript@5.9.2)':
+  '@typescript-eslint/typescript-estree@8.48.1(typescript@5.9.3)':
     dependencies:
-      '@typescript-eslint/project-service': 8.48.1(typescript@5.9.2)
-      '@typescript-eslint/tsconfig-utils': 8.48.1(typescript@5.9.2)
+      '@typescript-eslint/project-service': 8.48.1(typescript@5.9.3)
+      '@typescript-eslint/tsconfig-utils': 8.48.1(typescript@5.9.3)
       '@typescript-eslint/types': 8.48.1
       '@typescript-eslint/visitor-keys': 8.48.1
       debug: 4.4.1(supports-color@8.1.1)
       minimatch: 9.0.5
       semver: 7.7.2
       tinyglobby: 0.2.15
-      ts-api-utils: 2.1.0(typescript@5.9.2)
-      typescript: 5.9.2
+      ts-api-utils: 2.1.0(typescript@5.9.3)
+      typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
 
@@ -9118,13 +9119,13 @@ snapshots:
       tunnel-agent: 0.6.0
     optional: true
 
-  prebundle@1.6.0(typescript@5.9.2):
+  prebundle@1.6.0(typescript@5.9.3):
     dependencies:
       '@vercel/ncc': 0.38.4
       cac: 6.7.14
       prettier: 3.7.4
       rollup: 4.53.3
-      rollup-plugin-dts: 6.2.3(rollup@4.53.3)(typescript@5.9.2)
+      rollup-plugin-dts: 6.2.3(rollup@4.53.3)(typescript@5.9.3)
       terser: 5.44.1
     transitivePeerDependencies:
       - typescript
@@ -9403,11 +9404,11 @@ snapshots:
       glob: 13.0.0
       package-json-from-dist: 1.0.1
 
-  rollup-plugin-dts@6.2.3(rollup@4.53.3)(typescript@5.9.2):
+  rollup-plugin-dts@6.2.3(rollup@4.53.3)(typescript@5.9.3):
     dependencies:
       magic-string: 0.30.17
       rollup: 4.53.3
-      typescript: 5.9.2
+      typescript: 5.9.3
     optionalDependencies:
       '@babel/code-frame': 7.27.1
 
@@ -9439,14 +9440,14 @@ snapshots:
       '@rollup/rollup-win32-x64-msvc': 4.53.3
       fsevents: 2.3.3
 
-  rsbuild-plugin-dts@0.18.0(@microsoft/api-extractor@7.55.1(@types/node@24.3.0))(@rsbuild/core@1.6.6)(@typescript/native-preview@7.0.0-dev.20250904.1)(typescript@5.9.2):
+  rsbuild-plugin-dts@0.18.0(@microsoft/api-extractor@7.55.1(@types/node@24.3.0))(@rsbuild/core@1.6.6)(@typescript/native-preview@7.0.0-dev.20250904.1)(typescript@5.9.3):
     dependencies:
       '@ast-grep/napi': 0.37.0
       '@rsbuild/core': 1.6.6
     optionalDependencies:
       '@microsoft/api-extractor': 7.55.1(@types/node@24.3.0)
       '@typescript/native-preview': 7.0.0-dev.20250904.1
-      typescript: 5.9.2
+      typescript: 5.9.3
 
   rsbuild-plugin-google-analytics@1.0.4(@rsbuild/core@1.6.6):
     optionalDependencies:
@@ -9911,9 +9912,9 @@ snapshots:
 
   trough@2.2.0: {}
 
-  ts-api-utils@2.1.0(typescript@5.9.2):
+  ts-api-utils@2.1.0(typescript@5.9.3):
     dependencies:
-      typescript: 5.9.2
+      typescript: 5.9.3
 
   tslib@2.8.1: {}
 
@@ -9940,9 +9941,9 @@ snapshots:
 
   typescript@5.8.2: {}
 
-  typescript@5.8.3: {}
-
   typescript@5.9.2: {}
+
+  typescript@5.9.3: {}
 
   uc.micro@2.1.0: {}
 
