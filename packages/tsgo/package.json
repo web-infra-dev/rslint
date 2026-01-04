@@ -1,6 +1,6 @@
 {
   "name": "@rslint/tsgo",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "description": "custom tsgo binary",
   "files": [
     "lib"
