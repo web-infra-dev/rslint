@@ -5,10 +5,12 @@ import (
 	"flag"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/microsoft/typescript-go/shim/api"
 	"github.com/microsoft/typescript-go/shim/api/encoder"
+	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/tspath"
@@ -65,10 +67,7 @@ func main() {
 	os.Exit(runMain())
 }
 
-func getDiagnostics(program *compiler.Program, fileMap *map[string]int32) []Diagnostics {
-	diagnostics := program.GetSemanticDiagnostics(context.Background(), nil)
-	diagnostics = append(diagnostics, program.GetGlobalDiagnostics(context.Background())...)
-	diagnostics = append(diagnostics, program.GetOptionsDiagnostics(context.Background())...)
+func getDiagnostics(diagnostics []*ast.Diagnostic, fileMap *map[string]int32) []Diagnostics {
 	diags := []Diagnostics{}
 	for _, diag := range diagnostics {
 		diags = append(diags, Diagnostics{
@@ -83,6 +82,70 @@ func getDiagnostics(program *compiler.Program, fileMap *map[string]int32) []Diag
 	}
 	return diags
 }
+
+func printDiagnostics(diagnostics []Diagnostics, fileMap map[string]int32) {
+	if len(diagnostics) == 0 {
+		log.Println("✓ No diagnostics found.")
+		return
+	}
+
+	// Count by category
+	var warnings, errors, suggestions, messages int
+	for _, diag := range diagnostics {
+		switch diag.Category {
+		case 0:
+			warnings++
+		case 1:
+			errors++
+		case 2:
+			suggestions++
+		case 3:
+			messages++
+		}
+	}
+
+	log.Printf("\n Found %d diagnostic(s): %d error(s), %d warning(s), %d suggestion(s), %d message(s)\n",
+		len(diagnostics), errors, warnings, suggestions, messages)
+	log.Println(strings.Repeat("─", 80))
+
+	for i, diag := range diagnostics {
+		fileName := ""
+		for file, id := range fileMap {
+			if id == diag.File {
+				fileName = file
+				break
+			}
+		}
+
+		var category, icon string
+		switch diag.Category {
+		case 0:
+			category = "Warning"
+			icon = "⚠"
+		case 1:
+			category = "Error"
+			icon = "✗"
+		case 2:
+			category = "Suggestion"
+			icon = "💡"
+		case 3:
+			category = "Message"
+			icon = "ℹ"
+		default:
+			category = "Unknown"
+			icon = "•"
+		}
+
+		log.Printf("\n %s %s\n", icon, category)
+		log.Printf("   %s\n", diag.Message)
+		log.Printf("   → %s:%d-%d\n", fileName, diag.Loc.Start, diag.Loc.End)
+
+		if i < len(diagnostics)-1 {
+			log.Println(strings.Repeat("─", 80))
+		}
+	}
+	log.Println()
+}
 func runMain() int {
 	var (
 		config   string
@@ -91,19 +154,30 @@ func runMain() int {
 	)
 	flag.StringVar(&config, "config", "", "path to tsconfig.json")
 	flag.BoolVar(&help, "help", false, "show help")
-	flag.BoolVar(&api_mode, "api", true, "api mode")
+	flag.BoolVar(&api_mode, "api", false, "api mode")
 	flag.Parse()
 	if help {
 		flag.Usage()
 		return 0
 	}
 	program, err := CreateProgram(config)
-	tc, done := program.GetTypeChecker(context.Background())
-	defer done()
 	if err != nil {
 		log.Printf("error creating program: %v", err)
 		return 1
 	}
+	diagnostics := compiler.GetDiagnosticsOfAnyProgram(context.Background(), program, nil, false, func(ctx context.Context, file *ast.SourceFile) []*ast.Diagnostic {
+
+		diags := program.GetBindDiagnostics(ctx, file)
+		return diags
+	},
+		func(ctx context.Context, file *ast.SourceFile) []*ast.Diagnostic {
+			diags := program.GetSemanticDiagnostics(ctx, file)
+			return diags
+		})
+	tc, done := program.GetTypeChecker(context.Background())
+
+	defer done()
+
 	checkResult := CheckResult{}
 	checkResult.RootFiles = program.CommandLine().FileNames()
 	checkResult.Semantic = NewSemantic()
@@ -129,7 +203,16 @@ func runMain() int {
 
 		CollectSemanticInFile(tc, file, &checkResult.Semantic, sourcefileId)
 	}
-	checkResult.Diagnostics = getDiagnostics(program, &fileMap)
+	checkResult.Diagnostics = getDiagnostics(diagnostics, &fileMap)
+
+	if !api_mode {
+		// Print diagnostics in human-readable format
+		printDiagnostics(checkResult.Diagnostics, fileMap)
+		if len(checkResult.Diagnostics) > 0 {
+			return 1
+		}
+		return 0
+	}
 
 	result, err := cbor.Marshal(checkResult)
 	if err != nil {
