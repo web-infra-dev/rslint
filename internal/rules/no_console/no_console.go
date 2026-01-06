@@ -97,12 +97,17 @@ func checkElementAccess(ctx rule.RuleContext, node *ast.Node, options Options) {
 	}
 
 	arg := expr.ArgumentExpression
-	if arg.Kind != ast.KindStringLiteral {
+	var propName string
+
+	if arg.Kind == ast.KindStringLiteral {
+		propName = arg.AsStringLiteral().Text
+	} else if arg.Kind == ast.KindNoSubstitutionTemplateLiteral {
+		propName = arg.AsNoSubstitutionTemplateLiteral().Text
+	} else {
 		ctx.ReportNode(node, buildMessage())
 		return
 	}
 
-	propName := arg.AsStringLiteral().Text
 	if isAllowed(propName, options) {
 		return
 	}

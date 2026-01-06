@@ -53,7 +53,8 @@
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-misused-promises": "warn",
       "@typescript-eslint/no-unused-vars": "warn",
-      "@typescript-eslint/require-await": "warn"
+      "@typescript-eslint/require-await": "warn",
+      "no-console": ["warn", { "allow": ["warn", "error"] }]
     },
     "plugins": ["@typescript-eslint"]
   }

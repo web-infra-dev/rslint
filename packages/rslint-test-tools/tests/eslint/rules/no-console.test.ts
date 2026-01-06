@@ -17,6 +17,10 @@ ruleTester.run('no-console', null as never, {
       code: 'console["log"]("foo")',
       options: [{ allow: ['log'] }],
     },
+    {
+      code: 'console[`log`]("foo")',
+      options: [{ allow: ['log'] }],
+    },
   ],
   invalid: [
     {

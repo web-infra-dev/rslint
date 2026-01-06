@@ -35,6 +35,12 @@ func TestRule(t *testing.T) {
 					"allow": []interface{}{"log"},
 				},
 			},
+			{
+				Code: "console[`log`]('foo')",
+				Options: map[string]interface{}{
+					"allow": []interface{}{"log"},
+				},
+			},
 		},
 		[]rule_tester.InvalidTestCase{
 			{
