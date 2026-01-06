@@ -91,6 +91,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_class_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_compare_neg_zero"
 	"github.com/web-infra-dev/rslint/internal/rules/no_cond_assign"
+	"github.com/web-infra-dev/rslint/internal/rules/no_console"
 	"github.com/web-infra-dev/rslint/internal/rules/no_const_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constant_binary_expression"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constant_condition"
@@ -458,6 +459,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-class-assign", no_class_assign.NoClassAssignRule)
 	GlobalRuleRegistry.Register("no-compare-neg-zero", no_compare_neg_zero.NoCompareNegZeroRule)
 	GlobalRuleRegistry.Register("no-cond-assign", no_cond_assign.NoCondAssignRule)
+	GlobalRuleRegistry.Register("no-console", no_console.NoConsoleRule)
 	GlobalRuleRegistry.Register("no-const-assign", no_const_assign.NoConstAssignRule)
 	GlobalRuleRegistry.Register("no-constant-binary-expression", no_constant_binary_expression.NoConstantBinaryExpressionRule)
 	GlobalRuleRegistry.Register("no-constant-condition", no_constant_condition.NoConstantConditionRule)

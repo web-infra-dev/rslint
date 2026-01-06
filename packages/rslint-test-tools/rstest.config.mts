@@ -11,6 +11,9 @@ export default defineConfig({
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
     './tests/eslint-plugin-import/rules/no-webpack-loader-syntax.test.ts',
 
+    // eslint
+    './tests/eslint/rules/no-console.test.ts',
+
     // typescript-eslint
     './tests/typescript-eslint/rules/adjacent-overload-signatures.test.ts',
     './tests/typescript-eslint/rules/array-type.test.ts',
