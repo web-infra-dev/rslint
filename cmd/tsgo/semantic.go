@@ -2,10 +2,15 @@ package main
 
 import (
 	"context"
+	_ "unsafe"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
 )
+
+//go:linkname getAliasedSymbol github.com/microsoft/typescript-go/internal/checker.(*Checker).GetAliasedSymbol
+func getAliasedSymbol(recv *checker.Checker, symbol *ast.Symbol) *ast.Symbol
 
 type CString = []byte
 type SourceFileId = int
@@ -73,24 +78,26 @@ type PrimTypes struct {
 	Never     checker.TypeId `json:"never"`
 }
 type Semantic struct {
-	Symtab    map[ast.SymbolId]SymbolInfo      `json:"symtab"`
-	Typetab   map[checker.TypeId]TypeInfo      `json:"typetab"`
-	Sym2type  map[ast.SymbolId]checker.TypeId  `json:"sym2type"`
-	Node2sym  map[NodeReference]ast.SymbolId   `json:"node2sym"`
-	Node2type map[NodeReference]checker.TypeId `json:"node2type"`
-	Primtypes PrimTypes                        `json:"primtypes"`
-	TypeExtra TypeExtra                        `json:"type_extra"`
-	FuncData  FunctionData                     `json:"func_data"`
+	Symtab       map[ast.SymbolId]SymbolInfo      `json:"symtab"`
+	Typetab      map[checker.TypeId]TypeInfo      `json:"typetab"`
+	Sym2type     map[ast.SymbolId]checker.TypeId  `json:"sym2type"`
+	AliasSymbols map[ast.SymbolId]ast.SymbolId    `json:"alias_symbols"`
+	Node2sym     map[NodeReference]ast.SymbolId   `json:"node2sym"`
+	Node2type    map[NodeReference]checker.TypeId `json:"node2type"`
+	Primtypes    PrimTypes                        `json:"primtypes"`
+	TypeExtra    TypeExtra                        `json:"type_extra"`
+	FuncData     FunctionData                     `json:"func_data"`
 }
 
 func NewSemantic() Semantic {
 	return Semantic{
-		Symtab:    make(map[ast.SymbolId]SymbolInfo),
-		Typetab:   make(map[checker.TypeId]TypeInfo),
-		Sym2type:  make(map[ast.SymbolId]checker.TypeId),
-		Node2sym:  make(map[NodeReference]ast.SymbolId),
-		Node2type: make(map[NodeReference]checker.TypeId),
-		Primtypes: PrimTypes{},
+		Symtab:       make(map[ast.SymbolId]SymbolInfo),
+		Typetab:      make(map[checker.TypeId]TypeInfo),
+		Sym2type:     make(map[ast.SymbolId]checker.TypeId),
+		AliasSymbols: make(map[ast.SymbolId]ast.SymbolId),
+		Node2sym:     make(map[NodeReference]ast.SymbolId),
+		Node2type:    make(map[NodeReference]checker.TypeId),
+		Primtypes:    PrimTypes{},
 		TypeExtra: TypeExtra{
 			Name: make(map[int]CString),
 			Func: make(map[int]FunctionData),
@@ -186,6 +193,16 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 					semantic.Sym2type[sym_id] = typeID
 					(semantic.Node2sym)[key] = sym_id
 					semantic.Node2type[key] = typeID
+
+					// Resolve alias symbol if this is an alias
+					if symbol.Flags&ast.SymbolFlagsAlias != 0 {
+						if aliasedSymbol := getAliasedSymbol(tc, symbol); aliasedSymbol != nil {
+							aliased_id := ast.GetSymbolId(aliasedSymbol)
+							if aliased_id != sym_id {
+								semantic.AliasSymbols[sym_id] = aliased_id
+							}
+						}
+					}
 
 				}
 
