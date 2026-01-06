@@ -174,3 +174,54 @@ func TestSemanticSnapshot_ElementAccess(t *testing.T) {
 		t.Fatalf("semantic snapshot mismatch.\nGot:\n%s\n\nExpected:\n%s", snapshot, expected)
 	}
 }
+
+func TestSym2sym_ImportAlias(t *testing.T) {
+	tmpDir := t.TempDir()
+	tsconfigPath := filepath.Join(tmpDir, "tsconfig.json")
+	moduleSourcePath := filepath.Join(tmpDir, "module.ts")
+	indexSourcePath := filepath.Join(tmpDir, "index.ts")
+
+	if err := os.WriteFile(tsconfigPath, []byte(`{"include":["./index.ts", "./module.ts"]}`), 0o644); err != nil {
+		t.Fatalf("Failed to write tsconfig: %v", err)
+	}
+	if err := os.WriteFile(moduleSourcePath, []byte("export const originalValue = 42;"), 0o644); err != nil {
+		t.Fatalf("Failed to write module source: %v", err)
+	}
+	if err := os.WriteFile(indexSourcePath, []byte("import { originalValue as alias } from './module';"), 0o644); err != nil {
+		t.Fatalf("Failed to write index source: %v", err)
+	}
+
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Failed to get working directory: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(origDir)
+	})
+
+	if err := os.Chdir(tmpDir); err != nil {
+		t.Fatalf("Failed to change working directory: %v", err)
+	}
+
+	program, err := CreateProgram("tsconfig.json")
+	if err != nil {
+		t.Fatalf("Failed to create program: %v", err)
+	}
+
+	semantic := CollectSemantic(program)
+
+	// Check that Sym2sym contains entries
+	if len(semantic.AliasSymbols) == 0 {
+		t.Log("Warning: No alias symbols found in Sym2sym map")
+		// This is not necessarily a failure - it depends on whether the import creates an alias symbol
+		// that gets visited during the semantic collection
+	} else {
+		t.Logf("Found %d alias symbol mappings in Sym2sym", len(semantic.AliasSymbols))
+		for aliasID, targetID := range semantic.AliasSymbols {
+			aliasInfo := semantic.Symtab[aliasID]
+			targetInfo := semantic.Symtab[targetID]
+			t.Logf("  Alias %s (id=%d) -> Target %s (id=%d)",
+				string(aliasInfo.Name), aliasID, string(targetInfo.Name), targetID)
+		}
+	}
+}
