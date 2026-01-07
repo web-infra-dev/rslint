@@ -10,6 +10,7 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
+	nPlugin "github.com/web-infra-dev/rslint/internal/plugins/n"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/adjacent_overload_signatures"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/array_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/await_thenable"
@@ -66,6 +67,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/only_throw_error"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_as_const"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_promise_reject_errors"
+
 	// "github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_readonly_parameter_types" // Temporarily disabled - incomplete implementation
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_reduce_type_parameter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_return_this_type"
@@ -96,8 +98,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_constant_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constructor_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_debugger"
-	"github.com/web-infra-dev/rslint/internal/rules/no_template_curly_in_string"
 	"github.com/web-infra-dev/rslint/internal/rules/no_sparse_arrays"
+	"github.com/web-infra-dev/rslint/internal/rules/no_template_curly_in_string"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -260,6 +262,8 @@ func GetAllRulesForPlugin(plugin string) []rule.Rule {
 		return importPlugin.GetAllRules()
 	case "eslint-plugin-import/recommended":
 		return importPlugin.GetRecommendedRules()
+	case "eslint-plugin-n":
+		return nPlugin.GetAllRules()
 	default:
 		return []rule.Rule{} // Return empty slice for unsupported plugins
 	}
@@ -360,7 +364,14 @@ func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConf
 func RegisterAllRules() {
 	registerAllTypeScriptEslintPluginRules()
 	registerAllEslintImportPluginRules()
+	registerAllEslintNPluginRules()
 	registerAllCoreEslintRules()
+}
+
+func registerAllEslintNPluginRules() {
+	for _, rule := range nPlugin.GetAllRules() {
+		GlobalRuleRegistry.Register(rule.Name, rule)
+	}
 }
 
 // registerAllTypeScriptEslintPluginRules registers all available rules in the global registry
