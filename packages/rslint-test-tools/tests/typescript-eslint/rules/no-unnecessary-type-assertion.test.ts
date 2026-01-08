@@ -233,6 +233,87 @@ function Test(props: { id?: null | string | number }) {
     },
     {
       code: `
+declare namespace JSX {
+  interface IntrinsicElements {
+    div: { key?: string | number };
+  }
+}
+
+function Test(props: { id?: null | string | number }) {
+  return <div key={(props.id!)} />;
+}
+      `,
+      languageOptions: {
+        parserOptions: {
+          ecmaFeatures: {
+            jsx: true,
+          },
+        },
+      },
+    },
+    {
+      code: `
+declare namespace JSX {
+  interface IntrinsicElements {
+    div: { requiredProp: string | number };
+  }
+}
+
+function Test(props: { item: { id?: string | number } }) {
+  return <div requiredProp={props.item.id!} />;
+}
+      `,
+      languageOptions: {
+        parserOptions: {
+          ecmaFeatures: {
+            jsx: true,
+          },
+        },
+      },
+    },
+    {
+      code: `
+declare namespace JSX {
+  interface IntrinsicElements {
+    div: { prop: { id: string } };
+  }
+}
+
+function Test(props: { id?: string }) {
+  return <div prop={{ id: props.id! }} />;
+}
+      `,
+      languageOptions: {
+        parserOptions: {
+          ecmaFeatures: {
+            jsx: true,
+          },
+        },
+      },
+    },
+    {
+      code: `
+declare namespace JSX {
+  interface IntrinsicElements {
+    div: { prop: any };
+    span: { customProp: string };
+  }
+}
+
+function Test(props: { id?: string }) {
+  return <div prop={<span customProp={props.id!} />} />;
+}
+      `,
+      languageOptions: {
+        parserOptions: {
+          ecmaFeatures: {
+            jsx: true,
+          },
+        },
+      },
+    },
+    {
+      code: `
 const a = [1, 2];
 const b = [3, 4];
 const c = [...a, ...b] as const;

@@ -3,6 +3,7 @@ package lsp
 import (
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/microsoft/typescript-go/shim/vfs"
 )
@@ -31,6 +32,7 @@ func (m *mockFS) GetAccessibleEntries(path string) vfs.Entries                  
 func (m *mockFS) Stat(path string) vfs.FileInfo                                     { return nil }
 func (m *mockFS) WalkDir(root string, walkFn vfs.WalkDirFunc) error                 { return nil }
 func (m *mockFS) Realpath(path string) string                                       { return path }
+func (m *mockFS) Chtimes(path string, atime time.Time, mtime time.Time) error       { return nil }
 
 func TestFindRslintConfig(t *testing.T) {
 	// FIXME: skip windows tests now

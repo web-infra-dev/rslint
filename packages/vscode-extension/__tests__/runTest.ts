@@ -17,6 +17,14 @@ async function main() {
       extensionDevelopmentPath,
       extensionTestsPath,
       launchArgs: ['--disable-extensions', testWorkspace],
+      version: 'stable',
+    });
+
+    await runTests({
+      extensionDevelopmentPath,
+      extensionTestsPath,
+      launchArgs: ['--disable-extensions', testWorkspace],
+      version: '1.106.3',
     });
   } catch (err) {
     console.error(err);

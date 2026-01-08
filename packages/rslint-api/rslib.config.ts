@@ -5,7 +5,7 @@ export default defineConfig({
     {
       format: 'esm',
       dts: {
-        bundle: true,
+        bundle: false,
       },
     },
   ],

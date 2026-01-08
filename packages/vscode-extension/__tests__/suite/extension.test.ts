@@ -247,33 +247,38 @@ suite('rslint extension', function () {
     const diagnostics = await waitForDiagnostics(doc);
 
     for (const diagnostic of diagnostics) {
-      const codeActions = await vscode.commands.executeCommand<
-        vscode.CodeAction[]
-      >('vscode.executeCodeActionProvider', doc.uri, diagnostic.range);
+      // Filter quick fixes
+      const codeActions = (
+        await vscode.commands.executeCommand<vscode.CodeAction[]>(
+          'vscode.executeCodeActionProvider',
+          doc.uri,
+          diagnostic.range,
+        )
+      ).filter(
+        action => action.kind?.value === vscode.CodeActionKind.QuickFix.value,
+      );
 
-      if (codeActions && codeActions.length > 0) {
-        // Check that if there are auto fixes, they are marked as preferred
-        const autoFixActions = codeActions.filter(
-          action =>
-            action.title.toLowerCase().includes('fix') &&
-            !action.title.toLowerCase().includes('disable'),
+      // Check that if there are auto fixes, they are marked as preferred
+      const autoFixActions = codeActions.filter(
+        action =>
+          action.title.toLowerCase().includes('fix') &&
+          !action.title.toLowerCase().includes('disable'),
+      );
+
+      const disableActions = codeActions.filter(action =>
+        action.title.toLowerCase().includes('disable'),
+      );
+
+      // If both auto fix and disable actions exist, auto fix should be preferred
+      if (autoFixActions.length > 0 && disableActions.length > 0) {
+        assert.ok(
+          autoFixActions.some(action => action.isPreferred),
+          'Auto fix actions should be marked as preferred',
         );
-
-        const disableActions = codeActions.filter(action =>
-          action.title.toLowerCase().includes('disable'),
+        assert.ok(
+          !disableActions.some(action => action.isPreferred),
+          'Disable actions should not be marked as preferred when auto fixes exist',
         );
-
-        // If both auto fix and disable actions exist, auto fix should be preferred
-        if (autoFixActions.length > 0 && disableActions.length > 0) {
-          assert.ok(
-            autoFixActions.some(action => action.isPreferred),
-            'Auto fix actions should be marked as preferred',
-          );
-          assert.ok(
-            !disableActions.some(action => action.isPreferred),
-            'Disable actions should not be marked as preferred when auto fixes exist',
-          );
-        }
       }
     }
   });

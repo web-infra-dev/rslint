@@ -33,17 +33,7 @@ func buildSemanticFixture(t *testing.T, source string) semanticFixture {
 		t.Fatalf("Failed to write fixture source: %v", err)
 	}
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get working directory: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = os.Chdir(origDir)
-	})
-
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("Failed to change working directory: %v", err)
-	}
+	t.Chdir(tmpDir)
 
 	program, err := CreateProgram("tsconfig.json")
 	if err != nil {
@@ -53,7 +43,7 @@ func buildSemanticFixture(t *testing.T, source string) semanticFixture {
 	var sourceFile *ast.SourceFile
 	var sourceFileID int
 	for id, file := range program.GetSourceFiles() {
-		if strings.HasSuffix(string(file.FileName()), "index.ts") {
+		if strings.HasSuffix(file.FileName(), "index.ts") {
 			sourceFile = file
 			sourceFileID = id
 			break
@@ -191,17 +181,7 @@ func TestSym2sym_ImportAlias(t *testing.T) {
 		t.Fatalf("Failed to write index source: %v", err)
 	}
 
-	origDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Failed to get working directory: %v", err)
-	}
-	t.Cleanup(func() {
-		_ = os.Chdir(origDir)
-	})
-
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatalf("Failed to change working directory: %v", err)
-	}
+	t.Chdir(tmpDir)
 
 	program, err := CreateProgram("tsconfig.json")
 	if err != nil {
