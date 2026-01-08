@@ -68,7 +68,7 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 		}
 
 		// Skip if entire import is already type-only
-		if importClause.IsTypeOnly {
+		if importClause.IsTypeOnly() {
 			// If prefer is 'no-type-imports', report error
 			if opts.Prefer == "no-type-imports" {
 				ctx.ReportNode(node, rule.RuleMessage{

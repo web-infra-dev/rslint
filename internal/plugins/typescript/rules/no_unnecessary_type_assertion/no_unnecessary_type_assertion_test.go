@@ -204,6 +204,79 @@ function Test(props: { id?: null | string | number }) {
 		},
 		{
 			Code: `
+declare namespace JSX {
+  interface IntrinsicElements {
+    div: { key?: string | number };
+  }
+}
+
+function Test(props: { id?: null | string | number }) {
+  return <div key={(props.id!)} />;
+}
+      `,
+			Tsx: true,
+		},
+		{
+			Code: `
+declare namespace JSX {
+  interface IntrinsicElements {
+    div: any;
+  }
+}
+
+function Comp(props: { val: string }) { return <div />; }
+
+function Test(props: { val: string | null }) {
+  return <Comp val={props.val!} />;
+}
+      `,
+			Tsx: true,
+		},
+		{
+			Code: `
+declare namespace JSX {
+  interface IntrinsicElements {
+    div: { requiredProp: string | number };
+  }
+}
+
+function Test(props: { item: { id?: string | number } }) {
+  return <div requiredProp={props.item.id!} />;
+}
+      `,
+			Tsx: true,
+		},
+		{
+			Code: `
+declare namespace JSX {
+  interface IntrinsicElements {
+    div: { prop: { id: string } };
+  }
+}
+
+function Test(props: { id?: string }) {
+  return <div prop={{ id: props.id! }} />;
+}
+      `,
+			Tsx: true,
+		},
+		{
+			Code: `
+declare namespace JSX {
+  interface IntrinsicElements {
+    div: { prop: any };
+    span: { customProp: string };
+  }
+}
+
+function Test(props: { id?: string }) {
+  return <div prop={<span customProp={props.id!} />} />;
+}
+      `,
+			Tsx: true,
+		},
+		{
+			Code: `
 const a = [1, 2];
 const b = [3, 4];
 const c = [...a, ...b] as const;
@@ -412,6 +485,7 @@ foo!;
 					Line:      1,
 				},
 			},
+			Options: NoUnnecessaryTypeAssertionOptions{CheckLiteralConstAssertions: true},
 		},
 		{
 			Code:   "const a = 'a' as const;",
@@ -422,6 +496,7 @@ foo!;
 					Line:      1,
 				},
 			},
+			Options: NoUnnecessaryTypeAssertionOptions{CheckLiteralConstAssertions: true},
 		},
 		{
 			Code:   "const a = <const>'a';",
@@ -432,6 +507,7 @@ foo!;
 					Line:      1,
 				},
 			},
+			Options: NoUnnecessaryTypeAssertionOptions{CheckLiteralConstAssertions: true},
 		},
 		{
 			Code:   "const foo = <3>3;",
@@ -1273,6 +1349,7 @@ class T {
 					Line:      3,
 				},
 			},
+			Options: NoUnnecessaryTypeAssertionOptions{CheckLiteralConstAssertions: true},
 		},
 		{
 			Code: `
@@ -1402,6 +1479,7 @@ const b = a;
 					MessageId: "unnecessaryAssertion",
 				},
 			},
+			Options: NoUnnecessaryTypeAssertionOptions{CheckLiteralConstAssertions: true},
 		},
 		{
 			Code: `

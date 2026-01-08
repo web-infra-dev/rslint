@@ -26,18 +26,55 @@ func buildUnnecessaryAssertionMessage() rule.RuleMessage {
 
 type NoUnnecessaryTypeAssertionOptions struct {
 	// TODO(port): maybe typeOrValueSpecifier?
-	TypesToIgnore []string
+	TypesToIgnore               []string
+	CheckLiteralConstAssertions bool
 }
 
 var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 	Name: "no-unnecessary-type-assertion",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts, ok := options.(NoUnnecessaryTypeAssertionOptions)
-		if !ok {
-			opts = NoUnnecessaryTypeAssertionOptions{}
-		}
-		if opts.TypesToIgnore == nil {
-			opts.TypesToIgnore = []string{}
+		var typesToIgnore []string
+		var checkLiteralConstAssertions bool
+
+		if opts, ok := options.(NoUnnecessaryTypeAssertionOptions); ok {
+			typesToIgnore = opts.TypesToIgnore
+			checkLiteralConstAssertions = opts.CheckLiteralConstAssertions
+		} else if optsList, ok := options.([]any); ok {
+			// handle array of options (ESLint style)
+			if len(optsList) > 0 {
+				if firstOpt, ok := optsList[0].(map[string]any); ok {
+					if v, ok := firstOpt["typesToIgnore"]; ok {
+						if arr, ok := v.([]any); ok {
+							for _, item := range arr {
+								if s, ok := item.(string); ok {
+									typesToIgnore = append(typesToIgnore, s)
+								}
+							}
+						}
+					}
+					if v, ok := firstOpt["checkLiteralConstAssertions"]; ok {
+						if b, ok := v.(bool); ok {
+							checkLiteralConstAssertions = b
+						}
+					}
+				}
+			}
+		} else if optsMap, ok := options.(map[string]any); ok {
+			// handle single option object passed directly (just in case)
+			if v, ok := optsMap["typesToIgnore"]; ok {
+				if arr, ok := v.([]any); ok {
+					for _, item := range arr {
+						if s, ok := item.(string); ok {
+							typesToIgnore = append(typesToIgnore, s)
+						}
+					}
+				}
+			}
+			if v, ok := optsMap["checkLiteralConstAssertions"]; ok {
+				if b, ok := v.(bool); ok {
+					checkLiteralConstAssertions = b
+				}
+			}
 		}
 
 		compilerOptions := ctx.Program.Options()
@@ -133,7 +170,7 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			 * Even on `const` variable declarations, template literals with expressions can sometimes be widened without a type assertion.
 			 * @see https://github.com/typescript-eslint/typescript-eslint/issues/8737
 			 */
-			if ast.IsTemplateExpression(expression) {
+			if ast.IsTemplateExpression(expression) || expression.Kind == ast.KindNoSubstitutionTemplateLiteral {
 				return false
 			}
 
@@ -192,19 +229,27 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 
 		checkTypeAssertion := func(node *ast.Node) {
 			typeNode := node.Type()
-			if slices.Contains(opts.TypesToIgnore, strings.TrimSpace(ctx.SourceFile.Text()[typeNode.Pos():typeNode.End()])) {
+			typeText := strings.TrimSpace(ctx.SourceFile.Text()[typeNode.Pos():typeNode.End()])
+
+			if slices.Contains(typesToIgnore, typeText) {
 				return
 			}
 
 			castType := ctx.TypeChecker.GetTypeAtLocation(node)
 
-			if !utils.IsTypeFlagSet(castType, checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral|checker.TypeFlagsBigIntLiteral) {
+			if !utils.IsTypeFlagSet(castType, checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral|checker.TypeFlagsBigIntLiteral|checker.TypeFlagsBooleanLiteral|checker.TypeFlagsEnumLiteral) {
 				if isConstAssertion(typeNode) {
 					return
 				}
 			} else {
-				if !isImplicitlyNarrowedLiteralDeclaration(node) {
-					return
+				if isConstAssertion(typeNode) {
+					if !checkLiteralConstAssertions {
+						return
+					}
+				} else {
+					if !isImplicitlyNarrowedLiteralDeclaration(node) {
+						return
+					}
 				}
 			}
 
@@ -219,12 +264,12 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			if node.Kind == ast.KindAsExpression {
 				s := scanner.GetScannerForSourceFile(ctx.SourceFile, expression.End())
 				asKeywordRange := s.TokenRange()
-				
+
 				sourceText := ctx.SourceFile.Text()
 				startPos := asKeywordRange.Pos()
-				
+
 				if startPos > expression.End() && sourceText[startPos-1] == ' ' {
-				if startPos-1 == expression.End() || (startPos-2 >= 0 && sourceText[startPos-2] != ' ') {
+					if startPos-1 == expression.End() || (startPos-2 >= 0 && sourceText[startPos-2] != ' ') {
 						startPos--
 					}
 				}
@@ -293,23 +338,79 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 							return
 						}
 
-						// in strict mode you can't assign null to undefined, so we have to make sure that
-						// the two types share a nullable type
-						typeIncludesUndefined := tFlags&checker.TypeFlagsUndefined != 0
-						typeIncludesNull := tFlags&checker.TypeFlagsNull != 0
-						typeIncludesVoid := tFlags&checker.TypeFlagsVoid != 0
-
-						contextualTypeIncludesUndefined := contextualFlags&checker.TypeFlagsUndefined != 0
-						contextualTypeIncludesNull := contextualFlags&checker.TypeFlagsNull != 0
-						contextualTypeIncludesVoid := contextualFlags&checker.TypeFlagsVoid != 0
-
 						// make sure that the parent accepts the same types
 						// i.e. assigning `string | null | undefined` to `string | undefined` is invalid
-						isValidUndefined := !typeIncludesUndefined || contextualTypeIncludesUndefined
-						isValidNull := !typeIncludesNull || contextualTypeIncludesNull
-						isValidVoid := !typeIncludesVoid || contextualTypeIncludesVoid
 
-						if isValidUndefined && isValidNull && isValidVoid {
+						// In some cases (e.g. JSX attributes), the contextual type provided by the checker
+						// might include `Null` even if the target property does not explicitly accept it
+						// (especially when strictNullChecks is enabled).
+						// To avoid false positives (saying assertion is unnecessary when it IS necessary),
+						// we try to resolve the "clean" type from the target symbol if possible.
+						cleanContextualType := contextualType
+						var symbol *ast.Symbol
+
+						if isStrictNullChecks {
+							// Try to find the symbol we are assigning to, to get its declared type.
+							// We walk up parentheses to find the enclosing context.
+							parent := ast.WalkUpParenthesizedExpressions(node.Parent)
+							if parent != nil && parent.Kind == ast.KindJsxExpression {
+								// JSX Attribute value: <div key={expr} />
+								// The parent of JsxExpression is JsxAttribute.
+								grandparent := parent.Parent
+								if grandparent != nil && grandparent.Kind == ast.KindJsxAttribute {
+									attr := grandparent.AsJsxAttribute()
+									// Get the symbol of the attribute (e.g. "key").
+									// We look up the symbol at the attribute name location.
+									if attr.Name() != nil {
+										// attr.Name() returns *ast.JsxAttributeName which should have AsNode()
+										symbol = ctx.TypeChecker.GetSymbolAtLocation(attr.Name().AsNode())
+										if symbol != nil {
+											// Get the type of the symbol (this should be the clean declared type).
+											cleanContextualType = ctx.TypeChecker.GetTypeOfSymbol(symbol)
+										}
+									}
+								}
+							}
+						}
+
+						// Use IsTypeAssignableTo to check if the assertion is truly unnecessary.
+						// We use cleanContextualType to ensure we don't use the polluted JSX type.
+						isUnnecessary := true
+
+						if utils.IsTypeFlagSet(cleanContextualType, checker.TypeFlagsAny) {
+							// If context is Any, assertions are usually valid (or at least we don't nag).
+							// This matches original behavior.
+							isUnnecessary = false
+						} else {
+							// Check each part of the source type
+							parts := utils.UnionTypeParts(t)
+							for _, part := range parts {
+								partFlags := checker.Type_flags(part)
+
+								if partFlags&checker.TypeFlagsUndefined != 0 {
+									// Check if undefined is allowed
+									if checker.Checker_isTypeAssignableTo(ctx.TypeChecker, part, cleanContextualType) {
+										continue
+									}
+									// Fallback: If we found a symbol (JSX), GetTypeOfSymbol might have stripped 'undefined' from optional property.
+									// But the original contextualType should have it. We trust the original type for Undefined.
+									if symbol != nil && checker.Checker_isTypeAssignableTo(ctx.TypeChecker, part, contextualType) {
+										continue
+									}
+									isUnnecessary = false
+									break
+								}
+
+								// For Null and others, we MUST check against cleanContextualType.
+								// We specifically want to reject Null if it was only present in the polluted contextualType.
+								if !checker.Checker_isTypeAssignableTo(ctx.TypeChecker, part, cleanContextualType) {
+									isUnnecessary = false
+									break
+								}
+							}
+						}
+
+						if isUnnecessary {
 							ctx.ReportNodeWithFixes(node, buildContextuallyUnnecessaryMessage(), buildRemoveExclamationFix())
 						}
 					}
