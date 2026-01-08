@@ -12,6 +12,7 @@ module.exports = {
     'node_modules',
     'pnpm-lock.yaml',
     'shim',
+    'cmd/tsgo',
     'packages/vscode-extension/out',
     'packages/rslint-test-tools/tests',
     'packages/rslint/pkg/mod',
