@@ -1,6 +1,6 @@
 module github.com/web-infra-dev/rslint
 
-go 1.25.0
+go 1.25.5
 
 replace (
 	github.com/microsoft/typescript-go/shim/ast => ./shim/ast
@@ -23,7 +23,7 @@ replace (
 )
 
 require (
-	github.com/bmatcuk/doublestar/v4 v4.9.1
+	github.com/bmatcuk/doublestar/v4 v4.9.2
 	github.com/fatih/color v1.18.0
 	github.com/microsoft/typescript-go/shim/ast v0.0.0
 	github.com/microsoft/typescript-go/shim/bundled v0.0.0
