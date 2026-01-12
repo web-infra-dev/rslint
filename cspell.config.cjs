@@ -15,6 +15,7 @@ module.exports = {
     'packages/vscode-extension/out',
     'packages/rslint-test-tools/tests',
     'packages/rslint/pkg/mod',
+    'cmd/tsgo',
   ],
   dictionaries: ['dictionary'],
   dictionaryDefinitions: [
