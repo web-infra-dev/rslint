@@ -65,10 +65,10 @@ type LintRequest struct {
 	Format           string   `json:"format,omitempty"`
 	WorkingDirectory string   `json:"workingDirectory,omitempty"`
 	// Supports both string level and array [level, options] format
-	RuleOptions     map[string]interface{} `json:"ruleOptions,omitempty"`
-	FileContents    map[string]string      `json:"fileContents,omitempty"`    // Map of file paths to their contents for VFS
-	LanguageOptions *LanguageOptions       `json:"languageOptions,omitempty"` // Override languageOptions from config file
-	IncludeEncodedSourceFiles bool         `json:"includeEncodedSourceFiles,omitempty"` // Whether to include encoded source files in response
+	RuleOptions               map[string]interface{} `json:"ruleOptions,omitempty"`
+	FileContents              map[string]string      `json:"fileContents,omitempty"`              // Map of file paths to their contents for VFS
+	LanguageOptions           *LanguageOptions       `json:"languageOptions,omitempty"`           // Override languageOptions from config file
+	IncludeEncodedSourceFiles bool                   `json:"includeEncodedSourceFiles,omitempty"` // Whether to include encoded source files in response
 }
 
 // LanguageOptions contains language-specific configuration options
@@ -106,11 +106,11 @@ type ByteArray []byte
 
 // LintResponse represents a lint response from Go to JS
 type LintResponse struct {
-	Diagnostics      []Diagnostic           `json:"diagnostics"`
-	ErrorCount       int                    `json:"errorCount"`
-	FileCount        int                    `json:"fileCount"`
-	RuleCount        int                    `json:"ruleCount"`
-	EncodedSourceFiles map[string]ByteArray    `json:"encodedSourceFiles,omitempty"`
+	Diagnostics        []Diagnostic         `json:"diagnostics"`
+	ErrorCount         int                  `json:"errorCount"`
+	FileCount          int                  `json:"fileCount"`
+	RuleCount          int                  `json:"ruleCount"`
+	EncodedSourceFiles map[string]ByteArray `json:"encodedSourceFiles,omitempty"`
 }
 
 // ApplyFixesRequest represents a request to apply fixes from JS to Go
@@ -341,8 +341,6 @@ func (s *Service) sendResponse(id int, data interface{}) {
 		fmt.Fprintf(os.Stderr, "failed to send response: %v\n", err)
 	}
 }
-
-
 
 // sendError sends an error message
 func (s *Service) sendError(id int, message string) {

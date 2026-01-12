@@ -35,7 +35,7 @@ type ServerOptions struct {
 	DefaultLibraryPath string
 	TypingsLocation    string
 
-	ParsedFileCache project.ParsedFileCache
+	ParseCache *project.ParseCache
 }
 
 func NewServer(opts *ServerOptions) *Server {
@@ -54,15 +54,14 @@ func NewServer(opts *ServerOptions) *Server {
 		fs:                    opts.FS,
 		defaultLibraryPath:    opts.DefaultLibraryPath,
 		typingsLocation:       opts.TypingsLocation,
-		parsedFileCache:       opts.ParsedFileCache,
+		parseCache:            opts.ParseCache,
 		documents:             make(map[lsproto.DocumentUri]string),
 		diagnostics:           make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
 	}
 }
 
 var (
-	_ project.ServiceHost = (*Server)(nil)
-	_ project.Client      = (*Server)(nil)
+	_ project.Client = (*Server)(nil)
 )
 
 type pendingClientRequest struct {
@@ -146,13 +145,12 @@ type Server struct {
 
 	watchEnabled bool
 	watcherID    atomic.Uint32
-	watchers     collections.SyncSet[project.WatcherHandle]
-	//nolint
-	logger         *project.Logger
-	projectService *project.Service
+	watchers     collections.SyncSet[project.WatcherID]
+
+	session *project.Session
 
 	// enables tests to share a cache of parsed source files
-	parsedFileCache project.ParsedFileCache
+	parseCache *project.ParseCache
 
 	// !!! temporary; remove when we have `handleDidChangeConfiguration`/implicit project config support
 	compilerOptionsForInferredProjects *core.CompilerOptions
@@ -198,12 +196,11 @@ func (s *Server) Client() project.Client {
 }
 
 // WatchFiles implements project.Client.
-func (s *Server) WatchFiles(ctx context.Context, watchers []*lsproto.FileSystemWatcher) (project.WatcherHandle, error) {
-	watcherId := fmt.Sprintf("watcher-%d", s.watcherID.Add(1))
+func (s *Server) WatchFiles(ctx context.Context, id project.WatcherID, watchers []*lsproto.FileSystemWatcher) error {
 	_, err := s.sendRequest(ctx, lsproto.MethodClientRegisterCapability, &lsproto.RegistrationParams{
 		Registrations: []*lsproto.Registration{
 			{
-				Id:     watcherId,
+				Id:     string(id),
 				Method: string(lsproto.MethodWorkspaceDidChangeWatchedFiles),
 				RegisterOptions: ptrTo(any(lsproto.DidChangeWatchedFilesRegistrationOptions{
 					Watchers: watchers,
@@ -212,21 +209,20 @@ func (s *Server) WatchFiles(ctx context.Context, watchers []*lsproto.FileSystemW
 		},
 	})
 	if err != nil {
-		return "", fmt.Errorf("failed to register file watcher: %w", err)
+		return fmt.Errorf("failed to register file watcher: %w", err)
 	}
 
-	handle := project.WatcherHandle(watcherId)
-	s.watchers.Add(handle)
-	return handle, nil
+	s.watchers.Add(id)
+	return nil
 }
 
 // UnwatchFiles implements project.Client.
-func (s *Server) UnwatchFiles(ctx context.Context, handle project.WatcherHandle) error {
-	if s.watchers.Has(handle) {
+func (s *Server) UnwatchFiles(ctx context.Context, id project.WatcherID) error {
+	if s.watchers.Has(id) {
 		_, err := s.sendRequest(ctx, lsproto.MethodClientUnregisterCapability, &lsproto.UnregistrationParams{
 			Unregisterations: []*lsproto.Unregistration{
 				{
-					Id:     string(handle),
+					Id:     string(id),
 					Method: string(lsproto.MethodWorkspaceDidChangeWatchedFiles),
 				},
 			},
@@ -235,11 +231,11 @@ func (s *Server) UnwatchFiles(ctx context.Context, handle project.WatcherHandle)
 			return fmt.Errorf("failed to unregister file watcher: %w", err)
 		}
 
-		s.watchers.Delete(handle)
+		s.watchers.Delete(id)
 		return nil
 	}
 
-	return fmt.Errorf("no file watcher exists with ID %s", handle)
+	return fmt.Errorf("no file watcher exists with ID %s", id)
 }
 
 // RefreshDiagnostics implements project.Client.
@@ -538,7 +534,7 @@ func registerRequestHandler[Req, Resp any](handlers handlerMap, info lsproto.Req
 }
 
 func (s *Server) handleShutdown(ctx context.Context, params any) (lsproto.ShutdownResponse, error) {
-	s.projectService.Close()
+	s.session.Close()
 	return lsproto.ShutdownResponse{}, nil
 }
 
@@ -553,8 +549,8 @@ func (s *Server) Log(msg ...any) {
 // !!! temporary; remove when we have `handleDidChangeConfiguration`/implicit project config support
 func (s *Server) SetCompilerOptionsForInferredProjects(options *core.CompilerOptions) {
 	s.compilerOptionsForInferredProjects = options
-	if s.projectService != nil {
-		s.projectService.SetCompilerOptionsForInferredProjects(options)
+	if s.session != nil {
+		s.session.DidChangeCompilerOptionsForInferredProjects(context.Background(), options)
 	}
 }
 

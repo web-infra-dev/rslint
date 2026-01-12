@@ -1,6 +1,7 @@
 package no_unnecessary_type_assertion
 
 import (
+	"encoding/json"
 	"slices"
 	"strings"
 
@@ -26,15 +27,26 @@ func buildUnnecessaryAssertionMessage() rule.RuleMessage {
 
 type NoUnnecessaryTypeAssertionOptions struct {
 	// TODO(port): maybe typeOrValueSpecifier?
-	TypesToIgnore []string
+	TypesToIgnore []string `json:"typesToIgnore"`
+	// Whether to check const assertions on literal values
+	// When true, reports cases like `const foo = 'bar' as const` where the assertion is unnecessary
+	CheckLiteralConstAssertions bool `json:"checkLiteralConstAssertions"`
 }
 
 var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 	Name: "no-unnecessary-type-assertion",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-		opts, ok := options.(NoUnnecessaryTypeAssertionOptions)
-		if !ok {
-			opts = NoUnnecessaryTypeAssertionOptions{}
+		opts := NoUnnecessaryTypeAssertionOptions{}
+		if options != nil {
+			// Try direct type assertion first (for Go tests)
+			if directOpts, ok := options.(NoUnnecessaryTypeAssertionOptions); ok {
+				opts = directOpts
+			} else {
+				// For IPC mode, options come as map[string]interface{}, convert via JSON
+				if jsonBytes, err := json.Marshal(options); err == nil {
+					_ = json.Unmarshal(jsonBytes, &opts)
+				}
+			}
 		}
 		if opts.TypesToIgnore == nil {
 			opts.TypesToIgnore = []string{}
@@ -199,12 +211,22 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			castType := ctx.TypeChecker.GetTypeAtLocation(node)
 
 			if !utils.IsTypeFlagSet(castType, checker.TypeFlagsStringLiteral|checker.TypeFlagsNumberLiteral|checker.TypeFlagsBigIntLiteral) {
-				if isConstAssertion(typeNode) {
+				// Skip const assertions unless checkLiteralConstAssertions is enabled
+				if isConstAssertion(typeNode) && !opts.CheckLiteralConstAssertions {
 					return
 				}
 			} else {
-				if !isImplicitlyNarrowedLiteralDeclaration(node) {
+				// For literal types with const assertions, skip unless checkLiteralConstAssertions is enabled
+				if isConstAssertion(typeNode) && !opts.CheckLiteralConstAssertions {
 					return
+				}
+				// For literal types, only check if it's an implicitly narrowed declaration
+				// (e.g., const variable or readonly property)
+				// OR if checkLiteralConstAssertions is enabled for explicit const assertions
+				if !isImplicitlyNarrowedLiteralDeclaration(node) {
+					if !opts.CheckLiteralConstAssertions || !isConstAssertion(typeNode) {
+						return
+					}
 				}
 			}
 
@@ -219,12 +241,12 @@ var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
 			if node.Kind == ast.KindAsExpression {
 				s := scanner.GetScannerForSourceFile(ctx.SourceFile, expression.End())
 				asKeywordRange := s.TokenRange()
-				
+
 				sourceText := ctx.SourceFile.Text()
 				startPos := asKeywordRange.Pos()
-				
+
 				if startPos > expression.End() && sourceText[startPos-1] == ' ' {
-				if startPos-1 == expression.End() || (startPos-2 >= 0 && sourceText[startPos-2] != ' ') {
+					if startPos-1 == expression.End() || (startPos-2 >= 0 && sourceText[startPos-2] != ' ') {
 						startPos--
 					}
 				}

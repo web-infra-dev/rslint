@@ -61,7 +61,7 @@ func (dm *DisableManager) parseESLintDirectives(comments []*ast.CommentRange) {
 			commentContent = strings.TrimSpace(text[comment.Pos()+2 : comment.End()-2])
 		}
 
-		lineNum, _ := scanner.GetLineAndCharacterOfPosition(dm.sourceFile, comment.Pos())
+		lineNum, _ := scanner.GetECMALineAndCharacterOfPosition(dm.sourceFile, comment.Pos())
 		rulePos := 0
 
 		if strings.HasPrefix(commentContent, "eslint-disable") {
@@ -141,7 +141,7 @@ func (dm *DisableManager) IsRuleDisabled(ruleName string, pos int) bool {
 	}
 
 	// Get the line number for the position
-	line, _ := scanner.GetLineAndCharacterOfPosition(dm.sourceFile, pos)
+	line, _ := scanner.GetECMALineAndCharacterOfPosition(dm.sourceFile, pos)
 
 	// Check if rule is disabled for this specific line
 	if lineRules, exists := dm.lineDisabledRules[line]; exists {

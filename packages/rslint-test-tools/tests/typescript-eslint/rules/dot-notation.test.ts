@@ -483,13 +483,6 @@ function f<T extends Foo>(x: T) {
   x.extraKey;
 }
       `,
-      languageOptions: {
-        parserOptions: {
-          project: './tsconfig.noPropertyAccessFromIndexSignature.json',
-          projectService: false,
-          tsconfigRootDir: rootPath,
-        },
-      },
     },
   ],
 });
