@@ -64,7 +64,7 @@ func TestNoInvalidVoidTypeRule(t *testing.T) {
 				},
 			},
 			{
-				Code: `let voidPromise: Promise<void> = new Promise<void>(() => {});`,
+				Code:    `let voidPromise: Promise<void> = new Promise<void>(() => {});`,
 				Options: map[string]interface{}{"allowInGenericTypeArguments": false},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "invalidVoidNotReturn"},
@@ -72,7 +72,7 @@ func TestNoInvalidVoidTypeRule(t *testing.T) {
 				},
 			},
 			{
-				Code: `type GenericVoid = Generic<void>;`,
+				Code:    `type GenericVoid = Generic<void>;`,
 				Options: map[string]interface{}{"allowInGenericTypeArguments": false},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "invalidVoidNotReturn"},

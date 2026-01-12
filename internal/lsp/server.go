@@ -144,7 +144,6 @@ type Server struct {
 	locale           language.Tag
 
 	watchEnabled bool
-	watcherID    atomic.Uint32
 	watchers     collections.SyncSet[project.WatcherID]
 
 	session *project.Session

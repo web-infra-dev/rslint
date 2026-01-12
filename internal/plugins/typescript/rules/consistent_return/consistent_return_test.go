@@ -45,15 +45,15 @@ func TestConsistentReturnRule(t *testing.T) {
 
 		// treatUndefinedAsUnspecified option
 		{
-			Code: `function foo() { if (true) return undefined; else return; }`,
+			Code:    `function foo() { if (true) return undefined; else return; }`,
 			Options: []interface{}{map[string]interface{}{"treatUndefinedAsUnspecified": true}},
 		},
 		{
-			Code: `function foo() { return undefined; }`,
+			Code:    `function foo() { return undefined; }`,
 			Options: []interface{}{map[string]interface{}{"treatUndefinedAsUnspecified": true}},
 		},
 		{
-			Code: `const foo = () => { if (true) return undefined; else return; };`,
+			Code:    `const foo = () => { if (true) return undefined; else return; };`,
 			Options: []interface{}{map[string]interface{}{"treatUndefinedAsUnspecified": true}},
 		},
 
@@ -97,7 +97,6 @@ func TestConsistentReturnRule(t *testing.T) {
 
 		// Single return statement
 		{Code: `function foo() { if (true) { return 1; } }`},
-
 	}, []rule_tester.InvalidTestCase{
 		// Basic inconsistent returns
 		{

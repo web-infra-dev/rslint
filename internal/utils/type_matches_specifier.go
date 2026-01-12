@@ -66,13 +66,6 @@ type TypeOrValueSpecifier struct {
 	Package string `json:"package"`
 }
 
-func typeMatchesStringSpecifier(
-	t *checker.Type,
-	names []string,
-) bool {
-	return typeMatchesStringSpecifierWithCalleeNames(t, names, nil)
-}
-
 func typeMatchesStringSpecifierWithCalleeNames(
 	t *checker.Type,
 	names []string,
