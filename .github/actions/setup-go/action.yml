@@ -19,6 +19,23 @@ runs:
         go-version: ${{ inputs.go-version }}
         cache: false
 
+    # Clean up before cache restore to free disk space
+    - name: Pre-cache cleanup (Windows)
+      shell: pwsh
+      if: runner.os == 'Windows'
+      run: |
+        Write-Host "Disk space before cleanup:"
+        Get-PSDrive C | Select-Object Used,Free | Format-Table
+
+        # Clean temp directory
+        Get-ChildItem -Path $env:TEMP -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+        # Clean test cache (not worth caching, regenerates quickly)
+        go clean -testcache
+
+        Write-Host "Disk space after cleanup:"
+        Get-PSDrive C | Select-Object Used,Free | Format-Table
+
     - name: Go cache
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       if: runner.environment == 'github-hosted'
@@ -45,40 +62,20 @@ runs:
           ~/Library/Caches/go-build
           ~/AppData/Local/go-build
 
+    # Clean up after cache restore - remove toolchain to save space
     - name: Clean Go module cache dir (Linux)
       shell: bash
       if: runner.os == 'Linux'
       run: sudo rm -rf ~/go/pkg/mod/golang.org/toolchain*
 
-    - name: Clean Go cache dir (Windows)
+    - name: Clean Go module cache dir (Windows)
       shell: pwsh
       if: runner.os == 'Windows'
       run: |
-        # Show disk space before cleanup
-        Write-Host "Disk space before cleanup:"
-        Get-PSDrive C | Select-Object Used,Free | Format-Table
-
-        # Clean toolchain cache
         $toolchainPath = Join-Path $env:USERPROFILE "go/pkg/mod/golang.org"
         if (Test-Path $toolchainPath) {
           Get-ChildItem -Path $toolchainPath -Filter "toolchain*" -Directory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
         }
-
-        # Clean both build and test cache to free disk space
-        go clean -cache -testcache
-
-        # Clean temp directory completely
-        Get-ChildItem -Path $env:TEMP -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-
-        # Clean AppData Local go-build cache
-        $goBuildCache = Join-Path $env:LOCALAPPDATA "go-build"
-        if (Test-Path $goBuildCache) {
-          Remove-Item -Path $goBuildCache -Recurse -Force -ErrorAction SilentlyContinue
-        }
-
-        # Show disk space after cleanup
-        Write-Host "Disk space after cleanup:"
-        Get-PSDrive C | Select-Object Used,Free | Format-Table
 
     - name: Patch tsgo
       shell: bash
