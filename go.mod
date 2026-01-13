@@ -63,4 +63,5 @@ require (
 	github.com/go-json-experiment/json v0.0.0-20250811204210-4789234c3ea1
 	github.com/microsoft/typescript-go v0.0.0-20250829050502-5d1d69a77a4c // indirect
 	golang.org/x/text v0.28.0
+	github.com/fxamacker/cbor/v2 v2.9.0
 )

@@ -239,13 +239,25 @@ var NoFloatingPromisesRule = rule.CreateRule(rule.Rule{
 				return false
 			}
 
-			t := ctx.TypeChecker.GetTypeAtLocation(node.AsCallExpression().Expression)
+			callExpr := node.AsCallExpression()
+			t := ctx.TypeChecker.GetTypeAtLocation(callExpr.Expression)
 
-			return utils.TypeMatchesSomeSpecifier(
+			// Get callee names for matching export aliases
+			// e.g., `export { test as it }` where type's symbol is "test" but callee is "it"
+			var calleeNames []string
+			callee := ast.SkipParentheses(callExpr.Expression)
+			if ast.IsIdentifier(callee) {
+				calleeNames = append(calleeNames, callee.Text())
+			} else if ast.IsPropertyAccessExpression(callee) {
+				calleeNames = append(calleeNames, callee.AsPropertyAccessExpression().Name().Text())
+			}
+
+			return utils.TypeMatchesSomeSpecifierWithCalleeNames(
 				t,
 				opts.AllowForKnownSafeCalls,
 				opts.AllowForKnownSafeCallsInline,
 				ctx.Program,
+				calleeNames,
 			)
 		}
 

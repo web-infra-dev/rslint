@@ -39,7 +39,7 @@ func TestNoThisAliasRule(t *testing.T) {
 				},
 			},
 			{
-				Code: `const { props, state } = this;`,
+				Code:    `const { props, state } = this;`,
 				Options: map[string]interface{}{"allowDestructuring": false},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "thisDestructure"},
@@ -70,7 +70,7 @@ const testLambda = () => {
 				},
 			},
 			{
-				Code: `const [foo] = this;`,
+				Code:    `const [foo] = this;`,
 				Options: map[string]interface{}{"allowDestructuring": false},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "thisDestructure"},

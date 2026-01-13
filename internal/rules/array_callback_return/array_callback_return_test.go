@@ -55,43 +55,43 @@ func TestArrayCallbackReturnRule(t *testing.T) {
 
 			// allowImplicit option
 			{
-				Code: `foo.map(function() { return; });`,
+				Code:    `foo.map(function() { return; });`,
 				Options: []interface{}{map[string]interface{}{"allowImplicit": true}},
 			},
 			{
-				Code: `foo.map(function() { if (a === b) { return; } return; });`,
+				Code:    `foo.map(function() { if (a === b) { return; } return; });`,
 				Options: []interface{}{map[string]interface{}{"allowImplicit": true}},
 			},
 			{
-				Code: `foo.every(function() { return; });`,
+				Code:    `foo.every(function() { return; });`,
 				Options: []interface{}{map[string]interface{}{"allowImplicit": true}},
 			},
 			{
-				Code: `foo.filter(function() { return; });`,
+				Code:    `foo.filter(function() { return; });`,
 				Options: []interface{}{map[string]interface{}{"allowImplicit": true}},
 			},
 
 			// checkForEach option - valid cases
 			{
-				Code: `foo.forEach(function(x) { bar(x); });`,
+				Code:    `foo.forEach(function(x) { bar(x); });`,
 				Options: []interface{}{map[string]interface{}{"checkForEach": true}},
 			},
 			{
-				Code: `foo.forEach(function(x) {});`,
+				Code:    `foo.forEach(function(x) {});`,
 				Options: []interface{}{map[string]interface{}{"checkForEach": true}},
 			},
 			{
-				Code: `foo.forEach(function() { return; });`,
+				Code:    `foo.forEach(function() { return; });`,
 				Options: []interface{}{map[string]interface{}{"checkForEach": true}},
 			},
 
 			// checkForEach with allowVoid option
 			{
-				Code: `foo.forEach(x => void bar(x));`,
+				Code:    `foo.forEach(x => void bar(x));`,
 				Options: []interface{}{map[string]interface{}{"checkForEach": true, "allowVoid": true}},
 			},
 			{
-				Code: `foo.forEach((x, i) => void (i % 2 && bar(x)));`,
+				Code:    `foo.forEach((x, i) => void (i % 2 && bar(x)));`,
 				Options: []interface{}{map[string]interface{}{"checkForEach": true, "allowVoid": true}},
 			},
 
@@ -251,28 +251,28 @@ func TestArrayCallbackReturnRule(t *testing.T) {
 
 			// checkForEach option - invalid cases
 			{
-				Code: `foo.forEach(x => x);`,
+				Code:    `foo.forEach(x => x);`,
 				Options: []interface{}{map[string]interface{}{"checkForEach": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "expectedNoReturnValue", Line: 1, Column: 13},
 				},
 			},
 			{
-				Code: `foo.forEach(function(x) { return x; });`,
+				Code:    `foo.forEach(function(x) { return x; });`,
 				Options: []interface{}{map[string]interface{}{"checkForEach": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "expectedNoReturnValue", Line: 1, Column: 13},
 				},
 			},
 			{
-				Code: `foo.forEach(function() { if (a === b) { return a; } });`,
+				Code:    `foo.forEach(function() { if (a === b) { return a; } });`,
 				Options: []interface{}{map[string]interface{}{"checkForEach": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "expectedNoReturnValue", Line: 1, Column: 13},
 				},
 			},
 			{
-				Code: `foo.forEach(() => bar());`,
+				Code:    `foo.forEach(() => bar());`,
 				Options: []interface{}{map[string]interface{}{"checkForEach": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "expectedNoReturnValue", Line: 1, Column: 13},
@@ -281,7 +281,7 @@ func TestArrayCallbackReturnRule(t *testing.T) {
 
 			// checkForEach with allowVoid - void is not used
 			{
-				Code: `foo.forEach(x => bar(x));`,
+				Code:    `foo.forEach(x => bar(x));`,
 				Options: []interface{}{map[string]interface{}{"checkForEach": true, "allowVoid": true}},
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "expectedNoReturnValue", Line: 1, Column: 13},

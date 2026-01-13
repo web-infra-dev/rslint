@@ -44,23 +44,23 @@ func TestGetterReturnRule(t *testing.T) {
 
 			// With allowImplicit option
 			{
-				Code: `var foo = { get bar() {return;} };`,
+				Code:    `var foo = { get bar() {return;} };`,
 				Options: []interface{}{map[string]interface{}{"allowImplicit": true}},
 			},
 			{
-				Code: `var foo = { get bar(){return true;} };`,
+				Code:    `var foo = { get bar(){return true;} };`,
 				Options: []interface{}{map[string]interface{}{"allowImplicit": true}},
 			},
 			{
-				Code: `var foo = { get bar(){if(bar) {return;} return true;} };`,
+				Code:    `var foo = { get bar(){if(bar) {return;} return true;} };`,
 				Options: []interface{}{map[string]interface{}{"allowImplicit": true}},
 			},
 			{
-				Code: `class foo { get bar(){return true;} }`,
+				Code:    `class foo { get bar(){return true;} }`,
 				Options: []interface{}{map[string]interface{}{"allowImplicit": true}},
 			},
 			{
-				Code: `class foo { get bar(){return;} }`,
+				Code:    `class foo { get bar(){return;} }`,
 				Options: []interface{}{map[string]interface{}{"allowImplicit": true}},
 			},
 		},

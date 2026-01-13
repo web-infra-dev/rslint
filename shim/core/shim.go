@@ -9,16 +9,27 @@ import "golang.org/x/text/language"
 import "iter"
 import _ "unsafe"
 
+//go:linkname ApplyBulkEdits github.com/microsoft/typescript-go/internal/core.ApplyBulkEdits
+func ApplyBulkEdits(text string, edits []core.TextChange) string
 //go:linkname BoolToTristate github.com/microsoft/typescript-go/internal/core.BoolToTristate
 func BoolToTristate(b bool) core.Tristate
+type BreadthFirstSearchLevel[K comparable, N any] = core.BreadthFirstSearchLevel[K,N]
+type BreadthFirstSearchOptions[K comparable, N any] = core.BreadthFirstSearchOptions[K,N]
+type BreadthFirstSearchResult[N any] = core.BreadthFirstSearchResult[N]
+type BuildOptions = core.BuildOptions
+//go:linkname CompareBooleans github.com/microsoft/typescript-go/internal/core.CompareBooleans
+func CompareBooleans(a bool, b bool) int
 type CompilerOptions = core.CompilerOptions
-//go:linkname ComputeLineStarts github.com/microsoft/typescript-go/internal/core.ComputeLineStarts
-func ComputeLineStarts(text string) []core.TextPos
-//go:linkname ComputeLineStartsSeq github.com/microsoft/typescript-go/internal/core.ComputeLineStartsSeq
-func ComputeLineStartsSeq(text string) iter.Seq[core.TextPos]
+//go:linkname ComputeECMALineStarts github.com/microsoft/typescript-go/internal/core.ComputeECMALineStarts
+func ComputeECMALineStarts(text string) core.ECMALineStarts
+//go:linkname ComputeECMALineStartsSeq github.com/microsoft/typescript-go/internal/core.ComputeECMALineStartsSeq
+func ComputeECMALineStartsSeq(text string) iter.Seq[core.TextPos]
+type ECMALineStarts = core.ECMALineStarts
 var ExclusivelyPrefixedNodeCoreModules = core.ExclusivelyPrefixedNodeCoreModules
 //go:linkname GetLocale github.com/microsoft/typescript-go/internal/core.GetLocale
 func GetLocale(ctx context.Context) language.Tag
+//go:linkname GetNewLineKind github.com/microsoft/typescript-go/internal/core.GetNewLineKind
+func GetNewLineKind(s string) core.NewLineKind
 //go:linkname GetRequestID github.com/microsoft/typescript-go/internal/core.GetRequestID
 func GetRequestID(ctx context.Context) string
 //go:linkname GetScriptKindFromFileName github.com/microsoft/typescript-go/internal/core.GetScriptKindFromFileName
@@ -50,6 +61,7 @@ const ModuleKindES2022 = core.ModuleKindES2022
 const ModuleKindESNext = core.ModuleKindESNext
 const ModuleKindNode16 = core.ModuleKindNode16
 const ModuleKindNode18 = core.ModuleKindNode18
+const ModuleKindNode20 = core.ModuleKindNode20
 const ModuleKindNodeNext = core.ModuleKindNodeNext
 const ModuleKindNone = core.ModuleKindNone
 const ModuleKindPreserve = core.ModuleKindPreserve
@@ -58,6 +70,8 @@ var ModuleKindToModuleResolutionKind = core.ModuleKindToModuleResolutionKind
 const ModuleKindUMD = core.ModuleKindUMD
 type ModuleResolutionKind = core.ModuleResolutionKind
 const ModuleResolutionKindBundler = core.ModuleResolutionKindBundler
+const ModuleResolutionKindClassic = core.ModuleResolutionKindClassic
+const ModuleResolutionKindNode10 = core.ModuleResolutionKindNode10
 const ModuleResolutionKindNode16 = core.ModuleResolutionKindNode16
 const ModuleResolutionKindNodeNext = core.ModuleResolutionKindNodeNext
 const ModuleResolutionKindUnknown = core.ModuleResolutionKindUnknown
@@ -67,8 +81,11 @@ const NewLineKindLF = core.NewLineKindLF
 const NewLineKindNone = core.NewLineKindNone
 //go:linkname NewTextRange github.com/microsoft/typescript-go/internal/core.NewTextRange
 func NewTextRange(pos int, end int) core.TextRange
+//go:linkname NewThrottleGroup github.com/microsoft/typescript-go/internal/core.NewThrottleGroup
+func NewThrottleGroup(ctx context.Context, semaphore chan struct{}) *core.ThrottleGroup
 //go:linkname NewWorkGroup github.com/microsoft/typescript-go/internal/core.NewWorkGroup
 func NewWorkGroup(singleThreaded bool) core.WorkGroup
+var NodeCoreModules = core.NodeCoreModules
 //go:linkname NonRelativeModuleNameForTypingCache github.com/microsoft/typescript-go/internal/core.NonRelativeModuleNameForTypingCache
 func NonRelativeModuleNameForTypingCache(moduleName string) string
 type ParsedOptions = core.ParsedOptions
@@ -87,6 +104,8 @@ type ResolutionMode = core.ResolutionMode
 const ResolutionModeCommonJS = core.ResolutionModeCommonJS
 const ResolutionModeESM = core.ResolutionModeESM
 const ResolutionModeNone = core.ResolutionModeNone
+//go:linkname ResolveConfigFileNameOfProjectReference github.com/microsoft/typescript-go/internal/core.ResolveConfigFileNameOfProjectReference
+func ResolveConfigFileNameOfProjectReference(path string) string
 //go:linkname ResolveProjectReferencePath github.com/microsoft/typescript-go/internal/core.ResolveProjectReferencePath
 func ResolveProjectReferencePath(ref *core.ProjectReference) string
 type ScriptKind = core.ScriptKind
@@ -127,6 +146,7 @@ const TSUnknown = core.TSUnknown
 type TextChange = core.TextChange
 type TextPos = core.TextPos
 type TextRange = core.TextRange
+type ThrottleGroup = core.ThrottleGroup
 type Tristate = core.Tristate
 //go:linkname TryParsePattern github.com/microsoft/typescript-go/internal/core.TryParsePattern
 func TryParsePattern(pattern string) core.Pattern

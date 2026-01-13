@@ -371,7 +371,7 @@ var DotNotationRule = rule.CreateRule(rule.Rule{
 				replacement := objectText + whitespace + "." + propName
 
 				// Report on the node with the fix
-				ctx.ReportNodeWithFixes(node, buildUseDotMessage(), rule.RuleFixReplace(ctx.SourceFile, node, replacement))
+				ctx.ReportNodeWithFixes(elem.ArgumentExpression, buildUseDotMessage(), rule.RuleFixReplace(ctx.SourceFile, node, replacement))
 			}
 		}
 

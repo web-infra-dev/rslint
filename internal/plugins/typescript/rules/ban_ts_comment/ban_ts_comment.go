@@ -16,11 +16,11 @@ type DirectiveConfig struct {
 }
 
 type BanTsCommentOptions struct {
-	TsExpectError          interface{} `json:"ts-expect-error"`
-	TsIgnore               interface{} `json:"ts-ignore"`
-	TsNocheck              interface{} `json:"ts-nocheck"`
-	TsCheck                interface{} `json:"ts-check"`
-	MinimumDescriptionLength int        `json:"minimumDescriptionLength"`
+	TsExpectError            interface{} `json:"ts-expect-error"`
+	TsIgnore                 interface{} `json:"ts-ignore"`
+	TsNocheck                interface{} `json:"ts-nocheck"`
+	TsCheck                  interface{} `json:"ts-check"`
+	MinimumDescriptionLength int         `json:"minimumDescriptionLength"`
 }
 
 // Regular expressions for matching TypeScript directives
@@ -43,10 +43,10 @@ var BanTsCommentRule = rule.CreateRule(rule.Rule{
 
 func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 	opts := BanTsCommentOptions{
-		TsExpectError:          true,
-		TsIgnore:               true,
-		TsNocheck:              true,
-		TsCheck:                false,
+		TsExpectError:            true,
+		TsIgnore:                 true,
+		TsNocheck:                true,
+		TsCheck:                  false,
 		MinimumDescriptionLength: 3,
 	}
 

@@ -14,6 +14,8 @@ func ChangeExtension(path string, newExtension string) string
 func ChangeFullExtension(path string, newExtension string) string
 //go:linkname CombinePaths github.com/microsoft/typescript-go/internal/tspath.CombinePaths
 func CombinePaths(firstPath string, paths ...string) string
+//go:linkname CompareNumberOfDirectorySeparators github.com/microsoft/typescript-go/internal/tspath.CompareNumberOfDirectorySeparators
+func CompareNumberOfDirectorySeparators(path1 string, path2 string) int
 //go:linkname ComparePaths github.com/microsoft/typescript-go/internal/tspath.ComparePaths
 func ComparePaths(a string, b string, options tspath.ComparePathsOptions) int
 //go:linkname ComparePathsCaseInsensitive github.com/microsoft/typescript-go/internal/tspath.ComparePathsCaseInsensitive
@@ -60,6 +62,8 @@ func GetAnyExtensionFromPath(path string, extensions []string, ignoreCase bool) 
 func GetBaseFileName(path string) string
 //go:linkname GetCanonicalFileName github.com/microsoft/typescript-go/internal/tspath.GetCanonicalFileName
 func GetCanonicalFileName(fileName string, useCaseSensitiveFileNames bool) string
+//go:linkname GetCommonParents github.com/microsoft/typescript-go/internal/tspath.GetCommonParents
+func GetCommonParents(paths []string, minComponents int, getPathComponents func(path string, currentDirectory string) []string, options tspath.ComparePathsOptions) (parents []string, ignored map[string]struct{})
 //go:linkname GetDeclarationEmitExtensionForPath github.com/microsoft/typescript-go/internal/tspath.GetDeclarationEmitExtensionForPath
 func GetDeclarationEmitExtensionForPath(path string) string
 //go:linkname GetDeclarationFileExtension github.com/microsoft/typescript-go/internal/tspath.GetDeclarationFileExtension
@@ -131,6 +135,8 @@ func RemoveTrailingDirectorySeparators(path string) string
 func ResolvePath(path string, paths ...string) string
 //go:linkname ResolveTripleslashReference github.com/microsoft/typescript-go/internal/tspath.ResolveTripleslashReference
 func ResolveTripleslashReference(moduleName string, containingFile string) string
+//go:linkname SplitVolumePath github.com/microsoft/typescript-go/internal/tspath.SplitVolumePath
+func SplitVolumePath(path string) (volume string, rest string, ok bool)
 var SupportedJSExtensions = tspath.SupportedJSExtensions
 var SupportedJSExtensionsFlat = tspath.SupportedJSExtensionsFlat
 var SupportedTSExtensions = tspath.SupportedTSExtensions

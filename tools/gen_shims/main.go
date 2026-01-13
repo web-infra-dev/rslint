@@ -63,6 +63,7 @@ func main() {
 		"project",
 		"api",
 		"api/encoder",
+		"api/proto",
 	}
 
 	packagesToShimFullNames := make([]string, len(packagesToShim))

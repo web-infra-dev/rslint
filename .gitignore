@@ -145,6 +145,7 @@ vite.config.ts.timestamp-*
 
 ## ignore ai build result
 /rslint
+/tsgo
 /bin/rslint
 npm/*/rslint
 npm/*/rslint.exe

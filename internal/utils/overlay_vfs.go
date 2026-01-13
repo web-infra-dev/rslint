@@ -18,6 +18,9 @@ type OverlayVFS struct {
 
 var _ vfs.FS = (*OverlayVFS)(nil)
 
+func (vfs *OverlayVFS) Chtimes(path string, atime time.Time, mtime time.Time) error {
+	return vfs.fs.Chtimes(path, atime, mtime)
+}
 func (vfs *OverlayVFS) UseCaseSensitiveFileNames() bool {
 	return vfs.fs.UseCaseSensitiveFileNames()
 }

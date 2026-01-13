@@ -14,7 +14,6 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
-	"github.com/microsoft/typescript-go/shim/ls"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/scanner"
@@ -74,9 +73,17 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 	return response, nil
 }
 func (s *Server) handleInitialized(ctx context.Context, params *lsproto.InitializedParams) error {
-	s.projectService = project.NewService(s, project.ServiceOptions{
-		Logger:           project.NewLogger([]io.Writer{}, "", project.LogLevelVerbose),
-		PositionEncoding: lsproto.PositionEncodingKindUTF8,
+	s.session = project.NewSession(&project.SessionInit{
+		Options: &project.SessionOptions{
+			CurrentDirectory:   s.cwd,
+			DefaultLibraryPath: s.defaultLibraryPath,
+			TypingsLocation:    s.typingsLocation,
+			PositionEncoding:   lsproto.PositionEncodingKindUTF8,
+		},
+		FS:         s.fs,
+		Client:     s,
+		Logger:     project.NewLogger(io.Discard),
+		ParseCache: s.parseCache,
 	})
 	// Try to find rslint configuration files with multiple strategies
 	var rslintConfigPath string
@@ -169,8 +176,8 @@ func (s *Server) handleCodeAction(ctx context.Context, params *lsproto.CodeActio
 	// Find diagnostics that overlap with the requested range
 	for _, ruleDiag := range ruleDiagnostics {
 		// Check if diagnostic range overlaps with requested range
-		diagStartLine, diagStartChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
-		diagEndLine, diagEndChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
+		diagStartLine, diagStartChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
+		diagEndLine, diagEndChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
 
 		diagRange := lsproto.Range{
 			Start: lsproto.Position{Line: uint32(diagStartLine), Character: uint32(diagStartChar)},
@@ -230,7 +237,7 @@ func (s *Server) handleDocumentDiagnostic(ctx context.Context, params *lsproto.D
 	// Initialize rule registry with all available rules (ensure it's done once)
 	config.RegisterAllRules()
 
-	rule_diags, err := runLintWithProjectService(uri, s.projectService, ctx, s.rslintConfig)
+	rule_diags, err := runLintWithSession(uri, s.session, ctx, s.rslintConfig)
 
 	if err != nil {
 		log.Printf("Error running lint: %v", err)
@@ -253,8 +260,8 @@ func (s *Server) handleDocumentDiagnostic(ctx context.Context, params *lsproto.D
 func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic, content string) *lsproto.Diagnostic {
 	diagnosticStart := ruleDiag.Range.Pos()
 	diagnosticEnd := ruleDiag.Range.End()
-	startLine, startColumn := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, diagnosticStart)
-	endLine, endColumn := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, diagnosticEnd)
+	startLine, startColumn := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, diagnosticStart)
+	endLine, endColumn := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, diagnosticEnd)
 
 	return &lsproto.Diagnostic{
 		Range: lsproto.Range{
@@ -282,7 +289,12 @@ func isTypeScriptFile(uri string) bool {
 }
 
 func uriToPath(uri lsproto.DocumentUri) string {
-	return ls.DocumentURIToFileName(uri)
+	// Convert file:// URI to file path
+	uriStr := string(uri)
+	if strings.HasPrefix(uriStr, "file://") {
+		return strings.TrimPrefix(uriStr, "file://")
+	}
+	return uriStr
 }
 
 // findRslintConfig searches for rslint configuration files using multiple strategies
@@ -307,20 +319,21 @@ type LintResponse struct {
 	RuleCount   int                  `json:"ruleCount"`
 }
 
-func runLintWithProjectService(uri lsproto.DocumentUri, service *project.Service, ctx context.Context, rslintConfig config.RslintConfig) ([]rule.RuleDiagnostic, error) {
+func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig) ([]rule.RuleDiagnostic, error) {
 	log.Printf("context: %v", ctx)
 	// Initialize rule registry with all available rules
 	config.RegisterAllRules()
 	filename := uriToPath(uri)
-	content, ok := service.FS().ReadFile(filename)
+	content, ok := session.FS().ReadFile(filename)
 	if !ok {
 		return nil, fmt.Errorf("failed to read file %s", filename)
 	}
-	service.OpenFile(filename, content, core.GetScriptKindFromFileName(filename), service.GetCurrentDirectory())
-	project := service.EnsureDefaultProjectForURI(uri)
-	languageService, done := project.GetLanguageServiceForRequest(ctx)
+	session.DidOpenFile(ctx, uri, 1, content, lsproto.LanguageKindTypeScript)
+	languageService, err := session.GetLanguageService(ctx, uri)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get language service: %w", err)
+	}
 	program := languageService.GetProgram()
-	defer done()
 	// Collect diagnostics
 	var diagnostics []rule.RuleDiagnostic
 	var diagnosticsLock sync.Mutex
@@ -365,8 +378,8 @@ func createCodeActionFromRuleDiagnostic(ruleDiag rule.RuleDiagnostic, uri lsprot
 	// Convert rule fixes to LSP text edits
 	var textEdits []*lsproto.TextEdit
 	for _, fix := range fixes {
-		startLine, startChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, fix.Range.Pos())
-		endLine, endChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, fix.Range.End())
+		startLine, startChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, fix.Range.Pos())
+		endLine, endChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, fix.Range.End())
 
 		textEdit := &lsproto.TextEdit{
 			Range: lsproto.Range{
@@ -386,8 +399,8 @@ func createCodeActionFromRuleDiagnostic(ruleDiag rule.RuleDiagnostic, uri lsprot
 	}
 
 	// Create the corresponding LSP diagnostic for reference
-	diagStartLine, diagStartChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
-	diagEndLine, diagEndChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
+	diagStartLine, diagStartChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
+	diagEndLine, diagEndChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
 
 	lspDiagnostic := &lsproto.Diagnostic{
 		Range: lsproto.Range{
@@ -418,8 +431,8 @@ func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rul
 	// Convert rule fixes to LSP text edits
 	var textEdits []*lsproto.TextEdit
 	for _, fix := range fixes {
-		startLine, startChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, fix.Range.Pos())
-		endLine, endChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, fix.Range.End())
+		startLine, startChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, fix.Range.Pos())
+		endLine, endChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, fix.Range.End())
 
 		textEdit := &lsproto.TextEdit{
 			Range: lsproto.Range{
@@ -439,8 +452,8 @@ func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rul
 	}
 
 	// Create the corresponding LSP diagnostic for reference
-	diagStartLine, diagStartChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
-	diagEndLine, diagEndChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
+	diagStartLine, diagStartChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
+	diagEndLine, diagEndChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
 
 	lspDiagnostic := &lsproto.Diagnostic{
 		Range: lsproto.Range{
@@ -466,8 +479,8 @@ func createDisableRuleActions(ruleDiag rule.RuleDiagnostic, uri lsproto.Document
 	var actions []lsproto.CommandOrCodeAction
 
 	// Create the corresponding LSP diagnostic for reference
-	diagStartLine, diagStartChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
-	diagEndLine, diagEndChar := scanner.GetLineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
+	diagStartLine, diagStartChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
+	diagEndLine, diagEndChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
 
 	lspDiagnostic := &lsproto.Diagnostic{
 		Range: lsproto.Range{
