@@ -166,7 +166,7 @@ func isPossibleConstructor(node *ast.Node) bool {
 		// For logical expressions (&&, ||), check the right side
 		if binExpr != nil && binExpr.OperatorToken != nil {
 			if binExpr.OperatorToken.Kind == ast.KindAmpersandAmpersandToken ||
-			   binExpr.OperatorToken.Kind == ast.KindBarBarToken {
+				binExpr.OperatorToken.Kind == ast.KindBarBarToken {
 				return isPossibleConstructor(binExpr.Right)
 			}
 		}
@@ -433,8 +433,8 @@ func branchTerminates(stmt *ast.Node) bool {
 
 // analyzeSuperCalls analyzes super() calls in a constructor body
 type superCallAnalysis struct {
-	hasSuperCall       bool     // true if any super() call exists
-	allPathsHaveSuper  bool     // true if all paths call super()
+	hasSuperCall       bool        // true if any super() call exists
+	allPathsHaveSuper  bool        // true if all paths call super()
 	superCallLocations []*ast.Node // locations of all super() calls
 }
 

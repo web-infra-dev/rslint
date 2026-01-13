@@ -110,8 +110,8 @@ func printDiagnosticGitHub(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOp
 	diagnosticStart := d.Range.Pos()
 	diagnosticEnd := d.Range.End()
 
-	startLine, startColumn := scanner.GetLineAndCharacterOfPosition(d.SourceFile, diagnosticStart)
-	endLine, endColumn := scanner.GetLineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
+	startLine, startColumn := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticStart)
+	endLine, endColumn := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
 
 	filePath := tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions)
 	output := fmt.Sprintf(
@@ -150,8 +150,8 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 	diagnosticStart := d.Range.Pos()
 	diagnosticEnd := d.Range.End()
 
-	startLine, startColumn := scanner.GetLineAndCharacterOfPosition(d.SourceFile, diagnosticStart)
-	endLine, endColumn := scanner.GetLineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
+	startLine, startColumn := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticStart)
+	endLine, endColumn := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
 
 	type Location struct {
 		Line   int `json:"line"`
@@ -212,23 +212,23 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	diagnosticStart := d.Range.Pos()
 	diagnosticEnd := d.Range.End()
 
-	diagnosticStartLine, diagnosticStartColumn := scanner.GetLineAndCharacterOfPosition(d.SourceFile, diagnosticStart)
-	diagnosticEndline, _ := scanner.GetLineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
+	diagnosticStartLine, diagnosticStartColumn := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticStart)
+	diagnosticEndline, _ := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
 
-	lineMap := d.SourceFile.LineMap()
+	lineMap := scanner.GetECMALineStarts(d.SourceFile)
 	text := d.SourceFile.Text()
 
 	codeboxStartLine := max(diagnosticStartLine-1, 0)
 	codeboxEndLine := min(diagnosticEndline+1, len(lineMap)-1)
 
-	codeboxStart := scanner.GetPositionOfLineAndCharacter(d.SourceFile, codeboxStartLine, 0)
+	codeboxStart := scanner.GetECMAPositionOfLineAndCharacter(d.SourceFile, codeboxStartLine, 0)
 	var codeboxEndColumn int
 	if codeboxEndLine == len(lineMap)-1 {
 		codeboxEndColumn = len(text) - int(lineMap[len(lineMap)-1])
 	} else {
 		codeboxEndColumn = int(lineMap[codeboxEndLine+1]-lineMap[codeboxEndLine]) - 1
 	}
-	codeboxEnd := scanner.GetPositionOfLineAndCharacter(d.SourceFile, codeboxEndLine, codeboxEndColumn)
+	codeboxEnd := scanner.GetECMAPositionOfLineAndCharacter(d.SourceFile, codeboxEndLine, codeboxEndColumn)
 
 	// Rule name with conditional coloring
 	w.WriteByte(' ')

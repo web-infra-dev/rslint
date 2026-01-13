@@ -66,9 +66,10 @@ type TypeOrValueSpecifier struct {
 	Package string `json:"package"`
 }
 
-func typeMatchesStringSpecifier(
+func typeMatchesStringSpecifierWithCalleeNames(
 	t *checker.Type,
 	names []string,
+	calleeNames []string,
 ) bool {
 	alias := checker.Type_alias(t)
 	var symbol *ast.Symbol
@@ -80,6 +81,14 @@ func typeMatchesStringSpecifier(
 
 	if symbol != nil && slices.Contains(names, symbol.Name) {
 		return true
+	}
+
+	// Also check against callee names (handles export aliases like `export { test as it }`)
+	// where the type's symbol name is "test" but the callee identifier is "it"
+	for _, calleeName := range calleeNames {
+		if slices.Contains(names, calleeName) {
+			return true
+		}
 	}
 
 	if IsIntrinsicType(t) && slices.Contains(names, t.AsIntrinsicType().IntrinsicName()) {
@@ -153,28 +162,62 @@ func typeDeclaredInDeclarationFile(
 	declarationFiles []*ast.SourceFile,
 	program *compiler.Program,
 ) bool {
-	// typesPackageName := ""
-	//  // Handle scoped packages: if the name starts with @, remove it and replace / with __
-	// slashIndex := strings.Index(packageName, "/")
-	// if packageName[0] == '@' && slashIndex >= 0 {
-	// 	typesPackageName = packageName[1:slashIndex] + "__" + packageName[slashIndex+1:]
-	// }
-
-	// TODO(port): there is no sourceFileToPackageName anymore
-	// it looks like there is no other way to know sourceFile2PackageName,
-	// other than set package name for ast.SourceFile in resolver
-
+	// Check if any declaration file path contains the package name
+	// This handles cases like node_modules/package-name/...
+	for _, file := range declarationFiles {
+		if file == nil {
+			continue
+		}
+		fileName := file.FileName()
+		// Check if the file is from node_modules and matches the package name
+		if strings.Contains(fileName, "node_modules/"+packageName+"/") ||
+			strings.Contains(fileName, "node_modules\\"+packageName+"\\") {
+			return true
+		}
+		// Handle @types packages
+		if strings.Contains(fileName, "node_modules/@types/"+strings.TrimPrefix(packageName, "@types/")+"/") {
+			return true
+		}
+	}
 	return false
+}
 
-	// const matcher = new RegExp(`${packageName}|${typesPackageName}`);
-	// return declarationFiles.some(declaration => {
-	//   const packageIdName = program.sourceFileToPackageName.get(declaration.path);
-	//   return (
-	//     packageIdName != null &&
-	//     matcher.test(packageIdName) &&
-	//     program.isSourceFileFromExternalLibrary(declaration)
-	//   );
-	// });
+// getImportModuleSpecifier traverses up from a declaration to find the import module specifier
+func getImportModuleSpecifier(declaration *ast.Node) string {
+	if declaration == nil {
+		return ""
+	}
+
+	// Walk up to find ImportDeclaration
+	current := declaration
+	for current != nil {
+		if ast.IsImportDeclaration(current) {
+			moduleSpec := current.AsImportDeclaration().ModuleSpecifier
+			if moduleSpec != nil && ast.IsStringLiteral(moduleSpec) {
+				return moduleSpec.Text()
+			}
+			return ""
+		}
+		current = current.Parent
+	}
+	return ""
+}
+
+// typeDeclaredFromImport checks if any declaration comes from an import with the specified package name
+func typeDeclaredFromImport(
+	packageName string,
+	declarations []*ast.Node,
+) bool {
+	for _, decl := range declarations {
+		if decl == nil {
+			continue
+		}
+		moduleSpec := getImportModuleSpecifier(decl)
+		if moduleSpec == packageName {
+			return true
+		}
+	}
+	return false
 }
 
 func typeDeclaredInPackageDeclarationFile(
@@ -184,6 +227,7 @@ func typeDeclaredInPackageDeclarationFile(
 	program *compiler.Program,
 ) bool {
 	return typeDeclaredInDeclareModule(packageName, declarations) ||
+		typeDeclaredFromImport(packageName, declarations) ||
 		typeDeclaredInDeclarationFile(packageName, declarationFiles, program)
 }
 
@@ -191,8 +235,9 @@ func typeMatchesSpecifier(
 	t *checker.Type,
 	specifier TypeOrValueSpecifier,
 	program *compiler.Program,
+	calleeNames []string,
 ) bool {
-	if !typeMatchesStringSpecifier(t, specifier.Name) {
+	if !typeMatchesStringSpecifierWithCalleeNames(t, specifier.Name, calleeNames) {
 		return false
 	}
 
@@ -229,13 +274,26 @@ func TypeMatchesSomeSpecifier(
 	inlineSpecifiers []string,
 	program *compiler.Program,
 ) bool {
+	return TypeMatchesSomeSpecifierWithCalleeNames(t, specifiers, inlineSpecifiers, program, nil)
+}
+
+// TypeMatchesSomeSpecifierWithCalleeNames is like TypeMatchesSomeSpecifier but also accepts
+// callee names for matching export aliases (e.g., `export { test as it }` where the type's
+// symbol name is "test" but the callee identifier is "it")
+func TypeMatchesSomeSpecifierWithCalleeNames(
+	t *checker.Type,
+	specifiers []TypeOrValueSpecifier,
+	inlineSpecifiers []string,
+	program *compiler.Program,
+	calleeNames []string,
+) bool {
 	for _, typePart := range IntersectionTypeParts(t) {
 		if IsIntrinsicErrorType(typePart) {
 			continue
 		}
 		if Some(specifiers, func(s TypeOrValueSpecifier) bool {
-			return typeMatchesSpecifier(t, s, program)
-		}) || typeMatchesStringSpecifier(t, inlineSpecifiers) {
+			return typeMatchesSpecifier(t, s, program, calleeNames)
+		}) || typeMatchesStringSpecifierWithCalleeNames(t, inlineSpecifiers, calleeNames) {
 			return true
 		}
 	}

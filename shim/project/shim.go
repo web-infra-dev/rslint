@@ -3,6 +3,7 @@
 
 package project
 
+import "io"
 import "github.com/microsoft/typescript-go/internal/core"
 import "github.com/microsoft/typescript-go/internal/project"
 import "github.com/microsoft/typescript-go/internal/project/logging"
@@ -74,3 +75,7 @@ const UpdateReasonRequestedLanguageServiceProjectNotLoaded = project.UpdateReaso
 const UpdateReasonUnknown = project.UpdateReasonUnknown
 type WatchedFiles[T any] = project.WatchedFiles[T]
 type WatcherID = project.WatcherID
+type Logger = logging.Logger
+
+//go:linkname NewLogger github.com/microsoft/typescript-go/internal/project/logging.NewLogger
+func NewLogger(output io.Writer) logging.Logger

@@ -404,8 +404,9 @@ foo!;
 		`},
 	}, []rule_tester.InvalidTestCase{
 		{
-			Code:   "const a = `a` as const;",
-			Output: []string{"const a = `a`;"},
+			Code:    "const a = `a` as const;",
+			Options: NoUnnecessaryTypeAssertionOptions{CheckLiteralConstAssertions: true},
+			Output:  []string{"const a = `a`;"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unnecessaryAssertion",
@@ -414,8 +415,9 @@ foo!;
 			},
 		},
 		{
-			Code:   "const a = 'a' as const;",
-			Output: []string{"const a = 'a';"},
+			Code:    "const a = 'a' as const;",
+			Options: NoUnnecessaryTypeAssertionOptions{CheckLiteralConstAssertions: true},
+			Output:  []string{"const a = 'a';"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unnecessaryAssertion",
@@ -424,8 +426,9 @@ foo!;
 			},
 		},
 		{
-			Code:   "const a = <const>'a';",
-			Output: []string{"const a = 'a';"},
+			Code:    "const a = <const>'a';",
+			Options: NoUnnecessaryTypeAssertionOptions{CheckLiteralConstAssertions: true},
+			Output:  []string{"const a = 'a';"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "unnecessaryAssertion",
@@ -1261,6 +1264,7 @@ class T {
   readonly a = 'a' as const;
 }
       `,
+			Options: NoUnnecessaryTypeAssertionOptions{CheckLiteralConstAssertions: true},
 			Output: []string{`
 class T {
   readonly a = 'a';
@@ -1387,6 +1391,7 @@ enum T {
 declare const a: T.Value1;
 const b = a as const;
       `,
+			Options: NoUnnecessaryTypeAssertionOptions{CheckLiteralConstAssertions: true},
 			Output: []string{`
 enum T {
   Value1,

@@ -1,1 +1,1 @@
-console.log("use lib/tsgo instead");
+console.log('use lib/tsgo instead');

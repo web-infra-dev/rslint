@@ -3,6 +3,7 @@ package lsp
 import (
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/microsoft/typescript-go/shim/vfs"
 )
@@ -26,6 +27,7 @@ func (m *mockFS) UseCaseSensitiveFileNames() bool                               
 func (m *mockFS) ReadFile(path string) (string, bool)                               { return "", false }
 func (m *mockFS) WriteFile(path string, data string, writeByteOrderMark bool) error { return nil }
 func (m *mockFS) Remove(path string) error                                          { return nil }
+func (m *mockFS) Chtimes(path string, aTime time.Time, mTime time.Time) error       { return nil }
 func (m *mockFS) DirectoryExists(path string) bool                                  { return false }
 func (m *mockFS) GetAccessibleEntries(path string) vfs.Entries                      { return vfs.Entries{} }
 func (m *mockFS) Stat(path string) vfs.FileInfo                                     { return nil }

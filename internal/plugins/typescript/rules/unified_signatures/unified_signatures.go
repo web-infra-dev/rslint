@@ -5,8 +5,8 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-type UnifiedSignaturesOptions struct{
-	IgnoreDifferentlyNamedParameters     bool `json:"ignoreDifferentlyNamedParameters"`
+type UnifiedSignaturesOptions struct {
+	IgnoreDifferentlyNamedParameters  bool `json:"ignoreDifferentlyNamedParameters"`
 	IgnoreOverloadsWithDifferentJSDoc bool `json:"ignoreOverloadsWithDifferentJSDoc"`
 }
 
@@ -14,7 +14,7 @@ var UnifiedSignaturesRule = rule.CreateRule(rule.Rule{
 	Name: "unified-signatures",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := UnifiedSignaturesOptions{
-			IgnoreDifferentlyNamedParameters:     false,
+			IgnoreDifferentlyNamedParameters:  false,
 			IgnoreOverloadsWithDifferentJSDoc: false,
 		}
 

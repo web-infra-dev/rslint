@@ -186,8 +186,8 @@ func runMain() int {
 	initPrimitiveTypes(tc, &checkResult.Semantic)
 	fileMap := make(map[string]int32)
 	for sourcefileId, file := range program.GetSourceFiles() {
-		fileMap[string(file.FileName())] = int32(sourcefileId)
-		checkResult.ModuleList = append(checkResult.ModuleList, string(file.FileName()))
+		fileMap[file.FileName()] = int32(sourcefileId)
+		checkResult.ModuleList = append(checkResult.ModuleList, file.FileName())
 		sourceFile := file.AsSourceFile()
 
 		encodedSourceFile, err := encoder.EncodeSourceFile(sourceFile, string(api.FileHandle(sourceFile)))

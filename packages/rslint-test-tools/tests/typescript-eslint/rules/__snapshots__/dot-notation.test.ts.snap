@@ -748,3 +748,52 @@ foo.key_baz;
   "ruleCount": 1,
 }
 `;
+
+exports[`dot-notation > invalid 25`] = `
+{
+  "code": "
+type ExtraKey = \`extra\${string}\`;
+
+type Foo = {
+  foo: string;
+  [extraKey: ExtraKey]: number;
+};
+
+function f<T extends Foo>(x: T) {
+  x['extraKey'];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use dot notation instead of bracket notation.",
+      "messageId": "useDot",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 10,
+        },
+        "start": {
+          "column": 5,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/dot-notation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type ExtraKey = \`extra\${string}\`;
+
+type Foo = {
+  foo: string;
+  [extraKey: ExtraKey]: number;
+};
+
+function f<T extends Foo>(x: T) {
+  x.extraKey;
+}
+      ",
+  "ruleCount": 1,
+}
+`;

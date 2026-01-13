@@ -218,14 +218,14 @@ func TestConsistentTypeExportsRuleWithInlineTypeSpecifier(t *testing.T) {
 	}, []rule_tester.InvalidTestCase{
 		// Still report errors for non-inline type exports
 		{
-			Code: `type T = string; const value = 1; export { T, value };`,
+			Code:    `type T = string; const value = 1; export { T, value };`,
 			Options: []interface{}{map[string]interface{}{"fixMixedExportsWithInlineTypeSpecifier": true}},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "singleExportIsType"},
 			},
 		},
 		{
-			Code: `type T1 = string; type T2 = number; const value = 1; export { T1, T2, value };`,
+			Code:    `type T1 = string; type T2 = number; const value = 1; export { T1, T2, value };`,
 			Options: []interface{}{map[string]interface{}{"fixMixedExportsWithInlineTypeSpecifier": true}},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "multipleExportsAreTypes"},
