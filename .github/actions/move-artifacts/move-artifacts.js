@@ -68,10 +68,7 @@ async function moveArtifacts() {
       const dirname = filename.replace(/-tsgo$/, '');
       const targetDir = path.join('npm', 'tsgo', dirname);
 
-      const targetFile = path.join(
-        targetDir,
-        isWindows ? 'tsgo.exe' : 'tsgo',
-      );
+      const targetFile = path.join(targetDir, isWindows ? 'tsgo.exe' : 'tsgo');
 
       // Create target directory and copy file
       fs.mkdirSync(targetDir, { recursive: true });

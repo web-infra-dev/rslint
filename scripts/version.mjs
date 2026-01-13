@@ -155,8 +155,12 @@ async function main() {
     console.log(
       chalk.gray(`  - Workspace packages: ${workspacePackagePaths.length}`),
     );
-    console.log(chalk.gray(`  - NPM rslint packages: ${npmRslintPackagePaths.length}`));
-    console.log(chalk.gray(`  - NPM tsgo packages: ${npmTsgoPackagePaths.length}`));
+    console.log(
+      chalk.gray(`  - NPM rslint packages: ${npmRslintPackagePaths.length}`),
+    );
+    console.log(
+      chalk.gray(`  - NPM tsgo packages: ${npmTsgoPackagePaths.length}`),
+    );
 
     // Check current versions to find the highest one for unification
     const currentVersions = [];
