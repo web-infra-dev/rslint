@@ -1,6 +1,7 @@
 packages:
   - 'packages/*'
   - 'npm/*'
+  - 'npm/tsgo/*'
   - 'website'
   - 'typescript-go/_packages/ast'
   - 'typescript-go/_packages/api'

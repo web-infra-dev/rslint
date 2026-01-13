@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 
-function findRslintBinaries(dir = 'binaries') {
+function findBinaries(dir = 'binaries', suffix) {
   const files = [];
 
   if (!fs.existsSync(dir)) {
@@ -16,10 +16,10 @@ function findRslintBinaries(dir = 'binaries') {
     const fullPath = path.join(dir, entry.name);
 
     if (entry.isDirectory()) {
-      // Look for files ending with -rslint in subdirectories
+      // Look for files ending with the suffix in subdirectories
       const subEntries = fs.readdirSync(fullPath, { withFileTypes: true });
       for (const subEntry of subEntries) {
-        if (subEntry.isFile() && subEntry.name.includes('-rslint')) {
+        if (subEntry.isFile() && subEntry.name.includes(suffix)) {
           files.push(path.join(fullPath, subEntry.name));
         }
       }
@@ -33,11 +33,11 @@ async function moveArtifacts() {
   console.log('Starting artifact move process...');
 
   try {
-    // Find all rslint binary files
-    const files = findRslintBinaries();
-    console.log(`Found ${files.length} rslint binary files`);
+    // Find and move rslint binaries
+    const rslintFiles = findBinaries('binaries', '-rslint');
+    console.log(`Found ${rslintFiles.length} rslint binary files`);
 
-    for (const file of files) {
+    for (const file of rslintFiles) {
       console.log(`Processing ${file}`);
       const isWindows = file.includes('win32');
       const filename = path.basename(file);
@@ -47,6 +47,30 @@ async function moveArtifacts() {
       const targetFile = path.join(
         targetDir,
         isWindows ? 'rslint.exe' : 'rslint',
+      );
+
+      // Create target directory and copy file
+      fs.mkdirSync(targetDir, { recursive: true });
+      fs.copyFileSync(file, targetFile);
+      fs.chmodSync(targetFile, 0o755); // Make executable
+
+      console.log(`Copied ${file} to ${targetFile}`);
+    }
+
+    // Find and move tsgo binaries
+    const tsgoFiles = findBinaries('binaries', '-tsgo');
+    console.log(`Found ${tsgoFiles.length} tsgo binary files`);
+
+    for (const file of tsgoFiles) {
+      console.log(`Processing ${file}`);
+      const isWindows = file.includes('win32');
+      const filename = path.basename(file);
+      const dirname = filename.replace(/-tsgo$/, '');
+      const targetDir = path.join('npm', 'tsgo', dirname);
+
+      const targetFile = path.join(
+        targetDir,
+        isWindows ? 'tsgo.exe' : 'tsgo',
       );
 
       // Create target directory and copy file

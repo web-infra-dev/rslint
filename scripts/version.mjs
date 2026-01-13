@@ -137,11 +137,15 @@ async function main() {
     const npmPackagePaths = await glob('npm/*/package.json', {
       cwd: process.cwd(),
     });
+    const npmTsgoPackagePaths = await glob('npm/tsgo/*/package.json', {
+      cwd: process.cwd(),
+    });
 
     const allPackagePaths = [
       rootPackagePath,
       ...workspacePackagePaths.map(p => path.join(process.cwd(), p)),
       ...npmPackagePaths.map(p => path.join(process.cwd(), p)),
+      ...npmTsgoPackagePaths.map(p => path.join(process.cwd(), p)),
     ];
 
     console.log(
@@ -152,6 +156,7 @@ async function main() {
       chalk.gray(`  - Workspace packages: ${workspacePackagePaths.length}`),
     );
     console.log(chalk.gray(`  - NPM packages: ${npmPackagePaths.length}`));
+    console.log(chalk.gray(`  - NPM tsgo packages: ${npmTsgoPackagePaths.length}`));
 
     // Check current versions to find the highest one for unification
     const currentVersions = [];
