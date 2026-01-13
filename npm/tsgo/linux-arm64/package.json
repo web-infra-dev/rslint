@@ -1,0 +1,26 @@
+{
+  "name": "@rslint/tsgo-linux-arm64",
+  "version": "0.0.15",
+  "license": "MIT",
+  "description": "tsgo binary for linux arm64",
+  "bugs": "https://github.com/web-infra-dev/rslint/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/web-infra-dev/rslint"
+  },
+  "publishConfig": {
+    "access": "public",
+    "executableFiles": [
+      "./tsgo"
+    ]
+  },
+  "files": [
+    "tsgo"
+  ],
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ]
+}
