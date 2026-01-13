@@ -55,7 +55,7 @@ jobs:
           cache-name: test-go
       - name: Unit Test
         run: |
-          go test -parallel 8 ./internal/...
+          go test -parallel 4 ./internal/...
   lint:
     name: Lint&Check
     runs-on: rspack-ubuntu-22.04-large
