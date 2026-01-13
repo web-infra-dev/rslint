@@ -42,7 +42,7 @@ async function moveArtifacts() {
       const isWindows = file.includes('win32');
       const filename = path.basename(file);
       const dirname = filename.replace(/-rslint$/, '');
-      const targetDir = path.join('npm', dirname);
+      const targetDir = path.join('npm', 'rslint', dirname);
 
       const targetFile = path.join(
         targetDir,

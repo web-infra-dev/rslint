@@ -244,10 +244,10 @@ jobs:
             echo "Processing $file"
             filename=$(basename "$file")
             dirname="${filename%-rslint}"
-            target_dir="npm/$dirname"
+            target_dir="npm/rslint/$dirname"
             mkdir -p "$target_dir"
             echo "Copy $file to $target_dir/rslint"
-            cp "$file" "npm/$dirname/rslint"
+            cp "$file" "npm/rslint/$dirname/rslint"
           done
           # Move tsgo binaries
           for file in binaries/*/*-tsgo; do

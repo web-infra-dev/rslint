@@ -134,7 +134,7 @@ async function main() {
     const workspacePackagePaths = await glob('packages/*/package.json', {
       cwd: process.cwd(),
     });
-    const npmPackagePaths = await glob('npm/*/package.json', {
+    const npmRslintPackagePaths = await glob('npm/rslint/*/package.json', {
       cwd: process.cwd(),
     });
     const npmTsgoPackagePaths = await glob('npm/tsgo/*/package.json', {
@@ -144,7 +144,7 @@ async function main() {
     const allPackagePaths = [
       rootPackagePath,
       ...workspacePackagePaths.map(p => path.join(process.cwd(), p)),
-      ...npmPackagePaths.map(p => path.join(process.cwd(), p)),
+      ...npmRslintPackagePaths.map(p => path.join(process.cwd(), p)),
       ...npmTsgoPackagePaths.map(p => path.join(process.cwd(), p)),
     ];
 
@@ -155,7 +155,7 @@ async function main() {
     console.log(
       chalk.gray(`  - Workspace packages: ${workspacePackagePaths.length}`),
     );
-    console.log(chalk.gray(`  - NPM packages: ${npmPackagePaths.length}`));
+    console.log(chalk.gray(`  - NPM rslint packages: ${npmRslintPackagePaths.length}`));
     console.log(chalk.gray(`  - NPM tsgo packages: ${npmTsgoPackagePaths.length}`));
 
     // Check current versions to find the highest one for unification

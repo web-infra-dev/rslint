@@ -23,7 +23,7 @@ async function build_rslint() {
   for (const platform of platforms) {
     const nodeOs = platform['node-os'] || platform.os;
     const nodeArch = platform['node-arch'];
-    const outputDir = `npm/${nodeOs}-${nodeArch}`;
+    const outputDir = `npm/rslint/${nodeOs}-${nodeArch}`;
     const ext = platform.os === 'windows' ? '.exe' : '';
     await $`GOOS=${platform.os} GOARCH=${platform.arch} go build -o ${outputDir}/rslint${ext} ./cmd/rslint`;
   }
