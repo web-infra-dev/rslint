@@ -1,6 +1,6 @@
 {
   "name": "@rslint/core",
-  "version": "0.1.14",
+  "version": "0.1.15-canary.1768370256",
   "exports": {
     ".": {
       "@typescript/source": "./src/index.ts",

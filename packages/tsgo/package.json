@@ -1,6 +1,6 @@
 {
   "name": "@rslint/tsgo",
-  "version": "0.0.15",
+  "version": "0.1.15-canary.1768370256",
   "description": "custom tsgo binary",
   "license": "MIT",
   "type": "module",
