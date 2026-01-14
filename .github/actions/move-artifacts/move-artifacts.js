@@ -78,6 +78,43 @@ async function moveArtifacts() {
       console.log(`Copied ${file} to ${targetFile}`);
     }
 
+    // Copy typescript-go lib files to all tsgo platform packages
+    const tsgoLibSource = path.join('typescript-go', 'built', 'local');
+    const tsgoPlatforms = [
+      'darwin-arm64',
+      'darwin-x64',
+      'linux-arm64',
+      'linux-x64',
+      'win32-arm64',
+      'win32-x64',
+    ];
+
+    if (fs.existsSync(tsgoLibSource)) {
+      console.log(`Found typescript-go lib source: ${tsgoLibSource}`);
+
+      for (const platform of tsgoPlatforms) {
+        const targetLibDir = path.join('npm', 'tsgo', platform, 'lib');
+        fs.mkdirSync(targetLibDir, { recursive: true });
+
+        // Copy all files from source to target
+        const files = fs.readdirSync(tsgoLibSource);
+        for (const file of files) {
+          const srcFile = path.join(tsgoLibSource, file);
+          const destFile = path.join(targetLibDir, file);
+          const stat = fs.statSync(srcFile);
+
+          if (stat.isFile()) {
+            fs.copyFileSync(srcFile, destFile);
+          }
+        }
+        console.log(`Copied lib files to ${targetLibDir}`);
+      }
+    } else {
+      console.log(
+        `Warning: typescript-go lib source not found at ${tsgoLibSource}`,
+      );
+    }
+
     console.log('Artifact move process completed successfully!');
   } catch (error) {
     console.error('Error:', error.message);

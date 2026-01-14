@@ -15,7 +15,8 @@
     ]
   },
   "files": [
-    "tsgo"
+    "tsgo",
+    "lib"
   ],
   "os": [
     "linux"

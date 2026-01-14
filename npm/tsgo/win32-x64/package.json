@@ -15,7 +15,8 @@
     ]
   },
   "files": [
-    "tsgo.exe"
+    "tsgo.exe",
+    "lib"
   ],
   "os": [
     "win32"
