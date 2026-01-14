@@ -72,7 +72,3 @@ runs:
         if (Test-Path $toolchainPath) {
           Get-ChildItem -Path $toolchainPath -Filter "toolchain*" -Directory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
         }
-
-    - name: Patch tsgo
-      shell: bash
-      run: ./scripts/apply-tsgo-patch.sh

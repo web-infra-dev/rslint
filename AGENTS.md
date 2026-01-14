@@ -15,7 +15,7 @@ This document summarizes how to work on rslint effectively and consistently.
 
 ## Build, Test, and Development Commands
 
-- Setup submodule and patch: `git submodule update --init --recursive && ./scripts/apply-tsgo-patch.sh`
+- Setup submodule: `git submodule update --init --recursive`
 - Install Deps: `pnpm install`
 - Build JS/TS: `pnpm build`
 - Run Go tests: `pnpm run test:go`
