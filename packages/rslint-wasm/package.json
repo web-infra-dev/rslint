@@ -1,6 +1,6 @@
 {
   "name": "@rslint/wasm",
-  "version": "0.1.14",
+  "version": "0.1.15-canary.1768383980",
   "description": "rslint wasm package",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
