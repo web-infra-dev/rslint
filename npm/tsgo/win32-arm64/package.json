@@ -1,6 +1,6 @@
 {
   "name": "@rslint/tsgo-win32-arm64",
-  "version": "0.0.15",
+  "version": "0.1.15-canary.1768377508",
   "license": "MIT",
   "description": "tsgo binary for windows arm64",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",
