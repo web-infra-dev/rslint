@@ -11,11 +11,11 @@
   "publishConfig": {
     "access": "public",
     "executableFiles": [
-      "./tsgo.exe"
+      "./lib/tsgo.exe"
     ]
   },
   "files": [
-    "tsgo.exe"
+    "lib"
   ],
   "os": [
     "win32"

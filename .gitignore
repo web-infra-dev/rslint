@@ -149,6 +149,7 @@ vite.config.ts.timestamp-*
 /bin/rslint
 npm/*/rslint
 npm/*/rslint.exe
+npm/tsgo/*/local
 
 .idea
 
