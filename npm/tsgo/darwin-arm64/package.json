@@ -11,11 +11,11 @@
   "publishConfig": {
     "access": "public",
     "executableFiles": [
-      "./tsgo"
+      "./lib/tsgo"
     ]
   },
   "files": [
-    "tsgo"
+    "lib"
   ],
   "os": [
     "darwin"

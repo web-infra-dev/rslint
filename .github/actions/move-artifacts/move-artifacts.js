@@ -57,16 +57,20 @@ async function moveArtifacts() {
       console.log(`Copied ${file} to ${targetFile}`);
     }
 
-    // Find and move tsgo binaries
+    // Find and move tsgo binaries to lib directory
     const tsgoFiles = findBinaries('binaries', '-tsgo');
     console.log(`Found ${tsgoFiles.length} tsgo binary files`);
 
     for (const file of tsgoFiles) {
+      // Skip tsgo-built directories
+      if (file.includes('-tsgo-built')) {
+        continue;
+      }
       console.log(`Processing ${file}`);
       const isWindows = file.includes('win32');
       const filename = path.basename(file);
       const dirname = filename.replace(/-tsgo$/, '');
-      const targetDir = path.join('npm', 'tsgo', dirname);
+      const targetDir = path.join('npm', 'tsgo', dirname, 'lib');
 
       const targetFile = path.join(targetDir, isWindows ? 'tsgo.exe' : 'tsgo');
 
@@ -76,6 +80,53 @@ async function moveArtifacts() {
       fs.chmodSync(targetFile, 0o755); // Make executable
 
       console.log(`Copied ${file} to ${targetFile}`);
+    }
+
+    // Copy typescript-go built files (lib files) to tsgo platform packages
+    // Files are downloaded from platform-specific artifacts to binaries/{platform}-tsgo-built/
+    const tsgoPlatforms = [
+      'darwin-arm64',
+      'darwin-x64',
+      'linux-arm64',
+      'linux-x64',
+      'win32-arm64',
+      'win32-x64',
+    ];
+
+    for (const platform of tsgoPlatforms) {
+      const tsgoBuiltSource = path.join(
+        'binaries',
+        `${platform}-tsgo-built`,
+        'local',
+      );
+
+      if (!fs.existsSync(tsgoBuiltSource)) {
+        console.log(
+          `Warning: typescript-go built source not found at ${tsgoBuiltSource}`,
+        );
+        continue;
+      }
+
+      // Get all files from the built/local directory
+      const libFiles = fs.readdirSync(tsgoBuiltSource);
+      console.log(`Found ${libFiles.length} lib files for ${platform}`);
+
+      const targetLibDir = path.join('npm', 'tsgo', platform, 'lib');
+      fs.mkdirSync(targetLibDir, { recursive: true });
+
+      for (const file of libFiles) {
+        // Skip tsgo binary from typescript-go build, we use our own ./cmd/tsgo build
+        if (file === 'tsgo' || file === 'tsgo.exe') {
+          continue;
+        }
+        const srcFile = path.join(tsgoBuiltSource, file);
+        const destFile = path.join(targetLibDir, file);
+        const stat = fs.statSync(srcFile);
+        if (stat.isFile()) {
+          fs.copyFileSync(srcFile, destFile);
+        }
+      }
+      console.log(`Copied built files to ${targetLibDir}`);
     }
 
     console.log('Artifact move process completed successfully!');
