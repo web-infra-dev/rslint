@@ -8,15 +8,15 @@
 interface IpcMessage {
   id: number;
   kind: string;
-  data: any;
+  data: unknown;
 }
 
 // Global state for the worker
-let rslintProcess: any = null;
+let rslintProcess: unknown = null;
 let nextMessageId = 1;
 let pendingMessages = new Map<
   number,
-  { resolve: (data: any) => void; reject: (error: Error) => void }
+  { resolve: (data: unknown) => void; reject: (error: Error) => void }
 >();
 
 /**
@@ -42,9 +42,9 @@ async function initializeRslint(): Promise<void> {
 /**
  * Send a message to the rslint process
  */
-async function sendToRslint(kind: string, data: any): Promise<any> {
+function sendToRslint(kind: string, data: unknown): Promise<unknown> {
   if (!rslintProcess) {
-    throw new Error('Rslint process not initialized');
+    return Promise.reject(new Error('Rslint process not initialized'));
   }
 
   // In a real implementation, this would call the appropriate method on the rslint process
@@ -52,41 +52,48 @@ async function sendToRslint(kind: string, data: any): Promise<any> {
 
   switch (kind) {
     case 'handshake':
-      return { version: '1.0.0', status: 'ok' };
+      return Promise.resolve({ version: '1.0.0', status: 'ok' });
 
-    case 'lint':
+    case 'lint': {
+      const files = (data as { files?: unknown[] }).files;
       // Simulate linting response
-      return {
+      return Promise.resolve({
         diagnostics: [],
         errorCount: 0,
-        fileCount: data.files?.length || 0,
+        fileCount: files?.length || 0,
         ruleCount: 0,
         duration: '0ms',
-      };
+      });
+    }
 
-    case 'applyFixes':
+    case 'applyFixes': {
+      const fixData = data as {
+        fileContent: string;
+        diagnostics?: unknown[];
+      };
       // Simulate apply fixes response
-      return {
-        fixedContent: [data.fileContent],
+      return Promise.resolve({
+        fixedContent: [fixData.fileContent],
         wasFixed: false,
         appliedCount: 0,
-        unappliedCount: data.diagnostics?.length || 0,
-      };
+        unappliedCount: fixData.diagnostics?.length || 0,
+      });
+    }
 
     case 'exit':
       rslintProcess = null;
-      return { status: 'ok' };
+      return Promise.resolve({ status: 'ok' });
 
     default:
-      throw new Error(`Unknown message kind: ${kind}`);
+      return Promise.reject(new Error(`Unknown message kind: ${kind}`));
   }
 }
 
 /**
  * Handle messages from the main thread
  */
-async function handleMessage(event: MessageEvent): Promise<void> {
-  const { id, kind, data } = event.data as IpcMessage;
+async function handleMessage(event: MessageEvent<IpcMessage>): Promise<void> {
+  const { id, kind, data } = event.data;
 
   try {
     // Ensure rslint is initialized
@@ -135,7 +142,9 @@ function handleError(error: ErrorEvent): void {
 }
 
 // Set up event listeners
-self.addEventListener('message', handleMessage);
+self.addEventListener('message', (event: MessageEvent<IpcMessage>) => {
+  void handleMessage(event);
+});
 self.addEventListener('error', handleError);
 
 // Initialize the worker
