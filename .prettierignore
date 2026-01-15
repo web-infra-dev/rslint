@@ -3,6 +3,7 @@
 **/.vscode
 **/.nyc_output
 **/.vs
+**/.rslib
 
 .yarn/plugins
 .yarn/releases
@@ -15,3 +16,4 @@ packages/rslint-test-tools/tests/typescript-eslint/rules
 packages/rslint/pkg/
 website/doc_build
 pnpm-lock.yaml
+npm/tsgo/**/local

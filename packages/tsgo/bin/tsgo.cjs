@@ -12,7 +12,7 @@ function getBinPath() {
   let platformKey = `${process.platform}-${os.arch()}`;
 
   return require.resolve(
-    `@rslint/tsgo-${platformKey}/tsgo${process.platform === 'win32' ? '.exe' : ''}`,
+    `@rslint/tsgo-${platformKey}/lib/tsgo${process.platform === 'win32' ? '.exe' : ''}`,
   );
 }
 function main() {

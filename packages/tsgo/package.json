@@ -10,16 +10,14 @@
   },
   "bugs": "https://github.com/web-infra-dev/rslint/issues",
   "files": [
-    "bin/tsgo.cjs",
-    "lib"
+    "bin/tsgo.cjs"
   ],
   "bin": {
     "tsgo": "./bin/tsgo.cjs"
   },
   "scripts": {
     "build:bin": "go build -o ./bin/tsgo ../../cmd/tsgo",
-    "build:tsgo": "cp -r ../../typescript-go/built/local ./lib",
-    "build": "pnpm run build:tsgo && pnpm run build:bin"
+    "build": "pnpm run build:bin"
   },
   "keywords": [
     "tsgo",

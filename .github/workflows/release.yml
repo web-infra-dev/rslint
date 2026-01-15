@@ -195,7 +195,7 @@ jobs:
   check:
     name: Test
     if: ${{ inputs.dry_run == false }}
-    needs: build
+    needs: [build]
     strategy:
       fail-fast: true
       matrix:
@@ -237,29 +237,7 @@ jobs:
           path: binaries
 
       - name: Move binaries
-        run: |
-          find ./binaries
-          # Move rslint binaries
-          for file in binaries/*/*-rslint; do
-            echo "Processing $file"
-            filename=$(basename "$file")
-            dirname="${filename%-rslint}"
-            target_dir="npm/rslint/$dirname"
-            mkdir -p "$target_dir"
-            echo "Copy $file to $target_dir/rslint"
-            cp "$file" "npm/rslint/$dirname/rslint"
-          done
-          # Move tsgo binaries
-          for file in binaries/*/*-tsgo; do
-            echo "Processing $file"
-            filename=$(basename "$file")
-            dirname="${filename%-tsgo}"
-            target_dir="npm/tsgo/$dirname"
-            mkdir -p "$target_dir"
-            echo "Copy $file to $target_dir/tsgo"
-            cp "$file" "npm/tsgo/$dirname/tsgo"
-          done
-          find ./npm
+        uses: ./.github/actions/move-artifacts
 
       - name: Format code
         run: pnpm format:check
@@ -334,6 +312,14 @@ jobs:
           go-version: 1.25.0
           cache-name: ${{ matrix.node_os }}-${{ matrix.node_arch }}
 
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
       - name: Install pnpm
         run: corepack enable
 
@@ -359,3 +345,17 @@ jobs:
         with:
           name: ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo
           path: ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo
+
+      - name: Build typescript-go
+        run: |
+          cd typescript-go
+          npm ci
+          npm run build
+          # Remove tsgo binary from typescript-go build, we use our own ./cmd/tsgo build
+          rm -f built/local/tsgo built/local/tsgo.exe
+
+      - name: Upload typescript-go built artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo-built
+          path: typescript-go/built
