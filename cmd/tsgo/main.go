@@ -148,17 +148,61 @@ func printDiagnostics(diagnostics []Diagnostics, fileMap map[string]int32) {
 }
 func runMain() int {
 	var (
-		config   string
-		help     bool
-		api_mode bool
+		config          string
+		help            bool
+		api_mode        bool
+		transpileServer bool
+		serverCwd       string
+		transpile       bool
+		transpileFile   string
+		transpileModule string
+		transpileTarget string
+		transpileJsx    string
+		inlineSourceMap bool
+		sourceMap       bool
+		typecheck       bool
 	)
 	flag.StringVar(&config, "config", "", "path to tsconfig.json")
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&api_mode, "api", false, "api mode")
+	flag.BoolVar(&transpileServer, "transpileServer", false, "run transpile server mode")
+	flag.StringVar(&serverCwd, "cwd", "", "current working directory for transpile server")
+	flag.BoolVar(&transpile, "transpile", false, "transpile a single file to JS")
+	flag.StringVar(&transpileFile, "file", "", "path to input file for --transpile")
+	flag.StringVar(&transpileModule, "module", "", "module kind for --transpile (commonjs, esnext, node16, nodenext, etc)")
+	flag.StringVar(&transpileTarget, "target", "", "script target for --transpile (es2019, es2020, esnext, etc)")
+	flag.StringVar(&transpileJsx, "jsx", "", "jsx emit for --transpile (react, react-jsx, preserve, etc)")
+	flag.BoolVar(&inlineSourceMap, "inlineSourceMap", false, "emit inline source map for --transpile")
+	flag.BoolVar(&sourceMap, "sourceMap", false, "emit source map for --transpile")
+	flag.BoolVar(&typecheck, "typecheck", false, "enable typechecking for --transpile")
 	flag.Parse()
 	if help {
 		flag.Usage()
 		return 0
+	}
+	if transpileServer {
+		cwd := serverCwd
+		if cwd == "" {
+			var err error
+			cwd, err = os.Getwd()
+			if err != nil {
+				log.Printf("error resolving cwd: %v", err)
+				return 1
+			}
+		}
+		return runTranspileServer(cwd)
+	}
+	if transpile {
+		return runTranspile(transpileOptions{
+			Config:          config,
+			File:            transpileFile,
+			Module:          transpileModule,
+			Target:          transpileTarget,
+			Jsx:             transpileJsx,
+			InlineSourceMap: inlineSourceMap,
+			SourceMap:       sourceMap,
+			TypeCheck:       typecheck,
+		})
 	}
 	program, err := CreateProgram(config)
 	if err != nil {

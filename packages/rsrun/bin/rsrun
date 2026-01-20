@@ -1,0 +1,24 @@
+#!/usr/bin/env node
+
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+
+
+const registerPath = path.join(import.meta.dirname, '..', 'dist', 'register.js');
+const args = process.argv.slice(2);
+
+const result = spawnSync(process.execPath, ['-r', registerPath, ...args], {
+  stdio: 'inherit',
+});
+
+if (result.error) {
+  const message = result.error.message || 'rsrun: failed to start node';
+  process.stderr.write(`${message}\n`);
+  process.exit(1);
+}
+
+if (typeof result.status === 'number') {
+  process.exit(result.status);
+}
+
+process.exit(1);

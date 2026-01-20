@@ -171,6 +171,19 @@ importers:
         specifier: 1.6.0
         version: 1.6.0(typescript@5.9.3)
 
+  packages/rsrun:
+    dependencies:
+      '@rslint/tsgo':
+        specifier: workspace:*
+        version: link:../tsgo
+    devDependencies:
+      '@types/node':
+        specifier: 24.0.14
+        version: 24.0.14
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+
   packages/rule-tester:
     dependencies:
       '@rslint/core':
