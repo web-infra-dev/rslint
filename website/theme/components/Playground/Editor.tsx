@@ -4,7 +4,15 @@ import { type Diagnostic } from '@rslint/wasm';
 import './Editor.css';
 
 window.MonacoEnvironment = {
-  getWorker: function (moduleId, label) {
+  getWorker: function (_moduleId, label) {
+    if (label === 'json' || label === 'jsonc') {
+      return new Worker(
+        new URL(
+          'monaco-editor/esm/vs/language/json/json.worker',
+          import.meta.url,
+        ),
+      );
+    }
     if (label === 'typescript' || label === 'javascript') {
       return new Worker(
         new URL(

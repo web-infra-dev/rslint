@@ -28,6 +28,7 @@ export interface LintResponse {
   ruleCount: number;
   duration: string;
   encodedSourceFiles?: Record<string, string>; // Binary encoded source files as base64-encoded strings
+  hasTypeChecker?: boolean; // Whether type checker is available
 }
 
 export interface LintOptions {
@@ -38,6 +39,7 @@ export interface LintOptions {
   fileContents?: Record<string, string>; // Map of file paths to their contents for VFS
   languageOptions?: LanguageOptions; // Override languageOptions from config file
   includeEncodedSourceFiles?: boolean; // Whether to include encoded source files in response
+  includeTypeChecker?: boolean; // Whether to create a type checker session
 }
 
 export interface LanguageOptions {

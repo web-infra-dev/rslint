@@ -5,6 +5,15 @@ import type {
   ApplyFixesRequest,
   ApplyFixesResponse,
 } from './types.js';
+ import { RemoteTypeChecker } from './remote-typechecker.js';
+
+/**
+ * Extended lint response that includes the type checker instance
+ */
+export interface LintResult extends LintResponse {
+  /** Type checker instance if includeTypeChecker was true */
+  typeChecker?: RemoteTypeChecker;
+}
 
 /**
  * Main RslintService class that automatically uses the appropriate implementation
@@ -19,7 +28,7 @@ export class RSLintService {
   /**
    * Run the linter on specified files
    */
-  async lint(options: LintOptions = {}): Promise<LintResponse> {
+  async lint(options: LintOptions = {}): Promise<LintResult> {
     const {
       files,
       config,
@@ -28,13 +37,14 @@ export class RSLintService {
       fileContents,
       languageOptions,
       includeEncodedSourceFiles,
+      includeTypeChecker,
     } = options;
 
     // Send handshake
     await this.service.sendMessage('handshake', { version: '1.0.0' });
 
     // Send lint request
-    return this.service.sendMessage('lint', {
+    const response: LintResponse = await this.service.sendMessage('lint', {
       files,
       config,
       workingDirectory,
@@ -42,8 +52,19 @@ export class RSLintService {
       fileContents,
       languageOptions,
       includeEncodedSourceFiles,
+      includeTypeChecker,
       format: 'jsonline',
     });
+
+    // Create the result with optional type checker
+    const result: LintResult = { ...response };
+
+    // If type checker is available, create the RemoteTypeChecker instance
+    if (response.hasTypeChecker) {
+      result.typeChecker = new RemoteTypeChecker(this.service);
+    }
+
+    return result;
   }
 
   /**
@@ -87,3 +108,18 @@ export type {
   RSlintOptions,
   RslintServiceInterface,
 } from './types.js';
+
+// Re-export RemoteTypeChecker and related types
+export { RemoteTypeChecker } from './remote-typechecker.js';
+export type {
+  NodeLocation,
+  TypeDetails,
+  SymbolDetails,
+  SignatureDetails,
+  FlowNodeDetails,
+  NodeTypeResponse,
+  NodeSymbolResponse,
+  NodeSignatureResponse,
+  NodeFlowNodeResponse,
+  NodeInfoResponse,
+} from './checker-types.js';

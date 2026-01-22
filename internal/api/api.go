@@ -35,6 +35,13 @@ const (
 	KindHandshake MessageKind = "handshake"
 	// KindExit is sent to request termination
 	KindExit MessageKind = "exit"
+
+	// Lazy loading APIs for type checker
+	KindCheckerGetNodeType      MessageKind = "checker.getNodeType"
+	KindCheckerGetNodeSymbol    MessageKind = "checker.getNodeSymbol"
+	KindCheckerGetNodeSignature MessageKind = "checker.getNodeSignature"
+	KindCheckerGetNodeFlowNode  MessageKind = "checker.getNodeFlowNode"
+	KindCheckerGetNodeInfo      MessageKind = "checker.getNodeInfo"
 )
 
 // Version is the IPC protocol version
@@ -69,6 +76,7 @@ type LintRequest struct {
 	FileContents              map[string]string      `json:"fileContents,omitempty"`              // Map of file paths to their contents for VFS
 	LanguageOptions           *LanguageOptions       `json:"languageOptions,omitempty"`           // Override languageOptions from config file
 	IncludeEncodedSourceFiles bool                   `json:"includeEncodedSourceFiles,omitempty"` // Whether to include encoded source files in response
+	IncludeTypeChecker        bool                   `json:"includeTypeChecker,omitempty"`        // Whether to create a type checker session
 }
 
 // LanguageOptions contains language-specific configuration options
@@ -111,6 +119,7 @@ type LintResponse struct {
 	FileCount          int                  `json:"fileCount"`
 	RuleCount          int                  `json:"ruleCount"`
 	EncodedSourceFiles map[string]ByteArray `json:"encodedSourceFiles,omitempty"`
+	HasTypeChecker     bool                 `json:"hasTypeChecker,omitempty"` // Whether type checker is available
 }
 
 // ApplyFixesRequest represents a request to apply fixes from JS to Go
@@ -168,12 +177,147 @@ type Handler interface {
 	HandleApplyFixes(req ApplyFixesRequest) (*ApplyFixesResponse, error)
 }
 
+// CheckerHandler defines the interface for handling type checker IPC messages
+type CheckerHandler interface {
+	HandleCheckerGetNodeType(req CheckerNodeRequest) (*NodeTypeResponse, error)
+	HandleCheckerGetNodeSymbol(req CheckerNodeRequest) (*NodeSymbolResponse, error)
+	HandleCheckerGetNodeSignature(req CheckerNodeRequest) (*NodeSignatureResponse, error)
+	HandleCheckerGetNodeFlowNode(req CheckerNodeRequest) (*NodeFlowNodeResponse, error)
+	HandleCheckerGetNodeInfo(req CheckerNodeRequest) (*NodeInfoResponse, error)
+}
+
+// NodeLocation identifies a node in a source file using structured parameters
+type NodeLocation struct {
+	FilePath string `json:"filePath"` // Relative file path (e.g., "index.ts")
+	Pos      int    `json:"pos"`      // Start position of the node
+	Kind     int    `json:"kind"`     // SyntaxKind of the node
+}
+
+// CheckerNodeRequest represents a request to get node information from type checker
+type CheckerNodeRequest struct {
+	Node NodeLocation `json:"node"`
+}
+
+// TypeDetails represents detailed type information
+type TypeDetails struct {
+	Id                  uint32              `json:"Id"`
+	Flags               uint32              `json:"Flags"`
+	FlagNames           []string            `json:"FlagNames"`
+	ObjectFlags         uint32              `json:"ObjectFlags"`
+	ObjectFlagNames     []string            `json:"ObjectFlagNames"`
+	Symbol              *uint64             `json:"Symbol,omitempty"`
+	Target              *uint32             `json:"Target,omitempty"`
+	Types               []uint32            `json:"Types,omitempty"`
+	TypeString          string              `json:"TypeString"`
+	IntrinsicName       string              `json:"IntrinsicName,omitempty"`
+	Value               interface{}         `json:"Value,omitempty"`
+	TypeParameters      []uint32            `json:"TypeParameters,omitempty"`
+	FixedLength         *int                `json:"FixedLength,omitempty"`
+	ElementInfos        []ElementInfoDetail `json:"ElementInfos,omitempty"`
+	Properties          []uint64            `json:"Properties,omitempty"`
+	CallSignatures      []string            `json:"CallSignatures,omitempty"`
+	ConstructSignatures []string            `json:"ConstructSignatures,omitempty"`
+}
+
+// ElementInfoDetail represents tuple element info
+type ElementInfoDetail struct {
+	Flags uint32 `json:"Flags"`
+}
+
+// SymbolDetails represents detailed symbol information
+type SymbolDetails struct {
+	Id               uint64               `json:"Id"`
+	Flags            uint32               `json:"Flags"`
+	FlagNames        []string             `json:"FlagNames"`
+	CheckFlags       uint32               `json:"CheckFlags"`
+	CheckFlagNames   []string             `json:"CheckFlagNames"`
+	Name             string               `json:"Name"`
+	SymbolString     string               `json:"SymbolString"`
+	Declarations     []NodeLocation       `json:"Declarations,omitempty"`
+	ValueDeclaration *NodeLocation        `json:"ValueDeclaration,omitempty"`
+	Members          map[string]uint64    `json:"Members,omitempty"`
+	Exports          map[string]uint64    `json:"Exports,omitempty"`
+	Parent           *uint64              `json:"Parent,omitempty"`
+}
+
+// SignatureDetails represents detailed signature information
+// Note: Signature has no internal ID in typescript-go, so we don't expose one
+type SignatureDetails struct {
+	SignatureString  string            `json:"SignatureString"`
+	TypeParameters   []uint32          `json:"TypeParameters,omitempty"`
+	Parameters       []ParameterDetail `json:"Parameters"`
+	ThisParameter    *ParameterDetail  `json:"ThisParameter,omitempty"`
+	HasRestParameter bool              `json:"HasRestParameter"`
+	ReturnType       *uint32           `json:"ReturnType,omitempty"`
+	Declaration      *NodeLocation     `json:"Declaration,omitempty"`
+}
+
+// ParameterDetail represents a parameter in a signature
+type ParameterDetail struct {
+	Name     string `json:"Name"`
+	SymbolId uint64 `json:"SymbolId"`
+}
+
+// FlowNodeDetails represents detailed flow node information
+// Note: FlowNode has no internal ID in typescript-go, so we don't expose one
+// Antecedent/Antecedents use internal indices for cycle prevention during collection
+type FlowNodeDetails struct {
+	Flags       uint32        `json:"Flags"`
+	FlagNames   []string      `json:"FlagNames"`
+	Node        *NodeLocation `json:"Node,omitempty"`
+	Antecedent  *FlowNodeDetails `json:"Antecedent,omitempty"`
+	Antecedents []*FlowNodeDetails `json:"Antecedents,omitempty"`
+}
+
+// NodeTypeResponse is the response for getNodeType
+type NodeTypeResponse struct {
+	Type           *TypeDetails            `json:"Type,omitempty"`
+	ContextualType *TypeDetails            `json:"ContextualType,omitempty"`
+	// Related objects collected during traversal (for reference lookup)
+	RelatedTypes   map[uint32]TypeDetails  `json:"RelatedTypes,omitempty"`
+	RelatedSymbols map[uint64]SymbolDetails `json:"RelatedSymbols,omitempty"`
+}
+
+// NodeSymbolResponse is the response for getNodeSymbol
+type NodeSymbolResponse struct {
+	Symbol         *SymbolDetails           `json:"Symbol,omitempty"`
+	// Related objects collected during traversal (for reference lookup)
+	RelatedTypes   map[uint32]TypeDetails   `json:"RelatedTypes,omitempty"`
+	RelatedSymbols map[uint64]SymbolDetails `json:"RelatedSymbols,omitempty"`
+}
+
+// NodeSignatureResponse is the response for getNodeSignature
+type NodeSignatureResponse struct {
+	Signature      *SignatureDetails        `json:"Signature,omitempty"`
+	// Related objects collected during traversal (for reference lookup)
+	RelatedTypes   map[uint32]TypeDetails   `json:"RelatedTypes,omitempty"`
+	RelatedSymbols map[uint64]SymbolDetails `json:"RelatedSymbols,omitempty"`
+}
+
+// NodeFlowNodeResponse is the response for getNodeFlowNode
+type NodeFlowNodeResponse struct {
+	FlowNode *FlowNodeDetails `json:"FlowNode,omitempty"`
+}
+
+// NodeInfoResponse is the response for getNodeInfo
+type NodeInfoResponse struct {
+	Kind              int      `json:"Kind"`
+	KindName          string   `json:"KindName"`
+	Flags             uint32   `json:"Flags"`
+	FlagNames         []string `json:"FlagNames"`
+	ModifierFlags     uint32   `json:"ModifierFlags"`
+	ModifierFlagNames []string `json:"ModifierFlagNames"`
+	Pos               int      `json:"Pos"`
+	End               int      `json:"End"`
+}
+
 // Service manages the IPC communication
 type Service struct {
-	reader  *bufio.Reader
-	writer  io.Writer
-	handler Handler
-	mutex   sync.Mutex
+	reader         *bufio.Reader
+	writer         io.Writer
+	handler        Handler
+	checkerHandler CheckerHandler
+	mutex          sync.Mutex
 }
 
 // NewService creates a new IPC service
@@ -183,6 +327,11 @@ func NewService(reader io.Reader, writer io.Writer, handler Handler) *Service {
 		writer:  writer,
 		handler: handler,
 	}
+}
+
+// SetCheckerHandler sets the checker handler for the service
+func (s *Service) SetCheckerHandler(handler CheckerHandler) {
+	s.checkerHandler = handler
 }
 
 // readMessage reads a message from the input
@@ -253,6 +402,17 @@ func (s *Service) Start() error {
 		case KindExit:
 			s.handleExit(msg)
 			return nil
+		// Type checker messages
+		case KindCheckerGetNodeType:
+			s.handleCheckerGetNodeType(msg)
+		case KindCheckerGetNodeSymbol:
+			s.handleCheckerGetNodeSymbol(msg)
+		case KindCheckerGetNodeSignature:
+			s.handleCheckerGetNodeSignature(msg)
+		case KindCheckerGetNodeFlowNode:
+			s.handleCheckerGetNodeFlowNode(msg)
+		case KindCheckerGetNodeInfo:
+			s.handleCheckerGetNodeInfo(msg)
 		default:
 			s.sendError(msg.ID, fmt.Sprintf("unknown message kind: %s", msg.Kind))
 		}
@@ -361,4 +521,128 @@ func IsIPCMode() bool {
 
 func EncodeAST(sourceFile *ast.SourceFile, id string) ([]byte, error) {
 	return encoder.EncodeSourceFile(sourceFile, id)
+}
+
+// parseCheckerNodeRequest parses a checker node request from message data
+func (s *Service) parseCheckerNodeRequest(msg *Message) (*CheckerNodeRequest, error) {
+	data, err := json.Marshal(msg.Data)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal data: %w", err)
+	}
+
+	var req CheckerNodeRequest
+	if err := json.Unmarshal(data, &req); err != nil {
+		return nil, fmt.Errorf("failed to parse checker node request: %w", err)
+	}
+	return &req, nil
+}
+
+// handleCheckerGetNodeType handles checker.getNodeType messages
+func (s *Service) handleCheckerGetNodeType(msg *Message) {
+	if s.checkerHandler == nil {
+		s.sendError(msg.ID, "checker handler not available")
+		return
+	}
+
+	req, err := s.parseCheckerNodeRequest(msg)
+	if err != nil {
+		s.sendError(msg.ID, err.Error())
+		return
+	}
+
+	resp, err := s.checkerHandler.HandleCheckerGetNodeType(*req)
+	if err != nil {
+		s.sendError(msg.ID, err.Error())
+		return
+	}
+
+	s.sendResponse(msg.ID, resp)
+}
+
+// handleCheckerGetNodeSymbol handles checker.getNodeSymbol messages
+func (s *Service) handleCheckerGetNodeSymbol(msg *Message) {
+	if s.checkerHandler == nil {
+		s.sendError(msg.ID, "checker handler not available")
+		return
+	}
+
+	req, err := s.parseCheckerNodeRequest(msg)
+	if err != nil {
+		s.sendError(msg.ID, err.Error())
+		return
+	}
+
+	resp, err := s.checkerHandler.HandleCheckerGetNodeSymbol(*req)
+	if err != nil {
+		s.sendError(msg.ID, err.Error())
+		return
+	}
+
+	s.sendResponse(msg.ID, resp)
+}
+
+// handleCheckerGetNodeSignature handles checker.getNodeSignature messages
+func (s *Service) handleCheckerGetNodeSignature(msg *Message) {
+	if s.checkerHandler == nil {
+		s.sendError(msg.ID, "checker handler not available")
+		return
+	}
+
+	req, err := s.parseCheckerNodeRequest(msg)
+	if err != nil {
+		s.sendError(msg.ID, err.Error())
+		return
+	}
+
+	resp, err := s.checkerHandler.HandleCheckerGetNodeSignature(*req)
+	if err != nil {
+		s.sendError(msg.ID, err.Error())
+		return
+	}
+
+	s.sendResponse(msg.ID, resp)
+}
+
+// handleCheckerGetNodeFlowNode handles checker.getNodeFlowNode messages
+func (s *Service) handleCheckerGetNodeFlowNode(msg *Message) {
+	if s.checkerHandler == nil {
+		s.sendError(msg.ID, "checker handler not available")
+		return
+	}
+
+	req, err := s.parseCheckerNodeRequest(msg)
+	if err != nil {
+		s.sendError(msg.ID, err.Error())
+		return
+	}
+
+	resp, err := s.checkerHandler.HandleCheckerGetNodeFlowNode(*req)
+	if err != nil {
+		s.sendError(msg.ID, err.Error())
+		return
+	}
+
+	s.sendResponse(msg.ID, resp)
+}
+
+// handleCheckerGetNodeInfo handles checker.getNodeInfo messages
+func (s *Service) handleCheckerGetNodeInfo(msg *Message) {
+	if s.checkerHandler == nil {
+		s.sendError(msg.ID, "checker handler not available")
+		return
+	}
+
+	req, err := s.parseCheckerNodeRequest(msg)
+	if err != nil {
+		s.sendError(msg.ID, err.Error())
+		return
+	}
+
+	resp, err := s.checkerHandler.HandleCheckerGetNodeInfo(*req)
+	if err != nil {
+		s.sendError(msg.ID, err.Error())
+		return
+	}
+
+	s.sendResponse(msg.ID, resp)
 }

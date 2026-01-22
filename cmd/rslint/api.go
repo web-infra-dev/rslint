@@ -21,8 +21,15 @@ import (
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
-// IPCHandler implements the ipc.Handler interface
-type IPCHandler struct{}
+// IPCHandler implements the ipc.Handler and ipc.CheckerHandler interfaces
+type IPCHandler struct {
+	typeChecker *api.TypeChecker
+}
+
+// NewIPCHandler creates a new IPC handler
+func NewIPCHandler() *IPCHandler {
+	return &IPCHandler{}
+}
 
 // HandleLint handles lint requests in IPC mode
 func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) {
@@ -253,6 +260,13 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		}
 		response.EncodedSourceFiles = encodedSourceFiles
 	}
+
+	// Create type checker if requested
+	if req.IncludeTypeChecker {
+		h.typeChecker = api.NewTypeChecker(programs, sourceFiles)
+		response.HasTypeChecker = true
+	}
+
 	return response, nil
 }
 
@@ -328,10 +342,53 @@ func (h *IPCHandler) HandleApplyFixes(req api.ApplyFixesRequest) (*api.ApplyFixe
 	}, nil
 }
 
+// CheckerHandler implementation
+
+// HandleCheckerGetNodeType handles checker.getNodeType requests
+func (h *IPCHandler) HandleCheckerGetNodeType(req api.CheckerNodeRequest) (*api.NodeTypeResponse, error) {
+	if h.typeChecker == nil {
+		return nil, fmt.Errorf("type checker not available")
+	}
+	return h.typeChecker.GetNodeType(req.Node), nil
+}
+
+// HandleCheckerGetNodeSymbol handles checker.getNodeSymbol requests
+func (h *IPCHandler) HandleCheckerGetNodeSymbol(req api.CheckerNodeRequest) (*api.NodeSymbolResponse, error) {
+	if h.typeChecker == nil {
+		return nil, fmt.Errorf("type checker not available")
+	}
+	return h.typeChecker.GetNodeSymbol(req.Node), nil
+}
+
+// HandleCheckerGetNodeSignature handles checker.getNodeSignature requests
+func (h *IPCHandler) HandleCheckerGetNodeSignature(req api.CheckerNodeRequest) (*api.NodeSignatureResponse, error) {
+	if h.typeChecker == nil {
+		return nil, fmt.Errorf("type checker not available")
+	}
+	return h.typeChecker.GetNodeSignature(req.Node), nil
+}
+
+// HandleCheckerGetNodeFlowNode handles checker.getNodeFlowNode requests
+func (h *IPCHandler) HandleCheckerGetNodeFlowNode(req api.CheckerNodeRequest) (*api.NodeFlowNodeResponse, error) {
+	if h.typeChecker == nil {
+		return nil, fmt.Errorf("type checker not available")
+	}
+	return h.typeChecker.GetNodeFlowNode(req.Node), nil
+}
+
+// HandleCheckerGetNodeInfo handles checker.getNodeInfo requests
+func (h *IPCHandler) HandleCheckerGetNodeInfo(req api.CheckerNodeRequest) (*api.NodeInfoResponse, error) {
+	if h.typeChecker == nil {
+		return nil, fmt.Errorf("type checker not available")
+	}
+	return h.typeChecker.GetNodeInfo(req.Node), nil
+}
+
 // runAPI runs the linter in IPC mode
 func runAPI() int {
-	handler := &IPCHandler{}
+	handler := NewIPCHandler()
 	service := api.NewService(os.Stdin, os.Stdout, handler)
+	service.SetCheckerHandler(handler)
 
 	if err := service.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "error in IPC mode: %v\n", err)

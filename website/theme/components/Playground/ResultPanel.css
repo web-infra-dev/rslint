@@ -1,3 +1,9 @@
+.result-panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 .result-header {
   background: #f6f8fa;
   display: flex;
@@ -32,7 +38,8 @@
 
 .result-content {
   padding: 8px;
-  height: calc(100% - 46px);
+  flex: 1;
+  overflow: hidden;
 }
 
 .loading-state {
@@ -45,7 +52,8 @@
 }
 
 .lint-results {
-  height: calc(100% - 8px);
+  height: 100%;
+  overflow: auto;
 }
 
 /* Shadcn Alert used for messages */
@@ -131,6 +139,11 @@
   height: 100%;
 }
 
+.ast-tree-container {
+  height: 100%;
+  overflow: hidden;
+}
+
 .ast-tree {
   height: 100%;
   overflow: auto;
@@ -138,6 +151,13 @@
   border-radius: 6px;
   background: #fff;
   padding: 6px 6px 10px 6px;
+}
+
+/* AST Detail Panel */
+.ast-detail-container {
+  height: 100%;
+  overflow: hidden;
+  padding-left: 8px;
 }
 
 .ast-node-row {

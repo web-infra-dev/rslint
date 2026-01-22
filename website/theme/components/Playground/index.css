@@ -6,11 +6,11 @@
 }
 
 .editor-panel {
-  flex: 5;
+  height: 100%;
   background: #ffffff;
 }
 
 .result-panel {
-  flex: 3;
+  height: 100%;
   background: #ffffff;
 }

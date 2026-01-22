@@ -4,6 +4,13 @@ import { Share2Icon, CheckIcon } from 'lucide-react';
 // Removed ToggleGroup in favor of Button to match Share style
 import { Alert, AlertDescription, AlertTitle } from '@components/ui/alert';
 import { AlertCircleIcon } from 'lucide-react';
+import {
+  ResizablePanelGroup,
+  ResizablePanel,
+  ResizableHandle,
+} from '@components/ui/resizable';
+import { NodeDetailPanel, type NodeDetailInfo } from './NodeDetailPanel';
+export type { NodeDetailInfo };
 import './ResultPanel.css';
 
 export interface Diagnostic {
@@ -28,6 +35,8 @@ interface ResultPanelProps {
   onAstNodeSelect?: (start: number, end: number) => void;
   selectedAstNodeRange?: { start: number; end: number };
   onRequestTsAst?: () => void;
+  // Node detail for right panel
+  selectedNodeDetail?: NodeDetailInfo;
 }
 
 type TabType = 'lint' | 'fixed' | 'ast' | 'ast_ts' | 'type';
@@ -49,13 +58,13 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
     tsAstTree,
     error,
     initialized,
-    fixedCode,
-    typeInfo,
     loading,
     onAstNodeSelect,
     selectedAstNodeRange,
     onRequestTsAst,
+    selectedNodeDetail,
   } = props;
+
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     if (typeof window === 'undefined') return 'lint';
     const params = new URLSearchParams(window.location.search);
@@ -329,6 +338,26 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
     }
   }
 
+  // AST detail panel layout persistence
+  const getAstPanelLayout = () => {
+    if (typeof window === 'undefined') return undefined;
+    try {
+      const saved = localStorage.getItem('ast-panel-layout');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return undefined;
+  };
+
+  const handleAstLayoutChanged = (layout: Record<string, number>) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ast-panel-layout', JSON.stringify(layout));
+    }
+  };
+
+  const astPanelLayout = getAstPanelLayout();
+
   return (
     <div className="result-panel">
       <div className="result-header">
@@ -339,8 +368,14 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
             size="sm"
             onClick={() => setActiveTab('lint')}
             aria-pressed={activeTab === 'lint'}
+            className="relative"
           >
             Errors
+            {diagnostics.length > 0 && (
+              <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-destructive px-1.5 text-xs font-medium text-white">
+                {diagnostics.length}
+              </span>
+            )}
           </Button>
           <Button
             type="button"
@@ -421,19 +456,36 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
 
           {!error && activeTab === 'ast' && (
             <div className="ast-view">
-              {astTree ? (
-                <div className="ast-tree" role="tree">
-                  {renderNode(astTree)}
-                </div>
-              ) : ast ? (
-                <div className="code-block-wrapper">
-                  <pre className="ast-content">{ast}</pre>
-                </div>
-              ) : (
-                <div className="empty-state">
-                  <div className="empty-text">AST will be displayed here</div>
-                </div>
-              )}
+              <ResizablePanelGroup
+                orientation="horizontal"
+                id="ast-detail-layout"
+                defaultLayout={astPanelLayout}
+                onLayoutChanged={handleAstLayoutChanged}
+              >
+                <ResizablePanel id="ast-tree" defaultSize={astPanelLayout?.['ast-tree'] ?? 60} minSize={30}>
+                  <div className="ast-tree-container">
+                    {astTree ? (
+                      <div className="ast-tree" role="tree">
+                        {renderNode(astTree)}
+                      </div>
+                    ) : ast ? (
+                      <div className="code-block-wrapper">
+                        <pre className="ast-content">{ast}</pre>
+                      </div>
+                    ) : (
+                      <div className="empty-state">
+                        <div className="empty-text">AST will be displayed here</div>
+                      </div>
+                    )}
+                  </div>
+                </ResizablePanel>
+                <ResizableHandle withHandle />
+                <ResizablePanel id="ast-detail" defaultSize={astPanelLayout?.['ast-detail'] ?? 40} minSize={20}>
+                  <div className="ast-detail-container">
+                    <NodeDetailPanel detail={selectedNodeDetail} />
+                  </div>
+                </ResizablePanel>
+              </ResizablePanelGroup>
             </div>
           )}
 
