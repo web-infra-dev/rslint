@@ -171,6 +171,41 @@ jobs:
         run: |
           pnpm --filter '@rslint/core' build:js
           pnpm --filter '@rslint/wasm' build
+  test-rust:
+    name: Test Rust
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [rspack-ubuntu-22.04-large, windows-latest, macos-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          submodules: true
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: '.'
+          cache-on-failure: true
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Build
+        run: cargo build --verbose
+
+      - name: Run tests
+        run: cargo test --verbose
   website:
     name: Build Website
     runs-on: ubuntu-latest
@@ -191,6 +226,7 @@ jobs:
       - test-node
       - lint
       - test-wasm
+      - test-rust
       - website
     if: always()
     runs-on: ubuntu-latest
