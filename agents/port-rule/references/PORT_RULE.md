@@ -322,8 +322,20 @@ Add the new test file path to the `include` array.
    ```
 
 3. **Project-wide Checks**:
+
    ```bash
+   # Type check and lint
    pnpm typecheck && pnpm lint
+
+   # Format and Go lint checks (REQUIRED before commit)
+   pnpm format:check && pnpm lint:go
+   ```
+
+   **If checks fail**, run these to auto-fix:
+
+   ```bash
+   pnpm format      # Fix JS/TS formatting
+   pnpm format:go   # Fix Go formatting (e.g., import order)
    ```
 
 ---
