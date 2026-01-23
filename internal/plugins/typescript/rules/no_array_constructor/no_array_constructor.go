@@ -17,21 +17,11 @@ var NoArrayConstructorRule = rule.CreateRule(rule.Rule{
 	Name: "no-array-constructor",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		// getArgumentsText extracts the text between opening and closing parentheses
+		// Returns empty string if no parentheses found (e.g., "new Array;")
 		getArgumentsText := func(node *ast.Node) string {
 			text := ctx.SourceFile.Text()
-			nodeEnd := node.End()
 
-			// Find the last token (should be closing paren)
-			lastTokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, nodeEnd-1)
-			if lastTokenRange.Pos() >= lastTokenRange.End() {
-				return ""
-			}
-			lastToken := text[lastTokenRange.Pos():lastTokenRange.End()]
-			if lastToken != ")" {
-				return ""
-			}
-
-			// Find the opening paren - search forward from callee end
+			// Get callee end position to start scanning from
 			var callee *ast.Node
 			var typeArgs *ast.NodeList
 			switch node.Kind {
@@ -47,34 +37,34 @@ var NoArrayConstructorRule = rule.CreateRule(rule.Rule{
 				return ""
 			}
 
-			// Start searching from after callee or after type arguments if present
-			searchStart := callee.End()
+			// Start scanning from after callee or after type arguments if present
+			scanStart := callee.End()
 			if typeArgs != nil && len(typeArgs.Nodes) > 0 {
-				searchStart = typeArgs.End()
+				scanStart = typeArgs.End()
 			}
 
-			// Find opening paren
-			openParenPos := -1
-			for i := searchStart; i < nodeEnd; i++ {
-				tokenRange := scanner.GetRangeOfTokenAtPosition(ctx.SourceFile, i)
-				if tokenRange.Pos() >= tokenRange.End() {
-					continue
-				}
-				token := text[tokenRange.Pos():tokenRange.End()]
-				if token == "(" {
-					openParenPos = tokenRange.End()
+			// Use scanner to find the opening paren
+			s := scanner.GetScannerForSourceFile(ctx.SourceFile, scanStart)
+			openParenEnd := -1
+			closeParenStart := -1
+
+			for s.TokenStart() < node.End() {
+				if s.Token() == ast.KindOpenParenToken {
+					openParenEnd = s.TokenEnd()
+				} else if s.Token() == ast.KindCloseParenToken {
+					closeParenStart = s.TokenStart()
 					break
 				}
-				// Skip to end of this token
-				i = tokenRange.End() - 1
+				s.Scan()
 			}
 
-			if openParenPos == -1 {
+			// No parentheses found (e.g., "new Array;")
+			if openParenEnd == -1 || closeParenStart == -1 {
 				return ""
 			}
 
 			// Return the text between open and close parens
-			return text[openParenPos:lastTokenRange.Pos()]
+			return text[openParenEnd:closeParenStart]
 		}
 
 		check := func(node *ast.Node) {

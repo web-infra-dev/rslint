@@ -37,6 +37,20 @@ func TestNoArrayConstructorRule(t *testing.T) {
 		{Code: `Array?.<Foo>(1, 2, 3);`},
 		{Code: `Array?.<Foo>();`},
 	}, []rule_tester.InvalidTestCase{
+		// new Array (without parentheses)
+		{
+			Code: `new Array;`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "useLiteral",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 10,
+				},
+			},
+			Output: []string{`[];`},
+		},
 		// new Array()
 		{
 			Code: `new Array();`,
@@ -162,6 +176,76 @@ func TestNoArrayConstructorRule(t *testing.T) {
 				},
 			},
 			Output: []string{`[0, 1, 2];`},
+		},
+		// With comments (no args)
+		{
+			Code: `/* a */ /* b */ Array /* c */ /* d */ /* e */ /* f */?.(); /* g */ /* h */`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "useLiteral",
+					Line:      1,
+					Column:    17,
+					EndLine:   1,
+					EndColumn: 58,
+				},
+			},
+			Output: []string{`/* a */ /* b */ []; /* g */ /* h */`},
+		},
+		// With comments (with args)
+		{
+			Code: `/* a */ /* b */ Array /* c */ /* d */ /* e */ /* f */?.(x, y); /* g */ /* h */`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "useLiteral",
+					Line:      1,
+					Column:    17,
+					EndLine:   1,
+					EndColumn: 62,
+				},
+			},
+			Output: []string{`/* a */ /* b */ [x, y]; /* g */ /* h */`},
+		},
+		// Multi-line
+		{
+			Code: `
+new Array(0, 1, 2);
+`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "useLiteral",
+					Line:      2,
+					Column:    1,
+					EndLine:   2,
+					EndColumn: 19,
+				},
+			},
+			Output: []string{`
+[0, 1, 2];
+`},
+		},
+		// Multi-line with comments
+		{
+			Code: `
+/* a */ /* b */ Array /* c */ /* d */ /* e */ /* f */?.(
+  0,
+  1,
+  2,
+); /* g */ /* h */
+`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "useLiteral",
+					Line:      2,
+					Column:    17,
+				},
+			},
+			Output: []string{`
+/* a */ /* b */ [
+  0,
+  1,
+  2,
+]; /* g */ /* h */
+`},
 		},
 	})
 }
