@@ -43,17 +43,27 @@ var NoArrayConstructorRule = rule.CreateRule(rule.Rule{
 				scanStart = typeArgs.End()
 			}
 
-			// Use scanner to find the opening paren
+			// Use scanner to find the opening and closing parens
+			// Track paren depth to handle nested parens like Array((x), y) or Array(foo(), bar())
 			s := scanner.GetScannerForSourceFile(ctx.SourceFile, scanStart)
 			openParenEnd := -1
 			closeParenStart := -1
+			parenDepth := 0
 
 			for s.TokenStart() < node.End() {
 				if s.Token() == ast.KindOpenParenToken {
-					openParenEnd = s.TokenEnd()
+					if openParenEnd == -1 {
+						// Only capture the first open paren position
+						openParenEnd = s.TokenEnd()
+					}
+					parenDepth++
 				} else if s.Token() == ast.KindCloseParenToken {
-					closeParenStart = s.TokenStart()
-					break
+					parenDepth--
+					if parenDepth == 0 {
+						// This is the matching close paren for the first open paren
+						closeParenStart = s.TokenStart()
+						break
+					}
 				}
 				s.Scan()
 			}

@@ -247,5 +247,28 @@ new Array(0, 1, 2);
 ]; /* g */ /* h */
 `},
 		},
+		// Nested parentheses - bug test
+		{
+			Code: `Array((x), y);`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "useLiteral",
+					Line:      1,
+					Column:    1,
+				},
+			},
+			Output: []string{`[(x), y];`},
+		},
+		{
+			Code: `Array(foo(), bar());`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "useLiteral",
+					Line:      1,
+					Column:    1,
+				},
+			},
+			Output: []string{`[foo(), bar()];`},
+		},
 	})
 }
