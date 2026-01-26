@@ -162,6 +162,19 @@ var MyCoreRule = rule.Rule{
 - **Concrete Nodes** (e.g., `*ast.Identifier`): Use fields (e.g., `id.Text`)
 - Do not assume; check the shim source code to confirm.
 
+```go
+// Example: Checking if callee is "Array"
+if callee.Kind == ast.KindIdentifier {
+    identifier := callee.AsIdentifier()
+
+    // ✓ Correct - Text is a FIELD on concrete type
+    if identifier.Text == "Array" { ... }
+
+    // ✗ Wrong - Text is not a method!
+    if identifier.Text() == "Array" { ... }  // Compile error
+}
+```
+
 ### Handling Options
 
 ESLint options are weakly typed (JSON). You **MUST** handle both Go and JS test formats:
@@ -321,7 +334,17 @@ Add the new test file path to the `include` array.
    cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name>
    ```
 
-3. **Project-wide Checks**:
+3. **Verify Test Coverage Alignment**:
+
+   Ensure Go tests cover the same cases as JS tests:
+   - Check the JS test snapshot file for the number of invalid cases
+   - Go tests should include equivalent test cases
+   - Pay special attention to edge cases:
+     - Expressions with comments (e.g., `/* a */ foo /* b */ ()`)
+     - Multi-line expressions
+     - Nested structures (e.g., `foo((x), y)`, `foo(bar(), baz())`)
+
+4. **Project-wide Checks**:
 
    ```bash
    # Type check and lint

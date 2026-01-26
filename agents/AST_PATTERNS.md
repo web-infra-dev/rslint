@@ -366,6 +366,105 @@ rule.RuleFixRemoveRange(textRange)
 
 ---
 
+## Token Scanning
+
+When implementing auto-fixes that need to locate specific tokens (parentheses, brackets, operators), use the `scanner.GetScannerForSourceFile` API instead of manual character iteration.
+
+### Basic Scanner Usage
+
+```go
+import "github.com/microsoft/typescript-go/shim/scanner"
+
+// Create scanner starting from a position
+s := scanner.GetScannerForSourceFile(ctx.SourceFile, startPos)
+
+// Scan tokens until reaching end position
+for s.TokenStart() < endPos {
+    switch s.Token() {
+    case ast.KindOpenParenToken:
+        openPos := s.TokenEnd()  // Position after '('
+    case ast.KindCloseParenToken:
+        closePos := s.TokenStart()  // Position before ')'
+    }
+    s.Scan()  // Move to next token
+}
+```
+
+### Scanner Methods
+
+| Method            | Description                                         |
+| ----------------- | --------------------------------------------------- |
+| `s.Token()`       | Current token kind (e.g., `ast.KindOpenParenToken`) |
+| `s.TokenStart()`  | Start position of current token                     |
+| `s.TokenEnd()`    | End position of current token                       |
+| `s.TokenRange()`  | `core.TextRange` of current token                   |
+| `s.Scan()`        | Advance to next token                               |
+| `s.ResetPos(pos)` | Reset scanner to a new position                     |
+
+### Why Use Scanner API
+
+- **Handles whitespace and comments automatically** - No need to manually skip them
+- **Consistent boundary handling** - Token positions are always accurate
+- **Less error-prone** - Avoids off-by-one errors in manual scanning
+
+---
+
+## Nested Structure Handling
+
+When extracting text within delimiters (parentheses, brackets, braces), track depth to handle nested structures correctly.
+
+### Problem
+
+```go
+// Bug: Each '(' overwrites openParenEnd
+for s.TokenStart() < node.End() {
+    if s.Token() == ast.KindOpenParenToken {
+        openParenEnd = s.TokenEnd()  // Wrong for Array((x), y)
+    }
+    // ...
+}
+```
+
+For `Array((x), y)`, this incorrectly captures the inner `(` position, resulting in `[x)` instead of `[(x), y]`.
+
+### Solution: Track Depth
+
+```go
+openParenEnd := -1
+closeParenStart := -1
+parenDepth := 0
+
+for s.TokenStart() < node.End() {
+    if s.Token() == ast.KindOpenParenToken {
+        if openParenEnd == -1 {
+            // Only capture the first open paren
+            openParenEnd = s.TokenEnd()
+        }
+        parenDepth++
+    } else if s.Token() == ast.KindCloseParenToken {
+        parenDepth--
+        if parenDepth == 0 {
+            // This matches the first open paren
+            closeParenStart = s.TokenStart()
+            break
+        }
+    }
+    s.Scan()
+}
+
+// Extract text between matched delimiters
+text := ctx.SourceFile.Text()[openParenEnd:closeParenStart]
+```
+
+### Applies To
+
+- Parentheses: `(`, `)`
+- Brackets: `[`, `]`
+- Braces: `{`, `}`
+- Angle brackets (generics): `<`, `>`
+
+---
+
 ## See Also
 
 - [PORT_RULE.md](./PORT_RULE.md) - Main rule porting workflow

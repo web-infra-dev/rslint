@@ -98,6 +98,7 @@ import (
 - [ ] Go tests pass (`go test -count=1 ./internal/rules/<name>`)
 - [ ] Build binary (`cd packages/rslint && pnpm run build:bin`)
 - [ ] JS tests pass (`cd packages/rslint-test-tools && npx rstest run <name>`)
+- [ ] Go/JS test coverage aligned (same invalid cases, including comments/multi-line/nested)
 - [ ] Type check passes (`pnpm typecheck`)
 - [ ] Lint check passes (`pnpm lint`)
 - [ ] Format check passes (`pnpm format:check`)
