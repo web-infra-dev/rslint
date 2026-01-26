@@ -5,7 +5,7 @@ import { ResultPanel, Diagnostic } from './ResultPanel';
 import './index.css';
 import { RemoteSourceFile, type Node, SyntaxKind } from '@rslint/api';
 
-const wasmURL = new URL('@rslint/wasm/rslint.wasm', import.meta.url).href;
+const wasmURL = new URL('@rslint/wasm/rslint.wasm.gz', import.meta.url).href;
 let rslintService: Rslint.RSLintService | null = null;
 
 async function ensureService() {
