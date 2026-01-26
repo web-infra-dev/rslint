@@ -6,13 +6,15 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build:wasm": "cross-env GOOS=js GOARCH=wasm go build  -o rslint.wasm -ldflags=\"-s -w\"  ../../cmd/rslint",
+    "build:wasm:gz": "node scripts/gzip-wasm.mjs",
     "build:js": "node scripts/build.mjs && tsgo -b tsconfig.json",
-    "build": "pnpm run build:wasm && pnpm run build:js"
+    "build": "pnpm run build:wasm && pnpm run build:wasm:gz && pnpm run build:js"
   },
   "files": [
     "dist/index.mjs",
     "dist/**.d.ts",
-    "rslint.wasm"
+    "rslint.wasm",
+    "rslint.wasm.gz"
   ],
   "keywords": [],
   "author": "",

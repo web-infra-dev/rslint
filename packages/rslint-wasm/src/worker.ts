@@ -23,6 +23,38 @@ let pendingMessages = new Map<
 >();
 
 /**
+ * Decompress gzip data using DecompressionStream API
+ */
+async function decompressGzip(
+  compressedData: ArrayBuffer,
+): Promise<ArrayBuffer> {
+  const stream = new DecompressionStream('gzip');
+  const writer = stream.writable.getWriter();
+  writer.write(compressedData);
+  writer.close();
+
+  const reader = stream.readable.getReader();
+  const chunks: Uint8Array[] = [];
+  let totalLength = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    totalLength += value.length;
+  }
+
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const chunk of chunks) {
+    result.set(chunk, offset);
+    offset += chunk.length;
+  }
+
+  return result.buffer;
+}
+
+/**
  * Initialize the rslint process (could be WASM or other browser-compatible implementation)
  */
 async function initializeRslint(wasmURL: string): Promise<void> {
@@ -31,11 +63,23 @@ async function initializeRslint(wasmURL: string): Promise<void> {
     const go = new Go();
     go.argv = ['rslint', '--api'];
     console.log('go', go.importObject);
-    const result = await WebAssembly.instantiateStreaming(
-      fetch(wasmURL),
-      go.importObject,
-    );
-    go.run(result.instance);
+
+    let wasmSource: BufferSource | WebAssembly.Module;
+
+    // Check if the URL is a gzip file
+    if (wasmURL.endsWith('.gz')) {
+      const response = await fetch(wasmURL);
+      const compressedData = await response.arrayBuffer();
+      wasmSource = await decompressGzip(compressedData);
+      const result = await WebAssembly.instantiate(wasmSource, go.importObject);
+      go.run(result.instance);
+    } else {
+      const result = await WebAssembly.instantiateStreaming(
+        fetch(wasmURL),
+        go.importObject,
+      );
+      go.run(result.instance);
+    }
 
     console.log('Rslint worker initialized');
   } catch (error) {

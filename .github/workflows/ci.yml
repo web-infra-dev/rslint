@@ -53,9 +53,13 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
           cache-name: test-go
+      - name: Unit Test (Windows)
+        if: runner.os == 'Windows'
+        run: go test -parallel 4 -p 1 ./internal/...
+
       - name: Unit Test
-        run: |
-          go test -parallel 4 ./internal/...
+        if: runner.os != 'Windows'
+        run: go test -parallel 8 ./internal/...
   lint:
     name: Lint&Check
     runs-on: rspack-ubuntu-22.04-large
