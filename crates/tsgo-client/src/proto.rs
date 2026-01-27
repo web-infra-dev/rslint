@@ -66,6 +66,8 @@ pub struct SymbolData {
     pub name: Vec<u8>,
     pub flags: u32,
     pub check_flags: u32,
+    #[serde(default)]
+    pub decl: Option<NodeReference>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

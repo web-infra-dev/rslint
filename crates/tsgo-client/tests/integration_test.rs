@@ -174,9 +174,9 @@ fn test_fixture_structure() {
 
 #[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
 struct ShorthandSymbolMapping {
-    source_symbol_id: u32,
-    target_symbol_id: u32,
+    source_node_span: String,
     target_symbol_name: String,
+    target_decl_span: String,
 }
 
 #[test]
@@ -211,9 +211,8 @@ fn test_get_shorthand_assignment_value_symbol() {
 
     // Collect shorthand symbol mappings (source -> target)
     let mut shorthand_mappings = Vec::new();
-    let mut seen_target_names = std::collections::HashSet::new();
 
-    for (node_ref, source_symbol_id) in &semantic.node2sym {
+    for (node_ref, _source_symbol_id) in &semantic.node2sym {
         if let Some(target_symbol_id) = semantic.get_shorthand_assignment_value_symbol(node_ref) {
             // Get the target symbol data
             if let Some((_, target_symbol_data)) = semantic
@@ -232,25 +231,37 @@ fn test_get_shorthand_assignment_value_symbol() {
                 let target_symbol_name =
                     String::from_utf8_lossy(&target_symbol_data.name).to_string();
 
-                // Only collect one mapping per unique target symbol name from our test symbols
+                // Only collect mappings from our test symbols
                 if [
                     "name", "age", "username", "userAge", "isActive", "id", "email",
                 ]
                 .contains(&target_symbol_name.as_str())
-                    && seen_target_names.insert(target_symbol_name.clone())
                 {
+                    // Format source node span
+                    let source_span = format!(
+                        "{}:{}..{}",
+                        node_ref.sourcefile_id, node_ref.start, node_ref.end
+                    );
+
+                    // Format target declaration span
+                    let target_decl_span = if let Some(decl) = &target_symbol_data.decl {
+                        format!("{}:{}..{}", decl.sourcefile_id, decl.start, decl.end)
+                    } else {
+                        "unknown".to_string()
+                    };
+
                     shorthand_mappings.push(ShorthandSymbolMapping {
-                        source_symbol_id: *source_symbol_id,
-                        target_symbol_id,
+                        source_node_span: source_span,
                         target_symbol_name: target_symbol_name.clone(),
+                        target_decl_span,
                     });
                 }
             }
         }
     }
 
-    // Sort by target symbol name for consistent snapshots
-    shorthand_mappings.sort_by(|a, b| a.target_symbol_name.cmp(&b.target_symbol_name));
+    // Sort by source span for consistent snapshots
+    shorthand_mappings.sort();
 
     println!("\n✓ Shorthand assignment test passed!");
     println!(

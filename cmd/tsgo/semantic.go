@@ -26,6 +26,8 @@ type SymbolInfo struct {
 	Name       CString      `json:"name"`
 	Flags      int          `json:"flags"`
 	CheckFlags int          `json:"check_flags"`
+	// Declaration node reference (if available)
+	Decl *NodeReference `json:"decl,omitempty"`
 }
 type TypeExtra struct {
 	Name map[int]CString      `json:"name"`
@@ -188,11 +190,23 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 				if ty := tc.GetTypeOfSymbol(symbol); ty != nil {
 					typeID := recordType(ty)
 					sym_id := ast.GetSymbolId(symbol)
+
+					// Get declaration position if available
+					var declRef *NodeReference
+					if symbol.ValueDeclaration != nil && symbol.ValueDeclaration.Pos() >= 0 && symbol.ValueDeclaration.End() >= 0 {
+						declRef = &NodeReference{
+							SourceFileId: sourceFileId,
+							Start:        symbol.ValueDeclaration.Pos(),
+							End:          symbol.ValueDeclaration.End(),
+						}
+					}
+
 					semantic.Symtab[sym_id] = SymbolInfo{
 						Id:         sym_id,
 						Name:       []byte(symbol.Name),
 						Flags:      int(symbol.Flags),
 						CheckFlags: int(symbol.CheckFlags),
+						Decl:       declRef,
 					}
 					semantic.Sym2type[sym_id] = typeID
 					(semantic.Node2sym)[key] = sym_id
@@ -221,11 +235,23 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 				if _, exists := semantic.Symtab[value_sym_id]; !exists {
 					if ty := tc.GetTypeOfSymbol(valueSymbol); ty != nil {
 						typeID := recordType(ty)
+
+						// Get declaration position if available
+						var declRef *NodeReference
+						if valueSymbol.ValueDeclaration != nil && valueSymbol.ValueDeclaration.Pos() >= 0 && valueSymbol.ValueDeclaration.End() >= 0 {
+							declRef = &NodeReference{
+								SourceFileId: sourceFileId,
+								Start:        valueSymbol.ValueDeclaration.Pos(),
+								End:          valueSymbol.ValueDeclaration.End(),
+							}
+						}
+
 						semantic.Symtab[value_sym_id] = SymbolInfo{
 							Id:         value_sym_id,
 							Name:       []byte(valueSymbol.Name),
 							Flags:      int(valueSymbol.Flags),
 							CheckFlags: int(valueSymbol.CheckFlags),
+							Decl:       declRef,
 						}
 						semantic.Sym2type[value_sym_id] = typeID
 					}

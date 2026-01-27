@@ -4,38 +4,43 @@ expression: shorthand_mappings
 ---
 [
   {
-    "source_symbol_id": 26500,
-    "target_symbol_id": 26498,
-    "target_symbol_name": "age"
+    "source_node_span": "52:207..212",
+    "target_symbol_name": "name",
+    "target_decl_span": "52:75..87"
   },
   {
-    "source_symbol_id": 26516,
-    "target_symbol_id": 26513,
-    "target_symbol_name": "email"
+    "source_node_span": "52:213..217",
+    "target_symbol_name": "age",
+    "target_decl_span": "52:88..100"
   },
   {
-    "source_symbol_id": 26514,
-    "target_symbol_id": 26511,
-    "target_symbol_name": "id"
+    "source_node_span": "52:377..386",
+    "target_symbol_name": "username",
+    "target_decl_span": "52:263..282"
   },
   {
-    "source_symbol_id": 26508,
-    "target_symbol_id": 26505,
-    "target_symbol_name": "isActive"
+    "source_node_span": "52:387..395",
+    "target_symbol_name": "userAge",
+    "target_decl_span": "52:291..304"
   },
   {
-    "source_symbol_id": 26515,
-    "target_symbol_id": 26512,
-    "target_symbol_name": "name"
+    "source_node_span": "52:396..405",
+    "target_symbol_name": "isActive",
+    "target_decl_span": "52:313..329"
   },
   {
-    "source_symbol_id": 26507,
-    "target_symbol_id": 26504,
-    "target_symbol_name": "userAge"
+    "source_node_span": "52:568..575",
+    "target_symbol_name": "id",
+    "target_decl_span": "52:486..496"
   },
   {
-    "source_symbol_id": 26506,
-    "target_symbol_id": 26503,
-    "target_symbol_name": "username"
+    "source_node_span": "52:576..598",
+    "target_symbol_name": "name",
+    "target_decl_span": "52:507..520"
+  },
+  {
+    "source_node_span": "52:599..622",
+    "target_symbol_name": "email",
+    "target_decl_span": "52:529..555"
   }
 ]
