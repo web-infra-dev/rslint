@@ -5,7 +5,7 @@ export function createUser(name: string, age: number) {
 }
 
 export function getUserInfo() {
-  const username = "Alice";
+  const username = 'Alice';
   const userAge = 30;
   const isActive = true;
 
@@ -15,13 +15,13 @@ export function getUserInfo() {
 
 // Mixed shorthand and regular properties
 export function mixedProperties(id: number) {
-  const name = "Bob";
-  const email = "bob@example.com";
+  const name = 'Bob';
+  const email = 'bob@example.com';
 
   return {
-    id,              // shorthand
-    name,            // shorthand
-    email,           // shorthand
-    timestamp: Date.now(),  // regular property
+    id, // shorthand
+    name, // shorthand
+    email, // shorthand
+    timestamp: Date.now(), // regular property
   };
 }

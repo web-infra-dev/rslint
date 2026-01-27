@@ -19,11 +19,11 @@ export class Calculator {
 
   divide(a: number, b: number): number {
     if (b === 0) {
-      throw new Error("Division by zero");
+      throw new Error('Division by zero');
     }
     return a / b;
   }
 }
 
-const message = greet("World");
+const message = greet('World');
 console.log(message);
