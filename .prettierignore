@@ -18,3 +18,4 @@ website/doc_build
 pnpm-lock.yaml
 npm/tsgo/**/lib/
 binaries/
+target/

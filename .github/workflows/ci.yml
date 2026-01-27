@@ -200,14 +200,17 @@ jobs:
 
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Build
-        run: cargo build --verbose
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
+      - name: Setup Go
+        uses: ./.github/actions/setup-go
+        with:
+          go-version: 1.25.0
+          cache-name: test-wasm
       - name: Build
         run: |
           pnpm --filter '@rslint/tsgo' build
+
       - name: Run tests
         run: cargo test --verbose
   website:
