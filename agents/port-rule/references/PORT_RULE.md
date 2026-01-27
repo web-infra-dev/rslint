@@ -1,4 +1,4 @@
-# Rslint Rule Porting Guide for AI Agents
+# Rslint Rule Porting Guide
 
 ## Role & Objective
 
@@ -162,6 +162,19 @@ var MyCoreRule = rule.Rule{
 - **Concrete Nodes** (e.g., `*ast.Identifier`): Use fields (e.g., `id.Text`)
 - Do not assume; check the shim source code to confirm.
 
+```go
+// Example: Checking if callee is "Array"
+if callee.Kind == ast.KindIdentifier {
+    identifier := callee.AsIdentifier()
+
+    // ✓ Correct - Text is a FIELD on concrete type
+    if identifier.Text == "Array" { ... }
+
+    // ✗ Wrong - Text is not a method!
+    if identifier.Text() == "Array" { ... }  // Compile error
+}
+```
+
 ### Handling Options
 
 ESLint options are weakly typed (JSON). You **MUST** handle both Go and JS test formats:
@@ -321,9 +334,31 @@ Add the new test file path to the `include` array.
    cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name>
    ```
 
-3. **Project-wide Checks**:
+3. **Verify Test Coverage Alignment**:
+
+   Ensure Go tests cover the same cases as JS tests:
+   - Check the JS test snapshot file for the number of invalid cases
+   - Go tests should include equivalent test cases
+   - Pay special attention to edge cases:
+     - Expressions with comments (e.g., `/* a */ foo /* b */ ()`)
+     - Multi-line expressions
+     - Nested structures (e.g., `foo((x), y)`, `foo(bar(), baz())`)
+
+4. **Project-wide Checks**:
+
    ```bash
+   # Type check and lint
    pnpm typecheck && pnpm lint
+
+   # Format and Go lint checks (REQUIRED before commit)
+   pnpm format:check && pnpm lint:go
+   ```
+
+   **If checks fail**, run these to auto-fix:
+
+   ```bash
+   pnpm format      # Fix JS/TS formatting
+   pnpm format:go   # Fix Go formatting (e.g., import order)
    ```
 
 ---
@@ -351,14 +386,17 @@ Add the new test file path to the `include` array.
    ```bash
    git push origin feat/port-rule-<rule_name_snake_case>-$(date +%Y%m%d)
 
-   gh pr create --base main --title "feat: port rule <rule-name>" --body "## Description
-   Ported the \`<rule-name>\` rule from ESLint to rslint.
+   gh pr create --base main --title "feat: port rule <rule-name>" --body "## Summary
+   Port the \`<rule-name>\` rule from ESLint to rslint.
+
+   ## Test Plan
+   - [x] Go unit tests pass
+   - [x] JS integration tests pass
+   - [x] Lint checks pass
 
    ## References
    - **Original Rule**: <link_to_eslint_doc>
-
-   ## Agent Info
-   - **Model**: <ai_model_name>"
+   - **Source Code**: <link_to_source_code>"
    ```
 
 ---

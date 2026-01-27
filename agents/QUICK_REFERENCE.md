@@ -17,6 +17,10 @@ A quick reference for common commands, file locations, and checklists when porti
 | JS unit test  | `cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name>` |
 | Type check    | `pnpm typecheck`                                                                  |
 | Lint check    | `pnpm lint`                                                                       |
+| Format check  | `pnpm format:check`                                                               |
+| Format fix    | `pnpm format`                                                                     |
+| Go lint check | `pnpm lint:go`                                                                    |
+| Go format fix | `pnpm format:go`                                                                  |
 
 ---
 
@@ -94,11 +98,21 @@ import (
 - [ ] Go tests pass (`go test -count=1 ./internal/rules/<name>`)
 - [ ] Build binary (`cd packages/rslint && pnpm run build:bin`)
 - [ ] JS tests pass (`cd packages/rslint-test-tools && npx rstest run <name>`)
+- [ ] Go/JS test coverage aligned (same invalid cases, including comments/multi-line/nested)
 - [ ] Type check passes (`pnpm typecheck`)
 - [ ] Lint check passes (`pnpm lint`)
+- [ ] Format check passes (`pnpm format:check`)
+- [ ] Go lint check passes (`pnpm lint:go`)
 - [ ] Rule registered (`internal/config/config.go`)
 - [ ] Test file registered (`packages/rslint-test-tools/rstest.config.mts`)
 - [ ] Documentation created (`<rule_name>.md`)
+
+**Quick Fix Commands** (run before committing if checks fail):
+
+```bash
+pnpm format      # Fix JS/TS formatting
+pnpm format:go   # Fix Go formatting
+```
 
 ---
 
