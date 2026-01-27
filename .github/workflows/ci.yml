@@ -203,7 +203,11 @@ jobs:
 
       - name: Build
         run: cargo build --verbose
-
+      - name: Setup Node.js
+        uses: ./.github/actions/setup-node
+      - name: Build
+        run: |
+          pnpm --filter '@rslint/go' build
       - name: Run tests
         run: cargo test --verbose
   website:
