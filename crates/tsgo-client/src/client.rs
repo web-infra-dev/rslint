@@ -81,7 +81,15 @@ impl Builder {
     }
 
     pub fn build(mut self) -> Result<UninitializedClient, ProcessError> {
-        self.cmd.arg("-config").arg(&self.options.config_file);
+        // Add config file argument if provided
+        if !self.options.config_file.is_empty() {
+            self.cmd.arg("-config").arg(&self.options.config_file);
+        }
+
+        // Set the working directory if provided
+        if let Some(cwd) = &self.options.cwd {
+            self.cmd.current_dir(cwd);
+        }
 
         let mut child = self
             .cmd
