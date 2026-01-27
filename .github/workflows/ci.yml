@@ -207,7 +207,7 @@ jobs:
         uses: ./.github/actions/setup-node
       - name: Build
         run: |
-          pnpm --filter '@rslint/go' build
+          pnpm --filter '@rslint/tsgo' build
       - name: Run tests
         run: cargo test --verbose
   website:
