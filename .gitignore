@@ -158,3 +158,6 @@ npm/tsgo/*/local
 
 # go cache
 packages/rslint/pkg/
+
+# rust
+target/

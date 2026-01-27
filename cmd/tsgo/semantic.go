@@ -26,6 +26,8 @@ type SymbolInfo struct {
 	Name       CString      `json:"name"`
 	Flags      int          `json:"flags"`
 	CheckFlags int          `json:"check_flags"`
+	// Declaration node reference (if available)
+	Decl *NodeReference `json:"decl,omitempty"`
 }
 type TypeExtra struct {
 	Name map[int]CString      `json:"name"`
@@ -78,26 +80,30 @@ type PrimTypes struct {
 	Never     checker.TypeId `json:"never"`
 }
 type Semantic struct {
-	Symtab       map[ast.SymbolId]SymbolInfo      `json:"symtab"`
-	Typetab      map[checker.TypeId]TypeInfo      `json:"typetab"`
-	Sym2type     map[ast.SymbolId]checker.TypeId  `json:"sym2type"`
-	AliasSymbols map[ast.SymbolId]ast.SymbolId    `json:"alias_symbols"`
-	Node2sym     map[NodeReference]ast.SymbolId   `json:"node2sym"`
-	Node2type    map[NodeReference]checker.TypeId `json:"node2type"`
-	Primtypes    PrimTypes                        `json:"primtypes"`
-	TypeExtra    TypeExtra                        `json:"type_extra"`
-	FuncData     FunctionData                     `json:"func_data"`
+	Symtab           map[ast.SymbolId]SymbolInfo      `json:"symtab"`
+	Typetab          map[checker.TypeId]TypeInfo      `json:"typetab"`
+	Sym2type         map[ast.SymbolId]checker.TypeId  `json:"sym2type"`
+	AliasSymbols     map[ast.SymbolId]ast.SymbolId    `json:"alias_symbols"`
+	Node2sym         map[NodeReference]ast.SymbolId   `json:"node2sym"`
+	Node2type        map[NodeReference]checker.TypeId `json:"node2type"`
+	Primtypes        PrimTypes                        `json:"primtypes"`
+	TypeExtra        TypeExtra                        `json:"type_extra"`
+	FuncData         FunctionData                     `json:"func_data"`
+	// ShorthandSymbols maps node reference to the value symbol for shorthand property assignments
+	// (node -> value_symbol_id)
+	ShorthandSymbols map[NodeReference]ast.SymbolId `json:"shorthand_symbols"`
 }
 
 func NewSemantic() Semantic {
 	return Semantic{
-		Symtab:       make(map[ast.SymbolId]SymbolInfo),
-		Typetab:      make(map[checker.TypeId]TypeInfo),
-		Sym2type:     make(map[ast.SymbolId]checker.TypeId),
-		AliasSymbols: make(map[ast.SymbolId]ast.SymbolId),
-		Node2sym:     make(map[NodeReference]ast.SymbolId),
-		Node2type:    make(map[NodeReference]checker.TypeId),
-		Primtypes:    PrimTypes{},
+		Symtab:           make(map[ast.SymbolId]SymbolInfo),
+		Typetab:          make(map[checker.TypeId]TypeInfo),
+		Sym2type:         make(map[ast.SymbolId]checker.TypeId),
+		AliasSymbols:     make(map[ast.SymbolId]ast.SymbolId),
+		Node2sym:         make(map[NodeReference]ast.SymbolId),
+		Node2type:        make(map[NodeReference]checker.TypeId),
+		ShorthandSymbols: make(map[NodeReference]ast.SymbolId),
+		Primtypes:        PrimTypes{},
 		TypeExtra: TypeExtra{
 			Name: make(map[int]CString),
 			Func: make(map[int]FunctionData),
@@ -184,11 +190,23 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 				if ty := tc.GetTypeOfSymbol(symbol); ty != nil {
 					typeID := recordType(ty)
 					sym_id := ast.GetSymbolId(symbol)
+
+					// Get declaration position if available
+					var declRef *NodeReference
+					if symbol.ValueDeclaration != nil && symbol.ValueDeclaration.Pos() >= 0 && symbol.ValueDeclaration.End() >= 0 {
+						declRef = &NodeReference{
+							SourceFileId: sourceFileId,
+							Start:        symbol.ValueDeclaration.Pos(),
+							End:          symbol.ValueDeclaration.End(),
+						}
+					}
+
 					semantic.Symtab[sym_id] = SymbolInfo{
 						Id:         sym_id,
 						Name:       []byte(symbol.Name),
 						Flags:      int(symbol.Flags),
 						CheckFlags: int(symbol.CheckFlags),
+						Decl:       declRef,
 					}
 					semantic.Sym2type[sym_id] = typeID
 					(semantic.Node2sym)[key] = sym_id
@@ -206,6 +224,38 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 
 				}
 
+			}
+
+			// Collect shorthand assignment value symbol
+			if valueSymbol := tc.GetShorthandAssignmentValueSymbol(node); valueSymbol != nil {
+				value_sym_id := ast.GetSymbolId(valueSymbol)
+				semantic.ShorthandSymbols[key] = value_sym_id
+
+				// Also record this symbol if not already recorded
+				if _, exists := semantic.Symtab[value_sym_id]; !exists {
+					if ty := tc.GetTypeOfSymbol(valueSymbol); ty != nil {
+						typeID := recordType(ty)
+
+						// Get declaration position if available
+						var declRef *NodeReference
+						if valueSymbol.ValueDeclaration != nil && valueSymbol.ValueDeclaration.Pos() >= 0 && valueSymbol.ValueDeclaration.End() >= 0 {
+							declRef = &NodeReference{
+								SourceFileId: sourceFileId,
+								Start:        valueSymbol.ValueDeclaration.Pos(),
+								End:          valueSymbol.ValueDeclaration.End(),
+							}
+						}
+
+						semantic.Symtab[value_sym_id] = SymbolInfo{
+							Id:         value_sym_id,
+							Name:       []byte(valueSymbol.Name),
+							Flags:      int(valueSymbol.Flags),
+							CheckFlags: int(valueSymbol.CheckFlags),
+							Decl:       declRef,
+						}
+						semantic.Sym2type[value_sym_id] = typeID
+					}
+				}
 			}
 		}
 
