@@ -1,9 +1,9 @@
 use std::env;
 use std::ffi::OsStr;
 use std::path::PathBuf;
+use tsgo_client::Api;
 use tsgo_client::client::{Client, Options};
 use tsgo_client::symbolflags::SymbolFlags;
-use tsgo_client::Api;
 
 use serde::Serialize;
 
@@ -36,10 +36,7 @@ fn get_tsgo_path() -> Option<PathBuf> {
     }
 
     // Fall back to searching for existing binaries
-    let possible_paths = [
-        "target/tsgo",
-        "bin/tsgo",
-    ];
+    let possible_paths = ["target/tsgo", "bin/tsgo"];
 
     for path in &possible_paths {
         let full_path = repo_root.join(path);
@@ -88,8 +85,8 @@ fn test_tsgo_integration_simple_project() {
         .expect("Failed to build client");
 
     // Initialize the API
-    let api = Api::with_uninitialized_client(uninitialized_client)
-        .expect("Failed to initialize API");
+    let api =
+        Api::with_uninitialized_client(uninitialized_client).expect("Failed to initialize API");
 
     // Load the TypeScript project
     let mut buffer = Vec::new();
@@ -202,8 +199,8 @@ fn test_get_shorthand_assignment_value_symbol() {
         .build()
         .expect("Failed to build client");
 
-    let api = Api::with_uninitialized_client(uninitialized_client)
-        .expect("Failed to initialize API");
+    let api =
+        Api::with_uninitialized_client(uninitialized_client).expect("Failed to initialize API");
 
     let mut buffer = Vec::new();
     let project = api
@@ -219,7 +216,11 @@ fn test_get_shorthand_assignment_value_symbol() {
     for (node_ref, source_symbol_id) in &semantic.node2sym {
         if let Some(target_symbol_id) = semantic.get_shorthand_assignment_value_symbol(node_ref) {
             // Get the target symbol data
-            if let Some((_, target_symbol_data)) = semantic.symtab.iter().find(|(id, _)| *id == target_symbol_id) {
+            if let Some((_, target_symbol_data)) = semantic
+                .symtab
+                .iter()
+                .find(|(id, _)| *id == target_symbol_id)
+            {
                 let flags = SymbolFlags::from_bits_truncate(target_symbol_data.flags);
 
                 // Verify it has VALUE or ALIAS flags
@@ -229,10 +230,15 @@ fn test_get_shorthand_assignment_value_symbol() {
                     flags
                 );
 
-                let target_symbol_name = String::from_utf8_lossy(&target_symbol_data.name).to_string();
+                let target_symbol_name =
+                    String::from_utf8_lossy(&target_symbol_data.name).to_string();
 
                 // Only collect one mapping per unique target symbol name from our test symbols
-                if ["name", "age", "username", "userAge", "isActive", "id", "email"].contains(&target_symbol_name.as_str()) {
+                if [
+                    "name", "age", "username", "userAge", "isActive", "id", "email",
+                ]
+                .contains(&target_symbol_name.as_str())
+                {
                     if seen_target_names.insert(target_symbol_name.clone()) {
                         shorthand_mappings.push(ShorthandSymbolMapping {
                             source_symbol_id: *source_symbol_id,
@@ -249,9 +255,16 @@ fn test_get_shorthand_assignment_value_symbol() {
     shorthand_mappings.sort_by(|a, b| a.target_symbol_name.cmp(&b.target_symbol_name));
 
     println!("\n✓ Shorthand assignment test passed!");
-    println!("  - Found {} unique shorthand symbol mappings", shorthand_mappings.len());
-    println!("  - Symbols: {:?}",
-        shorthand_mappings.iter().map(|m| &m.target_symbol_name).collect::<Vec<_>>()
+    println!(
+        "  - Found {} unique shorthand symbol mappings",
+        shorthand_mappings.len()
+    );
+    println!(
+        "  - Symbols: {:?}",
+        shorthand_mappings
+            .iter()
+            .map(|m| &m.target_symbol_name)
+            .collect::<Vec<_>>()
     );
 
     // Verify we found the expected symbols
