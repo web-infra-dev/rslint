@@ -177,7 +177,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [rspack-ubuntu-22.04-large, windows-latest, macos-latest]
+        os: [macos-latest]
     steps:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
