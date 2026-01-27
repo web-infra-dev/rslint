@@ -226,8 +226,7 @@ fn test_get_shorthand_assignment_value_symbol() {
                 // Verify it has VALUE or ALIAS flags
                 assert!(
                     flags.intersects(SymbolFlags::VALUE | SymbolFlags::ALIAS),
-                    "Shorthand value symbol should have VALUE or ALIAS flags, got: {:?}",
-                    flags
+                    "Shorthand value symbol should have VALUE or ALIAS flags, got: {flags:?}"
                 );
 
                 let target_symbol_name =
@@ -238,14 +237,13 @@ fn test_get_shorthand_assignment_value_symbol() {
                     "name", "age", "username", "userAge", "isActive", "id", "email",
                 ]
                 .contains(&target_symbol_name.as_str())
+                    && seen_target_names.insert(target_symbol_name.clone())
                 {
-                    if seen_target_names.insert(target_symbol_name.clone()) {
-                        shorthand_mappings.push(ShorthandSymbolMapping {
-                            source_symbol_id: *source_symbol_id,
-                            target_symbol_id,
-                            target_symbol_name: target_symbol_name.clone(),
-                        });
-                    }
+                    shorthand_mappings.push(ShorthandSymbolMapping {
+                        source_symbol_id: *source_symbol_id,
+                        target_symbol_id,
+                        target_symbol_name: target_symbol_name.clone(),
+                    });
                 }
             }
         }
