@@ -48,6 +48,9 @@ pub struct Semantic {
     // (aliasSymbolId, targetSymbolId)
     #[serde(default, deserialize_with = "vecmap_or_empty")]
     pub alias_symbols: Vec<(u32, u32)>,
+    // Shorthand property assignment value symbols (node -> value_symbol_id)
+    #[serde(default, deserialize_with = "vecmap_or_empty")]
+    pub shorthand_symbols: Vec<(NodeReference, u32)>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -200,4 +203,33 @@ where
     }
 
     deserializer.deserialize_any(VecMapOrEmpty(PhantomData))
+}
+
+impl Semantic {
+    /// Returns the value (local variable) symbol of an identifier in the shorthand property assignment.
+    ///
+    /// This is necessary as an identifier in shorthand property assignment contains two meanings:
+    /// property name and property value. For example, in `{ x }`, `x` is both the property name
+    /// and references the variable value.
+    ///
+    /// # Arguments
+    /// * `location` - The node reference to query
+    ///
+    /// # Returns
+    /// * `Some(u32)` - The symbol ID if found and has Value or Alias flags
+    /// * `None` - If no symbol is found or the symbol doesn't have the required flags
+    ///
+    /// # Reference
+    /// TypeScript implementation: https://github.com/microsoft/TypeScript/blob/9e8eaa1746b0d09c3cd29048126ef9cf24f29c03/src/compiler/checker.ts
+    pub fn get_shorthand_assignment_value_symbol(&self, location: &NodeReference) -> Option<u32> {
+        // Look up in the shorthand_symbols mapping
+        self.shorthand_symbols
+            .iter()
+            .find(|(node_ref, _)| {
+                node_ref.sourcefile_id == location.sourcefile_id
+                    && node_ref.start == location.start
+                    && node_ref.end == location.end
+            })
+            .map(|(_, sym_id)| *sym_id)
+    }
 }

@@ -1,0 +1,41 @@
+---
+source: crates/tsgo-client/tests/integration_test.rs
+expression: shorthand_mappings
+---
+[
+  {
+    "source_symbol_id": 26500,
+    "target_symbol_id": 26498,
+    "target_symbol_name": "age"
+  },
+  {
+    "source_symbol_id": 26516,
+    "target_symbol_id": 26513,
+    "target_symbol_name": "email"
+  },
+  {
+    "source_symbol_id": 26514,
+    "target_symbol_id": 26511,
+    "target_symbol_name": "id"
+  },
+  {
+    "source_symbol_id": 26508,
+    "target_symbol_id": 26505,
+    "target_symbol_name": "isActive"
+  },
+  {
+    "source_symbol_id": 26515,
+    "target_symbol_id": 26512,
+    "target_symbol_name": "name"
+  },
+  {
+    "source_symbol_id": 26507,
+    "target_symbol_id": 26504,
+    "target_symbol_name": "userAge"
+  },
+  {
+    "source_symbol_id": 26506,
+    "target_symbol_id": 26503,
+    "target_symbol_name": "username"
+  }
+]

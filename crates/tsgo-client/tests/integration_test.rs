@@ -2,7 +2,10 @@ use std::env;
 use std::ffi::OsStr;
 use std::path::PathBuf;
 use tsgo_client::client::{Client, Options};
+use tsgo_client::symbolflags::SymbolFlags;
 use tsgo_client::Api;
+
+use serde::Serialize;
 
 /// Get the path to the tsgo executable for testing.
 /// Tries to build tsgo from cmd/tsgo or finds an existing binary.
@@ -167,4 +170,97 @@ fn test_fixture_structure() {
 
     let utils_ts = src_dir.join("utils.ts");
     assert!(utils_ts.exists(), "utils.ts should exist");
+
+    let shorthand_ts = src_dir.join("shorthand.ts");
+    assert!(shorthand_ts.exists(), "shorthand.ts should exist");
+}
+
+#[derive(Debug, Serialize, PartialEq, Eq, PartialOrd, Ord)]
+struct ShorthandSymbolMapping {
+    source_symbol_id: u32,
+    target_symbol_id: u32,
+    target_symbol_name: String,
+}
+
+#[test]
+fn test_get_shorthand_assignment_value_symbol() {
+    let tsgo_path = get_tsgo_path().expect(
+        "Could not find tsgo executable. \
+         Please build tsgo first or ensure it's in your PATH.",
+    );
+
+    let fixture_dir = get_fixtures_dir().join("simple-project");
+    let config_file = fixture_dir.join("tsconfig.json");
+
+    let options = Options {
+        cwd: Some(fixture_dir.clone()),
+        log_file: None,
+        config_file: config_file.to_string_lossy().to_string(),
+    };
+
+    let uninitialized_client = Client::builder(OsStr::new(&tsgo_path), options)
+        .build()
+        .expect("Failed to build client");
+
+    let api = Api::with_uninitialized_client(uninitialized_client)
+        .expect("Failed to initialize API");
+
+    let mut buffer = Vec::new();
+    let project = api
+        .load_project(&mut buffer)
+        .expect("Failed to load project");
+
+    let semantic = &project.semantic;
+
+    // Collect shorthand symbol mappings (source -> target)
+    let mut shorthand_mappings = Vec::new();
+    let mut seen_target_names = std::collections::HashSet::new();
+
+    for (node_ref, source_symbol_id) in &semantic.node2sym {
+        if let Some(target_symbol_id) = semantic.get_shorthand_assignment_value_symbol(node_ref) {
+            // Get the target symbol data
+            if let Some((_, target_symbol_data)) = semantic.symtab.iter().find(|(id, _)| *id == target_symbol_id) {
+                let flags = SymbolFlags::from_bits_truncate(target_symbol_data.flags);
+
+                // Verify it has VALUE or ALIAS flags
+                assert!(
+                    flags.intersects(SymbolFlags::VALUE | SymbolFlags::ALIAS),
+                    "Shorthand value symbol should have VALUE or ALIAS flags, got: {:?}",
+                    flags
+                );
+
+                let target_symbol_name = String::from_utf8_lossy(&target_symbol_data.name).to_string();
+
+                // Only collect one mapping per unique target symbol name from our test symbols
+                if ["name", "age", "username", "userAge", "isActive", "id", "email"].contains(&target_symbol_name.as_str()) {
+                    if seen_target_names.insert(target_symbol_name.clone()) {
+                        shorthand_mappings.push(ShorthandSymbolMapping {
+                            source_symbol_id: *source_symbol_id,
+                            target_symbol_id,
+                            target_symbol_name: target_symbol_name.clone(),
+                        });
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort by target symbol name for consistent snapshots
+    shorthand_mappings.sort_by(|a, b| a.target_symbol_name.cmp(&b.target_symbol_name));
+
+    println!("\n✓ Shorthand assignment test passed!");
+    println!("  - Found {} unique shorthand symbol mappings", shorthand_mappings.len());
+    println!("  - Symbols: {:?}",
+        shorthand_mappings.iter().map(|m| &m.target_symbol_name).collect::<Vec<_>>()
+    );
+
+    // Verify we found the expected symbols
+    assert!(
+        shorthand_mappings.len() >= 7,
+        "Expected at least 7 shorthand symbols, found {}",
+        shorthand_mappings.len()
+    );
+
+    // Generate snapshot
+    insta::assert_json_snapshot!(shorthand_mappings);
 }

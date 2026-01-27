@@ -78,26 +78,30 @@ type PrimTypes struct {
 	Never     checker.TypeId `json:"never"`
 }
 type Semantic struct {
-	Symtab       map[ast.SymbolId]SymbolInfo      `json:"symtab"`
-	Typetab      map[checker.TypeId]TypeInfo      `json:"typetab"`
-	Sym2type     map[ast.SymbolId]checker.TypeId  `json:"sym2type"`
-	AliasSymbols map[ast.SymbolId]ast.SymbolId    `json:"alias_symbols"`
-	Node2sym     map[NodeReference]ast.SymbolId   `json:"node2sym"`
-	Node2type    map[NodeReference]checker.TypeId `json:"node2type"`
-	Primtypes    PrimTypes                        `json:"primtypes"`
-	TypeExtra    TypeExtra                        `json:"type_extra"`
-	FuncData     FunctionData                     `json:"func_data"`
+	Symtab           map[ast.SymbolId]SymbolInfo      `json:"symtab"`
+	Typetab          map[checker.TypeId]TypeInfo      `json:"typetab"`
+	Sym2type         map[ast.SymbolId]checker.TypeId  `json:"sym2type"`
+	AliasSymbols     map[ast.SymbolId]ast.SymbolId    `json:"alias_symbols"`
+	Node2sym         map[NodeReference]ast.SymbolId   `json:"node2sym"`
+	Node2type        map[NodeReference]checker.TypeId `json:"node2type"`
+	Primtypes        PrimTypes                        `json:"primtypes"`
+	TypeExtra        TypeExtra                        `json:"type_extra"`
+	FuncData         FunctionData                     `json:"func_data"`
+	// ShorthandSymbols maps node reference to the value symbol for shorthand property assignments
+	// (node -> value_symbol_id)
+	ShorthandSymbols map[NodeReference]ast.SymbolId `json:"shorthand_symbols"`
 }
 
 func NewSemantic() Semantic {
 	return Semantic{
-		Symtab:       make(map[ast.SymbolId]SymbolInfo),
-		Typetab:      make(map[checker.TypeId]TypeInfo),
-		Sym2type:     make(map[ast.SymbolId]checker.TypeId),
-		AliasSymbols: make(map[ast.SymbolId]ast.SymbolId),
-		Node2sym:     make(map[NodeReference]ast.SymbolId),
-		Node2type:    make(map[NodeReference]checker.TypeId),
-		Primtypes:    PrimTypes{},
+		Symtab:           make(map[ast.SymbolId]SymbolInfo),
+		Typetab:          make(map[checker.TypeId]TypeInfo),
+		Sym2type:         make(map[ast.SymbolId]checker.TypeId),
+		AliasSymbols:     make(map[ast.SymbolId]ast.SymbolId),
+		Node2sym:         make(map[NodeReference]ast.SymbolId),
+		Node2type:        make(map[NodeReference]checker.TypeId),
+		ShorthandSymbols: make(map[NodeReference]ast.SymbolId),
+		Primtypes:        PrimTypes{},
 		TypeExtra: TypeExtra{
 			Name: make(map[int]CString),
 			Func: make(map[int]FunctionData),
@@ -206,6 +210,26 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 
 				}
 
+			}
+
+			// Collect shorthand assignment value symbol
+			if valueSymbol := tc.GetShorthandAssignmentValueSymbol(node); valueSymbol != nil {
+				value_sym_id := ast.GetSymbolId(valueSymbol)
+				semantic.ShorthandSymbols[key] = value_sym_id
+
+				// Also record this symbol if not already recorded
+				if _, exists := semantic.Symtab[value_sym_id]; !exists {
+					if ty := tc.GetTypeOfSymbol(valueSymbol); ty != nil {
+						typeID := recordType(ty)
+						semantic.Symtab[value_sym_id] = SymbolInfo{
+							Id:         value_sym_id,
+							Name:       []byte(valueSymbol.Name),
+							Flags:      int(valueSymbol.Flags),
+							CheckFlags: int(valueSymbol.CheckFlags),
+						}
+						semantic.Sym2type[value_sym_id] = typeID
+					}
+				}
 			}
 		}
 

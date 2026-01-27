@@ -1,5 +1,7 @@
 pub mod client;
 pub mod proto;
+pub mod symbolflags;
+
 pub struct Api {
     client: client::Client,
 }
