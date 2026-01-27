@@ -1,4 +1,4 @@
-# Rslint Rule Porting Guide for AI Agents
+# Rslint Rule Porting Guide
 
 ## Role & Objective
 
@@ -386,14 +386,17 @@ Add the new test file path to the `include` array.
    ```bash
    git push origin feat/port-rule-<rule_name_snake_case>-$(date +%Y%m%d)
 
-   gh pr create --base main --title "feat: port rule <rule-name>" --body "## Description
-   Ported the \`<rule-name>\` rule from ESLint to rslint.
+   gh pr create --base main --title "feat: port rule <rule-name>" --body "## Summary
+   Port the \`<rule-name>\` rule from ESLint to rslint.
+
+   ## Test Plan
+   - [x] Go unit tests pass
+   - [x] JS integration tests pass
+   - [x] Lint checks pass
 
    ## References
    - **Original Rule**: <link_to_eslint_doc>
-
-   ## Agent Info
-   - **Model**: <ai_model_name>"
+   - **Source Code**: <link_to_source_code>"
    ```
 
 ---
