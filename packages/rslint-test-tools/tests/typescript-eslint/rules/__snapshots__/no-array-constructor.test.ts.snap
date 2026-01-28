@@ -1,0 +1,368 @@
+// Rstest Snapshot v1
+
+exports[`no-array-constructor > invalid 1`] = `
+{
+  "code": "new Array();",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "[];",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 2`] = `
+{
+  "code": "Array();",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "[];",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 3`] = `
+{
+  "code": "Array?.();",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "[];",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 4`] = `
+{
+  "code": "/* a */ /* b */ Array /* c */ /* d */ /* e */ /* f */?.(); /* g */ /* h */",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "/* a */ /* b */ []; /* g */ /* h */",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 5`] = `
+{
+  "code": "new Array(x, y);",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "[x, y];",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 6`] = `
+{
+  "code": "Array(x, y);",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "[x, y];",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 7`] = `
+{
+  "code": "Array?.(x, y);",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "[x, y];",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 8`] = `
+{
+  "code": "/* a */ /* b */ Array /* c */ /* d */ /* e */ /* f */?.(x, y); /* g */ /* h */",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "/* a */ /* b */ [x, y]; /* g */ /* h */",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 9`] = `
+{
+  "code": "new Array(0, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "[0, 1, 2];",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 10`] = `
+{
+  "code": "Array(0, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "[0, 1, 2];",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 11`] = `
+{
+  "code": "Array?.(0, 1, 2);",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "[0, 1, 2];",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 12`] = `
+{
+  "code": "
+/* a */ /* b */ Array /* c */ /* d */ /* e */ /* f */?.(
+  0,
+  1,
+  2,
+); /* g */ /* h */
+      ",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 6,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+/* a */ /* b */ [
+  0,
+  1,
+  2,
+]; /* g */ /* h */
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-array-constructor > invalid 13`] = `
+{
+  "code": "
+new Array(0, 1, 2);
+      ",
+  "diagnostics": [
+    {
+      "message": "The array literal notation [] is preferable.",
+      "messageId": "useLiteral",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-array-constructor",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+[0, 1, 2];
+      ",
+  "ruleCount": 1,
+}
+`;
