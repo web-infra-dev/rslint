@@ -5,6 +5,11 @@ import { Share2Icon, CheckIcon } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@components/ui/alert';
 import { AlertCircleIcon } from 'lucide-react';
 import './ResultPanel.css';
+import {
+  AstInfoPanel,
+  ResizableSplitPane,
+  type GetAstInfoResponse,
+} from './ast';
 
 export interface Diagnostic {
   ruleName: string;
@@ -25,15 +30,37 @@ interface ResultPanelProps {
   fixedCode?: string;
   typeInfo?: string;
   loading?: boolean;
-  onAstNodeSelect?: (start: number, end: number) => void;
-  selectedAstNodeRange?: { start: number; end: number };
+  onAstNodeSelect?: (start: number, end: number, kind?: number) => void;
+  /** Update selected range without moving editor cursor (for syncing from AST tree) */
+  onUpdateSelectedRange?: (start: number, end: number, kind?: number) => void;
+  selectedAstNodeRange?: { start: number; end: number; kind?: number };
   onRequestTsAst?: () => void;
+  astInfo?: GetAstInfoResponse | null;
+  astInfoLoading?: boolean;
+  onRequestAstInfo?: (
+    position: number,
+    end?: number,
+    kind?: number,
+    fileName?: string,
+  ) => Promise<GetAstInfoResponse | null>;
+  /** Fetch AST info for lazy loading - does not update global state */
+  onFetchAstInfoForLazy?: (
+    position: number,
+    end?: number,
+    kind?: number,
+    fileName?: string,
+  ) => Promise<GetAstInfoResponse | null>;
+  /** Highlight a range in the editor (on hover) */
+  onHighlightRange?: (pos: number, end: number) => void;
+  /** Clear the highlight decoration */
+  onClearHighlight?: () => void;
 }
 
 type TabType = 'lint' | 'fixed' | 'ast' | 'ast_ts' | 'type';
 
 interface ASTNode {
   type: string;
+  kind?: number; // tsgo node kind (not present for TypeScript AST)
   start: number;
   end: number;
   name?: string;
@@ -49,12 +76,17 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
     tsAstTree,
     error,
     initialized,
-    fixedCode,
-    typeInfo,
     loading,
     onAstNodeSelect,
+    onUpdateSelectedRange,
     selectedAstNodeRange,
     onRequestTsAst,
+    astInfo,
+    astInfoLoading,
+    onRequestAstInfo,
+    onFetchAstInfoForLazy,
+    onHighlightRange,
+    onClearHighlight,
   } = props;
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     if (typeof window === 'undefined') return 'lint';
@@ -97,6 +129,17 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
       onRequestTsAst?.();
     }
   }, [activeTab]);
+
+  // Request AST info when AST tab is opened and there's a selection
+  useEffect(() => {
+    if (activeTab === 'ast' && selectedAstNodeRange) {
+      onRequestAstInfo?.(
+        selectedAstNodeRange.start,
+        selectedAstNodeRange.end,
+        selectedAstNodeRange.kind,
+      );
+    }
+  }, [activeTab, selectedAstNodeRange, onRequestAstInfo]);
 
   // Respond to browser navigation updating the tab
   useEffect(() => {
@@ -149,22 +192,28 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
 
   function clickNode(n: ASTNode) {
     setSelectedId(nodeId(n));
-    onAstNodeSelect?.(n.start, n.end);
+    onAstNodeSelect?.(n.start, n.end, n.kind);
   }
 
   function isExpandable(n?: ASTNode) {
     return !!(n && n.children && n.children.length);
   }
 
-  const renderNode = (n: ASTNode, depth = 0) => {
+  const renderNode = (n: ASTNode, depth = 0, index = 0) => {
     const id = nodeId(n);
+    const uniqueKey = `${id}:${index}`;
     const open = expanded.has(id);
     const hasKids = isExpandable(n);
     const preview = n.text ? n.text.replace(/\s+/g, ' ').slice(0, 40) : '';
     return (
-      <div key={id} className="ast-node" style={{ paddingLeft: depth * 2 }}>
+      <div
+        key={uniqueKey}
+        className="ast-node"
+        style={{ paddingLeft: depth * 2 }}
+      >
         <div
           className={`ast-node-row ${selectedId === id ? 'selected' : ''}`}
+          data-node-id={id}
           onClick={() => clickNode(n)}
         >
           {hasKids && (
@@ -181,11 +230,11 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
           <span className="node-range">
             [{n.start}, {n.end}]
           </span>
-          {preview && <span className="node-preview">“{preview}”</span>}
+          {preview && <span className="node-preview">"{preview}"</span>}
         </div>
         {open && hasKids && (
           <div className="ast-children">
-            {n.children!.map(child => renderNode(child, depth + 1))}
+            {n.children!.map((child, i) => renderNode(child, depth + 1, i))}
           </div>
         )}
       </div>
@@ -196,15 +245,21 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
   function tsNodeId(n: ASTNode) {
     return `ts:${n.type}:${n.start}-${n.end}`;
   }
-  function renderTsNode(n: ASTNode, depth = 0) {
+  function renderTsNode(n: ASTNode, depth = 0, index = 0) {
     const id = tsNodeId(n);
+    const uniqueKey = `${id}:${index}`;
     const open = tsExpanded.has(id);
     const hasKids = isExpandable(n);
     const preview = n.text ? n.text.replace(/\s+/g, ' ').slice(0, 40) : '';
     return (
-      <div key={id} className="ast-node" style={{ paddingLeft: depth * 2 }}>
+      <div
+        key={uniqueKey}
+        className="ast-node"
+        style={{ paddingLeft: depth * 2 }}
+      >
         <div
           className={`ast-node-row ${tsSelectedId === id ? 'selected' : ''}`}
+          data-node-id={id}
           onClick={() => {
             setTsSelectedId(id);
             onAstNodeSelect?.(n.start, n.end);
@@ -229,11 +284,11 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
           <span className="node-range">
             [{n.start}, {n.end}]
           </span>
-          {preview && <span className="node-preview">“{preview}”</span>}
+          {preview && <span className="node-preview">"{preview}"</span>}
         </div>
         {open && hasKids && (
           <div className="ast-children">
-            {n.children!.map(child => renderTsNode(child, depth + 1))}
+            {n.children!.map((child, i) => renderTsNode(child, depth + 1, i))}
           </div>
         )}
       </div>
@@ -243,7 +298,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
   // When selection in editor changes, select smallest covering AST node and expand its ancestors
   useEffect(() => {
     if (!astTree || !selectedAstNodeRange) return;
-    const { start, end } = selectedAstNodeRange;
+    const { start, end, kind } = selectedAstNodeRange;
 
     let best: { node: ASTNode; depth: number; path: ASTNode[] } | null = null;
 
@@ -266,8 +321,23 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
         for (const p of best!.path) next.add(nodeId(p));
         return next;
       });
+      // Scroll to the selected node after DOM updates
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-node-id="${CSS.escape(id)}"]`);
+        el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
+      // If the found node differs from current selection, update with correct pos/end/kind
+      // This ensures editor selections get mapped to actual AST node boundaries
+      // Use onUpdateSelectedRange to avoid moving editor cursor
+      if (
+        best.node.start !== start ||
+        best.node.end !== end ||
+        best.node.kind !== kind
+      ) {
+        onUpdateSelectedRange?.(best.node.start, best.node.end, best.node.kind);
+      }
     }
-  }, [selectedAstNodeRange, astTree]);
+  }, [selectedAstNodeRange, astTree, onUpdateSelectedRange]);
 
   // Auto-expand roots when new trees arrive
   useEffect(() => {
@@ -313,6 +383,11 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
         for (const p of best!.path) next.add(tsNodeId(p));
         return next;
       });
+      // Scroll to the selected node after DOM updates
+      requestAnimationFrame(() => {
+        const el = document.querySelector(`[data-node-id="${CSS.escape(id)}"]`);
+        el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      });
     }
   }, [selectedAstNodeRange, tsAstTree]);
 
@@ -331,7 +406,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
 
   return (
     <div className="result-panel">
-      <div className="result-header">
+      <div className="flex items-center justify-between bg-gray-50 p-2 flex-shrink-0">
         <div className="flex items-center gap-2">
           <Button
             type="button"
@@ -339,8 +414,14 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
             size="sm"
             onClick={() => setActiveTab('lint')}
             aria-pressed={activeTab === 'lint'}
+            className="relative"
           >
             Errors
+            {diagnostics.length > 0 && (
+              <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1 text-xs font-bold text-white">
+                {diagnostics.length > 99 ? '99+' : diagnostics.length}
+              </span>
+            )}
           </Button>
           <Button
             type="button"
@@ -420,20 +501,40 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
           )}
 
           {!error && activeTab === 'ast' && (
-            <div className="ast-view">
-              {astTree ? (
-                <div className="ast-tree" role="tree">
-                  {renderNode(astTree)}
-                </div>
-              ) : ast ? (
-                <div className="code-block-wrapper">
-                  <pre className="ast-content">{ast}</pre>
-                </div>
-              ) : (
-                <div className="empty-state">
-                  <div className="empty-text">AST will be displayed here</div>
-                </div>
-              )}
+            <div className="ast-view h-full">
+              <ResizableSplitPane
+                storageKey="playground-ast-split-width"
+                defaultLeftWidth={50}
+                minLeftWidth={25}
+                minRightWidth={25}
+                left={
+                  astTree ? (
+                    <div className="ast-tree h-full overflow-auto" role="tree">
+                      {renderNode(astTree)}
+                    </div>
+                  ) : ast ? (
+                    <div className="code-block-wrapper">
+                      <pre className="ast-content">{ast}</pre>
+                    </div>
+                  ) : (
+                    <div className="empty-state">
+                      <div className="empty-text">
+                        AST will be displayed here
+                      </div>
+                    </div>
+                  )
+                }
+                right={
+                  <AstInfoPanel
+                    info={astInfo ?? undefined}
+                    loading={astInfoLoading}
+                    onRequestAstInfo={onRequestAstInfo}
+                    onFetchAstInfoForLazy={onFetchAstInfoForLazy}
+                    onHighlightRange={onHighlightRange}
+                    onClearHighlight={onClearHighlight}
+                  />
+                }
+              />
             </div>
           )}
 

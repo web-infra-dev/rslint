@@ -14,3 +14,18 @@ async function initialize(options: { wasmURL: string }) {
 }
 
 export { initialize, type RSLintService, type Diagnostic };
+
+// Export AST info types for Playground
+export type {
+  GetAstInfoRequest,
+  GetAstInfoResponse,
+  NodeInfo,
+  TypeInfo,
+  SymbolInfo,
+  SignatureInfo,
+  FlowInfo,
+  ParameterInfo,
+  TypeParamInfo,
+  IndexInfo,
+  TypePredicateInfo,
+} from '@rslint/core/service';

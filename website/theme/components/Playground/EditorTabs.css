@@ -1,0 +1,14 @@
+/* Monaco Editor specific styles - cannot be done with Tailwind */
+.monaco-editor .ast-node-highlight {
+  background: rgba(198, 228, 255, 0.65);
+  outline: 1px solid #0969da;
+  border-radius: 2px;
+}
+
+/* Hover highlight for AST nodes (different from selection highlight) */
+.monaco-editor .ast-node-hover-highlight {
+  background: rgba(255, 213, 79, 0.45);
+  outline: 2px solid #f59e0b;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(245, 158, 11, 0.3);
+}
