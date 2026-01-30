@@ -30,9 +30,6 @@ runs:
         # Clean temp directory
         Get-ChildItem -Path $env:TEMP -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
-        # Clean test cache (not worth caching, regenerates quickly)
-        go clean -testcache
-
         Write-Host "Disk space after cleanup:"
         Get-PSDrive C | Select-Object Used,Free | Format-Table
 
