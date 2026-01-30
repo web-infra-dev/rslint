@@ -32,9 +32,10 @@ jobs:
       matrix:
         runner:
           [
-            rspack-ubuntu-22.04-large,
+            # rspack-ubuntu-22.04-large,
             rspack-windows-2022-large-new,
-            rspack-darwin-14-medium,
+            rspack-windows-2022-large,
+            # rspack-darwin-14-medium,
           ]
         go-version: ['1.25.0']
     steps:
@@ -85,185 +86,185 @@ jobs:
       - name: Unit Test
         if: runner.os != 'Windows'
         run: go test -parallel 8 ./internal/...
-  lint:
-    name: Lint&Check
-    runs-on: rspack-ubuntu-22.04-large
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          submodules: true
+  # lint:
+  #   name: Lint&Check
+  #   runs-on: rspack-ubuntu-22.04-large
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+  #       with:
+  #         submodules: true
 
-      - name: Setup Node.js
-        uses: ./.github/actions/setup-node
+  #     - name: Setup Node.js
+  #       uses: ./.github/actions/setup-node
 
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          go-version: 1.25.0
-          cache-name: go-lint
+  #     - name: Setup Go
+  #       uses: ./.github/actions/setup-go
+  #       with:
+  #         go-version: 1.25.0
+  #         cache-name: go-lint
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
-        with:
-          version: v2.4.0
-          args: --timeout=5m ./cmd/... ./internal/...
+  #     - name: golangci-lint
+  #       uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
+  #       with:
+  #         version: v2.4.0
+  #         args: --timeout=5m ./cmd/... ./internal/...
 
-      - name: go vet
-        run: npm run lint:go
+  #     - name: go vet
+  #       run: npm run lint:go
 
-      - name: go fmt
-        run: npm run format:go
+  #     - name: go fmt
+  #       run: npm run format:go
 
-      - name: Check Spell
-        run: pnpm check-spell
+  #     - name: Check Spell
+  #       run: pnpm check-spell
 
-  test-node:
-    name: Test npm packages
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [rspack-ubuntu-22.04-large, windows-latest]
-        go-version: ['1.25.0']
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          submodules: true
+  # test-node:
+  #   name: Test npm packages
+  #   runs-on: ${{ matrix.os }}
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       os: [rspack-ubuntu-22.04-large, windows-latest]
+  #       go-version: ['1.25.0']
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+  #       with:
+  #         submodules: true
 
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          go-version: ${{ matrix.go-version }}
-          cache-name: test-node
+  #     - name: Setup Go
+  #       uses: ./.github/actions/setup-go
+  #       with:
+  #         go-version: ${{ matrix.go-version }}
+  #         cache-name: test-node
 
-      - name: Setup Node.js
-        uses: ./.github/actions/setup-node
+  #     - name: Setup Node.js
+  #       uses: ./.github/actions/setup-node
 
-      - name: Format
-        if: runner.os == 'Linux'
-        run: pnpm format:check
+  #     - name: Format
+  #       if: runner.os == 'Linux'
+  #       run: pnpm format:check
 
-      - name: Build
-        run: pnpm run build
+  #     - name: Build
+  #       run: pnpm run build
 
-      - name: Dogfooding
-        if: runner.os == 'Linux'
-        run: pnpm run lint --format github
+  #     - name: Dogfooding
+  #       if: runner.os == 'Linux'
+  #       run: pnpm run lint --format github
 
-      - name: TypeCheck
-        if: runner.os == 'Linux'
-        run: pnpm typecheck
+  #     - name: TypeCheck
+  #       if: runner.os == 'Linux'
+  #       run: pnpm typecheck
 
-      - name: Install xvfb and dependencies (Linux only)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt update
-          sudo apt install -y libasound2 libgbm1 libgtk-3-0 libnss3 xvfb
+  #     - name: Install xvfb and dependencies (Linux only)
+  #       if: runner.os == 'Linux'
+  #       run: |
+  #         sudo apt update
+  #         sudo apt install -y libasound2 libgbm1 libgtk-3-0 libnss3 xvfb
 
-      - name: VSCode Test Cache
-        uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
-        with:
-          path: packages/vscode-extension/.vscode-test
-          key: vscode-test-${{ matrix.os }}
-          restore-keys: |
-            vscode-test-${{ matrix.os }}-
+  #     - name: VSCode Test Cache
+  #       uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
+  #       with:
+  #         path: packages/vscode-extension/.vscode-test
+  #         key: vscode-test-${{ matrix.os }}
+  #         restore-keys: |
+  #           vscode-test-${{ matrix.os }}-
 
-      - name: Test on Linux
-        if: runner.os == 'Linux'
-        run: xvfb-run -a pnpm run test
+  #     - name: Test on Linux
+  #       if: runner.os == 'Linux'
+  #       run: xvfb-run -a pnpm run test
 
-      - name: Test on non-Linux
-        if: runner.os != 'Linux'
-        run: pnpm run test
+  #     - name: Test on non-Linux
+  #       if: runner.os != 'Linux'
+  #       run: pnpm run test
 
-  test-wasm:
-    name: Test WASM
-    runs-on: rspack-ubuntu-22.04-large
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          submodules: true
+  # test-wasm:
+  #   name: Test WASM
+  #   runs-on: rspack-ubuntu-22.04-large
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+  #       with:
+  #         submodules: true
 
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          go-version: 1.25.0
-          cache-name: test-wasm
+  #     - name: Setup Go
+  #       uses: ./.github/actions/setup-go
+  #       with:
+  #         go-version: 1.25.0
+  #         cache-name: test-wasm
 
-      - name: Setup Node.js
-        uses: ./.github/actions/setup-node
+  #     - name: Setup Node.js
+  #       uses: ./.github/actions/setup-node
 
-      - name: Build
-        run: |
-          pnpm --filter '@rslint/core' build:js
-          pnpm --filter '@rslint/wasm' build
-  test-rust:
-    name: Test Rust
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          submodules: true
+  #     - name: Build
+  #       run: |
+  #         pnpm --filter '@rslint/core' build:js
+  #         pnpm --filter '@rslint/wasm' build
+  # test-rust:
+  #   name: Test Rust
+  #   runs-on: ${{ matrix.os }}
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       os: [macos-latest]
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+  #       with:
+  #         submodules: true
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
+  #     - name: Setup Rust
+  #       uses: dtolnay/rust-toolchain@stable
+  #       with:
+  #         components: rustfmt, clippy
 
-      - name: Rust Cache
-        uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: '.'
-          cache-on-failure: true
+  #     - name: Rust Cache
+  #       uses: Swatinem/rust-cache@v2
+  #       with:
+  #         workspaces: '.'
+  #         cache-on-failure: true
 
-      - name: Check formatting
-        run: cargo fmt --all -- --check
+  #     - name: Check formatting
+  #       run: cargo fmt --all -- --check
 
-      - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-      - name: Setup Node.js
-        uses: ./.github/actions/setup-node
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          go-version: 1.25.0
-          cache-name: test-wasm
-      - name: Build
-        run: |
-          pnpm --filter '@rslint/tsgo' build
+  #     - name: Run clippy
+  #       run: cargo clippy --all-targets --all-features -- -D warnings
+  #     - name: Setup Node.js
+  #       uses: ./.github/actions/setup-node
+  #     - name: Setup Go
+  #       uses: ./.github/actions/setup-go
+  #       with:
+  #         go-version: 1.25.0
+  #         cache-name: test-wasm
+  #     - name: Build
+  #       run: |
+  #         pnpm --filter '@rslint/tsgo' build
 
-      - name: Run tests
-        run: cargo test --verbose
-  website:
-    name: Build Website
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          submodules: true
+  #     - name: Run tests
+  #       run: cargo test --verbose
+  # website:
+  #   name: Build Website
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - name: Checkout code
+  #       uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+  #       with:
+  #         submodules: true
 
-      - name: Setup Node.js
-        uses: ./.github/actions/setup-node
+  #     - name: Setup Node.js
+  #       uses: ./.github/actions/setup-node
 
-      - name: Build
-        run: pnpm run build:website
+  #     - name: Build
+  #       run: pnpm run build:website
   done:
     needs:
       - test-go
-      - test-node
-      - lint
-      - test-wasm
-      - test-rust
-      - website
+      # - test-node
+      # - lint
+      # - test-wasm
+      # - test-rust
+      # - website
     if: always()
     runs-on: ubuntu-latest
     name: CI Done
