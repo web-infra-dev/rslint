@@ -532,6 +532,39 @@ const IndexFlagsNoReducibleCheck = checker.IndexFlagsNoReducibleCheck
 const IndexFlagsNone = checker.IndexFlagsNone
 const IndexFlagsStringsOnly = checker.IndexFlagsStringsOnly
 type IndexInfo = checker.IndexInfo
+
+// extra_IndexInfo provides access to IndexInfo's private fields
+type extra_IndexInfo struct {
+	keyType     *checker.Type
+	valueType   *checker.Type
+	isReadonly  bool
+	declaration *ast.Node
+	components  []*ast.Node
+}
+
+// IndexInfo_keyType returns the key type of the index signature
+func IndexInfo_keyType(v *checker.IndexInfo) *checker.Type {
+	return ((*extra_IndexInfo)(unsafe.Pointer(v))).keyType
+}
+
+// IndexInfo_valueType returns the value type of the index signature
+func IndexInfo_valueType(v *checker.IndexInfo) *checker.Type {
+	return ((*extra_IndexInfo)(unsafe.Pointer(v))).valueType
+}
+
+// IndexInfo_isReadonly returns whether the index signature is readonly
+func IndexInfo_isReadonly(v *checker.IndexInfo) bool {
+	return ((*extra_IndexInfo)(unsafe.Pointer(v))).isReadonly
+}
+
+// IndexInfo_declaration returns the declaration node of the index signature
+func IndexInfo_declaration(v *checker.IndexInfo) *ast.Node {
+	return ((*extra_IndexInfo)(unsafe.Pointer(v))).declaration
+}
+
+//go:linkname Checker_getIndexInfosOfType github.com/microsoft/typescript-go/internal/checker.(*Checker).getIndexInfosOfType
+func Checker_getIndexInfosOfType(recv *checker.Checker, t *checker.Type) []*checker.IndexInfo
+
 type IndexSymbolLinks = checker.IndexSymbolLinks
 type IndexType = checker.IndexType
 type IndexedAccessType = checker.IndexedAccessType
@@ -655,6 +688,26 @@ var LanguageFeatureMinimumTarget = checker.LanguageFeatureMinimumTarget
 type LanguageFeatureMinimumTargetMap = checker.LanguageFeatureMinimumTargetMap
 type LateBoundLinks = checker.LateBoundLinks
 type LiteralType = checker.LiteralType
+
+// extra_LiteralType mirrors the private fields of checker.LiteralType
+// LiteralType embeds TypeBase which embeds Type, then has value, freshType, regularType
+type extra_LiteralType struct {
+	_typeBase   [unsafe.Sizeof(checker.TypeBase{})]byte // TypeBase placeholder
+	value       any
+	freshType   *checker.Type
+	regularType *checker.Type
+}
+
+func LiteralType_value(v *checker.LiteralType) any {
+	return ((*extra_LiteralType)(unsafe.Pointer(v))).value
+}
+func LiteralType_freshType(v *checker.LiteralType) *checker.Type {
+	return ((*extra_LiteralType)(unsafe.Pointer(v))).freshType
+}
+func LiteralType_regularType(v *checker.LiteralType) *checker.Type {
+	return ((*extra_LiteralType)(unsafe.Pointer(v))).regularType
+}
+
 const MAX_REVERSE_MAPPED_NESTING_INSPECTION_DEPTH = checker.MAX_REVERSE_MAPPED_NESTING_INSPECTION_DEPTH
 type MappedSymbolLinks = checker.MappedSymbolLinks
 type MappedType = checker.MappedType
@@ -837,6 +890,15 @@ func Signature_parameters(v *checker.Signature) []*ast.Symbol {
 }
 func Signature_declaration(v *checker.Signature) *ast.Node {
   return ((*extra_Signature)(unsafe.Pointer(v))).declaration
+}
+func Signature_flags(v *checker.Signature) checker.SignatureFlags {
+  return ((*extra_Signature)(unsafe.Pointer(v))).flags
+}
+func Signature_typeParameters(v *checker.Signature) []*checker.Type {
+  return ((*extra_Signature)(unsafe.Pointer(v))).typeParameters
+}
+func Signature_thisParameter(v *checker.Signature) *ast.Symbol {
+  return ((*extra_Signature)(unsafe.Pointer(v))).thisParameter
 }
 type SignatureCheckMode = checker.SignatureCheckMode
 const SignatureCheckModeBivariantCallback = checker.SignatureCheckModeBivariantCallback
@@ -1140,6 +1202,25 @@ const TypePredicateKindAssertsIdentifier = checker.TypePredicateKindAssertsIdent
 const TypePredicateKindAssertsThis = checker.TypePredicateKindAssertsThis
 const TypePredicateKindIdentifier = checker.TypePredicateKindIdentifier
 const TypePredicateKindThis = checker.TypePredicateKindThis
+
+// extra_TypePredicate mirrors the private fields of checker.TypePredicate
+type extra_TypePredicate struct {
+	kind           TypePredicateKind
+	parameterIndex int32
+	parameterName  string
+	t              *checker.Type
+}
+
+func TypePredicate_kind(v *checker.TypePredicate) TypePredicateKind {
+	return ((*extra_TypePredicate)(unsafe.Pointer(v))).kind
+}
+func TypePredicate_parameterIndex(v *checker.TypePredicate) int32 {
+	return ((*extra_TypePredicate)(unsafe.Pointer(v))).parameterIndex
+}
+func TypePredicate_parameterName(v *checker.TypePredicate) string {
+	return ((*extra_TypePredicate)(unsafe.Pointer(v))).parameterName
+}
+
 type TypeReference = checker.TypeReference
 type TypeResolution = checker.TypeResolution
 type TypeSystemEntity = checker.TypeSystemEntity

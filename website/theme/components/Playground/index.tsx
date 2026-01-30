@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as Rslint from '@rslint/wasm';
-import { Editor, EditorRef } from './Editor';
+import { EditorTabs, EditorTabsRef } from './EditorTabs';
 import { ResultPanel, Diagnostic } from './ResultPanel';
 import './index.css';
 import { RemoteSourceFile, type Node, SyntaxKind } from '@rslint/api';
+import { ResizableSplitPane, type GetAstInfoResponse } from './ast';
 
 const wasmURL = new URL('@rslint/wasm/rslint.wasm.gz', import.meta.url).href;
 let rslintService: Rslint.RSLintService | null = null;
@@ -18,7 +19,7 @@ async function ensureService() {
 }
 
 const Playground: React.FC = () => {
-  const editorRef = useRef<EditorRef | null>(null);
+  const editorRef = useRef<EditorTabsRef | null>(null);
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState<string | undefined>();
@@ -31,8 +32,10 @@ const Playground: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const lintTimer = useRef<number | null>(null);
   const [selectedAstRange, setSelectedAstRange] = useState<
-    { start: number; end: number } | undefined
+    { start: number; end: number; kind?: number } | undefined
   >();
+  const [astInfo, setAstInfo] = useState<GetAstInfoResponse | null>(null);
+  const [astInfoLoading, setAstInfoLoading] = useState(false);
 
   async function runLint() {
     try {
@@ -40,16 +43,40 @@ const Playground: React.FC = () => {
       if (!initialized) setLoading(true);
       const service = await ensureService();
       const code = editorRef.current?.getValue() ?? '';
+      const rslintConfig = editorRef.current?.getRslintConfig();
+      const tsConfig = editorRef.current?.getTsConfig();
+
+      // Build fileContents with code and config files
+      const fileContents: Record<string, string> = {
+        '/index.ts': code,
+      };
+
+      // Add rslint.json if we have a valid config
+      if (rslintConfig) {
+        fileContents['/rslint.json'] = JSON.stringify(rslintConfig);
+      }
+
+      // Add tsconfig.json if we have a valid config
+      if (tsConfig) {
+        fileContents['/tsconfig.json'] = JSON.stringify(tsConfig);
+      }
+
+      // Extract rules from rslint config for ruleOptions
+      let ruleOptions: Record<string, string> | undefined;
+      if (rslintConfig && Array.isArray(rslintConfig)) {
+        ruleOptions = {};
+        for (const configItem of rslintConfig) {
+          if (configItem && typeof configItem.rules === 'object') {
+            Object.assign(ruleOptions, configItem.rules);
+          }
+        }
+      }
 
       const result = await service.lint({
         includeEncodedSourceFiles: true,
-        fileContents: {
-          '/index.ts': code,
-        },
+        fileContents,
         config: 'rslint.json',
-        ruleOptions: {
-          '@typescript-eslint/no-unsafe-member-access': 'error',
-        },
+        ruleOptions,
       });
       setInitialized(true);
 
@@ -72,6 +99,7 @@ const Playground: React.FC = () => {
       editorRef.current?.attachDiag(result.diagnostics);
       interface ASTNode {
         type: string;
+        kind?: number; // tsgo node kind (not present for TypeScript AST)
         start: number;
         end: number;
         name?: string;
@@ -94,6 +122,7 @@ const Playground: React.FC = () => {
         function RemoteNodeToEstree(node: Node): ASTNode {
           const current: ASTNode = {
             type: SyntaxKind[node.kind],
+            kind: node.kind,
             start: node.pos,
             end: node.end,
             text: (node as any).text,
@@ -129,7 +158,7 @@ const Playground: React.FC = () => {
     }
   }
 
-  // Debounce linting to reduce recomputation while typing
+  // Debounce linting to reduce recomputation while typing (1 second delay)
   function scheduleRunLint() {
     if (lintTimer.current) {
       window.clearTimeout(lintTimer.current);
@@ -137,7 +166,7 @@ const Playground: React.FC = () => {
     }
     lintTimer.current = window.setTimeout(() => {
       runLint();
-    }, 250);
+    }, 1000);
   }
 
   // Cleanup any pending timers on unmount
@@ -150,6 +179,77 @@ const Playground: React.FC = () => {
     };
   }, []);
   // Initial lint is triggered by Editor's initial onChange
+
+  // Get AST info at a specific position - updates global state for main panel
+  const handleRequestAstInfo = useCallback(
+    async (
+      position: number,
+      end?: number,
+      kind?: number,
+      fileName?: string,
+    ): Promise<GetAstInfoResponse | null> => {
+      if (!initialized) return null;
+
+      try {
+        setAstInfoLoading(true);
+        const service = await ensureService();
+        const code = editorRef.current?.getValue() ?? '';
+        const tsConfig = editorRef.current?.getTsConfig();
+
+        const result = await service.getAstInfo({
+          fileContent: code,
+          position,
+          end,
+          kind,
+          fileName,
+          compilerOptions: tsConfig?.compilerOptions,
+        });
+
+        setAstInfo(result);
+        return result;
+      } catch (err) {
+        console.warn('Failed to get AST info:', err);
+        setAstInfo(null);
+        return null;
+      } finally {
+        setAstInfoLoading(false);
+      }
+    },
+    [initialized],
+  );
+
+  // Fetch AST info for lazy loading - does NOT update global state
+  const fetchAstInfoForLazy = useCallback(
+    async (
+      position: number,
+      end?: number,
+      kind?: number,
+      fileName?: string,
+    ): Promise<GetAstInfoResponse | null> => {
+      if (!initialized) return null;
+
+      try {
+        const service = await ensureService();
+        const code = editorRef.current?.getValue() ?? '';
+        const tsConfig = editorRef.current?.getTsConfig();
+
+        const result = await service.getAstInfo({
+          fileContent: code,
+          position,
+          end,
+          kind,
+          fileName,
+          compilerOptions: tsConfig?.compilerOptions,
+        });
+
+        return result;
+      } catch (err) {
+        console.warn('Failed to get AST info for lazy load:', err);
+        return null;
+      }
+    },
+    [initialized],
+  );
 
   async function buildTypeScriptAst(text: string) {
     const ts = tsModuleRef.current!;
@@ -194,42 +294,75 @@ const Playground: React.FC = () => {
 
   return (
     <div className="playground-container">
-      <div className="editor-panel">
-        <Editor
-          ref={editorRef}
-          onChange={() => scheduleRunLint()}
-          onSelectionChange={(start, end) =>
-            setSelectedAstRange({ start, end })
-          }
-        />
-      </div>
-      <ResultPanel
-        initialized={initialized}
-        diagnostics={diagnostics}
-        ast={ast}
-        astTree={astTree}
-        tsAstTree={tsAstTree}
-        error={error}
-        loading={loading}
-        onAstNodeSelect={(start, end) =>
-          editorRef.current?.revealRangeByOffset(start, end)
+      <ResizableSplitPane
+        storageKey="playground-editor-result-width"
+        defaultLeftWidth={60}
+        minLeftWidth={30}
+        minRightWidth={20}
+        left={
+          <div className="editor-panel">
+            <EditorTabs
+              ref={editorRef}
+              onChange={() => scheduleRunLint()}
+              onSelectionChange={(start: number, end: number) =>
+                setSelectedAstRange(prev => {
+                  // Preserve kind if position is the same (e.g., from revealRangeByOffset)
+                  if (prev && prev.start === start && prev.end === end) {
+                    return prev;
+                  }
+                  return { start, end };
+                })
+              }
+              onConfigChange={() => scheduleRunLint()}
+            />
+          </div>
         }
-        selectedAstNodeRange={selectedAstRange}
-        onRequestTsAst={async () => {
-          tsAstActiveRef.current = true;
-          if (!tsModuleRef.current) {
-            try {
-              const mod = await import('typescript');
-              tsModuleRef.current = mod as any;
-            } catch (e) {
-              console.warn('Failed to load TypeScript module:', e);
-              return;
+        right={
+          <ResultPanel
+            initialized={initialized}
+            diagnostics={diagnostics}
+            ast={ast}
+            astTree={astTree}
+            tsAstTree={tsAstTree}
+            error={error}
+            loading={loading}
+            onAstNodeSelect={(start, end, kind) => {
+              // Set state first, then reveal range (which may trigger selection change events)
+              setSelectedAstRange({ start, end, kind });
+              editorRef.current?.revealRangeByOffset(start, end);
+            }}
+            onUpdateSelectedRange={(start, end, kind) => {
+              // Only update state, don't move editor cursor
+              setSelectedAstRange({ start, end, kind });
+            }}
+            selectedAstNodeRange={selectedAstRange}
+            onRequestTsAst={async () => {
+              tsAstActiveRef.current = true;
+              if (!tsModuleRef.current) {
+                try {
+                  const mod = await import('typescript');
+                  tsModuleRef.current = mod as any;
+                } catch (e) {
+                  console.warn('Failed to load TypeScript module:', e);
+                  return;
+                }
+              }
+              await buildTypeScriptAst(
+                lastSourceTextRef.current ||
+                  editorRef.current?.getValue() ||
+                  '',
+              );
+            }}
+            astInfo={astInfo}
+            astInfoLoading={astInfoLoading}
+            onRequestAstInfo={handleRequestAstInfo}
+            onFetchAstInfoForLazy={fetchAstInfoForLazy}
+            onHighlightRange={(pos, end) =>
+              editorRef.current?.highlightRange(pos, end)
             }
-          }
-          await buildTypeScriptAst(
-            lastSourceTextRef.current || editorRef.current?.getValue() || '',
-          );
-        }}
+            onClearHighlight={() => editorRef.current?.clearHighlight()}
+          />
+        }
       />
     </div>
   );

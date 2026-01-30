@@ -5,6 +5,8 @@ import {
   RSLintService,
   ApplyFixesRequest,
   ApplyFixesResponse,
+  GetAstInfoRequest,
+  GetAstInfoResponse,
 } from './service.js';
 
 // Export the main RSLintService class for direct usage
@@ -35,6 +37,16 @@ export async function applyFixes(
   return result;
 }
 
+// Convenience function for getting AST info
+export async function getAstInfo(
+  options: GetAstInfoRequest,
+): Promise<GetAstInfoResponse> {
+  const service = new RSLintService(new NodeRslintService());
+  const result = await service.getAstInfo(options);
+  await service.close();
+  return result;
+}
+
 // Export all types
 export {
   type Diagnostic,
@@ -46,4 +58,16 @@ export {
   type ParserOptions,
   type RSlintOptions,
   type RslintServiceInterface,
+  // AST Info types
+  type GetAstInfoRequest,
+  type GetAstInfoResponse,
+  type NodeInfo,
+  type TypeInfo,
+  type SymbolInfo,
+  type SignatureInfo,
+  type FlowInfo,
+  type ParameterInfo,
+  type TypeParamInfo,
+  type IndexInfo,
+  type TypePredicateInfo,
 } from './types.js';

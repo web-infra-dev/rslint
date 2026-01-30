@@ -4,6 +4,8 @@ import type {
   LintResponse,
   ApplyFixesRequest,
   ApplyFixesResponse,
+  GetAstInfoRequest,
+  GetAstInfoResponse,
 } from './types.js';
 
 /**
@@ -63,6 +65,36 @@ export class RSLintService {
   }
 
   /**
+   * Get detailed AST information at a specific position
+   * Returns Node, Type, Symbol, Signature, and Flow information
+   */
+  async getAstInfo(options: GetAstInfoRequest): Promise<GetAstInfoResponse> {
+    const {
+      fileContent,
+      position,
+      end,
+      kind,
+      depth = 2,
+      fileName,
+      compilerOptions,
+    } = options;
+
+    // Send handshake
+    await this.service.sendMessage('handshake', { version: '1.0.0' });
+
+    // Send getAstInfo request
+    return this.service.sendMessage('getAstInfo', {
+      fileContent,
+      position,
+      end,
+      kind,
+      depth,
+      fileName,
+      compilerOptions,
+    });
+  }
+
+  /**
    * Close the service
    */
   async close(): Promise<void> {
@@ -86,4 +118,16 @@ export type {
   ParserOptions,
   RSlintOptions,
   RslintServiceInterface,
+  // AST Info types
+  GetAstInfoRequest,
+  GetAstInfoResponse,
+  NodeInfo,
+  TypeInfo,
+  SymbolInfo,
+  SignatureInfo,
+  FlowInfo,
+  ParameterInfo,
+  TypeParamInfo,
+  IndexInfo,
+  TypePredicateInfo,
 } from './types.js';
