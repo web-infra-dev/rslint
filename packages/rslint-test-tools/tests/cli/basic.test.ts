@@ -458,7 +458,7 @@ describe('CLI Configuration Tests', () => {
         include: ['**/*.ts'],
       }),
       'test.ts': `
-        const a: string = "hello";
+        const a = "hello";
         console.log(a.length); // This is safe
       `,
     });
