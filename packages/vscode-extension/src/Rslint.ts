@@ -12,6 +12,7 @@ import {
   LanguageClientOptions,
   ServerOptions,
   State,
+  StateChangeEvent,
   Trace,
 } from 'vscode-languageclient/node';
 import { Logger } from './logger';
@@ -138,7 +139,9 @@ export class Rslint implements Disposable {
     return this.client;
   }
 
-  public onDidChangeState(listener: (event: any) => void): Disposable {
+  public onDidChangeState(
+    listener: (event: StateChangeEvent) => void,
+  ): Disposable {
     if (!this.client) {
       throw new Error('Client is not initialized');
     }
@@ -223,8 +226,10 @@ export class Rslint implements Disposable {
 
       try {
         this.logger.debug('Looking for Rslint binary in PnP mode');
-        // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports
-        const yarnPnpApi = require(yarnPnpFile.fsPath);
+        // eslint-disable-next-line @typescript-eslint/no-var-requires, @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-type-assertion
+        const yarnPnpApi = require(yarnPnpFile.fsPath) as {
+          resolveRequest(request: string, issuer: string): string | null;
+        };
 
         const rslintCorePackage = yarnPnpApi.resolveRequest(
           '@rslint/core/package.json',
@@ -235,12 +240,14 @@ export class Rslint implements Disposable {
           continue;
         }
 
-        const rslintPlatformPkg = Uri.file(
-          yarnPnpApi.resolveRequest(
-            PLATFORM_BIN_REQUEST,
-            rslintCorePackage,
-          ) as string,
+        const platformPath = yarnPnpApi.resolveRequest(
+          PLATFORM_BIN_REQUEST,
+          rslintCorePackage,
         );
+        if (!platformPath) {
+          continue;
+        }
+        const rslintPlatformPkg = Uri.file(platformPath);
 
         if (await fileExists(rslintPlatformPkg)) {
           this.logger.debug(
