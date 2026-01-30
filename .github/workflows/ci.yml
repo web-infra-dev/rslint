@@ -55,7 +55,32 @@ jobs:
           cache-name: test-go
       - name: Unit Test (Windows)
         if: runner.os == 'Windows'
-        run: go test -parallel 4 -p 1 ./internal/...
+        shell: pwsh
+        run: |
+          $packages = go list ./internal/... | Where-Object { $_ -ne "" }
+          $batchSize = 15
+          $batch = @()
+
+          foreach ($pkg in $packages) {
+            $batch += $pkg
+
+            if ($batch.Count -ge $batchSize) {
+              Write-Host "Running batch of $($batch.Count) packages..."
+              go test -parallel 4 $batch
+              if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+              # Clean build cache after each batch to free disk space
+              go clean -cache
+              $batch = @()
+            }
+          }
+
+          # Run remaining packages
+          if ($batch.Count -gt 0) {
+            Write-Host "Running final batch of $($batch.Count) packages..."
+            go test -parallel 4 $batch
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
 
       - name: Unit Test
         if: runner.os != 'Windows'
