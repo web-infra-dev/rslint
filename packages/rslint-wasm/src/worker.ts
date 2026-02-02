@@ -174,6 +174,8 @@ async function handleRequest(event: MessageEvent): Promise<void> {
       '/tsconfig.json': JSON.stringify(tsconfig),
       '/index.ts': 'let a:any; a.b = 10',
     });
+    // Store inner_fs globally so we can write to it dynamically
+    (globalThis as any).__rslint_inner_fs = inner_fs;
     let fs = globalThis.fs;
     let process = globalThis.process;
     process.cwd = () => {
@@ -286,6 +288,23 @@ async function handleRequest(event: MessageEvent): Promise<void> {
       return;
     } else {
       await ensureServiceIsRunning();
+
+      // Write any fileContents to the virtual filesystem before processing
+      if (data && data.fileContents && typeof data.fileContents === 'object') {
+        const inner_fs = (globalThis as any).__rslint_inner_fs;
+        if (inner_fs) {
+          for (const [path, content] of Object.entries(data.fileContents)) {
+            if (typeof content === 'string') {
+              try {
+                inner_fs.writeFileSync(path, content);
+              } catch (e) {
+                console.warn(`Failed to write ${path} to VFS:`, e);
+              }
+            }
+          }
+        }
+      }
+
       sendMessage(kind, data);
     }
   } catch (error) {

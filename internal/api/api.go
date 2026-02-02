@@ -13,7 +13,31 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/api/encoder"
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/web-infra-dev/rslint/internal/inspector"
 )
+
+// Re-export types from inspector package for backward compatibility
+type (
+	GetAstInfoRequest  = inspector.GetAstInfoRequest
+	GetAstInfoResponse = inspector.GetAstInfoResponse
+	NodeInfo           = inspector.NodeInfo
+	NodeListMeta       = inspector.NodeListMeta
+	TypeInfo           = inspector.TypeInfo
+	IndexInfoType      = inspector.IndexInfoType
+	SymbolInfo         = inspector.SymbolInfo
+	SignatureInfo      = inspector.SignatureInfo
+	TypePredicateInfo  = inspector.TypePredicateInfo
+	FlowInfo           = inspector.FlowInfo
+)
+
+// AstInfoBuilder wraps inspector.Builder for backward compatibility
+type AstInfoBuilder = inspector.Builder
+
+// NewAstInfoBuilder creates a new AST info builder (backward compatible)
+func NewAstInfoBuilder(c *checker.Checker, sf *ast.SourceFile) *AstInfoBuilder {
+	return inspector.NewBuilder(c, sf)
+}
 
 // Protocol implements a binary message protocol similar to esbuild:
 // - First 4 bytes: message length (uint32 in little endian)
@@ -27,6 +51,8 @@ const (
 	KindLint MessageKind = "lint"
 	// KindApplyFixes is sent from JS to Go to request applying fixes
 	KindApplyFixes MessageKind = "applyFixes"
+	// KindGetAstInfo is sent from JS to Go to request AST info at a position
+	KindGetAstInfo MessageKind = "getAstInfo"
 	// KindResponse is sent from Go to JS with the lint results
 	KindResponse MessageKind = "response"
 	// KindError is sent when an error occurs
@@ -166,6 +192,7 @@ type Fix struct {
 type Handler interface {
 	HandleLint(req LintRequest) (*LintResponse, error)
 	HandleApplyFixes(req ApplyFixesRequest) (*ApplyFixesResponse, error)
+	HandleGetAstInfo(req GetAstInfoRequest) (*GetAstInfoResponse, error)
 }
 
 // Service manages the IPC communication
@@ -250,6 +277,8 @@ func (s *Service) Start() error {
 			s.handleLint(msg)
 		case KindApplyFixes:
 			s.handleApplyFixes(msg)
+		case KindGetAstInfo:
+			s.handleGetAstInfo(msg)
 		case KindExit:
 			s.handleExit(msg)
 			return nil
@@ -322,6 +351,29 @@ func (s *Service) handleApplyFixes(msg *Message) {
 	}
 
 	resp, err := s.handler.HandleApplyFixes(req)
+	if err != nil {
+		s.sendError(msg.ID, err.Error())
+		return
+	}
+
+	s.sendResponse(msg.ID, resp)
+}
+
+// handleGetAstInfo handles get AST info messages
+func (s *Service) handleGetAstInfo(msg *Message) {
+	var req GetAstInfoRequest
+	data, err := json.Marshal(msg.Data)
+	if err != nil {
+		s.sendError(msg.ID, fmt.Sprintf("failed to marshal data: %v", err))
+		return
+	}
+
+	if err := json.Unmarshal(data, &req); err != nil {
+		s.sendError(msg.ID, fmt.Sprintf("failed to parse get ast info request: %v", err))
+		return
+	}
+
+	resp, err := s.handler.HandleGetAstInfo(req)
 	if err != nil {
 		s.sendError(msg.ID, err.Error())
 		return
