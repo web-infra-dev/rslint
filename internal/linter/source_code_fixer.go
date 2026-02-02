@@ -45,15 +45,34 @@ func ApplyRuleFixes[M LintMessage](code string, diagnostics []M) (string, []M, b
 	var builder strings.Builder
 
 	lastFixEnd := 0
+	lastWasInsertion := false
 	for _, diagnostic := range withFixes {
 		fixes := diagnostic.Fixes()
-		if lastFixEnd > fixes[0].Range.Pos() {
+		firstFix := fixes[0]
+
+		isCurrentFixInsertion := firstFix.Range.Pos() == firstFix.Range.End()
+
+		// Check for overlapping fixes (e.g., [0,5] and [2,7])
+		isOverlapping := lastFixEnd > firstFix.Range.Pos()
+
+		// Check for adjacent conflicts. This happens when a fix starts exactly where the last one ended,
+		// and at least one of them is an insertion. Adjacent replacements are allowed.
+		//   - Insertion followed by insertion at same pos: duplicate
+		//   - Insertion followed by replacement at same pos: conflict (replacement starts where insertion happened)
+		//   - Replacement followed by insertion at same pos: conflict (ambiguous position after replacement)
+		//   - Replacement followed by replacement at same pos: OK (adjacent, non-overlapping)
+		isAdjacentConflict := fixed &&
+			lastFixEnd == firstFix.Range.Pos() &&
+			(isCurrentFixInsertion || lastWasInsertion)
+
+		if isOverlapping || isAdjacentConflict {
 			unapplied = append(unapplied, diagnostic)
 			continue
 		}
 
 		for _, fix := range fixes {
 			fixed = true
+			lastWasInsertion = fix.Range.Pos() == fix.Range.End()
 
 			builder.WriteString(code[lastFixEnd:fix.Range.Pos()])
 			builder.WriteString(fix.Text)
