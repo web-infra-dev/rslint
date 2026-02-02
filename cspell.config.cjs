@@ -17,6 +17,7 @@ module.exports = {
     'packages/rslint/pkg/mod',
     'cmd/tsgo',
     './agents',
+    'internal/linter/*_test.go',
   ],
   dictionaries: ['dictionary'],
   dictionaryDefinitions: [
