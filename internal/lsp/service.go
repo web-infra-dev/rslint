@@ -74,6 +74,7 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 }
 func (s *Server) handleInitialized(ctx context.Context, params *lsproto.InitializedParams) error {
 	s.session = project.NewSession(&project.SessionInit{
+		BackgroundCtx: s.backgroundCtx,
 		Options: &project.SessionOptions{
 			CurrentDirectory:   s.cwd,
 			DefaultLibraryPath: s.defaultLibraryPath,

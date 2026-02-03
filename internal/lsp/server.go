@@ -139,6 +139,7 @@ type Server struct {
 	defaultLibraryPath string
 	typingsLocation    string
 
+	backgroundCtx    context.Context
 	initializeParams *lsproto.InitializeParams
 	positionEncoding lsproto.PositionEncodingKind
 	locale           language.Tag
@@ -201,9 +202,11 @@ func (s *Server) WatchFiles(ctx context.Context, id project.WatcherID, watchers 
 			{
 				Id:     string(id),
 				Method: string(lsproto.MethodWorkspaceDidChangeWatchedFiles),
-				RegisterOptions: ptrTo(any(lsproto.DidChangeWatchedFilesRegistrationOptions{
-					Watchers: watchers,
-				})),
+				RegisterOptions: &lsproto.RegisterOptions{
+					DidChangeWatchedFiles: &lsproto.DidChangeWatchedFilesRegistrationOptions{
+						Watchers: watchers,
+					},
+				},
 			},
 		},
 	})
@@ -253,11 +256,30 @@ func (s *Server) RefreshDiagnostics(ctx context.Context) error {
 	return nil
 }
 
+// PublishDiagnostics implements project.Client.
+func (s *Server) PublishDiagnostics(ctx context.Context, params *lsproto.PublishDiagnosticsParams) error {
+	s.outgoingQueue <- lsproto.TextDocumentPublishDiagnosticsInfo.NewNotificationMessage(params).Message()
+	return nil
+}
+
+// RefreshInlayHints implements project.Client.
+func (s *Server) RefreshInlayHints(ctx context.Context) error {
+	// TODO: implement inlay hints refresh
+	return nil
+}
+
+// RefreshCodeLens implements project.Client.
+func (s *Server) RefreshCodeLens(ctx context.Context) error {
+	// TODO: implement code lens refresh
+	return nil
+}
+
 func (s *Server) Run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	g, ctx := errgroup.WithContext(ctx)
+	s.backgroundCtx = ctx
 	g.Go(func() error { return s.dispatchLoop(ctx) })
 	g.Go(func() error { return s.writeLoop(ctx) })
 
@@ -453,8 +475,8 @@ func (s *Server) sendResult(id *lsproto.ID, result any) {
 
 func (s *Server) sendError(id *lsproto.ID, err error) {
 	code := lsproto.ErrInternalError.Code
-	if errCode := (*lsproto.ErrorCode)(nil); errors.As(err, &errCode) {
-		code = errCode.Code
+	if lspErr := (*lsproto.LSPError)(nil); errors.As(err, &lspErr) {
+		code = lspErr.Code
 	}
 	// TODO(jakebailey): error data
 	s.sendResponse(&lsproto.ResponseMessage{

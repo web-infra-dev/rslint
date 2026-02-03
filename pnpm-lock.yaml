@@ -270,12 +270,12 @@ importers:
         specifier: workspace:*
         version: link:../ast
       '@typescript/libsyncrpc':
-        specifier: github:microsoft/libsyncrpc#95d8cfcdd52a33169677fbc3b338a745accd7fdb
-        version: https://codeload.github.com/microsoft/libsyncrpc/tar.gz/95d8cfcdd52a33169677fbc3b338a745accd7fdb
+        specifier: github:microsoft/libsyncrpc#00f42f7e419186ae06c768cb75fff973d95bcaa6
+        version: https://codeload.github.com/microsoft/libsyncrpc/tar.gz/00f42f7e419186ae06c768cb75fff973d95bcaa6
     devDependencies:
       tinybench:
-        specifier: ^3.1.1
-        version: 3.1.1
+        specifier: ^6.0.0
+        version: 6.0.0
 
   typescript-go/_packages/ast: {}
 
@@ -2094,8 +2094,8 @@ packages:
     resolution: {integrity: sha512-BmxxndzEWhE4TIEEMBs8lP3MBWN3jFPs/p6gPm/wkv02o41hI6cq9AuSmGAaTTHPtA1FTi2jBre4A9rm5ZmX+Q==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@typescript/libsyncrpc@https://codeload.github.com/microsoft/libsyncrpc/tar.gz/95d8cfcdd52a33169677fbc3b338a745accd7fdb':
-    resolution: {tarball: https://codeload.github.com/microsoft/libsyncrpc/tar.gz/95d8cfcdd52a33169677fbc3b338a745accd7fdb}
+  '@typescript/libsyncrpc@https://codeload.github.com/microsoft/libsyncrpc/tar.gz/00f42f7e419186ae06c768cb75fff973d95bcaa6':
+    resolution: {tarball: https://codeload.github.com/microsoft/libsyncrpc/tar.gz/00f42f7e419186ae06c768cb75fff973d95bcaa6}
     version: 0.0.0
     engines: {node: '>= 10.16.0 < 11 || >= 11.8.0 < 12 || >= 12.0.0'}
 
@@ -4747,9 +4747,9 @@ packages:
     peerDependencies:
       tslib: ^2
 
-  tinybench@3.1.1:
-    resolution: {integrity: sha512-74pmf47HY/bHqamcCMGris+1AtGGsqTZ3Hc/UK4QvSmRuf/9PIF9753+c8XBh7JfX2r9KeZtVjOYjd6vFpc0qQ==}
-    engines: {node: '>=18.0.0'}
+  tinybench@6.0.0:
+    resolution: {integrity: sha512-BWlWpVbbZXaYjRV0twGLNQO00Zj4HA/sjLOQP2IvzQqGwRGp+2kh7UU3ijyJ3ywFRogYDRbiHDMrUOfaMnN56g==}
+    engines: {node: '>=20.0.0'}
 
   tinyglobby@0.2.15:
     resolution: {integrity: sha512-j2Zq4NyQYG5XMST4cbs02Ak8iJUdxRM0XI5QyxXuZOzKOINmWurp3smXu3y5wDcJrptwpSjgXHzIQxR0omXljQ==}
@@ -6789,7 +6789,7 @@ snapshots:
       '@typescript-eslint/types': 8.48.1
       eslint-visitor-keys: 4.2.1
 
-  '@typescript/libsyncrpc@https://codeload.github.com/microsoft/libsyncrpc/tar.gz/95d8cfcdd52a33169677fbc3b338a745accd7fdb': {}
+  '@typescript/libsyncrpc@https://codeload.github.com/microsoft/libsyncrpc/tar.gz/00f42f7e419186ae06c768cb75fff973d95bcaa6': {}
 
   '@typescript/native-preview-darwin-arm64@7.0.0-dev.20250904.1':
     optional: true
@@ -9950,7 +9950,7 @@ snapshots:
     dependencies:
       tslib: 2.8.1
 
-  tinybench@3.1.1: {}
+  tinybench@6.0.0: {}
 
   tinyglobby@0.2.15:
     dependencies:

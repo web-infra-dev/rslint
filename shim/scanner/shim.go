@@ -33,8 +33,9 @@ func GetECMAEndLinePosition(sourceFile *ast.SourceFile, line int) int
 func GetECMALineAndCharacterOfPosition(sourceFile ast.SourceFileLike, pos int) (line int, character int)
 //go:linkname GetECMALineStarts github.com/microsoft/typescript-go/internal/scanner.GetECMALineStarts
 func GetECMALineStarts(sourceFile ast.SourceFileLike) []core.TextPos
-//go:linkname GetECMAPositionOfLineAndCharacter github.com/microsoft/typescript-go/internal/scanner.GetECMAPositionOfLineAndCharacter
-func GetECMAPositionOfLineAndCharacter(sourceFile *ast.SourceFile, line int, character int) int
+func GetECMAPositionOfLineAndCharacter(sourceFile ast.SourceFileLike, line int, character int) int {
+	return ComputePositionOfLineAndCharacter(GetECMALineStarts(sourceFile), line, character)
+}
 //go:linkname GetErrorRangeForNode github.com/microsoft/typescript-go/internal/scanner.GetErrorRangeForNode
 func GetErrorRangeForNode(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange
 //go:linkname GetIdentifierToken github.com/microsoft/typescript-go/internal/scanner.GetIdentifierToken
