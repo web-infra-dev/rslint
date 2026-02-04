@@ -153,7 +153,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/prefer-optional-chain/prefer-optional-chain.test.ts',
     // './tests/typescript-eslint/rules/prefer-promise-reject-errors.test.ts',
     // './tests/typescript-eslint/rules/prefer-readonly-parameter-types.test.ts',
-    // './tests/typescript-eslint/rules/prefer-readonly.test.ts',
+    './tests/typescript-eslint/rules/prefer-readonly.test.ts',
     // './tests/typescript-eslint/rules/prefer-reduce-type-parameter.test.ts',
     // './tests/typescript-eslint/rules/prefer-regexp-exec.test.ts',
     // './tests/typescript-eslint/rules/prefer-return-this-type.test.ts',
