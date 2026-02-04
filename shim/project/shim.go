@@ -5,7 +5,9 @@ package project
 
 import "io"
 import "github.com/microsoft/typescript-go/internal/core"
+import "github.com/microsoft/typescript-go/internal/ls/lsutil"
 import "github.com/microsoft/typescript-go/internal/project"
+import "github.com/microsoft/typescript-go/internal/ls/autoimport"
 import "github.com/microsoft/typescript-go/internal/project/logging"
 import "github.com/microsoft/typescript-go/internal/tspath"
 import _ "unsafe"
@@ -14,7 +16,6 @@ type APISnapshotRequest = project.APISnapshotRequest
 type ATAStateChange = project.ATAStateChange
 type CheckerPool = project.CheckerPool
 type Client = project.Client
-type Config = project.Config
 type ConfigFileRegistry = project.ConfigFileRegistry
 type CreateProgramResult = project.CreateProgramResult
 type ExtendedConfigCache = project.ExtendedConfigCache
@@ -43,10 +44,9 @@ func NewProject(configFileName string, kind project.Kind, currentDirectory strin
 //go:linkname NewSession github.com/microsoft/typescript-go/internal/project.NewSession
 func NewSession(init *project.SessionInit) *project.Session
 //go:linkname NewSnapshot github.com/microsoft/typescript-go/internal/project.NewSnapshot
-func NewSnapshot(id uint64, fs *project.SnapshotFS, sessionOptions *project.SessionOptions, parseCache *project.ParseCache, extendedConfigCache *project.ExtendedConfigCache, configFileRegistry *project.ConfigFileRegistry, compilerOptionsForInferredProjects *core.CompilerOptions, config project.Config, toPath func(fileName string) tspath.Path) *project.Snapshot
+func NewSnapshot(id uint64, fs *project.SnapshotFS, sessionOptions *project.SessionOptions, configFileRegistry *project.ConfigFileRegistry, compilerOptionsForInferredProjects *core.CompilerOptions, allUserPreferences *lsutil.UserConfig, autoImports *autoimport.Registry, autoImportsWatch *project.WatchedFiles[map[tspath.Path]string], toPath func(fileName string) tspath.Path) *project.Snapshot
 type Overlay = project.Overlay
 type ParseCache = project.ParseCache
-type ParseCacheOptions = project.ParseCacheOptions
 type PatternsAndIgnored = project.PatternsAndIgnored
 type PendingReload = project.PendingReload
 const PendingReloadFileNames = project.PendingReloadFileNames

@@ -173,7 +173,7 @@ const WatchFileKindPriorityPollingInterval = core.WatchFileKindPriorityPollingIn
 const WatchFileKindUseFsEvents = core.WatchFileKindUseFsEvents
 const WatchFileKindUseFsEventsOnParentDirectory = core.WatchFileKindUseFsEventsOnParentDirectory
 type WatchOptions = core.WatchOptions
-//go:linkname WithLocale github.com/microsoft/typescript-go/internal/core.WithLocale
+//go:linkname WithLocale github.com/microsoft/typescript-go/internal/locale.WithLocale
 func WithLocale(ctx context.Context, locale language.Tag) context.Context
 //go:linkname WithRequestID github.com/microsoft/typescript-go/internal/core.WithRequestID
 func WithRequestID(ctx context.Context, id string) context.Context

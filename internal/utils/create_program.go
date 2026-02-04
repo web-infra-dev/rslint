@@ -24,7 +24,7 @@ func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath stri
 		return nil, fmt.Errorf("couldn't read tsconfig at %v", resolvedConfigPath)
 	}
 
-	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(tsconfigPath, &core.CompilerOptions{}, host, nil)
+	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(tsconfigPath, &core.CompilerOptions{}, nil, host, nil)
 
 	opts := compiler.ProgramOptions{
 		Config:         configParseResult,
@@ -44,7 +44,7 @@ func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath stri
 		// convert diagnostics to a string for better error reporting
 		var diagnosticStrings []string
 		for _, diagnostic := range diagnostics {
-			diagnosticStrings = append(diagnosticStrings, diagnostic.Message(), diagnostic.File().Text())
+			diagnosticStrings = append(diagnosticStrings, diagnostic.String(), diagnostic.File().Text())
 		}
 		return nil, fmt.Errorf("found %v syntactic errors. %v", len(diagnostics), diagnosticStrings)
 	}

@@ -210,8 +210,10 @@ type FunctionLikeWithBodyBase = ast.FunctionLikeWithBodyBase
 type FunctionOrConstructorTypeNodeBase = ast.FunctionOrConstructorTypeNodeBase
 type FunctionTypeNode = ast.FunctionTypeNode
 type GetAccessorDeclaration = ast.GetAccessorDeclaration
-//go:linkname GetAssertedTypeNode github.com/microsoft/typescript-go/internal/ast.GetAssertedTypeNode
-func GetAssertedTypeNode(node *ast.Node) *ast.Node
+// GetAssertedTypeNode returns the type node from a type assertion expression (compatibility wrapper)
+func GetAssertedTypeNode(node *ast.Node) *ast.Node {
+	return node.Type()
+}
 //go:linkname GetAssignmentDeclarationKind github.com/microsoft/typescript-go/internal/ast.GetAssignmentDeclarationKind
 func GetAssignmentDeclarationKind(bin *ast.BinaryExpression) ast.JSDeclarationKind
 //go:linkname GetAssignmentTarget github.com/microsoft/typescript-go/internal/ast.GetAssignmentTarget
@@ -1179,7 +1181,6 @@ const JSDeclarationKindExportsProperty = ast.JSDeclarationKindExportsProperty
 const JSDeclarationKindModuleExports = ast.JSDeclarationKindModuleExports
 const JSDeclarationKindNone = ast.JSDeclarationKindNone
 const JSDeclarationKindProperty = ast.JSDeclarationKindProperty
-const JSDeclarationKindPrototypeProperty = ast.JSDeclarationKindPrototypeProperty
 const JSDeclarationKindThisProperty = ast.JSDeclarationKindThisProperty
 type JSDoc = ast.JSDoc
 type JSDocAllType = ast.JSDocAllType
@@ -1292,7 +1293,6 @@ const KindBlock = ast.KindBlock
 const KindBooleanKeyword = ast.KindBooleanKeyword
 const KindBreakKeyword = ast.KindBreakKeyword
 const KindBreakStatement = ast.KindBreakStatement
-const KindBundle = ast.KindBundle
 const KindCallExpression = ast.KindCallExpression
 const KindCallSignature = ast.KindCallSignature
 const KindCaretEqualsToken = ast.KindCaretEqualsToken

@@ -71,7 +71,7 @@ func getDiagnostics(diagnostics []*ast.Diagnostic, fileMap *map[string]int32) []
 	diags := []Diagnostics{}
 	for _, diag := range diagnostics {
 		diags = append(diags, Diagnostics{
-			Message:  diag.Message(),
+			Message:  diag.String(),
 			Category: int32(diag.Category()),
 			File:     (*fileMap)[diag.File().FileName()],
 			Loc: Location{

@@ -129,7 +129,6 @@ var CodeLensResolveInfo = lsproto.CodeLensResolveInfo
 type CodeLensResolveResponse = lsproto.CodeLensResolveResponse
 type CodeLensResponse = lsproto.CodeLensResponse
 type CodeLensWorkspaceClientCapabilities = lsproto.CodeLensWorkspaceClientCapabilities
-type CodeLenssOrNull = lsproto.CodeLenssOrNull
 type Color = lsproto.Color
 type ColorInformation = lsproto.ColorInformation
 type ColorPresentation = lsproto.ColorPresentation
@@ -300,30 +299,46 @@ type DocumentSymbolResponse = lsproto.DocumentSymbolResponse
 type DocumentUri = lsproto.DocumentUri
 type DocumentUriOrNull = lsproto.DocumentUriOrNull
 type EditRangeWithInsertReplace = lsproto.EditRangeWithInsertReplace
-var ErrContentModified = lsproto.ErrContentModified
-var ErrInternalError = lsproto.ErrInternalError
 var ErrInvalidContentLength = lsproto.ErrInvalidContentLength
 var ErrInvalidHeader = lsproto.ErrInvalidHeader
 var ErrInvalidJSONRPCVersion = lsproto.ErrInvalidJSONRPCVersion
-var ErrInvalidParams = lsproto.ErrInvalidParams
-var ErrInvalidRequest = lsproto.ErrInvalidRequest
-var ErrMethodNotFound = lsproto.ErrMethodNotFound
 var ErrNoContentLength = lsproto.ErrNoContentLength
-var ErrParseError = lsproto.ErrParseError
-var ErrRequestCancelled = lsproto.ErrRequestCancelled
-var ErrRequestFailed = lsproto.ErrRequestFailed
-var ErrServerCancelled = lsproto.ErrServerCancelled
-var ErrServerNotInitialized = lsproto.ErrServerNotInitialized
-var ErrUnknownErrorCode = lsproto.ErrUnknownErrorCode
 type ErrorCode = lsproto.ErrorCode
-type ErrorCodes = lsproto.ErrorCodes
-const ErrorCodesInternalError = lsproto.ErrorCodesInternalError
-const ErrorCodesInvalidParams = lsproto.ErrorCodesInvalidParams
-const ErrorCodesInvalidRequest = lsproto.ErrorCodesInvalidRequest
-const ErrorCodesMethodNotFound = lsproto.ErrorCodesMethodNotFound
-const ErrorCodesParseError = lsproto.ErrorCodesParseError
-const ErrorCodesServerNotInitialized = lsproto.ErrorCodesServerNotInitialized
-const ErrorCodesUnknownErrorCode = lsproto.ErrorCodesUnknownErrorCode
+
+// ErrorCodes is an alias for ErrorCode for backwards compatibility
+type ErrorCodes = lsproto.ErrorCode
+
+// Error code constants - renamed from ErrorCodes* to ErrorCode* in upstream
+const ErrorCodesInternalError = lsproto.ErrorCodeInternalError
+const ErrorCodesInvalidParams = lsproto.ErrorCodeInvalidParams
+const ErrorCodesInvalidRequest = lsproto.ErrorCodeInvalidRequest
+const ErrorCodesMethodNotFound = lsproto.ErrorCodeMethodNotFound
+const ErrorCodesParseError = lsproto.ErrorCodeParseError
+const ErrorCodesServerNotInitialized = lsproto.ErrorCodeServerNotInitialized
+const ErrorCodesUnknownErrorCode = lsproto.ErrorCodeUnknownErrorCode
+
+// LSPError is a custom error type for compatibility with the old API
+type LSPError struct {
+	Code    int32
+	Message string
+}
+
+func (e *LSPError) Error() string {
+	return e.Message
+}
+
+// Compatibility error variables
+var ErrContentModified = &LSPError{Code: int32(lsproto.ErrorCodeContentModified), Message: "content modified"}
+var ErrInternalError = &LSPError{Code: int32(lsproto.ErrorCodeInternalError), Message: "internal error"}
+var ErrInvalidParams = &LSPError{Code: int32(lsproto.ErrorCodeInvalidParams), Message: "invalid params"}
+var ErrInvalidRequest = &LSPError{Code: int32(lsproto.ErrorCodeInvalidRequest), Message: "invalid request"}
+var ErrMethodNotFound = &LSPError{Code: int32(lsproto.ErrorCodeMethodNotFound), Message: "method not found"}
+var ErrParseError = &LSPError{Code: int32(lsproto.ErrorCodeParseError), Message: "parse error"}
+var ErrRequestCancelled = &LSPError{Code: int32(lsproto.ErrorCodeRequestCancelled), Message: "request cancelled"}
+var ErrRequestFailed = &LSPError{Code: int32(lsproto.ErrorCodeRequestFailed), Message: "request failed"}
+var ErrServerCancelled = &LSPError{Code: int32(lsproto.ErrorCodeServerCancelled), Message: "server cancelled"}
+var ErrServerNotInitialized = &LSPError{Code: int32(lsproto.ErrorCodeServerNotInitialized), Message: "server not initialized"}
+var ErrUnknownErrorCode = &LSPError{Code: int32(lsproto.ErrorCodeUnknownErrorCode), Message: "unknown error code"}
 type ExecuteCommandClientCapabilities = lsproto.ExecuteCommandClientCapabilities
 type ExecuteCommandOptions = lsproto.ExecuteCommandOptions
 type ExecuteCommandParams = lsproto.ExecuteCommandParams
@@ -348,8 +363,8 @@ type FileOperationFilter = lsproto.FileOperationFilter
 type FileOperationOptions = lsproto.FileOperationOptions
 type FileOperationPattern = lsproto.FileOperationPattern
 type FileOperationPatternKind = lsproto.FileOperationPatternKind
-const FileOperationPatternKindfile = lsproto.FileOperationPatternKindfile
-const FileOperationPatternKindfolder = lsproto.FileOperationPatternKindfolder
+const FileOperationPatternKindfile = lsproto.FileOperationPatternKindFile
+const FileOperationPatternKindfolder = lsproto.FileOperationPatternKindFolder
 type FileOperationPatternOptions = lsproto.FileOperationPatternOptions
 type FileOperationRegistrationOptions = lsproto.FileOperationRegistrationOptions
 type FileRename = lsproto.FileRename
@@ -388,7 +403,6 @@ type ImplementationResponse = lsproto.ImplementationResponse
 type InitializeError = lsproto.InitializeError
 var InitializeInfo = lsproto.InitializeInfo
 type InitializeParams = lsproto.InitializeParams
-type InitializeParamsBase = lsproto.InitializeParamsBase
 type InitializeResponse = lsproto.InitializeResponse
 type InitializeResult = lsproto.InitializeResult
 var InitializedInfo = lsproto.InitializedInfo
@@ -438,17 +452,12 @@ type InsertTextFormat = lsproto.InsertTextFormat
 const InsertTextFormatPlainText = lsproto.InsertTextFormatPlainText
 const InsertTextFormatSnippet = lsproto.InsertTextFormatSnippet
 type InsertTextMode = lsproto.InsertTextMode
-const InsertTextModeadjustIndentation = lsproto.InsertTextModeadjustIndentation
-const InsertTextModeasIs = lsproto.InsertTextModeasIs
+const InsertTextModeadjustIndentation = lsproto.InsertTextModeAdjustIndentation
+const InsertTextModeasIs = lsproto.InsertTextModeAsIs
 type IntegerOrNull = lsproto.IntegerOrNull
 type IntegerOrString = lsproto.IntegerOrString
 type JSONRPCVersion = lsproto.JSONRPCVersion
 type LSPAnyOrNull = lsproto.LSPAnyOrNull
-type LSPErrorCodes = lsproto.LSPErrorCodes
-const LSPErrorCodesContentModified = lsproto.LSPErrorCodesContentModified
-const LSPErrorCodesRequestCancelled = lsproto.LSPErrorCodesRequestCancelled
-const LSPErrorCodesRequestFailed = lsproto.LSPErrorCodesRequestFailed
-const LSPErrorCodesServerCancelled = lsproto.LSPErrorCodesServerCancelled
 type LanguageKind = lsproto.LanguageKind
 const LanguageKindABAP = lsproto.LanguageKindABAP
 const LanguageKindBibTeX = lsproto.LanguageKindBibTeX
@@ -647,9 +656,9 @@ const MethodWorkspaceWorkspaceFolders = lsproto.MethodWorkspaceWorkspaceFolders
 type Moniker = lsproto.Moniker
 type MonikerClientCapabilities = lsproto.MonikerClientCapabilities
 type MonikerKind = lsproto.MonikerKind
-const MonikerKindexport = lsproto.MonikerKindexport
-const MonikerKindimport = lsproto.MonikerKindimport
-const MonikerKindlocal = lsproto.MonikerKindlocal
+const MonikerKindexport = lsproto.MonikerKindExport
+const MonikerKindimport = lsproto.MonikerKindImport
+const MonikerKindlocal = lsproto.MonikerKindLocal
 type MonikerOptions = lsproto.MonikerOptions
 type MonikerParams = lsproto.MonikerParams
 type MonikerRegistrationOptions = lsproto.MonikerRegistrationOptions
@@ -665,8 +674,14 @@ func NewID(rawValue lsproto.IntegerOrString) *lsproto.ID
 func NewIDString(str string) *lsproto.ID
 //go:linkname NewNotificationMessage github.com/microsoft/typescript-go/internal/lsp/lsproto.NewNotificationMessage
 func NewNotificationMessage(method lsproto.Method, params any) *lsproto.RequestMessage
-//go:linkname NewRequestMessage github.com/microsoft/typescript-go/internal/lsp/lsproto.NewRequestMessage
-func NewRequestMessage(method lsproto.Method, id *lsproto.ID, params any) *lsproto.RequestMessage
+// NewRequestMessage creates a new request message (compatibility wrapper)
+func NewRequestMessage(method lsproto.Method, id *lsproto.ID, params any) *lsproto.RequestMessage {
+	return &lsproto.RequestMessage{
+		ID:     id,
+		Method: method,
+		Params: params,
+	}
+}
 type NotebookCell = lsproto.NotebookCell
 type NotebookCellArrayChange = lsproto.NotebookCellArrayChange
 type NotebookCellKind = lsproto.NotebookCellKind
@@ -726,6 +741,7 @@ type ReferenceOptions = lsproto.ReferenceOptions
 type ReferenceParams = lsproto.ReferenceParams
 type ReferenceRegistrationOptions = lsproto.ReferenceRegistrationOptions
 type ReferencesResponse = lsproto.ReferencesResponse
+type RegisterOptions = lsproto.RegisterOptions
 type Registration = lsproto.Registration
 type RegistrationParams = lsproto.RegistrationParams
 type RegistrationResponse = lsproto.RegistrationResponse
@@ -760,42 +776,6 @@ type SelectionRangeParams = lsproto.SelectionRangeParams
 type SelectionRangeRegistrationOptions = lsproto.SelectionRangeRegistrationOptions
 type SelectionRangeResponse = lsproto.SelectionRangeResponse
 type SelectionRangesOrNull = lsproto.SelectionRangesOrNull
-type SemanticTokenModifiers = lsproto.SemanticTokenModifiers
-const SemanticTokenModifiersabstract = lsproto.SemanticTokenModifiersabstract
-const SemanticTokenModifiersasync = lsproto.SemanticTokenModifiersasync
-const SemanticTokenModifiersdeclaration = lsproto.SemanticTokenModifiersdeclaration
-const SemanticTokenModifiersdefaultLibrary = lsproto.SemanticTokenModifiersdefaultLibrary
-const SemanticTokenModifiersdefinition = lsproto.SemanticTokenModifiersdefinition
-const SemanticTokenModifiersdeprecated = lsproto.SemanticTokenModifiersdeprecated
-const SemanticTokenModifiersdocumentation = lsproto.SemanticTokenModifiersdocumentation
-const SemanticTokenModifiersmodification = lsproto.SemanticTokenModifiersmodification
-const SemanticTokenModifiersreadonly = lsproto.SemanticTokenModifiersreadonly
-const SemanticTokenModifiersstatic = lsproto.SemanticTokenModifiersstatic
-type SemanticTokenTypes = lsproto.SemanticTokenTypes
-const SemanticTokenTypesclass = lsproto.SemanticTokenTypesclass
-const SemanticTokenTypescomment = lsproto.SemanticTokenTypescomment
-const SemanticTokenTypesdecorator = lsproto.SemanticTokenTypesdecorator
-const SemanticTokenTypesenum = lsproto.SemanticTokenTypesenum
-const SemanticTokenTypesenumMember = lsproto.SemanticTokenTypesenumMember
-const SemanticTokenTypesevent = lsproto.SemanticTokenTypesevent
-const SemanticTokenTypesfunction = lsproto.SemanticTokenTypesfunction
-const SemanticTokenTypesinterface = lsproto.SemanticTokenTypesinterface
-const SemanticTokenTypeskeyword = lsproto.SemanticTokenTypeskeyword
-const SemanticTokenTypeslabel = lsproto.SemanticTokenTypeslabel
-const SemanticTokenTypesmacro = lsproto.SemanticTokenTypesmacro
-const SemanticTokenTypesmethod = lsproto.SemanticTokenTypesmethod
-const SemanticTokenTypesmodifier = lsproto.SemanticTokenTypesmodifier
-const SemanticTokenTypesnamespace = lsproto.SemanticTokenTypesnamespace
-const SemanticTokenTypesnumber = lsproto.SemanticTokenTypesnumber
-const SemanticTokenTypesoperator = lsproto.SemanticTokenTypesoperator
-const SemanticTokenTypesparameter = lsproto.SemanticTokenTypesparameter
-const SemanticTokenTypesproperty = lsproto.SemanticTokenTypesproperty
-const SemanticTokenTypesregexp = lsproto.SemanticTokenTypesregexp
-const SemanticTokenTypesstring = lsproto.SemanticTokenTypesstring
-const SemanticTokenTypesstruct = lsproto.SemanticTokenTypesstruct
-const SemanticTokenTypestype = lsproto.SemanticTokenTypestype
-const SemanticTokenTypestypeParameter = lsproto.SemanticTokenTypestypeParameter
-const SemanticTokenTypesvariable = lsproto.SemanticTokenTypesvariable
 type SemanticTokens = lsproto.SemanticTokens
 type SemanticTokensClientCapabilities = lsproto.SemanticTokensClientCapabilities
 type SemanticTokensDelta = lsproto.SemanticTokensDelta
@@ -1010,11 +990,11 @@ type URI = lsproto.URI
 type UintegerOrNull = lsproto.UintegerOrNull
 type UnchangedDocumentDiagnosticReport = lsproto.UnchangedDocumentDiagnosticReport
 type UniquenessLevel = lsproto.UniquenessLevel
-const UniquenessLeveldocument = lsproto.UniquenessLeveldocument
-const UniquenessLevelglobal = lsproto.UniquenessLevelglobal
-const UniquenessLevelgroup = lsproto.UniquenessLevelgroup
-const UniquenessLevelproject = lsproto.UniquenessLevelproject
-const UniquenessLevelscheme = lsproto.UniquenessLevelscheme
+const UniquenessLeveldocument = lsproto.UniquenessLevelDocument
+const UniquenessLevelglobal = lsproto.UniquenessLevelGlobal
+const UniquenessLevelgroup = lsproto.UniquenessLevelGroup
+const UniquenessLevelproject = lsproto.UniquenessLevelProject
+const UniquenessLevelscheme = lsproto.UniquenessLevelScheme
 type Unregistration = lsproto.Unregistration
 type UnregistrationParams = lsproto.UnregistrationParams
 type UnregistrationResponse = lsproto.UnregistrationResponse

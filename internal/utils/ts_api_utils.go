@@ -173,7 +173,7 @@ func GetChildren(node *ast.Node, sourceFile *ast.SourceFile) []*ast.Node {
 			token := scanner.Token()
 			tokenFullStart := scanner.TokenFullStart()
 			tokenEnd := scanner.TokenEnd()
-			children = append(children, sourceFile.GetOrCreateToken(token, tokenFullStart, tokenEnd, node))
+			children = append(children, sourceFile.GetOrCreateToken(token, tokenFullStart, tokenEnd, node, ast.TokenFlagsNone))
 			pos = tokenEnd
 			scanner.Scan()
 		}
@@ -185,7 +185,7 @@ func GetChildren(node *ast.Node, sourceFile *ast.SourceFile) []*ast.Node {
 		token := scanner.Token()
 		tokenFullStart := scanner.TokenFullStart()
 		tokenEnd := scanner.TokenEnd()
-		children = append(children, sourceFile.GetOrCreateToken(token, tokenFullStart, tokenEnd, node))
+		children = append(children, sourceFile.GetOrCreateToken(token, tokenFullStart, tokenEnd, node, ast.TokenFlagsNone))
 		pos = tokenEnd
 		scanner.Scan()
 	}
