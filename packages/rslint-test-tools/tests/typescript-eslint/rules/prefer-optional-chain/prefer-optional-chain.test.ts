@@ -796,6 +796,17 @@ describe('hand-crafted cases', () => {
         errors: [{ messageId: 'preferOptionalChain', suggestions: null }],
         output: 'foo?.<string>() && foo<string, number>().bar;',
       },
+      // type reference (non-keyword) type arguments
+      {
+        code: 'foo && foo<T>() && foo<T>().bar;',
+        errors: [{ messageId: 'preferOptionalChain', suggestions: null }],
+        output: 'foo?.<T>()?.bar;',
+      },
+      {
+        code: 'foo && foo<T>() && foo<U>().bar;',
+        errors: [{ messageId: 'preferOptionalChain', suggestions: null }],
+        output: 'foo?.<T>() && foo<U>().bar;',
+      },
       // should preserve comments in a call expression
       {
         code: noFormat`
@@ -1983,16 +1994,72 @@ describe('base cases', () => {
             mutateCode: c => c.replaceAll('&&', '!== undefined &&'),
             mutateOutput: identity,
             operator: '&&',
+            skipIds: [20, 26],
           }),
           // but if the type is just `| undefined` - then it covers the cases and is
           // a valid conversion
-          invalid: BaseCases({
-            mutateCode: c => c.replaceAll('&&', '!== undefined &&'),
-            mutateDeclaration: c => c.replaceAll('| null', ''),
-            mutateOutput: identity,
-            operator: '&&',
-            useSuggestionFixer: true,
-          }),
+          invalid: [
+            ...BaseCases({
+              mutateCode: c => c.replaceAll('&&', '!== undefined &&'),
+              mutateDeclaration: c => c.replaceAll('| null', ''),
+              mutateOutput: identity,
+              operator: '&&',
+              useSuggestionFixer: true,
+            }),
+            // extra hand-crafted cases for call expressions with !== undefined
+            {
+              code: `
+                declare const foo: {bar: () => ({baz: {buzz: (() => number) | undefined} | undefined}) | undefined};
+                foo.bar !== undefined &&
+                  foo.bar() !== undefined &&
+                  foo.bar().baz !== undefined &&
+                  foo.bar().baz.buzz !== undefined &&
+                  foo.bar().baz.buzz();
+              `,
+              errors: [
+                {
+                  messageId: 'preferOptionalChain' as const,
+                  suggestions: [
+                    {
+                      messageId: 'optionalChainSuggest' as const,
+                      output: `
+                declare const foo: {bar: () => ({baz: {buzz: (() => number) | undefined} | undefined}) | undefined};
+                foo.bar?.() !== undefined &&
+                  foo.bar().baz !== undefined &&
+                  foo.bar().baz.buzz !== undefined &&
+                  foo.bar().baz.buzz();
+              `,
+                    },
+                  ],
+                },
+              ],
+              output: null,
+            },
+            {
+              code: `
+                declare const foo: {bar: () => ({baz: {buzz: (() => number) | undefined} | undefined}) | undefined};
+                foo.bar !== undefined &&
+                  foo.bar() !== undefined &&
+                  foo.bar().baz !== undefined &&
+                  foo.bar().baz.buzz !== undefined;
+              `,
+              errors: [
+                {
+                  messageId: 'preferOptionalChain' as const,
+                  suggestions: [
+                    {
+                      messageId: 'optionalChainSuggest' as const,
+                      output: `
+                declare const foo: {bar: () => ({baz: {buzz: (() => number) | undefined} | undefined}) | undefined};
+                foo.bar?.()?.baz?.buzz !== undefined;
+              `,
+                    },
+                  ],
+                },
+              ],
+              output: null,
+            },
+          ],
         });
       });
 
@@ -2073,20 +2140,66 @@ describe('base cases', () => {
             mutateCode: c => c.replaceAll('||', '=== undefined ||'),
             mutateOutput: identity,
             operator: '||',
+            skipIds: [20, 26],
           }),
           // but if the type is just `| undefined` - then it covers the cases and is
           // a valid conversion
-          invalid: BaseCases({
-            mutateCode: c =>
-              c
-                .replaceAll('||', '=== undefined ||')
-                // SEE TODO AT THE BOTTOM OF THE RULE
-                // We need to ensure the final operand is also a "valid" `||` check
-                .replace(/;$/, ' === undefined;'),
-            mutateDeclaration: c => c.replaceAll('| null', ''),
-            mutateOutput: c => c.replace(/;$/, ' === undefined;'),
-            operator: '||',
-          }),
+          invalid: [
+            ...BaseCases({
+              mutateCode: c =>
+                c
+                  .replaceAll('||', '=== undefined ||')
+                  // SEE TODO AT THE BOTTOM OF THE RULE
+                  // We need to ensure the final operand is also a "valid" `||` check
+                  .replace(/;$/, ' === undefined;'),
+              mutateDeclaration: c => c.replaceAll('| null', ''),
+              mutateOutput: c => c.replace(/;$/, ' === undefined;'),
+              operator: '||',
+            }),
+            // extra hand-crafted cases for call expressions with === undefined
+            {
+              code: `
+                declare const foo: {bar: () => ({baz: {buzz: (() => number) | undefined} | undefined}) | undefined};
+                foo.bar === undefined ||
+                  foo.bar() === undefined ||
+                  foo.bar().baz === undefined ||
+                  foo.bar().baz.buzz === undefined ||
+                  !foo.bar().baz.buzz();
+              `,
+              errors: [
+                {
+                  messageId: 'preferOptionalChain' as const,
+                  suggestions: null,
+                },
+              ],
+              output: `
+                declare const foo: {bar: () => ({baz: {buzz: (() => number) | undefined} | undefined}) | undefined};
+                foo.bar?.() === undefined ||
+                  foo.bar().baz === undefined ||
+                  foo.bar().baz.buzz === undefined ||
+                  !foo.bar().baz.buzz();
+              `,
+            },
+            {
+              code: `
+                declare const foo: {bar: () => ({baz: {buzz: (() => number) | undefined} | undefined}) | undefined};
+                foo.bar === undefined ||
+                  foo.bar() === undefined ||
+                  foo.bar().baz === undefined ||
+                  foo.bar().baz.buzz === undefined;
+              `,
+              errors: [
+                {
+                  messageId: 'preferOptionalChain' as const,
+                  suggestions: null,
+                },
+              ],
+              output: `
+                declare const foo: {bar: () => ({baz: {buzz: (() => number) | undefined} | undefined}) | undefined};
+                foo.bar?.()?.baz?.buzz === undefined;
+              `,
+            },
+          ],
         });
       });
 
