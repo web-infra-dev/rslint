@@ -1,0 +1,1312 @@
+// Rstest Snapshot v1
+
+exports[`no-inferrable-types > invalid 1`] = `
+{
+  "code": "const a: bigint = 10n;",
+  "diagnostics": [
+    {
+      "message": "Type bigint trivially inferred from a bigint literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = 10n;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 2`] = `
+{
+  "code": "const a: bigint = -10n;",
+  "diagnostics": [
+    {
+      "message": "Type bigint trivially inferred from a bigint literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = -10n;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 3`] = `
+{
+  "code": "const a: bigint = BigInt(10);",
+  "diagnostics": [
+    {
+      "message": "Type bigint trivially inferred from a bigint literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = BigInt(10);",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 4`] = `
+{
+  "code": "const a: bigint = -BigInt(10);",
+  "diagnostics": [
+    {
+      "message": "Type bigint trivially inferred from a bigint literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = -BigInt(10);",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 5`] = `
+{
+  "code": "const a: bigint = BigInt?.(10);",
+  "diagnostics": [
+    {
+      "message": "Type bigint trivially inferred from a bigint literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = BigInt?.(10);",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 6`] = `
+{
+  "code": "const a: bigint = -BigInt?.(10);",
+  "diagnostics": [
+    {
+      "message": "Type bigint trivially inferred from a bigint literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = -BigInt?.(10);",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 7`] = `
+{
+  "code": "const a: boolean = false;",
+  "diagnostics": [
+    {
+      "message": "Type boolean trivially inferred from a boolean literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = false;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 8`] = `
+{
+  "code": "const a: boolean = true;",
+  "diagnostics": [
+    {
+      "message": "Type boolean trivially inferred from a boolean literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = true;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 9`] = `
+{
+  "code": "const a: boolean = Boolean(null);",
+  "diagnostics": [
+    {
+      "message": "Type boolean trivially inferred from a boolean literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = Boolean(null);",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 10`] = `
+{
+  "code": "const a: boolean = Boolean?.(null);",
+  "diagnostics": [
+    {
+      "message": "Type boolean trivially inferred from a boolean literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = Boolean?.(null);",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 11`] = `
+{
+  "code": "const a: boolean = !0;",
+  "diagnostics": [
+    {
+      "message": "Type boolean trivially inferred from a boolean literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = !0;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 12`] = `
+{
+  "code": "const a: number = 10;",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = 10;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 13`] = `
+{
+  "code": "const a: number = +10;",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = +10;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 14`] = `
+{
+  "code": "const a: number = -10;",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = -10;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 15`] = `
+{
+  "code": "const a: number = Number('1');",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = Number('1');",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 16`] = `
+{
+  "code": "const a: number = +Number('1');",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = +Number('1');",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 17`] = `
+{
+  "code": "const a: number = -Number('1');",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = -Number('1');",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 18`] = `
+{
+  "code": "const a: number = Number?.('1');",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = Number?.('1');",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 19`] = `
+{
+  "code": "const a: number = +Number?.('1');",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = +Number?.('1');",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 20`] = `
+{
+  "code": "const a: number = -Number?.('1');",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = -Number?.('1');",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 21`] = `
+{
+  "code": "const a: number = Infinity;",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = Infinity;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 22`] = `
+{
+  "code": "const a: number = +Infinity;",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = +Infinity;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 23`] = `
+{
+  "code": "const a: number = -Infinity;",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = -Infinity;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 24`] = `
+{
+  "code": "const a: number = NaN;",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = NaN;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 25`] = `
+{
+  "code": "const a: number = +NaN;",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = +NaN;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 26`] = `
+{
+  "code": "const a: number = -NaN;",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = -NaN;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 27`] = `
+{
+  "code": "const a: null = null;",
+  "diagnostics": [
+    {
+      "message": "Type null trivially inferred from a null literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = null;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 28`] = `
+{
+  "code": "const a: RegExp = /a/;",
+  "diagnostics": [
+    {
+      "message": "Type RegExp trivially inferred from a RegExp literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = /a/;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 29`] = `
+{
+  "code": "const a: RegExp = RegExp('a');",
+  "diagnostics": [
+    {
+      "message": "Type RegExp trivially inferred from a RegExp literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = RegExp('a');",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 30`] = `
+{
+  "code": "const a: RegExp = RegExp?.('a');",
+  "diagnostics": [
+    {
+      "message": "Type RegExp trivially inferred from a RegExp literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = RegExp?.('a');",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 31`] = `
+{
+  "code": "const a: RegExp = new RegExp('a');",
+  "diagnostics": [
+    {
+      "message": "Type RegExp trivially inferred from a RegExp literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = new RegExp('a');",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 32`] = `
+{
+  "code": "const a: string = 'str';",
+  "diagnostics": [
+    {
+      "message": "Type string trivially inferred from a string literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = 'str';",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 33`] = `
+{
+  "code": "const a: string = \`str\`;",
+  "diagnostics": [
+    {
+      "message": "Type string trivially inferred from a string literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = \`str\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 34`] = `
+{
+  "code": "const a: string = String(1);",
+  "diagnostics": [
+    {
+      "message": "Type string trivially inferred from a string literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = String(1);",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 35`] = `
+{
+  "code": "const a: string = String?.(1);",
+  "diagnostics": [
+    {
+      "message": "Type string trivially inferred from a string literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = String?.(1);",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 36`] = `
+{
+  "code": "const a: symbol = Symbol('a');",
+  "diagnostics": [
+    {
+      "message": "Type symbol trivially inferred from a symbol literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = Symbol('a');",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 37`] = `
+{
+  "code": "const a: symbol = Symbol?.('a');",
+  "diagnostics": [
+    {
+      "message": "Type symbol trivially inferred from a symbol literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = Symbol?.('a');",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 38`] = `
+{
+  "code": "const a: undefined = undefined;",
+  "diagnostics": [
+    {
+      "message": "Type undefined trivially inferred from a undefined literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = undefined;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 39`] = `
+{
+  "code": "const a: undefined = void someValue;",
+  "diagnostics": [
+    {
+      "message": "Type undefined trivially inferred from a undefined literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const a = void someValue;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 40`] = `
+{
+  "code": "const fn = (a?: number = 5) => {};",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "const fn = (a = 5) => {};",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 41`] = `
+{
+  "code": "
+class A {
+  a!: number = 1;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class A {
+  a = 1;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 42`] = `
+{
+  "code": "const fn = (a: number = 5, b: boolean = true, c: string = 'foo') => {};",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+    {
+      "message": "Type boolean trivially inferred from a boolean literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+    {
+      "message": "Type string trivially inferred from a string literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": "const fn = (a = 5, b = true, c = 'foo') => {};",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 43`] = `
+{
+  "code": "
+class Foo {
+  a: number = 5;
+  b: boolean = true;
+  c: string = 'foo';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+    {
+      "message": "Type boolean trivially inferred from a boolean literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+    {
+      "message": "Type string trivially inferred from a string literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": "
+class Foo {
+  a = 5;
+  b = true;
+  c = 'foo';
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 44`] = `
+{
+  "code": "
+class Foo {
+  constructor(public a: boolean = true) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Type boolean trivially inferred from a boolean literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Foo {
+  constructor(public a = true) {}
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inferrable-types > invalid 45`] = `
+{
+  "code": "
+class Foo {
+  accessor a: number = 5;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Type number trivially inferred from a number literal, remove type annotation.",
+      "messageId": "noInferrableType",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-inferrable-types",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Foo {
+  accessor a = 5;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
