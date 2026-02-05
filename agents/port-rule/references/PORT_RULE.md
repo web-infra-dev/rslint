@@ -87,13 +87,26 @@ Before starting, familiarize yourself with these key source locations:
    - **Fallback**: If no link is provided, search for the rule documentation (ESLint website or Plugin repo) and source code (GitHub).
    - Find the rule test file (usually `tests/lib/rules/<rule>.js`).
 
-2. **Collect Test Cases**:
+2. **Determine Rule Origin & Deprecation Status**:
+
+   Some rules exist in both core ESLint and typescript-eslint. Before implementing, determine the canonical source:
+
+   | Scenario                                                                         | Registration                                | Test Location                    | Rule Wrapper        |
+   | -------------------------------------------------------------------------------- | ------------------------------------------- | -------------------------------- | ------------------- |
+   | **Core ESLint only** (e.g., `no-debugger`)                                       | `"no-debugger"`                             | `tests/eslint/rules/`            | `rule.Rule{}`       |
+   | **typescript-eslint only** (e.g., `await-thenable`)                              | `"@typescript-eslint/await-thenable"`       | `tests/typescript-eslint/rules/` | `rule.CreateRule()` |
+   | **typescript-eslint extends core** (active, e.g., `no-array-constructor`)        | `"@typescript-eslint/no-array-constructor"` | `tests/typescript-eslint/rules/` | `rule.CreateRule()` |
+   | **typescript-eslint deprecated in favor of core** (e.g., `no-loss-of-precision`) | `"no-loss-of-precision"`                    | `tests/eslint/rules/`            | `rule.Rule{}`       |
+
+   **How to check**: Visit the typescript-eslint rule page. If it shows a deprecation notice like _"use the base ESLint rule instead"_, treat it as a **core ESLint rule** — do NOT register with `@typescript-eslint/` prefix.
+
+3. **Collect Test Cases**:
    - Extract **ALL** `valid` and `invalid` cases from the official documentation.
    - Extract representative cases from the official unit tests, covering all branches of logic.
    - **Add Boundary Cases**: Add sufficient boundary cases (e.g., empty files, nested structures, edge cases in syntax).
    - **Ensure Coverage**: Ensure Line and Column numbers are tested in invalid cases.
 
-3. **Identify Edge Cases**:
+4. **Identify Edge Cases**:
    - Does the rule handle comments?
    - Does it handle Optional Chaining (`?.`)?
    - Does it handle TypeScript-specific syntax (if applicable)?
@@ -283,15 +296,17 @@ rule_tester.InvalidTestCase{
 
 ### Step 6: Add JS Tests
 
-**File Locations**:
+**File Locations** (determined by Phase 1 Step 2):
 
-- **Core Rules**: `packages/rslint-test-tools/tests/eslint/rules/<rule-name>.test.ts`
-- **Plugin Rules**: `packages/rslint-test-tools/tests/<plugin-name>/rules/<rule-name>.test.ts`
+- **Core ESLint Rules** (including deprecated typescript-eslint rules): `packages/rslint-test-tools/tests/eslint/rules/<rule-name>.test.ts`
+- **typescript-eslint Rules**: `packages/rslint-test-tools/tests/typescript-eslint/rules/<rule-name>.test.ts`
+- **Other Plugin Rules**: `packages/rslint-test-tools/tests/<plugin-name>/rules/<rule-name>.test.ts`
 
 **Setup RuleTester**:
 
-- **typescript-eslint Rules**: Import `RuleTester` from `@typescript-eslint/rule-tester`
-- **Other Rules**: Refer to `packages/rslint-test-tools/tests/eslint-plugin-import/rule-tester.ts`
+- **Core ESLint Rules**: Import `RuleTester` from `../rule-tester` (in `tests/eslint/rule-tester.ts`, no prefix)
+- **typescript-eslint Rules**: Import `RuleTester` from `@typescript-eslint/rule-tester` (auto-prefixes with `@typescript-eslint/`)
+- **Other Plugin Rules**: Refer to `packages/rslint-test-tools/tests/eslint-plugin-import/rule-tester.ts`
 
 **Options Format**: JS tests use array format: `options: [{ allow: ['warn'] }]`
 
@@ -306,11 +321,12 @@ Add the new test file path to the `include` array.
 **File**: `internal/config/config.go`
 
 1. Import your new package
-2. Register in the appropriate function:
-   - Core rules: `registerAllCoreEslintRules()`
-   - TypeScript rules: `registerAllTypeScriptEslintPluginRules()`
-   - Import rules: `registerAllEslintImportPluginRules()`
+2. Register in the appropriate function (determined by Phase 1 Step 2):
+   - **Core ESLint rules** (including deprecated typescript-eslint rules): `registerAllCoreEslintRules()` with `rule.Rule{}`
+   - **typescript-eslint rules** (active): `registerAllTypeScriptEslintPluginRules()` with `rule.CreateRule()`
+   - **Import plugin rules**: `registerAllEslintImportPluginRules()`
 3. Format: `GlobalRuleRegistry.Register("rule-name", package.RuleNameRule)`
+4. **Do NOT register a rule under both `"rule-name"` and `"@typescript-eslint/rule-name"`** — pick the canonical one based on deprecation status
 
 ---
 
@@ -380,24 +396,35 @@ Add the new test file path to the `include` array.
 
    - Use specific file paths with `git add` (NOT `git add .`)
    - Ensure all tests pass before committing
+   - **Do NOT include AI-related information** in commit messages (e.g., no `Co-Authored-By: Claude` or similar)
 
 3. **Push & Create PR**:
 
    ```bash
    git push origin feat/port-rule-<rule_name_snake_case>-$(date +%Y%m%d)
+   ```
 
+   **Important**: Use the repository's PR template at `.github/PULL_REQUEST_TEMPLATE.md`. Example:
+
+   ```bash
    gh pr create --base main --title "feat: port rule <rule-name>" --body "## Summary
+
    Port the \`<rule-name>\` rule from ESLint to rslint.
 
-   ## Test Plan
-   - [x] Go unit tests pass
-   - [x] JS integration tests pass
-   - [x] Lint checks pass
+   [Brief description of what the rule does]
 
-   ## References
-   - **Original Rule**: <link_to_eslint_doc>
-   - **Source Code**: <link_to_source_code>"
+   ## Related Links
+
+   - ESLint rule: <link_to_eslint_doc>
+   - Source code: <link_to_source_code>
+
+   ## Checklist
+
+   - [x] Tests updated (or not required).
+   - [x] Documentation updated (or not required)."
    ```
+
+   - **Do NOT include AI-related information** in PR title or body
 
 ---
 

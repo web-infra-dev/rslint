@@ -7,6 +7,9 @@ export default defineConfig({
     // cli
     './tests/cli/basic.test.ts',
 
+    // eslint
+    './tests/eslint/rules/no-loss-of-precision.test.ts',
+
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
     './tests/eslint-plugin-import/rules/no-webpack-loader-syntax.test.ts',
