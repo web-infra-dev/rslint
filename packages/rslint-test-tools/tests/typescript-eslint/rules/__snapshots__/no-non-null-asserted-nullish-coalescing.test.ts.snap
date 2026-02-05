@@ -1,0 +1,419 @@
+// Rstest Snapshot v1
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 1`] = `
+{
+  "code": "foo! ?? bar;",
+  "diagnostics": [
+    {
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 2`] = `
+{
+  "code": "foo! ?? bar!;",
+  "diagnostics": [
+    {
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 3`] = `
+{
+  "code": "foo.bazz! ?? bar;",
+  "diagnostics": [
+    {
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 4`] = `
+{
+  "code": "foo.bazz! ?? bar!;",
+  "diagnostics": [
+    {
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 5`] = `
+{
+  "code": "foo!.bazz! ?? bar;",
+  "diagnostics": [
+    {
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 6`] = `
+{
+  "code": "foo!.bazz! ?? bar!;",
+  "diagnostics": [
+    {
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 7`] = `
+{
+  "code": "foo()! ?? bar;",
+  "diagnostics": [
+    {
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 8`] = `
+{
+  "code": "foo()! ?? bar!;",
+  "diagnostics": [
+    {
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 9`] = `
+{
+  "code": "
+let x!: string;
+x! ?? '';
+      ",
+  "diagnostics": [
+    {
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 10`] = `
+{
+  "code": "
+let x: string;
+x = foo();
+x! ?? '';
+      ",
+  "diagnostics": [
+    {
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 11`] = `
+{
+  "code": "
+let x: string;
+x = foo();
+x! ?? '';
+x = foo();
+      ",
+  "diagnostics": [
+    {
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 12`] = `
+{
+  "code": "
+let x = foo();
+x! ?? '';
+      ",
+  "diagnostics": [
+    {
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 13`] = `
+{
+  "code": "
+function foo() {
+  let x!: string;
+  return x! ?? '';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 10,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 14`] = `
+{
+  "code": "
+let x!: string;
+function foo() {
+  return x! ?? '';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 10,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-nullish-coalescing > invalid 15`] = `
+{
+  "code": "
+let x = foo();
+x  ! ?? '';
+      ",
+  "diagnostics": [
+    {
+      "message": "The nullish coalescing operator is designed to handle undefined and null - using a non-null assertion is not needed.",
+      "messageId": "noNonNullAssertedNullishCoalescing",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-nullish-coalescing",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
