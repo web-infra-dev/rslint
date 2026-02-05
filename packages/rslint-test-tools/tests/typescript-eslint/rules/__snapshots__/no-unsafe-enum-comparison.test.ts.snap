@@ -1,0 +1,1549 @@
+// Rstest Snapshot v1
+
+exports[`no-unsafe-enum-comparison > invalid 1`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple,
+        }
+        Fruit.Apple < 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 2`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple,
+        }
+        Fruit.Apple > 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 3`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple,
+        }
+        Fruit.Apple == 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 4`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple,
+        }
+        Fruit.Apple === 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 5`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple,
+        }
+        Fruit.Apple != 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 6`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple,
+        }
+        Fruit.Apple !== 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 7`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple = 0,
+          Banana = 'banana',
+        }
+        Fruit.Apple === 0;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 8`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple = 0,
+          Banana = 'banana',
+        }
+        Fruit.Banana === '';
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 9`] = `
+{
+  "code": "
+        enum Vegetable {
+          Asparagus = 'asparagus',
+          Beet = 'beet',
+          Celery = 'celery',
+        }
+        Vegetable.Asparagus === 'beet';
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 10`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple,
+          Banana,
+          Cherry,
+        }
+        1 === Fruit.Apple;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 11`] = `
+{
+  "code": "
+        enum Vegetable {
+          Asparagus = 'asparagus',
+          Beet = 'beet',
+          Celery = 'celery',
+        }
+        'beet' === Vegetable.Asparagus;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 12`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple,
+          Banana,
+          Cherry,
+        }
+        const fruit = Fruit.Apple;
+        fruit === 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 8,
+        },
+        "start": {
+          "column": 9,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 13`] = `
+{
+  "code": "
+        enum Vegetable {
+          Asparagus = 'asparagus',
+          Beet = 'beet',
+          Celery = 'celery',
+        }
+        const vegetable = Vegetable.Asparagus;
+        vegetable === 'beet';
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 8,
+        },
+        "start": {
+          "column": 9,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 14`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple,
+          Banana,
+          Cherry,
+        }
+        const fruit = Fruit.Apple;
+        1 === fruit;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 8,
+        },
+        "start": {
+          "column": 9,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 15`] = `
+{
+  "code": "
+        enum Vegetable {
+          Asparagus = 'asparagus',
+          Beet = 'beet',
+          Celery = 'celery',
+        }
+        const vegetable = Vegetable.Asparagus;
+        'beet' === vegetable;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 8,
+        },
+        "start": {
+          "column": 9,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 16`] = `
+{
+  "code": "enum Fruit { Apple, Banana, Cherry }enum Fruit2 {
+  Apple2,
+  Banana2,
+  Cherry2,
+}
+      Fruit.Apple === Fruit2.Apple2;
+        ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 6,
+        },
+        "start": {
+          "column": 7,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 17`] = `
+{
+  "code": "
+        enum Vegetable {
+          Asparagus = 'asparagus',
+          Beet = 'beet',
+          Celery = 'celery',
+        }
+        enum Vegetable2 {
+          Asparagus2 = 'asparagus2',
+          Beet2 = 'beet2',
+          Celery2 = 'celery2',
+        }
+        Vegetable.Asparagus === Vegetable2.Asparagus2;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 12,
+        },
+        "start": {
+          "column": 9,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 18`] = `
+{
+  "code": "enum Fruit { Apple, Banana, Cherry }enum Fruit2 {
+  Apple2,
+  Banana2,
+  Cherry2,
+}
+      const fruit = Fruit.Apple;
+      fruit === Fruit2.Apple2;
+        ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 7,
+        },
+        "start": {
+          "column": 7,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 19`] = `
+{
+  "code": "
+        enum Vegetable {
+          Asparagus = 'asparagus',
+          Beet = 'beet',
+          Celery = 'celery',
+        }
+        enum Vegetable2 {
+          Asparagus2 = 'asparagus2',
+          Beet2 = 'beet2',
+          Celery2 = 'celery2',
+        }
+        const vegetable = Vegetable.Asparagus;
+        vegetable === Vegetable2.Asparagus2;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 13,
+        },
+        "start": {
+          "column": 9,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 20`] = `
+{
+  "code": "
+        enum Str {
+          A = 'a',
+        }
+        enum Num {
+          B = 1,
+        }
+        enum Mixed {
+          A = 'a',
+          B = 1,
+        }
+
+        declare const str: Str;
+        declare const num: Num;
+        declare const mixed: Mixed;
+
+        // following are all errors because the value might be an enum value
+        str === 'a';
+        num === 1;
+        mixed === 'a';
+        mixed === 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 18,
+        },
+        "start": {
+          "column": 9,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 19,
+        },
+        "start": {
+          "column": 9,
+          "line": 19,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 20,
+        },
+        "start": {
+          "column": 9,
+          "line": 20,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 21,
+        },
+        "start": {
+          "column": 9,
+          "line": 21,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 21`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple = 'apple',
+        }
+        type __String =
+          | (string & { __escapedIdentifier: void })
+          | (void & { __escapedIdentifier: void })
+          | Fruit;
+        declare const weirdString: __String;
+        weirdString === 'someArbitraryValue';
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 10,
+        },
+        "start": {
+          "column": 9,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 22`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple,
+        }
+
+        declare const fruit: Fruit;
+
+        switch (fruit) {
+          case 0: {
+            break;
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "The case statement does not have a shared enum type with the switch predicate.",
+      "messageId": "mismatchedCase",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 11,
+        },
+        "start": {
+          "column": 11,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 23`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple,
+          Banana,
+        }
+
+        declare const fruit: Fruit;
+
+        switch (fruit) {
+          case Fruit.Apple: {
+            break;
+          }
+          case 1: {
+            break;
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "The case statement does not have a shared enum type with the switch predicate.",
+      "messageId": "mismatchedCase",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 15,
+        },
+        "start": {
+          "column": 11,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 24`] = `
+{
+  "code": "
+        enum Vegetable {
+          Asparagus = 'asparagus',
+        }
+
+        declare const vegetable: Vegetable;
+
+        switch (vegetable) {
+          case 'asparagus': {
+            break;
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "The case statement does not have a shared enum type with the switch predicate.",
+      "messageId": "mismatchedCase",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 11,
+        },
+        "start": {
+          "column": 11,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 25`] = `
+{
+  "code": "
+        enum Vegetable {
+          Asparagus = 'asparagus',
+          Beet = 'beet',
+        }
+
+        declare const vegetable: Vegetable;
+
+        switch (vegetable) {
+          case Vegetable.Asparagus: {
+            break;
+          }
+          case 'beet': {
+            break;
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "The case statement does not have a shared enum type with the switch predicate.",
+      "messageId": "mismatchedCase",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 15,
+        },
+        "start": {
+          "column": 11,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 26`] = `
+{
+  "code": "
+        enum Vegetable {
+          Asparagus = 'asparagus',
+          Beet = 'beet',
+        }
+
+        declare const vegetable: Vegetable;
+
+        switch (vegetable) {
+          case Vegetable.Asparagus: {
+            break;
+          }
+          case 'beet': {
+            break;
+          }
+          default: {
+            break;
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "The case statement does not have a shared enum type with the switch predicate.",
+      "messageId": "mismatchedCase",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 15,
+        },
+        "start": {
+          "column": 11,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 27`] = `
+{
+  "code": "
+        enum Str {
+          A = 'a',
+          B = 'b',
+        }
+        declare const str: Str;
+        str === 'b';
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 28`] = `
+{
+  "code": "
+        enum Str {
+          A = 'a',
+          AB = 'ab',
+        }
+        declare const str: Str;
+        str === 'a' + 'b';
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 29`] = `
+{
+  "code": "
+        enum Num {
+          A = 1,
+          B = 2,
+        }
+        declare const num: Num;
+        1 === num;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 30`] = `
+{
+  "code": "
+        enum Num {
+          A = 1,
+          B = 2,
+        }
+        declare const num: Num;
+        1 /* with */ === /* comment */ num;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 31`] = `
+{
+  "code": "
+        enum Num {
+          A = 1,
+          B = 2,
+        }
+        declare const num: Num;
+        1 + 1 === num;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 32`] = `
+{
+  "code": "
+        enum Mixed {
+          A = 1,
+          B = 'b',
+        }
+        declare const mixed: Mixed;
+        mixed === 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 33`] = `
+{
+  "code": "
+        enum Mixed {
+          A = 1,
+          B = 'b',
+        }
+        declare const mixed: Mixed;
+        mixed === 'b';
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 34`] = `
+{
+  "code": "
+        enum StringKey {
+          'test-key' /* with comment */ = 1,
+        }
+        declare const stringKey: StringKey;
+        stringKey === 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 35`] = `
+{
+  "code": "
+        enum StringKey {
+          "key-'with-single'-quotes" = 1,
+        }
+        declare const stringKey: StringKey;
+        stringKey === 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 36`] = `
+{
+  "code": "
+        enum StringKey {
+          'key-"with-double"-quotes' = 1,
+        }
+        declare const stringKey: StringKey;
+        stringKey === 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 37`] = `
+{
+  "code": "
+        enum StringKey {
+          'key-\`with-backticks\`-quotes' = 1,
+        }
+        declare const stringKey: StringKey;
+        stringKey === 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 38`] = `
+{
+  "code": "
+        enum ComputedKey {
+          ['test-key' /* with comment */] = 1,
+        }
+        declare const computedKey: ComputedKey;
+        computedKey === 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 39`] = `
+{
+  "code": "
+        enum ComputedKey {
+          [\`test-key\` /* with comment */] = 1,
+        }
+        declare const computedKey: ComputedKey;
+        computedKey === 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 40`] = `
+{
+  "code": "
+        enum ComputedKey {
+          [\`test-
+          key\` /* with comment */] = 1,
+        }
+        declare const computedKey: ComputedKey;
+        computedKey === 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 41`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple,
+        }
+        declare const foo: number & {};
+        if (foo === Fruit.Apple) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 6,
+        },
+        "start": {
+          "column": 13,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 42`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple,
+        }
+        declare const foo: number & { __someBrand: void };
+        if (foo === Fruit.Apple) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 6,
+        },
+        "start": {
+          "column": 13,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 43`] = `
+{
+  "code": "
+        enum Vegetable {
+          Asparagus = 'asparagus',
+        }
+        declare const foo: string & {};
+        if (foo === Vegetable.Asparagus) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 6,
+        },
+        "start": {
+          "column": 13,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-enum-comparison > invalid 44`] = `
+{
+  "code": "
+        enum Vegetable {
+          Asparagus = 'asparagus',
+        }
+        declare const foo: string & { __someBrand: void };
+        if (foo === Vegetable.Asparagus) {
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "The two values in this comparison do not have a shared enum type.",
+      "messageId": "mismatchedCondition",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 6,
+        },
+        "start": {
+          "column": 13,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-enum-comparison",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

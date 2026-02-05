@@ -1,0 +1,499 @@
+// Rstest Snapshot v1
+
+exports[`prefer-reduce-type-parameter > invalid 1`] = `
+{
+  "code": "
+declare const arr: string[];
+arr.reduce<string | undefined>(acc => acc, arr.shift() as string | undefined);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary assertion: Array#reduce accepts a type parameter for the default value.",
+      "messageId": "preferTypeParameter",
+      "range": {
+        "end": {
+          "column": 77,
+          "line": 3,
+        },
+        "start": {
+          "column": 44,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-reduce-type-parameter",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+declare const arr: string[];
+arr.reduce<string | undefined>(acc => acc, arr.shift());
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-reduce-type-parameter > invalid 2`] = `
+{
+  "code": "[1, 2, 3].reduce((a, s) => a.concat(s * 2), [] as number[]);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary assertion: Array#reduce accepts a type parameter for the default value.",
+      "messageId": "preferTypeParameter",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-reduce-type-parameter",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "[1, 2, 3].reduce<number[]>((a, s) => a.concat(s * 2), []);",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-reduce-type-parameter > invalid 3`] = `
+{
+  "code": "[1, 2, 3].reduce((a, s) => a.concat(s * 2), <number[]>[]);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary assertion: Array#reduce accepts a type parameter for the default value.",
+      "messageId": "preferTypeParameter",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-reduce-type-parameter",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "[1, 2, 3].reduce<number[]>((a, s) => a.concat(s * 2), []);",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-reduce-type-parameter > invalid 4`] = `
+{
+  "code": "[1, 2, 3]?.reduce((a, s) => a.concat(s * 2), [] as number[]);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary assertion: Array#reduce accepts a type parameter for the default value.",
+      "messageId": "preferTypeParameter",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-reduce-type-parameter",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "[1, 2, 3]?.reduce<number[]>((a, s) => a.concat(s * 2), []);",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-reduce-type-parameter > invalid 5`] = `
+{
+  "code": "[1, 2, 3]?.reduce((a, s) => a.concat(s * 2), <number[]>[]);",
+  "diagnostics": [
+    {
+      "message": "Unnecessary assertion: Array#reduce accepts a type parameter for the default value.",
+      "messageId": "preferTypeParameter",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-reduce-type-parameter",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "[1, 2, 3]?.reduce<number[]>((a, s) => a.concat(s * 2), []);",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-reduce-type-parameter > invalid 6`] = `
+{
+  "code": "
+const names = ['a', 'b', 'c'];
+
+names.reduce(
+  (accum, name) => ({
+    ...accum,
+    [name]: true,
+  }),
+  {} as Record<string, boolean>,
+);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary assertion: Array#reduce accepts a type parameter for the default value.",
+      "messageId": "preferTypeParameter",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-reduce-type-parameter",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+const names = ['a', 'b', 'c'];
+
+names.reduce<Record<string, boolean>>(
+  (accum, name) => ({
+    ...accum,
+    [name]: true,
+  }),
+  {},
+);
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-reduce-type-parameter > invalid 7`] = `
+{
+  "code": "
+['a', 'b'].reduce(
+  (accum, name) => ({
+    ...accum,
+    [name]: true,
+  }),
+  <Record<string, boolean>>{},
+);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary assertion: Array#reduce accepts a type parameter for the default value.",
+      "messageId": "preferTypeParameter",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-reduce-type-parameter",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+['a', 'b'].reduce<Record<string, boolean>>(
+  (accum, name) => ({
+    ...accum,
+    [name]: true,
+  }),
+  {},
+);
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-reduce-type-parameter > invalid 8`] = `
+{
+  "code": "
+['a', 'b']['reduce'](
+  (accum, name) => ({
+    ...accum,
+    [name]: true,
+  }),
+  {} as Record<string, boolean>,
+);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary assertion: Array#reduce accepts a type parameter for the default value.",
+      "messageId": "preferTypeParameter",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-reduce-type-parameter",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+['a', 'b']['reduce']<Record<string, boolean>>(
+  (accum, name) => ({
+    ...accum,
+    [name]: true,
+  }),
+  {},
+);
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-reduce-type-parameter > invalid 9`] = `
+{
+  "code": "
+function f<T, U extends T[]>(a: U) {
+  return a.reduce(() => {}, {} as Record<string, boolean>);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary assertion: Array#reduce accepts a type parameter for the default value.",
+      "messageId": "preferTypeParameter",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 3,
+        },
+        "start": {
+          "column": 29,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-reduce-type-parameter",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function f<T, U extends T[]>(a: U) {
+  return a.reduce<Record<string, boolean>>(() => {}, {});
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-reduce-type-parameter > invalid 10`] = `
+{
+  "code": "
+declare const tuple: [number, number, number];
+tuple.reduce((a, s) => a.concat(s * 2), [] as number[]);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary assertion: Array#reduce accepts a type parameter for the default value.",
+      "messageId": "preferTypeParameter",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 3,
+        },
+        "start": {
+          "column": 41,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-reduce-type-parameter",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+declare const tuple: [number, number, number];
+tuple.reduce<number[]>((a, s) => a.concat(s * 2), []);
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-reduce-type-parameter > invalid 11`] = `
+{
+  "code": "
+declare const tupleOrArray: [number, number, number] | number[];
+tupleOrArray.reduce((a, s) => a.concat(s * 2), [] as number[]);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary assertion: Array#reduce accepts a type parameter for the default value.",
+      "messageId": "preferTypeParameter",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 3,
+        },
+        "start": {
+          "column": 48,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-reduce-type-parameter",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+declare const tupleOrArray: [number, number, number] | number[];
+tupleOrArray.reduce<number[]>((a, s) => a.concat(s * 2), []);
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-reduce-type-parameter > invalid 12`] = `
+{
+  "code": "
+declare const tuple: [number, number, number] & number[];
+tuple.reduce((a, s) => a.concat(s * 2), [] as number[]);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary assertion: Array#reduce accepts a type parameter for the default value.",
+      "messageId": "preferTypeParameter",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 3,
+        },
+        "start": {
+          "column": 41,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-reduce-type-parameter",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+declare const tuple: [number, number, number] & number[];
+tuple.reduce<number[]>((a, s) => a.concat(s * 2), []);
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-reduce-type-parameter > invalid 13`] = `
+{
+  "code": "
+['a', 'b'].reduce(
+  (accum, name) => ({
+    ...accum,
+    [name]: true,
+  }),
+  {} as Record<string, boolean>,
+);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary assertion: Array#reduce accepts a type parameter for the default value.",
+      "messageId": "preferTypeParameter",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-reduce-type-parameter",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+['a', 'b'].reduce<Record<string, boolean>>(
+  (accum, name) => ({
+    ...accum,
+    [name]: true,
+  }),
+  {},
+);
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-reduce-type-parameter > invalid 14`] = `
+{
+  "code": "
+function f<T extends Record<string, boolean>>(t: T) {
+  ['a', 'b'].reduce(
+    (accum, name) => ({
+      ...accum,
+      [name]: true,
+    }),
+    t as Record<string, boolean | number>,
+  );
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unnecessary assertion: Array#reduce accepts a type parameter for the default value.",
+      "messageId": "preferTypeParameter",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 8,
+        },
+        "start": {
+          "column": 5,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-reduce-type-parameter",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function f<T extends Record<string, boolean>>(t: T) {
+  ['a', 'b'].reduce<Record<string, boolean | number>>(
+    (accum, name) => ({
+      ...accum,
+      [name]: true,
+    }),
+    t,
+  );
+}
+      ",
+  "ruleCount": 1,
+}
+`;

@@ -1,0 +1,1344 @@
+// Rstest Snapshot v1
+
+exports[`default-param-last > invalid 1`] = `
+{
+  "code": "function foo(a = 1, b: number) {}",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 2`] = `
+{
+  "code": "function foo(a = 1, b = 2, c: number) {}",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 3`] = `
+{
+  "code": "function foo(a = 1, b: number, c = 2, d: number) {}",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 4`] = `
+{
+  "code": "function foo(a = 1, b: number, c = 2) {}",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 5`] = `
+{
+  "code": "function foo(a = 1, b: number, ...c) {}",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 6`] = `
+{
+  "code": "function foo(a?: number, b: number) {}",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 7`] = `
+{
+  "code": "function foo(a: number, b?: number, c: number) {}",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 8`] = `
+{
+  "code": "function foo(a = 1, b?: number, c: number) {}",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 9`] = `
+{
+  "code": "function foo(a = 1, { b }) {}",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 10`] = `
+{
+  "code": "function foo({ a } = {}, b) {}",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 11`] = `
+{
+  "code": "function foo({ a, b } = { a: 1, b: 2 }, c) {}",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 12`] = `
+{
+  "code": "function foo([a] = [], b) {}",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 13`] = `
+{
+  "code": "function foo([a, b] = [1, 2], c) {}",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 14`] = `
+{
+  "code": "const foo = function (a = 1, b: number) {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 15`] = `
+{
+  "code": "const foo = function (a = 1, b = 2, c: number) {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 16`] = `
+{
+  "code": "const foo = function (a = 1, b: number, c = 2, d: number) {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 17`] = `
+{
+  "code": "const foo = function (a = 1, b: number, c = 2) {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 18`] = `
+{
+  "code": "const foo = function (a = 1, b: number, ...c) {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 19`] = `
+{
+  "code": "const foo = function (a?: number, b: number) {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 20`] = `
+{
+  "code": "const foo = function (a: number, b?: number, c: number) {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 21`] = `
+{
+  "code": "const foo = function (a = 1, b?: number, c: number) {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 22`] = `
+{
+  "code": "const foo = function (a = 1, { b }) {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 23`] = `
+{
+  "code": "const foo = function ({ a } = {}, b) {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 24`] = `
+{
+  "code": "const foo = function ({ a, b } = { a: 1, b: 2 }, c) {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 25`] = `
+{
+  "code": "const foo = function ([a] = [], b) {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 26`] = `
+{
+  "code": "const foo = function ([a, b] = [1, 2], c) {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 27`] = `
+{
+  "code": "const foo = (a = 1, b: number) => {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 28`] = `
+{
+  "code": "const foo = (a = 1, b = 2, c: number) => {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 29`] = `
+{
+  "code": "const foo = (a = 1, b: number, c = 2, d: number) => {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 30`] = `
+{
+  "code": "const foo = (a = 1, b: number, c = 2) => {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 31`] = `
+{
+  "code": "const foo = (a = 1, b: number, ...c) => {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 32`] = `
+{
+  "code": "const foo = (a?: number, b: number) => {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 33`] = `
+{
+  "code": "const foo = (a: number, b?: number, c: number) => {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 34`] = `
+{
+  "code": "const foo = (a = 1, b?: number, c: number) => {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 35`] = `
+{
+  "code": "const foo = (a = 1, { b }) => {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 36`] = `
+{
+  "code": "const foo = ({ a } = {}, b) => {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 37`] = `
+{
+  "code": "const foo = ({ a, b } = { a: 1, b: 2 }, c) => {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 38`] = `
+{
+  "code": "const foo = ([a] = [], b) => {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 39`] = `
+{
+  "code": "const foo = ([a, b] = [1, 2], c) => {};",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 40`] = `
+{
+  "code": "
+class Foo {
+  constructor(
+    public a: number,
+    protected b?: number,
+    private c: number,
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 41`] = `
+{
+  "code": "
+class Foo {
+  constructor(
+    public a: number,
+    protected b = 0,
+    private c: number,
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 42`] = `
+{
+  "code": "
+class Foo {
+  constructor(
+    public a?: number,
+    private b: number,
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 43`] = `
+{
+  "code": "
+class Foo {
+  constructor(
+    public a = 0,
+    private b: number,
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 44`] = `
+{
+  "code": "
+class Foo {
+  constructor(a = 0, b: number) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-param-last > invalid 45`] = `
+{
+  "code": "
+class Foo {
+  constructor(a?: number, b: number) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Default parameters should be last.",
+      "messageId": "shouldBeLast",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/default-param-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

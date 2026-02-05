@@ -1,0 +1,1017 @@
+// Rstest Snapshot v1
+
+exports[`require-await > invalid 1`] = `
+{
+  "code": "
+async function numberOne(): Promise<number> {
+  return 1;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 2`] = `
+{
+  "code": "
+const numberOne = async function (): Promise<number> {
+  return 1;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 19,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 3`] = `
+{
+  "code": "const numberOne = async (): Promise<number> => 1;",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 4`] = `
+{
+  "code": "
+async function values(): Promise<Array<number>> {
+  return [1];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 5`] = `
+{
+  "code": "
+        async function foo() {
+          function nested() {
+            await doSomething();
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 6`] = `
+{
+  "code": "
+async function* foo(): void {
+  doSomething();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 7`] = `
+{
+  "code": "
+async function* foo() {
+  yield 1;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 8`] = `
+{
+  "code": "
+const foo = async function* () {
+  console.log('bar');
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 9`] = `
+{
+  "code": "
+async function* asyncGenerator() {
+  yield 1;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 10`] = `
+{
+  "code": "
+async function* asyncGenerator(source: Iterable<any>) {
+  yield* source;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 11`] = `
+{
+  "code": "
+function isAsyncIterable(value: unknown): value is AsyncIterable<any> {
+  return true;
+}
+async function* asyncGenerator(source: Iterable<any> | AsyncIterable<any>) {
+  if (!isAsyncIterable(source)) {
+    yield* source;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 9,
+        },
+        "start": {
+          "column": 1,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 12`] = `
+{
+  "code": "
+function* syncGenerator() {
+  yield 1;
+}
+async function* asyncGenerator() {
+  yield* syncGenerator();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 7,
+        },
+        "start": {
+          "column": 1,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 13`] = `
+{
+  "code": "
+async function* asyncGenerator() {
+  yield* anotherAsyncGenerator(); // Unknown function.
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 14`] = `
+{
+  "code": "
+        const fn = async () => {
+          using foo = new Bar();
+        };
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 20,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 15`] = `
+{
+  "code": "
+        // intentional TS error
+        async function* foo(): Promise<number> {
+          yield 1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 16`] = `
+{
+  "code": "
+        async function* foo(): AsyncGenerator {
+          yield 1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 17`] = `
+{
+  "code": "
+        async function* foo(): AsyncGenerator<number> {
+          yield 1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 18`] = `
+{
+  "code": "
+        async function foo() {
+          doSomething();
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 19`] = `
+{
+  "code": "
+        (async function () {
+          doSomething();
+        });
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 10,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 20`] = `
+{
+  "code": "
+        async () => {
+          doSomething();
+        };
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 21`] = `
+{
+  "code": "async () => doSomething();",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 22`] = `
+{
+  "code": "
+        ({
+          async foo() {
+            doSomething();
+          },
+        });
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 23`] = `
+{
+  "code": "
+        class A {
+          async foo() {
+            doSomething();
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 24`] = `
+{
+  "code": "
+        class A {
+          public async foo() {
+            doSomething();
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 25`] = `
+{
+  "code": "
+        (class {
+          async foo() {
+            doSomething();
+          }
+        });
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 26`] = `
+{
+  "code": "
+        (class {
+          async ''() {
+            doSomething();
+          }
+        });
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 27`] = `
+{
+  "code": "
+        async function foo() {
+          async () => {
+            await doSomething();
+          };
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 28`] = `
+{
+  "code": "
+        async function foo() {
+          await (async () => {
+            doSomething();
+          });
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 5,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 29`] = `
+{
+  "code": "
+        const obj = {
+          async: async function foo() {
+            bar();
+          },
+        };
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 5,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 30`] = `
+{
+  "code": "
+        async    /* test */ function foo() {
+          doSomething();
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 31`] = `
+{
+  "code": "
+        class A {
+          a = 0
+          async [b]() {
+            return 0;
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 6,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 32`] = `
+{
+  "code": "
+        foo
+        async () => {
+          return 0;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`require-await > invalid 33`] = `
+{
+  "code": "
+        class A {
+          foo() {}
+          async [bar]() {
+            baz;
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Function has no 'await' expression.",
+      "messageId": "missingAwait",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 6,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/require-await",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

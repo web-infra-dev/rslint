@@ -10,9 +10,9 @@ const TEST_CONFIG_PATH = path.join(
   __dirname,
   '../packages/rslint-test-tools/rstest.config.mts',
 );
-const TESTS_DIR = path.join(
+const TESTS_BASE_DIR = path.join(
   __dirname,
-  '../packages/rslint-test-tools/tests/typescript-eslint/rules',
+  '../packages/rslint-test-tools/tests',
 );
 const MANIFEST_PATH = path.join(
   __dirname,
@@ -71,26 +71,34 @@ function getPluginRuleEntries() {
   return entries;
 }
 
+// Map group name to test directory name: "@typescript-eslint" -> "typescript-eslint", etc.
+function groupToTestDir(group) {
+  return group.replace(/^@/, '');
+}
+
 function getIncludedRules() {
-  // Parse rstest.config.mts include list, extract rule names
+  // Parse rstest.config.mts include list, extract rule names from all test directories
   const config = fs.readFileSync(TEST_CONFIG_PATH, 'utf-8');
+  // Match any uncommented test path: ./tests/{any-group}/rules/{rule}.test.ts
   const includeRegex =
-    /\.(?:\/|\\)tests\/(?:eslint-plugin-import|typescript-eslint)\/rules\/([\w-]+)\.test\.ts/g;
+    /^\s*'\.(?:\/|\\)tests\/([\w-]+)\/rules\/([\w-]+)\.test\.ts'/gm;
   const included = new Set();
   let match;
   while ((match = includeRegex.exec(config))) {
-    const rule = match[1].replace(/-/g, '_');
+    const rule = match[2].replace(/-/g, '_');
     included.add(rule);
   }
   return included;
 }
 
-function getSkipCases(rule) {
+function getSkipCases(rule, group) {
   // Return skip cases as [{name, url}]
-  const testFile = path.join(TESTS_DIR, `${rule.replace(/_/g, '-')}.test.ts`);
+  const testDir = groupToTestDir(group);
+  const testsDir = path.join(TESTS_BASE_DIR, testDir, 'rules');
+  const testFile = path.join(testsDir, `${rule.replace(/_/g, '-')}.test.ts`);
   if (!fs.existsSync(testFile)) return [];
   const content = fs.readFileSync(testFile, 'utf-8');
-  const relPath = `packages/rslint-test-tools/tests/typescript-eslint/rules/${rule.replace(/_/g, '-')}.test.ts`;
+  const relPath = `packages/rslint-test-tools/tests/${testDir}/rules/${rule.replace(/_/g, '-')}.test.ts`;
   // Get current commit hash
   let commit = process.env.GITHUB_SHA;
   if (!commit) {
@@ -162,7 +170,7 @@ function buildManifest() {
       if (!included.has(rule)) {
         status = 'partial-test';
       } else {
-        const skipCases = getSkipCases(rule);
+        const skipCases = getSkipCases(rule, group);
         if (skipCases.length > 0) {
           status = 'partial-impl';
           failing_case = skipCases;
