@@ -1,0 +1,433 @@
+// Rstest Snapshot v1
+
+exports[`prefer-as-const > invalid 1`] = `
+{
+  "code": "let foo = { bar: 'baz' as 'baz' };",
+  "diagnostics": [
+    {
+      "message": "Expected a \`const\` instead of a literal type assertion.",
+      "messageId": "preferConstAssertion",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-as-const",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let foo = { bar: 'baz' as const };",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-as-const > invalid 2`] = `
+{
+  "code": "let foo = { bar: 1 as 1 };",
+  "diagnostics": [
+    {
+      "message": "Expected a \`const\` instead of a literal type assertion.",
+      "messageId": "preferConstAssertion",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-as-const",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let foo = { bar: 1 as const };",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-as-const > invalid 3`] = `
+{
+  "code": "let []: 'bar' = 'bar';",
+  "diagnostics": [
+    {
+      "message": "Expected a \`const\` assertion instead of a literal type annotation.",
+      "messageId": "variableConstAssertion",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-as-const",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-as-const > invalid 4`] = `
+{
+  "code": "let foo: 'bar' = 'bar';",
+  "diagnostics": [
+    {
+      "message": "Expected a \`const\` assertion instead of a literal type annotation.",
+      "messageId": "variableConstAssertion",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-as-const",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-as-const > invalid 5`] = `
+{
+  "code": "let foo: 2 = 2;",
+  "diagnostics": [
+    {
+      "message": "Expected a \`const\` assertion instead of a literal type annotation.",
+      "messageId": "variableConstAssertion",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-as-const",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-as-const > invalid 6`] = `
+{
+  "code": "let foo: 'bar' = 'bar' as 'bar';",
+  "diagnostics": [
+    {
+      "message": "Expected a \`const\` instead of a literal type assertion.",
+      "messageId": "preferConstAssertion",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-as-const",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let foo: 'bar' = 'bar' as const;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-as-const > invalid 7`] = `
+{
+  "code": "let foo = <'bar'>'bar';",
+  "diagnostics": [
+    {
+      "message": "Expected a \`const\` instead of a literal type assertion.",
+      "messageId": "preferConstAssertion",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-as-const",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let foo = <const>'bar';",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-as-const > invalid 8`] = `
+{
+  "code": "let foo = <4>4;",
+  "diagnostics": [
+    {
+      "message": "Expected a \`const\` instead of a literal type assertion.",
+      "messageId": "preferConstAssertion",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-as-const",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let foo = <const>4;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-as-const > invalid 9`] = `
+{
+  "code": "let foo = 'bar' as 'bar';",
+  "diagnostics": [
+    {
+      "message": "Expected a \`const\` instead of a literal type assertion.",
+      "messageId": "preferConstAssertion",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-as-const",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let foo = 'bar' as const;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-as-const > invalid 10`] = `
+{
+  "code": "let foo = 5 as 5;",
+  "diagnostics": [
+    {
+      "message": "Expected a \`const\` instead of a literal type assertion.",
+      "messageId": "preferConstAssertion",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-as-const",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "let foo = 5 as const;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-as-const > invalid 11`] = `
+{
+  "code": "
+class foo {
+  bar: 'baz' = 'baz';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`const\` assertion instead of a literal type annotation.",
+      "messageId": "variableConstAssertion",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-as-const",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-as-const > invalid 12`] = `
+{
+  "code": "
+class foo {
+  bar: 2 = 2;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`const\` assertion instead of a literal type annotation.",
+      "messageId": "variableConstAssertion",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-as-const",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-as-const > invalid 13`] = `
+{
+  "code": "
+class foo {
+  foo = <'bar'>'bar';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`const\` instead of a literal type assertion.",
+      "messageId": "preferConstAssertion",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-as-const",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class foo {
+  foo = <const>'bar';
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-as-const > invalid 14`] = `
+{
+  "code": "
+class foo {
+  foo = 'bar' as 'bar';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`const\` instead of a literal type assertion.",
+      "messageId": "preferConstAssertion",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-as-const",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class foo {
+  foo = 'bar' as const;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-as-const > invalid 15`] = `
+{
+  "code": "
+class foo {
+  foo = 5 as 5;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected a \`const\` instead of a literal type assertion.",
+      "messageId": "preferConstAssertion",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-as-const",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class foo {
+  foo = 5 as const;
+}
+      ",
+  "ruleCount": 1,
+}
+`;

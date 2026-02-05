@@ -1,0 +1,235 @@
+// Rstest Snapshot v1
+
+exports[`no-unsafe-unary-minus > invalid 1`] = `
+{
+  "code": "(a: string) => -a;",
+  "diagnostics": [
+    {
+      "message": "Argument of unary negation should be assignable to number | bigint but is string instead.",
+      "messageId": "unaryMinus",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-unary-minus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-unary-minus > invalid 2`] = `
+{
+  "code": "(a: {}) => -a;",
+  "diagnostics": [
+    {
+      "message": "Argument of unary negation should be assignable to number | bigint but is {} instead.",
+      "messageId": "unaryMinus",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-unary-minus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-unary-minus > invalid 3`] = `
+{
+  "code": "(a: number[]) => -a;",
+  "diagnostics": [
+    {
+      "message": "Argument of unary negation should be assignable to number | bigint but is number[] instead.",
+      "messageId": "unaryMinus",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-unary-minus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-unary-minus > invalid 4`] = `
+{
+  "code": "-'hello';",
+  "diagnostics": [
+    {
+      "message": "Argument of unary negation should be assignable to number | bigint but is "hello" instead.",
+      "messageId": "unaryMinus",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-unary-minus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-unary-minus > invalid 5`] = `
+{
+  "code": "-\`hello\`;",
+  "diagnostics": [
+    {
+      "message": "Argument of unary negation should be assignable to number | bigint but is "hello" instead.",
+      "messageId": "unaryMinus",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-unary-minus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-unary-minus > invalid 6`] = `
+{
+  "code": "(a: { x: number }) => -a;",
+  "diagnostics": [
+    {
+      "message": "Argument of unary negation should be assignable to number | bigint but is { x: number; } instead.",
+      "messageId": "unaryMinus",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-unary-minus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-unary-minus > invalid 7`] = `
+{
+  "code": "(a: unknown) => -a;",
+  "diagnostics": [
+    {
+      "message": "Argument of unary negation should be assignable to number | bigint but is unknown instead.",
+      "messageId": "unaryMinus",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-unary-minus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-unary-minus > invalid 8`] = `
+{
+  "code": "(a: void) => -a;",
+  "diagnostics": [
+    {
+      "message": "Argument of unary negation should be assignable to number | bigint but is void instead.",
+      "messageId": "unaryMinus",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-unary-minus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-unary-minus > invalid 9`] = `
+{
+  "code": "<T,>(t: T) => -t;",
+  "diagnostics": [
+    {
+      "message": "Argument of unary negation should be assignable to number | bigint but is T instead.",
+      "messageId": "unaryMinus",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-unary-minus",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
