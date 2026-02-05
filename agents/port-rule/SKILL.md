@@ -1,36 +1,46 @@
 ---
 name: port-rule
-description: Port ESLint rules to rslint (a Go-based linter). Use when users want to port/migrate/implement an ESLint rule, add a new lint rule, or mention "port rule" or specific ESLint rule names like "no-unused-vars", "no-console", etc. This skill guides through the complete workflow from setup to PR submission.
+description: Port ESLint rules to rslint (a Go-based linter). Use when users want to port/migrate/implement an ESLint rule, add a new lint rule, or mention "port rule" or specific ESLint rule names like "no-unused-vars", "no-console", etc. Supports both single-rule and batch-rule porting. This skill guides through the complete workflow from setup to PR submission.
 ---
 
 # Port Rule
 
-Port ESLint rules to rslint with 1:1 behavior parity.
+Port ESLint rules to rslint with 1:1 behavior parity. Supports porting a single rule or multiple rules in batch.
 
 ## Prerequisites
 
-### Step 1: Get Rule Name
+### Step 1: Get Rule Names
 
-If user didn't provide the rule name, ask for it. Accept formats:
+Accept one or more rule names from the user. Supported formats:
 
 - ESLint core: `no-console`, `no-unused-vars`
 - TypeScript-ESLint: `@typescript-eslint/no-explicit-any`
 - Other plugins: `import/no-duplicates`, `react/jsx-uses-react`
 
-### Step 2: Get Rule Documentation URL
+Users may provide rules as:
 
-If user already provided a documentation URL, skip this step.
+- A single rule name
+- Multiple names separated by commas, spaces, or newlines
+- A list provided one-by-one in conversation
+
+### Step 2: Get Rule Documentation URLs
+
+For each rule, obtain the documentation URL.
+
+If user already provided documentation URLs, skip to the next rule.
 
 Otherwise, ask user to choose:
 
 1. **Auto search** (Recommended) - Run the search script to find documentation
 2. **Provide URL manually** - User provides the URL directly
 
-**For auto search**, run:
+**For auto search**, run for each rule:
 
 ```bash
 node agents/port-rule/scripts/search_rule.mjs <rule-name>
 ```
+
+Multiple rules can be searched in parallel.
 
 The script searches:
 
@@ -43,9 +53,69 @@ The script searches:
 - If found: Show results and ask user to confirm the URLs are correct
 - If not found: Ask user to provide the documentation URL manually
 
+## Planning
+
+**Before starting any implementation**, you MUST output a structured plan, then proceed to execute immediately without waiting for user confirmation.
+
+### Single Rule
+
+For a single rule, output a brief checklist:
+
+```
+## Plan
+
+- [ ] Phase 0: Branch setup
+- [ ] Phase 1: Preparation — collect test cases for `<rule-name>`
+- [ ] Phase 2: Implementation — Go rule + tests + docs
+- [ ] Phase 3: Integration — JS tests + register
+- [ ] Phase 4: Verification — build + test
+- [ ] Phase 5: Commit & PR
+```
+
+### Batch Rules
+
+For multiple rules, output a structured plan with a summary table and per-rule breakdown:
+
+```
+## Plan
+
+### Rules to port (N rules)
+| # | Rule | Doc URL | Status |
+|---|------|---------|--------|
+| 1 | <rule-name-1> | <url> | pending |
+| 2 | <rule-name-2> | <url> | pending |
+| ... | ... | ... | ... |
+
+### Progress
+- [ ] Phase 0: Branch setup
+- Rule 1: `<rule-name-1>`
+  - [ ] Phase 1: Preparation
+  - [ ] Phase 2: Implementation
+  - [ ] Phase 3: Integration
+  - [ ] Phase 4: Verification
+  - [ ] Commit
+- Rule 2: `<rule-name-2>`
+  - [ ] Phase 1: Preparation
+  - [ ] Phase 2: Implementation
+  - [ ] Phase 3: Integration
+  - [ ] Phase 4: Verification
+  - [ ] Commit
+- ...
+- [ ] Phase 5: Create PR (summarize all rules)
+```
+
+Output the plan, then proceed to Phase 0 immediately.
+
 ## Workflow
 
-After prerequisites are complete, follow the phases in [PORT_RULE.md](references/PORT_RULE.md):
+Determine the mode based on the number of rules:
+
+- **1 rule** → Single Rule Mode
+- **2+ rules** → Batch Mode
+
+### Single Rule Mode
+
+Follow the phases in [PORT_RULE.md](references/PORT_RULE.md) sequentially:
 
 1. **Phase 0: Branch Setup** - Create feature branch from main
 2. **Phase 1: Preparation** - Collect test cases and identify edge cases
@@ -53,6 +123,32 @@ After prerequisites are complete, follow the phases in [PORT_RULE.md](references
 4. **Phase 3: Integration** - Add JS tests and register rule
 5. **Phase 4: Verification** - Build binary and run all tests
 6. **Phase 5: Submission** - Commit and create PR
+
+Update the checklist as each phase completes.
+
+### Batch Mode
+
+Follow the batch workflow in [PORT_RULE.md](references/PORT_RULE.md):
+
+1. **Phase 0: Branch Setup** - Create a single feature branch for the batch (once)
+2. **For each rule**, execute in order:
+   - **Phase 1: Preparation** - Collect test cases for this rule
+   - **Phase 2: Implementation** - Write Go rule, tests, and documentation
+   - **Phase 3: Integration** - Add JS tests and register rule
+   - **Phase 4: Verification** - Build binary and run all tests
+   - **Commit** - Create an independent commit: `feat: port rule <rule-name>`
+   - **Report** - Briefly report the result before moving to the next rule
+3. **Phase 5: Create PR** - One PR summarizing all ported rules (once)
+
+**Progress tracking**: After completing each rule, update the checklist (mark as `[x]`) and report the status. After a failure, mark as `[!]` with a reason.
+
+**Failure handling**: If a rule fails at any phase, stop and ask the user:
+
+- **(a) Skip** this rule and continue with the next one
+- **(b) Attempt to fix** the issue
+- **(c) Abort** the entire batch
+
+Already-committed rules are not affected by later failures.
 
 ## Quick Reference
 

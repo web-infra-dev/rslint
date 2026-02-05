@@ -70,10 +70,20 @@ Before starting, familiarize yourself with these key source locations:
    git checkout main && git pull origin main
    ```
 
-2. **Create Branch**: Create a new feature branch for the rule.
+2. **Create Branch**: Create a new feature branch.
+
+   **Single rule**:
    - **Naming Convention**: `feat/port-rule-<rule_name_snake_case>-<YYYYMMDD>`
+
    ```bash
    git checkout -b feat/port-rule-<rule_name_snake_case>-$(date +%Y%m%d)
+   ```
+
+   **Batch mode**:
+   - **Naming Convention**: `feat/port-rules-batch-<YYYYMMDD>`
+
+   ```bash
+   git checkout -b feat/port-rules-batch-$(date +%Y%m%d)
    ```
 
 ---
@@ -381,7 +391,11 @@ Add the new test file path to the `include` array.
 
 ## Phase 5: Submission & PR
 
-**Goal**: Submit the new rule.
+### Phase 5A: Per-Rule Commit
+
+**Goal**: Commit each rule independently after it passes verification (Phase 4).
+
+This step is executed **after each rule's Phase 4 completes** (both in single-rule and batch mode).
 
 1. **Configure Project Settings (Conditional)**:
    - If the rule's plugin is already in `rslint.json` `plugins`, add the rule with `"warn"` severity
@@ -390,21 +404,34 @@ Add the new test file path to the `include` array.
 2. **Commit Changes**:
 
    ```bash
-   git add <specific_files_related_to_port>
+   git add <specific_files_related_to_this_rule>
    git commit -m "feat: port rule <rule-name>"
    ```
 
    - Use specific file paths with `git add` (NOT `git add .`)
+   - Only include files related to **this specific rule** in the commit
    - Ensure all tests pass before committing
    - **Do NOT include AI-related information** in commit messages (e.g., no `Co-Authored-By: Claude` or similar)
 
-3. **Push & Create PR**:
+**In batch mode**: After committing, briefly report the result, update the checklist, then proceed to the next rule.
+
+### Phase 5B: Push & Create PR
+
+**Goal**: Push all commits and create a PR.
+
+This step is executed **once**, after all rules are committed (or after the single rule is committed).
+
+1. **Push**:
 
    ```bash
-   git push origin feat/port-rule-<rule_name_snake_case>-$(date +%Y%m%d)
+   git push origin <branch-name>
    ```
 
-   **Important**: Use the repository's PR template at `.github/PULL_REQUEST_TEMPLATE.md`. Example:
+2. **Create PR**:
+
+   **Important**: Use the repository's PR template at `.github/PULL_REQUEST_TEMPLATE.md`.
+
+   **Single rule**:
 
    ```bash
    gh pr create --base main --title "feat: port rule <rule-name>" --body "## Summary
@@ -424,7 +451,60 @@ Add the new test file path to the `include` array.
    - [x] Documentation updated (or not required)."
    ```
 
+   **Batch mode (single plugin)**:
+
+   PR title format: `feat: port N <plugin-name> rules`
+
+   ```bash
+   gh pr create --base main --title "feat: port N <plugin-name> rules" --body "## Summary
+
+   Port N <plugin-name> rules to rslint.
+
+   ### Rules ported
+   | Rule | Description | Doc |
+   |------|-------------|-----|
+   | \`<rule-1>\` | [brief description] | [link](<url>) |
+   | \`<rule-2>\` | [brief description] | [link](<url>) |
+   | ... | ... | ... |
+
+   ## Checklist
+
+   - [x] Tests updated (or not required).
+   - [x] Documentation updated (or not required)."
+   ```
+
+   Examples:
+   - `feat: port 4 @typescript-eslint non-null assertion rules`
+   - `feat: port 3 eslint-plugin-import rules`
+
+   **Batch mode (multiple plugins)**:
+
+   PR title format: `feat: port N rules from <plugin-1>, <plugin-2>`
+
+   ```bash
+   gh pr create --base main --title "feat: port N rules from <plugin-1>, <plugin-2>" --body "## Summary
+
+   Port N rules from <plugin-1> and <plugin-2> to rslint.
+
+   ### Rules ported
+   | Rule | Plugin | Description | Doc |
+   |------|--------|-------------|-----|
+   | \`<rule-1>\` | <plugin-1> | [brief description] | [link](<url>) |
+   | \`<rule-2>\` | <plugin-2> | [brief description] | [link](<url>) |
+   | ... | ... | ... | ... |
+
+   ## Checklist
+
+   - [x] Tests updated (or not required).
+   - [x] Documentation updated (or not required)."
+   ```
+
+   Examples:
+   - `feat: port 5 rules from @typescript-eslint, eslint-plugin-import`
+   - `feat: port 3 rules from ESLint core, @typescript-eslint`
+
    - **Do NOT include AI-related information** in PR title or body
+   - If any rules were skipped during batch execution, note them in the PR body
 
 ---
 
