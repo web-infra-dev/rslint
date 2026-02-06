@@ -1282,6 +1282,7 @@ ruleTester.run('naming-convention', {
       ],
     },
     {
+      skip: true, // TS 5.6 string literal import specifiers not supported by parser
       code: 'import { "🍎" as foo } from \'foo_bar\';',
       errors: [
         {
@@ -2282,6 +2283,7 @@ ruleTester.run('naming-convention', {
       ],
     },
     {
+      skip: true, // TS 5.6 string literal import specifiers not supported by parser
       code: 'import { "🍎" as Foo } from \'foo_bar\';',
       languageOptions: { parserOptions },
       options: [
