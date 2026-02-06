@@ -161,3 +161,6 @@ packages/rslint/pkg/
 
 # rust
 target/
+
+# generated rule manifest
+website/generated/
