@@ -18,7 +18,7 @@ export interface Diagnostic {
   filePath: string;
   range: Range;
   severity?: string;
-  suggestions: any[];
+  suggestions: unknown[];
 }
 
 export interface LintResponse {
@@ -67,19 +67,19 @@ export interface RSlintOptions {
 }
 
 export interface PendingMessage {
-  resolve: (data: any) => void;
+  resolve: (data: unknown) => void;
   reject: (error: Error) => void;
 }
 
 export interface IpcMessage {
   id: number;
   kind: string;
-  data: any;
+  data: unknown;
 }
 
 // Service interface that all implementations must follow
 export interface RslintServiceInterface {
-  sendMessage(kind: string, data: any): Promise<any>;
+  sendMessage(kind: string, data: unknown): Promise<unknown>;
   terminate(): void;
 }
 
