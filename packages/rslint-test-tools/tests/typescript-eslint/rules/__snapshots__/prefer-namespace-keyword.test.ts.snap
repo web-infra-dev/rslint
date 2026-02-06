@@ -1,0 +1,105 @@
+// Rstest Snapshot v1
+
+exports[`prefer-namespace-keyword > invalid 1`] = `
+{
+  "code": "module foo {}",
+  "diagnostics": [
+    {
+      "message": "Use 'namespace' instead of 'module' to declare custom TypeScript modules.",
+      "messageId": "useNamespace",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-namespace-keyword",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "namespace foo {}",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-namespace-keyword > invalid 2`] = `
+{
+  "code": "declare module foo {}",
+  "diagnostics": [
+    {
+      "message": "Use 'namespace' instead of 'module' to declare custom TypeScript modules.",
+      "messageId": "useNamespace",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-namespace-keyword",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "declare namespace foo {}",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-namespace-keyword > invalid 3`] = `
+{
+  "code": "
+declare module foo {
+  declare module bar {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'namespace' instead of 'module' to declare custom TypeScript modules.",
+      "messageId": "useNamespace",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-namespace-keyword",
+    },
+    {
+      "message": "Use 'namespace' instead of 'module' to declare custom TypeScript modules.",
+      "messageId": "useNamespace",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-namespace-keyword",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "
+declare namespace foo {
+  declare namespace bar {}
+}
+      ",
+  "ruleCount": 1,
+}
+`;
