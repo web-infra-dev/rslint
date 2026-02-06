@@ -1,0 +1,365 @@
+// Rstest Snapshot v1
+
+exports[`naming-convention > invalid 1`] = `
+{
+  "code": "const my_variable = 1;",
+  "diagnostics": [
+    {
+      "message": "Variable name \`my_variable\` must match one of the following formats: camelCase, UPPER_CASE",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 2`] = `
+{
+  "code": "function MyFunction() {}",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`MyFunction\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 3`] = `
+{
+  "code": "class myClass {}",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`myClass\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 4`] = `
+{
+  "code": "interface myInterface {}",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`myInterface\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 5`] = `
+{
+  "code": "type myType = string;",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`myType\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 6`] = `
+{
+  "code": "enum myEnum { a }",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`myEnum\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 7`] = `
+{
+  "code": "const _myVariable = 1;",
+  "diagnostics": [
+    {
+      "message": "Variable name \`_myVariable\` must not have a leading underscore.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 8`] = `
+{
+  "code": "const myVariable_ = 1;",
+  "diagnostics": [
+    {
+      "message": "Variable name \`myVariable_\` must not have a trailing underscore.",
+      "messageId": "unexpectedUnderscore",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 9`] = `
+{
+  "code": "const myVariable = 1;",
+  "diagnostics": [
+    {
+      "message": "Variable name \`myVariable\` must have 1 leading underscore(s).",
+      "messageId": "missingUnderscore",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 10`] = `
+{
+  "code": "const active = true;",
+  "diagnostics": [
+    {
+      "message": "Variable name \`active\` must have one of the following prefixes: is, has",
+      "messageId": "missingAffix",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 11`] = `
+{
+  "code": "const name = "hello";",
+  "diagnostics": [
+    {
+      "message": "Variable name \`name\` must have one of the following suffixes: Str, Num",
+      "messageId": "missingAffix",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 12`] = `
+{
+  "code": "const myVar = 1;",
+  "diagnostics": [
+    {
+      "message": "Variable name \`myVar\` must match the RegExp: \\d+$",
+      "messageId": "satisfyCustom",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 13`] = `
+{
+  "code": "function fn(MY_PARAM: string) {}",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`MY_PARAM\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 14`] = `
+{
+  "code": "const myID = 1;",
+  "diagnostics": [
+    {
+      "message": "Variable name \`myID\` must match one of the following formats: strictCamelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
