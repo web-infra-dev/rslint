@@ -57,6 +57,12 @@ The script searches:
 
 **Before starting any implementation**, you MUST output a structured plan, then proceed to execute immediately without waiting for user confirmation.
 
+**IMPORTANT — Task Tracking**: After outputting the text plan, you MUST use the `TaskCreate` tool to create a persistent task for each phase/step. This ensures progress is tracked even if the conversation context is compressed. Specifically:
+
+- Create one task per phase (for single rule) or one task per phase per rule (for batch).
+- Use `TaskUpdate` to mark tasks as `in_progress` when starting and `completed` when done.
+- If you are unsure about current progress (e.g., after context compression or conversation resume), call `TaskList` first to check which tasks remain.
+
 ### Single Rule
 
 For a single rule, output a brief checklist:
@@ -71,6 +77,15 @@ For a single rule, output a brief checklist:
 - [ ] Phase 4: Verification — build + test
 - [ ] Phase 5: Commit & PR
 ```
+
+Then create corresponding tasks via `TaskCreate`:
+
+- "Phase 0: Branch setup"
+- "Phase 1: Preparation — collect test cases for `<rule-name>`"
+- "Phase 2: Implementation — Go rule + tests + docs for `<rule-name>`"
+- "Phase 3: Integration — JS tests + register for `<rule-name>`"
+- "Phase 4: Verification — build + test for `<rule-name>`"
+- "Phase 5: Commit & PR for `<rule-name>`"
 
 ### Batch Rules
 
@@ -104,6 +119,8 @@ For multiple rules, output a structured plan with a summary table and per-rule b
 - [ ] Phase 5: Create PR (summarize all rules)
 ```
 
+Then create corresponding tasks via `TaskCreate` — one for Phase 0, then for each rule create tasks for Phase 1–4 + Commit, and finally one for Phase 5.
+
 Output the plan, then proceed to Phase 0 immediately.
 
 ## Workflow
@@ -124,7 +141,7 @@ Follow the phases in [PORT_RULE.md](references/PORT_RULE.md) sequentially:
 5. **Phase 4: Verification** - Build binary and run all tests
 6. **Phase 5: Submission** - Commit and create PR
 
-Update the checklist as each phase completes.
+For each phase: mark its task as `in_progress` (via `TaskUpdate`) before starting, and `completed` after finishing. Update the text checklist as well.
 
 ### Batch Mode
 
@@ -140,7 +157,7 @@ Follow the batch workflow in [PORT_RULE.md](references/PORT_RULE.md):
    - **Report** - Briefly report the result before moving to the next rule
 3. **Phase 5: Create PR** - One PR summarizing all ported rules (once)
 
-**Progress tracking**: After completing each rule, update the checklist (mark as `[x]`) and report the status. After a failure, mark as `[!]` with a reason.
+**Progress tracking**: After completing each rule, update the checklist (mark as `[x]`) and the corresponding tasks (via `TaskUpdate` to `completed`), then report the status. After a failure, mark the checklist as `[!]` with a reason.
 
 **Failure handling**: If a rule fails at any phase, stop and ask the user:
 
@@ -149,6 +166,10 @@ Follow the batch workflow in [PORT_RULE.md](references/PORT_RULE.md):
 - **(c) Abort** the entire batch
 
 Already-committed rules are not affected by later failures.
+
+### Completion Constraint
+
+The workflow is complete ONLY when all tasks created during Planning are marked as `completed` (or explicitly skipped due to failure). Do NOT stop or wait for user instructions while there are still pending tasks. If the conversation context was compressed or the session was resumed, call `TaskList` first to check remaining work before continuing.
 
 ## Quick Reference
 
