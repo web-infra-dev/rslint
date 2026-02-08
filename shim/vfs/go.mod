@@ -1,6 +1,6 @@
 module github.com/microsoft/typescript-go/shim/vfs
 
-go 1.25
+go 1.25.7
 
 require (
 	github.com/dlclark/regexp2 v1.11.5
