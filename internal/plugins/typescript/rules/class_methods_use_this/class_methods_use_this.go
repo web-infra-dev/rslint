@@ -53,10 +53,10 @@ var ClassMethodsUseThisRule = rule.CreateRule(rule.Rule{
 			return isPublicMember(member, nameInfo)
 		}
 
-		reportMissingThis := func(member *ast.Node, nameNode *ast.Node, initializer *ast.Node, displayName string) {
+		reportMissingThis := func(member *ast.Node, startNode *ast.Node, nameNode *ast.Node, initializer *ast.Node, displayName string) {
 			msg := buildMissingThisMessage(displayName)
-			if nameNode != nil {
-				if reportRange, ok := buildMemberReportRange(ctx.SourceFile, member, nameNode, initializer); ok {
+			if startNode != nil {
+				if reportRange, ok := buildMemberReportRange(ctx.SourceFile, member, startNode, nameNode, initializer); ok {
 					ctx.ReportRange(reportRange, msg)
 					return
 				}
@@ -64,7 +64,7 @@ var ClassMethodsUseThisRule = rule.CreateRule(rule.Rule{
 			ctx.ReportNode(member, msg)
 		}
 
-		checkMethodLike := func(member *ast.Node, body *ast.Node, kind string) {
+		checkMethodLike := func(member *ast.Node, body *ast.Node, kind string, startNode *ast.Node) {
 			if member == nil || body == nil {
 				return
 			}
@@ -75,6 +75,9 @@ var ClassMethodsUseThisRule = rule.CreateRule(rule.Rule{
 			}
 
 			nameNode := getMemberNameNode(member)
+			if startNode == nil {
+				startNode = nameNode
+			}
 			nameInfo := getMemberNameInfo(ctx.SourceFile, nameNode)
 
 			if opts.IgnoreOverrideMethods && ast.HasSyntacticModifier(member, ast.ModifierFlagsOverride) {
@@ -100,7 +103,7 @@ var ClassMethodsUseThisRule = rule.CreateRule(rule.Rule{
 			}
 
 			displayName := buildMemberDisplayName(kind, nameInfo)
-			reportMissingThis(member, nameNode, nil, displayName)
+			reportMissingThis(member, startNode, nameNode, nil, displayName)
 		}
 
 		checkProperty := func(member *ast.Node) {
@@ -169,7 +172,7 @@ var ClassMethodsUseThisRule = rule.CreateRule(rule.Rule{
 			}
 
 			displayName := buildMemberDisplayName("method", nameInfo)
-			reportMissingThis(member, nameNode, init, displayName)
+			reportMissingThis(member, nameNode, nameNode, init, displayName)
 		}
 
 		return rule.RuleListeners{
@@ -179,24 +182,26 @@ var ClassMethodsUseThisRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				kind := "method"
+				var startNode *ast.Node
 				if method.AsteriskToken != nil {
 					kind = "generator method"
+					startNode = node
 				}
-				checkMethodLike(node, method.Body, kind)
+				checkMethodLike(node, method.Body, kind, startNode)
 			},
 			ast.KindGetAccessor: func(node *ast.Node) {
 				accessor := node.AsGetAccessorDeclaration()
 				if accessor == nil || accessor.Body == nil {
 					return
 				}
-				checkMethodLike(node, accessor.Body, "getter")
+				checkMethodLike(node, accessor.Body, "getter", node)
 			},
 			ast.KindSetAccessor: func(node *ast.Node) {
 				accessor := node.AsSetAccessorDeclaration()
 				if accessor == nil || accessor.Body == nil {
 					return
 				}
-				checkMethodLike(node, accessor.Body, "setter")
+				checkMethodLike(node, accessor.Body, "setter", node)
 			},
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
 				checkProperty(node)
@@ -360,7 +365,11 @@ func getMemberNameInfo(sourceFile *ast.SourceFile, nameNode *ast.Node) memberNam
 	case ast.KindPrivateIdentifier:
 		privateIdent := nameNode.AsPrivateIdentifier()
 		if privateIdent != nil {
-			return memberNameInfo{Name: "#" + privateIdent.Text, HasName: true, IsPrivate: true}
+			name := privateIdent.Text
+			if !strings.HasPrefix(name, "#") {
+				name = "#" + name
+			}
+			return memberNameInfo{Name: name, HasName: true, IsPrivate: true}
 		}
 	case ast.KindComputedPropertyName:
 		computed := nameNode.AsComputedPropertyName()
@@ -501,15 +510,18 @@ func containsThisOrSuper(node *ast.Node) bool {
 	return found
 }
 
-func buildMemberReportRange(sourceFile *ast.SourceFile, member *ast.Node, nameNode *ast.Node, initializer *ast.Node) (core.TextRange, bool) {
-	if sourceFile == nil || nameNode == nil {
+func buildMemberReportRange(sourceFile *ast.SourceFile, member *ast.Node, startNode *ast.Node, nameNode *ast.Node, initializer *ast.Node) (core.TextRange, bool) {
+	if sourceFile == nil || startNode == nil {
 		return core.TextRange{}, false
 	}
 
-	nameRange := utils.TrimNodeTextRange(sourceFile, nameNode)
-	start := nameRange.Pos()
+	startRange := utils.TrimNodeTextRange(sourceFile, startNode)
+	start := startRange.Pos()
 
-	searchStart := nameNode.End()
+	searchStart := startNode.End()
+	if nameNode != nil {
+		searchStart = nameNode.End()
+	}
 	searchEnd := member.End()
 	if initializer != nil {
 		searchStart = initializer.Pos()
