@@ -588,8 +588,11 @@ var ExplicitFunctionReturnTypeRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			if opts.AllowTypedFunctionExpressions &&
-				(isValidFunctionExpressionReturnType(node, opts) || ancestorHasReturnType(node)) {
+			if isValidFunctionExpressionReturnType(node, opts) {
+				return
+			}
+
+			if opts.AllowTypedFunctionExpressions && ancestorHasReturnType(node) {
 				return
 			}
 
@@ -642,10 +645,6 @@ func ancestorHasReturnType(node *ast.Node) bool {
 	ancestor := getParentSkippingParens(node)
 	if ancestor == nil {
 		return false
-	}
-
-	if ancestor.Kind == ast.KindPropertyAssignment {
-		ancestor = ancestor.AsPropertyAssignment().Initializer
 	}
 
 	isReturnStatement := ancestor.Kind == ast.KindReturnStatement
