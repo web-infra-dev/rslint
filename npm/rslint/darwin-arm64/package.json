@@ -1,6 +1,6 @@
 {
   "name": "@rslint/darwin-arm64",
-  "version": "0.2.0",
+  "version": "0.2.1-canary.1770617231",
   "license": "MIT",
   "description": "binary for rslint",
   "homepage": "https://rslint.rs",
