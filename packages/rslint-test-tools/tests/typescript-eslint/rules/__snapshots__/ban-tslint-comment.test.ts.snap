@@ -5,7 +5,7 @@ exports[`ban-tslint-comment > invalid 1`] = `
   "code": "/* tslint:disable */",
   "diagnostics": [
     {
-      "message": "tslint comment detected: "/* tslint:disable */"",
+      "message": "tslint comment detected: /* tslint:disable */",
       "messageId": "commentDetected",
       "range": {
         "end": {
@@ -31,7 +31,7 @@ exports[`ban-tslint-comment > invalid 2`] = `
   "code": "/* tslint:enable */",
   "diagnostics": [
     {
-      "message": "tslint comment detected: "/* tslint:enable */"",
+      "message": "tslint comment detected: /* tslint:enable */",
       "messageId": "commentDetected",
       "range": {
         "end": {
@@ -57,7 +57,7 @@ exports[`ban-tslint-comment > invalid 3`] = `
   "code": "/* tslint:disable:rule1 rule2 rule3... */",
   "diagnostics": [
     {
-      "message": "tslint comment detected: "/* tslint:disable:rule1 rule2 rule3... */"",
+      "message": "tslint comment detected: /* tslint:disable:rule1 rule2 rule3... */",
       "messageId": "commentDetected",
       "range": {
         "end": {
@@ -83,7 +83,7 @@ exports[`ban-tslint-comment > invalid 4`] = `
   "code": "/* tslint:enable:rule1 rule2 rule3... */",
   "diagnostics": [
     {
-      "message": "tslint comment detected: "/* tslint:enable:rule1 rule2 rule3... */"",
+      "message": "tslint comment detected: /* tslint:enable:rule1 rule2 rule3... */",
       "messageId": "commentDetected",
       "range": {
         "end": {
@@ -109,7 +109,7 @@ exports[`ban-tslint-comment > invalid 5`] = `
   "code": "// tslint:disable-next-line",
   "diagnostics": [
     {
-      "message": "tslint comment detected: "// tslint:disable-next-line"",
+      "message": "tslint comment detected: // tslint:disable-next-line",
       "messageId": "commentDetected",
       "range": {
         "end": {
@@ -135,7 +135,7 @@ exports[`ban-tslint-comment > invalid 6`] = `
   "code": "someCode(); // tslint:disable-line",
   "diagnostics": [
     {
-      "message": "tslint comment detected: "// tslint:disable-line"",
+      "message": "tslint comment detected: // tslint:disable-line",
       "messageId": "commentDetected",
       "range": {
         "end": {
@@ -162,7 +162,7 @@ exports[`ban-tslint-comment > invalid 7`] = `
   "code": "// tslint:disable-next-line:rule1 rule2 rule3...",
   "diagnostics": [
     {
-      "message": "tslint comment detected: "// tslint:disable-next-line:rule1 rule2 rule3..."",
+      "message": "tslint comment detected: // tslint:disable-next-line:rule1 rule2 rule3...",
       "messageId": "commentDetected",
       "range": {
         "end": {
@@ -186,13 +186,13 @@ exports[`ban-tslint-comment > invalid 7`] = `
 exports[`ban-tslint-comment > invalid 8`] = `
 {
   "code": "
-const woah = doSomeStuff();
+const whoa = doSomeStuff();
 // tslint:disable-line
-console.log(woah);
+console.log(whoa);
       ",
   "diagnostics": [
     {
-      "message": "tslint comment detected: "// tslint:disable-line"",
+      "message": "tslint comment detected: // tslint:disable-line",
       "messageId": "commentDetected",
       "range": {
         "end": {
@@ -210,8 +210,8 @@ console.log(woah);
   "errorCount": 1,
   "fileCount": 1,
   "output": "
-const woah = doSomeStuff();
-console.log(woah);
+const whoa = doSomeStuff();
+console.log(whoa);
       ",
   "ruleCount": 1,
 }

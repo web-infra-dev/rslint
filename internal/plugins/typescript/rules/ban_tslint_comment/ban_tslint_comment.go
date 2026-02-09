@@ -32,10 +32,13 @@ func run(ctx rule.RuleContext, _ any) rule.RuleListeners {
 			return
 		}
 
-		formatted := formatCommentText(commentValue, comment.Kind == ast.KindSingleLineCommentTrivia)
+		commentText := extractCommentText(text, comment)
+		if commentText == "" {
+			commentText = commentValue
+		}
 		message := rule.RuleMessage{
 			Id:          "commentDetected",
-			Description: fmt.Sprintf("tslint comment detected: \"%s\"", formatted),
+			Description: fmt.Sprintf("tslint comment detected: %s", commentText),
 		}
 
 		fixRange := buildFixRange(ctx.SourceFile, comment, len(text))
@@ -66,12 +69,14 @@ func extractCommentValue(text string, comment *ast.CommentRange) string {
 	}
 }
 
-func formatCommentText(value string, isLine bool) string {
-	trimmed := strings.TrimSpace(value)
-	if isLine {
-		return "// " + trimmed
+func extractCommentText(text string, comment *ast.CommentRange) string {
+	if comment.End() <= comment.Pos() {
+		return ""
 	}
-	return "/* " + trimmed + " */"
+	if comment.Pos() < 0 || comment.End() > len(text) {
+		return ""
+	}
+	return strings.TrimSpace(text[comment.Pos():comment.End()])
 }
 
 func buildFixRange(sourceFile *ast.SourceFile, comment *ast.CommentRange, textLen int) core.TextRange {
