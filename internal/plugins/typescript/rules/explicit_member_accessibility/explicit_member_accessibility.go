@@ -165,7 +165,7 @@ func getMemberStartPos(ctx rule.RuleContext, node *ast.Node) int {
 
 func getMemberHeadRange(ctx rule.RuleContext, node *ast.Node, nameNode *ast.Node) core.TextRange {
 	start := getMemberStartPos(ctx, node)
-	end := start
+	var end int
 	if nameNode != nil {
 		nameRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
 		end = nameRange.End()
@@ -228,7 +228,7 @@ func findPublicKeywordRange(ctx rule.RuleContext, node *ast.Node) (core.TextRang
 	for s.TokenStart() < node.End() {
 		if s.Token() == ast.KindPublicKeyword {
 			keywordRange := core.NewTextRange(s.TokenStart(), s.TokenEnd())
-			removeEnd := s.TokenEnd()
+			var removeEnd int
 
 			i := s.TokenEnd()
 			for i < len(text) && utils.IsStrWhiteSpace(rune(text[i])) {
