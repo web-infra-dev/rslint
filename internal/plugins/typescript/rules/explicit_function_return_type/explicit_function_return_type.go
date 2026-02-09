@@ -343,13 +343,16 @@ func isValidFunctionExpressionReturnType(node *ast.Node, opts ExplicitFunctionRe
 
 	parent := getParentSkippingParens(node)
 	if opts.AllowExpressions && parent != nil {
-		if parent.Kind != ast.KindVariableDeclaration &&
-			parent.Kind != ast.KindPropertyDeclaration &&
-			parent.Kind != ast.KindExportAssignment &&
-			!(node.Kind == ast.KindMethodDeclaration && (parent.Kind == ast.KindClassDeclaration || parent.Kind == ast.KindClassExpression)) &&
-			!(node.Kind == ast.KindGetAccessor && (parent.Kind == ast.KindClassDeclaration || parent.Kind == ast.KindClassExpression)) &&
-			!(node.Kind == ast.KindSetAccessor && (parent.Kind == ast.KindClassDeclaration || parent.Kind == ast.KindClassExpression)) &&
-			!(node.Kind == ast.KindConstructor && (parent.Kind == ast.KindClassDeclaration || parent.Kind == ast.KindClassExpression)) {
+		isClassParent := parent.Kind == ast.KindClassDeclaration || parent.Kind == ast.KindClassExpression
+		isClassMember := isClassParent && (node.Kind == ast.KindMethodDeclaration ||
+			node.Kind == ast.KindGetAccessor ||
+			node.Kind == ast.KindSetAccessor ||
+			node.Kind == ast.KindConstructor)
+		isDisallowedParent := parent.Kind == ast.KindVariableDeclaration ||
+			parent.Kind == ast.KindPropertyDeclaration ||
+			parent.Kind == ast.KindExportAssignment ||
+			isClassMember
+		if !isDisallowedParent {
 			return true
 		}
 	}
