@@ -16,7 +16,7 @@ const TESTS_BASE_DIR = path.join(
 );
 const MANIFEST_PATH = path.join(
   __dirname,
-  '../packages/rslint-test-tools/rule-manifest.json',
+  '../website/generated/rule-manifest.json',
 );
 
 function getCoreRuleEntries() {
@@ -183,6 +183,7 @@ function buildManifest() {
 
 function main() {
   const manifest = buildManifest();
+  fs.mkdirSync(path.dirname(MANIFEST_PATH), { recursive: true });
   fs.writeFileSync(MANIFEST_PATH, JSON.stringify(manifest, null, 2) + '\n');
   console.log('rule-manifest.json generated at', MANIFEST_PATH);
 }
