@@ -1,7 +1,6 @@
 package ban_tslint_comment
 
 import (
-	"fmt"
 	"regexp"
 	"strings"
 
