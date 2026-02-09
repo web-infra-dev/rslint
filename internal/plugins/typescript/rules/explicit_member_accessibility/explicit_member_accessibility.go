@@ -221,7 +221,8 @@ func hasReadonly(node *ast.Node) bool {
 }
 
 func findPublicKeywordRange(ctx rule.RuleContext, node *ast.Node) (core.TextRange, core.TextRange, bool) {
-	s := scanner.GetScannerForSourceFile(ctx.SourceFile, node.Pos())
+	start := getMemberStartPos(ctx, node)
+	s := scanner.GetScannerForSourceFile(ctx.SourceFile, start)
 	text := ctx.SourceFile.Text()
 
 	for s.TokenStart() < node.End() {
