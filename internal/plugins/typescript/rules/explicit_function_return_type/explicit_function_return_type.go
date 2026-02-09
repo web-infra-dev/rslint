@@ -282,6 +282,9 @@ func isPropertyOfObjectWithType(property *ast.Node) bool {
 	}
 
 	parent := getParentSkippingParens(objectExpr)
+	for parent != nil && parent.Kind == ast.KindArrayLiteralExpression {
+		parent = getParentSkippingParens(parent)
+	}
 	return isTypedParent(parent, nil) || isPropertyOfObjectWithType(parent)
 }
 
