@@ -65,11 +65,11 @@ func TestBanTslintCommentRule(t *testing.T) {
 			Output: []string{""},
 		},
 		{
-			Code: "const woah = doSomeStuff();\n// tslint:disable-line\nconsole.log(woah);\n",
+			Code: "const whoa = doSomeStuff();\n// tslint:disable-line\nconsole.log(whoa);\n",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "commentDetected", Line: 2, Column: 1},
 			},
-			Output: []string{"const woah = doSomeStuff();\nconsole.log(woah);\n"},
+			Output: []string{"const whoa = doSomeStuff();\nconsole.log(whoa);\n"},
 		},
 	})
 }

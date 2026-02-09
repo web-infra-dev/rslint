@@ -75,15 +75,37 @@ func formatCommentText(value string, isLine bool) string {
 }
 
 func buildFixRange(sourceFile *ast.SourceFile, comment *ast.CommentRange, textLen int) core.TextRange {
+	text := sourceFile.Text()
 	start := comment.Pos()
-	startLine, startColumn := scanner.GetECMALineAndCharacterOfPosition(sourceFile, comment.Pos())
-	if startColumn > 0 {
-		start = scanner.GetECMAPositionOfLineAndCharacter(sourceFile, startLine, startColumn-1)
+	end := comment.End()
+
+	startLine, _ := scanner.GetECMALineAndCharacterOfPosition(sourceFile, start)
+	lineStart := scanner.GetECMAPositionOfLineAndCharacter(sourceFile, startLine, 0)
+
+	isStandalone := true
+	for i := lineStart; i < start; i++ {
+		if text[i] != ' ' && text[i] != '\t' {
+			isStandalone = false
+			break
+		}
 	}
 
-	end := comment.End()
-	if end < textLen {
-		end++
+	if isStandalone {
+		start = lineStart
+		if end < textLen {
+			if text[end] == '\r' {
+				end++
+				if end < textLen && text[end] == '\n' {
+					end++
+				}
+			} else if text[end] == '\n' {
+				end++
+			}
+		}
+	} else {
+		for start > lineStart && (text[start-1] == ' ' || text[start-1] == '\t') {
+			start--
+		}
 	}
 
 	return core.NewTextRange(start, end)
