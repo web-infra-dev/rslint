@@ -148,36 +148,12 @@ func formatMemberDescription(memberType string, name string) string {
 	return fmt.Sprintf("%s %s", memberType, name)
 }
 
-func getModifiers(node *ast.Node) *ast.ModifierList {
-	switch node.Kind {
-	case ast.KindMethodDeclaration:
-		return node.AsMethodDeclaration().Modifiers()
-	case ast.KindConstructor:
-		return node.AsConstructorDeclaration().Modifiers()
-	case ast.KindGetAccessor:
-		return node.AsGetAccessorDeclaration().Modifiers()
-	case ast.KindSetAccessor:
-		return node.AsSetAccessorDeclaration().Modifiers()
-	case ast.KindPropertyDeclaration:
-		return node.AsPropertyDeclaration().Modifiers()
-	case ast.KindParameter:
-		return node.AsParameterDeclaration().Modifiers()
-	}
-	return nil
-}
-
 func getLastDecorator(node *ast.Node) *ast.Node {
-	modifiers := getModifiers(node)
-	if modifiers == nil {
+	decorators := node.Decorators()
+	if len(decorators) == 0 {
 		return nil
 	}
-	var last *ast.Node
-	for _, modifier := range modifiers.Nodes {
-		if modifier.Kind == ast.KindDecorator {
-			last = modifier
-		}
-	}
-	return last
+	return decorators[len(decorators)-1]
 }
 
 func getMemberStartPos(ctx rule.RuleContext, node *ast.Node) int {
