@@ -423,9 +423,7 @@ func trimLiteralText(text string) string {
 func containsThisOrSuper(node *ast.Node) bool {
 	found := false
 	var visit func(n *ast.Node)
-	var visitClass func(n *ast.Node)
-
-	visitClass = func(n *ast.Node) {
+	visitClass := func(n *ast.Node) {
 		if n == nil || found {
 			return
 		}
