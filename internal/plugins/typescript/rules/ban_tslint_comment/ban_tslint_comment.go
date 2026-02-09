@@ -38,7 +38,7 @@ func run(ctx rule.RuleContext, _ any) rule.RuleListeners {
 		}
 		message := rule.RuleMessage{
 			Id:          "commentDetected",
-			Description: fmt.Sprintf("tslint comment detected: %s", commentText),
+			Description: "tslint comment detected: " + commentText,
 		}
 
 		fixRange := buildFixRange(ctx.SourceFile, comment, len(text))
@@ -98,12 +98,13 @@ func buildFixRange(sourceFile *ast.SourceFile, comment *ast.CommentRange, textLe
 	if isStandalone {
 		start = lineStart
 		if end < textLen {
-			if text[end] == '\r' {
+			switch text[end] {
+			case '\r':
 				end++
 				if end < textLen && text[end] == '\n' {
 					end++
 				}
-			} else if text[end] == '\n' {
+			case '\n':
 				end++
 			}
 		}
