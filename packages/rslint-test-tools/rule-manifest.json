@@ -124,6 +124,12 @@
       "failing_case": []
     },
     {
+      "name": "init-declarations",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
       "name": "no-array-constructor",
       "group": "@typescript-eslint",
       "status": "full",
@@ -238,6 +244,12 @@
       "failing_case": []
     },
     {
+      "name": "no-extra-non-null-assertion",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
       "name": "no-extraneous-class",
       "group": "@typescript-eslint",
       "status": "partial-test",
@@ -311,6 +323,24 @@
     },
     {
       "name": "no-namespace",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "no-non-null-asserted-nullish-coalescing",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "no-non-null-asserted-optional-chain",
+      "group": "@typescript-eslint",
+      "status": "full",
+      "failing_case": []
+    },
+    {
+      "name": "no-non-null-assertion",
       "group": "@typescript-eslint",
       "status": "full",
       "failing_case": []
