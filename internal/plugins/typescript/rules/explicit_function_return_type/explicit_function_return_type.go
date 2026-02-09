@@ -647,9 +647,16 @@ func ancestorHasReturnType(node *ast.Node) bool {
 		return false
 	}
 
+	for ancestor != nil && (ancestor.Kind == ast.KindPropertyAssignment || ancestor.Kind == ast.KindObjectLiteralExpression) {
+		ancestor = getParentSkippingParens(ancestor)
+	}
+	if ancestor == nil {
+		return false
+	}
+
 	isReturnStatement := ancestor.Kind == ast.KindReturnStatement
-	isBodylessArrow := ancestor.Kind == ast.KindArrowFunction && ancestor.Body() != nil && ancestor.Body().Kind != ast.KindBlock
-	if !isReturnStatement && !isBodylessArrow {
+	isArrowExpressionBody := ancestor.Kind == ast.KindArrowFunction && ancestor.Body() != nil && ancestor.Body().Kind != ast.KindBlock
+	if !isReturnStatement && !isArrowExpressionBody {
 		return false
 	}
 
