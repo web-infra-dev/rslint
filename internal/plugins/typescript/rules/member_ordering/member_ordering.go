@@ -694,9 +694,10 @@ func getRank(sourceFile *ast.SourceFile, node *ast.Node, orderConfig []memberTyp
 	}
 
 	memberGroups = append(memberGroups, nodeType)
-	if nodeType == "readonly-signature" {
+	switch nodeType {
+	case "readonly-signature":
 		memberGroups = append(memberGroups, "signature")
-	} else if nodeType == "readonly-field" {
+	case "readonly-field":
 		memberGroups = append(memberGroups, "field")
 	}
 
