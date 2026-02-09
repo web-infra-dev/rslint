@@ -37,7 +37,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/explicit-module-boundary-types.test.ts',
     // './tests/typescript-eslint/rules/init-declarations.test.ts',
     // './tests/typescript-eslint/rules/max-params.test.ts',
-    // './tests/typescript-eslint/rules/member-ordering.test.ts',
+    './tests/typescript-eslint/rules/member-ordering.test.ts',
     // './tests/typescript-eslint/rules/member-ordering/member-ordering-alphabetically-case-insensitive-order.test.ts',
     // './tests/typescript-eslint/rules/member-ordering/member-ordering-alphabetically-order.test.ts',
     // './tests/typescript-eslint/rules/member-ordering/member-ordering-natural-case-insensitive-order.test.ts',

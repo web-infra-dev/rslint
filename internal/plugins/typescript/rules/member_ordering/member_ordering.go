@@ -635,9 +635,18 @@ func getLowestRank(ranks []int, target int, order []memberTypeGroup) string {
 }
 
 func getRank(sourceFile *ast.SourceFile, node *ast.Node, orderConfig []memberTypeGroup, supportsModifiers bool) int {
+	nodeType := getNodeType(node)
+	if nodeType == "" {
+		if len(orderConfig) == 0 {
+			return -1
+		}
+		return len(orderConfig) - 1
+	}
+
+	abstract := ast.HasSyntacticModifier(node, ast.ModifierFlagsAbstract)
 	if node.Kind == ast.KindMethodDeclaration {
 		method := node.AsMethodDeclaration()
-		if method != nil && method.Body == nil {
+		if method != nil && method.Body == nil && !abstract {
 			return -1
 		}
 	}
@@ -647,16 +656,6 @@ func getRank(sourceFile *ast.SourceFile, node *ast.Node, orderConfig []memberTyp
 			return -1
 		}
 	}
-
-	nodeType := getNodeType(node)
-	if nodeType == "" {
-		if len(orderConfig) == 0 {
-			return -1
-		}
-		return len(orderConfig) - 1
-	}
-
-	abstract := ast.GetCombinedModifierFlags(node)&ast.ModifierFlagsAbstract != 0
 	scope := "instance"
 	if ast.IsStatic(node) {
 		scope = "static"
@@ -922,7 +921,7 @@ func isMemberOptional(node *ast.Node) bool {
 }
 
 func isReadonly(node *ast.Node) bool {
-	return ast.GetCombinedModifierFlags(node)&ast.ModifierFlagsReadonly != 0
+	return ast.HasSyntacticModifier(node, ast.ModifierFlagsReadonly)
 }
 
 func getClassMembers(node *ast.Node) []*ast.Node {
