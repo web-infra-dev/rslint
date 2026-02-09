@@ -723,7 +723,7 @@ class Foo {
   ],
 };
 
-ruleTester.run('member-ordering-alphabetically-case-insensitive-order', {
+ruleTester.run('member-ordering', {
   invalid: [
     ...sortedCiWithoutGrouping.invalid,
     ...sortedCiWithGrouping.invalid,

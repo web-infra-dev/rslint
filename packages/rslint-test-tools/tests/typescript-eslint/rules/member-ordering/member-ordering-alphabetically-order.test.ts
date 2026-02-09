@@ -2728,7 +2728,7 @@ const sortedWithGrouping: RunTests<MessageIds, Options> = {
   ],
 };
 
-ruleTester.run('member-ordering-alphabetically-order', {
+ruleTester.run('member-ordering', {
   invalid: [...sortedWithoutGrouping.invalid, ...sortedWithGrouping.invalid],
   valid: [...sortedWithoutGrouping.valid, ...sortedWithGrouping.valid],
 });
