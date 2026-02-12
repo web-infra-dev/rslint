@@ -1,0 +1,131 @@
+// Rstest Snapshot v1
+
+exports[`no-duplicate-case > invalid 1`] = `
+{
+  "code": "switch (a) { case 1: break; case 1: break; }",
+  "diagnostics": [
+    {
+      "message": "Duplicate case label.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-case",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-case > invalid 2`] = `
+{
+  "code": "switch (a) { case "a": break; case "a": break; }",
+  "diagnostics": [
+    {
+      "message": "Duplicate case label.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-case",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-case > invalid 3`] = `
+{
+  "code": "switch (a) { case 1: break; case 2: break; case 1: break; }",
+  "diagnostics": [
+    {
+      "message": "Duplicate case label.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-case",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-case > invalid 4`] = `
+{
+  "code": "switch (a) { case a: break; case a: break; }",
+  "diagnostics": [
+    {
+      "message": "Duplicate case label.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-case",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-duplicate-case > invalid 5`] = `
+{
+  "code": "switch (a) { case /*a*/ 1: break; case 1: break; }",
+  "diagnostics": [
+    {
+      "message": "Duplicate case label.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-duplicate-case",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

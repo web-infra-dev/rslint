@@ -1,0 +1,94 @@
+// Rstest Snapshot v1
+
+exports[`no-dupe-args > invalid 1`] = `
+{
+  "code": "function foo(a, b, a) {}",
+  "diagnostics": [
+    {
+      "message": "Duplicate param 'a'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-args",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-args > invalid 2`] = `
+{
+  "code": "function foo(a, a, a) {}",
+  "diagnostics": [
+    {
+      "message": "Duplicate param 'a'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-args",
+    },
+    {
+      "message": "Duplicate param 'a'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-args",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-args > invalid 3`] = `
+{
+  "code": "var foo = function(a, b, b) {}",
+  "diagnostics": [
+    {
+      "message": "Duplicate param 'b'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-args",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

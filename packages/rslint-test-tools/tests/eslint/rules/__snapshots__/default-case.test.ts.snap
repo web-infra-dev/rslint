@@ -1,0 +1,53 @@
+// Rstest Snapshot v1
+
+exports[`default-case > invalid 1`] = `
+{
+  "code": "switch (a) { case 1: break; }",
+  "diagnostics": [
+    {
+      "message": "Expected a default case.",
+      "messageId": "missingDefaultCase",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case > invalid 2`] = `
+{
+  "code": "switch (a) { case 1: break; case 2: break; }",
+  "diagnostics": [
+    {
+      "message": "Expected a default case.",
+      "messageId": "missingDefaultCase",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

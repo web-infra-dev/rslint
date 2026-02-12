@@ -1,0 +1,146 @@
+// Rstest Snapshot v1
+
+exports[`no-dupe-keys > invalid 1`] = `
+{
+  "code": "var x = { a: 1, a: 2 };",
+  "diagnostics": [
+    {
+      "message": "Duplicate key 'a'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-keys > invalid 2`] = `
+{
+  "code": "var x = { a: 1, b: 2, a: 3 };",
+  "diagnostics": [
+    {
+      "message": "Duplicate key 'a'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-keys > invalid 3`] = `
+{
+  "code": "var x = { a: 1, b: 2, a: 3, a: 4 };",
+  "diagnostics": [
+    {
+      "message": "Duplicate key 'a'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-keys",
+    },
+    {
+      "message": "Duplicate key 'a'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-keys",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-keys > invalid 4`] = `
+{
+  "code": "var x = { "a": 1, "a": 2 };",
+  "diagnostics": [
+    {
+      "message": "Duplicate key 'a'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-keys > invalid 5`] = `
+{
+  "code": "var x = { 0x1: "a", 1: "b" };",
+  "diagnostics": [
+    {
+      "message": "Duplicate key '1'.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-keys",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -1,0 +1,183 @@
+// Rstest Snapshot v1
+
+exports[`no-console > invalid 1`] = `
+{
+  "code": "console.log("test");",
+  "diagnostics": [
+    {
+      "message": "Unexpected console statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-console",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-console > invalid 2`] = `
+{
+  "code": "console.warn("test");",
+  "diagnostics": [
+    {
+      "message": "Unexpected console statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-console",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-console > invalid 3`] = `
+{
+  "code": "console.error("test");",
+  "diagnostics": [
+    {
+      "message": "Unexpected console statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-console",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-console > invalid 4`] = `
+{
+  "code": "console.info("test");",
+  "diagnostics": [
+    {
+      "message": "Unexpected console statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-console",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-console > invalid 5`] = `
+{
+  "code": "console.log("test");",
+  "diagnostics": [
+    {
+      "message": "Unexpected console statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-console",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-console > invalid 6`] = `
+{
+  "code": "console["log"]("test");",
+  "diagnostics": [
+    {
+      "message": "Unexpected console statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-console",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-console > invalid 7`] = `
+{
+  "code": "console.log.bind(null)("test");",
+  "diagnostics": [
+    {
+      "message": "Unexpected console statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-console",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

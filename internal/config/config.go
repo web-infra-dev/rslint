@@ -94,18 +94,26 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/rules/array_callback_return"
 	"github.com/web-infra-dev/rslint/internal/rules/constructor_super"
+	"github.com/web-infra-dev/rslint/internal/rules/default_case"
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_async_promise_executor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_await_in_loop"
+	"github.com/web-infra-dev/rslint/internal/rules/no_case_declarations"
 	"github.com/web-infra-dev/rslint/internal/rules/no_class_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_compare_neg_zero"
 	"github.com/web-infra-dev/rslint/internal/rules/no_cond_assign"
+	"github.com/web-infra-dev/rslint/internal/rules/no_console"
 	"github.com/web-infra-dev/rslint/internal/rules/no_const_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constant_binary_expression"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constant_condition"
 	"github.com/web-infra-dev/rslint/internal/rules/no_constructor_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_debugger"
+	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_args"
+	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_keys"
+	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_case"
+	"github.com/web-infra-dev/rslint/internal/rules/no_empty"
+	"github.com/web-infra-dev/rslint/internal/rules/no_empty_pattern"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
 	"github.com/web-infra-dev/rslint/internal/rules/no_sparse_arrays"
 	"github.com/web-infra-dev/rslint/internal/rules/no_template_curly_in_string"
@@ -472,18 +480,26 @@ func registerAllEslintImportPluginRules() {
 func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("array-callback-return", array_callback_return.ArrayCallbackReturnRule)
 	GlobalRuleRegistry.Register("constructor-super", constructor_super.ConstructorSuperRule)
+	GlobalRuleRegistry.Register("default-case", default_case.DefaultCaseRule)
 	GlobalRuleRegistry.Register("for-direction", for_direction.ForDirectionRule)
 	GlobalRuleRegistry.Register("getter-return", getter_return.GetterReturnRule)
 	GlobalRuleRegistry.Register("no-async-promise-executor", no_async_promise_executor.NoAsyncPromiseExecutorRule)
 	GlobalRuleRegistry.Register("no-await-in-loop", no_await_in_loop.NoAwaitInLoopRule)
+	GlobalRuleRegistry.Register("no-case-declarations", no_case_declarations.NoCaseDeclarationsRule)
 	GlobalRuleRegistry.Register("no-class-assign", no_class_assign.NoClassAssignRule)
 	GlobalRuleRegistry.Register("no-compare-neg-zero", no_compare_neg_zero.NoCompareNegZeroRule)
 	GlobalRuleRegistry.Register("no-cond-assign", no_cond_assign.NoCondAssignRule)
+	GlobalRuleRegistry.Register("no-console", no_console.NoConsoleRule)
 	GlobalRuleRegistry.Register("no-const-assign", no_const_assign.NoConstAssignRule)
 	GlobalRuleRegistry.Register("no-constant-binary-expression", no_constant_binary_expression.NoConstantBinaryExpressionRule)
 	GlobalRuleRegistry.Register("no-constant-condition", no_constant_condition.NoConstantConditionRule)
 	GlobalRuleRegistry.Register("no-constructor-return", no_constructor_return.NoConstructorReturnRule)
 	GlobalRuleRegistry.Register("no-debugger", no_debugger.NoDebuggerRule)
+	GlobalRuleRegistry.Register("no-dupe-args", no_dupe_args.NoDupeArgsRule)
+	GlobalRuleRegistry.Register("no-dupe-keys", no_dupe_keys.NoDupeKeysRule)
+	GlobalRuleRegistry.Register("no-duplicate-case", no_duplicate_case.NoDuplicateCaseRule)
+	GlobalRuleRegistry.Register("no-empty", no_empty.NoEmptyRule)
+	GlobalRuleRegistry.Register("no-empty-pattern", no_empty_pattern.NoEmptyPatternRule)
 	GlobalRuleRegistry.Register("no-loss-of-precision", no_loss_of_precision.NoLossOfPrecisionRule)
 	GlobalRuleRegistry.Register("no-template-curly-in-string", no_template_curly_in_string.NoTemplateCurlyInString)
 	GlobalRuleRegistry.Register("no-sparse-arrays", no_sparse_arrays.NoSparseArraysRule)

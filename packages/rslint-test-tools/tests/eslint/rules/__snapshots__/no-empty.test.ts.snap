@@ -1,0 +1,172 @@
+// Rstest Snapshot v1
+
+exports[`no-empty > invalid 1`] = `
+{
+  "code": "if (foo) {}",
+  "diagnostics": [
+    {
+      "message": "Empty block statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty > invalid 2`] = `
+{
+  "code": "while (foo) {}",
+  "diagnostics": [
+    {
+      "message": "Empty block statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty > invalid 3`] = `
+{
+  "code": "for (;;) {}",
+  "diagnostics": [
+    {
+      "message": "Empty block statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty > invalid 4`] = `
+{
+  "code": "try {} catch (e) {}",
+  "diagnostics": [
+    {
+      "message": "Empty block statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty",
+    },
+    {
+      "message": "Empty block statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty > invalid 5`] = `
+{
+  "code": "try { foo() } catch (e) {}",
+  "diagnostics": [
+    {
+      "message": "Empty block statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty > invalid 6`] = `
+{
+  "code": "switch (foo) {}",
+  "diagnostics": [
+    {
+      "message": "Empty switch statement.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
