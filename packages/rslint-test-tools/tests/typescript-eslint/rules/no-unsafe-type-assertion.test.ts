@@ -54,11 +54,9 @@ describe('basic assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: 'string',
             },
-            endColumn: 12,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -72,11 +70,9 @@ describe('basic assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: 'string',
             },
-            endColumn: 29,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -90,11 +86,9 @@ describe('basic assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: 'string',
             },
-            endColumn: 10,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -108,11 +102,9 @@ describe('basic assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: 'string | boolean',
             },
-            endColumn: 22,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -127,21 +119,17 @@ describe('basic assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '"bar"',
             },
-            endColumn: 20,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
           },
           {
-            column: 1,
             data: {
               type: '"foo"',
             },
-            endColumn: 11,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -157,11 +145,9 @@ describe('basic assertions', () => {
         `,
         errors: [
           {
-            column: 10,
             data: {
               type: 'true',
             },
-            endColumn: 19,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -176,11 +162,9 @@ describe('basic assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: 'Omit<Required<Readonly<{ hello: "world"; foo: "bar"; }>>, "foo">',
             },
-            endColumn: 69,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -194,11 +178,9 @@ describe('basic assertions', () => {
         `,
         errors: [
           {
-            column: 13,
             data: {
               type: 'number[]',
             },
-            endColumn: 28,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -229,11 +211,9 @@ describe('any assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '`any`',
             },
-            endColumn: 16,
             endLine: 3,
             line: 3,
             messageId: 'unsafeOfAnyTypeAssertion',
@@ -247,11 +227,9 @@ describe('any assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '`any`',
             },
-            endColumn: 17,
             endLine: 3,
             line: 3,
             messageId: 'unsafeToAnyTypeAssertion',
@@ -265,11 +243,9 @@ describe('any assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '`any`',
             },
-            endColumn: 18,
             endLine: 3,
             line: 3,
             messageId: 'unsafeOfAnyTypeAssertion',
@@ -283,11 +259,9 @@ describe('any assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '`any`',
             },
-            endColumn: 15,
             endLine: 3,
             line: 3,
             messageId: 'unsafeOfAnyTypeAssertion',
@@ -300,11 +274,9 @@ describe('any assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '`any`',
             },
-            endColumn: 13,
             endLine: 2,
             line: 2,
             messageId: 'unsafeToAnyTypeAssertion',
@@ -318,11 +290,9 @@ describe('any assertions', () => {
         `,
         errors: [
           {
-            column: 13,
             data: {
               type: 'error typed',
             },
-            endColumn: 26,
             endLine: 2,
             line: 2,
             messageId: 'unsafeOfAnyTypeAssertion',
@@ -335,11 +305,9 @@ describe('any assertions', () => {
         `,
         errors: [
           {
-            column: 13,
             data: {
               type: 'error typed',
             },
-            endColumn: 31,
             endLine: 2,
             line: 2,
             messageId: 'unsafeToAnyTypeAssertion',
@@ -370,11 +338,9 @@ describe('never assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '`any`',
             },
-            endColumn: 15,
             endLine: 3,
             line: 3,
             messageId: 'unsafeToAnyTypeAssertion',
@@ -388,8 +354,6 @@ describe('never assertions', () => {
         `,
         errors: [
           {
-            column: 1,
-            endColumn: 18,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -420,8 +384,6 @@ describe('function assertions', () => {
         `,
         errors: [
           {
-            column: 1,
-            endColumn: 25,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -435,11 +397,9 @@ describe('function assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '`any`',
             },
-            endColumn: 18,
             endLine: 3,
             line: 3,
             messageId: 'unsafeToAnyTypeAssertion',
@@ -453,8 +413,6 @@ describe('function assertions', () => {
         `,
         errors: [
           {
-            column: 1,
-            endColumn: 20,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -501,11 +459,9 @@ describe('object assertions', () => {
         `,
         errors: [
           {
-            column: 11,
             data: {
               type: '{ bar: number; bas: string; }',
             },
-            endColumn: 2,
             endLine: 5,
             line: 2,
             messageId: 'unsafeTypeAssertion',
@@ -519,11 +475,9 @@ describe('object assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '{ hello: string; world: string; }',
             },
-            endColumn: 71,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -537,8 +491,6 @@ describe('object assertions', () => {
         `,
         errors: [
           {
-            column: 1,
-            endColumn: 23,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -573,11 +525,9 @@ describe('array assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: 'string[]',
             },
-            endColumn: 14,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -591,11 +541,9 @@ describe('array assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '`any`',
             },
-            endColumn: 14,
             endLine: 3,
             line: 3,
             messageId: 'unsafeOfAnyTypeAssertion',
@@ -609,11 +557,9 @@ describe('array assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '`any`',
             },
-            endColumn: 11,
             endLine: 3,
             line: 3,
             messageId: 'unsafeToAnyTypeAssertion',
@@ -627,8 +573,6 @@ describe('array assertions', () => {
         `,
         errors: [
           {
-            column: 1,
-            endColumn: 14,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -642,8 +586,6 @@ describe('array assertions', () => {
         `,
         errors: [
           {
-            column: 1,
-            endColumn: 13,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -682,11 +624,9 @@ describe('tuple assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '[string]',
             },
-            endColumn: 14,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -700,11 +640,9 @@ describe('tuple assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '[string, string]',
             },
-            endColumn: 22,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -718,11 +656,9 @@ describe('tuple assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '[string, number]',
             },
-            endColumn: 22,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -736,11 +672,9 @@ describe('tuple assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '[string]',
             },
-            endColumn: 14,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -754,11 +688,9 @@ describe('tuple assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '`any`',
             },
-            endColumn: 14,
             endLine: 3,
             line: 3,
             messageId: 'unsafeOfAnyTypeAssertion',
@@ -772,11 +704,9 @@ describe('tuple assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '`any`',
             },
-            endColumn: 22,
             endLine: 3,
             line: 3,
             messageId: 'unsafeOfAnyTypeAssertion',
@@ -790,11 +720,9 @@ describe('tuple assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '`any`',
             },
-            endColumn: 11,
             endLine: 3,
             line: 3,
             messageId: 'unsafeToAnyTypeAssertion',
@@ -808,8 +736,6 @@ describe('tuple assertions', () => {
         `,
         errors: [
           {
-            column: 1,
-            endColumn: 14,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -823,8 +749,6 @@ describe('tuple assertions', () => {
         `,
         errors: [
           {
-            column: 1,
-            endColumn: 13,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -838,8 +762,6 @@ describe('tuple assertions', () => {
         `,
         errors: [
           {
-            column: 1,
-            endColumn: 23,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -878,11 +800,9 @@ describe('promise assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: 'Promise<string>',
             },
-            endColumn: 21,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -896,11 +816,9 @@ describe('promise assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '`any`',
             },
-            endColumn: 21,
             endLine: 3,
             line: 3,
             messageId: 'unsafeOfAnyTypeAssertion',
@@ -914,11 +832,9 @@ describe('promise assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '`any`',
             },
-            endColumn: 18,
             endLine: 3,
             line: 3,
             messageId: 'unsafeToAnyTypeAssertion',
@@ -932,11 +848,9 @@ describe('promise assertions', () => {
         `,
         errors: [
           {
-            column: 1,
             data: {
               type: '`any`',
             },
-            endColumn: 20,
             endLine: 3,
             line: 3,
             messageId: 'unsafeToAnyTypeAssertion',
@@ -950,8 +864,6 @@ describe('promise assertions', () => {
         `,
         errors: [
           {
-            column: 1,
-            endColumn: 21,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -965,8 +877,6 @@ describe('promise assertions', () => {
         `,
         errors: [
           {
-            column: 1,
-            endColumn: 20,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -1030,8 +940,6 @@ describe('class assertions', () => {
         `,
         errors: [
           {
-            column: 1,
-            endColumn: 9,
             endLine: 9,
             line: 9,
             messageId: 'unsafeTypeAssertion',
@@ -1085,8 +993,6 @@ describe('generic assertions', () => {
         `,
         errors: [
           {
-            column: 17,
-            endColumn: 35,
             endLine: 4,
             line: 4,
             messageId: 'unsafeTypeAssertionAssignableToConstraint',
@@ -1103,8 +1009,6 @@ describe('generic assertions', () => {
         `,
         errors: [
           {
-            column: 17,
-            endColumn: 23,
             endLine: 5,
             line: 5,
             messageId: 'unsafeTypeAssertionAssignableToConstraint',
@@ -1125,8 +1029,6 @@ describe('generic assertions', () => {
         `,
         errors: [
           {
-            column: 27,
-            endColumn: 49,
             endLine: 5,
             line: 5,
             messageId: 'unsafeTypeAssertion',
@@ -1143,8 +1045,6 @@ describe('generic assertions', () => {
         `,
         errors: [
           {
-            column: 3,
-            endColumn: 9,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertionAssignableToConstraint',
@@ -1159,8 +1059,6 @@ describe('generic assertions', () => {
         `,
         errors: [
           {
-            column: 3,
-            endColumn: 9,
             endLine: 3,
             line: 3,
             messageId: 'unsafeToUnconstrainedTypeAssertion',
@@ -1177,8 +1075,6 @@ describe('generic assertions', () => {
         `,
         errors: [
           {
-            column: 3,
-            endColumn: 9,
             endLine: 5,
             line: 5,
             messageId: 'unsafeTypeAssertionAssignableToConstraint',
@@ -1196,8 +1092,6 @@ describe('generic assertions', () => {
         `,
         errors: [
           {
-            column: 3,
-            endColumn: 9,
             endLine: 6,
             line: 6,
             messageId: 'unsafeTypeAssertionAssignableToConstraint',
@@ -1212,8 +1106,6 @@ describe('generic assertions', () => {
         `,
         errors: [
           {
-            column: 3,
-            endColumn: 9,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertionAssignableToConstraint',
@@ -1231,8 +1123,6 @@ describe('generic assertions', () => {
         `,
         errors: [
           {
-            column: 3,
-            endColumn: 9,
             endLine: 6,
             line: 6,
             messageId: 'unsafeTypeAssertion',
@@ -1247,8 +1137,6 @@ describe('generic assertions', () => {
         `,
         errors: [
           {
-            column: 3,
-            endColumn: 9,
             endLine: 3,
             line: 3,
             messageId: 'unsafeOfAnyTypeAssertion',
@@ -1267,8 +1155,6 @@ describe('generic assertions', () => {
         `,
         errors: [
           {
-            column: 3,
-            endColumn: 9,
             endLine: 6,
             line: 6,
             messageId: 'unsafeTypeAssertionAssignableToConstraint',
@@ -1283,8 +1169,6 @@ describe('generic assertions', () => {
         `,
         errors: [
           {
-            column: 3,
-            endColumn: 9,
             endLine: 3,
             line: 3,
             messageId: 'unsafeToUnconstrainedTypeAssertion',
@@ -1299,8 +1183,6 @@ describe('generic assertions', () => {
         `,
         errors: [
           {
-            column: 3,
-            endColumn: 9,
             endLine: 3,
             line: 3,
             messageId: 'unsafeToUnconstrainedTypeAssertion',
@@ -1316,8 +1198,6 @@ describe('generic assertions', () => {
         `,
         errors: [
           {
-            column: 3,
-            endColumn: 14,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',
@@ -1332,8 +1212,6 @@ describe('generic assertions', () => {
         `,
         errors: [
           {
-            column: 3,
-            endColumn: 11,
             endLine: 3,
             line: 3,
             messageId: 'unsafeToAnyTypeAssertion',
@@ -1348,8 +1226,6 @@ describe('generic assertions', () => {
         `,
         errors: [
           {
-            column: 3,
-            endColumn: 11,
             endLine: 3,
             line: 3,
             messageId: 'unsafeToAnyTypeAssertion',
@@ -1364,8 +1240,6 @@ describe('generic assertions', () => {
         `,
         errors: [
           {
-            column: 3,
-            endColumn: 17,
             endLine: 3,
             line: 3,
             messageId: 'unsafeTypeAssertion',

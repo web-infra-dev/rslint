@@ -1,0 +1,749 @@
+// Rstest Snapshot v1
+
+exports[`consistent-type-definitions > invalid 1`] = `
+{
+  "code": "type T = { x: number; };",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "interface T { x: number; }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 2`] = `
+{
+  "code": "type T={ x: number; };",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "interface T { x: number; }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 3`] = `
+{
+  "code": "type T=                         { x: number; };",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "interface T { x: number; }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 4`] = `
+{
+  "code": "type T /* comment */={ x: number; };",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "interface T /* comment */ { x: number; }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 5`] = `
+{
+  "code": "
+export type W<T> = {
+  x: T;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+export interface W<T> {
+  x: T;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 6`] = `
+{
+  "code": "interface T { x: number; }",
+  "diagnostics": [
+    {
+      "message": "Use a type literal instead of an interface.",
+      "messageId": "typeOverInterface",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = { x: number; }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 7`] = `
+{
+  "code": "interface T{ x: number; }",
+  "diagnostics": [
+    {
+      "message": "Use a type literal instead of an interface.",
+      "messageId": "typeOverInterface",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = { x: number; }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 8`] = `
+{
+  "code": "interface T                          { x: number; }",
+  "diagnostics": [
+    {
+      "message": "Use a type literal instead of an interface.",
+      "messageId": "typeOverInterface",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = { x: number; }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 9`] = `
+{
+  "code": "interface A extends B, C { x: number; };",
+  "diagnostics": [
+    {
+      "message": "Use a type literal instead of an interface.",
+      "messageId": "typeOverInterface",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type A = { x: number; } & B & C;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 10`] = `
+{
+  "code": "interface A extends B<T1>, C<T2> { x: number; };",
+  "diagnostics": [
+    {
+      "message": "Use a type literal instead of an interface.",
+      "messageId": "typeOverInterface",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type A = { x: number; } & B<T1> & C<T2>;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 11`] = `
+{
+  "code": "
+export interface W<T> {
+  x: T;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use a type literal instead of an interface.",
+      "messageId": "typeOverInterface",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 18,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+export type W<T> = {
+  x: T;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 12`] = `
+{
+  "code": "
+namespace JSX {
+  interface Array<T> {
+    foo(x: (x: number) => T): T[];
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use a type literal instead of an interface.",
+      "messageId": "typeOverInterface",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+namespace JSX {
+  type Array<T> = {
+    foo(x: (x: number) => T): T[];
+  }
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 13`] = `
+{
+  "code": "
+global {
+  interface Array<T> {
+    foo(x: (x: number) => T): T[];
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use a type literal instead of an interface.",
+      "messageId": "typeOverInterface",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+global {
+  type Array<T> = {
+    foo(x: (x: number) => T): T[];
+  }
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 14`] = `
+{
+  "code": "
+declare global {
+  interface Array<T> {
+    foo(x: (x: number) => T): T[];
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use a type literal instead of an interface.",
+      "messageId": "typeOverInterface",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 15`] = `
+{
+  "code": "
+declare global {
+  namespace Foo {
+    interface Bar {}
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use a type literal instead of an interface.",
+      "messageId": "typeOverInterface",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 16`] = `
+{
+  "code": "
+export default interface Test {
+  bar(): string;
+  foo(): number;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use a type literal instead of an interface.",
+      "messageId": "typeOverInterface",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 2,
+        },
+        "start": {
+          "column": 26,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Test = {
+  bar(): string;
+  foo(): number;
+}
+export default Test
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 17`] = `
+{
+  "code": "
+export declare type Test = {
+  foo: string;
+  bar: string;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+export declare interface Test {
+  foo: string;
+  bar: string;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 18`] = `
+{
+  "code": "
+export declare interface Test {
+  foo: string;
+  bar: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use a type literal instead of an interface.",
+      "messageId": "typeOverInterface",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 2,
+        },
+        "start": {
+          "column": 26,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+export declare type Test = {
+  foo: string;
+  bar: string;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 19`] = `
+{
+  "code": "
+type Foo = ({
+  a: string;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+interface Foo {
+  a: string;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 20`] = `
+{
+  "code": "
+type Foo = ((((((((({
+  a: string;
+})))))))));
+      ",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+interface Foo {
+  a: string;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 21`] = `
+{
+  "code": "
+type Foo = {
+  a: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+interface Foo {
+  a: string;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 22`] = `
+{
+  "code": "
+type Foo = {
+  a: string;
+}
+type Bar = string;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+interface Foo {
+  a: string;
+}
+type Bar = string;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 23`] = `
+{
+  "code": "
+type Foo = ((({
+  a: string;
+})))
+
+const bar = 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+interface Foo {
+  a: string;
+}
+
+const bar = 1;
+      ",
+  "ruleCount": 1,
+}
+`;

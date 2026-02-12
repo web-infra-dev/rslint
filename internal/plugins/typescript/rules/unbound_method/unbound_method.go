@@ -165,7 +165,12 @@ func checkIfMethod(symbol *ast.Symbol, ignoreStatic bool) ( /* dangerous */ bool
 	switch valueDeclaration.Kind {
 	case ast.KindPropertyDeclaration:
 		init := valueDeclaration.Initializer()
-		return init != nil && ast.IsFunctionExpression(valueDeclaration.Initializer()), true
+		if init == nil || !ast.IsFunctionExpression(init) {
+			return false, false
+		}
+		dangerous, _ := checkMethod(init, ignoreStatic)
+		// PropertyDeclaration function expressions always have `this` typed by the class context
+		return dangerous, true
 	case ast.KindPropertyAssignment:
 		assignee := valueDeclaration.Initializer()
 		if !ast.IsFunctionExpression(assignee) {
@@ -186,6 +191,19 @@ var UnboundMethodRule = rule.CreateRule(rule.Rule{
 		opts, ok := options.(UnboundMethodOptions)
 		if !ok {
 			opts = UnboundMethodOptions{}
+			if options != nil {
+				var optsMap map[string]interface{}
+				if optsArray, ok := options.([]interface{}); ok && len(optsArray) > 0 {
+					optsMap, _ = optsArray[0].(map[string]interface{})
+				} else {
+					optsMap, _ = options.(map[string]interface{})
+				}
+				if optsMap != nil {
+					if ignoreStatic, ok := optsMap["ignoreStatic"].(bool); ok {
+						opts.IgnoreStatic = utils.Ref(ignoreStatic)
+					}
+				}
+			}
 		}
 		if opts.IgnoreStatic == nil {
 			opts.IgnoreStatic = utils.Ref(false)

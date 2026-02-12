@@ -64,6 +64,15 @@ var NoExtraneousClassRule = rule.CreateRule(rule.Rule{
 					reportNode = node
 				}
 
+				// Skip classes that extend another class
+				if classDecl.HeritageClauses != nil {
+					for _, clause := range classDecl.HeritageClauses.Nodes {
+						if clause.AsHeritageClause() != nil && clause.AsHeritageClause().Token == ast.KindExtendsKeyword {
+							return
+						}
+					}
+				}
+
 				// Check for decorators
 				hasDecorators := false
 				if classDecl.Modifiers() != nil {
@@ -200,7 +209,7 @@ var NoExtraneousClassRule = rule.CreateRule(rule.Rule{
 				}
 
 				// Report static-only class
-				if hasStaticMember && !hasNonStaticMember && !hasConstructor {
+				if hasStaticMember && !hasNonStaticMember {
 					if !opts.AllowStaticOnly {
 						ctx.ReportNode(reportNode, rule.RuleMessage{
 							Id:          "onlyStatic",

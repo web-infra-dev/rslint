@@ -362,10 +362,11 @@ class C {
   getObs$: any;
   getPopularDepartments(): void {
     this.getObs$.pipe().subscribe(res => {
-      console.log(res);
+      log(res);
     });
   }
 }
+function log(arg: unknown) {}
       `,
       errors: [
         {

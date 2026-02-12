@@ -97,7 +97,7 @@ var NoUnsafeMemberAccessRule = rule.CreateRule(rule.Rule{
 					loc := utils.TrimNodeTextRange(ctx.SourceFile, property)
 					propertyName = "." + ctx.SourceFile.Text()[loc.Pos():loc.End()]
 				} else if ast.IsElementAccessExpression(node) {
-					property = node.AsElementAccessExpression().ArgumentExpression
+					property = ast.SkipParentheses(node.AsElementAccessExpression().ArgumentExpression)
 					loc := utils.TrimNodeTextRange(ctx.SourceFile, property)
 					propertyName = "[" + ctx.SourceFile.Text()[loc.Pos():loc.End()] + "]"
 				}
@@ -129,7 +129,7 @@ var NoUnsafeMemberAccessRule = rule.CreateRule(rule.Rule{
 			ast.KindElementAccessExpression: func(node *ast.Node) {
 				checkMemberExpression(node)
 
-				arg := node.AsElementAccessExpression().ArgumentExpression
+				arg := ast.SkipParentheses(node.AsElementAccessExpression().ArgumentExpression)
 				// x[1]
 				if ast.IsLiteralExpression(arg) {
 					// perf optimizations - literals can obviously never be `any`

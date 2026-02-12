@@ -64,20 +64,15 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 	}
 
 	// Helper to check if a type alias is a simple object type (not a union, intersection, etc.)
+	// Unwraps any number of parenthesized type wrappers before checking.
 	isSimpleObjectType := func(typeNode *ast.Node) bool {
 		if typeNode == nil {
 			return false
 		}
 
-		// Check if it's a parenthesized type wrapping an object type
-		if typeNode.Kind == ast.KindParenthesizedType {
-			parenthesized := typeNode.AsParenthesizedTypeNode()
-			if parenthesized != nil {
-				return isObjectTypeLiteral(parenthesized.Type)
-			}
-		}
-
-		return isObjectTypeLiteral(typeNode)
+		// Unwrap all layers of parenthesized types
+		unwrapped := ast.SkipTypeParentheses(typeNode)
+		return isObjectTypeLiteral(unwrapped)
 	}
 
 	// Helper to check if interface is in a globally-scoped module
@@ -116,7 +111,7 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 			return
 		}
 
-		ctx.ReportNode(node, rule.RuleMessage{
+		ctx.ReportNode(typeAlias.Name(), rule.RuleMessage{
 			Id:          "interfaceOverType",
 			Description: "Use an interface instead of a type literal.",
 		})
@@ -134,14 +129,14 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 
 		// Don't fix interfaces in global modules (see typescript-eslint #2707)
 		if isInGlobalModule(node) {
-			ctx.ReportNode(node, rule.RuleMessage{
+			ctx.ReportNode(interfaceDecl.Name(), rule.RuleMessage{
 				Id:          "typeOverInterface",
 				Description: "Use a type literal instead of an interface.",
 			})
 			return
 		}
 
-		ctx.ReportNode(node, rule.RuleMessage{
+		ctx.ReportNode(interfaceDecl.Name(), rule.RuleMessage{
 			Id:          "typeOverInterface",
 			Description: "Use a type literal instead of an interface.",
 		})

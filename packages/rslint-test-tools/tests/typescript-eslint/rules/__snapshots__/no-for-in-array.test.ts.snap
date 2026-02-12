@@ -2,9 +2,13 @@
 
 exports[`no-for-in-array > invalid 1`] = `
 {
+  "code": "
+for (const x in [3, 4, 5]) {
+  console.log(x);
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -28,9 +32,14 @@ exports[`no-for-in-array > invalid 1`] = `
 
 exports[`no-for-in-array > invalid 2`] = `
 {
+  "code": "
+const z = [3, 4, 5];
+for (const x in z) {
+  console.log(x);
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -54,9 +63,15 @@ exports[`no-for-in-array > invalid 2`] = `
 
 exports[`no-for-in-array > invalid 3`] = `
 {
+  "code": "
+const fn = (arr: number[]) => {
+  for (const x in arr) {
+    console.log(x);
+  }
+};
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -80,9 +95,15 @@ exports[`no-for-in-array > invalid 3`] = `
 
 exports[`no-for-in-array > invalid 4`] = `
 {
+  "code": "
+const fn = (arr: number[] | string[]) => {
+  for (const x in arr) {
+    console.log(x);
+  }
+};
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -106,9 +127,15 @@ exports[`no-for-in-array > invalid 4`] = `
 
 exports[`no-for-in-array > invalid 5`] = `
 {
+  "code": "
+const fn = <T extends any[]>(arr: T) => {
+  for (const x in arr) {
+    console.log(x);
+  }
+};
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -132,9 +159,28 @@ exports[`no-for-in-array > invalid 5`] = `
 
 exports[`no-for-in-array > invalid 6`] = `
 {
+  "code": "
+for (const x
+  in
+    (
+      (
+        (
+          [3, 4, 5]
+        )
+      )
+    )
+  )
+  // weird
+  /* spot for a */
+  // comment
+  /* ) */
+  /* ( */
+  {
+  console.log(x);
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -158,9 +204,28 @@ exports[`no-for-in-array > invalid 6`] = `
 
 exports[`no-for-in-array > invalid 7`] = `
 {
+  "code": "
+for (const x
+  in
+    (
+      (
+        (
+          [3, 4, 5]
+        )
+      )
+    )
+  )
+  // weird
+  /* spot for a */
+  // comment
+  /* ) */
+  /* ( */
+
+  ((((console.log('body without braces ')))));
+
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -184,9 +249,15 @@ exports[`no-for-in-array > invalid 7`] = `
 
 exports[`no-for-in-array > invalid 8`] = `
 {
+  "code": "
+declare const array: string[] | null;
+
+for (const key in array) {
+  console.log(key);
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -210,9 +281,15 @@ exports[`no-for-in-array > invalid 8`] = `
 
 exports[`no-for-in-array > invalid 9`] = `
 {
+  "code": "
+declare const array: number[] | undefined;
+
+for (const key in array) {
+  console.log(key);
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -236,9 +313,15 @@ exports[`no-for-in-array > invalid 9`] = `
 
 exports[`no-for-in-array > invalid 10`] = `
 {
+  "code": "
+declare const array: boolean[] | { a: 1; b: 2; c: 3 };
+
+for (const key in array) {
+  console.log(key);
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -262,9 +345,15 @@ exports[`no-for-in-array > invalid 10`] = `
 
 exports[`no-for-in-array > invalid 11`] = `
 {
+  "code": "
+declare const array: [number, string];
+
+for (const key in array) {
+  console.log(key);
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -288,9 +377,15 @@ exports[`no-for-in-array > invalid 11`] = `
 
 exports[`no-for-in-array > invalid 12`] = `
 {
+  "code": "
+declare const array: [number, string] | { a: 1; b: 2; c: 3 };
+
+for (const key in array) {
+  console.log(key);
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -314,9 +409,15 @@ exports[`no-for-in-array > invalid 12`] = `
 
 exports[`no-for-in-array > invalid 13`] = `
 {
+  "code": "
+declare const array: string[] | Record<number, string>;
+
+for (const key in array) {
+  console.log(key);
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -340,9 +441,15 @@ exports[`no-for-in-array > invalid 13`] = `
 
 exports[`no-for-in-array > invalid 14`] = `
 {
+  "code": "
+const arrayLike = /fe/.exec('foo');
+
+for (const x in arrayLike) {
+  console.log(x);
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -366,9 +473,15 @@ exports[`no-for-in-array > invalid 14`] = `
 
 exports[`no-for-in-array > invalid 15`] = `
 {
+  "code": "
+declare const arrayLike: HTMLCollection;
+
+for (const x in arrayLike) {
+  console.log(x);
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -392,9 +505,15 @@ exports[`no-for-in-array > invalid 15`] = `
 
 exports[`no-for-in-array > invalid 16`] = `
 {
+  "code": "
+declare const arrayLike: NodeList;
+
+for (const x in arrayLike) {
+  console.log(x);
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -418,9 +537,15 @@ exports[`no-for-in-array > invalid 16`] = `
 
 exports[`no-for-in-array > invalid 17`] = `
 {
+  "code": "
+function foo() {
+  for (const a in arguments) {
+    console.log(a);
+  }
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -444,9 +569,17 @@ exports[`no-for-in-array > invalid 17`] = `
 
 exports[`no-for-in-array > invalid 18`] = `
 {
+  "code": "
+declare const array:
+  | (({ a: string } & string[]) | Record<string, boolean>)
+  | Record<number, string>;
+
+for (const key in array) {
+  console.log(key);
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -470,9 +603,17 @@ exports[`no-for-in-array > invalid 18`] = `
 
 exports[`no-for-in-array > invalid 19`] = `
 {
+  "code": "
+declare const array:
+  | (({ a: string } & RegExpExecArray) | Record<string, boolean>)
+  | Record<number, string>;
+
+for (const key in array) {
+  console.log(k);
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {
@@ -496,9 +637,18 @@ exports[`no-for-in-array > invalid 19`] = `
 
 exports[`no-for-in-array > invalid 20`] = `
 {
+  "code": "
+declare const obj: {
+  [key: number]: number;
+  length: 1;
+};
+
+for (const key in obj) {
+  console.log(key);
+}
+      ",
   "diagnostics": [
     {
-      "filePath": "src/virtual.ts",
       "message": "For-in loops over arrays skips holes, returns indices as strings, and may visit the prototype chain or other enumerable properties. Use a more robust iteration method such as for-of or array.forEach instead.",
       "messageId": "forInViolation",
       "range": {

@@ -208,6 +208,7 @@ var NoRedundantTypeConstituentsRule = rule.CreateRule(rule.Rule{
 				seenUnionTypes := []seenUnionPart{}
 
 				for _, typeNode := range node.AsIntersectionTypeNode().Types.Nodes {
+					typeNode = ast.SkipTypeParentheses(typeNode)
 					typePartFlags := getTypeNodeTypePartFlags(typeNode)
 
 					// if any typeNode is TSTypeReference and typePartFlags have more than 1 element, than the referenced type is definitely a union.
@@ -352,6 +353,7 @@ var NoRedundantTypeConstituentsRule = rule.CreateRule(rule.Rule{
 				}
 
 				for _, typeNode := range node.AsUnionTypeNode().Types.Nodes {
+					typeNode = ast.SkipTypeParentheses(typeNode)
 					typePartFlags := getTypeNodeTypePartFlags(typeNode)
 
 					for _, typePart := range typePartFlags {

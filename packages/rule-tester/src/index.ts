@@ -175,8 +175,8 @@ export class RuleTester {
             typeof validCase === 'string' ? validCase : validCase.code;
           const languageOptions =
             typeof validCase === 'string'
-              ? undefined
-              : validCase.languageOptions;
+              ? this.options.languageOptions
+              : (validCase.languageOptions ?? this.options.languageOptions);
           const isJSX = languageOptions?.parserOptions?.ecmaFeatures?.jsx;
 
           const options =
@@ -231,7 +231,8 @@ export class RuleTester {
           if (hasOnly && !only) {
             continue;
           }
-          const languageOptions = item.languageOptions;
+          const languageOptions =
+            item.languageOptions ?? this.options.languageOptions;
           const isJSX = languageOptions?.parserOptions?.ecmaFeatures?.jsx;
           const test_virtual_entry = path.resolve(
             cwd,
