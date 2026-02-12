@@ -155,7 +155,7 @@ Follow the batch workflow in [PORT_RULE.md](references/PORT_RULE.md):
    - **Phase 4: Verification** - Build binary and run all tests
    - **Commit** - Create an independent commit: `feat: port rule <rule-name>`
    - **Report** - Briefly report the result before moving to the next rule
-3. **Phase 5: Create PR** - One PR summarizing all ported rules (once)
+3. **Phase 5: Create PR** - One PR summarizing all ported rules (once), see [Phase 5 Details](#phase-5-commit--pr-details) below
 
 **Progress tracking**: After completing each rule, update the checklist (mark as `[x]`) and the corresponding tasks (via `TaskUpdate` to `completed`), then report the status. After a failure, mark the checklist as `[!]` with a reason.
 
@@ -166,6 +166,62 @@ Follow the batch workflow in [PORT_RULE.md](references/PORT_RULE.md):
 - **(c) Abort** the entire batch
 
 Already-committed rules are not affected by later failures.
+
+### Phase 5: Commit & PR Details
+
+**Commit constraints**:
+
+- Commit message: `feat: port rule <rule-name>`
+- Do NOT include AI-related information in commit messages (no `Co-Authored-By: Claude` or similar)
+- Only stage files related to the current rule(s). `pnpm format:go` may reformat unrelated files — discard them with `git checkout -- <file>` before committing.
+- If the rule's plugin is already in `rslint.json` `plugins`, add the rule with `"warn"` severity. Otherwise, do NOT modify `rslint.json`.
+
+**PR title format**:
+
+- Single rule: `feat: port rule <rule-name>`
+- Batch (single plugin): `feat: port N <plugin-name> rules`
+- Batch (multiple plugins): `feat: port N rules from <plugin-1>, <plugin-2>`
+
+**PR body template** (batch single plugin):
+
+```
+## Summary
+
+Port N <plugin-name> rules to rslint.
+
+### Rules ported
+| Rule | Description | Doc |
+|------|-------------|-----|
+| `<rule-1>` | [brief description] | [link](<url>) |
+| `<rule-2>` | [brief description] | [link](<url>) |
+
+## Checklist
+
+- [x] Tests updated (or not required).
+- [x] Documentation updated (or not required).
+```
+
+**PR body template** (single rule):
+
+```
+## Summary
+
+Port the `<rule-name>` rule from ESLint to rslint.
+
+[Brief description of what the rule does]
+
+## Related Links
+
+- ESLint rule: <link_to_eslint_doc>
+- Source code: <link_to_source_code>
+
+## Checklist
+
+- [x] Tests updated (or not required).
+- [x] Documentation updated (or not required).
+```
+
+Do NOT include AI-related information in PR title or body. If any rules were skipped during batch execution, note them in the PR body.
 
 ### Completion Constraint
 
