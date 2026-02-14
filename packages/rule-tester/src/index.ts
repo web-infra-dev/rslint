@@ -77,7 +77,7 @@ interface RuleTesterOptions {
       ecmaFeatures?: any;
       ecmaVersion?: number;
       sourceType?: 'module' | 'script';
-      jsxPragma?: string | null;
+      jsxPragma?: string;
       jsxFragmentName?: string;
       emitDecoratorMetadata?: boolean;
       isolatedDeclarations?: boolean;
@@ -255,7 +255,8 @@ export class RuleTester {
           );
           // eslint-disable-next-line
           checkDiagnosticEqual(diags.diagnostics, errors);
-          if (output) {
+          const hasOutput = Object.prototype.hasOwnProperty.call(item, 'output');
+          if (hasOutput) {
             // check autofix
             const fixedCode = await applyFixes({
               fileContent: code,
