@@ -77,7 +77,7 @@ interface RuleTesterOptions {
       ecmaFeatures?: any;
       ecmaVersion?: number;
       sourceType?: 'module' | 'script';
-      jsxPragma?: string;
+      jsxPragma?: string | null;
       jsxFragmentName?: string;
       emitDecoratorMetadata?: boolean;
       isolatedDeclarations?: boolean;
@@ -206,7 +206,7 @@ export class RuleTester {
             ruleOptions: {
               [ruleName]: options,
             },
-            languageOptions,
+            languageOptions: languageOptions as any,
           });
 
           assert(
@@ -246,7 +246,7 @@ export class RuleTester {
             ruleOptions: {
               [ruleName]: options,
             },
-            languageOptions,
+            languageOptions: languageOptions as any,
           });
 
           assert(
