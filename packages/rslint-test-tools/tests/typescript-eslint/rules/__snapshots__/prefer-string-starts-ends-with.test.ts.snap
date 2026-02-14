@@ -271,6 +271,7 @@ exports[`prefer-string-starts-ends-with > invalid 8`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -301,6 +302,7 @@ exports[`prefer-string-starts-ends-with > invalid 9`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -576,6 +578,7 @@ exports[`prefer-string-starts-ends-with > invalid 17`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -606,6 +609,7 @@ exports[`prefer-string-starts-ends-with > invalid 18`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -1727,6 +1731,7 @@ exports[`prefer-string-starts-ends-with > invalid 50`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -1932,6 +1937,7 @@ exports[`prefer-string-starts-ends-with > invalid 56`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;

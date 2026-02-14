@@ -52,6 +52,10 @@ func run(ctx rule.RuleContext, _ any) rule.RuleListeners {
 }
 
 func extractCommentValue(text string, comment *ast.CommentRange) string {
+	if comment.Pos() < 0 || comment.End() > len(text) {
+		return ""
+	}
+
 	switch comment.Kind {
 	case ast.KindSingleLineCommentTrivia:
 		if comment.End() <= comment.Pos()+2 {

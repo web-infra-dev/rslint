@@ -22,6 +22,7 @@ exports[`ban-tslint-comment > invalid 1`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "",
   "ruleCount": 1,
 }
 `;
@@ -48,6 +49,7 @@ exports[`ban-tslint-comment > invalid 2`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "",
   "ruleCount": 1,
 }
 `;
@@ -74,6 +76,7 @@ exports[`ban-tslint-comment > invalid 3`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "",
   "ruleCount": 1,
 }
 `;
@@ -100,6 +103,7 @@ exports[`ban-tslint-comment > invalid 4`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "",
   "ruleCount": 1,
 }
 `;
@@ -126,6 +130,7 @@ exports[`ban-tslint-comment > invalid 5`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "",
   "ruleCount": 1,
 }
 `;
@@ -179,6 +184,7 @@ exports[`ban-tslint-comment > invalid 7`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "",
   "ruleCount": 1,
 }
 `;
