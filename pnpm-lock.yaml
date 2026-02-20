@@ -222,8 +222,8 @@ importers:
         specifier: 24.0.14
         version: 24.0.14
       '@types/vscode':
-        specifier: ^1.74.0
-        version: 1.102.0
+        specifier: ^1.109.0
+        version: 1.109.0
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20250904.1
         version: 7.0.0-dev.20250904.1
@@ -2054,8 +2054,8 @@ packages:
   '@types/unist@3.0.3':
     resolution: {integrity: sha512-ko/gIFJRv177XgZsZcBwnqJN5x/Gien8qNOn0D5bQU/zAzVf9Zt3BlcUiLqhV9y4ARk0GbT3tnUiPNgnTXzc/Q==}
 
-  '@types/vscode@1.102.0':
-    resolution: {integrity: sha512-V9sFXmcXz03FtYTSUsYsu5K0Q9wH9w9V25slddcxrh5JgORD14LpnOA7ov0L9ALi+6HrTjskLJ/tY5zeRF3TFA==}
+  '@types/vscode@1.109.0':
+    resolution: {integrity: sha512-0Pf95rnwEIwDbmXGC08r0B4TQhAbsHQ5UyTIgVgoieDe4cOnf92usuR5dEczb6bTKEp7ziZH4TV1TRGPPCExtw==}
 
   '@typescript-eslint/parser@8.48.1':
     resolution: {integrity: sha512-PC0PDZfJg8sP7cmKe6L3QIL8GZwU5aRvUFedqSIpw3B+QjRSUZeeITC2M5XKeMXEzL6wccN196iy3JLwKNvDVA==}
@@ -3014,11 +3014,13 @@ packages:
 
   glob@10.4.5:
     resolution: {integrity: sha512-7Bv8RF0k6xjo7d4A/PxYLbUCfb6c+Vpd2/mB2yRDlew7Jb5hEXiCD9ibfO7wpk8i4sevK6DFny9h7EYbM3/sHg==}
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
     hasBin: true
 
   glob@11.0.3:
     resolution: {integrity: sha512-2Nim7dha1KVkaiF4q6Dj+ngPPMdfvLJEOpZk/jKiUAkqKebpGAWQXAq9z1xu9HKu5lWfqw/FASuccEjyznjPaA==}
     engines: {node: 20 || >=22}
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
     hasBin: true
 
   glob@13.0.0:
@@ -3027,12 +3029,12 @@ packages:
 
   glob@7.2.3:
     resolution: {integrity: sha512-nFR0zLpU2YCaRxwoCJvL6UvCH2JFyFVIvwTLsIf21AuHlMskA1hhTdk+LlYJtOlYt9v6dvszD2BGRqBL+iQK9Q==}
-    deprecated: Glob versions prior to v9 are no longer supported
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   glob@8.1.0:
     resolution: {integrity: sha512-r8hpEjiQEYlF2QU0df3dS+nxxSIreXQS1qRhMJM0Q5NDdR386C7jb7Hwwod8Fgiuex+k0GFjgft18yvxm5XoCQ==}
     engines: {node: '>=12'}
-    deprecated: Glob versions prior to v9 are no longer supported
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   globals@14.0.0:
     resolution: {integrity: sha512-oahGvuMGQlPw/ivIYBjVSrWAfWLBeku5tpPE2fOPLi+WHffIWbuh2tCjhyQhTBPMf5E9jDEH4FOmTYgYwbKwtQ==}
@@ -4050,6 +4052,7 @@ packages:
   prebuild-install@7.1.3:
     resolution: {integrity: sha512-8Mf2cbV7x1cXPUILADGI3wuhfqWvtiLA1iclTDbFRZkgRQS0NqsPZphna9V+HyTEadheuPmjaJMsbzKQFOzLug==}
     engines: {node: '>=10'}
+    deprecated: No longer maintained. Please contact the author of the relevant native addon; alternatives are available.
     hasBin: true
 
   prebundle@1.6.0:
@@ -4719,7 +4722,7 @@ packages:
   tar@7.4.3:
     resolution: {integrity: sha512-5S7Va8hKfV7W5U6g3aYxXmlPoZVAwUMy9AOKyF2fVuZa2UD3qZjg578OrLRt8PcNN1PleVaL/5/yYATNL0ICUw==}
     engines: {node: '>=18'}
-    deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exhorbitant rates) by contacting i@izs.me
+    deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   terminal-link@4.0.0:
     resolution: {integrity: sha512-lk+vH+MccxNqgVqSnkMVKx4VLJfnLjDBGzH16JVZjKE2DoxP57s6/vt6JmXV5I3jBcfGrxNrYtC+mPtU7WJztA==}
@@ -6735,7 +6738,7 @@ snapshots:
 
   '@types/unist@3.0.3': {}
 
-  '@types/vscode@1.102.0': {}
+  '@types/vscode@1.109.0': {}
 
   '@typescript-eslint/parser@8.48.1(eslint@9.32.0(jiti@2.6.1))(typescript@5.9.3)':
     dependencies:
