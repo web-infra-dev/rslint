@@ -227,6 +227,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 			} else {
 				t.Errorf("Expected to have %v outputs but had %v: %v", len(testCase.Output), len(outputs), outputs)
 			}
+
 			if len(initialDiagnostics) != len(testCase.Errors) {
 				t.Fatalf("Expected invalid test case to contain exactly %v errors (reported %v errors - %v). Code:\n%v", len(testCase.Errors), len(initialDiagnostics), initialDiagnostics, testCase.Code)
 			}
