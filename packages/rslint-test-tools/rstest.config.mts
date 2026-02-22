@@ -9,6 +9,7 @@ export default defineConfig({
 
     // eslint
     './tests/eslint/rules/no-loss-of-precision.test.ts',
+    './tests/eslint/rules/no-ex-assign.test.ts',
 
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
