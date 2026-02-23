@@ -282,9 +282,6 @@ func isPropertyOfObjectWithType(property *ast.Node) bool {
 	}
 
 	parent := getParentSkippingParens(objectExpr)
-	for parent != nil && parent.Kind == ast.KindArrayLiteralExpression {
-		parent = getParentSkippingParens(parent)
-	}
 	return isTypedParent(parent, nil) || isPropertyOfObjectWithType(parent)
 }
 
@@ -591,11 +588,8 @@ var ExplicitFunctionReturnTypeRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			if isValidFunctionExpressionReturnType(node, opts) {
-				return
-			}
-
-			if opts.AllowTypedFunctionExpressions && ancestorHasReturnType(node) {
+			if opts.AllowTypedFunctionExpressions &&
+				(isValidFunctionExpressionReturnType(node, opts) || ancestorHasReturnType(node)) {
 				return
 			}
 
@@ -650,11 +644,12 @@ func ancestorHasReturnType(node *ast.Node) bool {
 		return false
 	}
 
-	for ancestor != nil && (ancestor.Kind == ast.KindPropertyAssignment || ancestor.Kind == ast.KindObjectLiteralExpression) {
-		ancestor = getParentSkippingParens(ancestor)
-	}
-	if ancestor == nil {
-		return false
+	if ancestor.Kind == ast.KindPropertyAssignment {
+		property := ancestor.AsPropertyAssignment()
+		if property == nil || property.Initializer == nil {
+			return false
+		}
+		ancestor = property.Initializer
 	}
 
 	isReturnStatement := ancestor.Kind == ast.KindReturnStatement
