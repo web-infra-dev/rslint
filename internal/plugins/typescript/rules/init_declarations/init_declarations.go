@@ -13,6 +13,14 @@ type Options struct {
 	IgnoreForLoopInit bool
 }
 
+func normalizeMode(mode string) string {
+	switch mode {
+	case "always", "never":
+		return mode
+	}
+	return "always"
+}
+
 func parseOptions(options any) Options {
 	opts := Options{
 		Mode:              "always",
@@ -24,6 +32,10 @@ func parseOptions(options any) Options {
 	}
 
 	switch optionValue := options.(type) {
+	case string:
+		if optionValue != "" {
+			opts.Mode = optionValue
+		}
 	case []interface{}:
 		if len(optionValue) > 0 {
 			if mode, ok := optionValue[0].(string); ok && mode != "" {
@@ -46,6 +58,7 @@ func parseOptions(options any) Options {
 		}
 	}
 
+	opts.Mode = normalizeMode(opts.Mode)
 	return opts
 }
 
