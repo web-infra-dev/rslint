@@ -292,3 +292,32 @@ delete container[typeof 1];
   "ruleCount": 1,
 }
 `;
+
+exports[`no-dynamic-delete > invalid 11`] = `
+{
+  "code": "
+const container: { [i: string]: 0 } = {};
+delete container[\`name\`];
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not delete dynamically computed property keys.",
+      "messageId": "dynamicDelete",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dynamic-delete",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

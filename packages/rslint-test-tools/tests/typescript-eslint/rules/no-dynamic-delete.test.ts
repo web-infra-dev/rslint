@@ -145,5 +145,13 @@ delete container[typeof 1];
       errors: [{ messageId: 'dynamicDelete' }],
       output: null,
     },
+    {
+      code: `
+const container: { [i: string]: 0 } = {};
+delete container[\`name\`];
+      `,
+      errors: [{ messageId: 'dynamicDelete' }],
+      output: null,
+    },
   ],
 });

@@ -16,7 +16,7 @@ func isAllowedDeleteArgument(argument *ast.Node) bool {
 	argument = ast.SkipParentheses(argument)
 
 	switch argument.Kind {
-	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral, ast.KindNumericLiteral:
+	case ast.KindStringLiteral, ast.KindNumericLiteral:
 		return true
 	case ast.KindPrefixUnaryExpression:
 		unary := argument.AsPrefixUnaryExpression()

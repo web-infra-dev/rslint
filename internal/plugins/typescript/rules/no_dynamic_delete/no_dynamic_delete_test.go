@@ -169,5 +169,11 @@ delete container[typeof 1];
 				{MessageId: "dynamicDelete", Line: 3, Column: 18, EndLine: 3, EndColumn: 26},
 			},
 		},
+		{
+			Code: "const container: { [i: string]: 0 } = {};\ndelete container[`name`];\n",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "dynamicDelete", Line: 2, Column: 18, EndLine: 2, EndColumn: 24},
+			},
+		},
 	})
 }
