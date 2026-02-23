@@ -1,5 +1,7 @@
 # rslint TypeScript ESLint Rule Porting Gap Report
 
+<!-- cspell:ignore LASTEXITCODE libasound libgbm libnss -->
+
 Generated on: 2026-02-09
 
 ## Hard constraint
@@ -12,9 +14,11 @@ Generated on: 2026-02-09
 This report is intentionally scoped to `@typescript-eslint` rules only.
 
 Upstream catalog source:
+
 - `@typescript-eslint/eslint-plugin` from `typescript-eslint/typescript-eslint` tag `v8.48.1` (`packages/eslint-plugin/src/rules/*`)
 
 rslint implemented rules source:
+
 - `internal/config/config.go` (`GlobalRuleRegistry.Register(...)` calls)
 
 ## Rules excluded from this report (already in open PRs)
@@ -33,11 +37,13 @@ rslint implemented rules source:
 ## Local validation commands from CI jobs
 
 Source of truth:
+
 - `.github/workflows/ci.yml`
 - `.github/actions/setup-node/action.yml`
 - `.github/actions/setup-go/action.yml`
 
 Environment used in CI:
+
 - Node.js `24`
 - Go `1.25.0`
 - Rust stable (for `test-rust` job)
@@ -136,29 +142,35 @@ cargo test --verbose
 pnpm run build:website
 ```
 
-## How to rgister rule
+## How to register rule
 
 1. Implement the rule under:
+
 - `internal/plugins/typescript/rules/<rule_name>/<rule_name>.go`
 
 2. Define a `rule.Rule` with:
+
 - `Name`: canonical id (for example, `@typescript-eslint/no-explicit-any`)
 - `Run`: callback returning listeners for AST node kinds
 
 3. Register it in `internal/config/config.go`:
+
 - Add a `GlobalRuleRegistry.Register("@typescript-eslint/<rule>", <RuleVar>)` entry in `registerAllTypeScriptEslintPluginRules`
 
 4. Ensure config enabling works:
+
 - `GetAllRulesForPlugin` in `internal/config/config.go`
 - `RuleRegistry.GetEnabledRules` in `internal/config/rule_registry.go`
 
 5. Add tests:
+
 - Go tests alongside implementation (`*_test.go`)
 - Optional upstream parity fixtures in `packages/rslint-test-tools/tests/typescript-eslint/...`
 
 ## Missing @typescript-eslint rules to port
 
 ### @typescript-eslint (49)
+
 - `@typescript-eslint/explicit-module-boundary-types` - docs: https://typescript-eslint.io/rules/explicit-module-boundary-types | source: https://github.com/typescript-eslint/typescript-eslint/blob/v8.48.1/packages/eslint-plugin/src/rules/explicit-module-boundary-types.ts
 - `@typescript-eslint/max-params` - docs: https://typescript-eslint.io/rules/max-params | source: https://github.com/typescript-eslint/typescript-eslint/blob/v8.48.1/packages/eslint-plugin/src/rules/max-params.ts
 - `@typescript-eslint/method-signature-style` - docs: https://typescript-eslint.io/rules/method-signature-style | source: https://github.com/typescript-eslint/typescript-eslint/blob/v8.48.1/packages/eslint-plugin/src/rules/method-signature-style.ts
