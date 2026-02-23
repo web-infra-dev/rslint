@@ -267,11 +267,12 @@ var PreferRegExpExecRule = rule.CreateRule(rule.Rule{
 
 				var receiver *ast.Node
 				var reportNode *ast.Node
-				if call.Expression.Kind == ast.KindPropertyAccessExpression {
+				switch call.Expression.Kind {
+				case ast.KindPropertyAccessExpression:
 					access := call.Expression.AsPropertyAccessExpression()
 					receiver = access.Expression
 					reportNode = access.Name().AsNode()
-				} else if call.Expression.Kind == ast.KindElementAccessExpression {
+				case ast.KindElementAccessExpression:
 					access := call.Expression.AsElementAccessExpression()
 					receiver = access.Expression
 					reportNode = access.ArgumentExpression
