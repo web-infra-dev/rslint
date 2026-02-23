@@ -306,6 +306,7 @@ exports[`prefer-includes > invalid 9`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -336,6 +337,7 @@ exports[`prefer-includes > invalid 10`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
