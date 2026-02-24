@@ -78,6 +78,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  color: #1c1d21;
   margin-bottom: 0.5rem;
 }
 
@@ -102,11 +103,11 @@
 
 .diagnostic-message {
   padding: 13px;
-  color: inherit;
   font-size: 12px;
   font-family:
     SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
     monospace;
+  color: #1c1d21;
   background-color: #ffebec;
   border-radius: 4px;
   border-left: 5px solid #e13238;

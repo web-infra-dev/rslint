@@ -414,7 +414,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
             size="sm"
             onClick={() => setActiveTab('lint')}
             aria-pressed={activeTab === 'lint'}
-            className="relative"
+            className="dark:text-accent dark:border-muted/20"
           >
             Errors
             {diagnostics.length > 0 && (
@@ -429,6 +429,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
             size="sm"
             onClick={() => setActiveTab('ast')}
             aria-pressed={activeTab === 'ast'}
+            className="dark:text-accent dark:border-muted/20"
           >
             AST (tsgo)
           </Button>
@@ -441,6 +442,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
               onRequestTsAst?.();
             }}
             aria-pressed={activeTab === 'ast_ts'}
+            className="dark:text-accent dark:border-muted/20"
           >
             AST (TypeScript)
           </Button>
