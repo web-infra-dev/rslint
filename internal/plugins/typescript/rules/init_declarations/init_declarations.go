@@ -119,31 +119,18 @@ func getForLoopKind(varDecl *ast.VariableDeclaration) (ast.Kind, bool) {
 	}
 }
 
-func isInAmbientContext(sourceFile *ast.SourceFile, node *ast.Node) bool {
-	if sourceFile != nil && sourceFile.IsDeclarationFile {
-		return true
-	}
-
+func isInDeclaredContext(node *ast.Node) bool {
 	for current := node; current != nil; current = current.Parent {
-		if current.Kind == ast.KindVariableStatement {
+		switch current.Kind {
+		case ast.KindVariableStatement:
 			stmt := current.AsVariableStatement()
 			if stmt != nil && utils.IncludesModifier(stmt, ast.KindDeclareKeyword) {
 				return true
 			}
-		}
-
-		if current.Kind == ast.KindModuleDeclaration {
+		case ast.KindModuleDeclaration:
 			moduleDecl := current.AsModuleDeclaration()
-			if moduleDecl != nil {
-				if utils.IncludesModifier(moduleDecl, ast.KindDeclareKeyword) {
-					return true
-				}
-				if ast.HasSyntacticModifier(current, ast.ModifierFlagsAmbient) {
-					return true
-				}
-				if current.Flags&ast.NodeFlagsAmbient != 0 {
-					return true
-				}
+			if moduleDecl != nil && utils.IncludesModifier(moduleDecl, ast.KindDeclareKeyword) {
+				return true
 			}
 		}
 	}
@@ -168,7 +155,7 @@ var InitDeclarationsRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				if isInAmbientContext(ctx.SourceFile, node) {
+				if opts.Mode == "always" && isInDeclaredContext(node) {
 					return
 				}
 
@@ -176,8 +163,8 @@ var InitDeclarationsRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				forLoopKind, isForLoopInit := getForLoopKind(varDecl)
-				if isForLoopInit && opts.IgnoreForLoopInit {
+				_, isForLoopInit := getForLoopKind(varDecl)
+				if opts.Mode == "never" && isForLoopInit && opts.IgnoreForLoopInit {
 					return
 				}
 
@@ -185,20 +172,19 @@ var InitDeclarationsRule = rule.CreateRule(rule.Rule{
 				nameText := getDeclarationNameText(ctx.SourceFile, nameNode)
 
 				hasInitializer := varDecl.Initializer != nil
-				isForInOrOf := forLoopKind == ast.KindForInStatement || forLoopKind == ast.KindForOfStatement
+				isInitialized := hasInitializer || isForLoopInit
 
 				switch opts.Mode {
 				case "always":
-					if !hasInitializer && !isForInOrOf {
+					if !isInitialized {
 						ctx.ReportRange(nameRange, buildInitializedMessage(nameText))
 					}
 				case "never":
-					if isForInOrOf {
-						ctx.ReportRange(nameRange, buildNotInitializedMessage(nameText))
-						return
-					}
-					if hasInitializer {
-						reportRange := nameRange.WithEnd(varDecl.Initializer.End())
+					if isInitialized {
+						reportRange := nameRange
+						if hasInitializer {
+							reportRange = reportRange.WithEnd(varDecl.Initializer.End())
+						}
 						ctx.ReportRange(reportRange, buildNotInitializedMessage(nameText))
 					}
 				}
