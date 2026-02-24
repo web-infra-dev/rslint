@@ -73,6 +73,33 @@ func escapeForSingleQuotedString(str string) string {
 	return b.String()
 }
 
+func isStringType(ctx rule.RuleContext, node *ast.Node) bool {
+	if node == nil || ctx.TypeChecker == nil {
+		return false
+	}
+	t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node)
+	return utils.GetTypeName(ctx.TypeChecker, t) == "string"
+}
+
+func hasOptionalChain(node *ast.Node) bool {
+	for n := node; n != nil; n = n.Parent {
+		if ast.IsOptionalChain(n) {
+			return true
+		}
+		if n.Kind == ast.KindBinaryExpression || n.Kind == ast.KindExpressionStatement || n.Kind == ast.KindBlock {
+			break
+		}
+	}
+	return false
+}
+
+func stripParens(node *ast.Node) *ast.Node {
+	for node != nil && node.Kind == ast.KindParenthesizedExpression {
+		node = node.AsParenthesizedExpression().Expression
+	}
+	return node
+}
+
 func extractRegexStaticString(pattern string) (string, bool) {
 	if pattern == "" {
 		return "", true
@@ -316,7 +343,18 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 					fixes = append(fixes, rule.RuleFixInsertBefore(ctx.SourceFile, call, "!"))
 				}
 				fixes = append(fixes, rule.RuleFixReplace(ctx.SourceFile, name, "includes"))
-				fixes = append(fixes, rule.RuleFixRemoveRange(core.NewTextRange(call.End(), bin.End())))
+				callRange := utils.TrimNodeTextRange(ctx.SourceFile, call)
+				binRange := utils.TrimNodeTextRange(ctx.SourceFile, bin)
+				if callRange.End() > binRange.End() {
+					fixes = nil
+				} else {
+					leftRange := utils.TrimNodeTextRange(ctx.SourceFile, bin.AsBinaryExpression().Left)
+					removeStart := callRange.End()
+					if leftRange.End() > removeStart {
+						removeStart = leftRange.End()
+					}
+					fixes = append(fixes, rule.RuleFixRemoveRange(core.NewTextRange(removeStart, binRange.End())))
+				}
 			}
 			ctx.ReportNodeWithFixes(bin, buildPreferIncludesMessage(), fixes...)
 		}
@@ -324,17 +362,20 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 		return rule.RuleListeners{
 			ast.KindBinaryExpression: func(node *ast.Node) {
 				bin := node.AsBinaryExpression()
-				left := ast.SkipParentheses(bin.Left)
-				if left.Kind != ast.KindCallExpression {
+				left := stripParens(bin.Left)
+				if left == nil || left.Kind != ast.KindCallExpression {
 					return
 				}
 				call := left.AsCallExpression()
-				expr := ast.SkipParentheses(call.Expression)
-				if expr.Kind != ast.KindPropertyAccessExpression {
+				expr := stripParens(call.Expression)
+				if expr == nil || expr.Kind != ast.KindPropertyAccessExpression {
 					return
 				}
 				prop := expr
 				allowFix := expr.AsPropertyAccessExpression().QuestionDotToken == nil
+				if allowFix && hasOptionalChain(call.Expression) {
+					allowFix = false
+				}
 				checkArrayIndexOf(prop, allowFix, node)
 			},
 			ast.KindCallExpression: func(node *ast.Node) {
@@ -357,6 +398,9 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 				if arg == nil || ctx.TypeChecker == nil {
 					return
 				}
+				if !isStringType(ctx, arg) {
+					return
+				}
 				argType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, arg)
 				includesSym := checker.Checker_getPropertyOfType(ctx.TypeChecker, argType, "includes")
 				if includesSym == nil {
@@ -370,18 +414,21 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				optChain := "."
-				if access.QuestionDotToken != nil {
-					optChain = "?."
-				}
-				fixes := []rule.RuleFix{
-					rule.RuleFixRemoveRange(core.NewTextRange(callRange.Pos(), argRange.Pos())),
-					rule.RuleFixRemoveRange(core.NewTextRange(argRange.End(), callRange.End())),
-					rule.RuleFixInsertAfter(arg, optChain+"includes("+escapeForSingleQuotedString(text)+")"),
-				}
-				if needsParentheses(arg) {
-					fixes = append(fixes, rule.RuleFixInsertBefore(ctx.SourceFile, arg, "("))
-					fixes = append(fixes, rule.RuleFixInsertAfter(arg, ")"))
+				fixes := []rule.RuleFix{}
+				if !hasOptionalChain(access.Expression) {
+					optChain := "."
+					if access.QuestionDotToken != nil {
+						optChain = "?."
+					}
+					fixes = append(fixes,
+						rule.RuleFixRemoveRange(core.NewTextRange(callRange.Pos(), argRange.Pos())),
+						rule.RuleFixRemoveRange(core.NewTextRange(argRange.End(), callRange.End())),
+						rule.RuleFixInsertAfter(arg, optChain+"includes("+escapeForSingleQuotedString(text)+")"),
+					)
+					if needsParentheses(arg) {
+						fixes = append(fixes, rule.RuleFixInsertBefore(ctx.SourceFile, arg, "("))
+						fixes = append(fixes, rule.RuleFixInsertAfter(arg, ")"))
+					}
 				}
 
 				ctx.ReportNodeWithFixes(node, buildPreferStringIncludesMessage(), fixes...)

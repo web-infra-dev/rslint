@@ -43,6 +43,15 @@ function f(a: UserDefined): void {
 		},
 		{
 			Code: `function f(a: string): void {
+  (a.indexOf(b)) === -1;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes", Line: 2, Column: 3}},
+			Output: []string{`function f(a: string): void {
+  (!a.includes(b));
+}`},
+		},
+		{
+			Code: `function f(a: string): void {
   a.indexOf(b) === -1;
 }`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes", Line: 2, Column: 3}},
