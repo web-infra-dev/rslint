@@ -204,7 +204,29 @@ func isRegExpOrStringArgument(ctx rule.RuleContext, argument *ast.Node) bool {
 	}
 	argType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, argument)
 	typeName := utils.GetTypeName(ctx.TypeChecker, argType)
-	return typeName == "RegExp" || typeName == "string"
+	if typeName == "RegExp" || typeName == "string" {
+		return true
+	}
+	if utils.IsUnionType(argType) {
+		regExpSeen := false
+		stringSeen := false
+		for _, part := range utils.UnionTypeParts(argType) {
+			partName := utils.GetTypeName(ctx.TypeChecker, part)
+			if partName == "RegExp" {
+				regExpSeen = true
+			} else if partName == "string" {
+				stringSeen = true
+			} else {
+				return false
+			}
+		}
+		// If both string and RegExp are possible, avoid reporting.
+		if regExpSeen && stringSeen {
+			return false
+		}
+		return regExpSeen || stringSeen
+	}
+	return false
 }
 
 func buildRegexLiteralFromString(pattern string) (string, bool) {
