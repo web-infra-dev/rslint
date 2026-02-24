@@ -45,39 +45,27 @@ func findDirectiveInBlockComment(commentText string) (int, int, bool) {
 	}
 	content := commentText[contentStart:contentEnd]
 
-	lineStart := 0
-	for lineStart <= len(content) {
-		lineEnd := strings.IndexByte(content[lineStart:], '\n')
-		if lineEnd == -1 {
-			lineEnd = len(content) - lineStart
-		}
-		lineEnd += lineStart
+	lastLineStart := strings.LastIndexByte(content, '\n')
+	if lastLineStart == -1 {
+		lastLineStart = 0
+	} else {
+		lastLineStart++
+	}
 
-		idx := lineStart
-		for idx < lineEnd && (content[idx] == ' ' || content[idx] == '\t' || content[idx] == '\r') {
-			idx++
-		}
-		if idx < lineEnd && content[idx] == '*' {
-			idx++
-			for idx < lineEnd && (content[idx] == ' ' || content[idx] == '\t') {
-				idx++
-			}
-		}
-		if strings.HasPrefix(content[idx:], "//") {
-			idx += 2
-			for idx < lineEnd && (content[idx] == ' ' || content[idx] == '\t') {
-				idx++
-			}
-		}
-		if idx < lineEnd && strings.HasPrefix(content[idx:], tsIgnoreDirective) {
-			start := contentStart + idx
-			return start, start + len(tsIgnoreDirective), true
-		}
-
-		if lineEnd == len(content) {
-			break
-		}
-		lineStart = lineEnd + 1
+	line := content[lastLineStart:]
+	idx := 0
+	for idx < len(line) && (line[idx] == ' ' || line[idx] == '\t' || line[idx] == '\r') {
+		idx++
+	}
+	for idx < len(line) && (line[idx] == '/' || line[idx] == '*') {
+		idx++
+	}
+	for idx < len(line) && (line[idx] == ' ' || line[idx] == '\t') {
+		idx++
+	}
+	if idx < len(line) && strings.HasPrefix(line[idx:], tsIgnoreDirective) {
+		start := contentStart + lastLineStart + idx
+		return start, start + len(tsIgnoreDirective), true
 	}
 
 	return 0, 0, false
