@@ -77,24 +77,19 @@ func isStringLikeFixableType(ctx rule.RuleContext, t *checker.Type) bool {
 	if t == nil || ctx.TypeChecker == nil {
 		return false
 	}
-	if utils.GetTypeName(ctx.TypeChecker, t) == "string" {
-		return true
-	}
 	if !utils.IsUnionType(t) {
+		return utils.IsTypeFlagSet(t, checker.TypeFlagsStringLike)
+	}
+	parts := utils.UnionTypeParts(t)
+	if len(parts) == 0 {
 		return false
 	}
-	sawString := false
-	for _, part := range utils.UnionTypeParts(t) {
-		if utils.GetTypeName(ctx.TypeChecker, part) == "string" {
-			sawString = true
-			continue
+	for _, part := range parts {
+		if !utils.IsTypeFlagSet(part, checker.TypeFlagsStringLike) {
+			return false
 		}
-		if utils.IsTypeFlagSet(part, checker.TypeFlagsUndefined|checker.TypeFlagsNull) {
-			continue
-		}
-		return false
 	}
-	return sawString
+	return true
 }
 
 func hasOptionalChain(node *ast.Node) bool {
@@ -418,8 +413,7 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 					return
 				}
 				argType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, arg)
-				argNonNullableType := ctx.TypeChecker.GetNonNullableType(argType)
-				includesSym := checker.Checker_getPropertyOfType(ctx.TypeChecker, argNonNullableType, "includes")
+				includesSym := checker.Checker_getPropertyOfType(ctx.TypeChecker, argType, "includes")
 				if includesSym == nil {
 					return
 				}
@@ -432,7 +426,7 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 				}
 
 				fixes := []rule.RuleFix{}
-				allowFix := isStringLikeFixableType(ctx, argNonNullableType) &&
+				allowFix := isStringLikeFixableType(ctx, argType) &&
 					access.QuestionDotToken == nil &&
 					!hasOptionalChain(access.Expression)
 				if allowFix {

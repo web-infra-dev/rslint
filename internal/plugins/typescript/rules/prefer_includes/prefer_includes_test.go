@@ -31,6 +31,9 @@ function f(a: UserDefined): void {
 function f(a: UserDefined): void {
   a.indexOf(b) !== -1;
 }`},
+		{Code: `function f(a?: string): void {
+  /bar/.test(a);
+}`},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: `function f(a: string): void {
@@ -72,6 +75,15 @@ function f(a: UserDefined): void {
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes", Line: 2, Column: 3}},
 			Output: []string{`function f(a: Uint8Array): void {
   a.includes(b);
+}`},
+		},
+		{
+			Code: `function f(a: string): void {
+  /bar/.test(a);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferStringIncludes", Line: 2, Column: 3}},
+			Output: []string{`function f(a: string): void {
+  a.includes('bar');
 }`},
 		},
 	})
