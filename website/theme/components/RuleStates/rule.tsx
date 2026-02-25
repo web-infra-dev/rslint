@@ -1,11 +1,5 @@
-import React, { useState, ReactNode } from 'react';
-import useSWR, { SWRConfig } from 'swr';
-import {
-  Card,
-  CardHeader,
-  CardContent as CardBody,
-  CardFooter,
-} from '@components/ui/card';
+import React, { useState } from 'react';
+import { Card, CardHeader, CardContent as CardBody } from '@components/ui/card';
 import {
   Table,
   TableBody,
@@ -15,11 +9,9 @@ import {
   TableRow,
 } from '@components/ui/table';
 import { CancelSymbol, TableSelector } from './table-selector';
-import { usePageData } from '@rspress/core/runtime';
-import { ErrorCard } from './error';
-import { LoadingCard } from './loading';
 import { Badge, Heading, Text } from './ui-utils';
 import { Button } from '@components/ui/button';
+import manifest from '@/generated/rule-manifest.json';
 
 // Type definitions
 type FailingCase = {
@@ -34,27 +26,10 @@ type Rule = {
   failing_case: FailingCase[];
 };
 
-type RuleManifest = {
-  rules: Rule[];
-};
-
 type RuleStateDescribe = {
   name: string;
   count: number;
   style: 'full' | 'partial-impl' | 'partial-test' | 'total';
-};
-
-// Constants
-const RULE_MANIFEST_URL =
-  'https://raw.githubusercontent.com/web-infra-dev/rslint/main/packages/rslint-test-tools/rule-manifest.json';
-
-// Fetcher function
-const fetcher = async (url: string): Promise<RuleManifest> => {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error('Failed to fetch rule manifest');
-  }
-  return response.json();
 };
 
 function getRuleUrl(rule: Rule): string {
@@ -102,16 +77,11 @@ function hooksFilter(setValue: (value: string) => void) {
 
 // Main component
 const RuleImplementationStatus: React.FC = () => {
-  const { data, error, isLoading, mutate } = useSWR<RuleManifest>(
-    RULE_MANIFEST_URL,
-    fetcher,
-  );
-
   const [searchValue, setSearchValue] = useState('');
   const [groupValue, setGroupValue] = useState('');
   const [statusValue, setStatusValue] = useState('');
 
-  const rulesData = data?.rules || [];
+  const rulesData = manifest.rules as Rule[];
 
   // Filter rule data
   const filteredRules = rulesData.filter(rule => {
@@ -157,25 +127,6 @@ const RuleImplementationStatus: React.FC = () => {
       style: 'total',
     },
   ];
-
-  // Error state
-  if (error) {
-    return (
-      <ErrorCard
-        onRetry={() => mutate()}
-        title="Rule Implementation Status"
-        message="We encountered an issue while loading the rule information."
-        retryButtonText="Try Again"
-      />
-    );
-  }
-
-  // Loading state
-  if (isLoading && !data) {
-    return (
-      <LoadingCard title="Rule Status" loadingText="Loading rules data..." />
-    );
-  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -279,20 +230,7 @@ const RuleImplementationStatus: React.FC = () => {
 
 // Export component
 export const RuleApp: React.FC = () => {
-  const { page } = usePageData();
-  const manifest = page.ruleManifest;
-
-  return (
-    <SWRConfig
-      value={{
-        fallback: {
-          [RULE_MANIFEST_URL]: manifest,
-        },
-      }}
-    >
-      <RuleImplementationStatus />
-    </SWRConfig>
-  );
+  return <RuleImplementationStatus />;
 };
 
 export default RuleApp;
