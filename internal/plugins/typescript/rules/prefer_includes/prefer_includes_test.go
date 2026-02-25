@@ -86,5 +86,14 @@ function f(a: UserDefined): void {
   a.includes('bar');
 }`},
 		},
+		{
+			Code: `function f(a: string): void {
+  new RegExp('bar', undefined).test(a);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferStringIncludes", Line: 2, Column: 3}},
+			Output: []string{`function f(a: string): void {
+  a.includes('bar');
+}`},
+		},
 	})
 }

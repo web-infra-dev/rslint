@@ -159,6 +159,15 @@ func parseRegexPattern(pattern, flags string) (string, bool) {
 	return extractRegexStaticString(pattern)
 }
 
+func isUndefinedLiteral(node *ast.Node) bool {
+	node = stripParens(node)
+	if node == nil || node.Kind != ast.KindIdentifier {
+		return false
+	}
+	id := node.AsIdentifier()
+	return id != nil && id.Text == "undefined"
+}
+
 // PreferIncludesRule checks for indexOf comparisons that can use includes instead.
 var PreferIncludesRule = rule.CreateRule(rule.Rule{
 	Name: "prefer-includes",
@@ -272,11 +281,15 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 				pattern := first.AsStringLiteral().Text
 				flags := ""
 				if len(newExpr.Arguments.Nodes) >= 2 {
-					second := newExpr.Arguments.Nodes[1]
-					if second == nil || second.Kind != ast.KindStringLiteral {
+					second := stripParens(newExpr.Arguments.Nodes[1])
+					if second == nil {
 						return "", false
 					}
-					flags = second.AsStringLiteral().Text
+					if second.Kind == ast.KindStringLiteral {
+						flags = second.AsStringLiteral().Text
+					} else if !isUndefinedLiteral(second) {
+						return "", false
+					}
 				}
 				return parseRegexPattern(pattern, flags)
 			case ast.KindIdentifier:
