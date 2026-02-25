@@ -109,6 +109,10 @@ func buildFix(sourceFile *ast.SourceFile, comment *ast.CommentRange, textLen int
 				}
 			case '\n':
 				end++
+			default:
+				for end < textLen && (text[end] == ' ' || text[end] == '\t') {
+					end++
+				}
 			}
 		}
 		return rule.RuleFixRemoveRange(core.NewTextRange(start, end))

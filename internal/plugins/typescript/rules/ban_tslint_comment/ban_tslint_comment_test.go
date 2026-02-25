@@ -78,5 +78,12 @@ func TestBanTslintCommentRule(t *testing.T) {
 			},
 			Output: []string{"const whoa = doSomeStuff();\nconsole.log(whoa);\n"},
 		},
+		{
+			Code: "/* tslint:disable */ const x = 1;",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "commentDetected", Line: 1, Column: 1},
+			},
+			Output: []string{"const x = 1;"},
+		},
 	})
 }
