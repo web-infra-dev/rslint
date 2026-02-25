@@ -5,11 +5,9 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
-func buildDynamicDeleteMessage() rule.RuleMessage {
-	return rule.RuleMessage{
-		Id:          "dynamicDelete",
-		Description: "Do not delete dynamically computed property keys.",
-	}
+var dynamicDeleteMessage = rule.RuleMessage{
+	Id:          "dynamicDelete",
+	Description: "Do not delete dynamically computed property keys.",
 }
 
 func isAllowedDeleteArgument(argument *ast.Node) bool {
@@ -20,7 +18,7 @@ func isAllowedDeleteArgument(argument *ast.Node) bool {
 		return true
 	case ast.KindPrefixUnaryExpression:
 		unary := argument.AsPrefixUnaryExpression()
-		return unary != nil && unary.Operator == ast.KindMinusToken && unary.Operand.Kind == ast.KindNumericLiteral
+		return unary != nil && unary.Operator == ast.KindMinusToken && ast.SkipParentheses(unary.Operand).Kind == ast.KindNumericLiteral
 	default:
 		return false
 	}
@@ -50,7 +48,7 @@ var NoDynamicDeleteRule = rule.CreateRule(rule.Rule{
 					return
 				}
 
-				ctx.ReportNode(elementAccess.ArgumentExpression, buildDynamicDeleteMessage())
+				ctx.ReportNode(elementAccess.ArgumentExpression, dynamicDeleteMessage)
 			},
 		}
 	},

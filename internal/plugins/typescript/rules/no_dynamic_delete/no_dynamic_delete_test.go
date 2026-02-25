@@ -36,6 +36,12 @@ delete container[-7];
 		{
 			Code: `
 const container: { [i: string]: 0 } = {};
+delete container[-(7)];
+			`,
+		},
+		{
+			Code: `
+const container: { [i: string]: 0 } = {};
 delete container['-Infinity'];
 			`,
 		},
