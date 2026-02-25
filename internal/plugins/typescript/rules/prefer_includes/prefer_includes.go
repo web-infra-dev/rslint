@@ -433,14 +433,10 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 					access.QuestionDotToken == nil &&
 					!hasOptionalChain(access.Expression)
 				if allowFix {
-					optChain := "."
-					if access.QuestionDotToken != nil {
-						optChain = "?."
-					}
 					fixes = append(fixes,
 						rule.RuleFixRemoveRange(core.NewTextRange(callRange.Pos(), argRange.Pos())),
 						rule.RuleFixRemoveRange(core.NewTextRange(argRange.End(), callRange.End())),
-						rule.RuleFixInsertAfter(arg, optChain+"includes("+escapeForSingleQuotedString(text)+")"),
+						rule.RuleFixInsertAfter(arg, ".includes("+escapeForSingleQuotedString(text)+")"),
 					)
 					if needsParentheses(arg) {
 						fixes = append(fixes, rule.RuleFixInsertBefore(ctx.SourceFile, arg, "("))
