@@ -64,7 +64,7 @@ var ClassMethodsUseThisRule = rule.CreateRule(rule.Rule{
 			ctx.ReportNode(member, msg)
 		}
 
-		checkMethodLike := func(member *ast.Node, body *ast.Node, kind string, startNode *ast.Node) {
+		checkMethodLike := func(member *ast.Node, body *ast.Node, parameters *ast.NodeList, kind string, startNode *ast.Node) {
 			if member == nil || body == nil {
 				return
 			}
@@ -98,7 +98,7 @@ var ClassMethodsUseThisRule = rule.CreateRule(rule.Rule{
 				}
 			}
 
-			if containsThisOrSuper(body) {
+			if containsThisOrSuperInFunction(body, parameters) {
 				return
 			}
 
@@ -148,17 +148,14 @@ var ClassMethodsUseThisRule = rule.CreateRule(rule.Rule{
 
 			init := prop.Initializer
 			var body *ast.Node
+			var parameters *ast.NodeList
 			switch init.Kind {
 			case ast.KindFunctionExpression:
-				fn := init.AsFunctionExpression()
-				if fn != nil {
-					body = fn.Body
-				}
+				body = init.AsFunctionExpression().Body
+				parameters = init.AsFunctionExpression().Parameters
 			case ast.KindArrowFunction:
-				arrow := init.AsArrowFunction()
-				if arrow != nil {
-					body = arrow.Body
-				}
+				body = init.AsArrowFunction().Body
+				parameters = init.AsArrowFunction().Parameters
 			default:
 				return
 			}
@@ -167,7 +164,7 @@ var ClassMethodsUseThisRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			if containsThisOrSuper(body) {
+			if containsThisOrSuperInFunction(body, parameters) {
 				return
 			}
 
@@ -187,21 +184,21 @@ var ClassMethodsUseThisRule = rule.CreateRule(rule.Rule{
 					kind = "generator method"
 					startNode = node
 				}
-				checkMethodLike(node, method.Body, kind, startNode)
+				checkMethodLike(node, method.Body, method.Parameters, kind, startNode)
 			},
 			ast.KindGetAccessor: func(node *ast.Node) {
 				accessor := node.AsGetAccessorDeclaration()
 				if accessor == nil || accessor.Body == nil {
 					return
 				}
-				checkMethodLike(node, accessor.Body, "getter", node)
+				checkMethodLike(node, accessor.Body, accessor.Parameters, "getter", node)
 			},
 			ast.KindSetAccessor: func(node *ast.Node) {
 				accessor := node.AsSetAccessorDeclaration()
 				if accessor == nil || accessor.Body == nil {
 					return
 				}
-				checkMethodLike(node, accessor.Body, "setter", node)
+				checkMethodLike(node, accessor.Body, accessor.Parameters, "setter", node)
 			},
 			ast.KindPropertyDeclaration: func(node *ast.Node) {
 				checkProperty(node)
@@ -224,9 +221,11 @@ func parseOptions(options any) classMethodsUseThisOptions {
 
 	var optsMap map[string]interface{}
 	if arr, ok := options.([]interface{}); ok && len(arr) > 0 {
-		optsMap, _ = arr[0].(map[string]interface{})
-	} else {
-		optsMap, _ = options.(map[string]interface{})
+		if m, ok := arr[0].(map[string]interface{}); ok {
+			optsMap = m
+		}
+	} else if m, ok := options.(map[string]interface{}); ok {
+		optsMap = m
 	}
 
 	if optsMap == nil {
@@ -328,25 +327,13 @@ func classImplementsInterface(classNode *ast.Node) bool {
 func getMemberNameNode(member *ast.Node) *ast.Node {
 	switch member.Kind {
 	case ast.KindMethodDeclaration:
-		method := member.AsMethodDeclaration()
-		if method != nil {
-			return method.Name()
-		}
+		return member.AsMethodDeclaration().Name()
 	case ast.KindGetAccessor:
-		accessor := member.AsGetAccessorDeclaration()
-		if accessor != nil {
-			return accessor.Name()
-		}
+		return member.AsGetAccessorDeclaration().Name()
 	case ast.KindSetAccessor:
-		accessor := member.AsSetAccessorDeclaration()
-		if accessor != nil {
-			return accessor.Name()
-		}
+		return member.AsSetAccessorDeclaration().Name()
 	case ast.KindPropertyDeclaration:
-		prop := member.AsPropertyDeclaration()
-		if prop != nil {
-			return prop.Name()
-		}
+		return member.AsPropertyDeclaration().Name()
 	}
 	return nil
 }
@@ -358,25 +345,17 @@ func getMemberNameInfo(sourceFile *ast.SourceFile, nameNode *ast.Node) memberNam
 
 	switch nameNode.Kind {
 	case ast.KindIdentifier:
-		ident := nameNode.AsIdentifier()
-		if ident != nil {
-			return memberNameInfo{Name: ident.Text, HasName: true}
-		}
+		return memberNameInfo{Name: nameNode.AsIdentifier().Text, HasName: true}
 	case ast.KindPrivateIdentifier:
-		privateIdent := nameNode.AsPrivateIdentifier()
-		if privateIdent != nil {
-			name := privateIdent.Text
-			if !strings.HasPrefix(name, "#") {
-				name = "#" + name
-			}
-			return memberNameInfo{Name: name, HasName: true, IsPrivate: true}
+		name := nameNode.AsPrivateIdentifier().Text
+		if !strings.HasPrefix(name, "#") {
+			name = "#" + name
 		}
+		return memberNameInfo{Name: name, HasName: true, IsPrivate: true}
 	case ast.KindComputedPropertyName:
 		computed := nameNode.AsComputedPropertyName()
-		if computed != nil {
-			if name, ok := literalNameFromExpression(computed.Expression); ok {
-				return memberNameInfo{Name: name, HasName: true}
-			}
+		if name, ok := literalNameFromExpression(computed.Expression); ok {
+			return memberNameInfo{Name: name, HasName: true}
 		}
 	default:
 		if ast.IsLiteralExpression(nameNode) {
@@ -508,6 +487,22 @@ func containsThisOrSuper(node *ast.Node) bool {
 	return found
 }
 
+func containsThisOrSuperInFunction(body *ast.Node, parameters *ast.NodeList) bool {
+	if parameters != nil {
+		for _, parameter := range parameters.Nodes {
+			if parameter == nil || parameter.Kind != ast.KindParameter {
+				continue
+			}
+			paramDecl := parameter.AsParameterDeclaration()
+			if paramDecl != nil && paramDecl.Initializer != nil && containsThisOrSuper(paramDecl.Initializer) {
+				return true
+			}
+		}
+	}
+
+	return containsThisOrSuper(body)
+}
+
 func buildMemberReportRange(sourceFile *ast.SourceFile, member *ast.Node, startNode *ast.Node, nameNode *ast.Node, initializer *ast.Node) (core.TextRange, bool) {
 	if sourceFile == nil || startNode == nil {
 		return core.TextRange{}, false
@@ -522,6 +517,9 @@ func buildMemberReportRange(sourceFile *ast.SourceFile, member *ast.Node, startN
 	}
 	searchEnd := member.End()
 	if initializer != nil {
+		if end, ok := getSingleParamArrowHeadEnd(sourceFile, start, initializer); ok {
+			return core.NewTextRange(start, end), true
+		}
 		searchStart = initializer.Pos()
 		searchEnd = initializer.End()
 	}
@@ -538,7 +536,13 @@ func findNextParen(text string, start int, end int) int {
 	if start < 0 {
 		start = 0
 	}
-	if end <= 0 || end > len(text) {
+	if start > len(text) {
+		return -1
+	}
+	if end < start {
+		return -1
+	}
+	if end > len(text) {
 		end = len(text)
 	}
 	for i := start; i < end; i++ {
@@ -547,4 +551,33 @@ func findNextParen(text string, start int, end int) int {
 		}
 	}
 	return -1
+}
+
+func getSingleParamArrowHeadEnd(sourceFile *ast.SourceFile, start int, initializer *ast.Node) (int, bool) {
+	if sourceFile == nil || initializer == nil || initializer.Kind != ast.KindArrowFunction {
+		return 0, false
+	}
+
+	arrow := initializer.AsArrowFunction()
+	if arrow == nil || arrow.Parameters == nil || len(arrow.Parameters.Nodes) != 1 {
+		return 0, false
+	}
+
+	firstParam := arrow.Parameters.Nodes[0]
+	if firstParam == nil {
+		return 0, false
+	}
+
+	firstParamRange := utils.TrimNodeTextRange(sourceFile, firstParam)
+	end := firstParamRange.Pos()
+	if end <= start || end <= 0 {
+		return 0, false
+	}
+
+	text := sourceFile.Text()
+	if end-1 < len(text) && text[end-1] == '(' {
+		return 0, false
+	}
+
+	return end, true
 }

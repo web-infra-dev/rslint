@@ -68,6 +68,22 @@ class Foo {
       `,
 			Options: map[string]interface{}{"exceptMethods": []interface{}{"method"}},
 		},
+		{
+			Code: `
+class Foo {
+  method(value = this.value) {}
+}
+      `,
+		},
+		{
+			Code: `
+class Foo {
+  property = (value = this.value) => {
+    return value;
+  };
+}
+      `,
+		},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
@@ -137,6 +153,20 @@ class Foo {
       `,
 			Options: map[string]interface{}{"ignoreOverrideMethods": false},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "missingThis"}},
+		},
+		{
+			Code: `
+class Foo {
+  property = value => value;
+}
+      `,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "missingThis",
+				Line:      3,
+				Column:    3,
+				EndLine:   3,
+				EndColumn: 14,
+			}},
 		},
 	})
 }
