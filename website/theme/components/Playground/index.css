@@ -1,0 +1,15 @@
+.playground-container {
+  height: calc(100vh - 72px);
+  background: #ffffff;
+}
+
+.editor-panel {
+  height: 100%;
+  background: #ffffff;
+  position: relative;
+}
+
+.result-panel {
+  height: 100%;
+  background: #ffffff;
+}

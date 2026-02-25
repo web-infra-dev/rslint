@@ -10,7 +10,34 @@ import (
 	"io"
 	"os"
 	"sync"
+
+	"github.com/microsoft/typescript-go/shim/api/encoder"
+	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/web-infra-dev/rslint/internal/inspector"
 )
+
+// Re-export types from inspector package for backward compatibility
+type (
+	GetAstInfoRequest  = inspector.GetAstInfoRequest
+	GetAstInfoResponse = inspector.GetAstInfoResponse
+	NodeInfo           = inspector.NodeInfo
+	NodeListMeta       = inspector.NodeListMeta
+	TypeInfo           = inspector.TypeInfo
+	IndexInfoType      = inspector.IndexInfoType
+	SymbolInfo         = inspector.SymbolInfo
+	SignatureInfo      = inspector.SignatureInfo
+	TypePredicateInfo  = inspector.TypePredicateInfo
+	FlowInfo           = inspector.FlowInfo
+)
+
+// AstInfoBuilder wraps inspector.Builder for backward compatibility
+type AstInfoBuilder = inspector.Builder
+
+// NewAstInfoBuilder creates a new AST info builder (backward compatible)
+func NewAstInfoBuilder(c *checker.Checker, sf *ast.SourceFile) *AstInfoBuilder {
+	return inspector.NewBuilder(c, sf)
+}
 
 // Protocol implements a binary message protocol similar to esbuild:
 // - First 4 bytes: message length (uint32 in little endian)
@@ -22,6 +49,10 @@ type MessageKind string
 const (
 	// KindLint is sent from JS to Go to request linting
 	KindLint MessageKind = "lint"
+	// KindApplyFixes is sent from JS to Go to request applying fixes
+	KindApplyFixes MessageKind = "applyFixes"
+	// KindGetAstInfo is sent from JS to Go to request AST info at a position
+	KindGetAstInfo MessageKind = "getAstInfo"
 	// KindResponse is sent from Go to JS with the lint results
 	KindResponse MessageKind = "response"
 	// KindError is sent when an error occurs
@@ -60,16 +91,66 @@ type LintRequest struct {
 	Format           string   `json:"format,omitempty"`
 	WorkingDirectory string   `json:"workingDirectory,omitempty"`
 	// Supports both string level and array [level, options] format
-	RuleOptions  map[string]interface{} `json:"ruleOptions,omitempty"`
-	FileContents map[string]string      `json:"fileContents,omitempty"` // Map of file paths to their contents for VFS
+	RuleOptions               map[string]interface{} `json:"ruleOptions,omitempty"`
+	FileContents              map[string]string      `json:"fileContents,omitempty"`              // Map of file paths to their contents for VFS
+	LanguageOptions           *LanguageOptions       `json:"languageOptions,omitempty"`           // Override languageOptions from config file
+	IncludeEncodedSourceFiles bool                   `json:"includeEncodedSourceFiles,omitempty"` // Whether to include encoded source files in response
 }
+
+// LanguageOptions contains language-specific configuration options
+type LanguageOptions struct {
+	ParserOptions *ParserOptions `json:"parserOptions,omitempty"`
+}
+
+// ProjectPaths represents project paths that can be either a single string or an array of strings
+type ProjectPaths []string
+
+// UnmarshalJSON implements custom JSON unmarshaling to support both string and string[] formats
+func (p *ProjectPaths) UnmarshalJSON(data []byte) error {
+	// Try to unmarshal as string first
+	var singlePath string
+	if err := json.Unmarshal(data, &singlePath); err == nil {
+		*p = []string{singlePath}
+		return nil
+	}
+
+	// If that fails, try to unmarshal as array of strings
+	var paths []string
+	if err := json.Unmarshal(data, &paths); err != nil {
+		return err
+	}
+	*p = paths
+	return nil
+}
+
+// ParserOptions contains parser-specific configuration
+type ParserOptions struct {
+	ProjectService bool         `json:"projectService"`
+	Project        ProjectPaths `json:"project,omitempty"`
+}
+type ByteArray []byte
 
 // LintResponse represents a lint response from Go to JS
 type LintResponse struct {
-	Diagnostics []Diagnostic `json:"diagnostics"`
-	ErrorCount  int          `json:"errorCount"`
-	FileCount   int          `json:"fileCount"`
-	RuleCount   int          `json:"ruleCount"`
+	Diagnostics        []Diagnostic         `json:"diagnostics"`
+	ErrorCount         int                  `json:"errorCount"`
+	FileCount          int                  `json:"fileCount"`
+	RuleCount          int                  `json:"ruleCount"`
+	EncodedSourceFiles map[string]ByteArray `json:"encodedSourceFiles,omitempty"`
+}
+
+// ApplyFixesRequest represents a request to apply fixes from JS to Go
+type ApplyFixesRequest struct {
+	FileContent string       `json:"fileContent"` // Current content of the file
+	Diagnostics []Diagnostic `json:"diagnostics"` // Diagnostics with fixes to apply
+}
+
+// ApplyFixesResponse represents a response after applying fixes
+type ApplyFixesResponse struct {
+	FixedContent   []string `json:"fixedContent"`   // The content after applying fixes (array of intermediate versions)
+	WasFixed       bool     `json:"wasFixed"`       // Whether any fixes were actually applied
+	AppliedCount   int      `json:"appliedCount"`   // Number of fixes that were applied
+	UnappliedCount int      `json:"unappliedCount"` // Number of fixes that couldn't be applied
 }
 
 // ErrorResponse represents an error response
@@ -97,11 +178,21 @@ type Diagnostic struct {
 	Range     Range  `json:"range"`
 	Severity  string `json:"severity,omitempty"`
 	MessageId string `json:"messageId"`
+	Fixes     []Fix  `json:"fixes,omitempty"`
+}
+
+// Fix represents a single fix that can be applied
+type Fix struct {
+	Text     string `json:"text"`
+	StartPos int    `json:"startPos"` // Character position in the file content
+	EndPos   int    `json:"endPos"`   // Character position in the file content
 }
 
 // Handler defines the interface for handling IPC messages
 type Handler interface {
 	HandleLint(req LintRequest) (*LintResponse, error)
+	HandleApplyFixes(req ApplyFixesRequest) (*ApplyFixesResponse, error)
+	HandleGetAstInfo(req GetAstInfoRequest) (*GetAstInfoResponse, error)
 }
 
 // Service manages the IPC communication
@@ -184,6 +275,10 @@ func (s *Service) Start() error {
 			s.handleHandshake(msg)
 		case KindLint:
 			s.handleLint(msg)
+		case KindApplyFixes:
+			s.handleApplyFixes(msg)
+		case KindGetAstInfo:
+			s.handleGetAstInfo(msg)
 		case KindExit:
 			s.handleExit(msg)
 			return nil
@@ -222,6 +317,7 @@ func (s *Service) handleExit(msg *Message) {
 func (s *Service) handleLint(msg *Message) {
 	var req LintRequest
 	data, err := json.Marshal(msg.Data)
+
 	if err != nil {
 		s.sendError(msg.ID, fmt.Sprintf("failed to marshal data: %v", err))
 		return
@@ -231,8 +327,53 @@ func (s *Service) handleLint(msg *Message) {
 		s.sendError(msg.ID, fmt.Sprintf("failed to parse lint request: %v", err))
 		return
 	}
-
 	resp, err := s.handler.HandleLint(req)
+	if err != nil {
+		s.sendError(msg.ID, err.Error())
+		return
+	}
+
+	s.sendResponse(msg.ID, resp)
+}
+
+// handleApplyFixes handles apply fixes messages
+func (s *Service) handleApplyFixes(msg *Message) {
+	var req ApplyFixesRequest
+	data, err := json.Marshal(msg.Data)
+	if err != nil {
+		s.sendError(msg.ID, fmt.Sprintf("failed to marshal data: %v", err))
+		return
+	}
+
+	if err := json.Unmarshal(data, &req); err != nil {
+		s.sendError(msg.ID, fmt.Sprintf("failed to parse apply fixes request: %v", err))
+		return
+	}
+
+	resp, err := s.handler.HandleApplyFixes(req)
+	if err != nil {
+		s.sendError(msg.ID, err.Error())
+		return
+	}
+
+	s.sendResponse(msg.ID, resp)
+}
+
+// handleGetAstInfo handles get AST info messages
+func (s *Service) handleGetAstInfo(msg *Message) {
+	var req GetAstInfoRequest
+	data, err := json.Marshal(msg.Data)
+	if err != nil {
+		s.sendError(msg.ID, fmt.Sprintf("failed to marshal data: %v", err))
+		return
+	}
+
+	if err := json.Unmarshal(data, &req); err != nil {
+		s.sendError(msg.ID, fmt.Sprintf("failed to parse get ast info request: %v", err))
+		return
+	}
+
+	resp, err := s.handler.HandleGetAstInfo(req)
 	if err != nil {
 		s.sendError(msg.ID, err.Error())
 		return
@@ -268,4 +409,8 @@ func (s *Service) sendError(id int, message string) {
 // IsIPCMode returns true if the process is in IPC mode
 func IsIPCMode() bool {
 	return os.Getenv("RSLINT_IPC") == "1"
+}
+
+func EncodeAST(sourceFile *ast.SourceFile, id string) ([]byte, error) {
+	return encoder.EncodeSourceFile(sourceFile, id)
 }

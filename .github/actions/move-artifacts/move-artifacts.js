@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 
-function findRslintBinaries(dir = 'binaries') {
+function findBinaries(dir = 'binaries', suffix) {
   const files = [];
 
   if (!fs.existsSync(dir)) {
@@ -16,10 +16,10 @@ function findRslintBinaries(dir = 'binaries') {
     const fullPath = path.join(dir, entry.name);
 
     if (entry.isDirectory()) {
-      // Look for files ending with -rslint in subdirectories
+      // Look for files ending with the suffix in subdirectories
       const subEntries = fs.readdirSync(fullPath, { withFileTypes: true });
       for (const subEntry of subEntries) {
-        if (subEntry.isFile() && subEntry.name.includes('-rslint')) {
+        if (subEntry.isFile() && subEntry.name.includes(suffix)) {
           files.push(path.join(fullPath, subEntry.name));
         }
       }
@@ -33,16 +33,16 @@ async function moveArtifacts() {
   console.log('Starting artifact move process...');
 
   try {
-    // Find all rslint binary files
-    const files = findRslintBinaries();
-    console.log(`Found ${files.length} rslint binary files`);
+    // Find and move rslint binaries
+    const rslintFiles = findBinaries('binaries', '-rslint');
+    console.log(`Found ${rslintFiles.length} rslint binary files`);
 
-    for (const file of files) {
+    for (const file of rslintFiles) {
       console.log(`Processing ${file}`);
       const isWindows = file.includes('win32');
       const filename = path.basename(file);
       const dirname = filename.replace(/-rslint$/, '');
-      const targetDir = path.join('npm', dirname);
+      const targetDir = path.join('npm', 'rslint', dirname);
 
       const targetFile = path.join(
         targetDir,
@@ -55,6 +55,78 @@ async function moveArtifacts() {
       fs.chmodSync(targetFile, 0o755); // Make executable
 
       console.log(`Copied ${file} to ${targetFile}`);
+    }
+
+    // Find and move tsgo binaries to lib directory
+    const tsgoFiles = findBinaries('binaries', '-tsgo');
+    console.log(`Found ${tsgoFiles.length} tsgo binary files`);
+
+    for (const file of tsgoFiles) {
+      // Skip tsgo-built directories
+      if (file.includes('-tsgo-built')) {
+        continue;
+      }
+      console.log(`Processing ${file}`);
+      const isWindows = file.includes('win32');
+      const filename = path.basename(file);
+      const dirname = filename.replace(/-tsgo$/, '');
+      const targetDir = path.join('npm', 'tsgo', dirname, 'lib');
+
+      const targetFile = path.join(targetDir, isWindows ? 'tsgo.exe' : 'tsgo');
+
+      // Create target directory and copy file
+      fs.mkdirSync(targetDir, { recursive: true });
+      fs.copyFileSync(file, targetFile);
+      fs.chmodSync(targetFile, 0o755); // Make executable
+
+      console.log(`Copied ${file} to ${targetFile}`);
+    }
+
+    // Copy typescript-go built files (lib files) to tsgo platform packages
+    // Files are downloaded from platform-specific artifacts to binaries/{platform}-tsgo-built/
+    const tsgoPlatforms = [
+      'darwin-arm64',
+      'darwin-x64',
+      'linux-arm64',
+      'linux-x64',
+      'win32-arm64',
+      'win32-x64',
+    ];
+
+    for (const platform of tsgoPlatforms) {
+      const tsgoBuiltSource = path.join(
+        'binaries',
+        `${platform}-tsgo-built`,
+        'local',
+      );
+
+      if (!fs.existsSync(tsgoBuiltSource)) {
+        console.log(
+          `Warning: typescript-go built source not found at ${tsgoBuiltSource}`,
+        );
+        continue;
+      }
+
+      // Get all files from the built/local directory
+      const libFiles = fs.readdirSync(tsgoBuiltSource);
+      console.log(`Found ${libFiles.length} lib files for ${platform}`);
+
+      const targetLibDir = path.join('npm', 'tsgo', platform, 'lib');
+      fs.mkdirSync(targetLibDir, { recursive: true });
+
+      for (const file of libFiles) {
+        // Skip tsgo binary from typescript-go build, we use our own ./cmd/tsgo build
+        if (file === 'tsgo' || file === 'tsgo.exe') {
+          continue;
+        }
+        const srcFile = path.join(tsgoBuiltSource, file);
+        const destFile = path.join(targetLibDir, file);
+        const stat = fs.statSync(srcFile);
+        if (stat.isFile()) {
+          fs.copyFileSync(srcFile, destFile);
+        }
+      }
+      console.log(`Copied built files to ${targetLibDir}`);
     }
 
     console.log('Artifact move process completed successfully!');

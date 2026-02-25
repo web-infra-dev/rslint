@@ -1,2 +1,3 @@
 # don't publish local rslint bin
 ./bin/rslint
+dist/tsconfig.build.tsbuildinfo

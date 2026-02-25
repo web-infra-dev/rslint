@@ -14,7 +14,7 @@ import { setupStatusBar } from './statusBar';
 import { RegisterCommands } from './commands';
 
 export class Extension implements Disposable {
-  private rslintInstances: Map<string, Rslint> = new Map();
+  private rslintInstances = new Map<string, Rslint>();
   private disposables: Disposable[] = [];
   private logger: Logger;
   public context: ExtensionContext;

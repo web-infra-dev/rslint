@@ -1,6 +1,6 @@
 {
   "name": "rslint-monorepo",
-  "version": "0.1.9",
+  "version": "0.2.1",
   "private": true,
   "description": "Rslint Monorepo",
   "homepage": "https://github.com/web-infra-dev/rslint#readme",
@@ -13,18 +13,19 @@
   },
   "license": "MIT",
   "scripts": {
-    "build": "pnpm -r build",
+    "build": "pnpm -r --filter=!@typescript/api --filter=!@typescript/ast --filter='@rslint/test-tools...' --filter='rslint...' build",
     "build:npm": "zx scripts/build-npm.mjs",
-    "check-spell": "pnpx cspell",
+    "build:website": "pnpm --filter=!@typescript/api --filter=!@typescript/ast --filter=!@rslint/core --filter @rslint/website... -r build",
+    "check-spell": "pnpx cspell lint --no-progress --show-context",
     "version": "zx scripts/version.mjs",
     "release": "pnpm publish -r --no-git-checks",
     "publish:vsce": "zx scripts/publish-marketplace.mjs",
     "publish:ovsx": "zx scripts/publish-marketplace.mjs --marketplace=ovsx",
     "format": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --write .",
     "format:check": "prettier --ignore-path=.prettierignore --config=.prettierrc.json --check .",
-    "test": "pnpm -r test",
+    "test": "pnpm -r --filter=!@typescript/api --filter=!@typescript/ast --filter='@rslint/test-tools...' --filter='rslint...' test",
     "test:go": "go test ./internal/...",
-    "typecheck": "pnpm tsc -b tsconfig.json",
+    "typecheck": "pnpm tsgo -b tsconfig.json",
     "lint": "rslint",
     "lint:go": "golangci-lint run ./cmd/... ./internal/...",
     "format:go": "golangci-lint fmt ./cmd/... ./internal/...",
@@ -33,12 +34,13 @@
   },
   "devDependencies": {
     "@rslint/core": "workspace:*",
-    "@rstest/core": "^0.1.0",
+    "@rstest/core": "^0.7.0",
     "husky": "^9.1.7",
-    "lint-staged": "^16.1.2",
-    "prettier": "3.5.0",
-    "typescript": "5.8.3",
-    "zx": "8.7.1"
+    "lint-staged": "^16.2.6",
+    "prettier": "3.7.4",
+    "typescript": "5.9.3",
+    "zx": "8.8.5",
+    "@typescript/native-preview": "7.0.0-dev.20250904.1"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [

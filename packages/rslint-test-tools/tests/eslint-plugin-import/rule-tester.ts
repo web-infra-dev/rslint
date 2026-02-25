@@ -12,7 +12,7 @@ export interface ValidTestCase {
   only?: boolean;
   // TODO: support `languageOptions` later
   // languageOptions?: Linter.LanguageOptions | undefined;
-  settings?: { [name: string]: any } | undefined;
+  settings?: Record<string, any> | undefined;
 }
 
 interface SuggestionOutput {
@@ -88,12 +88,13 @@ export class RuleTester {
             typeof validCase === 'string'
               ? defaultFilename
               : (validCase.filename ?? defaultFilename);
+          const absoluteFilename = path.resolve(import.meta.dirname, filename);
 
           const diags = await lint({
             config,
             workingDirectory: cwd,
             fileContents: {
-              [filename]: code,
+              [absoluteFilename]: code,
             },
             ruleOptions: {
               [ruleName]: options,
@@ -125,12 +126,12 @@ export class RuleTester {
             typeof item === 'string'
               ? defaultFilename
               : (item.filename ?? defaultFilename);
-
+          const absoluteFilename = path.resolve(import.meta.dirname, filename);
           const diags = await lint({
             config,
             workingDirectory: cwd,
             fileContents: {
-              [filename]: code,
+              [absoluteFilename]: code,
             },
             ruleOptions: {
               [ruleName]: options,
@@ -188,8 +189,11 @@ export class RuleTester {
                   `Error at index ${i} has suggestions. Please convert the test error into an object and specify 'suggestions' property on it to test suggestions.`,
                 );
               } else if (typeof error === 'object' && error !== null) {
-                // TODO: handle object error
+                // TODO: handle object error(currently partially implemented)
                 // https://github.com/eslint/eslint/blob/34f0723e2d0faf8ac8dc95ec56e6d181bd6b67f2/lib/rule-tester/rule-tester.js#L1145
+                if (typeof error.message === 'string') {
+                  assertMessageMatches(message.message, error.message);
+                }
               }
             }
           }

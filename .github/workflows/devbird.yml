@@ -1,0 +1,99 @@
+name: 'DevBird'
+run-name: 'DevBird: ${{ inputs.task_title }}'
+
+on:
+  workflow_dispatch:
+    inputs:
+      devbird_api_url:
+        description: 'The URL of the DevBird instance'
+        type: string
+        required: false
+        default: 'https://devbird.api.delino.io'
+
+      prompt:
+        description: 'Instructions for DevBird. Can be a direct prompt or custom template.'
+        type: string
+        required: true
+
+      base_branch:
+        description: 'The branch to use as the base/source when creating new branches (defaults to repository default branch)'
+        type: string
+        required: false
+        default: 'main'
+
+      agent:
+        description: "The agent to use for the action. Can be 'claude_code', 'gemini_cli', 'codex_cli' or 'opencode'"
+        type: choice
+        default: 'claude_code'
+        options:
+          - claude_code
+          - gemini_cli
+          - codex_cli
+          - opencode
+          - crush_cli
+          - github_copilot_cli
+
+      agent_model:
+        description: 'The (optional) model to use for the agent'
+        type: string
+        required: false
+        default: ''
+
+      devbird_workflow_execution_token:
+        description: 'The token to use for the DevBird task'
+        type: string
+        required: false
+        default: ''
+
+      devbird_mode:
+        description: "The DevBird execution mode. Can be 'develop' (default) or 'plan' (for task graph planning)"
+        type: choice
+        default: 'develop'
+        options:
+          - develop
+          - plan
+
+      task_title:
+        description: 'The title of the DevBird task'
+        type: string
+        required: false
+        default: ''
+
+jobs:
+  devbird:
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read # Required for Claude to read CI results on PRs
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+      - name: Setup Go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version: 1.25.0
+      - name: Install pnpm
+        run: corepack enable
+      - name: Install JavaScript dependencies
+        run: pnpm install
+      - name: Run DevBird
+        uses: delinoio/devbird-action@main
+        with:
+          agent: ${{ inputs.agent }}
+          agent_model: ${{ inputs.agent_model }}
+          devbird_mode: ${{ inputs.devbird_mode }}
+          devbird_workflow_execution_token: ${{ inputs.devbird_workflow_execution_token }}
+          prompt: ${{ inputs.prompt }}
+          base_branch: ${{ inputs.base_branch }}
+          delino_access_token: ${{ secrets.DELINO_ACCESS_TOKEN }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        env:
+          DEVBIRD_API_URL: ${{ inputs.devbird_api_url }}

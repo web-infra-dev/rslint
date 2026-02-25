@@ -1,0 +1,682 @@
+// Rstest Snapshot v1
+
+exports[`no-unsafe-argument > invalid 1`] = `
+{
+  "code": "
+declare function foo(arg: number): void;
+foo(1 as any);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe argument of type any assigned to a parameter of type number.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 2`] = `
+{
+  "code": "
+declare function foo(arg: number): void;
+foo(error);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe argument of type any assigned to a parameter of type number.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 3`] = `
+{
+  "code": "
+declare function foo(arg1: number, arg2: string): void;
+foo(1, 1 as any);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe argument of type any assigned to a parameter of type string.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 4`] = `
+{
+  "code": "
+declare function foo(...arg: number[]): void;
+foo(1, 2, 3, 1 as any);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe argument of type any assigned to a parameter of type number.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 5`] = `
+{
+  "code": "
+declare function foo(arg: string, ...arg: number[]): void;
+foo(1 as any, 1 as any);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe argument of type any assigned to a parameter of type string.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+    {
+      "message": "Unsafe argument of type any assigned to a parameter of type number.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 6`] = `
+{
+  "code": "
+declare function foo(arg1: string, arg2: number): void;
+
+foo(...(x as any));
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe spread of an any type.",
+      "messageId": "unsafeSpread",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 7`] = `
+{
+  "code": "
+declare function foo(arg1: string, arg2: number): void;
+
+foo(...(x as any[]));
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe spread of an any[] array type.",
+      "messageId": "unsafeArraySpread",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 8`] = `
+{
+  "code": "
+declare function foo(arg1: string, arg2: number): void;
+
+declare const errors: error[];
+
+foo(...errors);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe spread of an error array type.",
+      "messageId": "unsafeArraySpread",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 9`] = `
+{
+  "code": "
+declare function foo(arg1: string, arg2: number): void;
+
+const x = ['a', 1 as any] as const;
+foo(...x);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe spread of a tuple type. The argument is of type any and is assigned to a parameter of type number.",
+      "messageId": "unsafeTupleSpread",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 10`] = `
+{
+  "code": "
+declare function foo(arg1: string, arg2: number): void;
+
+const x = ['a', error] as const;
+foo(...x);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe spread of a tuple type. The argument is of type any and is assigned to a parameter of type number.",
+      "messageId": "unsafeTupleSpread",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 11`] = `
+{
+  "code": "
+declare function foo(arg1: string, arg2: number): void;
+foo(...(['foo', 1, 2] as [string, any, number]));
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe spread of a tuple type. The argument is of type any and is assigned to a parameter of type number.",
+      "messageId": "unsafeTupleSpread",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 12`] = `
+{
+  "code": "
+declare function foo(arg1: string, arg2: number, arg2: string): void;
+
+const x = [1] as const;
+foo('a', ...x, 1 as any);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe argument of type any assigned to a parameter of type string.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 5,
+        },
+        "start": {
+          "column": 16,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 13`] = `
+{
+  "code": "
+declare function foo(arg1: string, arg2: number, ...rest: string[]): void;
+
+const x = [1, 2] as [number, ...number[]];
+foo('a', ...x, 1 as any);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe argument of type any assigned to a parameter of type string.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 5,
+        },
+        "start": {
+          "column": 16,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 14`] = `
+{
+  "code": "
+declare function foo(arg1: Set<string>, arg2: Map<string, string>): void;
+
+const x = [new Map<any, string>()] as const;
+foo(new Set<any>(), ...x);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe argument of type Set<any> assigned to a parameter of type Set<string>.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+    {
+      "message": "Unsafe spread of a tuple type. The argument is of type Map<any, string> and is assigned to a parameter of type Map<string, string>.",
+      "messageId": "unsafeTupleSpread",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 5,
+        },
+        "start": {
+          "column": 21,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 15`] = `
+{
+  "code": "
+declare function foo(...params: [number, string, any]): void;
+foo(1 as any, 'a' as any, 1 as any);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe argument of type any assigned to a parameter of type number.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+    {
+      "message": "Unsafe argument of type any assigned to a parameter of type string.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 16`] = `
+{
+  "code": "
+declare function foo(param1: string, ...params: [number, string, any]): void;
+foo('a', 1 as any, 'a' as any, 1 as any);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe argument of type any assigned to a parameter of type number.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+    {
+      "message": "Unsafe argument of type any assigned to a parameter of type string.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 17`] = `
+{
+  "code": "
+type T = [number, T[]];
+declare function foo(t: T): void;
+declare const t: T;
+foo(t as any);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe argument of type any assigned to a parameter of type T.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 18`] = `
+{
+  "code": "
+function foo(
+  templates: TemplateStringsArray,
+  arg1: number,
+  arg2: any,
+  arg3: string,
+) {}
+declare const arg: any;
+foo<number>\`\${arg}\${arg}\${arg}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe argument of type any assigned to a parameter of type number.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 9,
+        },
+        "start": {
+          "column": 15,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+    {
+      "message": "Unsafe argument of type any assigned to a parameter of type string.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 9,
+        },
+        "start": {
+          "column": 27,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 19`] = `
+{
+  "code": "
+function foo(templates: TemplateStringsArray, arg: number) {}
+declare const arg: any;
+foo\`\${arg}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe argument of type any assigned to a parameter of type number.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 7,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-argument > invalid 20`] = `
+{
+  "code": "
+type T = [number, T[]];
+function foo(templates: TemplateStringsArray, arg: T) {}
+declare const arg: any;
+foo\`\${arg}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe argument of type any assigned to a parameter of type T.",
+      "messageId": "unsafeArgument",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 5,
+        },
+        "start": {
+          "column": 7,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-argument",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

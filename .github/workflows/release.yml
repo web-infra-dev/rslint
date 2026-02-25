@@ -42,8 +42,6 @@ on:
           - extension
 permissions:
   contents: read
-env:
-  GO_VERSION: '1.24.1'
 
 jobs:
   publish-npm:
@@ -51,7 +49,7 @@ jobs:
     name: ${{ inputs.dry_run == true && 'Dry Run - NPM Packages' || 'Publish NPM Packages' }}
     needs: [build]
     runs-on: ubuntu-22.04
-    environment: npm
+    environment: release
     permissions:
       # For push git tags
       contents: write
@@ -69,14 +67,14 @@ jobs:
           fi
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
           ref: ${{ github.event.inputs.branch }}
           submodules: true
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
       # Update npm to the latest version to enable OIDC
@@ -92,7 +90,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Download Artifact
-        uses: actions/download-artifact@v4.1.7
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: binaries
 
@@ -104,18 +102,19 @@ jobs:
           pnpm -r publish --no-git-checks --tag ${{ github.event.inputs.npm_tag }} --publish-branch ${{ github.event.inputs.branch }}
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name "github-actions"
-          echo git tag v$(jq -r .version package.json)
-          git tag v$(jq -r .version package.json)
-          git push origin --follow-tags
+          version=$(jq -r .version package.json)
+          git tag v$version -m "v$version"
+          git push origin v$version
 
   publish-extension-vscode:
     if: ${{ inputs.to_release == 'all' || inputs.to_release == 'extension' }}
     name: ${{ inputs.dry_run == true && 'Dry Run - VSCode Extensions' || 'Publish VSCode Extensions' }}
     needs: [build]
     runs-on: rspack-ubuntu-22.04-large
+    environment: release
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
           ref: ${{ github.event.inputs.branch }}
@@ -125,7 +124,7 @@ jobs:
         uses: ./.github/actions/setup-node
 
       - name: Download Artifact
-        uses: actions/download-artifact@v4.1.7
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: binaries
 
@@ -148,7 +147,7 @@ jobs:
             fi
           fi
       - name: Upload VSCE artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           path: packages/vscode-extension/rslint-*.vsix
 
@@ -157,9 +156,10 @@ jobs:
     name: ${{ inputs.dry_run == true && 'Dry Run - Open VSX Extensions' || 'Publish Open VSX Extensions' }}
     needs: [build]
     runs-on: ubuntu-22.04
+    environment: release
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
           ref: ${{ github.event.inputs.branch }}
@@ -169,7 +169,7 @@ jobs:
         uses: ./.github/actions/setup-node
 
       - name: Download Artifact
-        uses: actions/download-artifact@v4.1.7
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: binaries
 
@@ -195,7 +195,7 @@ jobs:
   check:
     name: Test
     if: ${{ inputs.dry_run == false }}
-    needs: build
+    needs: [build]
     strategy:
       fail-fast: true
       matrix:
@@ -208,21 +208,21 @@ jobs:
     runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
           ref: ${{ github.event.inputs.branch }}
           submodules: true
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version: 1.25.0
           cache-name: ${{ matrix.node_os }}-${{ matrix.node_arch }}
 
       - name: Install pnpm
@@ -232,23 +232,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Download Artifact
-        uses: actions/download-artifact@v4.1.7
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: binaries
 
       - name: Move binaries
-        run: |
-          find ./binaries
-          for file in binaries/*/*-rslint; do
-            echo "Processing $file"
-            filename=$(basename "$file")
-            dirname="${filename%-rslint}"
-            target_dir="npm/$dirname"
-            mkdir -p "$target_dir"
-            echo "Copy $file to $target_dir/rslint"
-            cp "$file" "npm/$dirname/rslint"
-          done
-          find ./npm
+        uses: ./.github/actions/move-artifacts
 
       - name: Format code
         run: pnpm format:check
@@ -269,9 +258,11 @@ jobs:
           sudo apt-get install -y xvfb libxss1 libgtk-3-0 libgconf-2-4 libnss3 libxrandr2 libasound2 libpangocairo-1.0-0 libatk1.0-0 libcairo-gobject2 libgtk-3-0 libgdk-pixbuf2.0-0
 
       - name: Test on Linux
-        run: xvfb-run -a pnpm -r test
+        run: xvfb-run -a npm run test
 
   build:
+    env:
+      GOMAXPROCS: 8
     name: Build-Binaries
     strategy:
       fail-fast: false
@@ -304,22 +295,30 @@ jobs:
     runs-on: rspack-ubuntu-22.04-large
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
           ref: ${{ github.event.inputs.branch }}
           submodules: true
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24'
 
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: ${{ env.GO_VERSION }}
+          go-version: 1.25.0
           cache-name: ${{ matrix.node_os }}-${{ matrix.node_arch }}
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
       - name: Install pnpm
         run: corepack enable
@@ -327,12 +326,36 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Go Build packages
+      - name: Go Build rslint
         run: |
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint ./cmd/rslint
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Go Build tsgo
+        run: |
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} go build -o ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo ./cmd/tsgo
+
+      - name: Upload rslint artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint
           path: ${{ matrix.node_os }}-${{ matrix.node_arch }}-rslint
+
+      - name: Upload tsgo artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo
+          path: ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo
+
+      - name: Build typescript-go
+        run: |
+          cd typescript-go
+          npm ci
+          npm run build
+          # Remove tsgo binary from typescript-go build, we use our own ./cmd/tsgo build
+          rm -f built/local/tsgo built/local/tsgo.exe
+
+      - name: Upload typescript-go built artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ${{ matrix.node_os }}-${{ matrix.node_arch }}-tsgo-built
+          path: typescript-go/built

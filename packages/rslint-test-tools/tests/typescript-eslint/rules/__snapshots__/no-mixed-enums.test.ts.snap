@@ -1,0 +1,730 @@
+// Rstest Snapshot v1
+
+exports[`no-mixed-enums > invalid 1`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple,
+          Banana = 'banana',
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 4,
+        },
+        "start": {
+          "column": 20,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 2`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple,
+          Banana = 'banana',
+          Cherry = 'cherry',
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 4,
+        },
+        "start": {
+          "column": 20,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 3`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple,
+          Banana,
+          Cherry = 'cherry',
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 5,
+        },
+        "start": {
+          "column": 20,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 4`] = `
+{
+  "code": "
+        enum Fruit {
+          Apple = 0,
+          Banana = 'banana',
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 4,
+        },
+        "start": {
+          "column": 20,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 5`] = `
+{
+  "code": "
+        const getValue = () => 0;
+        enum Fruit {
+          Apple = getValue(),
+          Banana = 'banana',
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 5,
+        },
+        "start": {
+          "column": 20,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 6`] = `
+{
+  "code": "
+        const getValue = () => '';
+        enum Fruit {
+          Apple,
+          Banana = getValue(),
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 5,
+        },
+        "start": {
+          "column": 20,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 7`] = `
+{
+  "code": "
+        const getValue = () => '';
+        enum Fruit {
+          Apple = getValue(),
+          Banana = 0,
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 5,
+        },
+        "start": {
+          "column": 20,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 8`] = `
+{
+  "code": "
+        enum First {
+          A = 1,
+        }
+
+        enum Second {
+          A = First.A,
+          B = 'b',
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 8,
+        },
+        "start": {
+          "column": 15,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 9`] = `
+{
+  "code": "
+        enum First {
+          A = 'a',
+        }
+
+        enum Second {
+          A = First.A,
+          B = 1,
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 8,
+        },
+        "start": {
+          "column": 15,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 10`] = `
+{
+  "code": "
+        enum Foo {
+          A,
+        }
+        enum Foo {
+          B = 'b',
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 6,
+        },
+        "start": {
+          "column": 15,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 11`] = `
+{
+  "code": "
+        enum Foo {
+          A = 1,
+        }
+        enum Foo {
+          B = 'b',
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 6,
+        },
+        "start": {
+          "column": 15,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 12`] = `
+{
+  "code": "
+        enum Foo {
+          A = 'a',
+        }
+        enum Foo {
+          B,
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 6,
+        },
+        "start": {
+          "column": 11,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 13`] = `
+{
+  "code": "
+        enum Foo {
+          A = 'a',
+        }
+        enum Foo {
+          B = 0,
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 6,
+        },
+        "start": {
+          "column": 15,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 14`] = `
+{
+  "code": "
+        enum Foo {
+          A,
+        }
+        enum Foo {
+          B = 'b',
+        }
+        enum Foo {
+          C = 'c',
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 6,
+        },
+        "start": {
+          "column": 15,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 9,
+        },
+        "start": {
+          "column": 15,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 15`] = `
+{
+  "code": "
+        enum Foo {
+          A,
+        }
+        enum Foo {
+          B = 'b',
+        }
+        enum Foo {
+          C,
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 6,
+        },
+        "start": {
+          "column": 15,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 16`] = `
+{
+  "code": "
+        enum Foo {
+          A,
+        }
+        enum Foo {
+          B,
+        }
+        enum Foo {
+          C = 'c',
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 9,
+        },
+        "start": {
+          "column": 15,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 17`] = `
+{
+  "code": "
+import { Enum } from './mixed-enums-decl';
+
+declare module './mixed-enums-decl' {
+  enum Enum {
+    Numeric = 0,
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 6,
+        },
+        "start": {
+          "column": 15,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 18`] = `
+{
+  "code": "
+enum Foo {
+  A = 1,
+}
+enum Foo {
+  B = 'B',
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 6,
+        },
+        "start": {
+          "column": 7,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 19`] = `
+{
+  "code": "
+namespace Test {
+  export enum Bar {
+    A = 1,
+  }
+}
+namespace Test {
+  export enum Bar {
+    B = 'B',
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 9,
+        },
+        "start": {
+          "column": 9,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 20`] = `
+{
+  "code": "
+namespace Test {
+  export enum Bar {
+    A,
+  }
+}
+namespace Test {
+  export enum Bar {
+    B = 'B',
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 9,
+        },
+        "start": {
+          "column": 9,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-mixed-enums > invalid 21`] = `
+{
+  "code": "
+namespace Outer {
+  export namespace Test {
+    export enum Bar {
+      A = 1,
+    }
+  }
+}
+namespace Outer {
+  export namespace Test {
+    export enum Bar {
+      B = 'B',
+    }
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Mixing number and string enums can be confusing.",
+      "messageId": "mixed",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 12,
+        },
+        "start": {
+          "column": 11,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-mixed-enums",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

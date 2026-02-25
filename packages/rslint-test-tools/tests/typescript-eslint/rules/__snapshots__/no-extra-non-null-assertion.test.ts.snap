@@ -1,0 +1,277 @@
+// Rstest Snapshot v1
+
+exports[`no-extra-non-null-assertion > invalid 1`] = `
+{
+  "code": "
+const foo: { bar: number } | null = null;
+const bar = foo!!.bar;
+      ",
+  "diagnostics": [
+    {
+      "message": "Forbidden extra non-null assertion.",
+      "messageId": "noExtraNonNullAssertion",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extra-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+const foo: { bar: number } | null = null;
+const bar = foo!.bar;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-non-null-assertion > invalid 2`] = `
+{
+  "code": "
+function foo(bar: number | undefined) {
+  const bar: number = bar!!;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Forbidden extra non-null assertion.",
+      "messageId": "noExtraNonNullAssertion",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 23,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extra-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function foo(bar: number | undefined) {
+  const bar: number = bar!;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-non-null-assertion > invalid 3`] = `
+{
+  "code": "
+function foo(bar?: { n: number }) {
+  return bar!?.n;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Forbidden extra non-null assertion.",
+      "messageId": "noExtraNonNullAssertion",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extra-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function foo(bar?: { n: number }) {
+  return bar?.n;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-non-null-assertion > invalid 4`] = `
+{
+  "code": "
+function foo(bar?: { n: number }) {
+  return bar!?.();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Forbidden extra non-null assertion.",
+      "messageId": "noExtraNonNullAssertion",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extra-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function foo(bar?: { n: number }) {
+  return bar?.();
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-non-null-assertion > invalid 5`] = `
+{
+  "code": "
+const foo: { bar: number } | null = null;
+const bar = (foo!)!.bar;
+      ",
+  "diagnostics": [
+    {
+      "message": "Forbidden extra non-null assertion.",
+      "messageId": "noExtraNonNullAssertion",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extra-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+const foo: { bar: number } | null = null;
+const bar = (foo)!.bar;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-non-null-assertion > invalid 6`] = `
+{
+  "code": "
+function foo(bar?: { n: number }) {
+  return (bar!)?.n;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Forbidden extra non-null assertion.",
+      "messageId": "noExtraNonNullAssertion",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extra-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function foo(bar?: { n: number }) {
+  return (bar)?.n;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-non-null-assertion > invalid 7`] = `
+{
+  "code": "
+function foo(bar?: { n: number }) {
+  return (bar)!?.n;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Forbidden extra non-null assertion.",
+      "messageId": "noExtraNonNullAssertion",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extra-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function foo(bar?: { n: number }) {
+  return (bar)?.n;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-non-null-assertion > invalid 8`] = `
+{
+  "code": "
+function foo(bar?: { n: number }) {
+  return (bar!)?.();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Forbidden extra non-null assertion.",
+      "messageId": "noExtraNonNullAssertion",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extra-non-null-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function foo(bar?: { n: number }) {
+  return (bar)?.();
+}
+      ",
+  "ruleCount": 1,
+}
+`;

@@ -1,0 +1,261 @@
+// Rstest Snapshot v1
+
+exports[`no-non-null-asserted-optional-chain > invalid 1`] = `
+{
+  "code": "foo?.bar!;",
+  "diagnostics": [
+    {
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "messageId": "noNonNullOptionalChain",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-optional-chain",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-optional-chain > invalid 2`] = `
+{
+  "code": "foo?.['bar']!;",
+  "diagnostics": [
+    {
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "messageId": "noNonNullOptionalChain",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-optional-chain",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-optional-chain > invalid 3`] = `
+{
+  "code": "foo?.bar()!;",
+  "diagnostics": [
+    {
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "messageId": "noNonNullOptionalChain",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-optional-chain",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-optional-chain > invalid 4`] = `
+{
+  "code": "foo.bar?.()!;",
+  "diagnostics": [
+    {
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "messageId": "noNonNullOptionalChain",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-optional-chain",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-optional-chain > invalid 5`] = `
+{
+  "code": "(foo?.bar)!.baz",
+  "diagnostics": [
+    {
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "messageId": "noNonNullOptionalChain",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-optional-chain",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-optional-chain > invalid 6`] = `
+{
+  "code": "(foo?.bar)!().baz",
+  "diagnostics": [
+    {
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "messageId": "noNonNullOptionalChain",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-optional-chain",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-optional-chain > invalid 7`] = `
+{
+  "code": "(foo?.bar)!",
+  "diagnostics": [
+    {
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "messageId": "noNonNullOptionalChain",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-optional-chain",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-optional-chain > invalid 8`] = `
+{
+  "code": "(foo?.bar)!()",
+  "diagnostics": [
+    {
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "messageId": "noNonNullOptionalChain",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-optional-chain",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-optional-chain > invalid 9`] = `
+{
+  "code": "(foo?.bar!)",
+  "diagnostics": [
+    {
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "messageId": "noNonNullOptionalChain",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-optional-chain",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-non-null-asserted-optional-chain > invalid 10`] = `
+{
+  "code": "(foo?.bar!)()",
+  "diagnostics": [
+    {
+      "message": "Optional chain expressions can return undefined by design - using a non-null assertion is unsafe and wrong.",
+      "messageId": "noNonNullOptionalChain",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-non-null-asserted-optional-chain",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

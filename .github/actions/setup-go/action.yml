@@ -4,7 +4,7 @@ description: Setup Go
 inputs:
   go-version:
     description: Go version range to set up.
-    default: '>=1.24.0'
+    required: true
   cache-name:
     description: Name of scoped cache for this set up.
     default: 'cache'
@@ -14,38 +14,58 @@ runs:
   steps:
     - name: Install Go
       id: install-go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
       with:
         go-version: ${{ inputs.go-version }}
         cache: false
 
-    - name: Clean Go module cache dir
-      shell: bash
-      if: runner.os == 'linux'
-      run: sudo rm -rf ~/go/pkg/mod/golang.org/toolchain*
+    # Clean up before cache restore to free disk space
+    - name: Pre-cache cleanup (Windows)
+      shell: pwsh
+      if: runner.os == 'Windows'
+      run: |
+        Write-Host "Disk space before cleanup:"
+        Get-PSDrive C | Select-Object Used,Free | Format-Table
+
+        # Clean temp directory
+        Get-ChildItem -Path $env:TEMP -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+        Write-Host "Disk space after cleanup:"
+        Get-PSDrive C | Select-Object Used,Free | Format-Table
 
     - name: Go cache
-      uses: actions/cache@v4.2.3
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       if: runner.environment == 'github-hosted'
       with:
         key: setup-go-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           setup-go-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
+        # Only cache dependencies, not build cache (saves disk space on Windows)
         path: |
           ~/go/pkg/mod
-          ~/.cache/go-build
-          ~/Library/Caches/go-build
-          ~/AppData/Local/go-build
 
     - name: Go cache
       uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
       if: runner.environment == 'self-hosted'
       with:
-        key: setup-go-SH-1-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
+        key: setup-go-SH-2-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
         restore-keys: |
-          setup-go-SH-1-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
+          setup-go-SH-2-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
+        # Only cache dependencies, not build cache (saves disk space on Windows)
         path: |
           ~/go/pkg/mod
-          ~/.cache/go-build
-          ~/Library/Caches/go-build
-          ~/AppData/Local/go-build
+
+    # Clean up after cache restore - remove toolchain to save space
+    - name: Clean Go module cache dir (Linux)
+      shell: bash
+      if: runner.os == 'Linux'
+      run: sudo rm -rf ~/go/pkg/mod/golang.org/toolchain*
+
+    - name: Clean Go module cache dir (Windows)
+      shell: pwsh
+      if: runner.os == 'Windows'
+      run: |
+        $toolchainPath = Join-Path $env:USERPROFILE "go/pkg/mod/golang.org"
+        if (Test-Path $toolchainPath) {
+          Get-ChildItem -Path $toolchainPath -Filter "toolchain*" -Directory | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+        }

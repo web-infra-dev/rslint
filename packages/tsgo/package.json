@@ -1,0 +1,38 @@
+{
+  "name": "@rslint/tsgo",
+  "version": "0.2.1",
+  "description": "custom tsgo binary",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/web-infra-dev/rslint"
+  },
+  "bugs": "https://github.com/web-infra-dev/rslint/issues",
+  "files": [
+    "bin/tsgo.cjs"
+  ],
+  "bin": {
+    "tsgo": "./bin/tsgo.cjs"
+  },
+  "scripts": {
+    "build:bin": "go build -o ./bin/tsgo ../../cmd/tsgo",
+    "build": "pnpm run build:bin"
+  },
+  "keywords": [
+    "tsgo",
+    "typescript",
+    "go"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "optionalDependencies": {
+    "@rslint/tsgo-darwin-arm64": "workspace:*",
+    "@rslint/tsgo-darwin-x64": "workspace:*",
+    "@rslint/tsgo-linux-arm64": "workspace:*",
+    "@rslint/tsgo-linux-x64": "workspace:*",
+    "@rslint/tsgo-win32-arm64": "workspace:*",
+    "@rslint/tsgo-win32-x64": "workspace:*"
+  }
+}

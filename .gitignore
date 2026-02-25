@@ -145,9 +145,11 @@ vite.config.ts.timestamp-*
 
 ## ignore ai build result
 /rslint
+/tsgo
 /bin/rslint
 npm/*/rslint
 npm/*/rslint.exe
+npm/tsgo/*/local
 
 .idea
 
@@ -156,3 +158,9 @@ npm/*/rslint.exe
 
 # go cache
 packages/rslint/pkg/
+
+# rust
+target/
+
+# generated rule manifest
+website/generated/

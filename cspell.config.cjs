@@ -14,6 +14,10 @@ module.exports = {
     'shim',
     'packages/vscode-extension/out',
     'packages/rslint-test-tools/tests',
+    'packages/rslint/pkg/mod',
+    'cmd/tsgo',
+    './agents',
+    'internal/linter/*_test.go',
   ],
   dictionaries: ['dictionary'],
   dictionaryDefinitions: [

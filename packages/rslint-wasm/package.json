@@ -1,0 +1,45 @@
+{
+  "name": "@rslint/wasm",
+  "version": "0.2.1",
+  "description": "rslint wasm package",
+  "main": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build:wasm": "cross-env GOOS=js GOARCH=wasm go build  -o rslint.wasm -ldflags=\"-s -w\"  ../../cmd/rslint",
+    "build:wasm:gz": "node scripts/gzip-wasm.mjs",
+    "build:js": "node scripts/build.mjs && tsgo -b tsconfig.json",
+    "build": "pnpm run build:wasm && pnpm run build:wasm:gz && pnpm run build:js"
+  },
+  "files": [
+    "dist/index.mjs",
+    "dist/**.d.ts",
+    "rslint.wasm",
+    "rslint.wasm.gz"
+  ],
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/web-infra-dev/rslint"
+  },
+  "packageManager": "pnpm@10.13.1",
+  "devDependencies": {
+    "@rslint/core": "workspace:*",
+    "@microsoft/api-extractor": "7.57.4",
+    "@wasmer/wasmfs": "0.12.0",
+    "esbuild": "^0.27.0",
+    "buffer": "^6.0.3",
+    "cross-env": "^10.1.0",
+    "esbuild-plugin-polyfill-node": "0.3.0",
+    "memfs": "^4.51.1",
+    "prebundle": "1.6.0",
+    "@typescript/native-preview": "7.0.0-dev.20250904.1"
+  },
+  "dependencies": {
+    "@rslint/core": "workspace:*"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

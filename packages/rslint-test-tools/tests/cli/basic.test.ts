@@ -211,6 +211,59 @@ describe('CLI Configuration Tests', () => {
     }
   });
 
+  test('should output in github workflow format when --format github is used', async () => {
+    const tempDir = await createTempDir({
+      'rslint.json': JSON.stringify([
+        {
+          language: 'javascript',
+          files: ['**/*.ts'],
+          languageOptions: {
+            parserOptions: {
+              projectService: false,
+              project: ['./tsconfig.json'],
+            },
+          },
+          rules: {
+            '@typescript-eslint/no-explicit-any': 'warn',
+            '@typescript-eslint/no-unsafe-member-access': 'error',
+          },
+          plugins: ['@typescript-eslint'],
+        },
+      ]),
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          target: 'ES2020',
+          module: 'ESNext',
+          strict: true,
+        },
+        include: ['**/*.ts'],
+      }),
+      'test:%,\r\nfile.ts': `
+        let a: any = 10;
+        a.b = 20;
+      `,
+    });
+
+    try {
+      const result = await runRslint(['--format', 'github'], tempDir);
+
+      const lines = result.stdout
+        .trim()
+        .split('\n')
+        .filter(line => line.trim());
+
+      expect(lines.length).toBe(2);
+      expect(lines[0]).toBe(
+        '::warning file=test%3A%25%2C%0D%0Afile.ts,line=2,endLine=2,col=16,endColumn=19,title=@typescript-eslint/no-explicit-any::Unexpected any. Specify a different type.',
+      );
+      expect(lines[1]).toBe(
+        '::error file=test%3A%25%2C%0D%0Afile.ts,line=3,endLine=3,col=11,endColumn=12,title=@typescript-eslint/no-unsafe-member-access::Unsafe member access .b on an `any` value.',
+      );
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
   test('should only report errors when --quiet flag is used', async () => {
     const tempDir = await createTempDir({
       'rslint.json': JSON.stringify([
@@ -405,7 +458,7 @@ describe('CLI Configuration Tests', () => {
         include: ['**/*.ts'],
       }),
       'test.ts': `
-        const a: string = "hello";
+        const a = "hello";
         console.log(a.length); // This is safe
       `,
     });

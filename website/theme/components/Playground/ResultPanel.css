@@ -1,0 +1,233 @@
+/* Actions area pinned to top-right of the header */
+.result-actions {
+  display: flex;
+  align-items: center;
+}
+
+.spinner {
+  border: 2px solid #d0d7de;
+  border-top: 2px solid #0969da;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.result-content {
+  padding: 8px;
+  height: calc(100% - 46px);
+}
+
+.loading-state {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  color: #656d76;
+}
+
+.lint-results {
+  height: calc(100% - 8px);
+}
+
+/* Shadcn Alert used for messages */
+
+/* Diagnostics */
+.diagnostics-list {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  gap: 16px;
+  overflow: auto;
+}
+
+.diagnostic-item {
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  font-family:
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Ubuntu,
+    Cantarell,
+    Noto Sans,
+    sans-serif,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Helvetica,
+    Arial,
+    sans-serif,
+    'Apple Color Emoji',
+    'Segoe UI Emoji',
+    'Segoe UI Symbol';
+  padding: 12px;
+}
+
+.diagnostic-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.diagnostic-rule {
+  background: #ddf4d8;
+  color: #1c1d21;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.diagnostic-severity {
+  background: #ffebe9;
+  color: #cf222e;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.diagnostic-message {
+  padding: 13px;
+  color: inherit;
+  font-size: 12px;
+  font-family:
+    SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
+  background-color: #ffebec;
+  border-radius: 4px;
+  border-left: 5px solid #e13238;
+}
+
+.diagnostic-location {
+  color: #656d76;
+  font-size: 0.75rem;
+  font-family: monospace;
+}
+
+/* AST View */
+.ast-view {
+  height: 100%;
+}
+
+.ast-tree {
+  height: 100%;
+  overflow: auto;
+  /* border: 1px solid #d0d7de; */
+  /* border-radius: 6px; */
+  background: #fff;
+  padding: 6px 6px 10px 6px;
+}
+
+.ast-node-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family:
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    Segoe UI,
+    Roboto,
+    Helvetica,
+    Arial,
+    Apple Color Emoji,
+    Segoe UI Emoji,
+    Segoe UI Symbol;
+  font-size: 12px;
+}
+.ast-node-row:hover {
+  background: #f3f4f6;
+}
+.ast-node-row.selected {
+  background: #e7f3ff;
+  outline: 1px solid #96c7ff;
+}
+
+.twisty {
+  width: 0;
+  height: 0;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  border-left: 6px solid #8c959f;
+  background: transparent;
+  padding: 0;
+  margin-right: 2px;
+  cursor: pointer;
+}
+.twisty.open {
+  transform: rotate(90deg);
+}
+/* no placeholder for twisty when no children */
+
+.node-type {
+  font-weight: 600;
+  color: #1f6feb;
+}
+.node-range {
+  color: #8c959f;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
+    'Courier New', monospace;
+}
+.node-preview {
+  color: #8c959f;
+  margin-left: 6px;
+  font-style: italic;
+}
+
+.ast-children {
+  margin-left: 10px;
+}
+
+.ast-content {
+  background: #f6f8fa;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+  padding: 1rem;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', 'Fira Code', monospace;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #24292f;
+  overflow: auto;
+  height: 100%;
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  color: #656d76;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.empty-text {
+  font-size: 0.875rem;
+}

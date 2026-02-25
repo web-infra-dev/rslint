@@ -1,0 +1,9 @@
+{
+  "extends": ["../../tsconfig.build.json"],
+  "compilerOptions": {
+    "lib": ["DOM", "ESNext"],
+    "emitDeclarationOnly": true,
+    "customConditions": ["@typescript/source"]
+  },
+  "references": []
+}

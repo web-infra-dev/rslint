@@ -1,8 +1,19 @@
 {
   "name": "@rslint/core",
-  "version": "0.1.9",
+  "version": "0.2.1",
   "exports": {
-    ".": "./dist/index.js",
+    ".": {
+      "@typescript/source": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./browser": {
+      "@typescript/source": "./src/browser.ts",
+      "default": "./dist/browser.js"
+    },
+    "./service": {
+      "@typescript/source": "./src/service.ts",
+      "default": "./dist/service.js"
+    },
     "./bin": "./bin/rslint.cjs",
     "./package.json": "./package.json"
   },
@@ -14,14 +25,15 @@
   "scripts": {
     "build:bin": "go build -v -o bin/ ../../cmd/rslint",
     "build:debug": "GOEXPERIMENT=noregabi go build -v -gcflags='all=-N -l' -o bin/ ../../cmd/rslint ",
-    "build:js": "tsc -b tsconfig.build.json --force",
-    "dev": "tsc -b tsconfig.build.json --force --watch",
+    "build:js": "tsgo -b tsconfig.build.json --force",
+    "dev": "tsgo -b tsconfig.build.json --force --watch",
     "build": "pnpm build:bin && pnpm build:js",
     "test": "rstest run",
     "test:update": "rstest run -u"
   },
   "files": [
-    "bin/rslint.cjs"
+    "bin/rslint.cjs",
+    "dist/"
   ],
   "bin": {
     "rslint": "./bin/rslint.cjs"
@@ -30,17 +42,21 @@
     "access": "public"
   },
   "license": "MIT",
-  "description": "rslint cli",
+  "description": "rslint core library",
   "publisher": "rslint",
   "keywords": [
     "rslint",
     "linter",
     "typescript",
-    "go"
+    "go",
+    "browser",
+    "webworker"
   ],
   "devDependencies": {
     "@types/node": "24.0.14",
-    "typescript": "5.8.3"
+    "typescript": "5.9.3",
+    "@rslint/api": "workspace:*",
+    "@typescript/native-preview": "7.0.0-dev.20250904.1"
   },
   "optionalDependencies": {
     "@rslint/darwin-arm64": "workspace:*",

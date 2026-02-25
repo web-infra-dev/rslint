@@ -1,0 +1,26 @@
+{
+  "name": "@rslint/darwin-x64",
+  "version": "0.2.1",
+  "license": "MIT",
+  "description": "binary for rslint",
+  "bugs": "https://github.com/web-infra-dev/rslint/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/web-infra-dev/rslint"
+  },
+  "publishConfig": {
+    "access": "public",
+    "executableFiles": [
+      "./rslint"
+    ]
+  },
+  "files": [
+    "rslint"
+  ],
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "name": "@rslint/tsgo-win32-x64",
+  "version": "0.2.1",
+  "license": "MIT",
+  "description": "tsgo binary for windows x64",
+  "bugs": "https://github.com/web-infra-dev/rslint/issues",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/web-infra-dev/rslint"
+  },
+  "publishConfig": {
+    "access": "public",
+    "executableFiles": [
+      "./lib/tsgo.exe"
+    ]
+  },
+  "files": [
+    "lib"
+  ],
+  "os": [
+    "win32"
+  ],
+  "cpu": [
+    "x64"
+  ]
+}

@@ -1,0 +1,308 @@
+// Rstest Snapshot v1
+
+exports[`no-this-alias > invalid 1`] = `
+{
+  "code": "const self = this;",
+  "diagnostics": [
+    {
+      "message": "Unexpected aliasing of \`this\` to local variable.",
+      "messageId": "thisAssignment",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-this-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-alias > invalid 2`] = `
+{
+  "code": "const self = this;",
+  "diagnostics": [
+    {
+      "message": "Unexpected aliasing of \`this\` to local variable.",
+      "messageId": "thisAssignment",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-this-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-alias > invalid 3`] = `
+{
+  "code": "
+let that;
+that = this;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected aliasing of \`this\` to local variable.",
+      "messageId": "thisAssignment",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-this-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-alias > invalid 4`] = `
+{
+  "code": "const { props, state } = this;",
+  "diagnostics": [
+    {
+      "message": "Destructuring \`this\` is not allowed.",
+      "messageId": "thisDestructure",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-this-alias",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-alias > invalid 5`] = `
+{
+  "code": "
+var unscoped = this;
+
+function testFunction() {
+  let inFunction = this;
+}
+const testLambda = () => {
+  const inLambda = this;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected aliasing of \`this\` to local variable.",
+      "messageId": "thisAssignment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-this-alias",
+    },
+    {
+      "message": "Unexpected aliasing of \`this\` to local variable.",
+      "messageId": "thisAssignment",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 5,
+        },
+        "start": {
+          "column": 7,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-this-alias",
+    },
+    {
+      "message": "Unexpected aliasing of \`this\` to local variable.",
+      "messageId": "thisAssignment",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 8,
+        },
+        "start": {
+          "column": 9,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-this-alias",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-alias > invalid 6`] = `
+{
+  "code": "
+class TestClass {
+  constructor() {
+    const inConstructor = this;
+    const asThis: this = this;
+
+    const asString = 'this';
+    const asArray = [this];
+    const asArrayString = ['this'];
+  }
+
+  public act(scope: this = this) {
+    const inMemberFunction = this;
+    const { act } = this;
+    const { act, constructor } = this;
+    const [foo] = this;
+    const [foo, bar] = this;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected aliasing of \`this\` to local variable.",
+      "messageId": "thisAssignment",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-this-alias",
+    },
+    {
+      "message": "Unexpected aliasing of \`this\` to local variable.",
+      "messageId": "thisAssignment",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-this-alias",
+    },
+    {
+      "message": "Unexpected aliasing of \`this\` to local variable.",
+      "messageId": "thisAssignment",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 13,
+        },
+        "start": {
+          "column": 11,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-this-alias",
+    },
+    {
+      "message": "Destructuring \`this\` is not allowed.",
+      "messageId": "thisDestructure",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 14,
+        },
+        "start": {
+          "column": 11,
+          "line": 14,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-this-alias",
+    },
+    {
+      "message": "Destructuring \`this\` is not allowed.",
+      "messageId": "thisDestructure",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 15,
+        },
+        "start": {
+          "column": 11,
+          "line": 15,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-this-alias",
+    },
+    {
+      "message": "Destructuring \`this\` is not allowed.",
+      "messageId": "thisDestructure",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 16,
+        },
+        "start": {
+          "column": 11,
+          "line": 16,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-this-alias",
+    },
+    {
+      "message": "Destructuring \`this\` is not allowed.",
+      "messageId": "thisDestructure",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 17,
+        },
+        "start": {
+          "column": 11,
+          "line": 17,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-this-alias",
+    },
+  ],
+  "errorCount": 7,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

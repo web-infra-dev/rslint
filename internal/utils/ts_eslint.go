@@ -363,7 +363,9 @@ func GetContextualType(
 		}
 		return nil
 	} else if parent.Kind == ast.KindJsxExpression {
-		return checker.Checker_getContextualType(typeChecker, parent, checker.ContextFlagsNone)
+		// For JSX expressions, get the contextual type of the node itself
+		// The contextual type flows from the JSX attribute down to the expression
+		return checker.Checker_getContextualType(typeChecker, node, checker.ContextFlagsNone)
 	} else if ast.IsIdentifier(node) && (ast.IsPropertyAssignment(parent) || ast.IsShorthandPropertyAssignment(parent)) {
 		return checker.Checker_getContextualType(typeChecker, node, checker.ContextFlagsNone)
 	} else if ast.IsBinaryExpression(parent) && parent.AsBinaryExpression().OperatorToken.Kind == ast.KindEqualsToken && parent.AsBinaryExpression().Right == node {
