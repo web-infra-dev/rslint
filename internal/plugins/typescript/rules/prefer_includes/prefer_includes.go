@@ -314,6 +314,9 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 		}
 
 		checkArrayIndexOf := func(prop *ast.Node, allowFix bool, bin *ast.Node) {
+			if ctx.TypeChecker == nil {
+				return
+			}
 			if prop == nil || prop.Kind != ast.KindPropertyAccessExpression {
 				return
 			}
