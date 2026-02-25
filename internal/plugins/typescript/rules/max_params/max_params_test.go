@@ -78,6 +78,25 @@ type sum = (a: number, b: number) => number;
 			`,
 			Options: []interface{}{map[string]interface{}{"max": 2}},
 		},
+		{
+			Code: `
+interface Foo {
+  method(a: number, b: number, c: number, d: number): void;
+}
+			`,
+		},
+		{
+			Code: `
+type CallSig = {
+  (a: number, b: number, c: number, d: number): void;
+};
+			`,
+		},
+		{
+			Code: `
+type Ctor = new (a: number, b: number, c: number, d: number) => Foo;
+			`,
+		},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: `function foo(a, b, c, d) {}`,

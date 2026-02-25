@@ -41,9 +41,11 @@ func parseOptions(options any) MaxParamsOptions {
 
 	var optsMap map[string]interface{}
 	if arr, ok := options.([]interface{}); ok && len(arr) > 0 {
-		optsMap, _ = arr[0].(map[string]interface{})
-	} else {
-		optsMap, _ = options.(map[string]interface{})
+		if m, ok := arr[0].(map[string]interface{}); ok {
+			optsMap = m
+		}
+	} else if m, ok := options.(map[string]interface{}); ok {
+		optsMap = m
 	}
 
 	if optsMap == nil {
@@ -128,14 +130,10 @@ var MaxParamsRule = rule.CreateRule(rule.Rule{
 			ast.KindFunctionExpression:  checkParameters,
 			ast.KindArrowFunction:       checkParameters,
 			ast.KindMethodDeclaration:   checkParameters,
-			ast.KindMethodSignature:     checkParameters,
 			ast.KindConstructor:         checkParameters,
 			ast.KindGetAccessor:         checkParameters,
 			ast.KindSetAccessor:         checkParameters,
-			ast.KindCallSignature:       checkParameters,
-			ast.KindConstructSignature:  checkParameters,
 			ast.KindFunctionType:        checkParameters,
-			ast.KindConstructorType:     checkParameters,
 		}
 	},
 })
