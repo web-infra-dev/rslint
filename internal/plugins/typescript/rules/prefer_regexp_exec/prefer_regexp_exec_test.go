@@ -17,6 +17,7 @@ func TestPreferRegExpExecRule(t *testing.T) {
 		{Code: `const value = "foo"; value.match("[a-z");`},
 		{Code: `const value = "foo"; value.search(/foo/);`},
 		{Code: `const value: { match(v: string): any } = { match: () => null as any }; value.match("foo");`},
+		{Code: `const value = "foo"; const pattern = /foo/g as RegExp; value.match(pattern);`},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code:   `const value = "foo"; value.match(/foo/);`,
@@ -57,6 +58,55 @@ reg.exec(value);`},
 		{
 			Code:   `const value = "foo"; value.match("a\nb");`,
 			Output: []string{`const value = "foo"; /a\nb/.exec(value);`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regExpExecOverStringMatch"}},
+		},
+		{
+			Code: `
+function test(value: string, pattern: string) {
+  value.match(pattern);
+}`,
+			Output: []string{`
+function test(value: string, pattern: string) {
+  RegExp(pattern).exec(value);
+}`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regExpExecOverStringMatch"}},
+		},
+		{
+			Code: `
+function test(value: string, a: string, b: string, cond: boolean) {
+  value.match(cond ? a : b);
+}`,
+			Output: []string{`
+function test(value: string, a: string, b: string, cond: boolean) {
+  RegExp((cond ? a : b)).exec(value);
+}`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regExpExecOverStringMatch"}},
+		},
+		{
+			Code: `
+const value = "foo";
+const reg = /foo/ as RegExp;
+value.match(reg);`,
+			Output: []string{`
+const value = "foo";
+const reg = /foo/ as RegExp;
+reg.exec(value);`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regExpExecOverStringMatch"}},
+		},
+		{
+			Code: `
+const value = "foo";
+const reg: RegExp | null = /foo/;
+value.match(reg!);`,
+			Output: []string{`
+const value = "foo";
+const reg: RegExp | null = /foo/;
+(reg!).exec(value);`},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regExpExecOverStringMatch"}},
+		},
+		{
+			Code:   `const value = "foo"; value.match(/foo/).toString();`,
+			Output: []string{`const value = "foo"; (/foo/.exec(value)).toString();`},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regExpExecOverStringMatch"}},
 		},
 	})

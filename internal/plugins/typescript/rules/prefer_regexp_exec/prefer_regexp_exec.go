@@ -39,6 +39,107 @@ type staticArgInfo struct {
 	global bool
 }
 
+const (
+	argumentTypeOther  = 0
+	argumentTypeString = 1 << iota
+	argumentTypeRegExp
+)
+
+func unwrapExpression(node *ast.Node) *ast.Node {
+	node = ast.SkipParentheses(node)
+	for node != nil {
+		switch node.Kind {
+		case ast.KindAsExpression, ast.KindTypeAssertionExpression, ast.KindNonNullExpression:
+			node = ast.SkipParentheses(node.Expression())
+		default:
+			return node
+		}
+	}
+	return nil
+}
+
+func isNodeParenthesized(node *ast.Node) bool {
+	if node == nil || node.Parent == nil || !ast.IsParenthesizedExpression(node.Parent) {
+		return false
+	}
+	parent := node.Parent.AsParenthesizedExpression()
+	return parent != nil && parent.Expression == node
+}
+
+func isWeakPrecedenceParent(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	parent := node.Parent
+	if parent == nil {
+		return false
+	}
+	switch parent.Kind {
+	case ast.KindPostfixUnaryExpression,
+		ast.KindPrefixUnaryExpression,
+		ast.KindBinaryExpression,
+		ast.KindConditionalExpression,
+		ast.KindAwaitExpression:
+		return true
+	}
+	if ast.IsPropertyAccessExpression(parent) {
+		return parent.AsPropertyAccessExpression().Expression == node
+	}
+	if ast.IsElementAccessExpression(parent) {
+		return parent.AsElementAccessExpression().Expression == node
+	}
+	if ast.IsCallExpression(parent) || ast.IsNewExpression(parent) {
+		return parent.Expression() == node
+	}
+	if ast.IsTaggedTemplateExpression(parent) {
+		return parent.AsTaggedTemplateExpression().Tag == node
+	}
+	return false
+}
+
+func getWrappedNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
+	if sourceFile == nil || node == nil {
+		return ""
+	}
+	text := strings.TrimSpace(scanner.GetSourceTextOfNodeFromSourceFile(sourceFile, node, false))
+	if text == "" {
+		return ""
+	}
+	if !utils.IsStrongPrecedenceNode(node) {
+		text = "(" + text + ")"
+	}
+	return text
+}
+
+func collectArgumentTypes(ctx rule.RuleContext, argument *ast.Node) int {
+	argument = unwrapExpression(argument)
+	if argument == nil {
+		return argumentTypeOther
+	}
+	switch argument.Kind {
+	case ast.KindStringLiteral:
+		return argumentTypeString
+	case ast.KindRegularExpressionLiteral:
+		return argumentTypeRegExp
+	}
+	if ctx.TypeChecker == nil {
+		return argumentTypeOther
+	}
+	argType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, argument)
+	result := argumentTypeOther
+	for _, part := range utils.UnionTypeParts(argType) {
+		switch utils.GetTypeName(ctx.TypeChecker, part) {
+		case "RegExp":
+			result |= argumentTypeRegExp
+		case "string":
+			result |= argumentTypeString
+		default:
+			return argumentTypeOther
+		}
+	}
+	return result
+}
+
 func regExpFlagInfo(args []*ast.Node) (known bool, global bool) {
 	// Pattern validity only matters when it is statically known.
 	// If the pattern is dynamic, we can still reason about the global flag from the flags argument.
@@ -74,7 +175,7 @@ func isUndefinedLiteral(node *ast.Node) bool {
 }
 
 func resolveStaticArgumentInfo(ctx rule.RuleContext, node *ast.Node, seen map[*ast.Symbol]bool) staticArgInfo {
-	node = ast.SkipParentheses(node)
+	node = unwrapExpression(node)
 	if node == nil {
 		return staticArgInfo{}
 	}
@@ -132,6 +233,7 @@ func resolveStaticArgumentInfo(ctx rule.RuleContext, node *ast.Node, seen map[*a
 }
 
 func definitelyDoesNotContainGlobalFlag(node *ast.Node) bool {
+	node = unwrapExpression(node)
 	if node == nil {
 		return false
 	}
@@ -192,43 +294,6 @@ func isStringLikeReceiver(ctx rule.RuleContext, receiver *ast.Node) bool {
 	return utils.GetTypeName(ctx.TypeChecker, receiverType) == "string"
 }
 
-func isRegExpOrStringArgument(ctx rule.RuleContext, argument *ast.Node) bool {
-	if argument == nil {
-		return false
-	}
-	if argument.Kind == ast.KindRegularExpressionLiteral || argument.Kind == ast.KindStringLiteral {
-		return true
-	}
-	if ctx.TypeChecker == nil {
-		return false
-	}
-	argType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, argument)
-	typeName := utils.GetTypeName(ctx.TypeChecker, argType)
-	if typeName == "RegExp" || typeName == "string" {
-		return true
-	}
-	if utils.IsUnionType(argType) {
-		regExpSeen := false
-		stringSeen := false
-		for _, part := range utils.UnionTypeParts(argType) {
-			partName := utils.GetTypeName(ctx.TypeChecker, part)
-			if partName == "RegExp" {
-				regExpSeen = true
-			} else if partName == "string" {
-				stringSeen = true
-			} else {
-				return false
-			}
-		}
-		// If both string and RegExp are possible, avoid reporting.
-		if regExpSeen && stringSeen {
-			return false
-		}
-		return regExpSeen || stringSeen
-	}
-	return false
-}
-
 func buildRegexLiteralFromString(pattern string) (string, bool) {
 	// Validate using ECMAScript semantics (not Go regexp/RE2).
 	if _, err := regexp2.Compile(pattern, regexp2.ECMAScript); err != nil {
@@ -241,40 +306,37 @@ func buildRegexLiteralFromString(pattern string) (string, bool) {
 	return "/" + pattern + "/", true
 }
 
-func buildPreferRegExpExecReplacement(ctx rule.RuleContext, receiver *ast.Node, arg *ast.Node) (string, bool) {
-	if ctx.SourceFile == nil || receiver == nil || arg == nil {
+func buildPreferRegExpExecReplacement(ctx rule.RuleContext, callNode *ast.Node, receiver *ast.Node, arg *ast.Node, argumentTypes int) (string, bool) {
+	if ctx.SourceFile == nil || callNode == nil || receiver == nil || arg == nil {
 		return "", false
 	}
-	receiverText := strings.TrimSpace(scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, receiver, false))
-	argText := strings.TrimSpace(scanner.GetSourceTextOfNodeFromSourceFile(ctx.SourceFile, arg, false))
+	receiverText := getWrappedNodeText(ctx.SourceFile, receiver)
+	argText := getWrappedNodeText(ctx.SourceFile, arg)
 	if receiverText == "" || argText == "" {
 		return "", false
 	}
 
+	var replacement string
 	if arg.Kind == ast.KindStringLiteral {
 		regexLiteral, ok := buildRegexLiteralFromString(arg.AsStringLiteral().Text)
 		if !ok {
 			return "", false
 		}
-		return regexLiteral + ".exec(" + receiverText + ")", true
+		replacement = regexLiteral + ".exec(" + receiverText + ")"
+	} else {
+		switch argumentTypes {
+		case argumentTypeRegExp:
+			replacement = argText + ".exec(" + receiverText + ")"
+		case argumentTypeString:
+			replacement = "RegExp(" + argText + ").exec(" + receiverText + ")"
+		default:
+			return "", false
+		}
 	}
-
-	if arg.Kind == ast.KindRegularExpressionLiteral {
-		return argText + ".exec(" + receiverText + ")", true
+	if isWeakPrecedenceParent(callNode) && !isNodeParenthesized(callNode) {
+		replacement = "(" + replacement + ")"
 	}
-
-	if ctx.TypeChecker == nil {
-		return "", false
-	}
-	argType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, arg)
-	typeName := utils.GetTypeName(ctx.TypeChecker, argType)
-	if typeName == "RegExp" {
-		return argText + ".exec(" + receiverText + ")", true
-	}
-	if typeName == "string" {
-		return "RegExp(" + argText + ").exec(" + receiverText + ")", true
-	}
-	return "", false
+	return replacement, true
 }
 
 var PreferRegExpExecRule = rule.CreateRule(rule.Rule{
@@ -307,14 +369,15 @@ var PreferRegExpExecRule = rule.CreateRule(rule.Rule{
 				}
 
 				arg := call.Arguments.Nodes[0]
+				argumentTypes := collectArgumentTypes(ctx, arg)
+				if argumentTypes == argumentTypeOther || argumentTypes == argumentTypeString|argumentTypeRegExp {
+					return
+				}
 				staticInfo := resolveStaticArgumentInfo(ctx, arg, map[*ast.Symbol]bool{})
 				if staticInfo.known && staticInfo.global {
 					return
 				}
-				if !staticInfo.known && !definitelyDoesNotContainGlobalFlag(arg) {
-					return
-				}
-				if !isRegExpOrStringArgument(ctx, arg) {
+				if !staticInfo.known && argumentTypes&argumentTypeRegExp != 0 && !definitelyDoesNotContainGlobalFlag(arg) {
 					return
 				}
 				if arg.Kind == ast.KindStringLiteral {
@@ -324,7 +387,7 @@ var PreferRegExpExecRule = rule.CreateRule(rule.Rule{
 				}
 
 				msg := buildPreferRegExpExecMessage()
-				if replacement, ok := buildPreferRegExpExecReplacement(ctx, receiver, arg); ok {
+				if replacement, ok := buildPreferRegExpExecReplacement(ctx, node, receiver, arg, argumentTypes); ok {
 					if ctx.SourceFile == nil {
 						ctx.ReportNode(reportNode, msg)
 						return
