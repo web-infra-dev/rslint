@@ -73,12 +73,28 @@ func escapeForSingleQuotedString(str string) string {
 	return b.String()
 }
 
-func isStringType(ctx rule.RuleContext, node *ast.Node) bool {
-	if node == nil || ctx.TypeChecker == nil {
+func isStringLikeFixableType(ctx rule.RuleContext, t *checker.Type) bool {
+	if t == nil || ctx.TypeChecker == nil {
 		return false
 	}
-	t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node)
-	return utils.GetTypeName(ctx.TypeChecker, t) == "string"
+	if utils.GetTypeName(ctx.TypeChecker, t) == "string" {
+		return true
+	}
+	if !utils.IsUnionType(t) {
+		return false
+	}
+	sawString := false
+	for _, part := range utils.UnionTypeParts(t) {
+		if utils.GetTypeName(ctx.TypeChecker, part) == "string" {
+			sawString = true
+			continue
+		}
+		if utils.IsTypeFlagSet(part, checker.TypeFlagsUndefined|checker.TypeFlagsNull) {
+			continue
+		}
+		return false
+	}
+	return sawString
 }
 
 func hasOptionalChain(node *ast.Node) bool {
@@ -142,7 +158,7 @@ func extractRegexStaticString(pattern string) (string, bool) {
 }
 
 func parseRegexPattern(pattern, flags string) (string, bool) {
-	if strings.Contains(flags, "i") || strings.Contains(flags, "g") {
+	if flags != "" {
 		return "", false
 	}
 	return extractRegexStaticString(pattern)
@@ -398,11 +414,9 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 				if arg == nil || ctx.TypeChecker == nil {
 					return
 				}
-				if !isStringType(ctx, arg) {
-					return
-				}
 				argType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, arg)
-				includesSym := checker.Checker_getPropertyOfType(ctx.TypeChecker, argType, "includes")
+				argNonNullableType := ctx.TypeChecker.GetNonNullableType(argType)
+				includesSym := checker.Checker_getPropertyOfType(ctx.TypeChecker, argNonNullableType, "includes")
 				if includesSym == nil {
 					return
 				}
@@ -415,7 +429,10 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 				}
 
 				fixes := []rule.RuleFix{}
-				if !hasOptionalChain(access.Expression) {
+				allowFix := isStringLikeFixableType(ctx, argNonNullableType) &&
+					access.QuestionDotToken == nil &&
+					!hasOptionalChain(access.Expression)
+				if allowFix {
 					optChain := "."
 					if access.QuestionDotToken != nil {
 						optChain = "?."
