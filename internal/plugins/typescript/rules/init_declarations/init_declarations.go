@@ -154,6 +154,10 @@ var InitDeclarationsRule = rule.CreateRule(rule.Rule{
 				if nameNode == nil {
 					return
 				}
+				// Align with ESLint base behavior: only identifier declarators are reported.
+				if !ast.IsIdentifier(nameNode) {
+					return
+				}
 
 				if opts.Mode == "always" && isInDeclaredContext(node) {
 					return

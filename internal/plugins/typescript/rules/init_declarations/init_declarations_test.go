@@ -23,6 +23,14 @@ func TestInitDeclarationsRule(t *testing.T) {
 			Code:    "for (var foo in []) {}",
 			Options: []interface{}{"never", map[string]interface{}{"ignoreForLoopInit": true}},
 		},
+		{
+			Code:    "const { a } = { a: 1 };",
+			Options: []interface{}{"never"},
+		},
+		{
+			Code:    "const [a] = [1];",
+			Options: []interface{}{"never"},
+		},
 		{Code: "declare const foo: number;", Options: []interface{}{"always"}},
 		{
 			Code: `
