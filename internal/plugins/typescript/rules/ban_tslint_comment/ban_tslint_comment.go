@@ -40,11 +40,11 @@ func run(ctx rule.RuleContext, _ any) rule.RuleListeners {
 			Description: "tslint comment detected: " + commentText,
 		}
 
-		fixRange := buildFixRange(ctx.SourceFile, comment, len(text))
+		fix := buildFix(ctx.SourceFile, comment, len(text))
 		ctx.ReportRangeWithFixes(
 			core.NewTextRange(comment.Pos(), comment.End()),
 			message,
-			rule.RuleFixRemoveRange(fixRange),
+			fix,
 		)
 	}, ctx.SourceFile)
 
@@ -82,7 +82,7 @@ func extractCommentText(text string, comment *ast.CommentRange) string {
 	return strings.TrimSpace(text[comment.Pos():comment.End()])
 }
 
-func buildFixRange(sourceFile *ast.SourceFile, comment *ast.CommentRange, textLen int) core.TextRange {
+func buildFix(sourceFile *ast.SourceFile, comment *ast.CommentRange, textLen int) rule.RuleFix {
 	text := sourceFile.Text()
 	start := comment.Pos()
 	end := comment.End()
@@ -111,11 +111,59 @@ func buildFixRange(sourceFile *ast.SourceFile, comment *ast.CommentRange, textLe
 				end++
 			}
 		}
-	} else {
-		for start > lineStart && (text[start-1] == ' ' || text[start-1] == '\t') {
-			start--
-		}
+		return rule.RuleFixRemoveRange(core.NewTextRange(start, end))
 	}
 
-	return core.NewTextRange(start, end)
+	for start > lineStart && (text[start-1] == ' ' || text[start-1] == '\t') {
+		start--
+	}
+
+	if needInlineSeparator(text, start, end, lineStart, textLen) {
+		for end < textLen && (text[end] == ' ' || text[end] == '\t') {
+			end++
+		}
+		return rule.RuleFixReplaceRange(core.NewTextRange(start, end), " ")
+	}
+
+	return rule.RuleFixRemoveRange(core.NewTextRange(start, end))
+}
+
+func needInlineSeparator(text string, start int, end int, lineStart int, textLen int) bool {
+	left := start - 1
+	for left >= lineStart && (text[left] == ' ' || text[left] == '\t') {
+		left--
+	}
+	right := end
+	for right < textLen && (text[right] == ' ' || text[right] == '\t') {
+		right++
+	}
+	if left < lineStart || right >= textLen {
+		return false
+	}
+	if text[right] == '\r' || text[right] == '\n' {
+		return false
+	}
+	if isWordLikeByte(text[left]) && isWordLikeByte(text[right]) {
+		return true
+	}
+	if (text[left] == '+' && text[right] == '+') || (text[left] == '-' && text[right] == '-') {
+		return true
+	}
+	return false
+}
+
+func isWordLikeByte(b byte) bool {
+	if b >= 0x80 {
+		return true
+	}
+	if b >= 'a' && b <= 'z' {
+		return true
+	}
+	if b >= 'A' && b <= 'Z' {
+		return true
+	}
+	if b >= '0' && b <= '9' {
+		return true
+	}
+	return b == '_' || b == '$'
 }

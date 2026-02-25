@@ -58,6 +58,13 @@ func TestBanTslintCommentRule(t *testing.T) {
 			Output: []string{"someCode();"},
 		},
 		{
+			Code: "function f() {\n  return/* tslint:disable-line */foo;\n}",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "commentDetected", Line: 2, Column: 9},
+			},
+			Output: []string{"function f() {\n  return foo;\n}"},
+		},
+		{
 			Code: "// tslint:disable-next-line:rule1 rule2 rule3...",
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "commentDetected", Line: 1, Column: 1},
