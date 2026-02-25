@@ -1,0 +1,2330 @@
+// Rstest Snapshot v1
+
+exports[`prefer-string-starts-ends-with > invalid 1`] = `
+{
+  "code": "
+        function f(s: string) {
+          s[0] === 'a';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.startsWith('a');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 2`] = `
+{
+  "code": "
+        function f(s: string) {
+          s?.[0] === 'a';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s?.startsWith('a');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 3`] = `
+{
+  "code": "
+        function f(s: string) {
+          s[0] !== 'a';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          !s.startsWith('a');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 4`] = `
+{
+  "code": "
+        function f(s: string) {
+          s?.[0] !== 'a';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          !s?.startsWith('a');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 5`] = `
+{
+  "code": "
+        function f(s: string) {
+          s[0] == 'a';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.startsWith('a');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 6`] = `
+{
+  "code": "
+        function f(s: string) {
+          s[0] != 'a';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          !s.startsWith('a');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 7`] = `
+{
+  "code": "
+        function f(s: string) {
+          s[0] === 'あ';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.startsWith('あ');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 8`] = `
+{
+  "code": "
+        function f(s: string) {
+          s[0] === '👍'; // the length is 2.
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 9`] = `
+{
+  "code": "
+        function f(s: string, t: string) {
+          s[0] === t; // the length of t is unknown.
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 10`] = `
+{
+  "code": "
+        function f(s: string) {
+          s[s.length - 1] === 'a';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.endsWith('a');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 11`] = `
+{
+  "code": "
+        function f(s: string) {
+          (s)[0] === ("a")
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          (s).startsWith("a")
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 12`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.charAt(0) === 'a';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.startsWith('a');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 13`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.charAt(0) !== 'a';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          !s.startsWith('a');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 14`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.charAt(0) == 'a';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.startsWith('a');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 15`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.charAt(0) != 'a';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          !s.startsWith('a');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 16`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.charAt(0) === 'あ';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.startsWith('あ');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 17`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.charAt(0) === '👍'; // the length is 2.
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 18`] = `
+{
+  "code": "
+        function f(s: string, t: string) {
+          s.charAt(0) === t; // the length of t is unknown.
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 19`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.charAt(s.length - 1) === 'a';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.endsWith('a');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 20`] = `
+{
+  "code": "
+        function f(s: string) {
+          (s).charAt(0) === "a";
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          (s).startsWith("a");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 21`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.indexOf(needle) === 0;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.startsWith(needle);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 22`] = `
+{
+  "code": "
+        function f(s: string) {
+          s?.indexOf(needle) === 0;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s?.startsWith(needle);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 23`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.indexOf(needle) !== 0;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          !s.startsWith(needle);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 24`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.indexOf(needle) == 0;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.startsWith(needle);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 25`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.indexOf(needle) != 0;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          !s.startsWith(needle);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 26`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.lastIndexOf('bar') === s.length - 3;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.endsWith('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 27`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.lastIndexOf('bar') !== s.length - 3;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          !s.endsWith('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 28`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.lastIndexOf('bar') == s.length - 3;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.endsWith('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 29`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.lastIndexOf('bar') != s.length - 3;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          !s.endsWith('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 30`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.lastIndexOf('bar') === s.length - 'bar'.length;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.endsWith('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 31`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.lastIndexOf(needle) === s.length - needle.length;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.endsWith(needle);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 32`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.match(/^bar/) !== null;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.startsWith("bar");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 33`] = `
+{
+  "code": "
+        function f(s: string) {
+          s?.match(/^bar/) !== null;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s?.startsWith("bar");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 34`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.match(/^bar/) != null;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.startsWith("bar");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 35`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.match(/bar$/) !== null;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.endsWith("bar");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 36`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.match(/bar$/) != null;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.endsWith("bar");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 37`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.match(/^bar/) === null;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          !s.startsWith("bar");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 38`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.match(/^bar/) == null;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          !s.startsWith("bar");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 39`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.match(/bar$/) === null;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          !s.endsWith("bar");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 40`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.match(/bar$/) == null;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          !s.endsWith("bar");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 41`] = `
+{
+  "code": "
+        const pattern = /^bar/;
+        function f(s: string) {
+          s.match(pattern) != null;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        const pattern = /^bar/;
+        function f(s: string) {
+          s.startsWith("bar");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 42`] = `
+{
+  "code": "
+        const pattern = new RegExp('^bar');
+        function f(s: string) {
+          s.match(pattern) != null;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        const pattern = new RegExp('^bar');
+        function f(s: string) {
+          s.startsWith("bar");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 43`] = `
+{
+  "code": "
+        const pattern = /^"quoted"/;
+        function f(s: string) {
+          s.match(pattern) != null;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        const pattern = /^"quoted"/;
+        function f(s: string) {
+          s.startsWith("\\"quoted\\"");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 44`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.slice(0, 3) === 'bar';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.startsWith('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 45`] = `
+{
+  "code": "
+        function f(s: string) {
+          s?.slice(0, 3) === 'bar';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s?.startsWith('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 46`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.slice(0, 3) !== 'bar';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          !s.startsWith('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 47`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.slice(0, 3) == 'bar';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.startsWith('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 48`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.slice(0, 3) != 'bar';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          !s.startsWith('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 49`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.slice(0, needle.length) === needle;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.startsWith(needle);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 50`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.slice(0, needle.length) == needle; // hating implicit type conversion
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 51`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.slice(-3) === 'bar';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.endsWith('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 52`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.slice(-3) !== 'bar';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          !s.endsWith('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 53`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.slice(-needle.length) === needle;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.endsWith(needle);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 54`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.slice(s.length - needle.length) === needle;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.endsWith(needle);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 55`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.substring(0, 3) === 'bar';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.startsWith('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 56`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.substring(-3) === 'bar'; // the code is probably mistake.
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 57`] = `
+{
+  "code": "
+        function f(s: string) {
+          s.substring(s.length - 3, s.length) === 'bar';
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.endsWith('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 58`] = `
+{
+  "code": "
+        function f(s: string) {
+          /^bar/.test(s);
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.startsWith("bar");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 59`] = `
+{
+  "code": "
+        function f(s: string) {
+          /^bar/?.test(s);
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s?.startsWith("bar");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 60`] = `
+{
+  "code": "
+        function f(s: string) {
+          /bar$/.test(s);
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the 'String#endsWith' method instead.",
+      "messageId": "preferEndsWith",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          s.endsWith("bar");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 61`] = `
+{
+  "code": "
+        const pattern = /^bar/;
+        function f(s: string) {
+          pattern.test(s);
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        const pattern = /^bar/;
+        function f(s: string) {
+          s.startsWith("bar");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 62`] = `
+{
+  "code": "
+        const pattern = new RegExp('^bar');
+        function f(s: string) {
+          pattern.test(s);
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        const pattern = new RegExp('^bar');
+        function f(s: string) {
+          s.startsWith("bar");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 63`] = `
+{
+  "code": "
+        const pattern = /^"quoted"/;
+        function f(s: string) {
+          pattern.test(s);
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        const pattern = /^"quoted"/;
+        function f(s: string) {
+          s.startsWith("\\"quoted\\"");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 64`] = `
+{
+  "code": "
+        function f(s: string) {
+          /^bar/.test(a + b);
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: string) {
+          (a + b).startsWith("bar");
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 65`] = `
+{
+  "code": "
+        function f(s: 'a' | 'b') {
+          s.indexOf(needle) === 0;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(s: 'a' | 'b') {
+          s.startsWith(needle);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 66`] = `
+{
+  "code": "
+        function f<T extends 'a' | 'b'>(s: T) {
+          s.indexOf(needle) === 0;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f<T extends 'a' | 'b'>(s: T) {
+          s.startsWith(needle);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-string-starts-ends-with > invalid 67`] = `
+{
+  "code": "
+        type SafeString = string & { __HTML_ESCAPED__: void };
+        function f(s: SafeString) {
+          s.indexOf(needle) === 0;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'String#startsWith' method instead.",
+      "messageId": "preferStartsWith",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-string-starts-ends-with",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        type SafeString = string & { __HTML_ESCAPED__: void };
+        function f(s: SafeString) {
+          s.startsWith(needle);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
