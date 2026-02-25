@@ -18,6 +18,8 @@ func TestPreferRegExpExecRule(t *testing.T) {
 		{Code: `const value = "foo"; value.search(/foo/);`},
 		{Code: `const value: { match(v: string): any } = { match: () => null as any }; value.match("foo");`},
 		{Code: `const value = "foo"; const pattern = /foo/g as RegExp; value.match(pattern);`},
+		{Code: `const value = "foo"; value.match(new RegExp(/foo/g));`},
+		{Code: `const value = "foo"; value.match(new RegExp(/foo/g, undefined));`},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code:   `const value = "foo"; value.match(/foo/);`,

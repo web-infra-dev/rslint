@@ -140,20 +140,35 @@ func collectArgumentTypes(ctx rule.RuleContext, argument *ast.Node) int {
 	return result
 }
 
-func regExpFlagInfo(args []*ast.Node) (known bool, global bool) {
-	// Pattern validity only matters when it is statically known.
-	// If the pattern is dynamic, we can still reason about the global flag from the flags argument.
+func regExpFlagInfo(ctx rule.RuleContext, args []*ast.Node) (known bool, global bool) {
+	patternKnown := len(args) == 0 || args[0] == nil
+	patternGlobal := false
+
+	// Pattern validity/flags only matter when statically known.
 	if len(args) > 0 && args[0] != nil {
-		patternArg := ast.SkipParentheses(args[0])
-		if patternArg.Kind == ast.KindStringLiteral {
+		patternArg := unwrapExpression(args[0])
+		switch patternArg.Kind {
+		case ast.KindStringLiteral:
 			if _, err := regexp2.Compile(patternArg.AsStringLiteral().Text, regexp2.ECMAScript); err != nil {
 				return false, false
+			}
+			patternKnown = true
+		case ast.KindRegularExpressionLiteral:
+			patternKnown = true
+			patternGlobal = isGlobalRegexLiteral(patternArg)
+		default:
+			// For dynamic patterns, only mark as known when type info proves string-only.
+			if collectArgumentTypes(ctx, patternArg) == argumentTypeString {
+				patternKnown = true
 			}
 		}
 	}
 
 	if len(args) < 2 || args[1] == nil || isUndefinedLiteral(args[1]) {
-		return true, false
+		if !patternKnown {
+			return false, false
+		}
+		return true, patternGlobal
 	}
 	flagsArg := ast.SkipParentheses(args[1])
 	if flagsArg.Kind != ast.KindStringLiteral {
@@ -187,13 +202,13 @@ func resolveStaticArgumentInfo(ctx rule.RuleContext, node *ast.Node, seen map[*a
 	case ast.KindCallExpression:
 		call := node.AsCallExpression()
 		if call != nil && call.Expression != nil && call.Expression.Kind == ast.KindIdentifier && call.Expression.AsIdentifier().Text == "RegExp" && call.Arguments != nil {
-			known, global := regExpFlagInfo(call.Arguments.Nodes)
+			known, global := regExpFlagInfo(ctx, call.Arguments.Nodes)
 			return staticArgInfo{known: known, global: global}
 		}
 	case ast.KindNewExpression:
 		newExpr := node.AsNewExpression()
 		if newExpr != nil && newExpr.Expression != nil && newExpr.Expression.Kind == ast.KindIdentifier && newExpr.Expression.AsIdentifier().Text == "RegExp" && newExpr.Arguments != nil {
-			known, global := regExpFlagInfo(newExpr.Arguments.Nodes)
+			known, global := regExpFlagInfo(ctx, newExpr.Arguments.Nodes)
 			return staticArgInfo{known: known, global: global}
 		}
 	case ast.KindIdentifier:
@@ -232,7 +247,7 @@ func resolveStaticArgumentInfo(ctx rule.RuleContext, node *ast.Node, seen map[*a
 	return staticArgInfo{}
 }
 
-func definitelyDoesNotContainGlobalFlag(node *ast.Node) bool {
+func definitelyDoesNotContainGlobalFlag(ctx rule.RuleContext, node *ast.Node) bool {
 	node = unwrapExpression(node)
 	if node == nil {
 		return false
@@ -243,14 +258,14 @@ func definitelyDoesNotContainGlobalFlag(node *ast.Node) bool {
 		if call == nil || call.Expression == nil || call.Expression.Kind != ast.KindIdentifier || call.Expression.AsIdentifier().Text != "RegExp" || call.Arguments == nil {
 			return false
 		}
-		known, global := regExpFlagInfo(call.Arguments.Nodes)
+		known, global := regExpFlagInfo(ctx, call.Arguments.Nodes)
 		return known && !global
 	case ast.KindNewExpression:
 		newExpr := node.AsNewExpression()
 		if newExpr == nil || newExpr.Expression == nil || newExpr.Expression.Kind != ast.KindIdentifier || newExpr.Expression.AsIdentifier().Text != "RegExp" || newExpr.Arguments == nil {
 			return false
 		}
-		known, global := regExpFlagInfo(newExpr.Arguments.Nodes)
+		known, global := regExpFlagInfo(ctx, newExpr.Arguments.Nodes)
 		return known && !global
 	default:
 		return false
@@ -377,7 +392,7 @@ var PreferRegExpExecRule = rule.CreateRule(rule.Rule{
 				if staticInfo.known && staticInfo.global {
 					return
 				}
-				if !staticInfo.known && argumentTypes&argumentTypeRegExp != 0 && !definitelyDoesNotContainGlobalFlag(arg) {
+				if !staticInfo.known && argumentTypes&argumentTypeRegExp != 0 && !definitelyDoesNotContainGlobalFlag(ctx, arg) {
 					return
 				}
 				if arg.Kind == ast.KindStringLiteral {
