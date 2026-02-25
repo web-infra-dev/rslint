@@ -37,6 +37,20 @@ func TestMemberOrderingRule(t *testing.T) {
 				},
 			},
 		},
+		{
+			Code: `class Foo {
+  foo(): void {}
+  Foo(): void {}
+}`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"default": map[string]interface{}{
+						"memberTypes": "never",
+						"order":       "natural-case-insensitive",
+					},
+				},
+			},
+		},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: `class Foo {
@@ -153,6 +167,33 @@ func TestMemberOrderingRule(t *testing.T) {
 				{
 					MessageId: "incorrectOrder",
 					Line:      4,
+					Column:    3,
+				},
+			},
+		},
+		{
+			Code: `class Foo {
+  b(): void {}
+  a(): void {}
+  field: string;
+}`,
+			Options: []interface{}{
+				map[string]interface{}{
+					"default": map[string]interface{}{
+						"memberTypes": []interface{}{"field", "method"},
+						"order":       "alphabetically",
+					},
+				},
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "incorrectGroupOrder",
+					Line:      4,
+					Column:    3,
+				},
+				{
+					MessageId: "incorrectOrder",
+					Line:      3,
 					Column:    3,
 				},
 			},

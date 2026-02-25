@@ -534,7 +534,7 @@ func naturalOutOfOrder(name string, previousName string, order string) bool {
 	case orderNatural:
 		return naturalCompare(name, previousName) != 1
 	case orderNaturalInsensitive:
-		return naturalCompare(strings.ToLower(name), strings.ToLower(previousName)) != 1
+		return naturalCompare(strings.ToLower(name), strings.ToLower(previousName)) < 0
 	default:
 		return false
 	}
@@ -572,7 +572,7 @@ func checkRequiredOrder(ctx rule.RuleContext, members []*ast.Node, optionalityOr
 
 func groupMembersByType(members []*ast.Node, memberTypes []memberTypeGroup, supportsModifiers bool, sourceFile *ast.SourceFile) [][]*ast.Node {
 	grouped := make([][]*ast.Node, 0, 4)
-	if len(members) == 0 {
+	if len(members) < 2 {
 		return grouped
 	}
 
@@ -581,23 +581,18 @@ func groupMembersByType(members []*ast.Node, memberTypes []memberTypeGroup, supp
 		memberRanks[i] = getRank(sourceFile, member, memberTypes, supportsModifiers)
 	}
 
-	previousRank := 0
-	hasPrevious := false
-
-	for i, member := range members {
-		if i == len(members)-1 {
-			return grouped
+	start := 0
+	for i := 1; i < len(members); i++ {
+		if memberRanks[i] != memberRanks[start] {
+			if i-start > 1 && memberRanks[start] != -1 {
+				grouped = append(grouped, members[start:i])
+			}
+			start = i
 		}
-		currentRank := memberRanks[i]
-		nextRank := memberRanks[i+1]
+	}
 
-		if hasPrevious && currentRank == previousRank {
-			grouped[len(grouped)-1] = append(grouped[len(grouped)-1], member)
-		} else if currentRank == nextRank {
-			grouped = append(grouped, []*ast.Node{member})
-			previousRank = currentRank
-			hasPrevious = true
-		}
+	if len(members)-start > 1 && memberRanks[start] != -1 {
+		grouped = append(grouped, members[start:])
 	}
 
 	return grouped
