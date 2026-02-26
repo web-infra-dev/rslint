@@ -90,27 +90,44 @@ func buildFix(sourceFile *ast.SourceFile, comment *ast.CommentRange, textLen int
 	startLine, _ := scanner.GetECMALineAndCharacterOfPosition(sourceFile, start)
 	lineStart := scanner.GetECMAPositionOfLineAndCharacter(sourceFile, startLine, 0)
 
-	isStandalone := true
-	for i := lineStart; i < start; i++ {
-		if text[i] != ' ' && text[i] != '\t' {
-			isStandalone = false
+	lineEnd := textLen
+	for i := end; i < textLen; i++ {
+		if text[i] == '\n' || text[i] == '\r' {
+			lineEnd = i
 			break
 		}
 	}
 
-	if isStandalone {
+	hasCodeBefore := false
+	for i := lineStart; i < start; i++ {
+		if text[i] != ' ' && text[i] != '\t' {
+			hasCodeBefore = true
+			break
+		}
+	}
+
+	hasCodeAfter := false
+	for i := end; i < lineEnd; i++ {
+		if text[i] != ' ' && text[i] != '\t' {
+			hasCodeAfter = true
+			break
+		}
+	}
+
+	if !hasCodeBefore && !hasCodeAfter {
 		start = lineStart
 		if end < textLen {
-			switch text[end] {
-			case '\r':
+			for end < textLen && (text[end] == ' ' || text[end] == '\t') {
 				end++
-				if end < textLen && text[end] == '\n' {
+			}
+			if end < textLen {
+				switch text[end] {
+				case '\r':
 					end++
-				}
-			case '\n':
-				end++
-			default:
-				for end < textLen && (text[end] == ' ' || text[end] == '\t') {
+					if end < textLen && text[end] == '\n' {
+						end++
+					}
+				case '\n':
 					end++
 				}
 			}
@@ -118,11 +135,23 @@ func buildFix(sourceFile *ast.SourceFile, comment *ast.CommentRange, textLen int
 		return rule.RuleFixRemoveRange(core.NewTextRange(start, end))
 	}
 
+	if !hasCodeBefore && hasCodeAfter {
+		start = comment.Pos()
+		end = comment.End()
+		for end < lineEnd && (text[end] == ' ' || text[end] == '\t') {
+			end++
+		}
+		return rule.RuleFixRemoveRange(core.NewTextRange(start, end))
+	}
+
 	for start > lineStart && (text[start-1] == ' ' || text[start-1] == '\t') {
 		start--
 	}
+	for end < lineEnd && (text[end] == ' ' || text[end] == '\t') {
+		end++
+	}
 
-	if needInlineSeparator(text, start, end, lineStart, textLen) {
+	if hasCodeAfter && needInlineSeparator(text, start, end, lineStart, textLen) {
 		for end < textLen && (text[end] == ' ' || text[end] == '\t') {
 			end++
 		}
