@@ -27,10 +27,29 @@ func findDirectiveInLineComment(commentText string) (int, int, bool) {
 	for idx < len(commentText) && (commentText[idx] == ' ' || commentText[idx] == '\t') {
 		idx++
 	}
-	if strings.HasPrefix(commentText[idx:], tsIgnoreDirective) {
+	if hasTsIgnoreDirectiveAt(commentText, idx) {
 		return idx, idx + len(tsIgnoreDirective), true
 	}
 	return 0, 0, false
+}
+
+func isDirectiveBoundaryChar(ch byte) bool {
+	return !((ch >= 'a' && ch <= 'z') ||
+		(ch >= 'A' && ch <= 'Z') ||
+		(ch >= '0' && ch <= '9') ||
+		ch == '_' ||
+		ch == '$')
+}
+
+func hasTsIgnoreDirectiveAt(text string, idx int) bool {
+	if idx < 0 || idx >= len(text) || !strings.HasPrefix(text[idx:], tsIgnoreDirective) {
+		return false
+	}
+	end := idx + len(tsIgnoreDirective)
+	if end >= len(text) {
+		return true
+	}
+	return isDirectiveBoundaryChar(text[end])
 }
 
 func findDirectiveInBlockComment(commentText string) (int, int, bool) {
@@ -63,7 +82,7 @@ func findDirectiveInBlockComment(commentText string) (int, int, bool) {
 	for idx < len(line) && (line[idx] == ' ' || line[idx] == '\t') {
 		idx++
 	}
-	if idx < len(line) && strings.HasPrefix(line[idx:], tsIgnoreDirective) {
+	if idx < len(line) && hasTsIgnoreDirectiveAt(line, idx) {
 		start := contentStart + lastLineStart + idx
 		return start, start + len(tsIgnoreDirective), true
 	}

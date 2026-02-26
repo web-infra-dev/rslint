@@ -12,6 +12,8 @@ func TestPreferTsExpectErrorRule(t *testing.T) {
 		{Code: `// @ts-nocheck`},
 		{Code: `// @ts-check`},
 		{Code: `// just a comment containing @ts-ignore somewhere`},
+		{Code: `// @ts-ignorefoo`},
+		{Code: `/* @ts-ignorefoo */`},
 		{
 			Code: `
 {
