@@ -159,13 +159,40 @@ func parseRegexPattern(pattern, flags string) (string, bool) {
 	return extractRegexStaticString(pattern)
 }
 
-func isUndefinedLiteral(node *ast.Node) bool {
+func isUndefinedLiteral(ctx rule.RuleContext, node *ast.Node) bool {
 	node = stripParens(node)
 	if node == nil || node.Kind != ast.KindIdentifier {
 		return false
 	}
 	id := node.AsIdentifier()
-	return id != nil && id.Text == "undefined"
+	if id == nil || id.Text != "undefined" {
+		return false
+	}
+	if ctx.TypeChecker == nil || ctx.Program == nil {
+		return true
+	}
+	sym := ctx.TypeChecker.GetSymbolAtLocation(node)
+	if sym == nil || sym.Declarations == nil || len(sym.Declarations) == 0 {
+		return true
+	}
+	for _, decl := range sym.Declarations {
+		if decl == nil {
+			return false
+		}
+		sourceFile := ast.GetSourceFileOfNode(decl)
+		if sourceFile == nil || !sourceFile.IsDeclarationFile {
+			return false
+		}
+	}
+	return true
+}
+
+func isConstVariableDeclaration(node *ast.Node) bool {
+	if node == nil || !ast.IsVariableDeclaration(node) {
+		return false
+	}
+	parent := node.Parent
+	return parent != nil && ast.IsVariableDeclarationList(parent) && parent.Flags&ast.NodeFlagsConst != 0
 }
 
 // PreferIncludesRule checks for indexOf comparisons that can use includes instead.
@@ -287,7 +314,7 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 					}
 					if second.Kind == ast.KindStringLiteral {
 						flags = second.AsStringLiteral().Text
-					} else if !isUndefinedLiteral(second) {
+					} else if !isUndefinedLiteral(ctx, second) {
 						return "", false
 					}
 				}
@@ -306,7 +333,7 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 					return "", false
 				}
 				for _, decl := range sym.Declarations {
-					if decl == nil || decl.Kind != ast.KindVariableDeclaration {
+					if decl == nil || !isConstVariableDeclaration(decl) {
 						continue
 					}
 					varDecl := decl.AsVariableDeclaration()
