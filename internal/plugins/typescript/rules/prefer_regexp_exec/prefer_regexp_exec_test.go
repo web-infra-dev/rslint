@@ -20,6 +20,7 @@ func TestPreferRegExpExecRule(t *testing.T) {
 		{Code: `const value = "foo"; const pattern = /foo/g as RegExp; value.match(pattern);`},
 		{Code: `const value = "foo"; value.match(new RegExp(/foo/g));`},
 		{Code: `const value = "foo"; value.match(new RegExp(/foo/g, undefined));`},
+		{Code: `function test(value: string, undefined: string) { value.match(new RegExp("foo", undefined)); }`},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code:   `const value = "foo"; value.match(/foo/);`,
@@ -54,7 +55,7 @@ reg.exec(value);`},
 		},
 		{
 			Code:   `const value = "foo"; value.match("\\d+");`,
-			Output: []string{`const value = "foo"; /\\d+/.exec(value);`},
+			Output: []string{`const value = "foo"; /\d+/.exec(value);`},
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "regExpExecOverStringMatch"}},
 		},
 		{

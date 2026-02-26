@@ -164,7 +164,7 @@ func regExpFlagInfo(ctx rule.RuleContext, args []*ast.Node) (known bool, global 
 		}
 	}
 
-	if len(args) < 2 || args[1] == nil || isUndefinedLiteral(args[1]) {
+	if len(args) < 2 || args[1] == nil || isUndefinedLiteral(ctx, args[1]) {
 		if !patternKnown {
 			return false, false
 		}
@@ -177,7 +177,7 @@ func regExpFlagInfo(ctx rule.RuleContext, args []*ast.Node) (known bool, global 
 	return true, strings.Contains(flagsArg.AsStringLiteral().Text, "g")
 }
 
-func isUndefinedLiteral(node *ast.Node) bool {
+func isUndefinedLiteral(ctx rule.RuleContext, node *ast.Node) bool {
 	node = ast.SkipParentheses(node)
 	if node == nil {
 		return false
@@ -186,7 +186,26 @@ func isUndefinedLiteral(node *ast.Node) bool {
 		return false
 	}
 	id := node.AsIdentifier()
-	return id != nil && id.Text == "undefined"
+	if id == nil || id.Text != "undefined" {
+		return false
+	}
+	if ctx.TypeChecker == nil || ctx.Program == nil {
+		return true
+	}
+	sym := ctx.TypeChecker.GetSymbolAtLocation(node)
+	if sym == nil || sym.Declarations == nil || len(sym.Declarations) == 0 {
+		return true
+	}
+	for _, decl := range sym.Declarations {
+		if decl == nil {
+			return false
+		}
+		sourceFile := ast.GetSourceFileOfNode(decl)
+		if sourceFile == nil || !sourceFile.IsDeclarationFile {
+			return false
+		}
+	}
+	return true
 }
 
 func resolveStaticArgumentInfo(ctx rule.RuleContext, node *ast.Node, seen map[*ast.Symbol]bool) staticArgInfo {
@@ -314,11 +333,22 @@ func buildRegexLiteralFromString(pattern string) (string, bool) {
 	if _, err := regexp2.Compile(pattern, regexp2.ECMAScript); err != nil {
 		return "", false
 	}
-	pattern = strings.ReplaceAll(pattern, `\`, `\\`)
-	pattern = strings.ReplaceAll(pattern, "\n", `\n`)
-	pattern = strings.ReplaceAll(pattern, "\r", `\r`)
-	pattern = strings.ReplaceAll(pattern, "/", `\/`)
-	return "/" + pattern + "/", true
+	var b strings.Builder
+	b.WriteByte('/')
+	for _, ch := range pattern {
+		switch ch {
+		case '/':
+			b.WriteString(`\/`)
+		case '\n':
+			b.WriteString(`\n`)
+		case '\r':
+			b.WriteString(`\r`)
+		default:
+			b.WriteRune(ch)
+		}
+	}
+	b.WriteByte('/')
+	return b.String(), true
 }
 
 func buildPreferRegExpExecReplacement(ctx rule.RuleContext, callNode *ast.Node, receiver *ast.Node, arg *ast.Node, argumentTypes int) (string, bool) {
