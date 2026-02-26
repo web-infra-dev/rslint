@@ -78,6 +78,11 @@ ruleTester.run('prefer-includes', {
     `,
     `
       function f(a: string): void {
+        /bar/y.test(a);
+      }
+    `,
+    `
+      function f(a: string): void {
         /foo|bar/.test(a);
       }
     `,
@@ -95,6 +100,17 @@ ruleTester.run('prefer-includes', {
       const pattern = new RegExp('bar');
       function f(a) {
         return pattern.test(a);
+      }
+    `,
+    `
+      function f(a?: string): void {
+        /bar/.test(a);
+      }
+    `,
+    `
+      let pattern = /bar/;
+      function f(a: string): void {
+        pattern?.test(a);
       }
     `,
   ],
@@ -217,6 +233,15 @@ ruleTester.run('prefer-includes', {
     },
     {
       code: `
+        function f(a?: { b: string[] }, c: string): void {
+          a?.b.indexOf(c) === -1;
+        }
+      `,
+      errors: [{ messageId: 'preferIncludes' }],
+      output: null,
+    },
+    {
+      code: `
         function f(a?: string): void {
           a?.indexOf(b) !== -1;
         }
@@ -263,6 +288,30 @@ ruleTester.run('prefer-includes', {
       output: `
         function f(a: string): void {
           a.includes('\\0\\'\\\\\\n\\r\\v\\t\\f');
+        }
+      `,
+    },
+    {
+      code: `
+        function f(a: string[]): void {
+          /bar/.test(a);
+        }
+      `,
+      errors: [{ messageId: 'preferStringIncludes' }],
+      output: null,
+    },
+    {
+      code: `
+        const pattern = /bar/;
+        function f(a: string): void {
+          pattern.test(a);
+        }
+      `,
+      errors: [{ messageId: 'preferStringIncludes' }],
+      output: `
+        const pattern = /bar/;
+        function f(a: string): void {
+          a.includes('bar');
         }
       `,
     },
