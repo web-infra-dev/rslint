@@ -72,10 +72,10 @@ func findDirectiveInBlockComment(commentText string) (int, int, bool) {
 }
 
 func findTsIgnoreDirective(commentText string, kind ast.Kind) (int, int, bool) {
-	if kind == ast.KindSingleLineCommentTrivia {
+	switch kind {
+	case ast.KindSingleLineCommentTrivia:
 		return findDirectiveInLineComment(commentText)
-	}
-	if kind == ast.KindMultiLineCommentTrivia {
+	case ast.KindMultiLineCommentTrivia:
 		return findDirectiveInBlockComment(commentText)
 	}
 	return 0, 0, false
