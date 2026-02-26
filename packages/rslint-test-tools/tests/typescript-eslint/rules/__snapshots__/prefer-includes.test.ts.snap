@@ -508,9 +508,9 @@ exports[`prefer-includes > invalid 15`] = `
 exports[`prefer-includes > invalid 16`] = `
 {
   "code": "
-        let pattern = /bar/;
+        const pattern = /bar/;
         function f(a: string): void {
-          pattern?.test(a);
+          pattern.test(a);
         }
       ",
   "diagnostics": [
@@ -519,7 +519,7 @@ exports[`prefer-includes > invalid 16`] = `
       "messageId": "preferStringIncludes",
       "range": {
         "end": {
-          "column": 27,
+          "column": 26,
           "line": 4,
         },
         "start": {
@@ -532,6 +532,12 @@ exports[`prefer-includes > invalid 16`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+        const pattern = /bar/;
+        function f(a: string): void {
+          a.includes('bar');
+        }
+      ",
   "ruleCount": 1,
 }
 `;

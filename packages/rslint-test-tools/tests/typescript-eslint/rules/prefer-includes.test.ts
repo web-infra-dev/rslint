@@ -107,6 +107,12 @@ ruleTester.run('prefer-includes', {
         /bar/.test(a);
       }
     `,
+    `
+      let pattern = /bar/;
+      function f(a: string): void {
+        pattern?.test(a);
+      }
+    `,
   ],
   invalid: [
     // positive
@@ -296,13 +302,18 @@ ruleTester.run('prefer-includes', {
     },
     {
       code: `
-        let pattern = /bar/;
+        const pattern = /bar/;
         function f(a: string): void {
-          pattern?.test(a);
+          pattern.test(a);
         }
       `,
       errors: [{ messageId: 'preferStringIncludes' }],
-      output: null,
+      output: `
+        const pattern = /bar/;
+        function f(a: string): void {
+          a.includes('bar');
+        }
+      `,
     },
     {
       code: `
