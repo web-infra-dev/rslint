@@ -41,9 +41,17 @@ func parseOptions(options any) MaxParamsOptions {
 
 	var optsMap map[string]interface{}
 	if arr, ok := options.([]interface{}); ok && len(arr) > 0 {
-		if m, ok := arr[0].(map[string]interface{}); ok {
+		first := arr[0]
+		if maxValue, ok := parseNumericOption(first); ok {
+			opts.Max = maxValue
+			return opts
+		}
+		if m, ok := first.(map[string]interface{}); ok {
 			optsMap = m
 		}
+	} else if maxValue, ok := parseNumericOption(options); ok {
+		opts.Max = maxValue
+		return opts
 	} else if m, ok := options.(map[string]interface{}); ok {
 		optsMap = m
 	}

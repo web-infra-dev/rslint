@@ -24,6 +24,19 @@ class Foo {
 }
 ```
 
+## Options
+
+- `max` (`number`, default: `3`): Maximum number of parameters.
+- `maximum` (`number`, deprecated): Alias of `max`.
+- `countVoidThis` (`boolean`, default: `false`): When `false`, a leading `this: void` parameter is not counted.
+
+The numeric shorthand is also supported:
+
+```typescript
+// equivalent to { max: 4 }
+['@typescript-eslint/max-params', 2, 4];
+```
+
 ## Original Documentation
 
 https://typescript-eslint.io/rules/max-params

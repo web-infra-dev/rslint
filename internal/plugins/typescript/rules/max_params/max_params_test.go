@@ -43,6 +43,10 @@ class Foo {
 			Options: []interface{}{map[string]interface{}{"maximum": 4}},
 		},
 		{
+			Code:    `function foo(a, b, c, d) {}`,
+			Options: []interface{}{4},
+		},
+		{
 			Code: `
 class Foo {
   method(this: void) {}
@@ -166,10 +170,17 @@ declare function makeDate(m: number, d: number, y: number): Date;
 		{
 			Code: `
 type sum = (a: number, b: number) => number;
-			`,
+				`,
 			Options: []interface{}{map[string]interface{}{"max": 1}},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "exceed", Line: 2, Column: 12, EndLine: 2, EndColumn: 44},
+			},
+		},
+		{
+			Code:    `function foo(a, b) {}`,
+			Options: []interface{}{1},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "exceed", Line: 1, Column: 1, EndLine: 1, EndColumn: 22},
 			},
 		},
 	})
