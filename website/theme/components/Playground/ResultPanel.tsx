@@ -486,10 +486,10 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
                 <div className="diagnostics-list">
                   {diagnostics.map((diagnostic, index) => (
                     <div key={index} className="diagnostic-item">
-                      <div className="diagnostic-header">
+                      <div className="diagnostic-header dark:text-[#1c1d21]">
                         <h4>{diagnostic.ruleName}</h4>
                       </div>
-                      <div className="diagnostic-message">
+                      <div className="diagnostic-message dark:text-[#1c1d21]">
                         {diagnostic.message} {diagnostic.range.start.line}:
                         {diagnostic.range.start.column} -{' '}
                         {diagnostic.range.end.line}:
