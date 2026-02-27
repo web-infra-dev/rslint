@@ -40,11 +40,11 @@ func findDirectiveInLineComment(commentText string) (int, int, bool) {
 }
 
 func isDirectiveBoundaryChar(ch byte) bool {
-	return !((ch >= 'a' && ch <= 'z') ||
-		(ch >= 'A' && ch <= 'Z') ||
-		(ch >= '0' && ch <= '9') ||
-		ch == '_' ||
-		ch == '$')
+	return (ch < 'a' || ch > 'z') &&
+		(ch < 'A' || ch > 'Z') &&
+		(ch < '0' || ch > '9') &&
+		ch != '_' &&
+		ch != '$'
 }
 
 func hasTsIgnoreDirectiveAt(text string, idx int) bool {
