@@ -20,8 +20,14 @@ func buildPreferExpectErrorMessage() rule.RuleMessage {
 }
 
 func findDirectiveInLineComment(commentText string) (int, int, bool) {
-	idx := 0
-	for idx < len(commentText) && commentText[idx] == '/' {
+	if len(commentText) < 2 || commentText[0] != '/' || commentText[1] != '/' {
+		return 0, 0, false
+	}
+	idx := 2
+	for idx < len(commentText) && (commentText[idx] == ' ' || commentText[idx] == '\t') {
+		idx++
+	}
+	if idx < len(commentText) && commentText[idx] == '/' {
 		idx++
 	}
 	for idx < len(commentText) && (commentText[idx] == ' ' || commentText[idx] == '\t') {

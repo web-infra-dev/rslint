@@ -72,19 +72,28 @@ if (false) {
 			},
 		},
 		{
+			Code: `/// @ts-ignore: Suppress next line`,
+			Output: []string{
+				`/// @ts-expect-error: Suppress next line`,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferExpectErrorComment", Line: 1, Column: 1, EndLine: 1, EndColumn: 35},
+			},
+		},
+		{
 			Code: `
 if (false) {
   // @ts-ignore: Unreachable code error
   console.log('hello');
 }
-			`,
+				`,
 			Output: []string{
 				`
 if (false) {
   // @ts-expect-error: Unreachable code error
   console.log('hello');
 }
-			`,
+				`,
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "preferExpectErrorComment", Line: 3, Column: 3, EndLine: 3, EndColumn: 40},
