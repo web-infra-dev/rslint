@@ -1,0 +1,1854 @@
+// Rstest Snapshot v1
+
+exports[`any assertions > no-unsafe-type-assertion > invalid 1`] = `
+{
+  "code": "
+  declare const _any_: any;
+  _any_ as string;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion from \`any\` detected: consider using type guards or a safer assertion.",
+      "messageId": "unsafeOfAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`any assertions > no-unsafe-type-assertion > invalid 2`] = `
+{
+  "code": "
+  declare const _unknown_: unknown;
+  _unknown_ as any;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion to \`any\` detected: consider using a more specific type to ensure safety.",
+      "messageId": "unsafeToAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`any assertions > no-unsafe-type-assertion > invalid 3`] = `
+{
+  "code": "
+  declare const _any_: any;
+  _any_ as Function;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion from \`any\` detected: consider using type guards or a safer assertion.",
+      "messageId": "unsafeOfAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`any assertions > no-unsafe-type-assertion > invalid 4`] = `
+{
+  "code": "
+  declare const _any_: any;
+  _any_ as never;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion from \`any\` detected: consider using type guards or a safer assertion.",
+      "messageId": "unsafeOfAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`any assertions > no-unsafe-type-assertion > invalid 5`] = `
+{
+  "code": "
+  'foo' as any;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion to \`any\` detected: consider using a more specific type to ensure safety.",
+      "messageId": "unsafeToAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 2,
+        },
+        "start": {
+          "column": 3,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`any assertions > no-unsafe-type-assertion > invalid 6`] = `
+{
+  "code": "
+  const bar = foo as number;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion from \`any\` detected: consider using type guards or a safer assertion.",
+      "messageId": "unsafeOfAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`any assertions > no-unsafe-type-assertion > invalid 7`] = `
+{
+  "code": "
+  const bar = 'foo' as errorType;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion to error typed detected: consider using a more specific type to ensure safety.",
+      "messageId": "unsafeToAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 2,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`array assertions > no-unsafe-type-assertion > invalid 1`] = `
+{
+  "code": "
+  declare const a: (string | number)[];
+  a as string[];
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'string[]' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`array assertions > no-unsafe-type-assertion > invalid 2`] = `
+{
+  "code": "
+  declare const a: any[];
+  a as number[];
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion from \`any\` detected: consider using type guards or a safer assertion.",
+      "messageId": "unsafeOfAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`array assertions > no-unsafe-type-assertion > invalid 3`] = `
+{
+  "code": "
+  declare const a: number[];
+  a as any[];
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion to \`any\` detected: consider using a more specific type to ensure safety.",
+      "messageId": "unsafeToAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`array assertions > no-unsafe-type-assertion > invalid 4`] = `
+{
+  "code": "
+  declare const a: unknown[];
+  a as number[];
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'number[]' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`array assertions > no-unsafe-type-assertion > invalid 5`] = `
+{
+  "code": "
+  declare const a: number[];
+  a as never[];
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'never[]' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`basic assertions > no-unsafe-type-assertion > invalid 1`] = `
+{
+  "code": "
+  declare const a: string | number;
+  a as string;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'string' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`basic assertions > no-unsafe-type-assertion > invalid 2`] = `
+{
+  "code": "
+  declare const a: string | number;
+  a satisfies string as string;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'string' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`basic assertions > no-unsafe-type-assertion > invalid 3`] = `
+{
+  "code": "
+  declare const a: string | number;
+  <string>a;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'string' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`basic assertions > no-unsafe-type-assertion > invalid 4`] = `
+{
+  "code": "
+  declare const a: string | undefined;
+  a as string | boolean;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'string | boolean' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`basic assertions > no-unsafe-type-assertion > invalid 5`] = `
+{
+  "code": "
+  declare const a: string;
+  a as 'foo' as 'bar';
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type '"bar"' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+    {
+      "message": "Unsafe type assertion: type '"foo"' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`basic assertions > no-unsafe-type-assertion > invalid 6`] = `
+{
+  "code": "
+  function foo<T extends boolean>(a: T) {
+  return a as true;
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'true' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`basic assertions > no-unsafe-type-assertion > invalid 7`] = `
+{
+  "code": "
+  declare const a: string;
+  a as Omit<Required<Readonly<{ hello: 'world'; foo: 'bar' }>>, 'foo'>;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'Omit<Required<Readonly<{ hello: "world"; foo: "bar"; }>>, "foo">' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`basic assertions > no-unsafe-type-assertion > invalid 8`] = `
+{
+  "code": "
+  declare const foo: readonly number[];
+  const bar = foo as number[];
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'number[]' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`class assertions > no-unsafe-type-assertion > invalid 1`] = `
+{
+  "code": "
+  class Foo {
+  hello() {}
+  }
+  class Bar extends Foo {
+  world() {}
+  }
+  declare const a: Foo;
+  a as Bar;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'Bar' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`function assertions > no-unsafe-type-assertion > invalid 1`] = `
+{
+  "code": "
+  declare const _function_: Function;
+  _function_ as () => void;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type '() => void' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`function assertions > no-unsafe-type-assertion > invalid 2`] = `
+{
+  "code": "
+  declare const _function_: Function;
+  _function_ as any;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion to \`any\` detected: consider using a more specific type to ensure safety.",
+      "messageId": "unsafeToAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`function assertions > no-unsafe-type-assertion > invalid 3`] = `
+{
+  "code": "
+  declare const _function_: Function;
+  _function_ as never;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'never' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`generic assertions > no-unsafe-type-assertion > invalid 1`] = `
+{
+  "code": "
+  type Obj = { foo: string };
+  function func<T extends Obj>() {
+  const myObj = { foo: 'hi' } as T;
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: the original type is assignable to the constraint of type 'T', but 'T' could be instantiated with a different subtype of its constraint.",
+      "messageId": "unsafeTypeAssertionAssignableToConstraint",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`generic assertions > no-unsafe-type-assertion > invalid 2`] = `
+{
+  "code": "
+  type Obj = { foo: string };
+  function func<T extends Obj>() {
+  const o: Obj = { foo: 'hi' };
+  const myObj = o as T;
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: the original type is assignable to the constraint of type 'T', but 'T' could be instantiated with a different subtype of its constraint.",
+      "messageId": "unsafeTypeAssertionAssignableToConstraint",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 17,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`generic assertions > no-unsafe-type-assertion > invalid 3`] = `
+{
+  "code": "
+  export function myfunc<CustomObjectT extends string>(
+  input: number,
+  ): CustomObjectT {
+  const newCustomObject = input as CustomObjectT;
+  return newCustomObject;
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'CustomObjectT' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 5,
+        },
+        "start": {
+          "column": 27,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`generic assertions > no-unsafe-type-assertion > invalid 4`] = `
+{
+  "code": "
+  function unknownConstraint<T extends unknown>(x: T, y: string) {
+  y as T; // banned; generic arbitrary subtype
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: the original type is assignable to the constraint of type 'T', but 'T' could be instantiated with a different subtype of its constraint.",
+      "messageId": "unsafeTypeAssertionAssignableToConstraint",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`generic assertions > no-unsafe-type-assertion > invalid 5`] = `
+{
+  "code": "
+  function unconstrained<T>(x: T, y: string) {
+  y as T;
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: 'T' could be instantiated with an arbitrary type which could be unrelated to the original type.",
+      "messageId": "unsafeToUnconstrainedTypeAssertion",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`generic assertions > no-unsafe-type-assertion > invalid 6`] = `
+{
+  "code": "
+  // constraint of any functions like constraint of \`unknown\`
+  // (even the TS error message has this verbiage)
+  function anyConstraint<T extends any>(x: T, y: string) {
+  y as T; // banned; generic arbitrary subtype
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: the original type is assignable to the constraint of type 'T', but 'T' could be instantiated with a different subtype of its constraint.",
+      "messageId": "unsafeTypeAssertionAssignableToConstraint",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`generic assertions > no-unsafe-type-assertion > invalid 7`] = `
+{
+  "code": "
+  function constraintWiderThanUncastType<T extends string | number>(
+  x: T,
+  y: string,
+  ) {
+  y as T; // banned; assignable to constraint
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: the original type is assignable to the constraint of type 'T', but 'T' could be instantiated with a different subtype of its constraint.",
+      "messageId": "unsafeTypeAssertionAssignableToConstraint",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`generic assertions > no-unsafe-type-assertion > invalid 8`] = `
+{
+  "code": "
+  function constraintEqualUncastType<T extends string>(x: T, y: string) {
+  y as T; // banned; assignable to constraint
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: the original type is assignable to the constraint of type 'T', but 'T' could be instantiated with a different subtype of its constraint.",
+      "messageId": "unsafeTypeAssertionAssignableToConstraint",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`generic assertions > no-unsafe-type-assertion > invalid 9`] = `
+{
+  "code": "
+  function constraintNarrowerThanUncastType<T extends string>(
+  x: T,
+  y: string | number,
+  ) {
+  y as T; // banned; *not* assignable to constraint
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'T' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`generic assertions > no-unsafe-type-assertion > invalid 10`] = `
+{
+  "code": "
+  function assertFromAny<T extends string | number>(x: T, y: any) {
+  y as T; // banned; just an \`any\` complaint. Not a generic subtype.
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion from \`any\` detected: consider using type guards or a safer assertion.",
+      "messageId": "unsafeOfAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`generic assertions > no-unsafe-type-assertion > invalid 11`] = `
+{
+  "code": "
+  function parameterExtendsOtherParameter<T extends string | number, V extends T>(
+  x: T,
+  y: V,
+  ) {
+  x as V; // banned; assignable to constraint
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: the original type is assignable to the constraint of type 'V', but 'V' could be instantiated with a different subtype of its constraint.",
+      "messageId": "unsafeTypeAssertionAssignableToConstraint",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`generic assertions > no-unsafe-type-assertion > invalid 12`] = `
+{
+  "code": "
+  function parameterExtendsUnconstrainedParameter<T, V extends T>(x: T, y: V) {
+  x as V; // banned; unconstrained arbitrary type
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: 'V' could be instantiated with an arbitrary type which could be unrelated to the original type.",
+      "messageId": "unsafeToUnconstrainedTypeAssertion",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`generic assertions > no-unsafe-type-assertion > invalid 13`] = `
+{
+  "code": "
+  function twoUnconstrained<T, V>(x: T, y: V) {
+  y as T;
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: 'T' could be instantiated with an arbitrary type which could be unrelated to the original type.",
+      "messageId": "unsafeToUnconstrainedTypeAssertion",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`generic assertions > no-unsafe-type-assertion > invalid 14`] = `
+{
+  "code": "
+  function toNarrower<T>(x: T, y: string) {
+  x as string; // banned; ordinary 'string' narrower than 'T'.
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'string' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`generic assertions > no-unsafe-type-assertion > invalid 15`] = `
+{
+  "code": "
+  function unconstrainedToAny<T>(x: T) {
+  x as any;
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion to \`any\` detected: consider using a more specific type to ensure safety.",
+      "messageId": "unsafeToAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`generic assertions > no-unsafe-type-assertion > invalid 16`] = `
+{
+  "code": "
+  function stringToAny<T extends string>(x: T) {
+  x as any;
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion to \`any\` detected: consider using a more specific type to ensure safety.",
+      "messageId": "unsafeToAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`generic assertions > no-unsafe-type-assertion > invalid 17`] = `
+{
+  "code": "
+  function stringToNarrower<T extends string>(x: T) {
+  x as 'a' | 'b';
+  }
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type '"a" | "b"' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`never assertions > no-unsafe-type-assertion > invalid 1`] = `
+{
+  "code": "
+  declare const _never_: never;
+  _never_ as any;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion to \`any\` detected: consider using a more specific type to ensure safety.",
+      "messageId": "unsafeToAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`never assertions > no-unsafe-type-assertion > invalid 2`] = `
+{
+  "code": "
+  declare const _string_: string;
+  _string_ as never;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'never' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object assertions > no-unsafe-type-assertion > invalid 1`] = `
+{
+  "code": "
+  var foo = {} as {
+  bar: number;
+  bas: string;
+  };
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type '{ bar: number; bas: string; }' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object assertions > no-unsafe-type-assertion > invalid 2`] = `
+{
+  "code": "
+  declare const a: { hello: string };
+  a satisfies Record<string, string> as { hello: string; world: string };
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type '{ hello: string; world: string; }' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 73,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`object assertions > no-unsafe-type-assertion > invalid 3`] = `
+{
+  "code": "
+  declare const a: { hello?: string };
+  a as { hello: string };
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type '{ hello: string; }' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`promise assertions > no-unsafe-type-assertion > invalid 1`] = `
+{
+  "code": "
+  declare const a: Promise<string | number>;
+  a as Promise<string>;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'Promise<string>' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`promise assertions > no-unsafe-type-assertion > invalid 2`] = `
+{
+  "code": "
+  declare const a: Promise<any>;
+  a as Promise<number>;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion from \`any\` detected: consider using type guards or a safer assertion.",
+      "messageId": "unsafeOfAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`promise assertions > no-unsafe-type-assertion > invalid 3`] = `
+{
+  "code": "
+  declare const a: Promise<number>;
+  a as Promise<any>;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion to \`any\` detected: consider using a more specific type to ensure safety.",
+      "messageId": "unsafeToAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`promise assertions > no-unsafe-type-assertion > invalid 4`] = `
+{
+  "code": "
+  declare const a: Promise<number[]>;
+  a as Promise<any[]>;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion to \`any\` detected: consider using a more specific type to ensure safety.",
+      "messageId": "unsafeToAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`promise assertions > no-unsafe-type-assertion > invalid 5`] = `
+{
+  "code": "
+  declare const a: Promise<unknown>;
+  a as Promise<number>;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'Promise<number>' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`promise assertions > no-unsafe-type-assertion > invalid 6`] = `
+{
+  "code": "
+  declare const a: Promise<number>;
+  a as Promise<never>;
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type 'Promise<never>' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`tuple assertions > no-unsafe-type-assertion > invalid 1`] = `
+{
+  "code": "
+  declare const a: [string | number];
+  a as [string];
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type '[string]' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`tuple assertions > no-unsafe-type-assertion > invalid 2`] = `
+{
+  "code": "
+  declare const a: [string, number];
+  a as [string, string];
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type '[string, string]' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`tuple assertions > no-unsafe-type-assertion > invalid 3`] = `
+{
+  "code": "
+  declare const a: [string];
+  a as [string, number];
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type '[string, number]' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`tuple assertions > no-unsafe-type-assertion > invalid 4`] = `
+{
+  "code": "
+  declare const a: [string, number];
+  a as [string];
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type '[string]' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`tuple assertions > no-unsafe-type-assertion > invalid 5`] = `
+{
+  "code": "
+  declare const a: [any];
+  a as [number];
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion from \`any\` detected: consider using type guards or a safer assertion.",
+      "messageId": "unsafeOfAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`tuple assertions > no-unsafe-type-assertion > invalid 6`] = `
+{
+  "code": "
+  declare const a: [number, any];
+  a as [number, number];
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion from \`any\` detected: consider using type guards or a safer assertion.",
+      "messageId": "unsafeOfAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`tuple assertions > no-unsafe-type-assertion > invalid 7`] = `
+{
+  "code": "
+  declare const a: [number];
+  a as [any];
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe assertion to \`any\` detected: consider using a more specific type to ensure safety.",
+      "messageId": "unsafeToAnyTypeAssertion",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`tuple assertions > no-unsafe-type-assertion > invalid 8`] = `
+{
+  "code": "
+  declare const a: [unknown];
+  a as [number];
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type '[number]' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`tuple assertions > no-unsafe-type-assertion > invalid 9`] = `
+{
+  "code": "
+  declare const a: [number];
+  a as [never];
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type '[never]' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`tuple assertions > no-unsafe-type-assertion > invalid 10`] = `
+{
+  "code": "
+  declare const a: [Promise<string | number>];
+  a as [Promise<string>];
+        ",
+  "diagnostics": [
+    {
+      "message": "Unsafe type assertion: type '[Promise<string>]' is more narrow than the original type.",
+      "messageId": "unsafeTypeAssertion",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-type-assertion",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

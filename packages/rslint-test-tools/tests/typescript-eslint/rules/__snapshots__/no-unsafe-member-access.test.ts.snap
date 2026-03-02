@@ -1,0 +1,514 @@
+// Rstest Snapshot v1
+
+exports[`no-unsafe-member-access > invalid 1`] = `
+{
+  "code": "
+function foo(x: any) {
+  x.a;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe member access .a on an \`any\` value.",
+      "messageId": "unsafeMemberExpression",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-member-access",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-member-access > invalid 2`] = `
+{
+  "code": "
+function foo(x: any) {
+  x.a.b.c.d.e.f.g;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe member access .a on an \`any\` value.",
+      "messageId": "unsafeMemberExpression",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-member-access",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-member-access > invalid 3`] = `
+{
+  "code": "
+function foo(x: { a: any }) {
+  x.a.b.c.d.e.f.g;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe member access .b on an \`any\` value.",
+      "messageId": "unsafeMemberExpression",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-member-access",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-member-access > invalid 4`] = `
+{
+  "code": "
+function foo(x: any) {
+  x['a'];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe member access ['a'] on an \`any\` value.",
+      "messageId": "unsafeMemberExpression",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-member-access",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-member-access > invalid 5`] = `
+{
+  "code": "
+function foo(x: any) {
+  x['a']['b']['c'];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe member access ['a'] on an \`any\` value.",
+      "messageId": "unsafeMemberExpression",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-member-access",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-member-access > invalid 6`] = `
+{
+  "code": "
+let value: NotKnown;
+
+value.property;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe member access .property on an \`error\` typed value.",
+      "messageId": "unsafeMemberExpression",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 4,
+        },
+        "start": {
+          "column": 7,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-member-access",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-member-access > invalid 7`] = `
+{
+  "code": "
+function foo(x: { a: number }, y: any) {
+  x[y];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Computed name [y] resolves to an \`any\` value.",
+      "messageId": "unsafeComputedMemberAccess",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-member-access",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-member-access > invalid 8`] = `
+{
+  "code": "
+function foo(x?: { a: number }, y: any) {
+  x?.[y];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Computed name [y] resolves to an \`any\` value.",
+      "messageId": "unsafeComputedMemberAccess",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-member-access",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-member-access > invalid 9`] = `
+{
+  "code": "
+function foo(x: { a: number }, y: any) {
+  x[(y += 1)];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Computed name [y += 1] resolves to an \`any\` value.",
+      "messageId": "unsafeComputedMemberAccess",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 6,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-member-access",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-member-access > invalid 10`] = `
+{
+  "code": "
+function foo(x: { a: number }, y: any) {
+  x[1 as any];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Computed name [1 as any] resolves to an \`any\` value.",
+      "messageId": "unsafeComputedMemberAccess",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-member-access",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-member-access > invalid 11`] = `
+{
+  "code": "
+function foo(x: { a: number }, y: any) {
+  x[y()];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Computed name [y()] resolves to an \`any\` value.",
+      "messageId": "unsafeComputedMemberAccess",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-member-access",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-member-access > invalid 12`] = `
+{
+  "code": "
+function foo(x: string[], y: any) {
+  x[y];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Computed name [y] resolves to an \`any\` value.",
+      "messageId": "unsafeComputedMemberAccess",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-member-access",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-member-access > invalid 13`] = `
+{
+  "code": "
+function foo(x: { a: number }, y: NotKnown) {
+  x[y];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Computed name [y] resolves to an \`error\` typed value.",
+      "messageId": "unsafeComputedMemberAccess",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-member-access",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-member-access > invalid 14`] = `
+{
+  "code": "
+const methods = {
+  methodA() {
+    return this.methodB()
+  },
+  methodB() {
+    const getProperty = () => Math.random() > 0.5 ? 'methodB' : 'methodC'
+    return this[getProperty()]()
+  },
+  methodC() {
+    return true
+  },
+  methodD() {
+    return (this?.methodA)?.()
+  }
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe member access .methodB on an \`any\` value. \`this\` is typed as \`any\`.You can try to fix this by turning on the \`noImplicitThis\` compiler option, or adding a \`this\` parameter to the function.",
+      "messageId": "unsafeThisMemberExpression",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-member-access",
+    },
+    {
+      "message": "Unsafe member access [getProperty()] on an \`any\` value. \`this\` is typed as \`any\`.You can try to fix this by turning on the \`noImplicitThis\` compiler option, or adding a \`this\` parameter to the function.",
+      "messageId": "unsafeThisMemberExpression",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 8,
+        },
+        "start": {
+          "column": 17,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-member-access",
+    },
+    {
+      "message": "Unsafe member access .methodA on an \`any\` value. \`this\` is typed as \`any\`.You can try to fix this by turning on the \`noImplicitThis\` compiler option, or adding a \`this\` parameter to the function.",
+      "messageId": "unsafeThisMemberExpression",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 14,
+        },
+        "start": {
+          "column": 19,
+          "line": 14,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-member-access",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-member-access > invalid 15`] = `
+{
+  "code": "
+class C {
+  getObs$: any;
+  getPopularDepartments(): void {
+    this.getObs$.pipe().subscribe(res => {
+      log(res);
+    });
+  }
+}
+function log(arg: unknown) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe member access .pipe on an \`any\` value.",
+      "messageId": "unsafeMemberExpression",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 18,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-member-access",
+    },
+    {
+      "message": "Unsafe member access .subscribe on an \`any\` value.",
+      "messageId": "unsafeMemberExpression",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 5,
+        },
+        "start": {
+          "column": 25,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-member-access",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

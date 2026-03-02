@@ -1,0 +1,1015 @@
+// Rstest Snapshot v1
+
+exports[`no-unsafe-return > invalid 1`] = `
+{
+  "code": "
+function foo() {
+  return 1 as any;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 2`] = `
+{
+  "code": "
+function foo() {
+  return Object.create(null);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 3`] = `
+{
+  "code": "
+const foo = () => {
+  return 1 as any;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 4`] = `
+{
+  "code": "const foo = () => Object.create(null);",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 5`] = `
+{
+  "code": "
+function foo() {
+  return [] as any[];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any[]\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 6`] = `
+{
+  "code": "
+function foo() {
+  return [] as Array<any>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any[]\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 7`] = `
+{
+  "code": "
+function foo() {
+  return [] as readonly any[];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any[]\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 8`] = `
+{
+  "code": "
+function foo() {
+  return [] as Readonly<any[]>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any[]\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 9`] = `
+{
+  "code": "
+const foo = () => {
+  return [] as any[];
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any[]\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 10`] = `
+{
+  "code": "const foo = () => [] as any[];",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any[]\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 11`] = `
+{
+  "code": "
+function foo(): Set<string> {
+  return new Set<any>();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of type \`Set<any>\` from function with return type \`Set<string>\`.",
+      "messageId": "unsafeReturnAssignment",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 12`] = `
+{
+  "code": "
+function foo(): Map<string, string> {
+  return new Map<string, any>();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of type \`Map<string, any>\` from function with return type \`Map<string, string>\`.",
+      "messageId": "unsafeReturnAssignment",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 13`] = `
+{
+  "code": "
+function foo(): Set<string[]> {
+  return new Set<any[]>();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of type \`Set<any[]>\` from function with return type \`Set<string[]>\`.",
+      "messageId": "unsafeReturnAssignment",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 14`] = `
+{
+  "code": "
+function foo(): Set<Set<Set<string>>> {
+  return new Set<Set<Set<any>>>();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of type \`Set<Set<Set<any>>>\` from function with return type \`Set<Set<Set<string>>>\`.",
+      "messageId": "unsafeReturnAssignment",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 15`] = `
+{
+  "code": "
+type Fn = () => Set<string>;
+const foo1: Fn = () => new Set<any>();
+const foo2: Fn = function test() {
+  return new Set<any>();
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of type \`Set<any>\` from function with return type \`Set<string>\`.",
+      "messageId": "unsafeReturnAssignment",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 3,
+        },
+        "start": {
+          "column": 24,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+    {
+      "message": "Unsafe return of type \`Set<any>\` from function with return type \`Set<string>\`.",
+      "messageId": "unsafeReturnAssignment",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 16`] = `
+{
+  "code": "
+type Fn = () => Set<string>;
+function receiver(arg: Fn) {}
+receiver(() => new Set<any>());
+receiver(function test() {
+  return new Set<any>();
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of type \`Set<any>\` from function with return type \`Set<string>\`.",
+      "messageId": "unsafeReturnAssignment",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 4,
+        },
+        "start": {
+          "column": 16,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+    {
+      "message": "Unsafe return of type \`Set<any>\` from function with return type \`Set<string>\`.",
+      "messageId": "unsafeReturnAssignment",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 17`] = `
+{
+  "code": "
+function foo() {
+  return this;
+}
+
+function bar() {
+  return () => this;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`\`any\`\`. \`this\` is typed as \`any\`.You can try to fix this by turning on the \`noImplicitThis\` compiler option, or adding a \`this\` parameter to the function.",
+      "messageId": "unsafeReturnThis",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+    {
+      "message": "Unsafe return of a value of type \`\`any\`\`. \`this\` is typed as \`any\`.You can try to fix this by turning on the \`noImplicitThis\` compiler option, or adding a \`this\` parameter to the function.",
+      "messageId": "unsafeReturnThis",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 7,
+        },
+        "start": {
+          "column": 16,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 18`] = `
+{
+  "code": "
+declare function foo(arg: null | (() => any)): void;
+foo(() => 'foo' as any);
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 19`] = `
+{
+  "code": "
+let value: NotKnown;
+
+function example() {
+  return value;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type error.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 20`] = `
+{
+  "code": "
+declare const value: any;
+async function foo() {
+  return value;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 21`] = `
+{
+  "code": "
+declare const value: Promise<any>;
+async function foo(): Promise<number> {
+  return value;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`Promise<any>\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 22`] = `
+{
+  "code": "
+async function foo(arg: number) {
+  return arg as Promise<any>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`Promise<any>\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 23`] = `
+{
+  "code": "
+function foo(): Promise<any> {
+  return {} as any;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 24`] = `
+{
+  "code": "
+function foo(): Promise<object> {
+  return {} as any;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`any\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 25`] = `
+{
+  "code": "
+async function foo(): Promise<object> {
+  return Promise.resolve<any>({});
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`Promise<any>\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 26`] = `
+{
+  "code": "
+async function foo(): Promise<object> {
+  return Promise.resolve<Promise<Promise<any>>>({} as Promise<any>);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`Promise<any>\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 27`] = `
+{
+  "code": "
+async function foo(): Promise<object> {
+  return {} as Promise<Promise<Promise<Promise<any>>>>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`Promise<any>\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 28`] = `
+{
+  "code": "
+async function foo() {
+  return {} as Promise<Promise<Promise<Promise<any>>>>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`Promise<any>\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 29`] = `
+{
+  "code": "
+async function foo() {
+  return {} as Promise<any> | Promise<object>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`Promise<any>\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 30`] = `
+{
+  "code": "
+async function foo() {
+  return {} as Promise<any | object>;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`Promise<any>\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 31`] = `
+{
+  "code": "
+async function foo() {
+  return {} as Promise<any> & { __brand: 'any' };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`Promise<any>\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-return > invalid 32`] = `
+{
+  "code": "
+interface Alias<T> extends Promise<any> {
+  foo: 'bar';
+}
+
+declare const value: Alias<number>;
+async function foo() {
+  return value;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe return of a value of type \`Promise<any>\`.",
+      "messageId": "unsafeReturn",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -286,7 +286,7 @@ func TestNoRedundantTypeConstituentsRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "literalOverridden",
-					Column:    19,
+					Column:    20,
 				},
 			},
 		},
@@ -295,7 +295,7 @@ func TestNoRedundantTypeConstituentsRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "literalOverridden",
-					Column:    10,
+					Column:    11,
 				},
 			},
 		},
@@ -307,7 +307,7 @@ func TestNoRedundantTypeConstituentsRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "literalOverridden",
-					Column:    18,
+					Column:    19,
 				},
 			},
 		},
@@ -316,7 +316,7 @@ func TestNoRedundantTypeConstituentsRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "literalOverridden",
-					Column:    10,
+					Column:    11,
 				},
 			},
 		},
@@ -325,7 +325,7 @@ func TestNoRedundantTypeConstituentsRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "literalOverridden",
-					Column:    10,
+					Column:    11,
 				},
 			},
 		},
@@ -334,7 +334,7 @@ func TestNoRedundantTypeConstituentsRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "literalOverridden",
-					Column:    10,
+					Column:    11,
 				},
 			},
 		},
@@ -343,7 +343,7 @@ func TestNoRedundantTypeConstituentsRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "literalOverridden",
-					Column:    10,
+					Column:    11,
 				},
 			},
 		},
@@ -421,7 +421,7 @@ func TestNoRedundantTypeConstituentsRule(t *testing.T) {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "literalOverridden",
-					Column:    10,
+					Column:    11,
 				},
 			},
 		},

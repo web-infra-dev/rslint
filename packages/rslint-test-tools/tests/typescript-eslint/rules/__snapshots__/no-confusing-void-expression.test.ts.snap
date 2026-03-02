@@ -2,6 +2,9 @@
 
 exports[`no-confusing-void-expression > invalid 1`] = `
 {
+  "code": "
+        const x = console.log('foo');
+      ",
   "diagnostics": [
     {
       "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
@@ -27,6 +30,9 @@ exports[`no-confusing-void-expression > invalid 1`] = `
 
 exports[`no-confusing-void-expression > invalid 2`] = `
 {
+  "code": "
+        const x = console?.log('foo');
+      ",
   "diagnostics": [
     {
       "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
@@ -52,6 +58,9 @@ exports[`no-confusing-void-expression > invalid 2`] = `
 
 exports[`no-confusing-void-expression > invalid 3`] = `
 {
+  "code": "
+        console.error(console.log('foo'));
+      ",
   "diagnostics": [
     {
       "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
@@ -77,6 +86,9 @@ exports[`no-confusing-void-expression > invalid 3`] = `
 
 exports[`no-confusing-void-expression > invalid 4`] = `
 {
+  "code": "
+        [console.log('foo')];
+      ",
   "diagnostics": [
     {
       "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
@@ -102,6 +114,9 @@ exports[`no-confusing-void-expression > invalid 4`] = `
 
 exports[`no-confusing-void-expression > invalid 5`] = `
 {
+  "code": "
+        ({ x: console.log('foo') });
+      ",
   "diagnostics": [
     {
       "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
@@ -127,6 +142,9 @@ exports[`no-confusing-void-expression > invalid 5`] = `
 
 exports[`no-confusing-void-expression > invalid 6`] = `
 {
+  "code": "
+        void console.log('foo');
+      ",
   "diagnostics": [
     {
       "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
@@ -152,6 +170,9 @@ exports[`no-confusing-void-expression > invalid 6`] = `
 
 exports[`no-confusing-void-expression > invalid 7`] = `
 {
+  "code": "
+        console.log('foo') ? true : false;
+      ",
   "diagnostics": [
     {
       "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
@@ -177,6 +198,9 @@ exports[`no-confusing-void-expression > invalid 7`] = `
 
 exports[`no-confusing-void-expression > invalid 8`] = `
 {
+  "code": "
+        (console.log('foo') && true) || false;
+      ",
   "diagnostics": [
     {
       "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
@@ -202,6 +226,9 @@ exports[`no-confusing-void-expression > invalid 8`] = `
 
 exports[`no-confusing-void-expression > invalid 9`] = `
 {
+  "code": "
+        (cond && console.log('ok')) || console.log('error');
+      ",
   "diagnostics": [
     {
       "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
@@ -227,6 +254,9 @@ exports[`no-confusing-void-expression > invalid 9`] = `
 
 exports[`no-confusing-void-expression > invalid 10`] = `
 {
+  "code": "
+        !console.log('foo');
+      ",
   "diagnostics": [
     {
       "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
@@ -252,6 +282,11 @@ exports[`no-confusing-void-expression > invalid 10`] = `
 
 exports[`no-confusing-void-expression > invalid 11`] = `
 {
+  "code": "
+function notcool(input: string) {
+  return input, console.log(input);
+}
+      ",
   "diagnostics": [
     {
       "message": "Placing a void expression inside another expression is forbidden. Move it to its own statement instead.",
@@ -277,6 +312,7 @@ exports[`no-confusing-void-expression > invalid 11`] = `
 
 exports[`no-confusing-void-expression > invalid 12`] = `
 {
+  "code": "() => console.log('foo');",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -296,12 +332,14 @@ exports[`no-confusing-void-expression > invalid 12`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "() => { console.log('foo'); };",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 13`] = `
 {
+  "code": "foo => foo && console.log(foo);",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -327,6 +365,7 @@ exports[`no-confusing-void-expression > invalid 13`] = `
 
 exports[`no-confusing-void-expression > invalid 14`] = `
 {
+  "code": "(foo: undefined) => foo && console.log(foo);",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -346,12 +385,14 @@ exports[`no-confusing-void-expression > invalid 14`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "(foo: undefined) => { foo && console.log(foo); };",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 15`] = `
 {
+  "code": "foo => foo || console.log(foo);",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -377,6 +418,7 @@ exports[`no-confusing-void-expression > invalid 15`] = `
 
 exports[`no-confusing-void-expression > invalid 16`] = `
 {
+  "code": "(foo: undefined) => foo || console.log(foo);",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -396,12 +438,14 @@ exports[`no-confusing-void-expression > invalid 16`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "(foo: undefined) => { foo || console.log(foo); };",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 17`] = `
 {
+  "code": "(foo: void) => foo || console.log(foo);",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -421,12 +465,14 @@ exports[`no-confusing-void-expression > invalid 17`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "(foo: void) => { foo || console.log(foo); };",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 18`] = `
 {
+  "code": "foo => (foo ? console.log(true) : console.log(false));",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -461,12 +507,19 @@ exports[`no-confusing-void-expression > invalid 18`] = `
   ],
   "errorCount": 2,
   "fileCount": 1,
+  "output": "foo => { foo ? console.log(true) : console.log(false); };",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 19`] = `
 {
+  "code": "
+        function f() {
+          return console.log('foo');
+          console.log('bar');
+        }
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please move it before the \`return\` statement.",
@@ -486,12 +539,25 @@ exports[`no-confusing-void-expression > invalid 19`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+        function f() {
+          console.log('foo'); return;
+          console.log('bar');
+        }
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 20`] = `
 {
+  "code": "
+        function f() {
+          console.log('foo')
+          return ['bar', 'baz'].forEach(console.log)
+          console.log('quux')
+        }
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please move it before the \`return\` statement.",
@@ -511,12 +577,25 @@ exports[`no-confusing-void-expression > invalid 20`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+        function f() {
+          console.log('foo')
+          ;['bar', 'baz'].forEach(console.log); return;
+          console.log('quux')
+        }
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 21`] = `
 {
+  "code": "
+        function f() {
+          console.log('foo');
+          return console.log('bar');
+        }
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
@@ -536,12 +615,24 @@ exports[`no-confusing-void-expression > invalid 21`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+        function f() {
+          console.log('foo');
+          console.log('bar');
+        }
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 22`] = `
 {
+  "code": "
+        function f() {
+          console.log('foo')
+          return ['bar', 'baz'].forEach(console.log)
+        }
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
@@ -561,12 +652,26 @@ exports[`no-confusing-void-expression > invalid 22`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+        function f() {
+          console.log('foo')
+          ;['bar', 'baz'].forEach(console.log);
+        }
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 23`] = `
 {
+  "code": "
+        const f = () => {
+          if (cond) {
+            return console.error('foo');
+          }
+          console.log('bar');
+        };
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please move it before the \`return\` statement.",
@@ -586,12 +691,26 @@ exports[`no-confusing-void-expression > invalid 23`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+        const f = () => {
+          if (cond) {
+            console.error('foo'); return;
+          }
+          console.log('bar');
+        };
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 24`] = `
 {
+  "code": "
+        const f = function () {
+          if (cond) return console.error('foo');
+          console.log('bar');
+        };
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please move it before the \`return\` statement.",
@@ -611,12 +730,24 @@ exports[`no-confusing-void-expression > invalid 24`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+        const f = function () {
+          if (cond) { console.error('foo'); return; }
+          console.log('bar');
+        };
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 25`] = `
 {
+  "code": "
+        const f = function () {
+          let num = 1;
+          return num ? console.log('foo') : num;
+        };
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
@@ -642,6 +773,12 @@ exports[`no-confusing-void-expression > invalid 25`] = `
 
 exports[`no-confusing-void-expression > invalid 26`] = `
 {
+  "code": "
+        const f = function () {
+          let undef = undefined;
+          return undef ? console.log('foo') : undef;
+        };
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
@@ -661,12 +798,24 @@ exports[`no-confusing-void-expression > invalid 26`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+        const f = function () {
+          let undef = undefined;
+          undef ? console.log('foo') : undef;
+        };
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 27`] = `
 {
+  "code": "
+        const f = function () {
+          let num = 1;
+          return num || console.log('foo');
+        };
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
@@ -692,6 +841,12 @@ exports[`no-confusing-void-expression > invalid 27`] = `
 
 exports[`no-confusing-void-expression > invalid 28`] = `
 {
+  "code": "
+        const f = function () {
+          let bar = void 0;
+          return bar || console.log('foo');
+        };
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
@@ -711,12 +866,22 @@ exports[`no-confusing-void-expression > invalid 28`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+        const f = function () {
+          let bar = void 0;
+          bar || console.log('foo');
+        };
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 29`] = `
 {
+  "code": "
+        let num = 1;
+        const foo = () => (num ? console.log('foo') : num);
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -742,6 +907,10 @@ exports[`no-confusing-void-expression > invalid 29`] = `
 
 exports[`no-confusing-void-expression > invalid 30`] = `
 {
+  "code": "
+        let bar = void 0;
+        const foo = () => (bar ? console.log('foo') : bar);
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -761,12 +930,17 @@ exports[`no-confusing-void-expression > invalid 30`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+        let bar = void 0;
+        const foo = () => { bar ? console.log('foo') : bar; };
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 31`] = `
 {
+  "code": "return console.log('foo');",
   "diagnostics": [
     {
       "message": "Void expressions returned from a function must be marked explicitly with the \`void\` operator.",
@@ -786,12 +960,14 @@ exports[`no-confusing-void-expression > invalid 31`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "return void console.log('foo');",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 32`] = `
 {
+  "code": "console.error(console.log('foo'));",
   "diagnostics": [
     {
       "message": "Void expressions used inside another expression must be moved to its own statement or marked explicitly with the \`void\` operator.",
@@ -817,6 +993,7 @@ exports[`no-confusing-void-expression > invalid 32`] = `
 
 exports[`no-confusing-void-expression > invalid 33`] = `
 {
+  "code": "console.log('foo') ? true : false;",
   "diagnostics": [
     {
       "message": "Void expressions used inside another expression must be moved to its own statement or marked explicitly with the \`void\` operator.",
@@ -842,6 +1019,7 @@ exports[`no-confusing-void-expression > invalid 33`] = `
 
 exports[`no-confusing-void-expression > invalid 34`] = `
 {
+  "code": "const x = foo ?? console.log('foo');",
   "diagnostics": [
     {
       "message": "Void expressions used inside another expression must be moved to its own statement or marked explicitly with the \`void\` operator.",
@@ -867,6 +1045,7 @@ exports[`no-confusing-void-expression > invalid 34`] = `
 
 exports[`no-confusing-void-expression > invalid 35`] = `
 {
+  "code": "foo => foo || console.log(foo);",
   "diagnostics": [
     {
       "message": "Void expressions returned from an arrow function shorthand must be marked explicitly with the \`void\` operator.",
@@ -886,12 +1065,14 @@ exports[`no-confusing-void-expression > invalid 35`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "foo => foo || void console.log(foo);",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 36`] = `
 {
+  "code": "!!console.log('foo');",
   "diagnostics": [
     {
       "message": "Void expressions used inside another expression must be moved to its own statement or marked explicitly with the \`void\` operator.",
@@ -917,6 +1098,11 @@ exports[`no-confusing-void-expression > invalid 36`] = `
 
 exports[`no-confusing-void-expression > invalid 37`] = `
 {
+  "code": "
+function test() {
+  return console.log('foo');
+}
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
@@ -936,12 +1122,18 @@ exports[`no-confusing-void-expression > invalid 37`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+function test() {
+  console.log('foo');
+}
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 38`] = `
 {
+  "code": "const test = () => console.log('foo');",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -961,12 +1153,18 @@ exports[`no-confusing-void-expression > invalid 38`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "const test = () => { console.log('foo'); };",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 39`] = `
 {
+  "code": "
+const test = () => {
+  return console.log('foo');
+};
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
@@ -986,12 +1184,24 @@ exports[`no-confusing-void-expression > invalid 39`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+const test = () => {
+  console.log('foo');
+};
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 40`] = `
 {
+  "code": "
+function foo(): void {
+  const bar = () => {
+    return console.log();
+  };
+}
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
@@ -1011,12 +1221,22 @@ exports[`no-confusing-void-expression > invalid 40`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+function foo(): void {
+  const bar = () => {
+    console.log();
+  };
+}
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 41`] = `
 {
+  "code": "
+        (): any => console.log('foo');
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -1036,12 +1256,18 @@ exports[`no-confusing-void-expression > invalid 41`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+        (): any => { console.log('foo'); };
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 42`] = `
 {
+  "code": "
+        (): unknown => console.log('foo');
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -1061,12 +1287,20 @@ exports[`no-confusing-void-expression > invalid 42`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+        (): unknown => { console.log('foo'); };
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 43`] = `
 {
+  "code": "
+function test(): void {
+  () => () => console.log();
+}
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -1086,12 +1320,21 @@ exports[`no-confusing-void-expression > invalid 43`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+function test(): void {
+  () => () => { console.log(); };
+}
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 44`] = `
 {
+  "code": "
+type Foo = any;
+(): Foo => console.log();
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -1111,12 +1354,20 @@ exports[`no-confusing-void-expression > invalid 44`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+type Foo = any;
+(): Foo => { console.log(); };
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 45`] = `
 {
+  "code": "
+type Foo = unknown;
+(): Foo => console.log();
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -1136,12 +1387,21 @@ exports[`no-confusing-void-expression > invalid 45`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+type Foo = unknown;
+(): Foo => { console.log(); };
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 46`] = `
 {
+  "code": "
+function test(): any {
+  () => () => console.log();
+}
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -1161,12 +1421,22 @@ exports[`no-confusing-void-expression > invalid 46`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+function test(): any {
+  () => () => { console.log(); };
+}
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 47`] = `
 {
+  "code": "
+function test(): unknown {
+  return console.log();
+}
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
@@ -1186,12 +1456,22 @@ exports[`no-confusing-void-expression > invalid 47`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+function test(): unknown {
+  console.log();
+}
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 48`] = `
 {
+  "code": "
+function test(): any {
+  return console.log();
+}
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
@@ -1211,12 +1491,21 @@ exports[`no-confusing-void-expression > invalid 48`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+function test(): any {
+  console.log();
+}
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 49`] = `
 {
+  "code": "
+type Foo = () => any;
+(): Foo => () => console.log();
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -1236,12 +1525,20 @@ exports[`no-confusing-void-expression > invalid 49`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+type Foo = () => any;
+(): Foo => () => { console.log(); };
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 50`] = `
 {
+  "code": "
+type Foo = () => unknown;
+(): Foo => () => console.log();
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -1261,12 +1558,20 @@ exports[`no-confusing-void-expression > invalid 50`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+type Foo = () => unknown;
+(): Foo => () => { console.log(); };
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 51`] = `
 {
+  "code": "
+type Foo = () => any;
+const test: Foo = () => console.log();
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -1286,12 +1591,20 @@ exports[`no-confusing-void-expression > invalid 51`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+type Foo = () => any;
+const test: Foo = () => { console.log(); };
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 52`] = `
 {
+  "code": "
+type Foo = () => unknown;
+const test: Foo = () => console.log();
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from an arrow function shorthand is forbidden. Please add braces to the arrow function.",
@@ -1311,12 +1624,25 @@ exports[`no-confusing-void-expression > invalid 52`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+type Foo = () => unknown;
+const test: Foo = () => { console.log(); };
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 53`] = `
 {
+  "code": "
+type Foo = () => void;
+
+const foo: Foo = function () {
+  function bar() {
+    return console.log();
+  }
+};
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
@@ -1336,12 +1662,28 @@ exports[`no-confusing-void-expression > invalid 53`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+type Foo = () => void;
+
+const foo: Foo = function () {
+  function bar() {
+    console.log();
+  }
+};
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 54`] = `
 {
+  "code": "
+const foo = function () {
+  function bar() {
+    return console.log();
+  }
+};
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
@@ -1361,12 +1703,22 @@ exports[`no-confusing-void-expression > invalid 54`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+const foo = function () {
+  function bar() {
+    console.log();
+  }
+};
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 55`] = `
 {
+  "code": "
+return console.log('foo');
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please move it before the \`return\` statement.",
@@ -1386,12 +1738,25 @@ exports[`no-confusing-void-expression > invalid 55`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+{ console.log('foo'); return; }
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 56`] = `
 {
+  "code": "
+function test(): void;
+function test(arg: string): any;
+function test(arg?: string): any | void {
+  if (arg) {
+    return arg;
+  }
+  return console.log();
+}
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
@@ -1411,12 +1776,32 @@ exports[`no-confusing-void-expression > invalid 56`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+function test(): void;
+function test(arg: string): any;
+function test(arg?: string): any | void {
+  if (arg) {
+    return arg;
+  }
+  console.log();
+}
+      ",
   "ruleCount": 1,
 }
 `;
 
 exports[`no-confusing-void-expression > invalid 57`] = `
 {
+  "code": "
+function test(arg: string): any;
+function test(): void;
+function test(arg?: string): any | void {
+  if (arg) {
+    return arg;
+  }
+  return console.log();
+}
+      ",
   "diagnostics": [
     {
       "message": "Returning a void expression from a function is forbidden. Please remove the \`return\` statement.",
@@ -1436,6 +1821,16 @@ exports[`no-confusing-void-expression > invalid 57`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": "
+function test(arg: string): any;
+function test(): void;
+function test(arg?: string): any | void {
+  if (arg) {
+    return arg;
+  }
+  console.log();
+}
+      ",
   "ruleCount": 1,
 }
 `;
