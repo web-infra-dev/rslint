@@ -147,7 +147,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/prefer-literal-enum-member.test.ts',
     './tests/typescript-eslint/rules/prefer-namespace-keyword.test.ts',
     // './tests/typescript-eslint/rules/prefer-nullish-coalescing.test.ts',
-    // './tests/typescript-eslint/rules/prefer-optional-chain/prefer-optional-chain.test.ts',
+    './tests/typescript-eslint/rules/prefer-optional-chain/prefer-optional-chain.test.ts',
     // './tests/typescript-eslint/rules/prefer-promise-reject-errors.test.ts',
     // './tests/typescript-eslint/rules/prefer-readonly-parameter-types.test.ts',
     './tests/typescript-eslint/rules/prefer-readonly.test.ts',
