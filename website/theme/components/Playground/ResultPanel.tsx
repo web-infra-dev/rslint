@@ -414,7 +414,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
             size="sm"
             onClick={() => setActiveTab('lint')}
             aria-pressed={activeTab === 'lint'}
-            className="relative"
+            className="dark:text-accent dark:border-muted/20"
           >
             Errors
             {diagnostics.length > 0 && (
@@ -429,6 +429,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
             size="sm"
             onClick={() => setActiveTab('ast')}
             aria-pressed={activeTab === 'ast'}
+            className="dark:text-accent dark:border-muted/20"
           >
             AST (tsgo)
           </Button>
@@ -441,6 +442,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
               onRequestTsAst?.();
             }}
             aria-pressed={activeTab === 'ast_ts'}
+            className="dark:text-accent dark:border-muted/20"
           >
             AST (TypeScript)
           </Button>
@@ -484,10 +486,10 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
                 <div className="diagnostics-list">
                   {diagnostics.map((diagnostic, index) => (
                     <div key={index} className="diagnostic-item">
-                      <div className="diagnostic-header">
+                      <div className="diagnostic-header dark:text-[#1c1d21]">
                         <h4>{diagnostic.ruleName}</h4>
                       </div>
-                      <div className="diagnostic-message">
+                      <div className="diagnostic-message dark:text-[#1c1d21]">
                         {diagnostic.message} {diagnostic.range.start.line}:
                         {diagnostic.range.start.column} -{' '}
                         {diagnostic.range.end.line}:

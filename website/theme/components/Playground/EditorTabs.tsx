@@ -440,6 +440,7 @@ export const EditorTabs = ({
             size="sm"
             onClick={() => setActiveTab(tab.key)}
             aria-pressed={activeTab === tab.key}
+            className="dark:text-accent dark:border-muted/20"
           >
             {tab.label}
           </Button>
