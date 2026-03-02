@@ -76,6 +76,7 @@ exports[`prefer-as-const > invalid 3`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -102,6 +103,7 @@ exports[`prefer-as-const > invalid 4`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -128,6 +130,7 @@ exports[`prefer-as-const > invalid 5`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -293,6 +296,7 @@ class foo {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -323,6 +327,7 @@ class foo {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;

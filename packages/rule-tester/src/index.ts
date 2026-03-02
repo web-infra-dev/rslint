@@ -206,7 +206,7 @@ export class RuleTester {
             ruleOptions: {
               [ruleName]: options,
             },
-            languageOptions,
+            languageOptions: languageOptions as any,
           });
 
           assert(
@@ -246,7 +246,7 @@ export class RuleTester {
             ruleOptions: {
               [ruleName]: options,
             },
-            languageOptions,
+            languageOptions: languageOptions as any,
           });
 
           assert(
@@ -255,7 +255,11 @@ export class RuleTester {
           );
           // eslint-disable-next-line
           checkDiagnosticEqual(diags.diagnostics, errors);
-          if (output) {
+          const hasOutput = Object.prototype.hasOwnProperty.call(
+            item,
+            'output',
+          );
+          if (hasOutput) {
             // check autofix
             const fixedCode = await applyFixes({
               fileContent: code,

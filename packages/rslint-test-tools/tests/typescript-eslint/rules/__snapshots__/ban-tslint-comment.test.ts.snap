@@ -1,0 +1,224 @@
+// Rstest Snapshot v1
+
+exports[`ban-tslint-comment > invalid 1`] = `
+{
+  "code": "/* tslint:disable */",
+  "diagnostics": [
+    {
+      "message": "tslint comment detected: /* tslint:disable */",
+      "messageId": "commentDetected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-tslint-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "",
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-tslint-comment > invalid 2`] = `
+{
+  "code": "/* tslint:enable */",
+  "diagnostics": [
+    {
+      "message": "tslint comment detected: /* tslint:enable */",
+      "messageId": "commentDetected",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-tslint-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "",
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-tslint-comment > invalid 3`] = `
+{
+  "code": "/* tslint:disable:rule1 rule2 rule3... */",
+  "diagnostics": [
+    {
+      "message": "tslint comment detected: /* tslint:disable:rule1 rule2 rule3... */",
+      "messageId": "commentDetected",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-tslint-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "",
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-tslint-comment > invalid 4`] = `
+{
+  "code": "/* tslint:enable:rule1 rule2 rule3... */",
+  "diagnostics": [
+    {
+      "message": "tslint comment detected: /* tslint:enable:rule1 rule2 rule3... */",
+      "messageId": "commentDetected",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-tslint-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "",
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-tslint-comment > invalid 5`] = `
+{
+  "code": "// tslint:disable-next-line",
+  "diagnostics": [
+    {
+      "message": "tslint comment detected: // tslint:disable-next-line",
+      "messageId": "commentDetected",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-tslint-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "",
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-tslint-comment > invalid 6`] = `
+{
+  "code": "someCode(); // tslint:disable-line",
+  "diagnostics": [
+    {
+      "message": "tslint comment detected: // tslint:disable-line",
+      "messageId": "commentDetected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-tslint-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "someCode();",
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-tslint-comment > invalid 7`] = `
+{
+  "code": "// tslint:disable-next-line:rule1 rule2 rule3...",
+  "diagnostics": [
+    {
+      "message": "tslint comment detected: // tslint:disable-next-line:rule1 rule2 rule3...",
+      "messageId": "commentDetected",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-tslint-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "",
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-tslint-comment > invalid 8`] = `
+{
+  "code": "
+const whoa = doSomeStuff();
+// tslint:disable-line
+console.log(whoa);
+      ",
+  "diagnostics": [
+    {
+      "message": "tslint comment detected: // tslint:disable-line",
+      "messageId": "commentDetected",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-tslint-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+const whoa = doSomeStuff();
+console.log(whoa);
+      ",
+  "ruleCount": 1,
+}
+`;

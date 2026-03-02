@@ -22,6 +22,7 @@ exports[`no-empty-interface > invalid 1`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -48,6 +49,7 @@ exports[`no-empty-interface > invalid 2`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -125,6 +127,7 @@ class Bar {}
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -393,6 +396,7 @@ declare module FooBar {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
