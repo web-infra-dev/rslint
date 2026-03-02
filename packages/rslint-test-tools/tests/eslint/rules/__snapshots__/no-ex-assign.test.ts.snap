@@ -1,0 +1,105 @@
+// Rstest Snapshot v1
+
+exports[`no-ex-assign > invalid 1`] = `
+{
+  "code": "try { } catch (e) { e = 10; }",
+  "diagnostics": [
+    {
+      "message": "Do not assign to the exception parameter.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-ex-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-ex-assign > invalid 2`] = `
+{
+  "code": "try { } catch (ex) { ex = 10; }",
+  "diagnostics": [
+    {
+      "message": "Do not assign to the exception parameter.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-ex-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-ex-assign > invalid 3`] = `
+{
+  "code": "try { } catch (ex) { [ex] = []; }",
+  "diagnostics": [
+    {
+      "message": "Do not assign to the exception parameter.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-ex-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-ex-assign > invalid 4`] = `
+{
+  "code": "try { } catch (ex) { ({x: ex = 0} = {}); }",
+  "diagnostics": [
+    {
+      "message": "Do not assign to the exception parameter.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-ex-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
