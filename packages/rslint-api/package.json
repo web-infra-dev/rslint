@@ -21,7 +21,7 @@
     "@typescript/ast": "workspace:*",
     "@rslib/core": "0.18.0",
     "@types/node": "24.3.0",
-    "@typescript/native-preview": "7.0.0-dev.20250904.1"
+    "@typescript/native-preview": "7.0.0-dev.20260302.1"
   },
   "publishConfig": {
     "access": "public"
