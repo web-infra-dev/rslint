@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/fatih/color"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -271,7 +272,7 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	indentSize := math.MaxInt
 	line := codeboxStartLine
 	lineIndentCalculated := false
-	lastNonSpaceIndex := -1
+	lastNonSpaceByteIndex := -1
 
 	lineStarts := make([]int, 13)
 	lineEnds := make([]int, 13)
@@ -286,12 +287,20 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 		return
 	}
 
-	for i, char := range text[codeboxStart:codeboxEnd] {
+	// Iterate by runes to correctly handle multi-byte UTF-8 characters,
+	// but track byte positions for string slicing
+	codeboxText := text[codeboxStart:codeboxEnd]
+	bytePos := codeboxStart
+	for _, char := range codeboxText {
+		charBytes := utf8.RuneLen(char)
+		current, next := bytePos, bytePos+charBytes
+		bytePos = next
+
 		if char == '\n' {
 			if line != codeboxEndLine {
 				lineIndentCalculated = false
-				lineEnds[line-codeboxStartLine] = lastNonSpaceIndex - int(lineMap[line]) + codeboxStart
-				lastNonSpaceIndex = -1
+				lineEnds[line-codeboxStartLine] = lastNonSpaceByteIndex - int(lineMap[line])
+				lastNonSpaceByteIndex = -1
 				line++
 			}
 			continue
@@ -299,16 +308,16 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 
 		if !lineIndentCalculated && !unicode.IsSpace(char) {
 			lineIndentCalculated = true
-			lineStarts[line-codeboxStartLine] = i - int(lineMap[line]) + codeboxStart
+			lineStarts[line-codeboxStartLine] = current - int(lineMap[line])
 			indentSize = min(indentSize, lineStarts[line-codeboxStartLine])
 		}
 
 		if lineIndentCalculated && !unicode.IsSpace(char) {
-			lastNonSpaceIndex = i + 1
+			lastNonSpaceByteIndex = next
 		}
 	}
 	if line == codeboxEndLine {
-		lineEnds[line-codeboxStartLine] = lastNonSpaceIndex - int(lineMap[line]) + codeboxStart
+		lineEnds[line-codeboxStartLine] = lastNonSpaceByteIndex - int(lineMap[line])
 	}
 
 	diagnosticHighlightActive := false
