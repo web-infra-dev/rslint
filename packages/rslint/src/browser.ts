@@ -11,6 +11,26 @@ import type {
   IpcMessage,
 } from './types.js';
 
+function isIpcMessage(value: unknown): value is IpcMessage {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    'kind' in value &&
+    'data' in value
+  );
+}
+
+function getErrorMessage(data: unknown): string {
+  if (typeof data === 'object' && data !== null && 'message' in data) {
+    const record = data as Record<string, unknown>;
+    if (typeof record.message === 'string') {
+      return record.message;
+    }
+  }
+  return String(data);
+}
+
 /**
  * Browser implementation of RslintService using web workers
  */
@@ -39,18 +59,18 @@ export class BrowserRslintService implements RslintServiceInterface {
   /**
    * Initialize the web worker
    */
-  private async ensureWorker(wasmUrl: string): Promise<Worker> {
+  private ensureWorker(wasmUrl: string): void {
     if (!this.worker) {
       this.worker = new Worker(this.workerUrl, { name: 'rslint-worker.js' });
 
-      this.worker.onmessage = event => {
+      this.worker.onmessage = (event: MessageEvent<Uint8Array>) => {
         this.handlePacket(event.data);
       };
 
-      this.worker.onerror = error => {
+      this.worker.onerror = (error: ErrorEvent) => {
         console.error('Worker error:', error);
         // Reject all pending messages
-        for (const [id, pending] of this.pendingMessages) {
+        for (const [, pending] of this.pendingMessages) {
           pending.reject(new Error(`Worker error: ${error.message}`));
         }
         this.pendingMessages.clear();
@@ -60,7 +80,6 @@ export class BrowserRslintService implements RslintServiceInterface {
         data: { version: '1.0.0', wasmURL: wasmUrl },
       });
     }
-    return this.worker;
   }
 
   /**
@@ -100,8 +119,12 @@ export class BrowserRslintService implements RslintServiceInterface {
 
       // Handle the message
       try {
-        const parsed: IpcMessage = JSON.parse(message);
-        this.handleResponse(parsed);
+        const parsed = JSON.parse(message) as unknown;
+        if (isIpcMessage(parsed)) {
+          this.handleResponse(parsed);
+        } else {
+          console.error('Invalid message format:', parsed);
+        }
       } catch (err) {
         console.error('Error parsing message:', err);
       }
@@ -139,8 +162,8 @@ export class BrowserRslintService implements RslintServiceInterface {
   /**
    * Send a message to the worker
    */
-  async sendMessage(kind: string, data: any): Promise<any> {
-    return new Promise((resolve, reject) => {
+  async sendMessage(kind: string, data: unknown): Promise<unknown> {
+    const result = await new Promise<unknown>((resolve, reject) => {
       const id = this.nextMessageId++;
       const message: IpcMessage = { id, kind, data };
 
@@ -150,6 +173,7 @@ export class BrowserRslintService implements RslintServiceInterface {
       // Send message to worker
       this.worker!.postMessage(message);
     });
+    return result;
   }
 
   /**
@@ -163,7 +187,7 @@ export class BrowserRslintService implements RslintServiceInterface {
     this.pendingMessages.delete(id);
 
     if (kind === 'error') {
-      pending.reject(new Error(data.message));
+      pending.reject(new Error(getErrorMessage(data)));
     } else {
       pending.resolve(data);
     }
