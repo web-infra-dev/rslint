@@ -1,0 +1,209 @@
+// Rstest Snapshot v1
+
+exports[`no-empty-pattern > invalid 1`] = `
+{
+  "code": "var {} = obj;",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty object pattern.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-pattern",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-pattern > invalid 2`] = `
+{
+  "code": "var [] = arr;",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty array pattern.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-pattern",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-pattern > invalid 3`] = `
+{
+  "code": "var {a: {}} = obj;",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty object pattern.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-pattern",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-pattern > invalid 4`] = `
+{
+  "code": "var {a: []} = obj;",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty array pattern.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-pattern",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-pattern > invalid 5`] = `
+{
+  "code": "function foo({}) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty object pattern.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-pattern",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-pattern > invalid 6`] = `
+{
+  "code": "function foo([]) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty array pattern.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-pattern",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-pattern > invalid 7`] = `
+{
+  "code": "function foo({} = {a: 1}) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty object pattern.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-pattern",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-pattern > invalid 8`] = `
+{
+  "code": "function foo({} = bar) {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty object pattern.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-pattern",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
