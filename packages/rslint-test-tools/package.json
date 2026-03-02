@@ -17,7 +17,7 @@
     "@rslint/core": "workspace:*",
     "@typescript-eslint/rule-tester": "workspace:*",
     "@typescript-eslint/utils": "workspace:*",
-    "@rstest/core": "0.7.0",
+    "@rstest/core": "0.8.5",
     "@typescript-eslint/parser": "8.48.1"
   },
   "publishConfig": {
