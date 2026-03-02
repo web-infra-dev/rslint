@@ -152,7 +152,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/prefer-readonly-parameter-types.test.ts',
     './tests/typescript-eslint/rules/prefer-readonly.test.ts',
     './tests/typescript-eslint/rules/prefer-reduce-type-parameter.test.ts',
-    // './tests/typescript-eslint/rules/prefer-regexp-exec.test.ts',
+    './tests/typescript-eslint/rules/prefer-regexp-exec.test.ts',
     './tests/typescript-eslint/rules/prefer-return-this-type.test.ts',
     './tests/typescript-eslint/rules/prefer-string-starts-ends-with.test.ts',
     // './tests/typescript-eslint/rules/prefer-ts-expect-error.test.ts',

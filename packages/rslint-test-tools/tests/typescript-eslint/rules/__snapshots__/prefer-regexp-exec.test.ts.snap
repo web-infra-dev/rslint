@@ -1,0 +1,354 @@
+// Rstest Snapshot v1
+
+exports[`prefer-regexp-exec > invalid 1`] = `
+{
+  "code": "'something'.match(/thing/);",
+  "diagnostics": [
+    {
+      "message": "Use the \`RegExp#exec()\` method instead.",
+      "messageId": "regExpExecOverStringMatch",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-regexp-exec",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "/thing/.exec('something');",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regexp-exec > invalid 2`] = `
+{
+  "code": "'something'.match('^[a-z]+thing/?$');",
+  "diagnostics": [
+    {
+      "message": "Use the \`RegExp#exec()\` method instead.",
+      "messageId": "regExpExecOverStringMatch",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-regexp-exec",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "/^[a-z]+thing\\/?$/.exec('something');",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regexp-exec > invalid 3`] = `
+{
+  "code": "
+const text = 'something';
+const search = /thing/;
+text.match(search);
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the \`RegExp#exec()\` method instead.",
+      "messageId": "regExpExecOverStringMatch",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 4,
+        },
+        "start": {
+          "column": 6,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-regexp-exec",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+const text = 'something';
+const search = /thing/;
+search.exec(text);
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regexp-exec > invalid 4`] = `
+{
+  "code": "
+const text = 'something';
+const search = 'thing';
+text.match(search);
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the \`RegExp#exec()\` method instead.",
+      "messageId": "regExpExecOverStringMatch",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 4,
+        },
+        "start": {
+          "column": 6,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-regexp-exec",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+const text = 'something';
+const search = 'thing';
+RegExp(search).exec(text);
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regexp-exec > invalid 5`] = `
+{
+  "code": "
+function f(s: 'a' | 'b') {
+  s.match('a');
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the \`RegExp#exec()\` method instead.",
+      "messageId": "regExpExecOverStringMatch",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-regexp-exec",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function f(s: 'a' | 'b') {
+  /a/.exec(s);
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regexp-exec > invalid 6`] = `
+{
+  "code": "
+type SafeString = string & { __HTML_ESCAPED__: void };
+function f(s: SafeString) {
+  s.match(/thing/);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the \`RegExp#exec()\` method instead.",
+      "messageId": "regExpExecOverStringMatch",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-regexp-exec",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type SafeString = string & { __HTML_ESCAPED__: void };
+function f(s: SafeString) {
+  /thing/.exec(s);
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regexp-exec > invalid 7`] = `
+{
+  "code": "
+function f<T extends 'a' | 'b'>(s: T) {
+  s.match(/thing/);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the \`RegExp#exec()\` method instead.",
+      "messageId": "regExpExecOverStringMatch",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-regexp-exec",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function f<T extends 'a' | 'b'>(s: T) {
+  /thing/.exec(s);
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regexp-exec > invalid 8`] = `
+{
+  "code": "
+const text = 'something';
+const search = new RegExp('test', '');
+text.match(search);
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the \`RegExp#exec()\` method instead.",
+      "messageId": "regExpExecOverStringMatch",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 4,
+        },
+        "start": {
+          "column": 6,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-regexp-exec",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+const text = 'something';
+const search = new RegExp('test', '');
+search.exec(text);
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regexp-exec > invalid 9`] = `
+{
+  "code": "
+function test(pattern: string) {
+  'check'.match(new RegExp(pattern, undefined));
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the \`RegExp#exec()\` method instead.",
+      "messageId": "regExpExecOverStringMatch",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-regexp-exec",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+function test(pattern: string) {
+  new RegExp(pattern, undefined).exec('check');
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-regexp-exec > invalid 10`] = `
+{
+  "code": "
+function temp(text: string): void {
+  text.match(new RegExp(\`\${'hello'}\`));
+  text.match(new RegExp(\`\${'hello'.toString()}\`));
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Use the \`RegExp#exec()\` method instead.",
+      "messageId": "regExpExecOverStringMatch",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-regexp-exec",
+    },
+    {
+      "message": "Use the \`RegExp#exec()\` method instead.",
+      "messageId": "regExpExecOverStringMatch",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 8,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-regexp-exec",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "
+function temp(text: string): void {
+  new RegExp(\`\${'hello'}\`).exec(text);
+  new RegExp(\`\${'hello'.toString()}\`).exec(text);
+}
+      ",
+  "ruleCount": 1,
+}
+`;
