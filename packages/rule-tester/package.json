@@ -34,7 +34,7 @@
   "devDependencies": {
     "@types/node": "24.0.14",
     "typescript": "5.9.3",
-    "@typescript/native-preview": "7.0.0-dev.20250904.1"
+    "@typescript/native-preview": "7.0.0-dev.20260302.1"
   },
   "dependencies": {
     "@rslint/core": "workspace:*"
