@@ -272,6 +272,21 @@ ruleTester.run('no-deprecated', {
         },
       },
     },
+    {
+      code: `
+        async function fn() {
+          const d = await import('./deprecated.js');
+          d.default['foo'];
+        }
+      `,
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.moduleResolution-node16.json',
+          projectService: false,
+          tsconfigRootDir: rootDir,
+        },
+      },
+    },
     'call();',
 
     // this test is to ensure the rule doesn't crash when class implements itself

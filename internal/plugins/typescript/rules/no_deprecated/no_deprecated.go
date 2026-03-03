@@ -88,7 +88,7 @@ func getReportedNodeName(node *ast.Node) string {
 	if node.Kind == ast.KindPrivateIdentifier {
 		privateIdentifier := node.AsPrivateIdentifier()
 		if privateIdentifier != nil {
-			return "#" + privateIdentifier.Text
+			return "#" + strings.TrimPrefix(privateIdentifier.Text, "#")
 		}
 	}
 	return node.Text()
@@ -511,15 +511,9 @@ func walkAst(node *ast.Node, visitor func(*ast.Node) bool) bool {
 	if visitor(node) {
 		return true
 	}
-	shouldStop := false
-	node.ForEachChild(func(child *ast.Node) bool {
-		if walkAst(child, visitor) {
-			shouldStop = true
-			return true
-		}
-		return false
+	return node.ForEachChild(func(child *ast.Node) bool {
+		return walkAst(child, visitor)
 	})
-	return shouldStop
 }
 
 func moduleSpecifierText(node *ast.Node) string {
@@ -1026,55 +1020,64 @@ func getDeprecationReason(ctx rule.RuleContext, node *ast.Node) (bool, string) {
 	if node.Parent != nil && node.Kind != ast.KindSuperKeyword {
 		parent := node.Parent
 		if parent.Kind == ast.KindBindingElement {
-			bindingPattern := parent.Parent
-			if bindingPattern != nil && (bindingPattern.Kind == ast.KindObjectBindingPattern || bindingPattern.Kind == ast.KindArrayBindingPattern) {
-				sourceType := getBindingPatternSourceType(ctx, bindingPattern, map[*ast.Node]bool{})
-				if sourceType == nil && bindingPattern.Kind == ast.KindObjectBindingPattern {
-					sourceType = ctx.TypeChecker.GetTypeAtLocation(bindingPattern)
-				}
-				if sourceType == nil {
-					sourceType = ctx.TypeChecker.GetTypeAtLocation(bindingPattern)
-				}
-				if sourceType != nil {
-					bindingElement := parent.AsBindingElement()
-					bindingNode := node
-					if bindingElement != nil && bindingElement.PropertyName != nil {
-						bindingNode = bindingElement.PropertyName
-					}
-					propertyName := ""
-					if bindingPattern.Kind == ast.KindArrayBindingPattern {
-						if bindingElement != nil {
-							if index, ok := bindingElementIndex(bindingElement); ok {
-								propertyName = strconv.Itoa(index)
+			bindingElement := parent.AsBindingElement()
+			if bindingElement != nil {
+				isBindingTarget := bindingElement.Name() == node ||
+					(bindingElement.PropertyName != nil && bindingElement.PropertyName == node)
+				if isBindingTarget {
+					bindingPattern := parent.Parent
+					if bindingPattern != nil && (bindingPattern.Kind == ast.KindObjectBindingPattern || bindingPattern.Kind == ast.KindArrayBindingPattern) {
+						sourceType := getBindingPatternSourceType(ctx, bindingPattern, map[*ast.Node]bool{})
+						if sourceType == nil && bindingPattern.Kind == ast.KindObjectBindingPattern {
+							sourceType = ctx.TypeChecker.GetTypeAtLocation(bindingPattern)
+						}
+						if sourceType == nil {
+							sourceType = ctx.TypeChecker.GetTypeAtLocation(bindingPattern)
+						}
+						if sourceType != nil {
+							bindingNode := node
+							if bindingElement.PropertyName != nil {
+								bindingNode = bindingElement.PropertyName
 							}
-						}
-					} else {
-						if bindingName := bindingElementPropertyNameFromNode(parent); bindingName != "" {
-							propertyName = bindingName
-						}
-						if propertyName == "" && bindingElement != nil && bindingElement.PropertyName != nil {
-							if resolvedName, ok := resolveConstantPropertyName(ctx, bindingElement.PropertyName, 0, map[*ast.Symbol]bool{}); ok {
-								propertyName = resolvedName
+							propertyName := ""
+							if bindingPattern.Kind == ast.KindArrayBindingPattern {
+								if index, ok := bindingElementIndex(bindingElement); ok {
+									propertyName = strconv.Itoa(index)
+								}
+							} else {
+								if bindingName := bindingElementPropertyName(bindingElement); bindingName != "" {
+									propertyName = bindingName
+								}
+								if propertyName == "" && bindingElement.PropertyName != nil {
+									if resolvedName, ok := resolveConstantPropertyName(ctx, bindingElement.PropertyName, 0, map[*ast.Symbol]bool{}); ok {
+										propertyName = resolvedName
+									}
+								}
+								if propertyName == "" {
+									propertyName = node.Text()
+								}
 							}
-						}
-						if propertyName == "" {
-							propertyName = node.Text()
-						}
-					}
-					if propertyName != "" {
-						property := checker.Checker_getPropertyOfType(ctx.TypeChecker, sourceType, propertyName)
-						if isDeprecated, reason := getJsDocDeprecation(ctx.TypeChecker, property); isDeprecated {
-							return true, reason
-						}
-						if propertySymbol := ctx.TypeChecker.GetSymbolAtLocation(bindingNode); propertySymbol != nil {
-							if propertySymbol.ValueDeclaration != nil && propertySymbol.ValueDeclaration.Kind == ast.KindBindingElement {
-								propertySymbol = nil
-							}
-							if isDeprecated, reason := searchForDeprecationInAliasesChain(ctx.TypeChecker, propertySymbol, true); isDeprecated {
-								return true, reason
-							}
-							if isDeprecated, reason := getJsDocDeprecation(ctx.TypeChecker, propertySymbol); isDeprecated {
-								return true, reason
+							if propertyName != "" {
+								property := checker.Checker_getPropertyOfType(ctx.TypeChecker, sourceType, propertyName)
+								if isDeprecated, reason := getJsDocDeprecation(ctx.TypeChecker, property); isDeprecated {
+									return true, reason
+								}
+								if propertySymbol := ctx.TypeChecker.GetSymbolAtLocation(bindingNode); propertySymbol != nil {
+									if propertySymbol.ValueDeclaration != nil && propertySymbol.ValueDeclaration.Kind == ast.KindBindingElement {
+										propertySymbol = nil
+									}
+									if isDeprecated, reason := searchForDeprecationInAliasesChain(ctx.TypeChecker, propertySymbol, true); isDeprecated {
+										return true, reason
+									}
+									if isDeprecated, reason := getJsDocDeprecation(ctx.TypeChecker, propertySymbol); isDeprecated {
+										return true, reason
+									}
+								}
+								if property != nil {
+									if isDeprecated, reason := searchForDeprecationInAliasesChain(ctx.TypeChecker, property, true); isDeprecated {
+										return true, reason
+									}
+								}
 							}
 						}
 					}
@@ -1185,17 +1188,34 @@ func isDynamicImportDefaultAccess(node *ast.Node, typeChecker *checker.Checker) 
 		if !isDynamicImportResultIdentifier(typeChecker.GetSymbolAtLocation(target)) {
 			continue
 		}
-		// Ignore only direct default access on the import result.
-		parent := access.AsNode().Parent
-		if parent != nil && parent.Kind == ast.KindPropertyAccessExpression {
-			parentAccess := parent.AsPropertyAccessExpression()
-			if parentAccess != nil && parentAccess.Expression == access.AsNode() && parentAccess.Name() != nil && parentAccess.Name().Text() == "default" {
-				return false
-			}
-		}
 		return true
 	}
 	return false
+}
+
+func isPromotedDynamicImportDefaultAccess(access *ast.PropertyAccessExpression, typeChecker *checker.Checker) bool {
+	if access == nil || typeChecker == nil || access.Name() == nil || access.Expression == nil {
+		return false
+	}
+	if access.Name().Text() != "default" {
+		return false
+	}
+	target := ast.SkipParentheses(access.Expression)
+	if target == nil || target.Kind != ast.KindIdentifier {
+		return false
+	}
+	if !isDynamicImportResultIdentifier(typeChecker.GetSymbolAtLocation(target)) {
+		return false
+	}
+	parent := access.AsNode().Parent
+	if parent == nil || parent.Kind != ast.KindPropertyAccessExpression {
+		return false
+	}
+	parentAccess := parent.AsPropertyAccessExpression()
+	return parentAccess != nil &&
+		parentAccess.Expression == access.AsNode() &&
+		parentAccess.Name() != nil &&
+		parentAccess.Name().Text() == "default"
 }
 
 func shouldIgnoreDynamicImportDefault(node *ast.Node, pos int, end int, entityName string, typeChecker *checker.Checker) bool {
@@ -1214,9 +1234,20 @@ func shouldIgnoreDynamicImportDefault(node *ast.Node, pos int, end int, entityNa
 		return false
 	}
 	if isDynamicImportResultIdentifier(typeChecker.GetSymbolAtLocation(target)) {
+		parent := access.AsNode().Parent
+		if parent != nil && parent.Kind == ast.KindPropertyAccessExpression {
+			parentAccess := parent.AsPropertyAccessExpression()
+			if parentAccess != nil && parentAccess.Expression == access.AsNode() &&
+				parentAccess.Name() != nil && parentAccess.Name().Text() == "default" {
+				return false
+			}
+		}
 		return true
 	}
-	return isDynamicImportResultIdentifier(typeChecker.GetSymbolAtLocation(access.Name()))
+	if access.Name() != nil && isDynamicImportResultIdentifier(typeChecker.GetSymbolAtLocation(access.Name())) {
+		return true
+	}
+	return isDynamicImportDefaultAccess(node, typeChecker)
 }
 
 func promotedDynamicImportDefaultRange(node *ast.Node, pos int, end int, entityName string, typeChecker *checker.Checker) *core.TextRange {
@@ -1243,6 +1274,12 @@ func promotedDynamicImportDefaultRange(node *ast.Node, pos int, end int, entityN
 	}
 	if parentAccess.Name().Text() != "default" {
 		return nil
+	}
+	grandParent := parentAccess.AsNode().Parent
+	if grandParent != nil {
+		if grandParent.Kind == ast.KindPropertyAccessExpression || grandParent.Kind == ast.KindElementAccessExpression {
+			return nil
+		}
 	}
 	promoted := core.NewTextRange(parentAccess.Name().Pos(), parentAccess.Name().End())
 	return &promoted
@@ -1577,7 +1614,10 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 					return false
 				}
 				if bindingElement.Name() == node {
-					return bindingElement.PropertyName != nil
+					if bindingElement.PropertyName == nil {
+						return false
+					}
+					return bindingElement.PropertyName.Text() != node.Text()
 				}
 				return false
 			case ast.KindClassExpression:
@@ -1651,13 +1691,13 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			}
 			return false
 		}
-		reported := map[string]bool{}
+		reportedRanges := map[string]bool{}
 		reportRange := func(diagnosticRange core.TextRange, message rule.RuleMessage) {
-			key := strconv.Itoa(diagnosticRange.Pos()) + ":" + strconv.Itoa(diagnosticRange.End()) + ":" + message.Id
-			if reported[key] {
+			key := strconv.Itoa(diagnosticRange.Pos()) + ":" + strconv.Itoa(diagnosticRange.End())
+			if reportedRanges[key] {
 				return
 			}
-			reported[key] = true
+			reportedRanges[key] = true
 			ctx.ReportRange(diagnosticRange, message)
 		}
 		if sourceFile != nil {
@@ -1669,6 +1709,9 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				name := diagnosticEntityName(diagnostic)
 				node := diagnosticNode(sourceFile, diagnostic.Pos(), diagnostic.End())
 				if shouldIgnoreDynamicImportDefault(node, diagnostic.Pos(), diagnostic.End(), name, ctx.TypeChecker) {
+					continue
+				}
+				if node != nil && (node.Kind == ast.KindIdentifier || node.Kind == ast.KindPrivateIdentifier || node.Kind == ast.KindSuperKeyword) {
 					continue
 				}
 				symbol := symbolAtLocation(ctx.TypeChecker, node)
@@ -1702,6 +1745,18 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 						}
 					}
 				}
+				deprecationNode := node
+				if node != nil && node.Kind == ast.KindVariableDeclaration {
+					variableDeclaration := node.AsVariableDeclaration()
+					if variableDeclaration != nil && variableDeclaration.Initializer != nil {
+						deprecationNode = ast.SkipParentheses(variableDeclaration.Initializer)
+					}
+				}
+				if message.Id != "deprecatedWithReason" {
+					if _, reason := getDeprecationReason(ctx, deprecationNode); reason != "" {
+						message = buildDeprecatedWithReasonMessage(name, reason)
+					}
+				}
 				if message.Id != "deprecatedWithReason" {
 					if reason := deprecatedReasonByNameInSource(ctx, name); reason != "" {
 						message = buildDeprecatedWithReasonMessage(name, reason)
@@ -1717,6 +1772,15 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			if isDeclaration(node) || isInsideImport(node) {
 				return
 			}
+			name := getReportedNodeName(node)
+			if name == "default" {
+				if access := propertyAccessForDiagnosticRange(node, node.Pos(), node.End()); isPromotedDynamicImportDefaultAccess(access, ctx.TypeChecker) {
+					return
+				}
+			}
+			if shouldIgnoreDynamicImportDefault(node, node.Pos(), node.End(), name, ctx.TypeChecker) {
+				return
+			}
 			isDeprecated, reason := getDeprecationReason(ctx, node)
 			if !isDeprecated {
 				return
@@ -1730,7 +1794,6 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 			}
 			// Only report if the deprecated symbol isn't just a local declaration in the current file.
 			// Allow reporting for deprecated locals (for example, symbol usage).
-			name := getReportedNodeName(node)
 			if shouldAllowDiagnostic(allowEntries, name, symbol, ctx.SourceFile) {
 				return
 			}
@@ -1795,8 +1858,7 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				}
 				checkIdentifier(node)
 			},
-			ast.KindPrivateIdentifier: checkIdentifier,
-			ast.KindSuperKeyword:      checkIdentifier,
+			ast.KindSuperKeyword: checkIdentifier,
 			ast.KindJsxAttribute: func(node *ast.Node) {
 				jsxAttribute := node.AsJsxAttribute()
 				if jsxAttribute == nil || jsxAttribute.Name() == nil {
@@ -1872,21 +1934,37 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 				if access == nil || access.Name() == nil {
 					return
 				}
+				if isPromotedDynamicImportDefaultAccess(access, ctx.TypeChecker) {
+					return
+				}
 				// Report the property name if it is deprecated.
 				nameNode := access.Name()
+				name := nameNode.Text()
+				if shouldIgnoreDynamicImportDefault(nameNode, nameNode.Pos(), nameNode.End(), name, ctx.TypeChecker) {
+					return
+				}
 				propertySymbol := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
 				if !symbolIsDeprecated(ctx.TypeChecker, propertySymbol) {
 					return
 				}
-				name := nameNode.Text()
 				if shouldAllowDiagnostic(allowEntries, name, propertySymbol, ctx.SourceFile) {
 					return
 				}
+				_, reason := getDeprecationReason(ctx, nameNode)
 				message := buildDeprecatedMessage(name)
-				for _, declaration := range propertySymbol.Declarations {
-					if reason := deprecatedReasonFromDeclaration(declaration); reason != "" {
-						message = buildDeprecatedWithReasonMessage(name, reason)
-						break
+				if reason != "" {
+					message = buildDeprecatedWithReasonMessage(name, reason)
+				} else if propertySymbol != nil {
+					for _, declaration := range propertySymbol.Declarations {
+						if reasonFromDecl := deprecatedReasonFromDeclaration(declaration); reasonFromDecl != "" {
+							message = buildDeprecatedWithReasonMessage(name, reasonFromDecl)
+							break
+						}
+					}
+				}
+				if message.Id != "deprecatedWithReason" {
+					if reasonByName := deprecatedReasonByNameInSource(ctx, name); reasonByName != "" {
+						message = buildDeprecatedWithReasonMessage(name, reasonByName)
 					}
 				}
 				trimmedRange := utils.TrimNodeTextRange(ctx.SourceFile, nameNode)
