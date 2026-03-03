@@ -7,13 +7,15 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
+// cspell:ignore ignorefoo
+
 func TestPreferTsExpectErrorRule(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &PreferTsExpectErrorRule, []rule_tester.ValidTestCase{
 		{Code: `// @ts-nocheck`},
 		{Code: `// @ts-check`},
 		{Code: `// just a comment containing @ts-ignore somewhere`},
-		{Code: `// @ts-ignorfu`},
-		{Code: `/* @ts-ignorfu */`},
+		{Code: `// @ts-ignorefoo`},
+		{Code: `/* @ts-ignorefoo */`},
 		{
 			Code: `
 {
