@@ -16,7 +16,6 @@ import (
 	typescriptPlugin "github.com/web-infra-dev/rslint/internal/plugins/typescript"
 	unicornPlugin "github.com/web-infra-dev/rslint/internal/plugins/unicorn"
 	coreRules "github.com/web-infra-dev/rslint/internal/rules"
-
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 

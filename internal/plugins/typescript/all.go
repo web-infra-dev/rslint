@@ -31,6 +31,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_base_to_string"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_confusing_non_null_assertion"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_confusing_void_expression"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_deprecated"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_dupe_class_members"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_duplicate_enum_values"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_duplicate_type_constituents"
@@ -165,6 +166,7 @@ func GetAllRules() []rule.Rule {
 		no_base_to_string.NoBaseToStringRule,
 		no_confusing_non_null_assertion.NoConfusingNonNullAssertionRule,
 		no_confusing_void_expression.NoConfusingVoidExpressionRule,
+		no_deprecated.NoDeprecatedRule,
 		no_dupe_class_members.NoDupeClassMembersRule,
 		no_duplicate_enum_values.NoDuplicateEnumValuesRule,
 		no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule,
