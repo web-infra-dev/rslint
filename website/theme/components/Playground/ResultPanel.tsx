@@ -453,6 +453,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
             variant="outline"
             size="sm"
             onClick={() => copyShareUrl()}
+            className="dark:text-accent dark:border-muted/20"
             title={shareCopied ? 'Copied link' : 'Copy shareable link'}
           >
             {shareCopied ? (

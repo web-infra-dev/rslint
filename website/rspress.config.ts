@@ -66,15 +66,6 @@ export default defineConfig({
     pluginLlms(),
   ],
   builderConfig: {
-    resolve: {
-      alias: {
-        '@rslint/wasm': path.join(__dirname, '../packages/rslint-wasm'),
-        '@rslint/wasm/rslint.wasm.gz': path.join(
-          __dirname,
-          '../packages/rslint-wasm/rslint.wasm.gz',
-        ),
-      },
-    },
     tools: {
       rspack(config) {
         config.ignoreWarnings = [
