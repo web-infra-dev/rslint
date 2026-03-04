@@ -18,39 +18,39 @@ describe('basic assertions', () => {
   ruleTester.run('no-unsafe-type-assertion', {
     valid: [
       `
-  declare const a: string;
-  a as string | number;
+declare const a: string;
+a as string | number;
       `,
       `
-  declare const a: string;
-  <string | number>a;
+declare const a: string;
+<string | number>a;
       `,
       `
-  declare const a: string;
-  a as string | number as string | number | boolean;
+declare const a: string;
+a as string | number as string | number | boolean;
       `,
       `
-  declare const a: string;
-  a as string;
+declare const a: string;
+a as string;
       `,
       `
-  declare const a: { hello: 'world' };
-  a as { hello: string };
+declare const a: { hello: 'world' };
+a as { hello: string };
       `,
       `
-  'hello' as const;
+'hello' as const;
       `,
       `
-  function foo<T extends boolean>(a: T) {
+function foo<T extends boolean>(a: T) {
   return a as T | number;
-  }
+}
       `,
     ],
     invalid: [
       {
         code: `
-  declare const a: string | number;
-  a as string;
+declare const a: string | number;
+a as string;
         `,
         errors: [
           {
@@ -67,8 +67,8 @@ describe('basic assertions', () => {
       },
       {
         code: `
-  declare const a: string | number;
-  a satisfies string as string;
+declare const a: string | number;
+a satisfies string as string;
         `,
         errors: [
           {
@@ -85,8 +85,8 @@ describe('basic assertions', () => {
       },
       {
         code: `
-  declare const a: string | number;
-  <string>a;
+declare const a: string | number;
+<string>a;
         `,
         errors: [
           {
@@ -103,8 +103,8 @@ describe('basic assertions', () => {
       },
       {
         code: `
-  declare const a: string | undefined;
-  a as string | boolean;
+declare const a: string | undefined;
+a as string | boolean;
         `,
         errors: [
           {
@@ -122,8 +122,8 @@ describe('basic assertions', () => {
       // multiple failures
       {
         code: `
-  declare const a: string;
-  a as 'foo' as 'bar';
+declare const a: string;
+a as 'foo' as 'bar';
         `,
         errors: [
           {
@@ -151,9 +151,9 @@ describe('basic assertions', () => {
       // type constraint
       {
         code: `
-  function foo<T extends boolean>(a: T) {
+function foo<T extends boolean>(a: T) {
   return a as true;
-  }
+}
         `,
         errors: [
           {
@@ -171,8 +171,8 @@ describe('basic assertions', () => {
       // long/complex asserted type
       {
         code: `
-  declare const a: string;
-  a as Omit<Required<Readonly<{ hello: 'world'; foo: 'bar' }>>, 'foo'>;
+declare const a: string;
+a as Omit<Required<Readonly<{ hello: 'world'; foo: 'bar' }>>, 'foo'>;
         `,
         errors: [
           {
@@ -189,8 +189,8 @@ describe('basic assertions', () => {
       },
       {
         code: `
-  declare const foo: readonly number[];
-  const bar = foo as number[];
+declare const foo: readonly number[];
+const bar = foo as number[];
         `,
         errors: [
           {
@@ -213,19 +213,19 @@ describe('any assertions', () => {
   ruleTester.run('no-unsafe-type-assertion', {
     valid: [
       `
-  declare const _any_: any;
-  _any_ as any;
+declare const _any_: any;
+_any_ as any;
       `,
       `
-  declare const _any_: any;
-  _any_ as unknown;
+declare const _any_: any;
+_any_ as unknown;
       `,
     ],
     invalid: [
       {
         code: `
-  declare const _any_: any;
-  _any_ as string;
+declare const _any_: any;
+_any_ as string;
         `,
         errors: [
           {
@@ -242,8 +242,8 @@ describe('any assertions', () => {
       },
       {
         code: `
-  declare const _unknown_: unknown;
-  _unknown_ as any;
+declare const _unknown_: unknown;
+_unknown_ as any;
         `,
         errors: [
           {
@@ -260,8 +260,8 @@ describe('any assertions', () => {
       },
       {
         code: `
-  declare const _any_: any;
-  _any_ as Function;
+declare const _any_: any;
+_any_ as Function;
         `,
         errors: [
           {
@@ -278,8 +278,8 @@ describe('any assertions', () => {
       },
       {
         code: `
-  declare const _any_: any;
-  _any_ as never;
+declare const _any_: any;
+_any_ as never;
         `,
         errors: [
           {
@@ -296,7 +296,7 @@ describe('any assertions', () => {
       },
       {
         code: `
-  'foo' as any;
+'foo' as any;
         `,
         errors: [
           {
@@ -314,7 +314,7 @@ describe('any assertions', () => {
       // an error type `any`
       {
         code: `
-  const bar = foo as number;
+const bar = foo as number;
         `,
         errors: [
           {
@@ -331,7 +331,7 @@ describe('any assertions', () => {
       },
       {
         code: `
-  const bar = 'foo' as errorType;
+const bar = 'foo' as errorType;
         `,
         errors: [
           {
@@ -354,19 +354,19 @@ describe('never assertions', () => {
   ruleTester.run('no-unsafe-type-assertion', {
     valid: [
       `
-  declare const _never_: never;
-  _never_ as never;
+declare const _never_: never;
+_never_ as never;
       `,
       `
-  declare const _never_: never;
-  _never_ as unknown;
+declare const _never_: never;
+_never_ as unknown;
       `,
     ],
     invalid: [
       {
         code: `
-  declare const _never_: never;
-  _never_ as any;
+declare const _never_: never;
+_never_ as any;
         `,
         errors: [
           {
@@ -383,8 +383,8 @@ describe('never assertions', () => {
       },
       {
         code: `
-  declare const _string_: string;
-  _string_ as never;
+declare const _string_: string;
+_string_ as never;
         `,
         errors: [
           {
@@ -404,19 +404,19 @@ describe('function assertions', () => {
   ruleTester.run('no-unsafe-type-assertion', {
     valid: [
       `
-  declare const _function_: Function;
-  _function_ as Function;
+declare const _function_: Function;
+_function_ as Function;
       `,
       `
-  declare const _function_: Function;
-  _function_ as unknown;
+declare const _function_: Function;
+_function_ as unknown;
       `,
     ],
     invalid: [
       {
         code: `
-  declare const _function_: Function;
-  _function_ as () => void;
+declare const _function_: Function;
+_function_ as () => void;
         `,
         errors: [
           {
@@ -430,8 +430,8 @@ describe('function assertions', () => {
       },
       {
         code: `
-  declare const _function_: Function;
-  _function_ as any;
+declare const _function_: Function;
+_function_ as any;
         `,
         errors: [
           {
@@ -448,8 +448,8 @@ describe('function assertions', () => {
       },
       {
         code: `
-  declare const _function_: Function;
-  _function_ as never;
+declare const _function_: Function;
+_function_ as never;
         `,
         errors: [
           {
@@ -469,35 +469,35 @@ describe('object assertions', () => {
   ruleTester.run('no-unsafe-type-assertion', {
     valid: [
       `
-  // additional properties should be allowed
-  export const foo = { bar: 1, bazz: 1 } as {
+// additional properties should be allowed
+export const foo = { bar: 1, bazz: 1 } as {
   bar: number;
-  };
+};
       `,
       `
-  declare const a: { hello: string } & { world: string };
-  a as { hello: string };
+declare const a: { hello: string } & { world: string };
+a as { hello: string };
       `,
       `
-  declare const a: { hello: any };
-  a as { hello: unknown };
+declare const a: { hello: any };
+a as { hello: unknown };
       `,
       `
-  declare const a: { hello: string };
-  a as { hello?: string };
+declare const a: { hello: string };
+a as { hello?: string };
       `,
       `
-  declare const a: { hello: string };
-  a satisfies Record<string, string> as { hello?: string };
+declare const a: { hello: string };
+a satisfies Record<string, string> as { hello?: string };
       `,
     ],
     invalid: [
       {
         code: `
-  var foo = {} as {
+var foo = {} as {
   bar: number;
   bas: string;
-  };
+};
         `,
         errors: [
           {
@@ -514,8 +514,8 @@ describe('object assertions', () => {
       },
       {
         code: `
-  declare const a: { hello: string };
-  a satisfies Record<string, string> as { hello: string; world: string };
+declare const a: { hello: string };
+a satisfies Record<string, string> as { hello: string; world: string };
         `,
         errors: [
           {
@@ -532,8 +532,8 @@ describe('object assertions', () => {
       },
       {
         code: `
-  declare const a: { hello?: string };
-  a as { hello: string };
+declare const a: { hello?: string };
+a as { hello: string };
         `,
         errors: [
           {
@@ -553,23 +553,23 @@ describe('array assertions', () => {
   ruleTester.run('no-unsafe-type-assertion', {
     valid: [
       `
-  declare const a: string[];
-  a as (string | number)[];
+declare const a: string[];
+a as (string | number)[];
       `,
       `
-  declare const a: number[];
-  a as unknown[];
+declare const a: number[];
+a as unknown[];
       `,
       `
-  declare const a: { hello: 'world'; foo: 'bar' }[];
-  a as { hello: 'world' }[];
+declare const a: { hello: 'world'; foo: 'bar' }[];
+a as { hello: 'world' }[];
       `,
     ],
     invalid: [
       {
         code: `
-  declare const a: (string | number)[];
-  a as string[];
+declare const a: (string | number)[];
+a as string[];
         `,
         errors: [
           {
@@ -586,8 +586,8 @@ describe('array assertions', () => {
       },
       {
         code: `
-  declare const a: any[];
-  a as number[];
+declare const a: any[];
+a as number[];
         `,
         errors: [
           {
@@ -604,8 +604,8 @@ describe('array assertions', () => {
       },
       {
         code: `
-  declare const a: number[];
-  a as any[];
+declare const a: number[];
+a as any[];
         `,
         errors: [
           {
@@ -622,8 +622,8 @@ describe('array assertions', () => {
       },
       {
         code: `
-  declare const a: unknown[];
-  a as number[];
+declare const a: unknown[];
+a as number[];
         `,
         errors: [
           {
@@ -637,8 +637,8 @@ describe('array assertions', () => {
       },
       {
         code: `
-  declare const a: number[];
-  a as never[];
+declare const a: number[];
+a as never[];
         `,
         errors: [
           {
@@ -658,27 +658,27 @@ describe('tuple assertions', () => {
   ruleTester.run('no-unsafe-type-assertion', {
     valid: [
       `
-  declare const a: [string];
-  a as [string | number];
+declare const a: [string];
+a as [string | number];
       `,
       `
-  declare const a: [string, number];
-  a as [string, string | number];
+declare const a: [string, number];
+a as [string, string | number];
       `,
       `
-  declare const a: [string];
-  a as [unknown];
+declare const a: [string];
+a as [unknown];
       `,
       `
-  declare const a: [{ hello: 'world'; foo: 'bar' }];
-  a as [{ hello: 'world' }];
+declare const a: [{ hello: 'world'; foo: 'bar' }];
+a as [{ hello: 'world' }];
       `,
     ],
     invalid: [
       {
         code: `
-  declare const a: [string | number];
-  a as [string];
+declare const a: [string | number];
+a as [string];
         `,
         errors: [
           {
@@ -695,8 +695,8 @@ describe('tuple assertions', () => {
       },
       {
         code: `
-  declare const a: [string, number];
-  a as [string, string];
+declare const a: [string, number];
+a as [string, string];
         `,
         errors: [
           {
@@ -713,8 +713,8 @@ describe('tuple assertions', () => {
       },
       {
         code: `
-  declare const a: [string];
-  a as [string, number];
+declare const a: [string];
+a as [string, number];
         `,
         errors: [
           {
@@ -731,8 +731,8 @@ describe('tuple assertions', () => {
       },
       {
         code: `
-  declare const a: [string, number];
-  a as [string];
+declare const a: [string, number];
+a as [string];
         `,
         errors: [
           {
@@ -749,8 +749,8 @@ describe('tuple assertions', () => {
       },
       {
         code: `
-  declare const a: [any];
-  a as [number];
+declare const a: [any];
+a as [number];
         `,
         errors: [
           {
@@ -767,8 +767,8 @@ describe('tuple assertions', () => {
       },
       {
         code: `
-  declare const a: [number, any];
-  a as [number, number];
+declare const a: [number, any];
+a as [number, number];
         `,
         errors: [
           {
@@ -785,8 +785,8 @@ describe('tuple assertions', () => {
       },
       {
         code: `
-  declare const a: [number];
-  a as [any];
+declare const a: [number];
+a as [any];
         `,
         errors: [
           {
@@ -803,8 +803,8 @@ describe('tuple assertions', () => {
       },
       {
         code: `
-  declare const a: [unknown];
-  a as [number];
+declare const a: [unknown];
+a as [number];
         `,
         errors: [
           {
@@ -818,8 +818,8 @@ describe('tuple assertions', () => {
       },
       {
         code: `
-  declare const a: [number];
-  a as [never];
+declare const a: [number];
+a as [never];
         `,
         errors: [
           {
@@ -833,8 +833,8 @@ describe('tuple assertions', () => {
       },
       {
         code: `
-  declare const a: [Promise<string | number>];
-  a as [Promise<string>];
+declare const a: [Promise<string | number>];
+a as [Promise<string>];
         `,
         errors: [
           {
@@ -854,27 +854,27 @@ describe('promise assertions', () => {
   ruleTester.run('no-unsafe-type-assertion', {
     valid: [
       `
-  declare const a: Promise<string>;
-  a as Promise<string | number>;
+declare const a: Promise<string>;
+a as Promise<string | number>;
       `,
       `
-  declare const a: Promise<number>;
-  a as Promise<unknown>;
+declare const a: Promise<number>;
+a as Promise<unknown>;
       `,
       `
-  declare const a: Promise<{ hello: 'world'; foo: 'bar' }>;
-  a as Promise<{ hello: 'world' }>;
+declare const a: Promise<{ hello: 'world'; foo: 'bar' }>;
+a as Promise<{ hello: 'world' }>;
       `,
       `
-  declare const a: Promise<string>;
-  a as Promise<string> | string;
+declare const a: Promise<string>;
+a as Promise<string> | string;
       `,
     ],
     invalid: [
       {
         code: `
-  declare const a: Promise<string | number>;
-  a as Promise<string>;
+declare const a: Promise<string | number>;
+a as Promise<string>;
         `,
         errors: [
           {
@@ -891,8 +891,8 @@ describe('promise assertions', () => {
       },
       {
         code: `
-  declare const a: Promise<any>;
-  a as Promise<number>;
+declare const a: Promise<any>;
+a as Promise<number>;
         `,
         errors: [
           {
@@ -909,8 +909,8 @@ describe('promise assertions', () => {
       },
       {
         code: `
-  declare const a: Promise<number>;
-  a as Promise<any>;
+declare const a: Promise<number>;
+a as Promise<any>;
         `,
         errors: [
           {
@@ -927,8 +927,8 @@ describe('promise assertions', () => {
       },
       {
         code: `
-  declare const a: Promise<number[]>;
-  a as Promise<any[]>;
+declare const a: Promise<number[]>;
+a as Promise<any[]>;
         `,
         errors: [
           {
@@ -945,8 +945,8 @@ describe('promise assertions', () => {
       },
       {
         code: `
-  declare const a: Promise<unknown>;
-  a as Promise<number>;
+declare const a: Promise<unknown>;
+a as Promise<number>;
         `,
         errors: [
           {
@@ -960,8 +960,8 @@ describe('promise assertions', () => {
       },
       {
         code: `
-  declare const a: Promise<number>;
-  a as Promise<never>;
+declare const a: Promise<number>;
+a as Promise<never>;
         `,
         errors: [
           {
@@ -981,52 +981,52 @@ describe('class assertions', () => {
   ruleTester.run('no-unsafe-type-assertion', {
     valid: [
       `
-  class Foo {}
-  declare const a: Foo;
-  a as Foo | number;
+class Foo {}
+declare const a: Foo;
+a as Foo | number;
       `,
       `
-  class Foo {}
-  class Bar {}
-  declare const a: Foo;
-  a as Bar;
+class Foo {}
+class Bar {}
+declare const a: Foo;
+a as Bar;
       `,
       `
-  class Foo {
+class Foo {
   hello() {}
-  }
-  class Bar {}
-  declare const a: Foo;
-  a as Bar;
+}
+class Bar {}
+declare const a: Foo;
+a as Bar;
       `,
       `
-  class Foo {
+class Foo {
   hello() {}
-  }
-  class Bar extends Foo {}
-  declare const a: Bar;
-  a as Foo;
+}
+class Bar extends Foo {}
+declare const a: Bar;
+a as Foo;
       `,
       `
-  class Foo {
+class Foo {
   hello() {}
-  }
-  class Bar extends Foo {}
-  declare const a: Foo;
-  a as Bar;
+}
+class Bar extends Foo {}
+declare const a: Foo;
+a as Bar;
       `,
     ],
     invalid: [
       {
         code: `
-  class Foo {
+class Foo {
   hello() {}
-  }
-  class Bar extends Foo {
+}
+class Bar extends Foo {
   world() {}
-  }
-  declare const a: Foo;
-  a as Bar;
+}
+declare const a: Foo;
+a as Bar;
         `,
         errors: [
           {
@@ -1046,42 +1046,42 @@ describe('generic assertions', () => {
   ruleTester.run('no-unsafe-type-assertion', {
     valid: [
       `
-  type Obj = { foo: string };
-  function func<T extends Obj>(a: T) {
+type Obj = { foo: string };
+function func<T extends Obj>(a: T) {
   const b = a as T;
-  }
+}
       `,
       `
-  function parameterExtendsOtherParameter<T extends string | number, V extends T>(
+function parameterExtendsOtherParameter<T extends string | number, V extends T>(
   x: T,
   y: V,
-  ) {
+) {
   y as T;
-  }
+}
       `,
       `
-  function parameterExtendsUnconstrainedParameter<T, V extends T>(x: T, y: V) {
+function parameterExtendsUnconstrainedParameter<T, V extends T>(x: T, y: V) {
   y as T;
-  }
+}
       `,
       `
-  function unconstrainedToUnknown<T>(x: T) {
+function unconstrainedToUnknown<T>(x: T) {
   x as unknown;
-  }
+}
       `,
       `
-  function stringToWider<T extends string>(x: T) {
+function stringToWider<T extends string>(x: T) {
   x as number | string; // allowed
-  }
+}
       `,
     ],
     invalid: [
       {
         code: `
-  type Obj = { foo: string };
-  function func<T extends Obj>() {
+type Obj = { foo: string };
+function func<T extends Obj>() {
   const myObj = { foo: 'hi' } as T;
-  }
+}
         `,
         errors: [
           {
@@ -1095,11 +1095,11 @@ describe('generic assertions', () => {
       },
       {
         code: `
-  type Obj = { foo: string };
-  function func<T extends Obj>() {
+type Obj = { foo: string };
+function func<T extends Obj>() {
   const o: Obj = { foo: 'hi' };
   const myObj = o as T;
-  }
+}
         `,
         errors: [
           {
@@ -1116,12 +1116,12 @@ describe('generic assertions', () => {
       // *actually* assignable to the constraint of the asserted type
       {
         code: `
-  export function myfunc<CustomObjectT extends string>(
+export function myfunc<CustomObjectT extends string>(
   input: number,
-  ): CustomObjectT {
+): CustomObjectT {
   const newCustomObject = input as CustomObjectT;
   return newCustomObject;
-  }
+}
         `,
         errors: [
           {
@@ -1137,9 +1137,9 @@ describe('generic assertions', () => {
       // 1. non-parameter -> parameter assertions
       {
         code: `
-  function unknownConstraint<T extends unknown>(x: T, y: string) {
+function unknownConstraint<T extends unknown>(x: T, y: string) {
   y as T; // banned; generic arbitrary subtype
-  }
+}
         `,
         errors: [
           {
@@ -1153,9 +1153,9 @@ describe('generic assertions', () => {
       },
       {
         code: `
-  function unconstrained<T>(x: T, y: string) {
+function unconstrained<T>(x: T, y: string) {
   y as T;
-  }
+}
         `,
         errors: [
           {
@@ -1169,11 +1169,11 @@ describe('generic assertions', () => {
       },
       {
         code: `
-  // constraint of any functions like constraint of \`unknown\`
-  // (even the TS error message has this verbiage)
-  function anyConstraint<T extends any>(x: T, y: string) {
+// constraint of any functions like constraint of \`unknown\`
+// (even the TS error message has this verbiage)
+function anyConstraint<T extends any>(x: T, y: string) {
   y as T; // banned; generic arbitrary subtype
-  }
+}
         `,
         errors: [
           {
@@ -1187,12 +1187,12 @@ describe('generic assertions', () => {
       },
       {
         code: `
-  function constraintWiderThanUncastType<T extends string | number>(
+function constraintWiderThanUncastType<T extends string | number>(
   x: T,
   y: string,
-  ) {
+) {
   y as T; // banned; assignable to constraint
-  }
+}
         `,
         errors: [
           {
@@ -1206,9 +1206,9 @@ describe('generic assertions', () => {
       },
       {
         code: `
-  function constraintEqualUncastType<T extends string>(x: T, y: string) {
+function constraintEqualUncastType<T extends string>(x: T, y: string) {
   y as T; // banned; assignable to constraint
-  }
+}
         `,
         errors: [
           {
@@ -1222,12 +1222,12 @@ describe('generic assertions', () => {
       },
       {
         code: `
-  function constraintNarrowerThanUncastType<T extends string>(
+function constraintNarrowerThanUncastType<T extends string>(
   x: T,
   y: string | number,
-  ) {
+) {
   y as T; // banned; *not* assignable to constraint
-  }
+}
         `,
         errors: [
           {
@@ -1241,9 +1241,9 @@ describe('generic assertions', () => {
       },
       {
         code: `
-  function assertFromAny<T extends string | number>(x: T, y: any) {
+function assertFromAny<T extends string | number>(x: T, y: any) {
   y as T; // banned; just an \`any\` complaint. Not a generic subtype.
-  }
+}
         `,
         errors: [
           {
@@ -1258,12 +1258,12 @@ describe('generic assertions', () => {
       // 2. parameter -> parameter assertions
       {
         code: `
-  function parameterExtendsOtherParameter<T extends string | number, V extends T>(
+function parameterExtendsOtherParameter<T extends string | number, V extends T>(
   x: T,
   y: V,
-  ) {
+) {
   x as V; // banned; assignable to constraint
-  }
+}
         `,
         errors: [
           {
@@ -1277,9 +1277,9 @@ describe('generic assertions', () => {
       },
       {
         code: `
-  function parameterExtendsUnconstrainedParameter<T, V extends T>(x: T, y: V) {
+function parameterExtendsUnconstrainedParameter<T, V extends T>(x: T, y: V) {
   x as V; // banned; unconstrained arbitrary type
-  }
+}
         `,
         errors: [
           {
@@ -1293,9 +1293,9 @@ describe('generic assertions', () => {
       },
       {
         code: `
-  function twoUnconstrained<T, V>(x: T, y: V) {
+function twoUnconstrained<T, V>(x: T, y: V) {
   y as T;
-  }
+}
         `,
         errors: [
           {
@@ -1310,9 +1310,9 @@ describe('generic assertions', () => {
       // 2. parameter -> non-parameter assertions
       {
         code: `
-  function toNarrower<T>(x: T, y: string) {
+function toNarrower<T>(x: T, y: string) {
   x as string; // banned; ordinary 'string' narrower than 'T'.
-  }
+}
         `,
         errors: [
           {
@@ -1326,9 +1326,9 @@ describe('generic assertions', () => {
       },
       {
         code: `
-  function unconstrainedToAny<T>(x: T) {
+function unconstrainedToAny<T>(x: T) {
   x as any;
-  }
+}
         `,
         errors: [
           {
@@ -1342,9 +1342,9 @@ describe('generic assertions', () => {
       },
       {
         code: `
-  function stringToAny<T extends string>(x: T) {
+function stringToAny<T extends string>(x: T) {
   x as any;
-  }
+}
         `,
         errors: [
           {
@@ -1358,9 +1358,9 @@ describe('generic assertions', () => {
       },
       {
         code: `
-  function stringToNarrower<T extends string>(x: T) {
+function stringToNarrower<T extends string>(x: T) {
   x as 'a' | 'b';
-  }
+}
         `,
         errors: [
           {

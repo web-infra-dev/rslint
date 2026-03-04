@@ -1,0 +1,658 @@
+// Rstest Snapshot v1
+
+exports[`no-unsafe-call > invalid 1`] = `
+{
+  "code": "
+function foo(x: any) {
+  x();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`any\` typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 2`] = `
+{
+  "code": "
+function foo(x: any) {
+  x?.();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`any\` typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 3`] = `
+{
+  "code": "
+function foo(x: any) {
+  x.a.b.c.d.e.f.g();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`any\` typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 4`] = `
+{
+  "code": "
+function foo(x: any) {
+  x.a.b.c.d.e.f.g?.();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`any\` typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 5`] = `
+{
+  "code": "
+function foo(x: { a: any }) {
+  x.a();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`any\` typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 6`] = `
+{
+  "code": "
+function foo(x: { a: any }) {
+  x?.a();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`any\` typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 7`] = `
+{
+  "code": "
+function foo(x: { a: any }) {
+  x.a?.();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`any\` typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 8`] = `
+{
+  "code": "
+function foo(x: any) {
+  new x();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe construction of a(n) \`any\` typed value.",
+      "messageId": "unsafeNew",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 9`] = `
+{
+  "code": "
+function foo(x: { a: any }) {
+  new x.a();
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe construction of a(n) \`any\` typed value.",
+      "messageId": "unsafeNew",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 10`] = `
+{
+  "code": "
+function foo(x: any) {
+  x\`foo\`;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe use of a(n) \`any\` typed template tag.",
+      "messageId": "unsafeTemplateTag",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 11`] = `
+{
+  "code": "
+function foo(x: { tag: any }) {
+  x.tag\`foo\`;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe use of a(n) \`any\` typed template tag.",
+      "messageId": "unsafeTemplateTag",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 12`] = `
+{
+  "code": "
+const methods = {
+  methodA() {
+    return this.methodB()
+  },
+  methodB() {
+    return true
+  },
+  methodC() {
+    return this()
+  }
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`any\` typed value. \`this\` is typed as \`any\`.
+You can try to fix this by turning on the \`noImplicitThis\` compiler option, or adding a \`this\` parameter to the function.",
+      "messageId": "unsafeCallThis",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 4,
+        },
+        "start": {
+          "column": 12,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+    {
+      "message": "Unsafe call of a(n) \`any\` typed value. \`this\` is typed as \`any\`.
+You can try to fix this by turning on the \`noImplicitThis\` compiler option, or adding a \`this\` parameter to the function.",
+      "messageId": "unsafeCallThis",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 10,
+        },
+        "start": {
+          "column": 12,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 13`] = `
+{
+  "code": "
+let value: NotKnown;
+value();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`error\` type typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 14`] = `
+{
+  "code": "
+const t: Function = () => {};
+t();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`Function\` typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 15`] = `
+{
+  "code": "
+const f: Function = () => {};
+f\`oo\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe use of a(n) \`Function\` typed template tag.",
+      "messageId": "unsafeTemplateTag",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 16`] = `
+{
+  "code": "
+declare const maybeFunction: unknown;
+if (typeof maybeFunction === 'function') {
+  maybeFunction('call', 'with', 'any', 'args');
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`Function\` typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 17`] = `
+{
+  "code": "
+interface Unsafe extends Function {}
+declare const unsafe: Unsafe;
+unsafe();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`Function\` typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 18`] = `
+{
+  "code": "
+interface Unsafe extends Function {}
+declare const unsafe: Unsafe;
+unsafe\`bad\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe use of a(n) \`Function\` typed template tag.",
+      "messageId": "unsafeTemplateTag",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 19`] = `
+{
+  "code": "
+interface Unsafe extends Function {}
+declare const unsafe: Unsafe;
+new unsafe();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe construction of a(n) \`Function\` typed value.",
+      "messageId": "unsafeNew",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 20`] = `
+{
+  "code": "
+interface UnsafeToConstruct extends Function {
+  (): void;
+}
+declare const unsafe: UnsafeToConstruct;
+new unsafe();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe construction of a(n) \`Function\` typed value.",
+      "messageId": "unsafeNew",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 6,
+        },
+        "start": {
+          "column": 1,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-call > invalid 21`] = `
+{
+  "code": "
+interface StillUnsafe extends Function {
+  property: string;
+}
+declare const unsafe: StillUnsafe;
+unsafe();
+      ",
+  "diagnostics": [
+    {
+      "message": "Unsafe call of a(n) \`Function\` typed value.",
+      "messageId": "unsafeCall",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 6,
+        },
+        "start": {
+          "column": 1,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unsafe-call",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
