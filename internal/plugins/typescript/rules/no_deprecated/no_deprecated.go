@@ -95,8 +95,8 @@ func getJsDocDeprecationFromNode(node *ast.Node) string {
 	if node == nil {
 		return ""
 	}
-	jsdocs := node.JSDoc(nil)
-	for _, jsdoc := range jsdocs {
+	jsDocs := node.JSDoc(nil)
+	for _, jsdoc := range jsDocs {
 		tags := jsdoc.AsJSDoc().Tags
 		if tags == nil {
 			continue
@@ -123,8 +123,8 @@ func hasDeprecatedTag(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	jsdocs := node.JSDoc(nil)
-	for _, jsdoc := range jsdocs {
+	jsDocs := node.JSDoc(nil)
+	for _, jsdoc := range jsDocs {
 		tags := jsdoc.AsJSDoc().Tags
 		if tags == nil {
 			continue
@@ -1831,8 +1831,8 @@ var NoDeprecatedRule = rule.CreateRule(rule.Rule{
 						if isPropertyName {
 							return
 						}
-						jsdocs := node.Parent.JSDoc(nil)
-						for _, jsdoc := range jsdocs {
+						jsDocs := node.Parent.JSDoc(nil)
+						for _, jsdoc := range jsDocs {
 							tags := jsdoc.AsJSDoc().Tags
 							if tags == nil {
 								continue
