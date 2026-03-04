@@ -192,8 +192,8 @@ function foo(x: { a: number }, y: any) {
 				{
 					MessageId: "unsafeComputedMemberAccess",
 					Line:      3,
-					Column:    5,
-					EndColumn: 13,
+					Column:    6,
+					EndColumn: 12,
 				},
 			},
 		},
