@@ -62,10 +62,7 @@ func isNodeCalleeOfParent(node *ast.Node) bool {
 
 func getCallLikeNode(node *ast.Node) *ast.Node {
 	callee := node
-	for {
-		if callee == nil || callee.Parent == nil || callee.Parent.Kind != ast.KindPropertyAccessExpression {
-			break
-		}
+	for callee != nil && callee.Parent != nil && callee.Parent.Kind == ast.KindPropertyAccessExpression {
 		parentAccess := callee.Parent.AsPropertyAccessExpression()
 		if parentAccess == nil || parentAccess.Name() == nil || parentAccess.Name().AsNode() != callee {
 			break
@@ -915,14 +912,6 @@ func getJsxAttributeDeprecation(ctx rule.RuleContext, elementNode *ast.Node, pro
 	}
 	symbol := checker.Checker_getPropertyOfType(ctx.TypeChecker, contextualType, propertyName)
 	return getJsDocDeprecation(ctx.TypeChecker, symbol)
-}
-
-func bindingElementPropertyNameFromNode(node *ast.Node) string {
-	if node == nil || node.Kind != ast.KindBindingElement {
-		return ""
-	}
-	bindingElement := node.AsBindingElement()
-	return bindingElementPropertyName(bindingElement)
 }
 
 func getBindingPatternSourceType(ctx rule.RuleContext, bindingPattern *ast.Node, seen map[*ast.Node]bool) *checker.Type {
