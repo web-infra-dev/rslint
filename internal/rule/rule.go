@@ -68,6 +68,11 @@ const (
 	lastOnNotAllowPatternOnExitTokenKind ast.Kind = 6000
 )
 
+const (
+	WildcardTokenKind ast.Kind = iota + 10000 // start well beyond any AST kind
+	WildcardExitTokenKind
+)
+
 func ListenerOnExit(kind ast.Kind) ast.Kind {
 	return kind + 1000
 }
