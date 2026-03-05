@@ -70,7 +70,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/no-dupe-class-members.test.ts',
     './tests/typescript-eslint/rules/no-duplicate-enum-values.test.ts',
     './tests/typescript-eslint/rules/no-duplicate-type-constituents.test.ts',
-    // './tests/typescript-eslint/rules/no-dynamic-delete.test.ts',
+    './tests/typescript-eslint/rules/no-dynamic-delete.test.ts',
     './tests/typescript-eslint/rules/no-empty-function.test.ts',
     './tests/typescript-eslint/rules/no-empty-interface.test.ts',
     // './tests/typescript-eslint/rules/no-empty-object-type.test.ts',

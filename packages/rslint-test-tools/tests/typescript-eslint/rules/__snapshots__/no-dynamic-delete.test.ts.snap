@@ -1,0 +1,323 @@
+// Rstest Snapshot v1
+
+exports[`no-dynamic-delete > invalid 1`] = `
+{
+  "code": "
+const container: { [i: string]: 0 } = {};
+delete container['aa' + 'b'];
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not delete dynamically computed property keys.",
+      "messageId": "dynamicDelete",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dynamic-delete",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dynamic-delete > invalid 2`] = `
+{
+  "code": "
+const container: { [i: string]: 0 } = {};
+delete container[+7];
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not delete dynamically computed property keys.",
+      "messageId": "dynamicDelete",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dynamic-delete",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dynamic-delete > invalid 3`] = `
+{
+  "code": "
+const container: { [i: string]: 0 } = {};
+delete container[-Infinity];
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not delete dynamically computed property keys.",
+      "messageId": "dynamicDelete",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dynamic-delete",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dynamic-delete > invalid 4`] = `
+{
+  "code": "
+const container: { [i: string]: 0 } = {};
+delete container[+Infinity];
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not delete dynamically computed property keys.",
+      "messageId": "dynamicDelete",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dynamic-delete",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dynamic-delete > invalid 5`] = `
+{
+  "code": "
+const container: { [i: string]: 0 } = {};
+delete container[NaN];
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not delete dynamically computed property keys.",
+      "messageId": "dynamicDelete",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dynamic-delete",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dynamic-delete > invalid 6`] = `
+{
+  "code": "
+const container: { [i: string]: 0 } = {};
+const name = 'name';
+delete container[name];
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not delete dynamically computed property keys.",
+      "messageId": "dynamicDelete",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 4,
+        },
+        "start": {
+          "column": 18,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dynamic-delete",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dynamic-delete > invalid 7`] = `
+{
+  "code": "
+const container: { [i: string]: 0 } = {};
+const getName = () => 'aaa';
+delete container[getName()];
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not delete dynamically computed property keys.",
+      "messageId": "dynamicDelete",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 18,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dynamic-delete",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dynamic-delete > invalid 8`] = `
+{
+  "code": "
+const container: { [i: string]: 0 } = {};
+const name = { foo: { bar: 'bar' } };
+delete container[name.foo.bar];
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not delete dynamically computed property keys.",
+      "messageId": "dynamicDelete",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 4,
+        },
+        "start": {
+          "column": 18,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dynamic-delete",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dynamic-delete > invalid 9`] = `
+{
+  "code": "
+const container: { [i: string]: 0 } = {};
+delete container[+'Infinity'];
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not delete dynamically computed property keys.",
+      "messageId": "dynamicDelete",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dynamic-delete",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dynamic-delete > invalid 10`] = `
+{
+  "code": "
+const container: { [i: string]: 0 } = {};
+delete container[typeof 1];
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not delete dynamically computed property keys.",
+      "messageId": "dynamicDelete",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dynamic-delete",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dynamic-delete > invalid 11`] = `
+{
+  "code": "
+const container: { [i: string]: 0 } = {};
+delete container[\`name\`];
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not delete dynamically computed property keys.",
+      "messageId": "dynamicDelete",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-dynamic-delete",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
