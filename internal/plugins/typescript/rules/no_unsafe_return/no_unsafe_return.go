@@ -33,10 +33,10 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 	Name: "no-unsafe-return",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		compilerOptions := ctx.Program.Options()
-		isNoImplicitThis := utils.IsStrictCompilerOptionEnabled(
-			compilerOptions,
-			compilerOptions.NoImplicitThis,
-		)
+		// When noImplicitThis is not enabled (considering strict mode), object literal methods
+		// can have implicit any this. We need to use IsStrictCompilerOptionEnabled to properly
+		// handle the case where noImplicitThis is inherited from strict mode.
+		shouldCheckImplicitAnyThis := !utils.IsStrictCompilerOptionEnabled(compilerOptions, compilerOptions.NoImplicitThis)
 
 		checkReturn := func(
 			returnNode *ast.Node,
@@ -129,7 +129,10 @@ var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
 					typeString = "`any[]`"
 				}
 
-				if !isNoImplicitThis {
+				// Check this type only when noImplicitThis is not enabled
+				// This matches upstream typescript-eslint/no-unsafe-return behavior
+				// See: https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/eslint-plugin/src/rules/no-unsafe-return.ts
+				if shouldCheckImplicitAnyThis {
 					// `return this`
 					thisExpression := utils.GetThisExpression(returnNode)
 					if thisExpression != nil && utils.IsTypeAnyType(utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, thisExpression)) {

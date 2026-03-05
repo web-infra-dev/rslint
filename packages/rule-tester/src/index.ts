@@ -141,8 +141,16 @@ export class RuleTester {
       valid: ValidTestCase[];
       invalid: InvalidTestCase[];
     },
+    options?: {
+      description?: string; // Optional description appended to test suite name
+    },
   ) {
-    describe(ruleName, () => {
+    const testSuiteName = options?.description
+      ? `${ruleName} - ${options.description}`
+      : ruleName;
+
+    describe(testSuiteName, () => {
+      // Use the rule name as-is (no splitting)
       ruleName = '@typescript-eslint/' + ruleName;
       let cwd =
         this.options.languageOptions?.parserOptions?.tsconfigRootDir ||
@@ -175,8 +183,8 @@ export class RuleTester {
             typeof validCase === 'string' ? validCase : validCase.code;
           const languageOptions =
             typeof validCase === 'string'
-              ? undefined
-              : validCase.languageOptions;
+              ? this.options.languageOptions
+              : (validCase.languageOptions ?? this.options.languageOptions);
           const isJSX = languageOptions?.parserOptions?.ecmaFeatures?.jsx;
 
           const options =
@@ -231,7 +239,8 @@ export class RuleTester {
           if (hasOnly && !only) {
             continue;
           }
-          const languageOptions = item.languageOptions;
+          const languageOptions =
+            item.languageOptions ?? this.options.languageOptions;
           const isJSX = languageOptions?.parserOptions?.ecmaFeatures?.jsx;
           const test_virtual_entry = path.resolve(
             cwd,

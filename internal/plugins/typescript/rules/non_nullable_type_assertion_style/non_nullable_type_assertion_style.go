@@ -26,12 +26,19 @@ var NonNullableTypeAssertionStyleRule = rule.CreateRule(rule.Rule{
 			return utils.UnionTypeParts(t)
 		}
 
-		couldBeNullable := func(t *checker.Type) bool {
+		// couldBeNullable recursively checks if a type could be null or undefined.
+		// Note: No explicit cycle detection is needed here, as TypeScript's type system
+		// prevents circular type parameter constraints. This matches the upstream
+		// typescript-eslint implementation which also relies on this guarantee.
+		// See: https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/eslint-plugin/src/rules/non-nullable-type-assertion-style.ts
+		var couldBeNullable func(t *checker.Type) bool
+		couldBeNullable = func(t *checker.Type) bool {
 			if utils.IsTypeParameter(t) {
-				t = checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, t)
-				if t == nil {
+				constraint := checker.Checker_getBaseConstraintOfType(ctx.TypeChecker, t)
+				if constraint == nil {
 					return true
 				}
+				return couldBeNullable(constraint)
 			}
 			for _, p := range utils.UnionTypeParts(t) {
 				if utils.IsTypeFlagSet(p, checker.TypeFlagsNullable) {

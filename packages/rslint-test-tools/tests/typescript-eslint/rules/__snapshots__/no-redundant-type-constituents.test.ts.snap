@@ -1,0 +1,1333 @@
+// Rstest Snapshot v1
+
+exports[`no-redundant-type-constituents > invalid 1`] = `
+{
+  "code": "type T = number | any;",
+  "diagnostics": [
+    {
+      "message": "'any' overrides all other types in this union type.",
+      "messageId": "overrides",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 2`] = `
+{
+  "code": "
+        type B = number;
+        type T = B | any;
+      ",
+  "diagnostics": [
+    {
+      "message": "'any' overrides all other types in this union type.",
+      "messageId": "overrides",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 3`] = `
+{
+  "code": "type T = any | number;",
+  "diagnostics": [
+    {
+      "message": "'any' overrides all other types in this union type.",
+      "messageId": "overrides",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 4`] = `
+{
+  "code": "
+        type B = any;
+        type T = B | number;
+      ",
+  "diagnostics": [
+    {
+      "message": "'any' overrides all other types in this union type.",
+      "messageId": "overrides",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 5`] = `
+{
+  "code": "type T = number | never;",
+  "diagnostics": [
+    {
+      "message": "'never' is overridden by other types in this union type.",
+      "messageId": "overridden",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 6`] = `
+{
+  "code": "
+        type B = number;
+        type T = B | never;
+      ",
+  "diagnostics": [
+    {
+      "message": "'never' is overridden by other types in this union type.",
+      "messageId": "overridden",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 7`] = `
+{
+  "code": "
+        type B = never;
+        type T = B | number;
+      ",
+  "diagnostics": [
+    {
+      "message": "'never' is overridden by other types in this union type.",
+      "messageId": "overridden",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 8`] = `
+{
+  "code": "type T = never | number;",
+  "diagnostics": [
+    {
+      "message": "'never' is overridden by other types in this union type.",
+      "messageId": "overridden",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 9`] = `
+{
+  "code": "type T = number | unknown;",
+  "diagnostics": [
+    {
+      "message": "'unknown' overrides all other types in this union type.",
+      "messageId": "overrides",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 10`] = `
+{
+  "code": "type T = unknown | number;",
+  "diagnostics": [
+    {
+      "message": "'unknown' overrides all other types in this union type.",
+      "messageId": "overrides",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 11`] = `
+{
+  "code": "type ErrorTypes = NotKnown | 0;",
+  "diagnostics": [
+    {
+      "message": "'NotKnown' is an 'error' type that acts as 'any' and overrides all other types in this union type.",
+      "messageId": "errorTypeOverrides",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 12`] = `
+{
+  "code": "type T = number | 0;",
+  "diagnostics": [
+    {
+      "message": "0 is overridden by number in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 13`] = `
+{
+  "code": "type T = number | (0 | 1);",
+  "diagnostics": [
+    {
+      "message": "0 | 1 is overridden by number in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 14`] = `
+{
+  "code": "type T = (0 | 0) | number;",
+  "diagnostics": [
+    {
+      "message": "0 | 0 is overridden by number in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 15`] = `
+{
+  "code": "
+        type B = 0 | 1;
+        type T = (2 | B) | number;
+      ",
+  "diagnostics": [
+    {
+      "message": "2 | 0 | 1 is overridden by number in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 19,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 16`] = `
+{
+  "code": "type T = (0 | (1 | 2)) | number;",
+  "diagnostics": [
+    {
+      "message": "0 | 1 | 2 is overridden by number in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 17`] = `
+{
+  "code": "type T = (0 | 1) | number;",
+  "diagnostics": [
+    {
+      "message": "0 | 1 is overridden by number in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 18`] = `
+{
+  "code": "type T = (0 | (0 | 1)) | number;",
+  "diagnostics": [
+    {
+      "message": "0 | 0 | 1 is overridden by number in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 19`] = `
+{
+  "code": "type T = (2 | 'other' | 3) | number;",
+  "diagnostics": [
+    {
+      "message": "2 | 3 is overridden by number in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 20`] = `
+{
+  "code": "type T = '' | string;",
+  "diagnostics": [
+    {
+      "message": " is overridden by string in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 21`] = `
+{
+  "code": "
+        type B = 'b';
+        type T = B | string;
+      ",
+  "diagnostics": [
+    {
+      "message": ""\\"b\\"" is overridden by string in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 22`] = `
+{
+  "code": "type T = \`a\${number}c\` | string;",
+  "diagnostics": [
+    {
+      "message": "\`a\${number}c\` is overridden by string in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 23`] = `
+{
+  "code": "
+        type B = \`a\${number}c\`;
+        type T = B | string;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\${number}c\` is overridden by string in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 24`] = `
+{
+  "code": "type T = \`\${number}\` | string;",
+  "diagnostics": [
+    {
+      "message": "\`\${number}\` is overridden by string in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 25`] = `
+{
+  "code": "type T = 0n | bigint;",
+  "diagnostics": [
+    {
+      "message": "0n is overridden by bigint in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 26`] = `
+{
+  "code": "type T = -1n | bigint;",
+  "diagnostics": [
+    {
+      "message": "-1n is overridden by bigint in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 27`] = `
+{
+  "code": "type T = (-1n | 1n) | bigint;",
+  "diagnostics": [
+    {
+      "message": "-1n | 1n is overridden by bigint in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 28`] = `
+{
+  "code": "
+        type B = boolean;
+        type T = B | false;
+      ",
+  "diagnostics": [
+    {
+      "message": "literal type is overridden by boolean in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 29`] = `
+{
+  "code": "type T = false | boolean;",
+  "diagnostics": [
+    {
+      "message": "literal type is overridden by boolean in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 30`] = `
+{
+  "code": "type T = true | boolean;",
+  "diagnostics": [
+    {
+      "message": "literal type is overridden by boolean in this union type.",
+      "messageId": "literalOverridden",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 31`] = `
+{
+  "code": "type T = false & boolean;",
+  "diagnostics": [
+    {
+      "message": "boolean is overridden by the literal type in this intersection type.",
+      "messageId": "primitiveOverridden",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 32`] = `
+{
+  "code": "
+        type B = false;
+        type T = B & boolean;
+      ",
+  "diagnostics": [
+    {
+      "message": "boolean is overridden by the false in this intersection type.",
+      "messageId": "primitiveOverridden",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 33`] = `
+{
+  "code": "
+        type B = true;
+        type T = B & boolean;
+      ",
+  "diagnostics": [
+    {
+      "message": "boolean is overridden by the true in this intersection type.",
+      "messageId": "primitiveOverridden",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 34`] = `
+{
+  "code": "type T = true & boolean;",
+  "diagnostics": [
+    {
+      "message": "boolean is overridden by the literal type in this intersection type.",
+      "messageId": "primitiveOverridden",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 35`] = `
+{
+  "code": "type T = number & any;",
+  "diagnostics": [
+    {
+      "message": "'any' overrides all other types in this intersection type.",
+      "messageId": "overrides",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 36`] = `
+{
+  "code": "type T = any & number;",
+  "diagnostics": [
+    {
+      "message": "'any' overrides all other types in this intersection type.",
+      "messageId": "overrides",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 37`] = `
+{
+  "code": "type ErrorTypes = NotKnown & 0;",
+  "diagnostics": [
+    {
+      "message": "'NotKnown' is an 'error' type that acts as 'any' and overrides all other types in this intersection type.",
+      "messageId": "errorTypeOverrides",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 38`] = `
+{
+  "code": "type T = number & never;",
+  "diagnostics": [
+    {
+      "message": "'never' overrides all other types in this intersection type.",
+      "messageId": "overrides",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 39`] = `
+{
+  "code": "
+        type B = never;
+        type T = B & number;
+      ",
+  "diagnostics": [
+    {
+      "message": "'never' overrides all other types in this intersection type.",
+      "messageId": "overrides",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 40`] = `
+{
+  "code": "type T = never & number;",
+  "diagnostics": [
+    {
+      "message": "'never' overrides all other types in this intersection type.",
+      "messageId": "overrides",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 41`] = `
+{
+  "code": "type T = number & unknown;",
+  "diagnostics": [
+    {
+      "message": "'unknown' is overridden by other types in this intersection type.",
+      "messageId": "overridden",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 42`] = `
+{
+  "code": "type T = unknown & number;",
+  "diagnostics": [
+    {
+      "message": "'unknown' is overridden by other types in this intersection type.",
+      "messageId": "overridden",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 43`] = `
+{
+  "code": "type T = number & 0;",
+  "diagnostics": [
+    {
+      "message": "number is overridden by the 0 in this intersection type.",
+      "messageId": "primitiveOverridden",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 44`] = `
+{
+  "code": "type T = '' & string;",
+  "diagnostics": [
+    {
+      "message": "string is overridden by the  in this intersection type.",
+      "messageId": "primitiveOverridden",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 45`] = `
+{
+  "code": "
+        type B = 0n;
+        type T = B & bigint;
+      ",
+  "diagnostics": [
+    {
+      "message": "bigint is overridden by the 0n in this intersection type.",
+      "messageId": "primitiveOverridden",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 46`] = `
+{
+  "code": "type T = 0n & bigint;",
+  "diagnostics": [
+    {
+      "message": "bigint is overridden by the 0n in this intersection type.",
+      "messageId": "primitiveOverridden",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 47`] = `
+{
+  "code": "type T = -1n & bigint;",
+  "diagnostics": [
+    {
+      "message": "bigint is overridden by the -1n in this intersection type.",
+      "messageId": "primitiveOverridden",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 48`] = `
+{
+  "code": "
+        type T = 'a' | 'b';
+        type U = T & string;
+      ",
+  "diagnostics": [
+    {
+      "message": ""\\"a\\"" | "\\"b\\"" is overridden by the string in this intersection type.",
+      "messageId": "primitiveOverridden",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-redundant-type-constituents > invalid 49`] = `
+{
+  "code": "
+        type S = 1 | 2;
+        type T = 'a' | 'b';
+        type U = S & T & string & number;
+      ",
+  "diagnostics": [
+    {
+      "message": "1 | 2 is overridden by the number in this intersection type.",
+      "messageId": "primitiveOverridden",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 4,
+        },
+        "start": {
+          "column": 18,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+    {
+      "message": "1 | 2 is overridden by the string in this intersection type.",
+      "messageId": "primitiveOverridden",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 4,
+        },
+        "start": {
+          "column": 22,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-redundant-type-constituents",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
