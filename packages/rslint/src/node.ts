@@ -11,6 +11,26 @@ import type {
   IpcMessage,
 } from './types.js';
 
+function isIpcMessage(value: unknown): value is IpcMessage {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    'kind' in value &&
+    'data' in value
+  );
+}
+
+function getErrorMessage(data: unknown): string {
+  if (typeof data === 'object' && data !== null && 'message' in data) {
+    const record = data as Record<string, unknown>;
+    if (typeof record.message === 'string') {
+      return record.message;
+    }
+  }
+  return String(data);
+}
+
 /**
  * Node.js implementation of RslintService using child processes
  */
@@ -38,7 +58,7 @@ export class NodeRslintService implements RslintServiceInterface {
     });
 
     // Set up binary message reading
-    this.process.stdout!.on('data', data => {
+    this.process.stdout!.on('data', (data: Buffer) => {
       this.handleChunk(data);
     });
     this.chunks = [];
@@ -49,8 +69,8 @@ export class NodeRslintService implements RslintServiceInterface {
   /**
    * Send a message to the rslint process
    */
-  async sendMessage(kind: string, data: any): Promise<any> {
-    return new Promise((resolve, reject) => {
+  async sendMessage(kind: string, data: unknown): Promise<unknown> {
+    const result = await new Promise<unknown>((resolve, reject) => {
       const id = this.nextMessageId++;
       const message: IpcMessage = { id, kind, data };
 
@@ -66,6 +86,7 @@ export class NodeRslintService implements RslintServiceInterface {
       // Send message
       this.process.stdin!.write(Buffer.concat([length, jsonBuffer]));
     });
+    return result;
   }
 
   /**
@@ -99,8 +120,12 @@ export class NodeRslintService implements RslintServiceInterface {
 
       // Handle the message
       try {
-        const parsed: IpcMessage = JSON.parse(message);
-        this.handleMessage(parsed);
+        const parsed = JSON.parse(message) as unknown;
+        if (isIpcMessage(parsed)) {
+          this.handleMessage(parsed);
+        } else {
+          console.error('Invalid message format:', parsed);
+        }
       } catch (err) {
         console.error('Error parsing message:', err);
       }
@@ -123,7 +148,7 @@ export class NodeRslintService implements RslintServiceInterface {
     this.pendingMessages.delete(id);
 
     if (kind === 'error') {
-      pending.reject(new Error(data.message));
+      pending.reject(new Error(getErrorMessage(data)));
     } else {
       pending.resolve(data);
     }
