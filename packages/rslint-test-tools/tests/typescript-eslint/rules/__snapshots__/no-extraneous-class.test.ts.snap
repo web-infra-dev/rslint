@@ -1,0 +1,406 @@
+// Rstest Snapshot v1
+
+exports[`no-extraneous-class > invalid 1`] = `
+{
+  "code": "class Foo {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty class.",
+      "messageId": "empty",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extraneous-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extraneous-class > invalid 2`] = `
+{
+  "code": "
+class Foo {
+  public prop = 1;
+  constructor() {
+    class Bar {
+      static PROP = 2;
+    }
+  }
+}
+export class Bar {
+  public static helper(): void {}
+  private static privateHelper(): boolean {
+    return true;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected class with only static properties.",
+      "messageId": "onlyStatic",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extraneous-class",
+    },
+    {
+      "message": "Unexpected class with only static properties.",
+      "messageId": "onlyStatic",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 10,
+        },
+        "start": {
+          "column": 14,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extraneous-class",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extraneous-class > invalid 3`] = `
+{
+  "code": "
+class Foo {
+  constructor() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected class with only a constructor.",
+      "messageId": "onlyConstructor",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 2,
+        },
+        "start": {
+          "column": 7,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extraneous-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extraneous-class > invalid 4`] = `
+{
+  "code": "
+export class AClass {
+  public static helper(): void {}
+  private static privateHelper(): boolean {
+    return true;
+  }
+  constructor() {
+    class nestedClass {}
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected class with only static properties.",
+      "messageId": "onlyStatic",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 2,
+        },
+        "start": {
+          "column": 14,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extraneous-class",
+    },
+    {
+      "message": "Unexpected empty class.",
+      "messageId": "empty",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 8,
+        },
+        "start": {
+          "column": 11,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extraneous-class",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extraneous-class > invalid 5`] = `
+{
+  "code": "
+export default class {
+  static hello() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected class with only static properties.",
+      "messageId": "onlyStatic",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extraneous-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extraneous-class > invalid 6`] = `
+{
+  "code": "
+@FooDecorator
+class Foo {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty class.",
+      "messageId": "empty",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extraneous-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extraneous-class > invalid 7`] = `
+{
+  "code": "
+@FooDecorator
+class Foo {
+  constructor(foo: Foo) {
+    foo.subscribe(a => {
+      console.log(a);
+    });
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected class with only a constructor.",
+      "messageId": "onlyConstructor",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extraneous-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extraneous-class > invalid 8`] = `
+{
+  "code": "
+abstract class Foo {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected empty class.",
+      "messageId": "empty",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 16,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extraneous-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extraneous-class > invalid 9`] = `
+{
+  "code": "
+abstract class Foo {
+  static property: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected class with only static properties.",
+      "messageId": "onlyStatic",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 16,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extraneous-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extraneous-class > invalid 10`] = `
+{
+  "code": "
+abstract class Foo {
+  constructor() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected class with only a constructor.",
+      "messageId": "onlyConstructor",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 16,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extraneous-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extraneous-class > invalid 11`] = `
+{
+  "code": "
+class Foo {
+  static accessor prop: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected class with only static properties.",
+      "messageId": "onlyStatic",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 2,
+        },
+        "start": {
+          "column": 7,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extraneous-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extraneous-class > invalid 12`] = `
+{
+  "code": "
+abstract class Foo {
+  static accessor prop: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Unexpected class with only static properties.",
+      "messageId": "onlyStatic",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 16,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-extraneous-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
