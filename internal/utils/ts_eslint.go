@@ -595,3 +595,59 @@ func GetNameFromMember(sourceFile *ast.SourceFile, member *ast.Node) (string, Me
 	r := TrimNodeTextRange(sourceFile, member)
 	return sourceFile.Text()[r.Pos():r.End()], MemberNameTypeExpression
 }
+
+// GetPropertyInfo extracts the property node and formatted property name from a PropertyAccessExpression
+// or ElementAccessExpression. Returns the property node and a formatted string like ".propertyName" or "[index]".
+// Returns (nil, "") if the node is neither a property access nor an element access expression.
+//
+// Note: When called from ast.KindPropertyAccessExpression or ast.KindElementAccessExpression listeners,
+// the returned property is guaranteed to be non-nil because:
+//   - PropertyAccessExpression.Name() always returns a valid Identifier node
+//   - ElementAccessExpression.ArgumentExpression always exists (after SkipParentheses)
+//
+// The nil return case only applies when called with nodes of other types.
+func GetPropertyInfo(sourceFile *ast.SourceFile, node *ast.Node) (*ast.Node, string) {
+	var property *ast.Node
+	var propertyName string
+
+	if ast.IsPropertyAccessExpression(node) {
+		property = node.Name()
+		loc := TrimNodeTextRange(sourceFile, property)
+		propertyName = "." + sourceFile.Text()[loc.Pos():loc.End()]
+	} else if ast.IsElementAccessExpression(node) {
+		property = ast.SkipParentheses(node.AsElementAccessExpression().ArgumentExpression)
+		loc := TrimNodeTextRange(sourceFile, property)
+		propertyName = "[" + sourceFile.Text()[loc.Pos():loc.End()] + "]"
+	}
+
+	return property, propertyName
+}
+
+// IsInObjectLiteralMethod checks if a function node is defined as a method in an object literal.
+// This includes both shorthand method syntax ({ methodA() {} }) and property assignment syntax
+// ({ methodA: function() {} }). Returns true if the function is an object literal method.
+func IsInObjectLiteralMethod(functionNode *ast.Node) bool {
+	if functionNode == nil {
+		return false
+	}
+
+	parent := functionNode.Parent
+	if parent == nil {
+		return false
+	}
+
+	// Direct object literal (shorthand method syntax): { methodA() {} }
+	if ast.IsObjectLiteralExpression(parent) {
+		return true
+	}
+
+	// Property assignment syntax: { methodA: function() {} } or { methodA: () => {} }
+	if ast.IsPropertyAssignment(parent) || ast.IsShorthandPropertyAssignment(parent) || ast.IsMethodDeclaration(parent) {
+		grandParent := parent.Parent
+		if grandParent != nil && ast.IsObjectLiteralExpression(grandParent) {
+			return true
+		}
+	}
+
+	return false
+}

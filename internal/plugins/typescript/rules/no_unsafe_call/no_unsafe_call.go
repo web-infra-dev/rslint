@@ -39,10 +39,10 @@ var NoUnsafeCallRule = rule.CreateRule(rule.Rule{
 	Name: "no-unsafe-call",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		compilerOptions := ctx.Program.Options()
-		isNoImplicitThis := utils.IsStrictCompilerOptionEnabled(
-			compilerOptions,
-			compilerOptions.NoImplicitThis,
-		)
+		// When noImplicitThis is not enabled (considering strict mode), object literal methods
+		// can have implicit any this. We need to use IsStrictCompilerOptionEnabled to properly
+		// handle the case where noImplicitThis is inherited from strict mode.
+		shouldCheckImplicitAnyThis := !utils.IsStrictCompilerOptionEnabled(compilerOptions, compilerOptions.NoImplicitThis)
 
 		checkCall := func(
 			node *ast.Node,
@@ -50,19 +50,54 @@ var NoUnsafeCallRule = rule.CreateRule(rule.Rule{
 			messageBuilder func(t string) rule.RuleMessage,
 			newCall bool,
 		) {
+			// Note: Control flow differs from upstream typescript-eslint/no-unsafe-call
+			//
+			// Upstream logic:
+			//   1. Check if callee type is any
+			//   2. If any, check this (when !noImplicitThis) to choose message
+			//   3. Report with appropriate message
+			//
+			// Our logic:
+			//   1. Check this first (using IsInObjectLiteralMethod helper)
+			//   2. If in object literal method without noImplicitThis, report and return
+			//   3. Then check callee type
+			//
+			// Rationale: typescript-go's type checker may not automatically infer implicit any
+			// for this in object literal methods when noImplicitThis=false (unlike TypeScript's
+			// official compiler). We explicitly check IsInObjectLiteralMethod to compensate for
+			// this limitation and ensure consistent behavior with upstream typescript-eslint.
+			//
+			// See: https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/eslint-plugin/src/rules/no-unsafe-call.ts
+
+			// Check for unsafe this calls first, before checking the callee type
+			thisExpression := utils.GetThisExpression(node)
+			if thisExpression != nil {
+				// Check the this type directly for actual any types
+				thisType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, thisExpression)
+				if utils.IsTypeAnyType(thisType) {
+					msg := "`any`"
+					if utils.IsIntrinsicErrorType(thisType) {
+						msg = "`error` type"
+					}
+
+					// When noImplicitThis is not enabled and we're in an object literal method,
+					// use a more specific error message suggesting to enable noImplicitThis
+					if shouldCheckImplicitAnyThis {
+						functionNode := utils.GetParentFunctionNode(thisExpression)
+						if functionNode != nil && utils.IsInObjectLiteralMethod(functionNode) {
+							ctx.ReportNode(reportingNode, buildUnsafeCallThisMessage(msg))
+							return
+						}
+					}
+
+					ctx.ReportNode(reportingNode, buildUnsafeCallThisMessage(msg))
+					return
+				}
+			}
+
 			t := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, node)
 
 			if utils.IsTypeAnyType(t) {
-				if !isNoImplicitThis {
-					// `this()` or `this.foo()` or `this.foo[bar]()`
-					thisExpression := utils.GetThisExpression(node)
-					if thisExpression != nil && utils.IsTypeAnyType(
-						utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, thisExpression),
-					) {
-						messageBuilder = buildUnsafeCallThisMessage
-					}
-				}
-
 				isErrorType := utils.IsIntrinsicErrorType(t)
 
 				msg := "`any`"
