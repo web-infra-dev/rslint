@@ -362,10 +362,13 @@ class C {
   getObs$: any;
   getPopularDepartments(): void {
     this.getObs$.pipe().subscribe(res => {
-      console.log(res);
+      log(res);
     });
   }
 }
+// Modified from upstream: replaced console.log(res) with log(res)
+// because rslint doesn't have built-in global types like console
+function log(arg: unknown) {}
       `,
       errors: [
         {
