@@ -1,0 +1,3811 @@
+// Rstest Snapshot v1
+
+exports[`no-unnecessary-template-expression > invalid 1`] = `
+{
+  "code": "\`\${1}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`1\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 2`] = `
+{
+  "code": "\`\${1n}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`1\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 3`] = `
+{
+  "code": "\`\${0o25}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`21\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 4`] = `
+{
+  "code": "\`\${0b1010} \${0b1111}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "\`10 15\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 5`] = `
+{
+  "code": "\`\${0x25}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`37\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 6`] = `
+{
+  "code": "\`\${/a/}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`/a/\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 7`] = `
+{
+  "code": "\`\${/a/gim}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`/a/gim\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 8`] = `
+{
+  "code": "\`\${    1    }\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`1\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 9`] = `
+{
+  "code": "\`\${    'a'    }\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "'a';",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 10`] = `
+{
+  "code": "\`\${    "a"    }\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": ""a";",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 11`] = `
+{
+  "code": "\`\${    'a' + 'b'    }\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "'a' + 'b';",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 12`] = `
+{
+  "code": "\`\${true}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`true\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 13`] = `
+{
+  "code": "\`\${    true    }\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`true\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 14`] = `
+{
+  "code": "\`\${null}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`null\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 15`] = `
+{
+  "code": "\`\${    null    }\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`null\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 16`] = `
+{
+  "code": "\`\${undefined}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`undefined\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 17`] = `
+{
+  "code": "\`\${    undefined    }\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`undefined\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 18`] = `
+{
+  "code": "\`\${Infinity}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`Infinity\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 19`] = `
+{
+  "code": "\`\${NaN}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`NaN\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 20`] = `
+{
+  "code": "\`\${'a'} \${'b'}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "\`a b\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 21`] = `
+{
+  "code": "\`\${   'a'   } \${   'b'   }\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "\`a b\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 22`] = `
+{
+  "code": "\`use\${'less'}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`useless\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 23`] = `
+{
+  "code": "\`use\${\`less\`}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`useless\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 24`] = `
+{
+  "code": "
+\`u\${
+  // hopefully this comment is not needed.
+  'se'
+
+}\${
+  \`le\${  \`ss\`  }\`
+}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 8,
+        },
+        "start": {
+          "column": 2,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 7,
+        },
+        "start": {
+          "column": 6,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": [
+    "
+\`u\${
+  // hopefully this comment is not needed.
+  'se'
+
+}le\${  \`ss\`  }\`;
+      ",
+    "
+\`u\${
+  // hopefully this comment is not needed.
+  'se'
+
+}less\`;
+      ",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 25`] = `
+{
+  "code": "
+\`use\${
+  \`less\`
+}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+\`useless\`;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 26`] = `
+{
+  "code": "\`\${'1 + 1 ='} \${2}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "\`1 + 1 = 2\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 27`] = `
+{
+  "code": "\`\${'a'} \${true}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "\`a true\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 28`] = `
+{
+  "code": "\`\${String(Symbol.for('test'))}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "String(Symbol.for('test'));",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 29`] = `
+{
+  "code": "\`\${'\`'}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "'\`';",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 30`] = `
+{
+  "code": "\`back\${'\`'}tick\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`back\\\`tick\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 31`] = `
+{
+  "code": "\`dollar\${'\${\`this is test\`}'}sign\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`dollar\\\${\\\`this is test\\\`}sign\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 32`] = `
+{
+  "code": "\`complex\${'\`\${"\`\${test}\`"}\`'}case\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`complex\\\`\\\${"\\\`\\\${test}\\\`"}\\\`case\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 33`] = `
+{
+  "code": "\`some \${'\\\\\${test}'} string\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`some \\\\\\\${test} string\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 34`] = `
+{
+  "code": "\`some \${'\\\\\`'} string\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`some \\\\\\\` string\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 35`] = `
+{
+  "code": "\`some \${/\`/} string\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`some /\\\`/ string\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 36`] = `
+{
+  "code": "\`some \${/\\\`/} string\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`some /\\\\\\\`/ string\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 37`] = `
+{
+  "code": "\`some \${/\\\\\`/} string\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`some /\\\\\\\\\\\`/ string\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 38`] = `
+{
+  "code": "\`some \${/\\\\\\\`/} string\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`some /\\\\\\\\\\\\\\\`/ string\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 39`] = `
+{
+  "code": "\`some \${/\${}/} string\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`some /\\\${}/ string\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 40`] = `
+{
+  "code": "\`some \${/$ {}/} string\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`some /$ {}/ string\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 41`] = `
+{
+  "code": "\`some \${/\\\\/} string\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`some /\\\\\\\\/ string\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 42`] = `
+{
+  "code": "\`some \${/\\\\\\b/} string\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`some /\\\\\\\\\\\\b/ string\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 43`] = `
+{
+  "code": "\`some \${/\\\\\\\\/} string\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`some /\\\\\\\\\\\\\\\\/ string\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 44`] = `
+{
+  "code": "\` \${''} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`  \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 45`] = `
+{
+  "code": "\` \${""} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`  \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 46`] = `
+{
+  "code": "\` \${\`\`} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\`  \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 47`] = `
+{
+  "code": "\` \${'\\\`'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\\` \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 48`] = `
+{
+  "code": "\` \${'\\\\\`'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\\\\\\` \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 49`] = `
+{
+  "code": "\` \${'$'}{} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\\${} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 50`] = `
+{
+  "code": "\` \${'\\$'}{} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\\${} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 51`] = `
+{
+  "code": "\` \${'\\\\$'}{} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\\\\\\${} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 52`] = `
+{
+  "code": "\` \${'\\\\$ '}{} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\\\$ {} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 53`] = `
+{
+  "code": "\` \${'\\\\\\$'}{} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\\\\\\${} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 54`] = `
+{
+  "code": "\` \\\\\${'\\\\$'}{} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\\\\\\\\\\${} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 55`] = `
+{
+  "code": "\` $\${'{$'}{} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\\${\\\${} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 56`] = `
+{
+  "code": "\` $\${'\${$'}{} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` $\\\${\\\${} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 57`] = `
+{
+  "code": "\` \${'foo$'}{} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` foo\\\${} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 58`] = `
+{
+  "code": "\` \${\`$\`} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` $ \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 59`] = `
+{
+  "code": "\` \${\`$\`}{} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\\${} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 60`] = `
+{
+  "code": "\` \${\`$\`} {} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` $ {} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 61`] = `
+{
+  "code": "\` \${\`$\`}\${undefined}{} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": [
+    "\` $\${undefined}{} \`;",
+    "\` $undefined{} \`;",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 62`] = `
+{
+  "code": "\` \${\`foo$\`}{} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` foo\\\${} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 63`] = `
+{
+  "code": "\` \${'$'}\${''}{} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": [
+    "\` \\$\${''}{} \`;",
+    "\` \\\${} \`;",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 64`] = `
+{
+  "code": "\` \${'$'}\${\`\`}{} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": [
+    "\` \\$\${\`\`}{} \`;",
+    "\` \\\${} \`;",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 65`] = `
+{
+  "code": "\` \${'foo$'}\${''}\${\`\`}{} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": [
+    "\` foo\\$\${''}{} \`;",
+    "\` foo\\\${} \`;",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 66`] = `
+{
+  "code": "\` $\${'{}'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\\${} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 67`] = `
+{
+  "code": "\` $\${undefined}\${'{}'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": [
+    "\` $undefined\${'{}'} \`;",
+    "\` $undefined{} \`;",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 68`] = `
+{
+  "code": "\` $\${''}\${undefined}\${'{}'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": [
+    "\` $\${undefined}{} \`;",
+    "\` $undefined{} \`;",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 69`] = `
+{
+  "code": "\` \\$\${'{}'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\\${} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 70`] = `
+{
+  "code": "\` $\${'foo'}\${'{'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": [
+    "\` $foo\${'{'} \`;",
+    "\` $foo{ \`;",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 71`] = `
+{
+  "code": "\` $\${'{ foo'}\${'{'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": [
+    "\` \\\${ foo\${'{'} \`;",
+    "\` \\\${ foo{ \`;",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 72`] = `
+{
+  "code": "\` \\\\$\${'{}'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\\\\\\${} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 73`] = `
+{
+  "code": "\` \\\\\\$\${'{}'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\\\\\\${} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 74`] = `
+{
+  "code": "\` foo$\${'{}'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` foo\\\${} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 75`] = `
+{
+  "code": "\` $\${''}\${'{}'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": [
+    "\` \\$\${'{}'} \`;",
+    "\` \\\${} \`;",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 76`] = `
+{
+  "code": "\` $\${''} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` $ \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 77`] = `
+{
+  "code": "\` $\${\`{}\`} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\\${} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 78`] = `
+{
+  "code": "\` $\${\`\`}\${\`{}\`} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": [
+    "\` \\$\${\`{}\`} \`;",
+    "\` \\\${} \`;",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 79`] = `
+{
+  "code": "\` $\${\`\`}\${\`foo{}\`} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": [
+    "\` $\${\`foo{}\`} \`;",
+    "\` $foo{} \`;",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 80`] = `
+{
+  "code": "\` $\${\`\${''}\${\`\${\`\`}\`}\`}\${\`{a}\`} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 5,
+  "fileCount": 1,
+  "output": [
+    "\` \\$\${''}\${\`\${\`\`}\`}\${\`{a}\`} \`;",
+    "\` \\$\${\`\`}{a} \`;",
+    "\` \\\${a} \`;",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 81`] = `
+{
+  "code": "\` $\${''}\${\`{}\`} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": [
+    "\` \\$\${\`{}\`} \`;",
+    "\` \\\${} \`;",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 82`] = `
+{
+  "code": "\` $\${\`\`}\${'{}'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": [
+    "\` \\$\${'{}'} \`;",
+    "\` \\\${} \`;",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 83`] = `
+{
+  "code": "\` $\${''}\${\`\`}\${'{}'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": [
+    "\` \\$\${\`\`}{} \`;",
+    "\` \\\${} \`;",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 84`] = `
+{
+  "code": "\` \${'$'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` $ \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 85`] = `
+{
+  "code": "\` \${'$'}\${'{}'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": [
+    "\` \\$\${'{}'} \`;",
+    "\` \\\${} \`;",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 86`] = `
+{
+  "code": "\` \${'$'}\${''}\${'{'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "output": [
+    "\` \\$\${''}{ \`;",
+    "\` \\\${ \`;",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 87`] = `
+{
+  "code": "\` \${\`
+\\$\`}{} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` 
+\\\${} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 88`] = `
+{
+  "code": "\` \${\`
+\\\\$\`}{} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 2,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` 
+\\\\\\\${} \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 89`] = `
+{
+  "code": "\`\${'\\u00E5'}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "'\\u00E5';",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 90`] = `
+{
+  "code": "\`\${'\\n'}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "'\\n';",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 91`] = `
+{
+  "code": "\` \${'\\u00E5'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\u00E5 \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 92`] = `
+{
+  "code": "\` \${'\\n'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\n \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 93`] = `
+{
+  "code": "\` \${"\\n"} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\n \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 94`] = `
+{
+  "code": "\` \${\`\\n\`} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\n \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 95`] = `
+{
+  "code": "\` \${ 'A\\u0307\\u0323' } \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` A\\u0307\\u0323 \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 96`] = `
+{
+  "code": "\` \${'👨‍👩‍👧‍👦'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` 👨‍👩‍👧‍👦 \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 97`] = `
+{
+  "code": "\` \${'\\ud83d\\udc68'} \`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "\` \\ud83d\\udc68 \`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 98`] = `
+{
+  "code": "
+\`
+this code does not have trailing whitespace: \${' '}\\n even though it might look it.\`;
+    ",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 3,
+        },
+        "start": {
+          "column": 46,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+\`
+this code does not have trailing whitespace:  \\n even though it might look it.\`;
+    ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 99`] = `
+{
+  "code": "
+\`
+this code has trailing position template expression \${'but it isn\\'t whitespace'}
+    \`;
+    ",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 82,
+          "line": 3,
+        },
+        "start": {
+          "column": 53,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+\`
+this code has trailing position template expression but it isn\\'t whitespace
+    \`;
+    ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 100`] = `
+{
+  "code": "
+\`trailing whitespace followed by escaped windows newline: \${' '}\\r\\n\`;
+    ",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 65,
+          "line": 2,
+        },
+        "start": {
+          "column": 59,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+\`trailing whitespace followed by escaped windows newline:  \\r\\n\`;
+    ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 101`] = `
+{
+  "code": "
+\`template literal with interpolations followed by newline: \${\` \${'interpolation'} \`}
+\`;
+    ",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 85,
+          "line": 2,
+        },
+        "start": {
+          "column": 60,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 82,
+          "line": 2,
+        },
+        "start": {
+          "column": 64,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": [
+    "
+\`template literal with interpolations followed by newline:  \${'interpolation'} 
+\`;
+    ",
+    "
+\`template literal with interpolations followed by newline:  interpolation 
+\`;
+    ",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 102`] = `
+{
+  "code": "
+        function func<T extends string>(arg: T) {
+          \`\${arg}\`;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 12,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function func<T extends string>(arg: T) {
+          arg;
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 103`] = `
+{
+  "code": "
+        declare const b: 'b';
+        \`a\${b}\${'c'}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const b: 'b';
+        \`a\${b}c\`;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 104`] = `
+{
+  "code": "
+declare const nested: string, interpolation: string;
+\`use\${\`less\${nested}\${interpolation}\`}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+declare const nested: string, interpolation: string;
+\`useless\${nested}\${interpolation}\`;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 105`] = `
+{
+  "code": "
+        declare const string: 'a';
+        \`\${   string   }\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const string: 'a';
+        string;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 106`] = `
+{
+  "code": "
+        declare const string: 'a';
+        \`\${string}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const string: 'a';
+        string;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 107`] = `
+{
+  "code": "
+        declare const intersection: string & { _brand: 'test-brand' };
+        \`\${intersection}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        declare const intersection: string & { _brand: 'test-brand' };
+        intersection;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 108`] = `
+{
+  "code": "true ? \`\${'test' || ''}\`.trim() : undefined;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "true ? ('test' || '').trim() : undefined;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 109`] = `
+{
+  "code": "type Foo = \`\${1}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Foo = \`1\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 110`] = `
+{
+  "code": "type Foo = \`\${null}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Foo = \`null\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 111`] = `
+{
+  "code": "type Foo = \`\${undefined}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Foo = \`undefined\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 112`] = `
+{
+  "code": "type Foo = \`\${'foo'}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Foo = 'foo';",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 113`] = `
+{
+  "code": "
+type Foo = 'A' | 'B';
+type Bar = \`\${Foo}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+type Foo = 'A' | 'B';
+type Bar = Foo;
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 114`] = `
+{
+  "code": "
+type Foo = 'A' | 'B';
+type Bar = \`\${\`\${Foo}\`}\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 16,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": [
+    "
+type Foo = 'A' | 'B';
+type Bar = \`\${Foo}\`;
+      ",
+    "
+type Foo = 'A' | 'B';
+type Bar = Foo;
+      ",
+  ],
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 115`] = `
+{
+  "code": "type FooBarBaz = \`foo\${'bar'}baz\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type FooBarBaz = \`foobarbaz\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 116`] = `
+{
+  "code": "type FooBar = \`foo\${\`bar\`}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type FooBar = \`foobar\`;",
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unnecessary-template-expression > invalid 117`] = `
+{
+  "code": "type FooBar = \`\${'foo' | 'bar'}\`;",
+  "diagnostics": [
+    {
+      "message": "Template literal expression is unnecessary and can be simplified.",
+      "messageId": "noUnnecessaryTemplateExpression",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-unnecessary-template-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type FooBar = 'foo' | 'bar';",
+  "ruleCount": 1,
+}
+`;

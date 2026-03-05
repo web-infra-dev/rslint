@@ -47,10 +47,10 @@ var NoUnsafeMemberAccessRule = rule.CreateRule(rule.Rule{
 	Name: "no-unsafe-member-access",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		compilerOptions := ctx.Program.Options()
-		isNoImplicitThis := utils.IsStrictCompilerOptionEnabled(
-			compilerOptions,
-			compilerOptions.NoImplicitThis,
-		)
+		// When noImplicitThis is not enabled (considering strict mode), object literal methods
+		// can have implicit any this. We need to use IsStrictCompilerOptionEnabled to properly
+		// handle the case where noImplicitThis is inherited from strict mode.
+		shouldCheckImplicitAnyThis := !utils.IsStrictCompilerOptionEnabled(compilerOptions, compilerOptions.NoImplicitThis)
 
 		stateCache := map[*ast.Node]state{}
 
@@ -82,6 +82,51 @@ var NoUnsafeMemberAccessRule = rule.CreateRule(rule.Rule{
 				}
 			}
 
+			// Note: Control flow differs from upstream typescript-eslint/no-unsafe-member-access
+			//
+			// Upstream logic:
+			//   1. Check if member expression type is any
+			//   2. If any, check this (when !noImplicitThis) to choose message
+			//   3. Report with appropriate message
+			//
+			// Our logic:
+			//   1. Check this first (using IsInObjectLiteralMethod helper)
+			//   2. If in object literal method without noImplicitThis, report and return
+			//   3. Then check member expression type
+			//
+			// Rationale: typescript-go's type checker may not automatically infer implicit any
+			// for this in object literal methods when noImplicitThis=false (unlike TypeScript's
+			// official compiler). We explicitly check IsInObjectLiteralMethod to compensate for
+			// this limitation and ensure consistent behavior with upstream typescript-eslint.
+			//
+			// See: https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/eslint-plugin/src/rules/no-unsafe-member-access.ts
+
+			// Check for unsafe this member access first
+			thisExpression := utils.GetThisExpression(node)
+			if thisExpression != nil {
+				// Check the this type directly for actual any types
+				thisType := utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, thisExpression)
+				if utils.IsTypeAnyType(thisType) {
+					state := stateUnsafe
+					stateCache[node] = state
+
+					property, propertyName := utils.GetPropertyInfo(ctx.SourceFile, node)
+
+					// When noImplicitThis is not enabled and we're in an object literal method,
+					// use a more specific error message suggesting to enable noImplicitThis
+					if shouldCheckImplicitAnyThis {
+						functionNode := utils.GetParentFunctionNode(thisExpression)
+						if functionNode != nil && utils.IsInObjectLiteralMethod(functionNode) {
+							ctx.ReportNode(property, buildUnsafeThisMemberExpressionMessage(propertyName))
+							return state
+						}
+					}
+
+					ctx.ReportNode(property, buildUnsafeThisMemberExpressionMessage(propertyName))
+					return state
+				}
+			}
+
 			t := ctx.TypeChecker.GetTypeAtLocation(expression)
 			state := stateSafe
 			if utils.IsTypeAnyType(t) {
@@ -90,32 +135,7 @@ var NoUnsafeMemberAccessRule = rule.CreateRule(rule.Rule{
 			stateCache[node] = state
 
 			if state == stateUnsafe {
-				var property *ast.Node
-				var propertyName string
-				if ast.IsPropertyAccessExpression(node) {
-					property = node.Name()
-					loc := utils.TrimNodeTextRange(ctx.SourceFile, property)
-					propertyName = "." + ctx.SourceFile.Text()[loc.Pos():loc.End()]
-				} else if ast.IsElementAccessExpression(node) {
-					property = node.AsElementAccessExpression().ArgumentExpression
-					loc := utils.TrimNodeTextRange(ctx.SourceFile, property)
-					propertyName = "[" + ctx.SourceFile.Text()[loc.Pos():loc.End()] + "]"
-				}
-
-				// let messageId: 'unsafeMemberExpression' | 'unsafeThisMemberExpression' =
-				//   'unsafeMemberExpression';
-
-				if !isNoImplicitThis {
-					// `this.foo` or `this.foo[bar]`
-					thisExpression := utils.GetThisExpression(node)
-
-					if thisExpression != nil && utils.IsTypeAnyType(
-						utils.GetConstrainedTypeAtLocation(ctx.TypeChecker, thisExpression)) {
-						ctx.ReportNode(property, buildUnsafeThisMemberExpressionMessage(propertyName))
-						return state
-					}
-				}
-
+				property, propertyName := utils.GetPropertyInfo(ctx.SourceFile, node)
 				ctx.ReportNode(property, buildUnsafeMemberExpressionMessage(propertyName, createDataType(t)))
 			}
 
@@ -129,7 +149,7 @@ var NoUnsafeMemberAccessRule = rule.CreateRule(rule.Rule{
 			ast.KindElementAccessExpression: func(node *ast.Node) {
 				checkMemberExpression(node)
 
-				arg := node.AsElementAccessExpression().ArgumentExpression
+				arg := ast.SkipParentheses(node.AsElementAccessExpression().ArgumentExpression)
 				// x[1]
 				if ast.IsLiteralExpression(arg) {
 					// perf optimizations - literals can obviously never be `any`
