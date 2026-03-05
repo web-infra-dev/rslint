@@ -1,0 +1,1402 @@
+// Rstest Snapshot v1
+
+exports[`explicit-member-accessibility > invalid 1`] = `
+{
+  "code": "
+export class XXXX {
+  public constructor(readonly value: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on parameter property value.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 2`] = `
+{
+  "code": "
+export class WithParameterProperty {
+  public constructor(readonly value: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on parameter property value.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 3`] = `
+{
+  "code": "
+export class XXXX {
+  public constructor(readonly samosa: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on parameter property samosa.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 4`] = `
+{
+  "code": "
+class Test {
+  public constructor(readonly foo: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on parameter property foo.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 5`] = `
+{
+  "code": "
+class Test {
+  x: number;
+  public getX() {
+    return this.x;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on class property x.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 6`] = `
+{
+  "code": "
+class Test {
+  private x: number;
+  getX() {
+    return this.x;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on method definition getX.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 7`] = `
+{
+  "code": "
+class Test {
+  x?: number;
+  getX?() {
+    return this.x;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on class property x.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+    {
+      "message": "Missing accessibility modifier on method definition getX.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 8`] = `
+{
+  "code": "
+class Test {
+  protected name: string;
+  protected foo?: string;
+  public getX() {
+    return this.x;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Public accessibility modifier on method definition getX.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Test {
+  protected name: string;
+  protected foo?: string;
+  getX() {
+    return this.x;
+  }
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 9`] = `
+{
+  "code": "
+class Test {
+  protected name: string;
+  public foo?: string;
+  getX() {
+    return this.x;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Public accessibility modifier on class property foo.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Test {
+  protected name: string;
+  foo?: string;
+  getX() {
+    return this.x;
+  }
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 10`] = `
+{
+  "code": "
+class Test {
+  public x: number;
+  public getX() {
+    return this.x;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Public accessibility modifier on class property x.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+    {
+      "message": "Public accessibility modifier on method definition getX.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "output": "
+class Test {
+  x: number;
+  getX() {
+    return this.x;
+  }
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 11`] = `
+{
+  "code": "
+class Test {
+  private x: number;
+  constructor(x: number) {
+    this.x = x;
+  }
+  get internalValue() {
+    return this.x;
+  }
+  set internalValue(value: number) {
+    this.x = value;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on get property accessor internalValue.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+    {
+      "message": "Missing accessibility modifier on set property accessor internalValue.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 10,
+        },
+        "start": {
+          "column": 3,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 12`] = `
+{
+  "code": "
+class Test {
+  private x: number;
+  constructor(x: number) {
+    this.x = x;
+  }
+  get internalValue() {
+    return this.x;
+  }
+  set internalValue(value: number) {
+    this.x = value;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on method definition constructor.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+    {
+      "message": "Missing accessibility modifier on get property accessor internalValue.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+    {
+      "message": "Missing accessibility modifier on set property accessor internalValue.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 10,
+        },
+        "start": {
+          "column": 3,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 13`] = `
+{
+  "code": "
+class Test {
+  constructor(public x: number) {}
+  public foo(): string {
+    return 'foo';
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on method definition constructor.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 14`] = `
+{
+  "code": "
+class Test {
+  constructor(public x: number) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on method definition constructor.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 15`] = `
+{
+  "code": "
+class Test {
+  constructor(public readonly x: number) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Public accessibility modifier on parameter property x.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Test {
+  constructor(readonly x: number) {}
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 16`] = `
+{
+  "code": "
+class Test {
+  x = 2;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on class property x.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 17`] = `
+{
+  "code": "
+class Test {
+  public x = 2;
+  private x = 2;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Public accessibility modifier on class property x.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Test {
+  x = 2;
+  private x = 2;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 18`] = `
+{
+  "code": "
+class Test {
+  constructor(public x: any[]) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on method definition constructor.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 19`] = `
+{
+  "code": "
+class Test {
+  public /*public*/constructor(private foo: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Public accessibility modifier on method definition constructor.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Test {
+  /*public*/constructor(private foo: string) {}
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 20`] = `
+{
+  "code": "
+class Test {
+  @public
+  public foo() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Public accessibility modifier on method definition foo.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Test {
+  @public
+  foo() {}
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 21`] = `
+{
+  "code": "
+class Test {
+  @public
+  public foo;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Public accessibility modifier on class property foo.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Test {
+  @public
+  foo;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 22`] = `
+{
+  "code": "
+class Test {
+  public foo = '';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Public accessibility modifier on class property foo.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Test {
+  foo = '';
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 23`] = `
+{
+  "code": "
+class Test {
+  constructor(public/* Hi there */ readonly foo) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Public accessibility modifier on parameter property foo.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Test {
+  constructor(/* Hi there */ readonly foo) {}
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 24`] = `
+{
+  "code": "
+class Test {
+  constructor(public readonly foo: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Public accessibility modifier on parameter property foo.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class Test {
+  constructor(readonly foo: string) {}
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 25`] = `
+{
+  "code": "
+class EnsureWhiteSPaceSpan {
+  public constructor() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Public accessibility modifier on method definition constructor.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class EnsureWhiteSPaceSpan {
+  constructor() {}
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 26`] = `
+{
+  "code": "
+class EnsureWhiteSPaceSpan {
+  public /* */ constructor() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Public accessibility modifier on method definition constructor.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+class EnsureWhiteSPaceSpan {
+  /* */ constructor() {}
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 27`] = `
+{
+  "code": "
+class Test {
+  public 'foo' = 1;
+  public 'foo foo' = 2;
+  public 'bar'() {}
+  public 'bar bar'() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Public accessibility modifier on class property 'foo'.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+    {
+      "message": "Public accessibility modifier on class property 'foo foo'.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+    {
+      "message": "Public accessibility modifier on method definition 'bar'.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+    {
+      "message": "Public accessibility modifier on method definition 'bar bar'.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "output": "
+class Test {
+  'foo' = 1;
+  'foo foo' = 2;
+  'bar'() {}
+  'bar bar'() {}
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 28`] = `
+{
+  "code": "
+abstract class SomeClass {
+  abstract method(): string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on method definition method.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 29`] = `
+{
+  "code": "
+abstract class SomeClass {
+  public abstract method(): string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Public accessibility modifier on method definition method.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+abstract class SomeClass {
+  abstract method(): string;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 30`] = `
+{
+  "code": "
+abstract class SomeClass {
+  abstract x: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on class property x.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 31`] = `
+{
+  "code": "
+abstract class SomeClass {
+  public abstract x: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Public accessibility modifier on class property x.",
+      "messageId": "unwantedPublicAccessibility",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+abstract class SomeClass {
+  abstract x: string;
+}
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 32`] = `
+{
+  "code": "
+class SomeClass {
+  accessor foo = 1;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on class property foo.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 33`] = `
+{
+  "code": "
+abstract class SomeClass {
+  abstract accessor foo: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on class property foo.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 34`] = `
+{
+  "code": "
+class DecoratedClass {
+  constructor(@foo @bar() readonly arg: string) {}
+  @foo @bar() x: string;
+  @foo @bar() getX() {
+    return this.x;
+  }
+  @foo
+  @bar()
+  get y() {
+    return this.x;
+  }
+  @foo @bar() set z(@foo @bar() value: x) {
+    this.x = x;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on method definition constructor.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+    {
+      "message": "Missing accessibility modifier on parameter property arg.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 3,
+        },
+        "start": {
+          "column": 27,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+    {
+      "message": "Missing accessibility modifier on class property x.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+    {
+      "message": "Missing accessibility modifier on method definition getX.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 5,
+        },
+        "start": {
+          "column": 15,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+    {
+      "message": "Missing accessibility modifier on get property accessor y.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 10,
+        },
+        "start": {
+          "column": 3,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+    {
+      "message": "Missing accessibility modifier on set property accessor z.",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 13,
+        },
+        "start": {
+          "column": 15,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 6,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-member-accessibility > invalid 35`] = `
+{
+  "code": "
+abstract class SomeClass {
+  abstract ['computed-method-name'](): string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing accessibility modifier on method definition "computed-method-name".",
+      "messageId": "missingAccessibility",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-member-accessibility",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
