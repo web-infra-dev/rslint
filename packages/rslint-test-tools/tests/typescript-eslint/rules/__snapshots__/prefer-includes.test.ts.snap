@@ -1,0 +1,1141 @@
+// Rstest Snapshot v1
+
+exports[`prefer-includes > invalid 1`] = `
+{
+  "code": "
+        function f(a: string): void {
+          a.indexOf(b) !== -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: string): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 2`] = `
+{
+  "code": "
+        function f(a: string): void {
+          a.indexOf(b) != -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: string): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 3`] = `
+{
+  "code": "
+        function f(a: string): void {
+          a.indexOf(b) > -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: string): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 4`] = `
+{
+  "code": "
+        function f(a: string): void {
+          a.indexOf(b) >= 0;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: string): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 5`] = `
+{
+  "code": "
+        function f(a: string): void {
+          a.indexOf(b) === -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: string): void {
+          !a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 6`] = `
+{
+  "code": "
+        function f(a: string): void {
+          a.indexOf(b) == -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: string): void {
+          !a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 7`] = `
+{
+  "code": "
+        function f(a: string): void {
+          a.indexOf(b) <= -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: string): void {
+          !a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 8`] = `
+{
+  "code": "
+        function f(a: string): void {
+          a.indexOf(b) < 0;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: string): void {
+          !a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 9`] = `
+{
+  "code": "
+        function f(a?: string): void {
+          a?.indexOf(b) === -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 10`] = `
+{
+  "code": "
+        function f(a?: { b: string[] }, c: string): void {
+          a?.b.indexOf(c) === -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 11`] = `
+{
+  "code": "
+        function f(a?: string): void {
+          a?.indexOf(b) !== -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 12`] = `
+{
+  "code": "
+        function f(a: string): void {
+          /bar/.test(a);
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use \`String#includes()\` method with a string instead.",
+      "messageId": "preferStringIncludes",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: string): void {
+          a.includes('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 13`] = `
+{
+  "code": "
+        function f(a: string): void {
+          /bar/.test((1 + 1, a));
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use \`String#includes()\` method with a string instead.",
+      "messageId": "preferStringIncludes",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: string): void {
+          (1 + 1, a).includes('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 14`] = `
+{
+  "code": "
+        function f(a: string): void {
+          /\\0'\\\\\\n\\r\\v\\t\\f/.test(a);
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use \`String#includes()\` method with a string instead.",
+      "messageId": "preferStringIncludes",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: string): void {
+          a.includes('\\0\\'\\\\\\n\\r\\v\\t\\f');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 15`] = `
+{
+  "code": "
+        function f(a: string[]): void {
+          /bar/.test(a);
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use \`String#includes()\` method with a string instead.",
+      "messageId": "preferStringIncludes",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 16`] = `
+{
+  "code": "
+        const pattern = /bar/;
+        function f(a: string): void {
+          pattern.test(a);
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use \`String#includes()\` method with a string instead.",
+      "messageId": "preferStringIncludes",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        const pattern = /bar/;
+        function f(a: string): void {
+          a.includes('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 17`] = `
+{
+  "code": "
+        const pattern = new RegExp('bar');
+        function f(a: string): void {
+          pattern.test(a);
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use \`String#includes()\` method with a string instead.",
+      "messageId": "preferStringIncludes",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        const pattern = new RegExp('bar');
+        function f(a: string): void {
+          a.includes('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 18`] = `
+{
+  "code": "
+        const pattern = /bar/;
+        function f(a: string, b: string): void {
+          pattern.test(a + b);
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use \`String#includes()\` method with a string instead.",
+      "messageId": "preferStringIncludes",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        const pattern = /bar/;
+        function f(a: string, b: string): void {
+          (a + b).includes('bar');
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 19`] = `
+{
+  "code": "
+        function f(a: any[]): void {
+          a.indexOf(b) !== -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: any[]): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 20`] = `
+{
+  "code": "
+        function f(a: ReadonlyArray<any>): void {
+          a.indexOf(b) !== -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: ReadonlyArray<any>): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 21`] = `
+{
+  "code": "
+        function f(a: Int8Array): void {
+          a.indexOf(b) !== -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: Int8Array): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 22`] = `
+{
+  "code": "
+        function f(a: Int16Array): void {
+          a.indexOf(b) !== -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: Int16Array): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 23`] = `
+{
+  "code": "
+        function f(a: Int32Array): void {
+          a.indexOf(b) !== -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: Int32Array): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 24`] = `
+{
+  "code": "
+        function f(a: Uint8Array): void {
+          a.indexOf(b) !== -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: Uint8Array): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 25`] = `
+{
+  "code": "
+        function f(a: Uint16Array): void {
+          a.indexOf(b) !== -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: Uint16Array): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 26`] = `
+{
+  "code": "
+        function f(a: Uint32Array): void {
+          a.indexOf(b) !== -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: Uint32Array): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 27`] = `
+{
+  "code": "
+        function f(a: Float32Array): void {
+          a.indexOf(b) !== -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: Float32Array): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 28`] = `
+{
+  "code": "
+        function f(a: Float64Array): void {
+          a.indexOf(b) !== -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: Float64Array): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 29`] = `
+{
+  "code": "
+        function f<T>(a: T[] | ReadonlyArray<T>): void {
+          a.indexOf(b) !== -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f<T>(a: T[] | ReadonlyArray<T>): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 30`] = `
+{
+  "code": "
+        function f<
+          T,
+          U extends
+            | T[]
+            | ReadonlyArray<T>
+            | Int8Array
+            | Uint8Array
+            | Int16Array
+            | Uint16Array
+            | Int32Array
+            | Uint32Array
+            | Float32Array
+            | Float64Array,
+        >(a: U): void {
+          a.indexOf(b) !== -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 16,
+        },
+        "start": {
+          "column": 11,
+          "line": 16,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f<
+          T,
+          U extends
+            | T[]
+            | ReadonlyArray<T>
+            | Int8Array
+            | Uint8Array
+            | Int16Array
+            | Uint16Array
+            | Int32Array
+            | Uint32Array
+            | Float32Array
+            | Float64Array,
+        >(a: U): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 31`] = `
+{
+  "code": "
+        type UserDefined = {
+          indexOf(x: any): number;
+          includes(x: any): boolean;
+        };
+        function f(a: UserDefined): void {
+          a.indexOf(b) !== -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 7,
+        },
+        "start": {
+          "column": 11,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        type UserDefined = {
+          indexOf(x: any): number;
+          includes(x: any): boolean;
+        };
+        function f(a: UserDefined): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 32`] = `
+{
+  "code": "
+        function f(a: Readonly<any[]>): void {
+          a.indexOf(b) !== -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f(a: Readonly<any[]>): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
