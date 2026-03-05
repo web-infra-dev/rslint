@@ -1,0 +1,2613 @@
+// Rstest Snapshot v1
+
+exports[`naming-convention > invalid 1`] = `
+{
+  "code": "const x_x = 1;",
+  "diagnostics": [
+    {
+      "message": "Variable name \`x_x\` must match one of the following formats: camelCase, UPPER_CASE",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 2`] = `
+{
+  "code": "const x_x = 1;",
+  "diagnostics": [
+    {
+      "message": "Variable name \`x_x\` must match one of the following formats: camelCase, UPPER_CASE",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 3`] = `
+{
+  "code": "
+        const child_process = require('child_process');
+      ",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`child_process\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 4`] = `
+{
+  "code": "
+        declare const any_camelCase01: any;
+        declare const any_camelCase02: any | null;
+        declare const any_camelCase03: any | null | undefined;
+        declare const string_camelCase01: string;
+        declare const string_camelCase02: string | null;
+        declare const string_camelCase03: string | null | undefined;
+        declare const string_camelCase04: 'a' | null | undefined;
+        declare const string_camelCase05: string | 'a' | null | undefined;
+        declare const number_camelCase06: number;
+        declare const number_camelCase07: number | null;
+        declare const number_camelCase08: number | null | undefined;
+        declare const number_camelCase09: 1 | null | undefined;
+        declare const number_camelCase10: number | 2 | null | undefined;
+        declare const boolean_camelCase11: boolean;
+        declare const boolean_camelCase12: boolean | null;
+        declare const boolean_camelCase13: boolean | null | undefined;
+        declare const boolean_camelCase14: true | null | undefined;
+        declare const boolean_camelCase15: false | null | undefined;
+        declare const boolean_camelCase16: true | false | null | undefined;
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable name \`any_camelCase01\` must match one of the following formats: UPPER_CASE. The format was tested against \`camelCase01\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`any_camelCase02\` must match one of the following formats: UPPER_CASE. The format was tested against \`camelCase02\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 3,
+        },
+        "start": {
+          "column": 23,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`any_camelCase03\` must match one of the following formats: UPPER_CASE. The format was tested against \`camelCase03\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 4,
+        },
+        "start": {
+          "column": 23,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`string_camelCase01\` must match one of the following formats: snake_case. The format was tested against \`camelCase01\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 5,
+        },
+        "start": {
+          "column": 23,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`string_camelCase02\` must match one of the following formats: snake_case. The format was tested against \`camelCase02\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 6,
+        },
+        "start": {
+          "column": 23,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`string_camelCase03\` must match one of the following formats: snake_case. The format was tested against \`camelCase03\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 7,
+        },
+        "start": {
+          "column": 23,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`string_camelCase04\` must match one of the following formats: snake_case. The format was tested against \`camelCase04\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 8,
+        },
+        "start": {
+          "column": 23,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`string_camelCase05\` must match one of the following formats: snake_case. The format was tested against \`camelCase05\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 9,
+        },
+        "start": {
+          "column": 23,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`number_camelCase06\` must match one of the following formats: snake_case. The format was tested against \`camelCase06\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 10,
+        },
+        "start": {
+          "column": 23,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`number_camelCase07\` must match one of the following formats: snake_case. The format was tested against \`camelCase07\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 11,
+        },
+        "start": {
+          "column": 23,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`number_camelCase08\` must match one of the following formats: snake_case. The format was tested against \`camelCase08\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 12,
+        },
+        "start": {
+          "column": 23,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`number_camelCase09\` must match one of the following formats: snake_case. The format was tested against \`camelCase09\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 13,
+        },
+        "start": {
+          "column": 23,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`number_camelCase10\` must match one of the following formats: snake_case. The format was tested against \`camelCase10\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 14,
+        },
+        "start": {
+          "column": 23,
+          "line": 14,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`boolean_camelCase11\` must match one of the following formats: snake_case. The format was tested against \`camelCase11\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 15,
+        },
+        "start": {
+          "column": 23,
+          "line": 15,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`boolean_camelCase12\` must match one of the following formats: snake_case. The format was tested against \`camelCase12\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 16,
+        },
+        "start": {
+          "column": 23,
+          "line": 16,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`boolean_camelCase13\` must match one of the following formats: snake_case. The format was tested against \`camelCase13\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 17,
+        },
+        "start": {
+          "column": 23,
+          "line": 17,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`boolean_camelCase14\` must match one of the following formats: snake_case. The format was tested against \`camelCase14\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 18,
+        },
+        "start": {
+          "column": 23,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`boolean_camelCase15\` must match one of the following formats: snake_case. The format was tested against \`camelCase15\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 19,
+        },
+        "start": {
+          "column": 23,
+          "line": 19,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`boolean_camelCase16\` must match one of the following formats: snake_case. The format was tested against \`camelCase16\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 20,
+        },
+        "start": {
+          "column": 23,
+          "line": 20,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 19,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 5`] = `
+{
+  "code": "
+        declare const function_camelCase1: () => void;
+        declare const function_camelCase2: (() => void) | null;
+        declare const function_camelCase3: (() => void) | null | undefined;
+        declare const function_camelCase4:
+          | (() => void)
+          | (() => string)
+          | null
+          | undefined;
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable name \`function_camelCase1\` must match one of the following formats: snake_case. The format was tested against \`camelCase1\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`function_camelCase2\` must match one of the following formats: snake_case. The format was tested against \`camelCase2\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 3,
+        },
+        "start": {
+          "column": 23,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`function_camelCase3\` must match one of the following formats: snake_case. The format was tested against \`camelCase3\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 4,
+        },
+        "start": {
+          "column": 23,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`function_camelCase4\` must match one of the following formats: snake_case. The format was tested against \`camelCase4\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 5,
+        },
+        "start": {
+          "column": 23,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 6`] = `
+{
+  "code": "
+        declare const array_camelCase1: Array<number>;
+        declare const array_camelCase2: ReadonlyArray<number> | null;
+        declare const array_camelCase3: number[] | null | undefined;
+        declare const array_camelCase4: readonly number[] | null | undefined;
+        declare const array_camelCase5:
+          | number[]
+          | (number | string)[]
+          | null
+          | undefined;
+        declare const array_camelCase6: [] | null | undefined;
+        declare const array_camelCase7: [number] | null | undefined;
+        declare const array_camelCase8:
+          | readonly number[]
+          | Array<string>
+          | [boolean]
+          | null
+          | undefined;
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable name \`array_camelCase1\` must match one of the following formats: snake_case. The format was tested against \`camelCase1\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`array_camelCase2\` must match one of the following formats: snake_case. The format was tested against \`camelCase2\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 3,
+        },
+        "start": {
+          "column": 23,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`array_camelCase3\` must match one of the following formats: snake_case. The format was tested against \`camelCase3\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 4,
+        },
+        "start": {
+          "column": 23,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`array_camelCase4\` must match one of the following formats: snake_case. The format was tested against \`camelCase4\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 5,
+        },
+        "start": {
+          "column": 23,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`array_camelCase5\` must match one of the following formats: snake_case. The format was tested against \`camelCase5\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 6,
+        },
+        "start": {
+          "column": 23,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`array_camelCase6\` must match one of the following formats: snake_case. The format was tested against \`camelCase6\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 11,
+        },
+        "start": {
+          "column": 23,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`array_camelCase7\` must match one of the following formats: snake_case. The format was tested against \`camelCase7\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 12,
+        },
+        "start": {
+          "column": 23,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`array_camelCase8\` must match one of the following formats: snake_case. The format was tested against \`camelCase8\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 13,
+        },
+        "start": {
+          "column": 23,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 8,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 7`] = `
+{
+  "code": "
+        let unused_foo = 'a';
+        const _unused_foo = 1;
+        interface IFoo {}
+        class IBar {}
+        function fooBar() {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`unused_foo\` must not match the RegExp: ^unused_\\w",
+      "messageId": "satisfyCustom",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`_unused_foo\` must not match the RegExp: ^unused_\\w",
+      "messageId": "satisfyCustom",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`IFoo\` must not match the RegExp: ^I[A-Z]",
+      "messageId": "satisfyCustom",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 4,
+        },
+        "start": {
+          "column": 19,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`IBar\` must not match the RegExp: ^I[A-Z]",
+      "messageId": "satisfyCustom",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 5,
+        },
+        "start": {
+          "column": 15,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Function name \`fooBar\` must match the RegExp: function",
+      "messageId": "satisfyCustom",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 6,
+        },
+        "start": {
+          "column": 18,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 5,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 8`] = `
+{
+  "code": "
+        let unused_foo = 'a';
+        const _unused_foo = 1;
+        function foo_bar() {}
+        interface IFoo {}
+        class IBar {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable name \`unused_foo\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`_unused_foo\` must match one of the following formats: camelCase. The format was tested against \`unused_foo\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Function name \`foo_bar\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 4,
+        },
+        "start": {
+          "column": 18,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Interface name \`IFoo\` must not match the RegExp: ^I[A-Z]",
+      "messageId": "satisfyCustom",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Class name \`IBar\` must not match the RegExp: ^I[A-Z]",
+      "messageId": "satisfyCustom",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 6,
+        },
+        "start": {
+          "column": 15,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 5,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 9`] = `
+{
+  "code": "
+        const foo = {
+          'Property Name': 'asdf',
+        };
+      ",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`Property Name\` must match one of the following formats: strictCamelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 10`] = `
+{
+  "code": "
+        const myfoo_bar = 'abcs';
+        function fun(myfoo: string) {}
+        class foo {
+          Myfoo: string;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable name \`myfoo_bar\` must match one of the following formats: PascalCase. The format was tested against \`foo_bar\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 2,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Parameter name \`myfoo\` must match one of the following formats: PascalCase. The format was tested against \`foo\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 22,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`Myfoo\` must match one of the following formats: PascalCase. The format was tested against \`foo\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 11`] = `
+{
+  "code": "
+        class foo {
+          private readonly fooBar: boolean;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`fooBar\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 28,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 12`] = `
+{
+  "code": "
+        function my_foo_bar() {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Function name \`my_foo_bar\` must match one of the following formats: PascalCase. The format was tested against \`_foo_bar\`",
+      "messageId": "doesNotMatchFormatTrimmed",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 18,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 13`] = `
+{
+  "code": "
+        class SomeClass {
+          static otherConstant = 'hello';
+        }
+
+        export const { otherConstant } = SomeClass;
+      ",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`otherConstant\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 14`] = `
+{
+  "code": "
+        declare class Foo {
+          Bar(Baz: string): void;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter name \`Baz\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 15`] = `
+{
+  "code": "
+        export const PascalCaseVar = 1;
+        export enum PascalCaseEnum {}
+        export class PascalCaseClass {}
+        export function PascalCaseFunction() {}
+        export interface PascalCaseInterface {}
+        export type PascalCaseType = {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable name \`PascalCaseVar\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 2,
+        },
+        "start": {
+          "column": 22,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Enum name \`PascalCaseEnum\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Class name \`PascalCaseClass\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 4,
+        },
+        "start": {
+          "column": 22,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Function name \`PascalCaseFunction\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 5,
+        },
+        "start": {
+          "column": 25,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Interface name \`PascalCaseInterface\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 6,
+        },
+        "start": {
+          "column": 26,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Type Alias name \`PascalCaseType\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 7,
+        },
+        "start": {
+          "column": 21,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 6,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 16`] = `
+{
+  "code": "
+        const PascalCaseVar = 1;
+        enum PascalCaseEnum {}
+        class PascalCaseClass {}
+        function PascalCaseFunction() {}
+        interface PascalCaseInterface {}
+        type PascalCaseType = {};
+        export {
+          PascalCaseVar,
+          PascalCaseEnum,
+          PascalCaseClass,
+          PascalCaseFunction,
+          PascalCaseInterface,
+          PascalCaseType,
+        };
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable name \`PascalCaseVar\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Enum name \`PascalCaseEnum\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 14,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Class name \`PascalCaseClass\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 4,
+        },
+        "start": {
+          "column": 15,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Function name \`PascalCaseFunction\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 5,
+        },
+        "start": {
+          "column": 18,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Interface name \`PascalCaseInterface\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 6,
+        },
+        "start": {
+          "column": 19,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Type Alias name \`PascalCaseType\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 7,
+        },
+        "start": {
+          "column": 14,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 6,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 17`] = `
+{
+  "code": "
+        const PascalCaseVar = 1;
+        function PascalCaseFunction() {}
+        declare function PascalCaseDeclaredFunction();
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable name \`PascalCaseVar\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 2,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Function name \`PascalCaseFunction\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Function name \`PascalCaseDeclaredFunction\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 4,
+        },
+        "start": {
+          "column": 26,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 18`] = `
+{
+  "code": "
+        const { some_name1 } = {};
+        const { some_name2 = 2 } = {};
+        const { ignored: IgnoredDueToModifiers1 } = {};
+        const { ignored: IgnoredDueToModifiers2 = 3 } = {};
+        const IgnoredDueToModifiers3 = 1;
+      ",
+  "diagnostics": [
+    {
+      "message": "Variable name \`some_name1\` must match one of the following formats: UPPER_CASE",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Variable name \`some_name2\` must match one of the following formats: UPPER_CASE",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 17,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 19`] = `
+{
+  "code": "
+        export function Foo(
+          { aName },
+          { anotherName = 1 },
+          { ignored: IgnoredDueToModifiers1 },
+          { ignored: IgnoredDueToModifiers1 = 2 },
+          IgnoredDueToModifiers2,
+        ) {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter name \`aName\` must match one of the following formats: UPPER_CASE",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Parameter name \`anotherName\` must match one of the following formats: UPPER_CASE",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 4,
+        },
+        "start": {
+          "column": 13,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 20`] = `
+{
+  "code": "
+        class Ignored {
+          private static abstract readonly some_name;
+          IgnoredDueToModifiers = 1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Class Property name \`some_name\` must match one of the following formats: UPPER_CASE",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 3,
+        },
+        "start": {
+          "column": 44,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 21`] = `
+{
+  "code": "
+        class Ignored {
+          constructor(
+            private readonly some_name,
+            IgnoredDueToModifiers,
+          ) {}
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Parameter Property name \`some_name\` must match one of the following formats: UPPER_CASE",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 4,
+        },
+        "start": {
+          "column": 30,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 22`] = `
+{
+  "code": "
+        class Ignored {
+          private static abstract some_name() {}
+          IgnoredDueToModifiers() {}
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Class Method name \`some_name\` must match one of the following formats: UPPER_CASE",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 3,
+        },
+        "start": {
+          "column": 35,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 23`] = `
+{
+  "code": "
+        class Ignored {
+          private static get some_name() {}
+          get IgnoredDueToModifiers() {}
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`some_name\` must match one of the following formats: UPPER_CASE",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 3,
+        },
+        "start": {
+          "column": 30,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 24`] = `
+{
+  "code": "
+        abstract class some_name {}
+        class IgnoredDueToModifier {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Class name \`some_name\` must match one of the following formats: UPPER_CASE",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 2,
+        },
+        "start": {
+          "column": 24,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 25`] = `
+{
+  "code": "
+        const UnusedVar = 1;
+        function UnusedFunc(
+          // this line is intentionally broken out
+          UnusedParam: string,
+        ) {}
+        class UnusedClass {}
+        interface UnusedInterface {}
+        type UnusedType<
+          // this line is intentionally broken out
+          UnusedTypeParam,
+        > = {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`UnusedVar\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 2,
+        },
+        "start": {
+          "column": 15,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`UnusedFunc\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 3,
+        },
+        "start": {
+          "column": 18,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`UnusedParam\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`UnusedClass\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 7,
+        },
+        "start": {
+          "column": 15,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`UnusedInterface\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 8,
+        },
+        "start": {
+          "column": 19,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`UnusedType\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 9,
+        },
+        "start": {
+          "column": 14,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`UnusedTypeParam\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 11,
+        },
+        "start": {
+          "column": 11,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 7,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 26`] = `
+{
+  "code": "
+        const ignored1 = {
+          'a a': 1,
+          'b b'() {},
+          get 'c c'() {
+            return 1;
+          },
+          set 'd d'(value: string) {},
+        };
+        class ignored2 {
+          'a a' = 1;
+          'b b'() {}
+          get 'c c'() {
+            return 1;
+          }
+          set 'd d'(value: string) {}
+        }
+        interface ignored3 {
+          'a a': 1;
+          'b b'(): void;
+        }
+        type ignored4 = {
+          'a a': 1;
+          'b b'(): void;
+        };
+        enum ignored5 {
+          'a a',
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`a a\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`b b\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`c c\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 5,
+        },
+        "start": {
+          "column": 15,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`d d\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 8,
+        },
+        "start": {
+          "column": 15,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`a a\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 11,
+        },
+        "start": {
+          "column": 11,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`b b\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 12,
+        },
+        "start": {
+          "column": 11,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`c c\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 13,
+        },
+        "start": {
+          "column": 15,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`d d\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 16,
+        },
+        "start": {
+          "column": 15,
+          "line": 16,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`a a\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 19,
+        },
+        "start": {
+          "column": 11,
+          "line": 19,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`b b\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 20,
+        },
+        "start": {
+          "column": 11,
+          "line": 20,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`a a\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 23,
+        },
+        "start": {
+          "column": 11,
+          "line": 23,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`b b\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 24,
+        },
+        "start": {
+          "column": 11,
+          "line": 24,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`a a\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 27,
+        },
+        "start": {
+          "column": 11,
+          "line": 27,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 13,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 27`] = `
+{
+  "code": "
+        type Foo = {
+          'foo     Bar': string;
+          '': string;
+          '0': string;
+          'foo': string;
+          'foo-bar': string;
+          '#foo-bar': string;
+        };
+
+        interface Bar {
+          'boo-----foo': string;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`foo     Bar\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 11,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`0\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`foo-bar\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 7,
+        },
+        "start": {
+          "column": 11,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`#foo-bar\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 8,
+        },
+        "start": {
+          "column": 11,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`boo-----foo\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 12,
+        },
+        "start": {
+          "column": 11,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 6,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 28`] = `
+{
+  "code": "
+        class foo {
+          public Bar() {
+            return 42;
+          }
+          public async async_bar() {
+            return 42;
+          }
+          // ❌ error
+          public async asyncBar() {
+            return 42;
+          }
+          // ❌ error
+          public AsyncBar2 = async () => {
+            return 42;
+          };
+          // ❌ error
+          public AsyncBar3 = async function () {
+            return 42;
+          };
+        }
+        abstract class foo {
+          public abstract Bar(): number;
+          public abstract async async_bar(): number;
+          // ❌ error
+          public abstract async ASYNC_BAR(): number;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`asyncBar\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 10,
+        },
+        "start": {
+          "column": 24,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`AsyncBar2\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 14,
+        },
+        "start": {
+          "column": 18,
+          "line": 14,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`AsyncBar3\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 18,
+        },
+        "start": {
+          "column": 18,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`ASYNC_BAR\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 26,
+        },
+        "start": {
+          "column": 33,
+          "line": 26,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 29`] = `
+{
+  "code": "
+        const obj = {
+          Bar() {
+            return 42;
+          },
+          async async_bar() {
+            return 42;
+          },
+          // ❌ error
+          async AsyncBar() {
+            return 42;
+          },
+          // ❌ error
+          AsyncBar2: async () => {
+            return 42;
+          },
+          // ❌ error
+          AsyncBar3: async function () {
+            return 42;
+          },
+        };
+      ",
+  "diagnostics": [
+    {
+      "message": "Object Literal Method name \`AsyncBar\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 10,
+        },
+        "start": {
+          "column": 17,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Object Literal Method name \`AsyncBar2\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 14,
+        },
+        "start": {
+          "column": 11,
+          "line": 14,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Object Literal Method name \`AsyncBar3\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 18,
+        },
+        "start": {
+          "column": 11,
+          "line": 18,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 30`] = `
+{
+  "code": "
+        const syncbar1 = () => {};
+        function syncBar2() {}
+        const syncBar3 = function syncBar4() {};
+
+        // ❌ error
+        const AsyncBar1 = async () => {};
+        const async_bar1 = async () => {};
+        const async_bar3 = async function async_bar4() {};
+        async function async_bar2() {}
+        // ❌ error
+        const asyncBar5 = async function async_bar6() {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`AsyncBar1\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 7,
+        },
+        "start": {
+          "column": 15,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`asyncBar5\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 12,
+        },
+        "start": {
+          "column": 15,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 31`] = `
+{
+  "code": "
+        const syncbar1 = () => {};
+        function syncBar2() {}
+        const syncBar3 = function syncBar4() {};
+
+        const async_bar1 = async () => {};
+        // ❌ error
+        async function asyncBar2() {}
+        const async_bar3 = async function async_bar4() {};
+        async function async_bar2() {}
+        // ❌ error
+        const async_bar3 = async function ASYNC_BAR4() {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`asyncBar2\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 8,
+        },
+        "start": {
+          "column": 24,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`ASYNC_BAR4\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 12,
+        },
+        "start": {
+          "column": 43,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 32`] = `
+{
+  "code": "
+        class foo extends bar {
+          public someAttribute = 1;
+          public override some_attribute_override = 1;
+          // ❌ error
+          public override someAttributeOverride = 1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`someAttributeOverride\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 6,
+        },
+        "start": {
+          "column": 27,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 33`] = `
+{
+  "code": "
+        class foo extends bar {
+          public override some_method_override() {
+            return 42;
+          }
+          // ❌ error
+          public override someMethodOverride() {
+            return 42;
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`someMethodOverride\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 7,
+        },
+        "start": {
+          "column": 27,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 34`] = `
+{
+  "code": "
+        class foo extends bar {
+          public get someGetter(): string;
+          public override get some_getter_override(): string;
+          // ❌ error
+          public override get someGetterOverride(): string;
+          public set someSetter(val: string);
+          public override set some_setter_override(val: string);
+          // ❌ error
+          public override set someSetterOverride(val: string);
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`someGetterOverride\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 6,
+        },
+        "start": {
+          "column": 31,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`someSetterOverride\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 10,
+        },
+        "start": {
+          "column": 31,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 35`] = `
+{
+  "code": "
+        class foo {
+          private firstPrivateField = 1;
+          // ❌ error
+          private first_private_field = 1;
+          // ❌ error
+          #secondPrivateField = 1;
+          #second_private_field = 1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`first_private_field\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`secondPrivateField\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 7,
+        },
+        "start": {
+          "column": 11,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 36`] = `
+{
+  "code": "
+        class foo {
+          private firstPrivateMethod() {}
+          // ❌ error
+          private first_private_method() {}
+          // ❌ error
+          #secondPrivateMethod() {}
+          #second_private_method() {}
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Identifier name \`first_private_method\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 5,
+        },
+        "start": {
+          "column": 19,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+    {
+      "message": "Identifier name \`secondPrivateMethod\` must match one of the following formats: snake_case",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 7,
+        },
+        "start": {
+          "column": 11,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 37`] = `
+{
+  "code": "import * as fooBar from 'foo_bar';",
+  "diagnostics": [
+    {
+      "message": "Import name \`fooBar\` must match one of the following formats: PascalCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 38`] = `
+{
+  "code": "import FooBar from 'foo_bar';",
+  "diagnostics": [
+    {
+      "message": "Import name \`FooBar\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`naming-convention > invalid 39`] = `
+{
+  "code": "import { default as foo_bar } from 'foo_bar';",
+  "diagnostics": [
+    {
+      "message": "Import name \`foo_bar\` must match one of the following formats: camelCase",
+      "messageId": "doesNotMatchFormat",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/naming-convention",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

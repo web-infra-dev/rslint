@@ -76,6 +76,8 @@ const CheckModeSkipContextSensitive = checker.CheckModeSkipContextSensitive
 const CheckModeSkipGenericFunctions = checker.CheckModeSkipGenericFunctions
 const CheckModeTypeOnly = checker.CheckModeTypeOnly
 type Checker = checker.Checker
+//go:linkname Checker_isReferenced github.com/microsoft/typescript-go/internal/checker.(*Checker).isReferenced
+func Checker_isReferenced(recv *checker.Checker, symbol *ast.Symbol) bool
 //go:linkname Checker_getResolvedSignature github.com/microsoft/typescript-go/internal/checker.(*Checker).getResolvedSignature
 func Checker_getResolvedSignature(recv *checker.Checker, node *ast.Node, candidatesOutArray *[]*checker.Signature, checkMode checker.CheckMode) *checker.Signature
 //go:linkname Checker_getTypeOfSymbol github.com/microsoft/typescript-go/internal/checker.(*Checker).getTypeOfSymbol

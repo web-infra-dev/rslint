@@ -160,3 +160,4 @@ marginx
 marginy
 Readonlys
 exclam
+typeparam
