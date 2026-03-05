@@ -488,4 +488,4 @@ class Test {
   ],
 };
 
-ruleTester.run('member-ordering-required', grouped);
+ruleTester.run('member-ordering', grouped);

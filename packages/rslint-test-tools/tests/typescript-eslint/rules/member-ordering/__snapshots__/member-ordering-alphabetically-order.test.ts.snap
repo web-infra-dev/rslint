@@ -1,0 +1,1569 @@
+// Rstest Snapshot v1
+
+exports[`member-ordering > invalid 1`] = `
+{
+  "code": "
+interface Foo {
+  b(): void;
+  a: b;
+  [a: string]: number;
+  new (): Bar;
+  (): Baz;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member call should be declared before member new.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 2`] = `
+{
+  "code": "
+interface Foo {
+  'b.d': Foo;
+  'b.c': Foo;
+  a: Foo;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b.c should be declared before member b.d.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member a should be declared before member b.c.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 3`] = `
+{
+  "code": "
+interface Foo {
+  c: string;
+  b: string;
+  a: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared before member c.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 4`] = `
+{
+  "code": "
+type Foo = {
+  b(): void;
+  a: b;
+  [a: string]: number;
+  new (): Bar;
+  (): Baz;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member call should be declared before member new.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 5`] = `
+{
+  "code": "
+type Foo = {
+  'b.d': Foo;
+  'b.c': Foo;
+  a: Foo;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b.c should be declared before member b.d.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member a should be declared before member b.c.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 6`] = `
+{
+  "code": "
+type Foo = {
+  c: string;
+  b: string;
+  a: string;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared before member c.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 7`] = `
+{
+  "code": "
+class Foo {
+  protected static b: string = '';
+  public static a: string;
+  private static c: string = '';
+  constructor() {}
+  public d: string = '';
+  protected e: string = '';
+  private f: string = '';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 8`] = `
+{
+  "code": "
+class Foo {
+  public static c: string;
+  public static b: string;
+  public static a: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared before member c.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 9`] = `
+{
+  "code": "
+const foo = class Foo {
+  protected static b: string = '';
+  public static a: string;
+  private static c: string = '';
+  constructor() {}
+  public d: string = '';
+  protected e: string = '';
+  private f: string = '';
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 10`] = `
+{
+  "code": "
+const foo = class Foo {
+  public static c: string;
+  public static b: string;
+  public static a: string;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared before member c.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 11`] = `
+{
+  "code": "
+class Foo {
+  protected static b: string = '';
+  public static a: string;
+  private static c: string = '';
+  constructor() {}
+  public d: string = '';
+  protected e: string = '';
+  private f: string = '';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 12`] = `
+{
+  "code": "
+class Foo {
+  public static c: string;
+  public static b: string;
+  public static a: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared before member c.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 13`] = `
+{
+  "code": "
+const foo = class Foo {
+  protected static b: string = '';
+  public static a: string;
+  private static c: string = '';
+  constructor() {}
+  public d: string = '';
+  protected e: string = '';
+  private f: string = '';
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 14`] = `
+{
+  "code": "
+const foo = class Foo {
+  public static c: string;
+  public static b: string;
+  public static a: string;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared before member c.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 15`] = `
+{
+  "code": "
+interface Foo {
+  b(): void;
+  a: b;
+  [a: string]: number;
+  new (): Bar;
+  (): Baz;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member call should be declared before member new.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 16`] = `
+{
+  "code": "
+interface Foo {
+  c: string;
+  b: string;
+  a: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared before member c.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 17`] = `
+{
+  "code": "
+type Foo = {
+  b(): void;
+  a: b;
+  [a: string]: number;
+  new (): Bar;
+  (): Baz;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member call should be declared before member new.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 18`] = `
+{
+  "code": "
+type Foo = {
+  c: string;
+  b: string;
+  a: string;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared before member c.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 19`] = `
+{
+  "code": "
+class FooTestGetter {
+  public static a: string;
+  protected static b: string = '';
+  private static c: string = '';
+
+  public d: string = '';
+  protected e: string = '';
+  private f: string = '';
+
+  get h() {}
+
+  set g() {}
+
+  constructor() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member constructor should be declared before all public instance get definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 15,
+        },
+        "start": {
+          "column": 3,
+          "line": 15,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 20`] = `
+{
+  "code": "
+class Foo {
+  @Bar
+  get a() {}
+
+  get b() {}
+
+  @Bar
+  set c() {}
+
+  set d() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared before all decorated get definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member d should be declared before all decorated set definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 21`] = `
+{
+  "code": "
+class FooTestGetter {
+  public static a: string;
+  protected static b: string = '';
+  private static c: string = '';
+
+  public d: string = '';
+  protected e: string = '';
+  private f: string = '';
+
+  set g() {}
+
+  constructor() {}
+
+  get h() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member constructor should be declared before all public instance set definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 13,
+        },
+        "start": {
+          "column": 3,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member h should be declared before all public instance set definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 15,
+        },
+        "start": {
+          "column": 3,
+          "line": 15,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 22`] = `
+{
+  "code": "
+const foo = class Foo {
+  public static c: string = '';
+  public static b: string = '';
+  public static a: string;
+
+  constructor() {}
+
+  public d: string = '';
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared before member c.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member d should be declared before all public constructor definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 23`] = `
+{
+  "code": "
+class Foo {
+  @Dec() a1: string;
+  @Dec()
+  a3: string;
+  @Dec()
+  a2: string;
+
+  constructor() {}
+
+  b1: string;
+  b2: string;
+
+  public c(): void;
+  @Dec() d(): void {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member a2 should be declared before member a3.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member b1 should be declared before all constructor definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member b2 should be declared before all constructor definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 12,
+        },
+        "start": {
+          "column": 3,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 24`] = `
+{
+  "code": "
+class Foo {
+  public static c: string = '';
+  public static b: string = '';
+  public static a: string;
+
+  constructor() {}
+
+  public d: string = '';
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared before member c.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member d should be declared before all public constructor definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 25`] = `
+{
+  "code": "
+const foo = class Foo {
+  public static c: string = '';
+  public static b: string = '';
+  public static a: string;
+
+  constructor() {}
+
+  public d: string = '';
+};
+        ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared before member c.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member d should be declared before all public constructor definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 26`] = `
+{
+  "code": "
+interface Foo {
+  [a: string]: number;
+
+  a: x;
+  b: x;
+  c: x;
+
+  c(): void;
+  b(): void;
+  a(): void;
+
+  (): Baz;
+
+  new (): Bar;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared before member c.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 10,
+        },
+        "start": {
+          "column": 3,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member call should be declared before all field definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 13,
+        },
+        "start": {
+          "column": 3,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member new should be declared before all method definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 15,
+        },
+        "start": {
+          "column": 3,
+          "line": 15,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 27`] = `
+{
+  "code": "
+type Foo = {
+  [a: string]: number;
+
+  a: x;
+  b: x;
+  c: x;
+
+  c(): void;
+  b(): void;
+  a(): void;
+
+  (): Baz;
+
+  new (): Bar;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared before member c.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 10,
+        },
+        "start": {
+          "column": 3,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member call should be declared before all field definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 13,
+        },
+        "start": {
+          "column": 3,
+          "line": 13,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member new should be declared before all method definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 15,
+        },
+        "start": {
+          "column": 3,
+          "line": 15,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 28`] = `
+{
+  "code": "
+class Foo {
+  #c = 3;
+  #b = 2;
+  #a = 1;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member #b should be declared before member #c.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member #a should be declared before member #b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 29`] = `
+{
+  "code": "
+class Foo {
+  @Dec() accessor b;
+  @Dec() accessor a;
+
+  accessor d;
+  accessor c;
+
+  abstract accessor f;
+  abstract accessor e;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member c should be declared before member d.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member e should be declared before member f.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 10,
+        },
+        "start": {
+          "column": 3,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 30`] = `
+{
+  "code": "
+class Foo {
+  accessor a;
+  abstract accessor b;
+  accessor c;
+  @Dec() accessor d;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member c should be declared before all abstract accessor definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+    {
+      "message": "Member d should be declared before all accessor definitions.",
+      "messageId": "incorrectGroupOrder",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 6,
+        },
+        "start": {
+          "column": 3,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

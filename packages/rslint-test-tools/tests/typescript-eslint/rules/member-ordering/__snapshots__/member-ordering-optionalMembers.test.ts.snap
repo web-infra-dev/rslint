@@ -1,0 +1,262 @@
+// Rstest Snapshot v1
+
+exports[`member-ordering > invalid 1`] = `
+{
+  "code": "
+interface X {
+  m: string;
+  d?: string;
+  b?: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared before member d.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 2`] = `
+{
+  "code": "
+interface X {
+  a: string;
+  b?: string;
+  c: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared after all required members.",
+      "messageId": "incorrectRequiredMembersOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 3`] = `
+{
+  "code": "
+class X {
+  a?: string;
+  static {}
+  b?: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member a should be declared after all required members.",
+      "messageId": "incorrectRequiredMembersOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 4`] = `
+{
+  "code": "
+class X {
+  b: string;
+  a: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member a should be declared before member b.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 5`] = `
+{
+  "code": "
+interface X {
+  d?: string;
+  b?: string;
+  m: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared before member d.",
+      "messageId": "incorrectOrder",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 6`] = `
+{
+  "code": "
+interface X {
+  a?: string;
+  b: string;
+  c?: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member b should be declared after all optional members.",
+      "messageId": "incorrectRequiredMembersOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 7`] = `
+{
+  "code": "
+class Test {
+  a?: string;
+  b?: string;
+  f: string;
+  c?: string;
+  d?: string;
+  g: string;
+  h: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member f should be declared after all optional members.",
+      "messageId": "incorrectRequiredMembersOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`member-ordering > invalid 8`] = `
+{
+  "code": "
+class Test {
+  a: string;
+  b: string;
+  f?: string;
+  c?: string;
+  d?: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Member a should be declared after all optional members.",
+      "messageId": "incorrectRequiredMembersOrder",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/member-ordering",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
