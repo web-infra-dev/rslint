@@ -35,7 +35,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/explicit-function-return-type.test.ts',
     // './tests/typescript-eslint/rules/explicit-member-accessibility.test.ts',
     // './tests/typescript-eslint/rules/explicit-module-boundary-types.test.ts',
-    // './tests/typescript-eslint/rules/init-declarations.test.ts',
+    './tests/typescript-eslint/rules/init-declarations.test.ts',
     // './tests/typescript-eslint/rules/max-params.test.ts',
     // './tests/typescript-eslint/rules/member-ordering.test.ts',
     // './tests/typescript-eslint/rules/member-ordering/member-ordering-alphabetically-case-insensitive-order.test.ts',
