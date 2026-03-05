@@ -55,6 +55,7 @@ export type ValidTestCase =
   | string
   | {
       code: string;
+      options?: Record<string, unknown>;
       only?: boolean;
       skip?: boolean;
     };
@@ -62,6 +63,7 @@ export type ValidTestCase =
 export interface InvalidTestCase {
   code: string;
   errors: TsDiagnostic[];
+  options?: Record<string, unknown>;
   only?: boolean;
   skip?: boolean;
 }
@@ -99,13 +101,17 @@ export class RuleTester {
 
           const code =
             typeof validCase === 'string' ? validCase : validCase.code;
+          const options =
+            typeof validCase === 'object' ? validCase.options : undefined;
           const virtual_entry = path.resolve(cwd, 'src/virtual.ts');
 
           const diags = await lint({
             config,
             workingDirectory: cwd,
             fileContents: { [virtual_entry]: code },
-            ruleOptions: { [ruleName]: [] } as any,
+            ruleOptions: {
+              [ruleName]: options ? [options] : [],
+            } as any,
           });
 
           assert(
@@ -120,14 +126,16 @@ export class RuleTester {
           if (item.skip) continue;
           if (hasOnly && !item.only) continue;
 
-          const { code, errors } = item;
+          const { code, errors, options } = item;
           const virtual_entry = path.resolve(cwd, 'src/virtual.ts');
 
           const diags = await lint({
             config,
             workingDirectory: cwd,
             fileContents: { [virtual_entry]: code },
-            ruleOptions: { [ruleName]: [] } as any,
+            ruleOptions: {
+              [ruleName]: options ? [options] : [],
+            } as any,
           });
 
           assert(
