@@ -251,7 +251,7 @@ describe.for(PARSER_OPTION_COMBOS)(
           export default Type; // is a type-only export
           export type { Type }; // is a type-only export
         `,
-    
+
         {
           code: `
     import Type from 'foo';
@@ -338,7 +338,7 @@ describe.for(PARSER_OPTION_COMBOS)(
           const a: typeof Default = Default;
           const b: typeof Rest = Rest;
         `,
-    
+
         // https://github.com/typescript-eslint/typescript-eslint/issues/2989
         `
           import type * as constants from './constants';
@@ -363,7 +363,7 @@ describe.for(PARSER_OPTION_COMBOS)(
           import { type A } from 'foo';
           export = {} as A;
         `,
-    
+
         // semantically these are insane but syntactically they are valid
         // we don't want to handle them because it means changing invalid code
         // to valid code which is dangerous "undefined" behavior.
@@ -1388,7 +1388,7 @@ describe.for(PARSER_OPTION_COMBOS)(
     const b = B;
           `,
         },
-    
+
         // inline-type-imports
         {
           code: `
@@ -1970,7 +1970,7 @@ describe('experimentalDecorators: true + emitDecoratorMetadata: true', () => {
           constructor(foo: Foo) {}
         }
       `,
-  
+
       `
         import Foo from 'foo';
         class A {
@@ -1978,7 +1978,7 @@ describe('experimentalDecorators: true + emitDecoratorMetadata: true', () => {
           foo: Foo;
         }
       `,
-  
+
       `
         import Foo from 'foo';
         class A {
@@ -1986,7 +1986,7 @@ describe('experimentalDecorators: true + emitDecoratorMetadata: true', () => {
           foo(foo: Foo) {}
         }
       `,
-  
+
       `
         import Foo from 'foo';
         class A {
@@ -1994,14 +1994,14 @@ describe('experimentalDecorators: true + emitDecoratorMetadata: true', () => {
           foo(): Foo {}
         }
       `,
-  
+
       `
         import Foo from 'foo';
         class A {
           foo(@deco foo: Foo) {}
         }
       `,
-  
+
       `
         import Foo from 'foo';
         class A {
@@ -2009,7 +2009,7 @@ describe('experimentalDecorators: true + emitDecoratorMetadata: true', () => {
           set foo(value: Foo) {}
         }
       `,
-  
+
       `
         import Foo from 'foo';
         class A {
@@ -2019,7 +2019,7 @@ describe('experimentalDecorators: true + emitDecoratorMetadata: true', () => {
           set foo(value: Foo) {}
         }
       `,
-  
+
       `
         import Foo from 'foo';
         class A {
@@ -2029,7 +2029,7 @@ describe('experimentalDecorators: true + emitDecoratorMetadata: true', () => {
           set ['foo'](value: Foo) {}
         }
       `,
-  
+
       `
         import type { Foo } from 'foo';
         const key = 'k';
@@ -2040,7 +2040,7 @@ describe('experimentalDecorators: true + emitDecoratorMetadata: true', () => {
           set [key](value: Foo) {}
         }
       `,
-  
+
       `
         import * as foo from 'foo';
         @deco
@@ -2048,7 +2048,7 @@ describe('experimentalDecorators: true + emitDecoratorMetadata: true', () => {
           constructor(foo: foo.Foo) {}
         }
       `,
-  
+
       // https://github.com/typescript-eslint/typescript-eslint/issues/7327
       `
         import type { ClassA } from './classA';
@@ -2057,7 +2057,7 @@ describe('experimentalDecorators: true + emitDecoratorMetadata: true', () => {
           public constructor(node: ClassA) {}
         }
       `,
-  
+
       `
         import type Foo from 'foo';
         @deco
