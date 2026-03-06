@@ -27,11 +27,20 @@ func NewConfigLoader(fs vfs.FS, currentDirectory string) *ConfigLoader {
 	}
 }
 
-// LoadRslintConfig loads and parses a rslint configuration file
+// LoadRslintConfig loads and parses a rslint configuration file.
+// For JSON/JSONC files, a deprecation warning is printed to stderr.
 func (loader *ConfigLoader) LoadRslintConfig(configPath string) (RslintConfig, string, error) {
 	configFileName := tspath.ResolvePath(loader.currentDirectory, configPath)
 	if !loader.fs.FileExists(configFileName) {
 		return nil, "", fmt.Errorf("rslint config file %q doesn't exist", configFileName)
+	}
+
+	// Deprecation warning for JSON/JSONC config
+	if strings.HasSuffix(configFileName, ".json") || strings.HasSuffix(configFileName, ".jsonc") {
+		fmt.Fprintf(os.Stderr,
+			"\n[rslint] Warning: JSON configuration is deprecated and will be removed in a future version.\n"+
+				"[rslint] Please migrate to rslint.config.ts. Run `rslint --init` to generate a new config file.\n\n",
+		)
 	}
 
 	data, ok := loader.fs.ReadFile(configFileName)
@@ -45,9 +54,49 @@ func (loader *ConfigLoader) LoadRslintConfig(configPath string) (RslintConfig, s
 		return nil, "", fmt.Errorf("error parsing rslint config file %q: %w", configFileName, err)
 	}
 
+	// Normalize JSON config: inject core rules and plugin rules into each entry's Rules map.
+	// User-specified rules take precedence (they are applied after the defaults).
+	config = normalizeJSONConfig(config)
+
 	// Update current directory to the config file's directory
 	configDirectory := tspath.GetDirectoryPath(configFileName)
 	return config, configDirectory, nil
+}
+
+// normalizeJSONConfig injects core rules and plugin rules into each entry's Rules map.
+// This ensures JSON config and JS config are processed identically in GetConfigForFile.
+// User-specified rules always take precedence over auto-enabled defaults.
+func normalizeJSONConfig(config RslintConfig) RslintConfig {
+	for i := range config {
+		entry := &config[i]
+
+		// Skip global-ignore-only entries (no rules, plugins, or other fields)
+		if isGlobalIgnoreEntry(*entry) {
+			continue
+		}
+
+		if entry.Rules == nil {
+			entry.Rules = make(Rules)
+		}
+
+		// Auto-enable core rules as defaults
+		for _, r := range GetCoreRules() {
+			if _, exists := entry.Rules[r.Name]; !exists {
+				entry.Rules[r.Name] = "error"
+			}
+		}
+
+		// Auto-enable plugin rules as defaults
+		for _, plugin := range entry.Plugins {
+			for _, r := range GetPluginRules(plugin) {
+				if _, exists := entry.Rules[r.Name]; !exists {
+					entry.Rules[r.Name] = "error"
+				}
+			}
+		}
+	}
+
+	return config
 }
 
 // LoadDefaultRslintConfig attempts to load default configuration files
@@ -64,7 +113,9 @@ func (loader *ConfigLoader) LoadDefaultRslintConfig() (RslintConfig, string, err
 	return nil, "", errors.New("no rslint config file found. Expected rslint.json or rslint.jsonc")
 }
 
-// LoadTsConfigsFromRslintConfig extracts and validates TypeScript configuration paths from rslint config
+// LoadTsConfigsFromRslintConfig extracts and validates TypeScript configuration paths from rslint config.
+// Returns an empty slice (no error) when no parserOptions.project is specified — this is valid
+// for pure JS projects that don't need explicit TypeScript configuration.
 func (loader *ConfigLoader) LoadTsConfigsFromRslintConfig(rslintConfig RslintConfig, configDirectory string) ([]string, error) {
 	tsConfigs := []string{}
 	seenPaths := make(map[string]struct{})
@@ -97,10 +148,6 @@ func (loader *ConfigLoader) LoadTsConfigsFromRslintConfig(rslintConfig RslintCon
 
 			tsConfigs = appendUniqueConfigPath(tsConfigs, seenPaths, tsconfigPath)
 		}
-	}
-
-	if len(tsConfigs) == 0 {
-		return nil, errors.New("no TypeScript configuration found in rslint config")
 	}
 
 	return tsConfigs, nil

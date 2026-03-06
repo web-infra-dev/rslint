@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -518,6 +519,15 @@ var handlers = sync.OnceValue(func() handlerMap {
 	registerNotificationHandler(handlers, lsproto.TextDocumentDidSaveInfo, (*Server).handleDidSave)
 	registerRequestHandler(handlers, lsproto.TextDocumentDiagnosticInfo, (*Server).handleDocumentDiagnostic)
 	registerRequestHandler(handlers, lsproto.TextDocumentCodeActionInfo, (*Server).handleCodeAction)
+
+	// Custom rslint notification
+	handlers[lsproto.Method("rslint/configUpdate")] = func(s *Server, ctx context.Context, req *lsproto.RequestMessage) error {
+		if err := s.handleConfigUpdate(ctx, req.Params); err != nil {
+			log.Printf("[rslint] Error handling config update: %v", err)
+		}
+		return nil
+	}
+
 	return handlers
 })
 
