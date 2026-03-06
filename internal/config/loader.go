@@ -4,7 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sort"
+	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -64,6 +67,7 @@ func (loader *ConfigLoader) LoadDefaultRslintConfig() (RslintConfig, string, err
 // LoadTsConfigsFromRslintConfig extracts and validates TypeScript configuration paths from rslint config
 func (loader *ConfigLoader) LoadTsConfigsFromRslintConfig(rslintConfig RslintConfig, configDirectory string) ([]string, error) {
 	tsConfigs := []string{}
+	seenPaths := make(map[string]struct{})
 
 	for _, entry := range rslintConfig {
 		if entry.LanguageOptions == nil || entry.LanguageOptions.ParserOptions == nil {
@@ -71,13 +75,27 @@ func (loader *ConfigLoader) LoadTsConfigsFromRslintConfig(rslintConfig RslintCon
 		}
 
 		for _, config := range entry.LanguageOptions.ParserOptions.Project {
+			if containsGlobPattern(config) {
+				matches, err := loader.expandProjectGlob(configDirectory, config)
+				if err != nil {
+					return nil, err
+				}
+				if len(matches) == 0 {
+					return nil, fmt.Errorf("glob pattern %q matched no files", config)
+				}
+				for _, match := range matches {
+					tsConfigs = appendUniqueConfigPath(tsConfigs, seenPaths, match)
+				}
+				continue
+			}
+
 			tsconfigPath := tspath.ResolvePath(configDirectory, config)
 
 			if !loader.fs.FileExists(tsconfigPath) {
 				return nil, fmt.Errorf("tsconfig file %q doesn't exist", tsconfigPath)
 			}
 
-			tsConfigs = append(tsConfigs, tsconfigPath)
+			tsConfigs = appendUniqueConfigPath(tsConfigs, seenPaths, tsconfigPath)
 		}
 	}
 
@@ -86,6 +104,121 @@ func (loader *ConfigLoader) LoadTsConfigsFromRslintConfig(rslintConfig RslintCon
 	}
 
 	return tsConfigs, nil
+}
+
+func appendUniqueConfigPath(paths []string, seenPaths map[string]struct{}, configPath string) []string {
+	normalizedPath := tspath.NormalizePath(configPath)
+	if _, exists := seenPaths[normalizedPath]; exists {
+		return paths
+	}
+	seenPaths[normalizedPath] = struct{}{}
+	return append(paths, normalizedPath)
+}
+
+func (loader *ConfigLoader) expandProjectGlob(configDirectory string, pattern string) ([]string, error) {
+	resolvedPattern := normalizeGlobPath(tspath.ResolvePath(configDirectory, pattern))
+	searchRoot := globSearchRoot(resolvedPattern, normalizeGlobPath(configDirectory))
+
+	matches := []string{}
+	err := loader.walkProjectFiles(searchRoot, func(path string) error {
+		normalizedPath := normalizeGlobPath(path)
+		matched, err := doublestar.Match(resolvedPattern, normalizedPath)
+		if err != nil {
+			return err
+		}
+		if matched {
+			matches = append(matches, tspath.NormalizePath(path))
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error expanding glob pattern %q: %w", pattern, err)
+	}
+
+	sort.Strings(matches)
+	return matches, nil
+}
+
+func containsGlobPattern(path string) bool {
+	return strings.ContainsAny(path, "*?[")
+}
+
+func (loader *ConfigLoader) walkProjectFiles(root string, visit func(path string) error) error {
+	if !loader.fs.DirectoryExists(root) {
+		return nil
+	}
+
+	visitedDirectories := make(map[string]struct{})
+	var walk func(path string) error
+
+	walk = func(path string) error {
+		normalizedPath := tspath.NormalizePath(path)
+		if _, visited := visitedDirectories[normalizedPath]; visited {
+			return nil
+		}
+		visitedDirectories[normalizedPath] = struct{}{}
+
+		entries := loader.fs.GetAccessibleEntries(path)
+		sort.Strings(entries.Files)
+		sort.Strings(entries.Directories)
+
+		for _, fileName := range entries.Files {
+			if err := visit(tspath.ResolvePath(path, fileName)); err != nil {
+				return err
+			}
+		}
+
+		for _, directoryName := range entries.Directories {
+			if err := walk(tspath.ResolvePath(path, directoryName)); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	return walk(root)
+}
+
+func globSearchRoot(pattern string, fallback string) string {
+	firstGlob := strings.IndexAny(pattern, "*?[")
+	if firstGlob == -1 {
+		return pattern
+	}
+
+	prefix := pattern[:firstGlob]
+	if prefix == "" {
+		return fallback
+	}
+
+	if strings.HasSuffix(prefix, "/") {
+		root := strings.TrimSuffix(prefix, "/")
+		if root == "" {
+			return "/"
+		}
+		if strings.HasSuffix(root, ":") {
+			return root + "/"
+		}
+		return root
+	}
+
+	lastSlash := strings.LastIndex(prefix, "/")
+	if lastSlash == -1 {
+		return fallback
+	}
+
+	root := strings.TrimSuffix(prefix[:lastSlash], "/")
+	if root == "" {
+		return "/"
+	}
+	if strings.HasSuffix(root, ":") {
+		return root + "/"
+	}
+	return root
+}
+
+func normalizeGlobPath(path string) string {
+	return strings.ReplaceAll(tspath.NormalizePath(path), "\\", "/")
 }
 
 // LoadConfiguration is a convenience method that loads both rslint and tsconfig configurations
