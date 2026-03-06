@@ -46,6 +46,24 @@ Object.defineProperty(obj, 'prop', {
     return this._prop;
   },
 });
+
+// Throw statements are valid exit paths
+class AbstractFoo {
+  get value() {
+    throw new Error('Not implemented');
+  }
+}
+
+// All code paths must return or throw
+class Bar {
+  get value() {
+    if (condition) {
+      return this._value;
+    } else {
+      throw new Error('Invalid state');
+    }
+  }
+}
 ```
 
 ## Original Documentation

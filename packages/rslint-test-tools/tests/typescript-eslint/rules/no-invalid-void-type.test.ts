@@ -101,6 +101,9 @@ ruleTester.run('allowInGenericTypeArguments: true', {
   valid: [
     'function func(): void {}',
     'type NormalType = () => void;',
+    // Callable signatures in interfaces
+    'interface Callable { (...args: string[]): void; }',
+    'interface Constructable { new (...args: string[]): void; }',
     'let normalArrow = (): void => {};',
     'let ughThisThing = void 0;',
     'function takeThing(thing: undefined) {}',

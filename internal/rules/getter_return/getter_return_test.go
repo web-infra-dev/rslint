@@ -63,6 +63,25 @@ func TestGetterReturnRule(t *testing.T) {
 				Code:    `class foo { get bar(){return;} }`,
 				Options: []interface{}{map[string]interface{}{"allowImplicit": true}},
 			},
+
+			// Throw statements as valid exit paths
+			{Code: `var foo = { get bar(){ throw new Error("not implemented"); } };`},
+			{Code: `class foo { get bar(){ if(baz) { throw new Error(); } return true; } }`},
+			{Code: `class foo { get bar(){ if(baz) { return true; } else { throw new Error(); } } }`},
+			{Code: `class foo { get bar(){ if(baz) { throw new Error(); } else { throw new Error(); } } }`},
+
+			// Try/catch with return
+			{Code: `class foo { get bar(){ try { return 1; } catch(e) { return 2; } } }`},
+			{Code: `class foo { get bar(){ try { return 1; } catch(e) { throw e; } } }`},
+			{Code: `class foo { get bar(){ try { throw new Error(); } catch(e) { return 1; } } }`},
+			{Code: `class foo { get bar(){ try { return 1; } finally { } } }`},
+
+			// Switch with return
+			{Code: `class foo { get bar(){ switch(x) { case 1: return 1; default: return 2; } } }`},
+			{Code: `class foo { get bar(){ switch(x) { case 1: return 1; case 2: return 2; default: throw new Error(); } } }`},
+
+			// Object.defineProperty with throw
+			{Code: `Object.defineProperty(foo, "bar", { get: function () { throw new Error("not implemented"); }});`},
 		},
 		// Invalid cases
 		[]rule_tester.InvalidTestCase{
@@ -138,6 +157,42 @@ func TestGetterReturnRule(t *testing.T) {
 						MessageId: "expected",
 						Line:      1,
 						Column:    37,
+					},
+				},
+			},
+
+			// if-throw without else (not all paths covered)
+			{
+				Code: `class foo { get bar(){ if(baz) { throw new Error(); } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "expected",
+						Line:      1,
+						Column:    13,
+					},
+				},
+			},
+
+			// Switch without default (not all paths covered)
+			{
+				Code: `class foo { get bar(){ switch(x) { case 1: return 1; } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "expectedAlways",
+						Line:      1,
+						Column:    13,
+					},
+				},
+			},
+
+			// Try/catch where not all paths return
+			{
+				Code: `class foo { get bar(){ try { return 1; } catch(e) { } } }`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{
+						MessageId: "expectedAlways",
+						Line:      1,
+						Column:    13,
 					},
 				},
 			},

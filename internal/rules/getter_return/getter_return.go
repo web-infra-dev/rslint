@@ -88,6 +88,16 @@ type returnAnalysisResult struct {
 	allPathsReturn bool // true if all code paths return a value
 }
 
+// pathResult represents how a code path terminates
+type pathResult int
+
+const (
+	pathFallthrough  pathResult = iota // path falls through (no return/throw)
+	pathReturns                        // path returns a value
+	pathTerminates                     // path terminates without returning a value (throw, empty return)
+	pathEmptyReturn                    // path has an explicit empty return
+)
+
 // analyzeReturnPaths performs control flow analysis on a function body
 func analyzeReturnPaths(body *ast.Node) returnAnalysisResult {
 	if body == nil {
@@ -95,55 +105,33 @@ func analyzeReturnPaths(body *ast.Node) returnAnalysisResult {
 	}
 
 	hasReturnWithValue := false
-	hasReturnWithoutValue := false
-
-	// Use ForEachReturnStatement to find all return statements
-	ast.ForEachReturnStatement(body, func(stmt *ast.Node) bool {
-		expr := stmt.Expression()
-		if expr != nil {
-			hasReturnWithValue = true
-		} else {
-			hasReturnWithoutValue = true
-		}
-		return false // Continue iterating
-	})
-
-	// Determine if this is a simple case or complex case
-	// Simple case: body is a block with a single return statement
-	isSingleReturn := false
-	if body.Kind == ast.KindBlock {
-		statements := body.Statements()
-		if len(statements) == 1 && statements[0].Kind == ast.KindReturnStatement {
-			isSingleReturn = true
-		}
-	}
-
-	// If we have no return with value at all, report "expected"
-	if !hasReturnWithValue {
-		return returnAnalysisResult{
-			hasNoReturns:   true,
-			allPathsReturn: false,
-		}
-	}
-
-	// Heuristic for determining if all paths return:
-	// 1. If it's a single return statement, yes
-	// 2. If we have both return with value and return without value, no (inconsistent)
-	// 3. If we have only returns with values and no control flow, yes
-	// 4. If we have only returns with values and control flow, we need more analysis
-	//    For now, we'll be conservative: assume all paths return if there are multiple returns with values
-	//    and no empty returns (this handles if-else cases)
-
-	countReturnsWithValue := 0
 	ast.ForEachReturnStatement(body, func(stmt *ast.Node) bool {
 		if stmt.Expression() != nil {
-			countReturnsWithValue++
+			hasReturnWithValue = true
 		}
 		return false
 	})
 
-	allPathsReturn := isSingleReturn ||
-		(!hasReturnWithoutValue && (isSimpleBody(body) || countReturnsWithValue >= 2))
+	// Analyze control flow
+	if body.Kind != ast.KindBlock {
+		if hasReturnWithValue {
+			return returnAnalysisResult{hasNoReturns: false, allPathsReturn: true}
+		}
+		return returnAnalysisResult{hasNoReturns: true, allPathsReturn: false}
+	}
+
+	result := analyzeStatements(body.Statements())
+
+	if !hasReturnWithValue {
+		// No return with value: valid only if all paths terminate (e.g., all throw)
+		if result == pathTerminates {
+			return returnAnalysisResult{hasNoReturns: false, allPathsReturn: true}
+		}
+		return returnAnalysisResult{hasNoReturns: true, allPathsReturn: false}
+	}
+
+	// Has return with value: check if all paths return or terminate
+	allPathsReturn := result == pathReturns || result == pathTerminates
 
 	return returnAnalysisResult{
 		hasNoReturns:   false,
@@ -151,38 +139,188 @@ func analyzeReturnPaths(body *ast.Node) returnAnalysisResult {
 	}
 }
 
-// isSimpleBody checks if a function body is simple enough that we can assume all paths return
-// if there's at least one return with value
-func isSimpleBody(body *ast.Node) bool {
-	if body == nil || body.Kind != ast.KindBlock {
-		return true
-	}
-
-	statements := body.Statements()
-	if len(statements) == 0 {
-		return true
-	}
-
-	// Check for control flow statements (if, switch, loops, etc.)
+// analyzeStatements analyzes a list of statements to determine how the path terminates
+func analyzeStatements(statements []*ast.Node) pathResult {
 	for _, stmt := range statements {
 		if stmt == nil {
 			continue
 		}
-		switch stmt.Kind {
-		case ast.KindIfStatement, ast.KindSwitchStatement,
-			ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement,
-			ast.KindWhileStatement, ast.KindDoStatement,
-			ast.KindTryStatement:
-			// Has control flow - not simple
-			return false
+
+		r := analyzeStatement(stmt)
+		if r != pathFallthrough {
+			return r
+		}
+	}
+	return pathFallthrough
+}
+
+// analyzeStatement analyzes a single statement to determine how its path terminates
+func analyzeStatement(stmt *ast.Node) pathResult {
+	if stmt == nil {
+		return pathFallthrough
+	}
+
+	switch stmt.Kind {
+	case ast.KindReturnStatement:
+		if stmt.Expression() != nil {
+			return pathReturns
+		}
+		return pathEmptyReturn
+
+	case ast.KindThrowStatement:
+		return pathTerminates
+
+	case ast.KindIfStatement:
+		return analyzeIfStatement(stmt)
+
+	case ast.KindSwitchStatement:
+		return analyzeSwitchStatement(stmt)
+
+	case ast.KindTryStatement:
+		return analyzeTryStatement(stmt)
+
+	case ast.KindBlock:
+		return analyzeStatements(stmt.Statements())
+	}
+
+	return pathFallthrough
+}
+
+// analyzeIfStatement analyzes if/else branches
+func analyzeIfStatement(stmt *ast.Node) pathResult {
+	ifStmt := stmt.AsIfStatement()
+	if ifStmt == nil {
+		return pathFallthrough
+	}
+
+	thenResult := analyzeBranch(ifStmt.ThenStatement)
+
+	if ifStmt.ElseStatement == nil {
+		// No else: can't guarantee all paths are covered
+		return pathFallthrough
+	}
+
+	elseResult := analyzeBranch(ifStmt.ElseStatement)
+
+	return combineResults(thenResult, elseResult)
+}
+
+// analyzeSwitchStatement analyzes switch/case branches
+func analyzeSwitchStatement(stmt *ast.Node) pathResult {
+	switchStmt := stmt.AsSwitchStatement()
+	if switchStmt == nil || switchStmt.CaseBlock == nil {
+		return pathFallthrough
+	}
+
+	// Get clauses from case block using ForEachChild
+	var clauses []*ast.Node
+	switchStmt.CaseBlock.ForEachChild(func(child *ast.Node) bool {
+		if child != nil && (child.Kind == ast.KindCaseClause || child.Kind == ast.KindDefaultClause) {
+			clauses = append(clauses, child)
+		}
+		return false
+	})
+
+	if len(clauses) == 0 {
+		return pathFallthrough
+	}
+
+	hasDefault := false
+	combined := pathReturns // start optimistic
+
+	for _, clause := range clauses {
+		if clause == nil {
+			continue
+		}
+		if clause.Kind == ast.KindDefaultClause {
+			hasDefault = true
+		}
+
+		caseOrDefault := clause.AsCaseOrDefaultClause()
+		if caseOrDefault == nil || caseOrDefault.Statements == nil || len(caseOrDefault.Statements.Nodes) == 0 {
+			// Empty clause falls through to next
+			continue
+		}
+
+		clauseResult := analyzeStatements(caseOrDefault.Statements.Nodes)
+		combined = combineResults(combined, clauseResult)
+	}
+
+	if !hasDefault {
+		// Without default, not all paths are covered
+		return pathFallthrough
+	}
+
+	return combined
+}
+
+// analyzeTryStatement analyzes try/catch/finally
+func analyzeTryStatement(stmt *ast.Node) pathResult {
+	tryStmt := stmt.AsTryStatement()
+	if tryStmt == nil {
+		return pathFallthrough
+	}
+
+	// If there's a finally block that terminates, the whole thing terminates
+	if tryStmt.FinallyBlock != nil {
+		finallyResult := analyzeStatements(tryStmt.FinallyBlock.Statements())
+		if finallyResult == pathReturns || finallyResult == pathTerminates {
+			return finallyResult
 		}
 	}
 
-	return true
+	tryResult := pathFallthrough
+	if tryStmt.TryBlock != nil {
+		tryResult = analyzeStatements(tryStmt.TryBlock.Statements())
+	}
+
+	if tryStmt.CatchClause != nil {
+		catchBlock := tryStmt.CatchClause.AsCatchClause().Block
+		catchResult := pathFallthrough
+		if catchBlock != nil {
+			catchResult = analyzeStatements(catchBlock.Statements())
+		}
+		return combineResults(tryResult, catchResult)
+	}
+
+	return tryResult
+}
+
+// analyzeBranch analyzes a branch (statement or block)
+func analyzeBranch(stmt *ast.Node) pathResult {
+	if stmt == nil {
+		return pathFallthrough
+	}
+
+	if stmt.Kind == ast.KindBlock {
+		return analyzeStatements(stmt.Statements())
+	}
+
+	return analyzeStatement(stmt)
+}
+
+// combineResults combines results from two branches (e.g., if/else)
+// Both branches must return for the combined result to be "returns"
+func combineResults(a, b pathResult) pathResult {
+	if a == pathFallthrough || b == pathFallthrough {
+		return pathFallthrough
+	}
+	if a == pathEmptyReturn || b == pathEmptyReturn {
+		return pathEmptyReturn
+	}
+	// Both branches either return or terminate
+	if a == pathReturns && b == pathReturns {
+		return pathReturns
+	}
+	// At least one terminates (throw), the other returns or terminates
+	if a == pathReturns || b == pathReturns {
+		return pathReturns
+	}
+	return pathTerminates
 }
 
 // GetterReturnRule enforces return statements in getters
-var GetterReturnRule = rule.CreateRule(rule.Rule{
+var GetterReturnRule = rule.Rule{
 	Name: "getter-return",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := parseOptions(options)
@@ -281,7 +419,7 @@ var GetterReturnRule = rule.CreateRule(rule.Rule{
 			},
 		}
 	},
-})
+}
 
 // checkDescriptorForGetter checks property descriptors for get functions
 func checkDescriptorForGetter(ctx rule.RuleContext, descriptor *ast.Node, opts Options) {
