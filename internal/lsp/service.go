@@ -2,7 +2,7 @@ package lsp
 
 import (
 	"context"
-	"errors"
+	stdjson "encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -17,8 +17,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/scanner"
-
-	"github.com/microsoft/typescript-go/shim/vfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/linter"
@@ -86,31 +84,54 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 		Logger:     project.NewLogger(io.Discard),
 		ParseCache: s.parseCache,
 	})
-	// Try to find rslint configuration files with multiple strategies
-	var rslintConfigPath string
-	var configFound bool
 
-	// Use helper function to find config
-	rslintConfigPath, configFound = findRslintConfig(s.fs, s.cwd)
+	// Register all rules before loading config so that normalizeJSONConfig
+	// can inject default core/plugin rules into the registry.
+	config.RegisterAllRules()
 
-	if !configFound {
-		return nil
+	// Try to load JSON config as fallback.
+	// If a JS/TS config exists, the VS Code extension will send it via
+	// rslint/configUpdate notification, which overwrites this config.
+	jsonConfigs := []string{"rslint.json", "rslint.jsonc"}
+	for _, configName := range jsonConfigs {
+		configPath := filepath.Join(s.cwd, configName)
+		if s.fs.FileExists(configPath) {
+			loader := config.NewConfigLoader(s.fs, s.cwd)
+			rslintConfig, _, err := loader.LoadRslintConfig(configPath)
+			if err != nil {
+				log.Printf("[rslint] Failed to load JSON config: %v", err)
+				break
+			}
+			s.rslintConfig = rslintConfig
+			break
+		}
 	}
 
-	// Load rslint configuration and extract tsconfig paths
-	loader := config.NewConfigLoader(s.fs, s.cwd)
-	rslintConfig, configDirectory, err := loader.LoadRslintConfig(rslintConfigPath)
+	return nil
+}
+
+func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
+	// params is raw JSON from the custom notification
+	data, err := stdjson.Marshal(params)
 	if err != nil {
-		return fmt.Errorf("could not load rslint config: %w", err)
-	}
-	s.rslintConfig = rslintConfig
-	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, configDirectory)
-	if err != nil {
-		return fmt.Errorf("could not load TypeScript configs from rslint config: %w", err)
+		return fmt.Errorf("failed to marshal config update params: %w", err)
 	}
 
-	if len(tsConfigs) == 0 {
-		return errors.New("no TypeScript configurations found in rslint config")
+	var payload struct {
+		ConfigDirectory string              `json:"configDirectory"`
+		Entries         config.RslintConfig `json:"entries"`
+	}
+	if err := stdjson.Unmarshal(data, &payload); err != nil {
+		return fmt.Errorf("failed to parse config update: %w", err)
+	}
+
+	config.RegisterAllRules()
+	s.rslintConfig = payload.Entries
+	log.Printf("[rslint] Config updated from JS/TS config (%d entries)", len(payload.Entries))
+
+	// Ask the client to re-pull diagnostics with the updated config.
+	if err := s.RefreshDiagnostics(ctx); err != nil {
+		log.Printf("[rslint] Failed to refresh diagnostics after config update: %v", err)
 	}
 
 	return nil
@@ -298,20 +319,6 @@ func uriToPath(uri lsproto.DocumentUri) string {
 	return uriStr
 }
 
-// findRslintConfig searches for rslint configuration files using multiple strategies
-func findRslintConfig(fs vfs.FS, workingDir string) (string, bool) {
-	defaultConfigs := []string{"rslint.json", "rslint.jsonc"}
-
-	// Strategy 1: Try in the working directory
-	for _, configName := range defaultConfigs {
-		configPath := filepath.Join(workingDir, configName)
-		if fs.FileExists(configPath) {
-			return configPath, true
-		}
-	}
-	return "", false
-}
-
 // LintResponse represents a lint response from Go to JS
 type LintResponse struct {
 	Diagnostics []lsproto.Diagnostic `json:"diagnostics"`
@@ -348,7 +355,7 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 
 	linter.RunLinterInProgram(program, []string{filename}, util.ExcludePaths,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			activeRules := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
+			activeRules, _ := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
 			return activeRules
 		}, diagnosticCollector)
 

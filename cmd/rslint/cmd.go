@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"runtime"
@@ -25,8 +26,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
@@ -376,13 +379,13 @@ Usage:
   rslint [OPTIONS]
 
 Options:
-  --init				Initialize a default config in the current directory.
-  --config PATH         Which rslint config file to use. Defaults to rslint.json.
+  --init                Initialize a default config in the current directory.
+  --config PATH         Which rslint config file to use.
   --format FORMAT       Output format: default | jsonline | github
   --fix                 Automatically fix problems
   --no-color            Disable colored output
   --force-color         Force colored output
-  --quiet               Report errors only 
+  --quiet               Report errors only
   --max-warnings Int    Number of warnings to trigger nonzero exit code
   -h, --help            Show help
 `
@@ -391,10 +394,11 @@ func runCMD() int {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
 	var (
-		init   bool
-		help   bool
-		config string
-		fix    bool
+		init       bool
+		help       bool
+		config     string
+		configStdin bool
+		fix        bool
 
 		traceOut       string
 		cpuprofOut     string
@@ -407,6 +411,7 @@ func runCMD() int {
 	)
 	flag.StringVar(&format, "format", "default", "output format")
 	flag.StringVar(&config, "config", "", "which rslint config to use")
+	flag.BoolVar(&configStdin, "config-stdin", false, "read config from stdin (used internally by JS config loader)")
 	flag.BoolVar(&init, "init", false, "initialize a default config in the current directory")
 	flag.BoolVar(&fix, "fix", false, "automatically fix problems")
 	flag.BoolVar(&help, "help", false, "show help")
@@ -484,8 +489,45 @@ func runCMD() int {
 	rslintconfig.RegisterAllRules()
 	var rslintConfig rslintconfig.RslintConfig
 	var tsConfigs []string
-	// Load rslint configuration and determine which rules to enable
-	rslintConfig, tsConfigs, currentDirectory = rslintconfig.LoadConfigurationWithFallback(config, currentDirectory, fs)
+
+	if configStdin {
+		// Read config JSON from stdin (sent by JS config loader)
+		data, err := io.ReadAll(os.Stdin)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error reading config from stdin: %v\n", err)
+			return 1
+		}
+
+		var payload struct {
+			ConfigDirectory string                  `json:"configDirectory"`
+			Entries         rslintconfig.RslintConfig `json:"entries"`
+		}
+		if err := json.Unmarshal(data, &payload); err != nil {
+			fmt.Fprintf(os.Stderr, "error parsing config from stdin: %v\n", err)
+			return 1
+		}
+
+		rslintConfig = payload.Entries
+		currentDirectory = payload.ConfigDirectory
+
+		loader := rslintconfig.NewConfigLoader(fs, currentDirectory)
+		tsConfigs, err = loader.LoadTsConfigsFromRslintConfig(rslintConfig, currentDirectory)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+	} else {
+		// Load configuration from file (JSON config path, isJSConfig stays false)
+		rslintConfig, tsConfigs, currentDirectory = rslintconfig.LoadConfigurationWithFallback(config, currentDirectory, fs)
+	}
+
+	// When no tsconfig is specified in rslint config, auto-detect tsconfig.json in the working directory.
+	if len(tsConfigs) == 0 {
+		defaultTsConfig := tspath.ResolvePath(currentDirectory, "tsconfig.json")
+		if fs.FileExists(defaultTsConfig) {
+			tsConfigs = []string{defaultTsConfig}
+		}
+	}
 
 	host := utils.CreateCompilerHost(currentDirectory, fs)
 
@@ -494,14 +536,29 @@ func runCMD() int {
 		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
 	}
 	programs := []*compiler.Program{}
-	for _, configFileName := range tsConfigs {
-		program, err := utils.CreateProgram(singleThreaded, fs, currentDirectory, configFileName, host)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
-			return 1
+	if len(tsConfigs) > 0 {
+		for _, configFileName := range tsConfigs {
+			program, err := utils.CreateProgram(singleThreaded, fs, currentDirectory, configFileName, host)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
+				return 1
+			}
+			programs = append(programs, program)
 		}
-		programs = append(programs, program)
-
+	} else {
+		// No tsconfig available — create program in memory for pure JS projects.
+		sourceExts := []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".mjs"}
+		excludes := []string{"node_modules"}
+		includes := []string{"**/*"}
+		rootFiles := vfs.ReadDirectory(fs, currentDirectory, currentDirectory, sourceExts, excludes, includes, nil)
+		if len(rootFiles) > 0 {
+			program, err := utils.CreateProgramFromOptions(singleThreaded, &core.CompilerOptions{AllowJs: core.TSTrue}, rootFiles, host)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error creating program: %v", err)
+				return 1
+			}
+			programs = append(programs, program)
+		}
 	}
 
 	var wg sync.WaitGroup
@@ -557,7 +614,7 @@ func runCMD() int {
 		utils.ExcludePaths,
 
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			activeRules := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
+			activeRules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
 			return activeRules
 		},
 		func(d rule.RuleDiagnostic) {

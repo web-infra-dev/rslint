@@ -9,6 +9,9 @@ import {
   GetAstInfoResponse,
 } from './service.js';
 
+export { defineConfig } from './define-config.js';
+export type { RslintConfigEntry } from './define-config.js';
+
 // Export the main RSLintService class for direct usage
 export { RSLintService } from './service.js';
 

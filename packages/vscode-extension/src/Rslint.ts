@@ -2,6 +2,8 @@ import {
   workspace,
   Uri,
   Disposable,
+  FileSystemWatcher,
+  RelativePattern,
   WorkspaceFolder,
   window,
   OutputChannel,
@@ -17,7 +19,13 @@ import {
 import { Logger } from './logger';
 import type { Extension } from './Extension';
 import { fileExists, PLATFORM_BIN_REQUEST, RslintBinPath } from './utils';
-import { dirname } from 'node:path';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import {
+  findJSConfig,
+  loadConfigFile,
+  normalizeConfig,
+} from '@rslint/core/config-loader';
 
 export class Rslint implements Disposable {
   private client: LanguageClient | undefined;
@@ -26,6 +34,7 @@ export class Rslint implements Disposable {
   private readonly workspaceFolder: WorkspaceFolder;
   private lspOutputChannel: OutputChannel | undefined;
   private outputChannel: OutputChannel | undefined;
+  private configWatcher: FileSystemWatcher | undefined;
 
   constructor(
     extension: Extension,
@@ -74,7 +83,7 @@ export class Rslint implements Disposable {
       ],
       synchronize: {
         fileEvents: workspace.createFileSystemWatcher(
-          '**/{rslint.{json,jsonc},package-lock.json,pnpm-lock.yaml,yarn.lock}',
+          '**/{rslint.config.{ts,mts,js,mjs},rslint.{json,jsonc},package-lock.json,pnpm-lock.yaml,yarn.lock}',
         ),
       },
       outputChannel: this.outputChannel,
@@ -106,11 +115,68 @@ export class Rslint implements Disposable {
         this.logger.info(`LSP trace level set to: ${traceServer}`);
       }
 
+      // Load JS config and send to LSP server
+      await this.loadAndSendConfig();
+
+      // Watch for JS config file changes and re-send config
+      this.configWatcher = workspace.createFileSystemWatcher(
+        new RelativePattern(
+          this.workspaceFolder,
+          'rslint.config.{ts,mts,js,mjs}',
+        ),
+      );
+      const reloadConfig = () => {
+        this.loadAndSendConfig().catch((err: unknown) => {
+          this.logger.error('Failed to reload JS config', err);
+        });
+      };
+      this.configWatcher.onDidChange(reloadConfig);
+      this.configWatcher.onDidCreate(reloadConfig);
+      this.configWatcher.onDidDelete(reloadConfig);
+
       this.logger.info('Rslint language client started successfully');
     } catch (err: unknown) {
       this.logger.error('Failed to start Rslint language client', err);
       throw err;
     }
+  }
+
+  private async loadAndSendConfig(): Promise<void> {
+    const workspaceRoot = this.workspaceFolder.uri.fsPath;
+    const jsConfigPath = findJSConfig(workspaceRoot);
+    if (!jsConfigPath) return;
+
+    try {
+      const rawConfig = await this.loadConfigFresh(jsConfigPath);
+      const entries = normalizeConfig(rawConfig);
+      const configDir = path.dirname(path.resolve(workspaceRoot, jsConfigPath));
+
+      if (!this.client) return;
+      await this.client.sendNotification('rslint/configUpdate', {
+        configDirectory: configDir,
+        entries,
+      });
+      this.logger.info(`Loaded JS config: ${jsConfigPath}`);
+    } catch (err) {
+      this.logger.error('Failed to load JS config', err);
+    }
+  }
+
+  /**
+   * Load a JS/TS config file with ESM cache busting for hot reload.
+   * For .js/.mjs files, appends ?t=timestamp to the file URL so that
+   * Node.js treats each reload as a new module (bypassing ESM cache).
+   * For .ts/.mts files, delegates to loadConfigFile which uses jiti
+   * (jiti reads from disk each time, no caching issue).
+   */
+  private async loadConfigFresh(configPath: string): Promise<unknown> {
+    const ext = path.extname(configPath);
+    if (ext === '.js' || ext === '.mjs') {
+      const url = `${pathToFileURL(configPath).href}?t=${Date.now()}`;
+      const mod: Record<string, unknown> = await import(url);
+      return mod.default ?? mod;
+    }
+    return loadConfigFile(configPath);
   }
 
   public async stop(): Promise<void> {
@@ -151,6 +217,7 @@ export class Rslint implements Disposable {
         this.logger.error('Error disposing Rslint client', err);
       });
     }
+    this.configWatcher?.dispose();
     this.lspOutputChannel?.dispose();
   }
 
@@ -191,7 +258,7 @@ export class Rslint implements Disposable {
 
     try {
       this.logger.debug('Looking for Rslint binary in node_modules');
-      const pathToRslintCorePackage = dirname(
+      const pathToRslintCorePackage = path.dirname(
         require.resolve('@rslint/core/package.json', {
           paths: [searchRoot],
         }),
