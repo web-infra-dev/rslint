@@ -19,3 +19,4 @@ pnpm-lock.yaml
 npm/tsgo/**/lib/
 binaries/
 target/
+internal/plugins/**/rules/**/*.md
