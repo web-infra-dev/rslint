@@ -10,6 +10,7 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
+	reactPlugin "github.com/web-infra-dev/rslint/internal/plugins/react"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/adjacent_overload_signatures"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/array_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/await_thenable"
@@ -282,6 +283,8 @@ func GetAllRulesForPlugin(plugin string) []rule.Rule {
 		return importPlugin.GetAllRules()
 	case "eslint-plugin-import/recommended":
 		return importPlugin.GetRecommendedRules()
+	case "react":
+		return reactPlugin.GetAllRules()
 	default:
 		return []rule.Rule{} // Return empty slice for unsupported plugins
 	}
@@ -382,7 +385,14 @@ func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConf
 func RegisterAllRules() {
 	registerAllTypeScriptEslintPluginRules()
 	registerAllEslintImportPluginRules()
+	registerAllReactPluginRules()
 	registerAllCoreEslintRules()
+}
+
+func registerAllReactPluginRules() {
+	for _, rule := range reactPlugin.GetAllRules() {
+		GlobalRuleRegistry.Register(rule.Name, rule)
+	}
 }
 
 // registerAllTypeScriptEslintPluginRules registers all available rules in the global registry
