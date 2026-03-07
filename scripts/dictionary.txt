@@ -55,16 +55,19 @@ lintedfile
 lsproto
 myfunc
 nolint
+nullary
 noregabi
 notcool
 objectbindingpattern
 objectliteralexpression
 osvfs
 parenless
+preact
 propertyassignment
 qwer
 readonlyness
 realpath
+reactutil
 recurser
 reducable
 reqs
@@ -160,3 +163,7 @@ marginx
 marginy
 Readonlys
 exclam
+multilines
+keygen
+corge
+nbsp
