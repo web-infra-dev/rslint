@@ -100,7 +100,8 @@ var NoInvalidVoidTypeRule = rule.CreateRule(rule.Rule{
 					return true
 
 				case ast.KindFunctionDeclaration, ast.KindMethodDeclaration,
-					ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindMethodSignature:
+					ast.KindArrowFunction, ast.KindFunctionExpression, ast.KindMethodSignature,
+					ast.KindCallSignature, ast.KindConstructSignature:
 					// For actual function/method declarations, void is valid as return type
 					return true
 
