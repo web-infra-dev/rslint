@@ -71,6 +71,20 @@ func TestArrayCallbackReturnRule(t *testing.T) {
 				Options: []interface{}{map[string]interface{}{"allowImplicit": true}},
 			},
 
+			// allowImplicit: mixed return-with-value and empty-return is valid
+			{
+				Code:    `foo.every(function() { if (a) return; else return a; });`,
+				Options: []interface{}{map[string]interface{}{"allowImplicit": true}},
+			},
+			{
+				Code:    `foo.every(function() { if (a) return a; else return; });`,
+				Options: []interface{}{map[string]interface{}{"allowImplicit": true}},
+			},
+			{
+				Code:    `foo.map(() => { if (a) return 1; else return; });`,
+				Options: []interface{}{map[string]interface{}{"allowImplicit": true}},
+			},
+
 			// checkForEach option - valid cases
 			{
 				Code:    `foo.forEach(function(x) { bar(x); });`,
@@ -96,7 +110,7 @@ func TestArrayCallbackReturnRule(t *testing.T) {
 			},
 
 			// Edge cases
-			{Code: `foo.map(function() { try { return true; } catch(e) {} });`},
+			{Code: `foo.map(function() { try { return true; } catch(e) { return false; } });`},
 			{Code: `foo.map(async function() { return true; });`},
 			{Code: `foo.map(async () => true);`},
 			{Code: `foo.map(function*() { yield true; });`},
@@ -249,6 +263,32 @@ func TestArrayCallbackReturnRule(t *testing.T) {
 				},
 			},
 
+			// Mixed return-with-value and empty-return without allowImplicit
+			{
+				Code: `foo.every(function() { if (a) return; else return a; });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "expectedAtEnd", Line: 1, Column: 11},
+				},
+			},
+			{
+				Code: `foo.every(function() { if (a) return a; else return; });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "expectedAtEnd", Line: 1, Column: 11},
+				},
+			},
+			{
+				Code: `foo.map(() => { if (a) return 1; else return; });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "expectedInside", Line: 1, Column: 9},
+				},
+			},
+			{
+				Code: `foo.every(function foo() { if (a) return; else return; });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "expectedAtEnd", Line: 1, Column: 11},
+				},
+			},
+
 			// checkForEach option - invalid cases
 			{
 				Code:    `foo.forEach(x => x);`,
@@ -293,6 +333,14 @@ func TestArrayCallbackReturnRule(t *testing.T) {
 				Code: `foo.map(x => x).filter(() => {});`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "expectedReturnValue", Line: 1, Column: 24},
+				},
+			},
+
+			// try-catch where not all paths return
+			{
+				Code: `foo.map(function() { try { return true; } catch(e) {} });`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "expectedAtEnd", Line: 1, Column: 9},
 				},
 			},
 
