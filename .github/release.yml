@@ -17,7 +17,7 @@ changelog:
     - title: Refactor 🔨
       labels:
         - 'release: refactor'
-    - title: Document 📖
+    - title: Documentation 📖
       labels:
         - 'release: document'
     - title: Other Changes
