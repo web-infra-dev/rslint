@@ -1,0 +1,5 @@
+/* This file is used to test that non-TS files don't get diagnostics */
+body {
+  margin: 0;
+  padding: 0;
+}

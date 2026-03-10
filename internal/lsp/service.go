@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -59,11 +60,6 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 					},
 				},
 			},
-			DiagnosticProvider: &lsproto.DiagnosticOptionsOrRegistrationOptions{
-				Options: &lsproto.DiagnosticOptions{
-					InterFileDependencies: true,
-				},
-			},
 			CodeActionProvider: &lsproto.BooleanOrCodeActionOptions{
 				Boolean: ptrTo(true),
 			},
@@ -73,6 +69,18 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 	return response, nil
 }
 func (s *Server) handleInitialized(ctx context.Context, params *lsproto.InitializedParams) error {
+	// Enable file watching if the client supports dynamic registration of
+	// didChangeWatchedFiles. This allows Session to register tsconfig watchers
+	// and call RefreshDiagnostics when project state changes.
+	if s.initializeParams.Capabilities != nil &&
+		s.initializeParams.Capabilities.Workspace != nil &&
+		s.initializeParams.Capabilities.Workspace.DidChangeWatchedFiles != nil &&
+		ptrIsTrue(s.initializeParams.Capabilities.Workspace.DidChangeWatchedFiles.DynamicRegistration) {
+		s.watchEnabled = true
+	}
+
+	config.RegisterAllRules()
+
 	s.session = project.NewSession(&project.SessionInit{
 		BackgroundCtx: s.backgroundCtx,
 		Options: &project.SessionOptions{
@@ -80,6 +88,7 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 			DefaultLibraryPath: s.defaultLibraryPath,
 			TypingsLocation:    s.typingsLocation,
 			PositionEncoding:   lsproto.PositionEncodingKindUTF8,
+			WatchEnabled:       s.watchEnabled,
 		},
 		FS:         s.fs,
 		Client:     s,
@@ -97,9 +106,18 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 		return nil
 	}
 
-	// Load rslint configuration and extract tsconfig paths
+	s.rslintConfigPath = rslintConfigPath
+	if err := s.reloadConfig(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// reloadConfig loads (or reloads) the rslint configuration from s.rslintConfigPath.
+func (s *Server) reloadConfig() error {
 	loader := config.NewConfigLoader(s.fs, s.cwd)
-	rslintConfig, configDirectory, err := loader.LoadRslintConfig(rslintConfigPath)
+	rslintConfig, configDirectory, err := loader.LoadRslintConfig(s.rslintConfigPath)
 	if err != nil {
 		return fmt.Errorf("could not load rslint config: %w", err)
 	}
@@ -115,33 +133,149 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 
 	return nil
 }
+
+// handleDidChangeWatchedFiles handles file change notifications from the client.
+func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsproto.DidChangeWatchedFilesParams) error {
+	if params == nil {
+		return nil
+	}
+
+	// Forward all file change events to Session so it can detect tsconfig
+	// changes, update its internal project state, and trigger
+	// RefreshDiagnostics via its background queue.
+	if s.session != nil {
+		s.session.DidChangeWatchedFiles(ctx, params.Changes)
+	}
+
+	// Check for rslint config changes — these need immediate handling
+	// because Session doesn't know about rslint.json.
+	for _, change := range params.Changes {
+		if isRslintConfigURI(string(change.Uri)) {
+			s.reloadConfigAndRelint()
+			return nil
+		}
+	}
+
+	return nil
+}
+
+// isRslintConfigURI returns true if the URI points to an rslint config file.
+func isRslintConfigURI(uri string) bool {
+	return strings.HasSuffix(uri, "/rslint.json") || strings.HasSuffix(uri, "/rslint.jsonc")
+}
+
+// reloadConfigAndRelint re-discovers and reloads the rslint config, then
+// re-lints all open documents.
+func (s *Server) reloadConfigAndRelint() {
+	log.Printf("Reloading rslint config...")
+
+	configPath, found := findRslintConfig(s.fs, s.cwd)
+	if !found {
+		log.Printf("rslint config file no longer exists, clearing config")
+		s.rslintConfig = config.RslintConfig{}
+		s.rslintConfigPath = ""
+	} else {
+		s.rslintConfigPath = configPath
+		if err := s.reloadConfig(); err != nil {
+			log.Printf("Error reloading rslint config: %v", err)
+			return
+		}
+	}
+
+	for uri := range s.documents {
+		s.pushDiagnostics(uri)
+	}
+}
+// lintDebounceDelay is how long to wait after the last keystroke before
+// running the linter. This avoids linting on every keystroke against
+// incomplete/broken syntax that can cause panics or waste CPU.
+const lintDebounceDelay = 200 * time.Millisecond
+
+// scheduleLint marks a URI for deferred linting and resets the debounce timer.
+// When the timer fires it signals debounceCh, which is consumed by the main
+// dispatch loop. Must be called from the main dispatch loop goroutine.
+func (s *Server) scheduleLint(uri lsproto.DocumentUri) {
+	s.pendingLintURIs[uri] = struct{}{}
+	if s.lintTimer != nil {
+		s.lintTimer.Stop()
+	}
+	s.lintTimer = time.AfterFunc(lintDebounceDelay, func() {
+		select {
+		case s.debounceCh <- struct{}{}:
+		default:
+			// Already pending — no need to queue another signal
+		}
+	})
+}
+
 func (s *Server) handleDidOpen(ctx context.Context, params *lsproto.DidOpenTextDocumentParams) error {
-	log.Printf("Handling didOpen: %+v,%+v", params, ctx)
+	log.Printf("Handling didOpen: %s", params.TextDocument.Uri)
 
 	uri := params.TextDocument.Uri
 	content := params.TextDocument.Text
 
 	s.documents[uri] = content
+
+	// Notify session about the opened file so it creates the overlay
+	if s.session != nil {
+		s.session.DidOpenFile(ctx, uri, params.TextDocument.Version, content, params.TextDocument.LanguageId)
+		s.pushDiagnostics(uri)
+	}
 	return nil
 }
 
 func (s *Server) handleDidChange(ctx context.Context, params *lsproto.DidChangeTextDocumentParams) error {
-	log.Printf("Handling didChange: %+v", params)
+	log.Printf("Handling didChange: %s (version %d)", params.TextDocument.Uri, params.TextDocument.Version)
 
 	uri := params.TextDocument.Uri
 
 	// For full document sync, we expect one change with the full text
 	if len(params.ContentChanges) > 0 {
-		content := params.ContentChanges[0].WholeDocument.Text
-		s.documents[uri] = content
+		s.documents[uri] = params.ContentChanges[0].WholeDocument.Text
+	}
+
+	// Notify session immediately so tsgo's overlay stays up-to-date for
+	// other LSP features (completions, hover, etc.).  Lint is deferred
+	// via scheduleLint to avoid running the linter on every keystroke.
+	if s.session != nil {
+		s.session.DidChangeFile(ctx, uri, params.TextDocument.Version, params.ContentChanges)
+		s.scheduleLint(uri)
 	}
 	return nil
 }
 
 func (s *Server) handleDidSave(ctx context.Context, params *lsproto.DidSaveTextDocumentParams) error {
-	log.Printf("Handling didSave: %+v", params)
+	log.Printf("Handling didSave: %s", params.TextDocument.Uri)
 	uri := params.TextDocument.Uri
-	s.documents[uri] = *params.Text
+	if params.Text != nil {
+		s.documents[uri] = *params.Text
+	}
+
+	// Notify session about the save event
+	if s.session != nil {
+		s.session.DidSaveFile(ctx, uri)
+		s.pushDiagnostics(uri)
+	}
+	return nil
+}
+
+func (s *Server) handleDidClose(ctx context.Context, params *lsproto.DidCloseTextDocumentParams) error {
+	log.Printf("Handling didClose: %s", params.TextDocument.Uri)
+	uri := params.TextDocument.Uri
+	delete(s.documents, uri)
+	delete(s.diagnostics, uri)
+	delete(s.pendingLintURIs, uri)
+
+	if s.session != nil {
+		// Push empty diagnostics to clear the client's display before closing
+		if err := s.PublishDiagnostics(ctx, &lsproto.PublishDiagnosticsParams{
+			Uri:         uri,
+			Diagnostics: []*lsproto.Diagnostic{},
+		}); err != nil {
+			log.Printf("Error clearing diagnostics on close: %v", err)
+		}
+		s.session.DidCloseFile(ctx, uri)
+	}
 	return nil
 }
 
@@ -152,24 +286,9 @@ func (s *Server) handleCodeAction(ctx context.Context, params *lsproto.CodeActio
 	// Get stored diagnostics for this document
 	ruleDiagnostics, exists := s.diagnostics[uri]
 	if !exists {
-		// If no diagnostics exist for this document, try to generate them
-		// This can happen if the document was opened without a proper didOpen event
-		filePath := uriToPath(uri)
-		if content, err := os.ReadFile(filePath); err == nil {
-			s.documents[uri] = string(content)
-
-			// Try to get diagnostics again after running them
-			ruleDiagnostics, exists = s.diagnostics[uri]
-			if !exists {
-				return lsproto.CodeActionResponse{
-					CommandOrCodeActionArray: &[]lsproto.CommandOrCodeAction{},
-				}, nil
-			}
-		} else {
-			return lsproto.CodeActionResponse{
-				CommandOrCodeActionArray: &[]lsproto.CommandOrCodeAction{},
-			}, nil
-		}
+		return lsproto.CodeActionResponse{
+			CommandOrCodeActionArray: &[]lsproto.CommandOrCodeAction{},
+		}, nil
 	}
 
 	var codeActions []lsproto.CommandOrCodeAction
@@ -215,46 +334,6 @@ func (s *Server) handleCodeAction(ctx context.Context, params *lsproto.CodeActio
 
 	return lsproto.CodeActionResponse{
 		CommandOrCodeActionArray: &codeActions,
-	}, nil
-}
-
-func (s *Server) handleDocumentDiagnostic(ctx context.Context, params *lsproto.DocumentDiagnosticParams) (lsproto.DocumentDiagnosticResponse, error) {
-	log.Printf("Running diagnostics for: %+v", params)
-	uriString := string(params.TextDocument.Uri)
-	uri := params.TextDocument.Uri
-	content := s.documents[uri]
-	// Collect diagnostics
-	var lsp_diagnostics []*lsproto.Diagnostic
-
-	// Only process TypeScript/JavaScript files
-	if !isTypeScriptFile(uriString) {
-		return lsproto.RelatedFullDocumentDiagnosticReportOrUnchangedDocumentDiagnosticReport{
-			FullDocumentDiagnosticReport: &lsproto.RelatedFullDocumentDiagnosticReport{
-				Items: lsp_diagnostics,
-			},
-		}, nil
-	}
-
-	// Initialize rule registry with all available rules (ensure it's done once)
-	config.RegisterAllRules()
-
-	rule_diags, err := runLintWithSession(uri, s.session, ctx, s.rslintConfig)
-
-	if err != nil {
-		log.Printf("Error running lint: %v", err)
-	}
-
-	// Store rule diagnostics for code actions
-	s.diagnostics[uri] = rule_diags
-
-	for _, diagnostic := range rule_diags {
-		lspDiag := convertRuleDiagnosticToLSP(diagnostic, content)
-		lsp_diagnostics = append(lsp_diagnostics, lspDiag)
-	}
-	return lsproto.RelatedFullDocumentDiagnosticReportOrUnchangedDocumentDiagnosticReport{
-		FullDocumentDiagnosticReport: &lsproto.RelatedFullDocumentDiagnosticReport{
-			Items: lsp_diagnostics,
-		},
 	}, nil
 }
 
@@ -321,15 +400,10 @@ type LintResponse struct {
 }
 
 func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig) ([]rule.RuleDiagnostic, error) {
-	log.Printf("context: %v", ctx)
-	// Initialize rule registry with all available rules
-	config.RegisterAllRules()
 	filename := uriToPath(uri)
-	content, ok := session.FS().ReadFile(filename)
-	if !ok {
-		return nil, fmt.Errorf("failed to read file %s", filename)
-	}
-	session.DidOpenFile(ctx, uri, 1, content, lsproto.LanguageKindTypeScript)
+
+	// GetLanguageService flushes any pending changes (from DidChangeFile) and
+	// returns a language service whose program reflects the latest overlay content.
 	languageService, err := session.GetLanguageService(ctx, uri)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get language service: %w", err)
@@ -576,5 +650,42 @@ func createDisableRuleForFileAction(ruleDiag rule.RuleDiagnostic, uri lsproto.Do
 		Edit:        workspaceEdit,
 		Diagnostics: &[]*lsproto.Diagnostic{lspDiagnostic},
 		IsPreferred: ptrTo(false),
+	}
+}
+
+// pushDiagnostics runs the linter for the given URI and pushes results to the client.
+// Must be called synchronously from the LSP message loop (not from a goroutine)
+// because session is not goroutine-safe.
+func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
+	if s.session == nil {
+		return
+	}
+
+	ctx := s.backgroundCtx
+	content := s.documents[uri]
+
+	if !isTypeScriptFile(string(uri)) {
+		return
+	}
+
+	ruleDiags, err := runLintWithSession(uri, s.session, ctx, s.rslintConfig)
+	if err != nil {
+		log.Printf("Error running lint for push diagnostics: %v", err)
+		return
+	}
+
+	s.diagnostics[uri] = ruleDiags
+
+	// Must use empty slice (not nil) so JSON serializes as [] instead of null
+	lspDiags := make([]*lsproto.Diagnostic, 0, len(ruleDiags))
+	for _, d := range ruleDiags {
+		lspDiags = append(lspDiags, convertRuleDiagnosticToLSP(d, content))
+	}
+
+	if err := s.PublishDiagnostics(ctx, &lsproto.PublishDiagnosticsParams{
+		Uri:         uri,
+		Diagnostics: lspDiags,
+	}); err != nil {
+		log.Printf("Error publishing diagnostics: %v", err)
 	}
 }
