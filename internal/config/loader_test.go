@@ -21,6 +21,7 @@ func TestContainsGlobPattern(t *testing.T) {
 		{name: "recursive wildcard", path: "./packages/**/tsconfig.json", expected: true},
 		{name: "question wildcard", path: "./tsconfig?.json", expected: true},
 		{name: "character class", path: "./tsconfig[0-9].json", expected: true},
+		{name: "negated character class", path: "./tsconfig[!a].json", expected: true},
 	}
 
 	for _, tt := range tests {
@@ -196,6 +197,183 @@ func TestLoadTsConfigsFromRslintConfig_DoubleStarPattern(t *testing.T) {
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/ui/subpackage/tsconfig.json")),
 		filepath.ToSlash(filepath.Join(tmpDir, "packages/ui/tsconfig.json")),
 	})
+}
+
+func TestLoadTsConfigsFromRslintConfig_SingleStarDoesNotMatchNested(t *testing.T) {
+	tmpDir := t.TempDir()
+	// Direct child — should match
+	createTestFile(t, filepath.Join(tmpDir, "packages/ui/tsconfig.json"))
+	// Nested deeper — should NOT match with single *
+	createTestFile(t, filepath.Join(tmpDir, "packages/ui/node_modules/foo/tsconfig.json"))
+	createTestFile(t, filepath.Join(tmpDir, "packages/ui/src/tsconfig.json"))
+
+	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	rslintConfig := RslintConfig{
+		{
+			LanguageOptions: &LanguageOptions{
+				ParserOptions: &ParserOptions{
+					Project: ProjectPaths{"./packages/*/tsconfig.json"},
+				},
+			},
+		},
+	}
+
+	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, tsConfigs, []string{
+		filepath.ToSlash(filepath.Join(tmpDir, "packages/ui/tsconfig.json")),
+	})
+}
+
+func TestLoadTsConfigsFromRslintConfig_NonExistentSearchRoot(t *testing.T) {
+	tmpDir := t.TempDir()
+	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	rslintConfig := RslintConfig{
+		{
+			LanguageOptions: &LanguageOptions{
+				ParserOptions: &ParserOptions{
+					Project: ProjectPaths{"./nonexistent/*/tsconfig.json"},
+				},
+			},
+		},
+	}
+
+	_, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	assert.ErrorContains(t, err, "glob pattern")
+}
+
+func TestLoadTsConfigsFromRslintConfig_DoubleStarWithSymlinkCycle(t *testing.T) {
+	tmpDir := t.TempDir()
+	createTestFile(t, filepath.Join(tmpDir, "packages/ui/tsconfig.json"))
+	// Create symlink cycle: packages/ui/loop -> packages
+	assert.NilError(t, os.Symlink(
+		filepath.Join(tmpDir, "packages"),
+		filepath.Join(tmpDir, "packages/ui/loop"),
+	))
+
+	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	rslintConfig := RslintConfig{
+		{
+			LanguageOptions: &LanguageOptions{
+				ParserOptions: &ParserOptions{
+					Project: ProjectPaths{"./packages/**/tsconfig.json"},
+				},
+			},
+		},
+	}
+
+	// Should complete without hanging, finding only the real tsconfig
+	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	assert.NilError(t, err)
+	assert.Assert(t, len(tsConfigs) >= 1, "should find at least the real tsconfig.json")
+
+	found := false
+	for _, c := range tsConfigs {
+		if filepath.Base(filepath.Dir(c)) == "ui" {
+			found = true
+		}
+	}
+	assert.Assert(t, found, "should find packages/ui/tsconfig.json")
+}
+
+func TestLoadTsConfigsFromRslintConfig_QuestionMarkPattern(t *testing.T) {
+	tmpDir := t.TempDir()
+	createTestFile(t, filepath.Join(tmpDir, "packages/a/tsconfig.json"))
+	createTestFile(t, filepath.Join(tmpDir, "packages/b/tsconfig.json"))
+	// "ab" is two chars — should NOT match single ?
+	createTestFile(t, filepath.Join(tmpDir, "packages/ab/tsconfig.json"))
+
+	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	rslintConfig := RslintConfig{
+		{
+			LanguageOptions: &LanguageOptions{
+				ParserOptions: &ParserOptions{
+					Project: ProjectPaths{"./packages/?/tsconfig.json"},
+				},
+			},
+		},
+	}
+
+	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, tsConfigs, []string{
+		filepath.ToSlash(filepath.Join(tmpDir, "packages/a/tsconfig.json")),
+		filepath.ToSlash(filepath.Join(tmpDir, "packages/b/tsconfig.json")),
+	})
+}
+
+func TestLoadTsConfigsFromRslintConfig_CharacterClassPattern(t *testing.T) {
+	tmpDir := t.TempDir()
+	createTestFile(t, filepath.Join(tmpDir, "tsconfig1.json"))
+	createTestFile(t, filepath.Join(tmpDir, "tsconfig2.json"))
+	// "a" is not in [0-9] — should NOT match
+	createTestFile(t, filepath.Join(tmpDir, "tsconfiga.json"))
+
+	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	rslintConfig := RslintConfig{
+		{
+			LanguageOptions: &LanguageOptions{
+				ParserOptions: &ParserOptions{
+					Project: ProjectPaths{"./tsconfig[0-9].json"},
+				},
+			},
+		},
+	}
+
+	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, tsConfigs, []string{
+		filepath.ToSlash(filepath.Join(tmpDir, "tsconfig1.json")),
+		filepath.ToSlash(filepath.Join(tmpDir, "tsconfig2.json")),
+	})
+}
+
+func TestLoadTsConfigsFromRslintConfig_NegatedCharacterClass(t *testing.T) {
+	tmpDir := t.TempDir()
+	createTestFile(t, filepath.Join(tmpDir, "packages/a/tsconfig.json"))
+	createTestFile(t, filepath.Join(tmpDir, "packages/b/tsconfig.json"))
+	createTestFile(t, filepath.Join(tmpDir, "packages/c/tsconfig.json"))
+
+	loader := NewConfigLoader(osvfs.FS(), tmpDir)
+	rslintConfig := RslintConfig{
+		{
+			LanguageOptions: &LanguageOptions{
+				ParserOptions: &ParserOptions{
+					// [!a] matches any single char except "a"
+					Project: ProjectPaths{"./packages/[!a]/tsconfig.json"},
+				},
+			},
+		},
+	}
+
+	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, tmpDir)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, tsConfigs, []string{
+		filepath.ToSlash(filepath.Join(tmpDir, "packages/b/tsconfig.json")),
+		filepath.ToSlash(filepath.Join(tmpDir, "packages/c/tsconfig.json")),
+	})
+}
+
+func TestGlobSearchRoot(t *testing.T) {
+	tests := []struct {
+		name     string
+		pattern  string
+		fallback string
+		expected string
+	}{
+		{name: "no glob", pattern: "/a/b/c", fallback: "/fallback", expected: "/a/b/c"},
+		{name: "star after slash", pattern: "/a/b/*/c.json", fallback: "/fallback", expected: "/a/b"},
+		{name: "doublestar after slash", pattern: "/a/b/**/c.json", fallback: "/fallback", expected: "/a/b"},
+		{name: "star at start", pattern: "*/c.json", fallback: "/fallback", expected: "/fallback"},
+		{name: "star mid segment", pattern: "/a/b/ts*.json", fallback: "/fallback", expected: "/a/b"},
+		{name: "question mark", pattern: "/a/b/?.json", fallback: "/fallback", expected: "/a/b"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, globSearchRoot(tt.pattern, tt.fallback), tt.expected)
+		})
+	}
 }
 
 func createTestFile(t *testing.T, path string) {
