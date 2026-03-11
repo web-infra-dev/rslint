@@ -7,19 +7,45 @@ Disallow assign another value to the exception parameter a catch clause in a try
 Examples of **correct** code for this rule:
 
 ```javascript
-try { } catch (e) { three = 2 + 1; }
-try { } catch ({e}) { this.something = 2; }
-function foo() { try { } catch (e) { return false; } }
+try {
+} catch (e) {
+  three = 2 + 1;
+}
+try {
+} catch ({ e }) {
+  this.something = 2;
+}
+function foo() {
+  try {
+  } catch (e) {
+    return false;
+  }
+}
 ```
 
 Examples of **incorrect** code for this rule:
 
 ```javascript
-try { } catch (e) { e = 10; }
-try { } catch (ex) { ex = 10; }
-try { } catch (ex) { [ex] = []; }
-try { } catch (ex) { ({x: ex = 0} = {}); }
-try { } catch ({message}) { message = 10; }
+try {
+} catch (e) {
+  e = 10;
+}
+try {
+} catch (ex) {
+  ex = 10;
+}
+try {
+} catch (ex) {
+  [ex] = [];
+}
+try {
+} catch (ex) {
+  ({ x: ex = 0 } = {});
+}
+try {
+} catch ({ message }) {
+  message = 10;
+}
 ```
 
 ## Original Documentation
