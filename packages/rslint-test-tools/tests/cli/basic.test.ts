@@ -445,6 +445,7 @@ describe('CLI Configuration Tests', () => {
           },
           rules: {
             'no-unsafe-member-access': 'error',
+            'no-console': 'off',
           },
           plugins: ['@typescript-eslint'],
         },
