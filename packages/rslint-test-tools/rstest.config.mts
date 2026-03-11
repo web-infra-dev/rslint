@@ -8,6 +8,15 @@ export default defineConfig({
     './tests/cli/basic.test.ts',
 
     // eslint
+    './tests/eslint/rules/default-case.test.ts',
+    './tests/eslint/rules/no-case-declarations.test.ts',
+    './tests/eslint/rules/no-console.test.ts',
+    './tests/eslint/rules/no-dupe-args.test.ts',
+    './tests/eslint/rules/no-dupe-keys.test.ts',
+    './tests/eslint/rules/no-duplicate-case.test.ts',
+    './tests/eslint/rules/no-empty.test.ts',
+    './tests/eslint/rules/no-empty-pattern.test.ts',
+    './tests/eslint/rules/getter-return.test.ts',
     './tests/eslint/rules/no-loss-of-precision.test.ts',
 
     // eslint-plugin-import
@@ -105,7 +114,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/no-shadow/no-shadow.test.ts',
     './tests/typescript-eslint/rules/no-this-alias.test.ts',
     // './tests/typescript-eslint/rules/no-type-alias.test.ts',
-    // './tests/typescript-eslint/rules/no-unnecessary-boolean-literal-compare.test.ts',
+    './tests/typescript-eslint/rules/no-unnecessary-boolean-literal-compare.test.ts',
     // './tests/typescript-eslint/rules/no-unnecessary-condition.test.ts',
     // './tests/typescript-eslint/rules/no-unnecessary-parameter-property-assignment.test.ts',
     // './tests/typescript-eslint/rules/no-unnecessary-qualifier.test.ts',

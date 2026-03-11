@@ -3,6 +3,7 @@ package getter_return
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // Options for getter-return rule
@@ -53,143 +54,57 @@ func buildExpectedAlwaysMessage() rule.RuleMessage {
 	}
 }
 
-// checkGetterReturn checks if a getter function has proper return statements
-func checkGetterReturn(ctx rule.RuleContext, node *ast.Node, opts Options) {
-	if node == nil {
+// reportGetterReturn reports getter-return diagnostics based on flow analysis.
+func reportGetterReturn(ctx rule.RuleContext, funcNode *ast.Node, reportNode *ast.Node, opts Options) {
+	if funcNode == nil {
 		return
 	}
 
-	body := node.Body()
+	body := funcNode.Body()
 	if body == nil {
 		return
 	}
 
-	// If allowImplicit is true, we don't check for return values
+	// ESLint only checks getters with block bodies (BlockStatement).
+	// Arrow functions with expression bodies (e.g., `get: () => value`) are
+	// implicitly returning and should not be flagged.
+	if body.Kind != ast.KindBlock {
+		return
+	}
+
 	if opts.AllowImplicit {
 		return
 	}
 
-	// Perform control flow analysis
-	result := analyzeReturnPaths(body)
+	analysis := utils.AnalyzeFunctionReturns(funcNode)
 
-	// Report on the getter node itself
-	if result.hasNoReturns {
-		// No return statements at all, or only empty returns
-		ctx.ReportNode(node, buildExpectedMessage())
-	} else if !result.allPathsReturn {
-		// Some paths return a value, but not all paths do
-		ctx.ReportNode(node, buildExpectedAlwaysMessage())
-	}
-}
-
-// returnAnalysisResult holds the result of control flow analysis
-type returnAnalysisResult struct {
-	hasNoReturns   bool // true if there are no return statements with values
-	allPathsReturn bool // true if all code paths return a value
-}
-
-// analyzeReturnPaths performs control flow analysis on a function body
-func analyzeReturnPaths(body *ast.Node) returnAnalysisResult {
-	if body == nil {
-		return returnAnalysisResult{hasNoReturns: true, allPathsReturn: false}
+	if reportNode == nil {
+		reportNode = funcNode
 	}
 
-	hasReturnWithValue := false
-	hasReturnWithoutValue := false
-
-	// Use ForEachReturnStatement to find all return statements
-	ast.ForEachReturnStatement(body, func(stmt *ast.Node) bool {
-		expr := stmt.Expression()
-		if expr != nil {
-			hasReturnWithValue = true
-		} else {
-			hasReturnWithoutValue = true
+	if !analysis.HasReturnWithValue {
+		// No return-with-value anywhere. Valid only if all paths throw.
+		// EndReachable means some paths fall through; HasEmptyReturn means explicit "return;"
+		if analysis.EndReachable || analysis.HasEmptyReturn {
+			ctx.ReportNode(reportNode, buildExpectedMessage())
 		}
-		return false // Continue iterating
-	})
-
-	// Determine if this is a simple case or complex case
-	// Simple case: body is a block with a single return statement
-	isSingleReturn := false
-	if body.Kind == ast.KindBlock {
-		statements := body.Statements()
-		if len(statements) == 1 && statements[0].Kind == ast.KindReturnStatement {
-			isSingleReturn = true
+	} else {
+		// Has at least one return-with-value. All paths must return a value.
+		if analysis.EndReachable || analysis.HasEmptyReturn {
+			ctx.ReportNode(reportNode, buildExpectedAlwaysMessage())
 		}
 	}
-
-	// If we have no return with value at all, report "expected"
-	if !hasReturnWithValue {
-		return returnAnalysisResult{
-			hasNoReturns:   true,
-			allPathsReturn: false,
-		}
-	}
-
-	// Heuristic for determining if all paths return:
-	// 1. If it's a single return statement, yes
-	// 2. If we have both return with value and return without value, no (inconsistent)
-	// 3. If we have only returns with values and no control flow, yes
-	// 4. If we have only returns with values and control flow, we need more analysis
-	//    For now, we'll be conservative: assume all paths return if there are multiple returns with values
-	//    and no empty returns (this handles if-else cases)
-
-	countReturnsWithValue := 0
-	ast.ForEachReturnStatement(body, func(stmt *ast.Node) bool {
-		if stmt.Expression() != nil {
-			countReturnsWithValue++
-		}
-		return false
-	})
-
-	allPathsReturn := isSingleReturn ||
-		(!hasReturnWithoutValue && (isSimpleBody(body) || countReturnsWithValue >= 2))
-
-	return returnAnalysisResult{
-		hasNoReturns:   false,
-		allPathsReturn: allPathsReturn,
-	}
-}
-
-// isSimpleBody checks if a function body is simple enough that we can assume all paths return
-// if there's at least one return with value
-func isSimpleBody(body *ast.Node) bool {
-	if body == nil || body.Kind != ast.KindBlock {
-		return true
-	}
-
-	statements := body.Statements()
-	if len(statements) == 0 {
-		return true
-	}
-
-	// Check for control flow statements (if, switch, loops, etc.)
-	for _, stmt := range statements {
-		if stmt == nil {
-			continue
-		}
-		switch stmt.Kind {
-		case ast.KindIfStatement, ast.KindSwitchStatement,
-			ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement,
-			ast.KindWhileStatement, ast.KindDoStatement,
-			ast.KindTryStatement:
-			// Has control flow - not simple
-			return false
-		}
-	}
-
-	return true
 }
 
 // GetterReturnRule enforces return statements in getters
-var GetterReturnRule = rule.CreateRule(rule.Rule{
+var GetterReturnRule = rule.Rule{
 	Name: "getter-return",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := parseOptions(options)
 
 		return rule.RuleListeners{
 			ast.KindGetAccessor: func(node *ast.Node) {
-				checkGetterReturn(ctx, node, opts)
+				reportGetterReturn(ctx, node, node, opts)
 			},
 
 			// Handle Object.defineProperty, Reflect.defineProperty
@@ -210,7 +125,6 @@ var GetterReturnRule = rule.CreateRule(rule.Rule{
 				}
 
 				// Check for Object.defineProperty, Reflect.defineProperty
-				// This handles both regular PropertyAccessExpression and optional chaining (checked via flags)
 				if actualExpr != nil && actualExpr.Kind == ast.KindPropertyAccessExpression {
 					obj := actualExpr.Expression()
 					if obj != nil && obj.Kind == ast.KindIdentifier {
@@ -281,7 +195,7 @@ var GetterReturnRule = rule.CreateRule(rule.Rule{
 			},
 		}
 	},
-})
+}
 
 // checkDescriptorForGetter checks property descriptors for get functions
 func checkDescriptorForGetter(ctx rule.RuleContext, descriptor *ast.Node, opts Options) {
@@ -327,43 +241,10 @@ func checkDescriptorForGetter(ctx rule.RuleContext, descriptor *ast.Node, opts O
 					if getterFunc.Kind == ast.KindFunctionExpression ||
 						getterFunc.Kind == ast.KindArrowFunction ||
 						getterFunc.Kind == ast.KindMethodDeclaration {
-						// Report on the 'get' property name, not the function
-						checkGetterReturnInDescriptor(ctx, getterFunc, propNameNode, opts)
+						reportGetterReturn(ctx, getterFunc, propNameNode, opts)
 					}
 				}
 			}
 		}
-	}
-}
-
-// checkGetterReturnInDescriptor is like checkGetterReturn but reports on a specific node
-func checkGetterReturnInDescriptor(ctx rule.RuleContext, funcNode *ast.Node, reportNode *ast.Node, opts Options) {
-	if funcNode == nil {
-		return
-	}
-
-	body := funcNode.Body()
-	if body == nil {
-		return
-	}
-
-	// If allowImplicit is true, we don't check for return values
-	if opts.AllowImplicit {
-		return
-	}
-
-	// Perform control flow analysis
-	result := analyzeReturnPaths(body)
-
-	// Use the reportNode for error reporting (e.g., the 'get' property name)
-	// Fall back to function node if reportNode is nil
-	if reportNode == nil {
-		reportNode = funcNode
-	}
-
-	if result.hasNoReturns {
-		ctx.ReportNode(reportNode, buildExpectedMessage())
-	} else if !result.allPathsReturn {
-		ctx.ReportNode(reportNode, buildExpectedAlwaysMessage())
 	}
 }

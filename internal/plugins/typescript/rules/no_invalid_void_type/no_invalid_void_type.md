@@ -2,7 +2,7 @@
 
 ## Rule Details
 
-Disallows `void` type outside of generic or return types. The `void` type in TypeScript means a function returns nothing, and is only meaningful as a return type or as a generic type argument (e.g., `Promise<void>`). Using `void` in other positions such as variable types, parameter types, or union types is typically a mistake and can lead to confusing behavior.
+Disallows `void` type outside of generic or return types. The `void` type in TypeScript means a function returns nothing, and is only meaningful as a return type of functions, methods, callable signatures, construct signatures, or as a generic type argument (e.g., `Promise<void>`). Using `void` in other positions such as variable types, parameter types, or union types is typically a mistake and can lead to confusing behavior.
 
 Examples of **incorrect** code for this rule:
 
@@ -24,6 +24,15 @@ type Callback = () => void;
 async function bar(): Promise<void> {}
 
 type Result = void | never;
+
+// Callable and construct signatures
+interface Callable {
+  (...args: string[]): void;
+}
+
+interface Constructable {
+  new (...args: string[]): void;
+}
 ```
 
 ## Original Documentation

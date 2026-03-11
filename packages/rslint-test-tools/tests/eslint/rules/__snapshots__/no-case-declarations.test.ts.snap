@@ -1,0 +1,131 @@
+// Rstest Snapshot v1
+
+exports[`no-case-declarations > invalid 1`] = `
+{
+  "code": "switch (a) { case 1: let x = 1; break; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected lexical declaration in case clause.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-case-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-case-declarations > invalid 2`] = `
+{
+  "code": "switch (a) { case 1: const x = 1; break; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected lexical declaration in case clause.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-case-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-case-declarations > invalid 3`] = `
+{
+  "code": "switch (a) { case 1: function f() {} break; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected lexical declaration in case clause.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-case-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-case-declarations > invalid 4`] = `
+{
+  "code": "switch (a) { case 1: class C {} break; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected lexical declaration in case clause.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-case-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-case-declarations > invalid 5`] = `
+{
+  "code": "switch (a) { default: let x = 1; break; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected lexical declaration in case clause.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-case-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
