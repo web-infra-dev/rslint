@@ -160,3 +160,7 @@ marginx
 marginy
 Readonlys
 exclam
+relint
+relints
+relinting
+lifecycles

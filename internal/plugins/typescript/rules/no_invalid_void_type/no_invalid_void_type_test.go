@@ -25,6 +25,13 @@ func TestNoInvalidVoidTypeRule(t *testing.T) {
 			{Code: `async function asyncFunc(): Promise<void> {}`},
 			{Code: `type FunctionType = (x: number) => void;`},
 			{Code: `interface Foo { method(): void; }`},
+			// Callable and construct signatures
+			{Code: `interface Callable { (...args: string[]): void; }`},
+			{Code: `interface Constructable { new (...args: string[]): void; }`},
+			{Code: `interface GenericCallable { <T>(arg: T): void; }`},
+			// Callable signatures should be valid even with allowInGenericTypeArguments: false
+			{Code: `interface Callable { (...args: string[]): void; }`, Options: map[string]interface{}{"allowInGenericTypeArguments": false}},
+			{Code: `interface Constructable { new (...args: string[]): void; }`, Options: map[string]interface{}{"allowInGenericTypeArguments": false}},
 			{Code: `function f(this: void) {}`, Options: map[string]interface{}{"allowAsThisParameter": true}},
 		},
 		// Invalid cases
@@ -74,6 +81,13 @@ func TestNoInvalidVoidTypeRule(t *testing.T) {
 			{
 				Code:    `type GenericVoid = Generic<void>;`,
 				Options: map[string]interface{}{"allowInGenericTypeArguments": false},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "invalidVoidNotReturn"},
+				},
+			},
+			// Void in callable signature parameter position should be invalid
+			{
+				Code: `interface Foo { (arg: void): string; }`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "invalidVoidNotReturn"},
 				},

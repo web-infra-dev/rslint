@@ -70,6 +70,16 @@ hasAny := utils.Some(items, func(item T) bool { return condition })
 allMatch := utils.Every(items, func(item T) bool { return condition })
 ```
 
+### Rule Options Parsing
+
+```go
+// Extract options map from rule options (handles both array and object format)
+optsMap := utils.GetOptionsMap(options)
+if optsMap != nil {
+    // Parse options from optsMap...
+}
+```
+
 ### Other Utilities
 
 ```go
@@ -235,6 +245,29 @@ receiver, sender, unsafe := utils.IsUnsafeAssignment(t, receiverT, typeChecker, 
 ```go
 // Get contextual type of a node
 contextualType := utils.GetContextualType(typeChecker, node)
+```
+
+### Property Names & Binding Patterns
+
+```go
+// Get static property name from a property name node
+// Handles Identifier, StringLiteral, NumericLiteral, ComputedPropertyName
+// (with static string, numeric, BigInt, or template literal expressions)
+name, isStatic := utils.GetStaticPropertyName(nameNode)
+
+// Normalize numeric literal to its canonical form (matches ESLint's String(node.value))
+// e.g., "0x1" -> "1", "1.0" -> "1", "1e2" -> "100"
+normalized := utils.NormalizeNumericLiteral(text)
+
+// Normalize BigInt literal to its decimal string representation
+// e.g., "1n" -> "1", "0x1n" -> "1", "0o1n" -> "1", "0b1n" -> "1"
+normalized := utils.NormalizeBigIntLiteral(text)
+
+// Recursively collect all identifier names from a binding pattern
+// Handles Identifier, ObjectBindingPattern, ArrayBindingPattern
+utils.CollectBindingNames(nameNode, func(ident *ast.Node, name string) {
+    // Process each identifier
+})
 ```
 
 ### Other Helpers
