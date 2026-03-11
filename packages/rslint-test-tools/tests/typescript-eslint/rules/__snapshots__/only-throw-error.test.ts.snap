@@ -1,0 +1,1342 @@
+// Rstest Snapshot v1
+
+exports[`only-throw-error > invalid 1`] = `
+{
+  "code": "throw undefined;",
+  "diagnostics": [
+    {
+      "message": "Do not throw undefined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 2`] = `
+{
+  "code": "throw new String('');",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 3`] = `
+{
+  "code": "throw 'error';",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 4`] = `
+{
+  "code": "throw 0;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 5`] = `
+{
+  "code": "throw false;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 6`] = `
+{
+  "code": "throw null;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 7`] = `
+{
+  "code": "throw {};",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 8`] = `
+{
+  "code": "throw 'a' + 'b';",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 9`] = `
+{
+  "code": "
+const a = '';
+throw a + 'b';
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 10`] = `
+{
+  "code": "throw (foo = 'error');",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 11`] = `
+{
+  "code": "throw (new Error(), 1, 2, 3);",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 12`] = `
+{
+  "code": "throw 'literal' && 'not an Error';",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 13`] = `
+{
+  "code": "throw 'literal' || new Error();",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 14`] = `
+{
+  "code": "throw new Error() && 'literal';",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 15`] = `
+{
+  "code": "throw 'literal' ?? new Error();",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 16`] = `
+{
+  "code": "throw foo ? 'not an Error' : 'literal';",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 17`] = `
+{
+  "code": "throw foo ? new Error() : 'literal';",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 18`] = `
+{
+  "code": "throw foo ? 'literal' : new Error();",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 19`] = `
+{
+  "code": "throw \`\${err}\`;",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 20`] = `
+{
+  "code": "
+const err = 'error';
+throw err;
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 21`] = `
+{
+  "code": "
+function foo(msg) {}
+throw foo('error');
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 22`] = `
+{
+  "code": "
+const foo = {
+  msg: 'error',
+};
+throw foo.msg;
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 7,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 23`] = `
+{
+  "code": "
+const foo = {
+  msg: undefined,
+};
+throw foo.msg;
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not throw undefined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 7,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 24`] = `
+{
+  "code": "
+class CustomError {}
+throw new CustomError();
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 25`] = `
+{
+  "code": "
+class Foo {}
+class CustomError extends Foo {}
+throw new CustomError();
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 4,
+        },
+        "start": {
+          "column": 7,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 26`] = `
+{
+  "code": "
+const Error = null;
+throw Error;
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 27`] = `
+{
+  "code": "
+import { Error } from './class';
+throw new Error();
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 28`] = `
+{
+  "code": "
+class CustomError<T extends object> extends Foo {}
+throw new CustomError();
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 29`] = `
+{
+  "code": "
+function foo<T>() {
+  const res: T;
+  throw res;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 30`] = `
+{
+  "code": "
+function foo<T>(fn: () => Promise<T>) {
+  const promise = fn();
+  const res = promise.then(() => {}).catch(() => {});
+  throw res;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 31`] = `
+{
+  "code": "
+function foo() {
+  throw Object.assign({ foo: 'foo' }, { bar: 'bar' });
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 32`] = `
+{
+  "code": "
+const foo: Error | { bar: string } = bar();
+function bar() {
+  throw foo;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 33`] = `
+{
+  "code": "
+declare const foo: Error | string;
+throw foo as string;
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 34`] = `
+{
+  "code": "
+function fun(value: any) {
+  throw value;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 35`] = `
+{
+  "code": "
+function fun(value: unknown) {
+  throw value;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 36`] = `
+{
+  "code": "
+function fun<T extends number>(t: T): void {
+  throw t;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 37`] = `
+{
+  "code": "
+class UnknownError implements Error {}
+throw new UnknownError();
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 38`] = `
+{
+  "code": "
+let x = 1;
+Promise.reject('foo').catch(e => {
+  throw x;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 39`] = `
+{
+  "code": "
+Promise.reject('foo').catch((...e) => {
+  throw e;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 40`] = `
+{
+  "code": "
+declare const x: any[];
+Promise.reject('foo').catch(...x, e => {
+  throw e;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 41`] = `
+{
+  "code": "
+declare const x: any[];
+Promise.reject('foo').then(...x, e => {
+  throw e;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 42`] = `
+{
+  "code": "
+declare const onFulfilled: any;
+declare const x: any[];
+Promise.reject('foo').then(onFulfilled, ...x, e => {
+  throw e;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 43`] = `
+{
+  "code": "
+Promise.reject('foo').then((...e) => {
+  throw e;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 44`] = `
+{
+  "code": "
+Promise.reject('foo').then(e => {
+  throw globalThis;
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 45`] = `
+{
+  "code": "
+function func<T1, T2>() {
+  let err: Promise<T1> | Promise<T2> | void;
+  throw err;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 46`] = `
+{
+  "code": "
+async function foo() {
+  throw await bar;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`only-throw-error > invalid 47`] = `
+{
+  "code": "
+async function foo() {
+  throw await Promise.resolve<number>(303);
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Expected an error object to be thrown.",
+      "messageId": "object",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/only-throw-error",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
