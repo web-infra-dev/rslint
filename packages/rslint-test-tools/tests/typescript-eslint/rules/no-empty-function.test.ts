@@ -79,6 +79,46 @@ class Foo extends Base {
       `,
       options: [{ allow: ['overrideMethods'] }],
     },
+    // Functions with comments are not empty
+    {
+      code: `function foo() { /* comment */ }`,
+    },
+    {
+      code: `const foo = () => { // comment
+};`,
+    },
+    {
+      code: `
+class Foo {
+  bar() { /* comment */ }
+}
+      `,
+    },
+    {
+      code: `
+class Foo {
+  constructor() { /* initializing */ }
+}
+      `,
+    },
+    {
+      code: `
+class Foo {
+  get bar() { /* TODO */ }
+}
+      `,
+    },
+    {
+      code: `
+class Foo {
+  set bar(value: string) { /* noop */ }
+}
+      `,
+    },
+    {
+      code: `const foo = function() { // comment
+};`,
+    },
   ],
 
   invalid: [

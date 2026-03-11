@@ -1,6 +1,8 @@
 package no_empty_function
 
 import (
+	"strings"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -47,6 +49,29 @@ var NoEmptyFunctionRule = rule.CreateRule(rule.Rule{
 			return false
 		}
 
+		// Check if a block body has no statements and no comments
+		isBlockBodyEmpty := func(body *ast.Node) bool {
+			if body == nil {
+				return false
+			}
+			if len(body.Statements()) != 0 {
+				return false
+			}
+			// Best-effort heuristic: since Statements() is empty, the only content
+			// between the braces can be comments. A simple substring check is safe here
+			// because there are no statements that could contain "//"|"/*" in strings/regexps.
+			text := ctx.SourceFile.Text()
+			pos := body.Pos()
+			end := body.End()
+			if pos >= 0 && end <= len(text) && pos < end {
+				bodyText := text[pos:end]
+				if strings.Contains(bodyText, "//") || strings.Contains(bodyText, "/*") {
+					return false
+				}
+			}
+			return true
+		}
+
 		// Check if the function body is empty
 		isBodyEmpty := func(node *ast.Node) bool {
 			switch node.Kind {
@@ -55,13 +80,13 @@ var NoEmptyFunctionRule = rule.CreateRule(rule.Rule{
 				if fn == nil || fn.Body == nil {
 					return false
 				}
-				return len(fn.Body.Statements()) == 0
+				return isBlockBodyEmpty(fn.Body)
 			case ast.KindFunctionExpression:
 				fn := node.AsFunctionExpression()
 				if fn == nil || fn.Body == nil {
 					return false
 				}
-				return len(fn.Body.Statements()) == 0
+				return isBlockBodyEmpty(fn.Body)
 			case ast.KindArrowFunction:
 				fn := node.AsArrowFunction()
 				if fn == nil || fn.Body == nil {
@@ -71,35 +96,31 @@ var NoEmptyFunctionRule = rule.CreateRule(rule.Rule{
 				if fn.Body.Kind != ast.KindBlock {
 					return false // Expression body, not empty
 				}
-				block := fn.Body.AsBlock()
-				if block == nil || block.Statements == nil {
-					return false
-				}
-				return len(block.Statements.Nodes) == 0
+			return isBlockBodyEmpty(fn.Body)
 			case ast.KindConstructor:
 				constructor := node.AsConstructorDeclaration()
 				if constructor == nil || constructor.Body == nil {
 					return false
 				}
-				return len(constructor.Body.Statements()) == 0
+				return isBlockBodyEmpty(constructor.Body)
 			case ast.KindMethodDeclaration:
 				method := node.AsMethodDeclaration()
 				if method == nil || method.Body == nil {
 					return false
 				}
-				return len(method.Body.Statements()) == 0
+				return isBlockBodyEmpty(method.Body)
 			case ast.KindGetAccessor:
 				accessor := node.AsGetAccessorDeclaration()
 				if accessor == nil || accessor.Body == nil {
 					return false
 				}
-				return len(accessor.Body.Statements()) == 0
+				return isBlockBodyEmpty(accessor.Body)
 			case ast.KindSetAccessor:
 				accessor := node.AsSetAccessorDeclaration()
 				if accessor == nil || accessor.Body == nil {
 					return false
 				}
-				return len(accessor.Body.Statements()) == 0
+				return isBlockBodyEmpty(accessor.Body)
 			default:
 				return false
 			}
