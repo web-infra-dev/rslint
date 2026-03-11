@@ -237,12 +237,9 @@ func checkComment(ctx rule.RuleContext, commentText string, commentStart int, co
 		afterDirective = withoutClosing
 	}
 
-	// Check if there's a description
+	// Description is everything after the directive, trimmed of whitespace only.
+	// Separators like ':' and '--' are part of the description (included in length).
 	description := strings.TrimSpace(afterDirective)
-
-	// Remove leading separators (: -- etc.)
-	description = strings.TrimLeft(description, ": \t-")
-	description = strings.TrimSpace(description)
 
 	// Special case: for ts-ignore with no description allowed, suggest ts-expect-error
 	if directiveType == "ignore" && !config.AllowWithDescription {
@@ -268,10 +265,10 @@ func checkComment(ctx rule.RuleContext, commentText string, commentStart int, co
 		return
 	}
 
-	// If description is required
+	// If description is required, check minimum length (handles both empty and too-short)
 	if config.AllowWithDescription {
-		// Check if description exists
-		if len(description) == 0 {
+		descLength := graphemeLength(description)
+		if descLength < minDescLength {
 			ctx.ReportRange(
 				core.NewTextRange(commentStart, commentStart+len(commentText)),
 				rule.RuleMessage{
@@ -282,27 +279,11 @@ func checkComment(ctx rule.RuleContext, commentText string, commentStart int, co
 			return
 		}
 
-		// Check minimum description length (counting grapheme clusters for Unicode)
-		descLength := graphemeLength(description)
-		if descLength < minDescLength {
-			ctx.ReportRange(
-				core.NewTextRange(commentStart, commentStart+len(commentText)),
-				rule.RuleMessage{
-					Id:          "tsDirectiveCommentDescriptionNotMatchPattern",
-					Description: "The description for the '@" + directiveName + "' directive must be " + formatMinimumDescLength(minDescLength) + " characters long.",
-				},
-			)
-			return
-		}
-
 		// Check description format if specified
 		if config.DescriptionFormat != "" {
 			formatRegex, err := regexp.Compile(config.DescriptionFormat)
 			if err == nil {
-				// For format checking, we need to check the original afterDirective text
-				// to preserve the exact format (including leading colons, etc.)
-				checkText := strings.TrimSpace(afterDirective)
-				if !formatRegex.MatchString(checkText) {
+				if !formatRegex.MatchString(description) {
 					ctx.ReportRange(
 						core.NewTextRange(commentStart, commentStart+len(commentText)),
 						rule.RuleMessage{
