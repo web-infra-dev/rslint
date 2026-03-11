@@ -6,6 +6,7 @@ export default defineConfig({
   include: [
     // cli
     './tests/cli/basic.test.ts',
+    './tests/cli/disable-comments.test.ts',
 
     // eslint
     './tests/eslint/rules/default-case.test.ts',
