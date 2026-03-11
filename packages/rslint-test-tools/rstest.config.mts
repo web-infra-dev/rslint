@@ -6,6 +6,7 @@ export default defineConfig({
   include: [
     // cli
     './tests/cli/basic.test.ts',
+    './tests/cli/disable-comments.test.ts',
 
     // eslint
     './tests/eslint/rules/default-case.test.ts',
@@ -92,7 +93,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-implied-eval.test.ts',
     './tests/typescript-eslint/rules/no-inferrable-types.test.ts',
     // './tests/typescript-eslint/rules/no-invalid-this.test.ts',
-    // './tests/typescript-eslint/rules/no-invalid-void-type.test.ts',
+    './tests/typescript-eslint/rules/no-invalid-void-type.test.ts',
     // './tests/typescript-eslint/rules/no-loop-func.test.ts',
     // './tests/typescript-eslint/rules/no-loss-of-precision.test.ts',
     // './tests/typescript-eslint/rules/no-magic-numbers.test.ts',
@@ -144,7 +145,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/no-wrapper-object-types.test.ts',
     './tests/typescript-eslint/rules/no_namespace.test.ts',
     './tests/typescript-eslint/rules/non-nullable-type-assertion-style.test.ts',
-    // './tests/typescript-eslint/rules/only-throw-error.test.ts',
+    './tests/typescript-eslint/rules/only-throw-error.test.ts',
     // './tests/typescript-eslint/rules/parameter-properties.test.ts',
     './tests/typescript-eslint/rules/prefer-as-const.test.ts',
     // './tests/typescript-eslint/rules/prefer-destructuring.test.ts',
