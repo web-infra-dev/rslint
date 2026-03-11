@@ -3,6 +3,7 @@ package consistent_type_definitions
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type DefinitionStyle string
@@ -111,7 +112,7 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 			return
 		}
 
-		ctx.ReportNode(typeAlias.Name(), rule.RuleMessage{
+		reportIdentifierRange(ctx, typeAlias.Name(), rule.RuleMessage{
 			Id:          "interfaceOverType",
 			Description: "Use an interface instead of a type literal.",
 		})
@@ -129,14 +130,14 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 
 		// Don't fix interfaces in global modules (see typescript-eslint #2707)
 		if isInGlobalModule(node) {
-			ctx.ReportNode(interfaceDecl.Name(), rule.RuleMessage{
+			reportIdentifierRange(ctx, interfaceDecl.Name(), rule.RuleMessage{
 				Id:          "typeOverInterface",
 				Description: "Use a type literal instead of an interface.",
 			})
 			return
 		}
 
-		ctx.ReportNode(interfaceDecl.Name(), rule.RuleMessage{
+		reportIdentifierRange(ctx, interfaceDecl.Name(), rule.RuleMessage{
 			Id:          "typeOverInterface",
 			Description: "Use a type literal instead of an interface.",
 		})
@@ -146,4 +147,12 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 		ast.KindTypeAliasDeclaration: checkTypeAlias,
 		ast.KindInterfaceDeclaration: checkInterface,
 	}
+}
+
+func reportIdentifierRange(ctx rule.RuleContext, node *ast.Node, msg rule.RuleMessage) {
+	if node == nil {
+		return
+	}
+
+	ctx.ReportRange(utils.TrimNodeTextRange(ctx.SourceFile, node), msg)
 }

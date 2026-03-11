@@ -452,6 +452,7 @@ declare global {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
