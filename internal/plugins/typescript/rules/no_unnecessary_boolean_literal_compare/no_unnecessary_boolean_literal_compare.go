@@ -1,6 +1,8 @@
 package no_unnecessary_boolean_literal_compare
 
 import (
+	"encoding/json"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/core"
@@ -46,9 +48,9 @@ func buildNoStrictNullCheckMessage() rule.RuleMessage {
 }
 
 type NoUnnecessaryBooleanLiteralCompareOptions struct {
-	AllowComparingNullableBooleansToFalse                  *bool
-	AllowComparingNullableBooleansToTrue                   *bool
-	AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing *bool
+	AllowComparingNullableBooleansToFalse                  *bool `json:"allowComparingNullableBooleansToFalse,omitempty"`
+	AllowComparingNullableBooleansToTrue                   *bool `json:"allowComparingNullableBooleansToTrue,omitempty"`
+	AllowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing *bool `json:"allowRuleToRunWithoutStrictNullChecksIKnowWhatIAmDoing,omitempty"`
 }
 
 type booleanComparison struct {
@@ -68,6 +70,15 @@ var NoUnnecessaryBooleanLiteralCompareRule = rule.CreateRule(rule.Rule{
 		opts, ok := options.(NoUnnecessaryBooleanLiteralCompareOptions)
 		if !ok {
 			opts = NoUnnecessaryBooleanLiteralCompareOptions{}
+			if optionsArray, ok := options.([]interface{}); ok && len(optionsArray) > 0 {
+				if optsJSON, err := json.Marshal(optionsArray[0]); err == nil {
+					json.Unmarshal(optsJSON, &opts)
+				}
+			} else if optsMap, ok := options.(map[string]interface{}); ok {
+				if optsJSON, err := json.Marshal(optsMap); err == nil {
+					json.Unmarshal(optsJSON, &opts)
+				}
+			}
 		}
 		if opts.AllowComparingNullableBooleansToFalse == nil {
 			opts.AllowComparingNullableBooleansToFalse = utils.Ref(true)
@@ -100,11 +111,19 @@ var NoUnnecessaryBooleanLiteralCompareRule = rule.CreateRule(rule.Rule{
 				return false
 			}
 
-			var flags checker.TypeFlags
+			hasNullable := false
+			hasBoolean := false
 			for _, t := range t.Types() {
-				flags |= checker.Type_flags(t)
+				f := checker.Type_flags(t)
+				if f&checker.TypeFlagsNullable != 0 {
+					hasNullable = true
+				} else if f&checker.TypeFlagsBooleanLike != 0 {
+					hasBoolean = true
+				} else {
+					return false
+				}
 			}
-			return flags&checker.TypeFlagsNullable != 0 && flags&checker.TypeFlagsBooleanLike != 0
+			return hasNullable && hasBoolean
 		}
 
 		getBooleanComparison := func(node *ast.BinaryExpression) (booleanComparison, bool) {
