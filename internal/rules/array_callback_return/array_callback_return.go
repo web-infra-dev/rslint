@@ -3,6 +3,7 @@ package array_callback_return
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // Options for array-callback-return rule
@@ -183,8 +184,6 @@ func isGeneratorOrAsyncFunction(node *ast.Node) bool {
 	}
 
 	// Check for generator function (function*)
-	// Generators contain yield expressions
-	// We check recursively through the body
 	if containsYield(node.Body()) {
 		return true
 	}
@@ -253,258 +252,41 @@ func checkCallbackReturn(ctx rule.RuleContext, funcNode *ast.Node, methodName st
 		}
 	}
 
-	// Analyze return statements
-	result := analyzeCallbackReturns(body, opts.AllowImplicit)
+	analysis := utils.AnalyzeFunctionReturns(funcNode)
 
 	if checkForEach {
 		// forEach callbacks should not return values
-		if result.hasReturnWithValue {
+		if analysis.HasReturnWithValue {
 			ctx.ReportNode(funcNode, buildExpectedNoReturnValue(methodName))
 		}
+		return
+	}
+
+	// When allowImplicit is false, empty returns (return;) don't count as valid returns.
+	// When allowImplicit is true, empty returns are acceptable.
+	hasNoReturns := !analysis.HasReturnWithValue && (!opts.AllowImplicit || !analysis.HasEmptyReturn)
+	var allPathsReturn bool
+	if opts.AllowImplicit {
+		allPathsReturn = !analysis.EndReachable && (analysis.HasReturnWithValue || analysis.HasEmptyReturn)
 	} else {
-		// Other methods require return values
-		if result.hasNoReturns {
-			// No return statements at all, or only empty returns
-			if funcNode.Kind == ast.KindArrowFunction {
-				ctx.ReportNode(funcNode, buildExpectedReturnValue(methodName))
-			} else {
-				ctx.ReportNode(funcNode, buildExpectedAtEnd(methodName))
-			}
-		} else if !result.allPathsReturn {
-			// Some paths return a value, but not all paths do
-			if funcNode.Kind == ast.KindArrowFunction {
-				ctx.ReportNode(funcNode, buildExpectedInside(methodName))
-			} else {
-				ctx.ReportNode(funcNode, buildExpectedAtEnd(methodName))
-			}
-		}
-	}
-}
-
-// callbackReturnResult holds the result of callback return analysis
-type callbackReturnResult struct {
-	hasNoReturns       bool // true if there are no return statements with values
-	allPathsReturn     bool // true if all code paths return a value
-	hasReturnWithValue bool // true if there's at least one return with value
-}
-
-// analyzeCallbackReturns performs control flow analysis on a callback body
-func analyzeCallbackReturns(body *ast.Node, allowImplicit bool) callbackReturnResult {
-	if body == nil {
-		return callbackReturnResult{hasNoReturns: true, allPathsReturn: false, hasReturnWithValue: false}
+		// Without allowImplicit, all return statements must have values.
+		// Mixed return-with-value + empty-return is invalid (e.g., if (a) return 1; else return;)
+		allPathsReturn = !analysis.EndReachable && analysis.HasReturnWithValue && !analysis.HasEmptyReturn
 	}
 
-	hasReturnWithValue := false
-	hasReturnWithoutValue := false
-
-	// Use ForEachReturnStatement to find all return statements
-	ast.ForEachReturnStatement(body, func(stmt *ast.Node) bool {
-		expr := stmt.Expression()
-		if expr != nil {
-			hasReturnWithValue = true
+	if hasNoReturns {
+		if funcNode.Kind == ast.KindArrowFunction {
+			ctx.ReportNode(funcNode, buildExpectedReturnValue(methodName))
 		} else {
-			hasReturnWithoutValue = true
+			ctx.ReportNode(funcNode, buildExpectedAtEnd(methodName))
 		}
-		return false // Continue iterating
-	})
-
-	// Track if we found at least one return with value
-	result := callbackReturnResult{
-		hasReturnWithValue: hasReturnWithValue,
-	}
-
-	// If allowImplicit is true, empty returns are acceptable
-	if allowImplicit && hasReturnWithoutValue && !hasReturnWithValue {
-		return callbackReturnResult{
-			hasNoReturns:       false,
-			allPathsReturn:     true,
-			hasReturnWithValue: false,
+	} else if !allPathsReturn {
+		if funcNode.Kind == ast.KindArrowFunction {
+			ctx.ReportNode(funcNode, buildExpectedInside(methodName))
+		} else {
+			ctx.ReportNode(funcNode, buildExpectedAtEnd(methodName))
 		}
 	}
-
-	// Determine if this is a simple case or complex case
-	isSingleReturn := false
-	if body.Kind == ast.KindBlock {
-		statements := body.Statements()
-		if len(statements) == 1 && statements[0].Kind == ast.KindReturnStatement {
-			isSingleReturn = true
-		}
-	}
-
-	// If we have no return with value at all (and empty returns don't count unless allowImplicit)
-	if !hasReturnWithValue && (!allowImplicit || !hasReturnWithoutValue) {
-		return callbackReturnResult{
-			hasNoReturns:       true,
-			allPathsReturn:     false,
-			hasReturnWithValue: false,
-		}
-	}
-
-	// Heuristic for determining if all paths return:
-	// This is a simplified heuristic that works for common cases
-	countReturnsWithValue := 0
-	ast.ForEachReturnStatement(body, func(stmt *ast.Node) bool {
-		if stmt.Expression() != nil {
-			countReturnsWithValue++
-		}
-		return false
-	})
-
-	// For try-catch blocks, if the try block has a return, we consider it valid
-	// even if the catch doesn't (since the catch only runs on exception)
-	hasTryStatement := false
-	if body.Kind == ast.KindBlock {
-		statements := body.Statements()
-		for _, stmt := range statements {
-			if stmt != nil {
-				if stmt.Kind == ast.KindTryStatement {
-					hasTryStatement = true
-				}
-			}
-		}
-	}
-
-	// Check if all paths return based on the structure
-	// We use several heuristics:
-	// 1. Single return statement (obviously all paths return)
-	// 2. Simple body with no empty returns and at least one return
-	// 3. Try-catch with a return in the try block
-	// 4. If-else statements where both branches return
-	hasIfElseWithReturns := checkIfElseReturns(body)
-
-	// Note: We intentionally don't try to detect all control flow patterns perfectly
-	// as this requires proper control flow analysis which is complex
-	allPathsReturn := isSingleReturn ||
-		(!hasReturnWithoutValue && isSimpleBody(body) && hasReturnWithValue) ||
-		(hasTryStatement && hasReturnWithValue) ||
-		hasIfElseWithReturns
-
-	result.hasNoReturns = false
-	result.allPathsReturn = allPathsReturn
-
-	return result
-}
-
-// isSimpleBody checks if a function body is simple enough that we can assume all paths return
-func isSimpleBody(body *ast.Node) bool {
-	if body == nil || body.Kind != ast.KindBlock {
-		return true
-	}
-
-	statements := body.Statements()
-	if len(statements) == 0 {
-		return true
-	}
-
-	// Check for control flow statements (if, switch, loops, etc.)
-	for _, stmt := range statements {
-		if stmt == nil {
-			continue
-		}
-		switch stmt.Kind {
-		case ast.KindIfStatement, ast.KindSwitchStatement,
-			ast.KindForStatement, ast.KindForInStatement, ast.KindForOfStatement,
-			ast.KindWhileStatement, ast.KindDoStatement,
-			ast.KindTryStatement:
-			// Has control flow - not simple
-			return false
-		}
-	}
-
-	return true
-}
-
-// checkIfElseReturns checks if an if-else statement has returns in all branches
-// This properly analyzes if-else chains to ensure all branches return
-func checkIfElseReturns(body *ast.Node) bool {
-	if body == nil || body.Kind != ast.KindBlock {
-		return false
-	}
-
-	statements := body.Statements()
-	if len(statements) == 0 {
-		return false
-	}
-
-	// Check if the function body consists of a single if-else chain that covers all paths
-	// For example:
-	// if (a) { return x; } else { return y; }  -> all paths return
-	// if (a) { return x; } else if (b) { return y; }  -> NOT all paths (missing final else)
-	// if (a) { return x; } else if (b) { return y; } else { return z; }  -> all paths return
-
-	for _, stmt := range statements {
-		if stmt == nil {
-			continue
-		}
-		if stmt.Kind == ast.KindIfStatement {
-			if ifStatementCoversAllPaths(stmt) {
-				return true
-			}
-		}
-	}
-
-	return false
-}
-
-// ifStatementCoversAllPaths checks if an if-statement covers all code paths with returns
-func ifStatementCoversAllPaths(ifStmt *ast.Node) bool {
-	if ifStmt == nil || ifStmt.Kind != ast.KindIfStatement {
-		return false
-	}
-
-	// Access the IfStatement structure
-	ifStmtData := ifStmt.AsIfStatement()
-	if ifStmtData == nil {
-		return false
-	}
-
-	// Get the then statement
-	thenStmt := ifStmtData.ThenStatement
-	if thenStmt == nil || !blockReturnsValue(thenStmt) {
-		return false
-	}
-
-	// Get the else statement
-	elseStmt := ifStmtData.ElseStatement
-	if elseStmt == nil {
-		// No else clause - doesn't cover all paths
-		return false
-	}
-
-	// If the else statement is another if-statement (else if), check it recursively
-	if elseStmt.Kind == ast.KindIfStatement {
-		return ifStatementCoversAllPaths(elseStmt)
-	}
-
-	// Otherwise, check if the else block returns a value
-	return blockReturnsValue(elseStmt)
-}
-
-// blockReturnsValue checks if a block/statement returns a value
-func blockReturnsValue(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-
-	// Direct return statement
-	if node.Kind == ast.KindReturnStatement {
-		return node.Expression() != nil
-	}
-
-	// Block statement - check if it ends with a return
-	if node.Kind == ast.KindBlock {
-		statements := node.Statements()
-		if len(statements) == 0 {
-			return false
-		}
-		// Check the last statement
-		lastStmt := statements[len(statements)-1]
-		if lastStmt != nil && lastStmt.Kind == ast.KindReturnStatement {
-			return lastStmt.Expression() != nil
-		}
-	}
-
-	return false
 }
 
 // ArrayCallbackReturnRule enforces return statements in callbacks of array methods

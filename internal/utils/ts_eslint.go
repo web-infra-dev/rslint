@@ -1,7 +1,10 @@
 package utils
 
 import (
+	"math"
 	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -594,4 +597,162 @@ func GetNameFromMember(sourceFile *ast.SourceFile, member *ast.Node) (string, Me
 
 	r := TrimNodeTextRange(sourceFile, member)
 	return sourceFile.Text()[r.Pos():r.End()], MemberNameTypeExpression
+}
+
+// GetPropertyInfo extracts the property node and formatted property name from a PropertyAccessExpression
+// or ElementAccessExpression. Returns the property node and a formatted string like ".propertyName" or "[index]".
+// Returns (nil, "") if the node is neither a property access nor an element access expression.
+//
+// Note: When called from ast.KindPropertyAccessExpression or ast.KindElementAccessExpression listeners,
+// the returned property is guaranteed to be non-nil because:
+//   - PropertyAccessExpression.Name() always returns a valid Identifier node
+//   - ElementAccessExpression.ArgumentExpression always exists (after SkipParentheses)
+//
+// The nil return case only applies when called with nodes of other types.
+func GetPropertyInfo(sourceFile *ast.SourceFile, node *ast.Node) (*ast.Node, string) {
+	var property *ast.Node
+	var propertyName string
+
+	if ast.IsPropertyAccessExpression(node) {
+		property = node.Name()
+		loc := TrimNodeTextRange(sourceFile, property)
+		propertyName = "." + sourceFile.Text()[loc.Pos():loc.End()]
+	} else if ast.IsElementAccessExpression(node) {
+		property = ast.SkipParentheses(node.AsElementAccessExpression().ArgumentExpression)
+		loc := TrimNodeTextRange(sourceFile, property)
+		propertyName = "[" + sourceFile.Text()[loc.Pos():loc.End()] + "]"
+	}
+
+	return property, propertyName
+}
+
+// IsInObjectLiteralMethod checks if a function node is defined as a method in an object literal.
+// This includes both shorthand method syntax ({ methodA() {} }) and property assignment syntax
+// ({ methodA: function() {} }). Returns true if the function is an object literal method.
+func IsInObjectLiteralMethod(functionNode *ast.Node) bool {
+	if functionNode == nil {
+		return false
+	}
+
+	parent := functionNode.Parent
+	if parent == nil {
+		return false
+	}
+
+	// Direct object literal (shorthand method syntax): { methodA() {} }
+	if ast.IsObjectLiteralExpression(parent) {
+		return true
+	}
+
+	// Property assignment syntax: { methodA: function() {} } or { methodA: () => {} }
+	if ast.IsPropertyAssignment(parent) || ast.IsShorthandPropertyAssignment(parent) || ast.IsMethodDeclaration(parent) {
+		grandParent := parent.Parent
+		if grandParent != nil && ast.IsObjectLiteralExpression(grandParent) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// GetStaticPropertyName extracts the static name from a property name node.
+// It handles Identifier, StringLiteral, NumericLiteral, and ComputedPropertyName
+// (with static string, numeric, BigInt, or template literal expressions).
+// Returns the name and whether it's a static (non-computed or statically-computable) name.
+func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
+	switch nameNode.Kind {
+	case ast.KindIdentifier:
+		return nameNode.AsIdentifier().Text, true
+	case ast.KindStringLiteral:
+		return nameNode.AsStringLiteral().Text, true
+	case ast.KindNumericLiteral:
+		return NormalizeNumericLiteral(nameNode.AsNumericLiteral().Text), true
+	case ast.KindComputedPropertyName:
+		expr := nameNode.AsComputedPropertyName().Expression
+		switch expr.Kind {
+		case ast.KindStringLiteral:
+			return expr.AsStringLiteral().Text, true
+		case ast.KindNumericLiteral:
+			return NormalizeNumericLiteral(expr.AsNumericLiteral().Text), true
+		case ast.KindBigIntLiteral:
+			return NormalizeBigIntLiteral(expr.AsBigIntLiteral().Text), true
+		case ast.KindNoSubstitutionTemplateLiteral:
+			return expr.AsNoSubstitutionTemplateLiteral().Text, true
+		}
+		return "", false
+	default:
+		return "", false
+	}
+}
+
+// NormalizeNumericLiteral parses a numeric literal text and returns its
+// normalized string representation, matching ESLint's String(node.value) behavior.
+// e.g., "0x1" -> "1", "1.0" -> "1", "1e2" -> "100"
+func NormalizeNumericLiteral(text string) string {
+	f, err := strconv.ParseFloat(text, 64)
+	if err != nil {
+		// ParseFloat returns +/-Inf with ErrRange for overflow (e.g. 1e309).
+		// Only return raw text for true parse failures.
+		if !math.IsInf(f, 0) {
+			return text
+		}
+	}
+	if math.IsInf(f, 1) {
+		return "Infinity"
+	}
+	if math.IsInf(f, -1) {
+		return "-Infinity"
+	}
+	return strconv.FormatFloat(f, 'f', -1, 64)
+}
+
+// NormalizeBigIntLiteral normalizes a BigInt literal to its decimal string
+// representation, matching ESLint's String(node.value) behavior.
+// e.g., "1n" -> "1", "0x1n" -> "1", "0o1n" -> "1", "0b1n" -> "1"
+func NormalizeBigIntLiteral(text string) string {
+	s := strings.TrimSuffix(text, "n")
+	i, err := strconv.ParseInt(s, 0, 64)
+	if err != nil {
+		return s
+	}
+	return strconv.FormatInt(i, 10)
+}
+
+// CollectBindingNames recursively extracts all identifier names from a binding
+// pattern (ObjectBindingPattern, ArrayBindingPattern) or plain Identifier.
+// For each identifier found, it calls the callback with the identifier node and its name.
+func CollectBindingNames(nameNode *ast.Node, callback func(ident *ast.Node, name string)) {
+	if nameNode == nil {
+		return
+	}
+
+	switch nameNode.Kind {
+	case ast.KindIdentifier:
+		name := nameNode.AsIdentifier().Text
+		if name != "" {
+			callback(nameNode, name)
+		}
+
+	case ast.KindObjectBindingPattern:
+		nameNode.ForEachChild(func(child *ast.Node) bool {
+			if child.Kind == ast.KindBindingElement {
+				bindingElem := child.AsBindingElement()
+				if bindingElem != nil && bindingElem.Name() != nil {
+					CollectBindingNames(bindingElem.Name(), callback)
+				}
+			}
+			return false
+		})
+
+	case ast.KindArrayBindingPattern:
+		nameNode.ForEachChild(func(child *ast.Node) bool {
+			if child.Kind == ast.KindBindingElement {
+				bindingElem := child.AsBindingElement()
+				if bindingElem != nil && bindingElem.Name() != nil {
+					CollectBindingNames(bindingElem.Name(), callback)
+				}
+			}
+			return false
+		})
+	}
 }

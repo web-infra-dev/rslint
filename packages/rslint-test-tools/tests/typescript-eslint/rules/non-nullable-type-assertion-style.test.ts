@@ -256,7 +256,7 @@ const ruleTesterWithNoUncheckedIndexAccess = new RuleTester({
 });
 
 ruleTesterWithNoUncheckedIndexAccess.run(
-  'non-nullable-type-assertion-style - noUncheckedIndexedAccess',
+  'non-nullable-type-assertion-style',
   {
     valid: [
       `
@@ -310,5 +310,8 @@ function first<T extends string | number>(array: ArrayLike<T>): T | null {
         `,
       },
     ],
+  },
+  {
+    description: 'noUncheckedIndexedAccess',
   },
 );
