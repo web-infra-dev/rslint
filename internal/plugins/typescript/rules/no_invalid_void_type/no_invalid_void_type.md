@@ -12,6 +12,12 @@ let value: void;
 function foo(arg: void) {}
 
 type Union = string | void;
+
+type KeyofVoid = keyof void;
+
+let arr: void[];
+
+let value = undefined as void;
 ```
 
 Examples of **correct** code for this rule:
@@ -32,6 +38,43 @@ interface Callable {
 
 interface Constructable {
   new (...args: string[]): void;
+}
+
+// Function overloads - void in implementation return type is valid
+function f(): void;
+function f(x: string): string;
+function f(x?: string): string | void {
+  if (x !== undefined) {
+    return x;
+  }
+}
+```
+
+## Options
+
+### `allowInGenericTypeArguments`
+
+- Type: `boolean | string[]`
+- Default: `true`
+
+When `true` (default), allows `void` as a type argument in any generic type (e.g., `Promise<void>`, `Map<string, void>`).
+
+When set to an array of strings, only allows `void` as a type argument in the listed generic types. Supports dotted names (e.g., `['Promise', 'Ex.Mx.Tx']`).
+
+When `false`, `void` is only valid as a direct return type.
+
+### `allowAsThisParameter`
+
+- Type: `boolean`
+- Default: `false`
+
+When `true`, allows `void` as the type of a `this` parameter in functions and methods.
+
+```typescript
+// Valid when allowAsThisParameter is true
+function f(this: void) {}
+class Test {
+  method(this: void) {}
 }
 ```
 
