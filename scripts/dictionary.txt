@@ -66,6 +66,7 @@ qwer
 readonlyness
 realpath
 recurser
+rethrowing
 reducable
 reqs
 rsbuild
@@ -164,3 +165,5 @@ relint
 relints
 relinting
 lifecycles
+fsys
+tsconfiga
