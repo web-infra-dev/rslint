@@ -82,25 +82,6 @@ type sum = (a: number, b: number) => number;
 			`,
 			Options: []interface{}{map[string]interface{}{"max": 2}},
 		},
-		{
-			Code: `
-interface Foo {
-  method(a: number, b: number, c: number, d: number): void;
-}
-			`,
-		},
-		{
-			Code: `
-type CallSig = {
-  (a: number, b: number, c: number, d: number): void;
-};
-			`,
-		},
-		{
-			Code: `
-type Ctor = new (a: number, b: number, c: number, d: number) => Foo;
-			`,
-		},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: `function foo(a, b, c, d) {}`,
@@ -181,6 +162,34 @@ type sum = (a: number, b: number) => number;
 			Options: []interface{}{1},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{MessageId: "exceed", Line: 1, Column: 1, EndLine: 1, EndColumn: 22},
+			},
+		},
+		{
+			Code: `
+interface Foo {
+  method(a: number, b: number, c: number, d: number): void;
+}
+			`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "exceed", Line: 3, Column: 3, EndLine: 3, EndColumn: 60},
+			},
+		},
+		{
+			Code: `
+type CallSig = {
+  (a: number, b: number, c: number, d: number): void;
+};
+			`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "exceed", Line: 3, Column: 3, EndLine: 3, EndColumn: 54},
+			},
+		},
+		{
+			Code: `
+type Ctor = new (a: number, b: number, c: number, d: number) => Foo;
+			`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "exceed", Line: 2, Column: 13, EndLine: 2, EndColumn: 68},
 			},
 		},
 	})
