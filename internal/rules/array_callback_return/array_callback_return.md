@@ -2,7 +2,13 @@
 
 ## Rule Details
 
-Enforces `return` statements in callbacks of array methods such as `map`, `filter`, `find`, `every`, `some`, `reduce`, `flatMap`, `sort`, `toSorted`, and `Array.from`. Callbacks for these methods must return a value; otherwise, the code likely contains a mistake. When the `checkForEach` option is enabled, it also disallows returning values from `forEach` callbacks.
+Enforces `return` statements in callbacks of array methods such as `map`, `filter`, `find`, `findIndex`, `findLast`, `findLastIndex`, `every`, `some`, `reduce`, `reduceRight`, `flatMap`, `sort`, `toSorted`, and `Array.from`. Callbacks for these methods must return a value; otherwise, the code likely contains a mistake.
+
+### Options
+
+- `allowImplicit` (default: `false`): When set to `true`, allows callbacks to implicitly return `undefined` by using `return;` without a value.
+- `checkForEach` (default: `false`): When set to `true`, also checks that `forEach` callbacks do not return a value.
+- `allowVoid` (default: `false`): When set to `true` along with `checkForEach`, allows `forEach` callbacks to return `void` expressions (e.g., `void bar(x)`).
 
 Examples of **incorrect** code for this rule:
 
@@ -18,7 +24,8 @@ var bools = [1, 2, 3].filter(function (x) {
   // missing return in else path
 });
 
-[1, 2, 3].forEach(x => x * x); // with checkForEach: true
+// with checkForEach: true
+[1, 2, 3].forEach(x => x * x);
 ```
 
 Examples of **correct** code for this rule:
@@ -35,6 +42,9 @@ var bools = [1, 2, 3].filter(function (x) {
 [1, 2, 3].forEach(x => {
   console.log(x);
 });
+
+// with checkForEach: true and allowVoid: true
+[1, 2, 3].forEach(x => void bar(x));
 ```
 
 ## Original Documentation

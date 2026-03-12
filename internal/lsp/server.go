@@ -12,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 
 	"github.com/go-json-experiment/json"
 	"github.com/microsoft/typescript-go/shim/collections"
@@ -57,6 +58,9 @@ func NewServer(opts *ServerOptions) *Server {
 		parseCache:            opts.ParseCache,
 		documents:             make(map[lsproto.DocumentUri]string),
 		diagnostics:           make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
+		refreshCh:             make(chan struct{}, 1),
+		debounceCh:            make(chan struct{}, 1),
+		pendingLintURIs:       make(map[lsproto.DocumentUri]struct{}),
 	}
 }
 
@@ -156,10 +160,21 @@ type Server struct {
 	compilerOptionsForInferredProjects *core.CompilerOptions
 
 	// rslint config
-	rslintConfig config.RslintConfig
-	documents    map[lsproto.DocumentUri]string                // URI -> content
-	diagnostics  map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
+	rslintConfig     config.RslintConfig
+	rslintConfigPath string // path to rslint.json/rslint.jsonc, empty if not found
+	documents        map[lsproto.DocumentUri]string                // URI -> content
+	diagnostics      map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
 
+	// refreshCh receives signals from RefreshDiagnostics (called by Session's
+	// background goroutine) and is consumed by the main dispatch loop so that
+	// relinting runs on the main goroutine (session is not goroutine-safe).
+	refreshCh chan struct{}
+
+	// debounceCh receives a signal when the debounce timer fires, telling
+	// the dispatch loop to lint only the URIs in pendingLintURIs.
+	debounceCh      chan struct{}
+	pendingLintURIs map[lsproto.DocumentUri]struct{}
+	lintTimer       *time.Timer
 }
 
 // FS implements project.ServiceHost.
@@ -241,18 +256,15 @@ func (s *Server) UnwatchFiles(ctx context.Context, id project.WatcherID) error {
 }
 
 // RefreshDiagnostics implements project.Client.
+// Called from Session's background goroutine when project state changes
+// (e.g. tsconfig reload). We signal the main dispatch loop via refreshCh
+// so that relinting happens on the main goroutine (session is not goroutine-safe).
 func (s *Server) RefreshDiagnostics(ctx context.Context) error {
-	if s.initializeParams.Capabilities == nil ||
-		s.initializeParams.Capabilities.Workspace == nil ||
-		s.initializeParams.Capabilities.Workspace.Diagnostics == nil ||
-		!ptrIsTrue(s.initializeParams.Capabilities.Workspace.Diagnostics.RefreshSupport) {
-		return nil
+	select {
+	case s.refreshCh <- struct{}{}:
+	default:
+		// Already pending — no need to queue another signal
 	}
-
-	if _, err := s.sendRequest(ctx, lsproto.MethodWorkspaceDiagnosticRefresh, nil); err != nil {
-		return fmt.Errorf("failed to refresh diagnostics: %w", err)
-	}
-
 	return nil
 }
 
@@ -370,6 +382,18 @@ func (s *Server) dispatchLoop(ctx context.Context) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case <-s.refreshCh:
+			// Session detected a project change (e.g. tsconfig reload).
+			// Re-lint all open documents on the main goroutine.
+			for uri := range s.documents {
+				s.pushDiagnostics(uri)
+			}
+		case <-s.debounceCh:
+			// Debounce timer fired — lint only documents with pending changes.
+			for uri := range s.pendingLintURIs {
+				s.pushDiagnostics(uri)
+			}
+			clear(s.pendingLintURIs)
 		case req := <-s.requestQueue:
 			requestCtx := core.WithLocale(ctx, s.locale)
 			if req.ID != nil {
@@ -516,7 +540,8 @@ var handlers = sync.OnceValue(func() handlerMap {
 	registerNotificationHandler(handlers, lsproto.TextDocumentDidOpenInfo, (*Server).handleDidOpen)
 	registerNotificationHandler(handlers, lsproto.TextDocumentDidChangeInfo, (*Server).handleDidChange)
 	registerNotificationHandler(handlers, lsproto.TextDocumentDidSaveInfo, (*Server).handleDidSave)
-	registerRequestHandler(handlers, lsproto.TextDocumentDiagnosticInfo, (*Server).handleDocumentDiagnostic)
+	registerNotificationHandler(handlers, lsproto.TextDocumentDidCloseInfo, (*Server).handleDidClose)
+	registerNotificationHandler(handlers, lsproto.WorkspaceDidChangeWatchedFilesInfo, (*Server).handleDidChangeWatchedFiles)
 	registerRequestHandler(handlers, lsproto.TextDocumentCodeActionInfo, (*Server).handleCodeAction)
 	return handlers
 })

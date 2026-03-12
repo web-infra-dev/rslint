@@ -122,6 +122,13 @@ Before starting, familiarize yourself with these key source locations:
    - Does it handle TypeScript-specific syntax (if applicable)?
    - Does it handle empty bodies or malformed code?
 
+5. **Document Intentional Differences**:
+
+   If the implementation intentionally differs from ESLint (e.g., more precise error locations, different reporting granularity), complete all three:
+   1. **Source code comment**: Add a `// NOTE: Unlike ESLint...` comment explaining the difference and rationale
+   2. **Rule documentation**: Add a "Differences from ESLint" section in the rule's `.md` file
+   3. **Test cases**: Ensure the differing behavior is covered by tests
+
 ---
 
 ## Phase 2: Implementation (Go)
@@ -200,24 +207,12 @@ if callee.Kind == ast.KindIdentifier {
 
 ### Handling Options
 
-ESLint options are weakly typed (JSON). You **MUST** handle both Go and JS test formats:
+ESLint options are weakly typed (JSON). Use `utils.GetOptionsMap()` to extract the options map — it handles both array format (`[]interface{}` from JS tests) and direct object format (`map[string]interface{}` from Go tests):
 
 ```go
 func parseOptions(options any) Options {
     opts := Options{/* defaults */}
-    if options == nil {
-        return opts
-    }
-
-    var optsMap map[string]interface{}
-    // Handle array format (JS tests pass []interface{})
-    if arr, ok := options.([]interface{}); ok && len(arr) > 0 {
-        optsMap, _ = arr[0].(map[string]interface{})
-    } else {
-        // Handle object format (Go tests pass map[string]interface{})
-        optsMap, _ = options.(map[string]interface{})
-    }
-
+    optsMap := utils.GetOptionsMap(options)
     if optsMap != nil {
         // Parse options from optsMap...
     }
@@ -344,23 +339,35 @@ Add the new test file path to the `include` array.
 
 **Goal**: Ensure the compiled binary runs the rule correctly.
 
-1. **Build Binary (REQUIRED)**:
+Follow this **strict order** — each step depends on the previous one:
+
+1. **Go formatting** (catches indentation issues early):
+
+   ```bash
+   gofmt -l internal/rules/<rule_name>/
+   ```
+
+   If files are listed, run `gofmt -w` on them to fix.
+
+2. **Go tests**:
+
+   ```bash
+   go test -count=1 ./internal/rules/<rule_name>
+   ```
+
+3. **Build binary** (REQUIRED before JS tests — they spawn the binary via IPC):
 
    ```bash
    cd packages/rslint && pnpm run build:bin
    ```
 
-2. **Run Tests**:
+4. **JS tests** (note: this changes cwd, use absolute paths for subsequent commands):
 
    ```bash
-   # Go tests
-   go test -count=1 ./internal/rules/<rule_name>
-
-   # JS tests
    cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name>
    ```
 
-3. **Verify Test Coverage Alignment**:
+5. **Verify Test Coverage Alignment**:
 
    Ensure Go tests cover the same cases as JS tests:
    - Check the JS test snapshot file for the number of invalid cases
@@ -370,7 +377,7 @@ Add the new test file path to the `include` array.
      - Multi-line expressions
      - Nested structures (e.g., `foo((x), y)`, `foo(bar(), baz())`)
 
-4. **Project-wide Checks**:
+6. **Project-wide Checks**:
 
    ```bash
    # Type check and lint

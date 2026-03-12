@@ -1,7 +1,10 @@
 package utils
 
 import (
+	"math"
 	"slices"
+	"strconv"
+	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
@@ -650,4 +653,106 @@ func IsInObjectLiteralMethod(functionNode *ast.Node) bool {
 	}
 
 	return false
+}
+
+// GetStaticPropertyName extracts the static name from a property name node.
+// It handles Identifier, StringLiteral, NumericLiteral, and ComputedPropertyName
+// (with static string, numeric, BigInt, or template literal expressions).
+// Returns the name and whether it's a static (non-computed or statically-computable) name.
+func GetStaticPropertyName(nameNode *ast.Node) (string, bool) {
+	switch nameNode.Kind {
+	case ast.KindIdentifier:
+		return nameNode.AsIdentifier().Text, true
+	case ast.KindStringLiteral:
+		return nameNode.AsStringLiteral().Text, true
+	case ast.KindNumericLiteral:
+		return NormalizeNumericLiteral(nameNode.AsNumericLiteral().Text), true
+	case ast.KindComputedPropertyName:
+		expr := nameNode.AsComputedPropertyName().Expression
+		switch expr.Kind {
+		case ast.KindStringLiteral:
+			return expr.AsStringLiteral().Text, true
+		case ast.KindNumericLiteral:
+			return NormalizeNumericLiteral(expr.AsNumericLiteral().Text), true
+		case ast.KindBigIntLiteral:
+			return NormalizeBigIntLiteral(expr.AsBigIntLiteral().Text), true
+		case ast.KindNoSubstitutionTemplateLiteral:
+			return expr.AsNoSubstitutionTemplateLiteral().Text, true
+		}
+		return "", false
+	default:
+		return "", false
+	}
+}
+
+// NormalizeNumericLiteral parses a numeric literal text and returns its
+// normalized string representation, matching ESLint's String(node.value) behavior.
+// e.g., "0x1" -> "1", "1.0" -> "1", "1e2" -> "100"
+func NormalizeNumericLiteral(text string) string {
+	f, err := strconv.ParseFloat(text, 64)
+	if err != nil {
+		// ParseFloat returns +/-Inf with ErrRange for overflow (e.g. 1e309).
+		// Only return raw text for true parse failures.
+		if !math.IsInf(f, 0) {
+			return text
+		}
+	}
+	if math.IsInf(f, 1) {
+		return "Infinity"
+	}
+	if math.IsInf(f, -1) {
+		return "-Infinity"
+	}
+	return strconv.FormatFloat(f, 'f', -1, 64)
+}
+
+// NormalizeBigIntLiteral normalizes a BigInt literal to its decimal string
+// representation, matching ESLint's String(node.value) behavior.
+// e.g., "1n" -> "1", "0x1n" -> "1", "0o1n" -> "1", "0b1n" -> "1"
+func NormalizeBigIntLiteral(text string) string {
+	s := strings.TrimSuffix(text, "n")
+	i, err := strconv.ParseInt(s, 0, 64)
+	if err != nil {
+		return s
+	}
+	return strconv.FormatInt(i, 10)
+}
+
+// CollectBindingNames recursively extracts all identifier names from a binding
+// pattern (ObjectBindingPattern, ArrayBindingPattern) or plain Identifier.
+// For each identifier found, it calls the callback with the identifier node and its name.
+func CollectBindingNames(nameNode *ast.Node, callback func(ident *ast.Node, name string)) {
+	if nameNode == nil {
+		return
+	}
+
+	switch nameNode.Kind {
+	case ast.KindIdentifier:
+		name := nameNode.AsIdentifier().Text
+		if name != "" {
+			callback(nameNode, name)
+		}
+
+	case ast.KindObjectBindingPattern:
+		nameNode.ForEachChild(func(child *ast.Node) bool {
+			if child.Kind == ast.KindBindingElement {
+				bindingElem := child.AsBindingElement()
+				if bindingElem != nil && bindingElem.Name() != nil {
+					CollectBindingNames(bindingElem.Name(), callback)
+				}
+			}
+			return false
+		})
+
+	case ast.KindArrayBindingPattern:
+		nameNode.ForEachChild(func(child *ast.Node) bool {
+			if child.Kind == ast.KindBindingElement {
+				bindingElem := child.AsBindingElement()
+				if bindingElem != nil && bindingElem.Name() != nil {
+					CollectBindingNames(bindingElem.Name(), callback)
+				}
+			}
+			return false
+		})
+	}
 }

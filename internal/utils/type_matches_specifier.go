@@ -37,6 +37,9 @@ const (
 	TypeOrValueSpecifierFromFile TypeOrValueSpecifierFrom = iota
 	TypeOrValueSpecifierFromLib
 	TypeOrValueSpecifierFromPackage
+	// TypeOrValueSpecifierFromString represents the string shorthand form.
+	// It matches any type with the given name regardless of origin.
+	TypeOrValueSpecifierFromString
 )
 
 type NameList []string
@@ -66,11 +69,37 @@ type TypeOrValueSpecifier struct {
 	Package string `json:"package"`
 }
 
+// UnmarshalJSON handles both string shorthand ("Promise") and object form
+// ({"from": "lib", "name": "Promise"}) for TypeOrValueSpecifier, matching
+// the original TypeScript-ESLint TypeOrValueSpecifier union type.
+func (s *TypeOrValueSpecifier) UnmarshalJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err == nil {
+		s.From = TypeOrValueSpecifierFromString
+		s.Name = NameList{str}
+		return nil
+	}
+	type Alias TypeOrValueSpecifier
+	var alias Alias
+	if err := json.Unmarshal(data, &alias); err != nil {
+		return err
+	}
+	*s = TypeOrValueSpecifier(alias)
+	return nil
+}
+
 func typeMatchesStringSpecifierWithCalleeNames(
 	t *checker.Type,
 	names []string,
 	calleeNames []string,
 ) bool {
+	// Handle union types: all constituents must match the specifier
+	if parts := UnionTypeParts(t); len(parts) > 1 {
+		return Every(parts, func(part *checker.Type) bool {
+			return typeMatchesStringSpecifierWithCalleeNames(part, names, calleeNames)
+		})
+	}
+
 	alias := checker.Type_alias(t)
 	var symbol *ast.Symbol
 	if alias == nil {
@@ -237,6 +266,13 @@ func typeMatchesSpecifier(
 	program *compiler.Program,
 	calleeNames []string,
 ) bool {
+	// Handle union types: all constituents must match the specifier
+	if parts := UnionTypeParts(t); len(parts) > 1 {
+		return Every(parts, func(part *checker.Type) bool {
+			return typeMatchesSpecifier(part, specifier, program, calleeNames)
+		})
+	}
+
 	if !typeMatchesStringSpecifierWithCalleeNames(t, specifier.Name, calleeNames) {
 		return false
 	}
@@ -257,6 +293,8 @@ func typeMatchesSpecifier(
 	})
 
 	switch specifier.From {
+	case TypeOrValueSpecifierFromString:
+		return true // string shorthand matches any origin; name already matched above
 	case TypeOrValueSpecifierFromFile:
 		return typeDeclaredInFile(specifier.Path, declarationFiles, program)
 	case TypeOrValueSpecifierFromLib:

@@ -11,21 +11,19 @@
       "packages/rslint-test-tools/tests/typescript-eslint/rules/prefer-optional-chain/base-cases.ts",
       "packages/rslint-test-tools/tests/typescript-eslint/rules/naming-convention/cases/createTestCases.ts",
       "packages/rslint-test-tools/tests/typescript-eslint/areOptionsValid.ts",
-      "packages/rule-tester/src/index.ts"
+      "packages/rslint-wasm/src/worker.ts",
+      "packages/rule-tester/src/index.ts",
+      "typescript-go/**"
     ],
     "languageOptions": {
       "parserOptions": {
         // enable project service for typed linting which will run tsgo language service behind the scene
         "projectService": false,
-        // FIXME: enable legacy multi tsconfig project
-        // tsgo doesn't support project reference yet, so we have to set config manually
-        // will consider migrate to project service when it's supported
+        // Use glob patterns to keep package tsconfig discovery in sync automatically
+        // until projectService can replace the legacy multi-tsconfig setup.
         "project": [
-          "./packages/rslint/tsconfig.build.json",
-          "./packages/rslint-test-tools/tsconfig.spec.json",
-          "./packages/vscode-extension/tsconfig.build.json",
-          "./packages/rule-tester/tsconfig.build.json",
-          "./packages/vscode-extension/tsconfig.spec.json",
+          "./packages/*/tsconfig.build.json",
+          "./packages/*/tsconfig.spec.json",
           "./packages/rslint/fixtures/tsconfig.json"
         ]
       }
@@ -56,7 +54,8 @@
       "@typescript-eslint/require-await": "warn",
       "@typescript-eslint/prefer-readonly": "warn",
       "@typescript-eslint/no-non-null-assertion": "warn",
-      "@typescript-eslint/member-ordering": "off"
+      "@typescript-eslint/member-ordering": "off",
+      "no-console": "warn"
     },
     "plugins": ["@typescript-eslint"]
   }

@@ -145,6 +145,222 @@ export interface W<T> {
 
 exports[`consistent-type-definitions > invalid 6`] = `
 {
+  "code": "type T = { [K: string]: number };",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "interface T { [K: string]: number }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 7`] = `
+{
+  "code": "type T= { x: number; };",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "interface T { x: number; }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 8`] = `
+{
+  "code": "type T = { x: number };",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "interface T { x: number }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 9`] = `
+{
+  "code": "type T = { x: number; y: string; };",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "interface T { x: number; y: string; }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 10`] = `
+{
+  "code": "type T = { x: number; y: { z: string; }; };",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "interface T { x: number; y: { z: string; }; }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 11`] = `
+{
+  "code": "type T<U> = { x: U; };",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "interface T<U> { x: U; }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 12`] = `
+{
+  "code": "type Foo = { a: string; };",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "interface Foo { a: string; }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 13`] = `
+{
+  "code": "type Foo = (  { a: string; });",
+  "diagnostics": [
+    {
+      "message": "Use an interface instead of a type literal.",
+      "messageId": "interfaceOverType",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "interface Foo { a: string; }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 14`] = `
+{
   "code": "interface T { x: number; }",
   "diagnostics": [
     {
@@ -170,7 +386,7 @@ exports[`consistent-type-definitions > invalid 6`] = `
 }
 `;
 
-exports[`consistent-type-definitions > invalid 7`] = `
+exports[`consistent-type-definitions > invalid 15`] = `
 {
   "code": "interface T{ x: number; }",
   "diagnostics": [
@@ -197,7 +413,7 @@ exports[`consistent-type-definitions > invalid 7`] = `
 }
 `;
 
-exports[`consistent-type-definitions > invalid 8`] = `
+exports[`consistent-type-definitions > invalid 16`] = `
 {
   "code": "interface T                          { x: number; }",
   "diagnostics": [
@@ -224,7 +440,7 @@ exports[`consistent-type-definitions > invalid 8`] = `
 }
 `;
 
-exports[`consistent-type-definitions > invalid 9`] = `
+exports[`consistent-type-definitions > invalid 17`] = `
 {
   "code": "interface A extends B, C { x: number; };",
   "diagnostics": [
@@ -251,7 +467,7 @@ exports[`consistent-type-definitions > invalid 9`] = `
 }
 `;
 
-exports[`consistent-type-definitions > invalid 10`] = `
+exports[`consistent-type-definitions > invalid 18`] = `
 {
   "code": "interface A extends B<T1>, C<T2> { x: number; };",
   "diagnostics": [
@@ -278,7 +494,7 @@ exports[`consistent-type-definitions > invalid 10`] = `
 }
 `;
 
-exports[`consistent-type-definitions > invalid 11`] = `
+exports[`consistent-type-definitions > invalid 19`] = `
 {
   "code": "
 export interface W<T> {
@@ -313,7 +529,169 @@ export type W<T> = {
 }
 `;
 
-exports[`consistent-type-definitions > invalid 12`] = `
+exports[`consistent-type-definitions > invalid 20`] = `
+{
+  "code": "interface T { x: number }",
+  "diagnostics": [
+    {
+      "message": "Use a type literal instead of an interface.",
+      "messageId": "typeOverInterface",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = { x: number }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 21`] = `
+{
+  "code": "interface T { x: number; y: string; }",
+  "diagnostics": [
+    {
+      "message": "Use a type literal instead of an interface.",
+      "messageId": "typeOverInterface",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T = { x: number; y: string; }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 22`] = `
+{
+  "code": "export interface W<T> { x: T; };",
+  "diagnostics": [
+    {
+      "message": "Use a type literal instead of an interface.",
+      "messageId": "typeOverInterface",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "export type W<T> = { x: T; };",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 23`] = `
+{
+  "code": "interface T<U> { x: U; };",
+  "diagnostics": [
+    {
+      "message": "Use a type literal instead of an interface.",
+      "messageId": "typeOverInterface",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type T<U> = { x: U; };",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 24`] = `
+{
+  "code": "interface Foo { a: string; }",
+  "diagnostics": [
+    {
+      "message": "Use a type literal instead of an interface.",
+      "messageId": "typeOverInterface",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "type Foo = { a: string; }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 25`] = `
+{
+  "code": "namespace Foo { export interface Bar {} }",
+  "diagnostics": [
+    {
+      "message": "Use a type literal instead of an interface.",
+      "messageId": "typeOverInterface",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/consistent-type-definitions",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "namespace Foo { export type Bar = {} }",
+  "ruleCount": 1,
+}
+`;
+
+exports[`consistent-type-definitions > invalid 26`] = `
 {
   "code": "
 namespace JSX {
@@ -352,7 +730,7 @@ namespace JSX {
 }
 `;
 
-exports[`consistent-type-definitions > invalid 13`] = `
+exports[`consistent-type-definitions > invalid 27`] = `
 {
   "code": "
 global {
@@ -391,7 +769,7 @@ global {
 }
 `;
 
-exports[`consistent-type-definitions > invalid 14`] = `
+exports[`consistent-type-definitions > invalid 28`] = `
 {
   "code": "
 declare global {
@@ -419,11 +797,12 @@ declare global {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
 
-exports[`consistent-type-definitions > invalid 15`] = `
+exports[`consistent-type-definitions > invalid 29`] = `
 {
   "code": "
 declare global {
@@ -451,11 +830,12 @@ declare global {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
 
-exports[`consistent-type-definitions > invalid 16`] = `
+exports[`consistent-type-definitions > invalid 30`] = `
 {
   "code": "
 export default interface Test {
@@ -493,7 +873,7 @@ export default Test
 }
 `;
 
-exports[`consistent-type-definitions > invalid 17`] = `
+exports[`consistent-type-definitions > invalid 31`] = `
 {
   "code": "
 export declare type Test = {
@@ -530,7 +910,7 @@ export declare interface Test {
 }
 `;
 
-exports[`consistent-type-definitions > invalid 18`] = `
+exports[`consistent-type-definitions > invalid 32`] = `
 {
   "code": "
 export declare interface Test {
@@ -567,7 +947,7 @@ export declare type Test = {
 }
 `;
 
-exports[`consistent-type-definitions > invalid 19`] = `
+exports[`consistent-type-definitions > invalid 33`] = `
 {
   "code": "
 type Foo = ({
@@ -602,7 +982,7 @@ interface Foo {
 }
 `;
 
-exports[`consistent-type-definitions > invalid 20`] = `
+exports[`consistent-type-definitions > invalid 34`] = `
 {
   "code": "
 type Foo = ((((((((({
@@ -637,7 +1017,7 @@ interface Foo {
 }
 `;
 
-exports[`consistent-type-definitions > invalid 21`] = `
+exports[`consistent-type-definitions > invalid 35`] = `
 {
   "code": "
 type Foo = {
@@ -672,7 +1052,7 @@ interface Foo {
 }
 `;
 
-exports[`consistent-type-definitions > invalid 22`] = `
+exports[`consistent-type-definitions > invalid 36`] = `
 {
   "code": "
 type Foo = {
@@ -709,7 +1089,7 @@ type Bar = string;
 }
 `;
 
-exports[`consistent-type-definitions > invalid 23`] = `
+exports[`consistent-type-definitions > invalid 37`] = `
 {
   "code": "
 type Foo = ((({
