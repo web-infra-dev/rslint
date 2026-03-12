@@ -1,6 +1,8 @@
 package no_ex_assign
 
 import (
+	"slices"
+
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -13,15 +15,16 @@ func buildExAssignMessage() rule.RuleMessage {
 	}
 }
 
-func collectCatchBindingNames(name *ast.Node) []string {
+func collectCatchBindingNamesAndSymbols(name *ast.Node, ctx rule.RuleContext) ([]string, []*ast.Symbol) {
 	if name == nil {
-		return nil
+		return nil, nil
 	}
 	if ast.IsIdentifier(name) {
-		return []string{name.Text()}
+		return []string{name.Text()}, []*ast.Symbol{ctx.TypeChecker.GetSymbolAtLocation(name)}
 	}
 	if ast.IsBindingPattern(name) {
 		var names []string
+		var symbols []*ast.Symbol
 		for _, elem := range name.Elements() {
 			if elem == nil || !ast.IsBindingElement(elem) {
 				continue
@@ -30,53 +33,201 @@ func collectCatchBindingNames(name *ast.Node) []string {
 			if be == nil || be.Name() == nil {
 				continue
 			}
-			names = append(names, collectCatchBindingNames(be.Name())...)
+			names = append(names, be.Name().Text())
+			symbols = append(symbols, ctx.TypeChecker.GetSymbolAtLocation(be.Name()))
 		}
-		return names
+		return names, symbols
 	}
-	return nil
+	return nil, nil
 }
 
-func checkExpressionForExAssign(expression *ast.Node, namesSet map[string]bool, ctx rule.RuleContext) {
-	if expression == nil {
+func isBindingPatternInAssignment(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+
+	parent := node.Parent
+
+	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
+		parent = parent.Parent
+	}
+
+	if parent == nil || parent.Kind != ast.KindBinaryExpression {
+		return false
+	}
+
+	binary := parent.AsBinaryExpression()
+	if binary == nil || binary.OperatorToken == nil {
+		return false
+	}
+
+	switch binary.OperatorToken.Kind {
+	case ast.KindEqualsToken:
+		return binary.Left == node
+	}
+
+	return false
+}
+
+func isInDestructuringAssignment(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+
+	parent := node.Parent
+
+	for parent != nil {
+		if parent.Kind == ast.KindObjectLiteralExpression || parent.Kind == ast.KindArrayLiteralExpression {
+			return true
+		}
+		if parent.Kind == ast.KindBinaryExpression {
+			binary := parent.AsBinaryExpression()
+			if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindEqualsToken {
+				return binary.Left == node
+			}
+		}
+		if parent.Kind == ast.KindParenthesizedExpression {
+			parent = parent.Parent
+		} else {
+			break
+		}
+		parent = parent.Parent
+	}
+
+	return false
+}
+
+func isWriteReference(node *ast.Node) bool {
+	if node == nil || node.Parent == nil {
+		return false
+	}
+
+	parent := node.Parent
+
+	switch parent.Kind {
+	case ast.KindBinaryExpression:
+		binary := parent.AsBinaryExpression()
+		if binary == nil || binary.OperatorToken == nil {
+			return false
+		}
+
+		switch binary.OperatorToken.Kind {
+		case ast.KindEqualsToken,
+			ast.KindPlusEqualsToken,
+			ast.KindMinusEqualsToken,
+			ast.KindAsteriskAsteriskEqualsToken,
+			ast.KindAsteriskEqualsToken,
+			ast.KindSlashEqualsToken,
+			ast.KindPercentEqualsToken,
+			ast.KindLessThanLessThanEqualsToken,
+			ast.KindGreaterThanGreaterThanEqualsToken,
+			ast.KindGreaterThanGreaterThanGreaterThanEqualsToken,
+			ast.KindAmpersandEqualsToken,
+			ast.KindBarEqualsToken,
+			ast.KindCaretEqualsToken,
+			ast.KindBarBarEqualsToken,
+			ast.KindAmpersandAmpersandEqualsToken,
+			ast.KindQuestionQuestionEqualsToken:
+			return binary.Left == node
+		}
+	case ast.KindPostfixUnaryExpression:
+		postfix := parent.AsPostfixUnaryExpression()
+		if postfix == nil {
+			return false
+		}
+		switch postfix.Operator {
+		case ast.KindPlusPlusToken, ast.KindMinusMinusToken:
+			return postfix.Operand == node
+		}
+	case ast.KindPrefixUnaryExpression:
+		prefix := parent.AsPrefixUnaryExpression()
+		if prefix == nil {
+			return false
+		}
+		switch prefix.Operator {
+		case ast.KindPlusPlusToken, ast.KindMinusMinusToken:
+			return prefix.Operand == node
+		}
+	case ast.KindObjectBindingPattern:
+		return isBindingPatternInAssignment(parent)
+	case ast.KindArrayBindingPattern:
+		return isBindingPatternInAssignment(parent)
+	case ast.KindBindingElement:
+		return isWriteReference(parent)
+	case ast.KindShorthandPropertyAssignment:
+		return isInDestructuringAssignment(parent)
+	case ast.KindPropertyAssignment:
+		return isInDestructuringAssignment(parent)
+	case ast.KindObjectLiteralExpression:
+		return isInDestructuringAssignment(parent)
+	case ast.KindArrayLiteralExpression:
+		return isInDestructuringAssignment(parent)
+	case ast.KindParenthesizedExpression:
+		return isWriteReference(parent)
+	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
+		return isWriteReference(parent)
+	}
+
+	return false
+}
+
+func isNameShadowed(node *ast.Node, symbols []*ast.Symbol, ctx rule.RuleContext) bool {
+	if node == nil || ctx.TypeChecker == nil || len(symbols) == 0 {
+		return false
+	}
+
+	symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
+	if symbol == nil {
+		return false
+	}
+
+	for _, s := range symbols {
+		if s == symbol {
+			return false
+		}
+	}
+	return true
+}
+
+func getIdentifierName(node *ast.Node) string {
+	if node == nil || node.Kind != ast.KindIdentifier {
+		return ""
+	}
+	return node.Text()
+}
+
+func checkReassignments(block *ast.Node, names []string, symbols []*ast.Symbol, ctx rule.RuleContext) {
+	if block == nil || ctx.TypeChecker == nil || len(names) == 0 || len(symbols) == 0 {
 		return
 	}
 
-	if ast.IsBinaryExpression(expression) {
-		binary := expression.AsBinaryExpression()
-		if binary == nil || binary.OperatorToken == nil || binary.OperatorToken.Kind != ast.KindEqualsToken {
+	var walk func(*ast.Node)
+	walk = func(block *ast.Node) {
+		if block == nil {
 			return
 		}
 
-		left := binary.Left
-		if left == nil {
-			return
-		}
+		block.ForEachChild(func(child *ast.Node) bool {
+			if child == nil {
+				return false
+			}
 
-		if ast.IsIdentifier(left) {
-			if namesSet[left.Text()] {
-				ctx.ReportNode(expression, buildExAssignMessage())
-			}
-		} else if ast.IsArrayLiteralExpression(left) {
-			for _, elem := range left.Elements() {
-				if elem == nil || !ast.IsIdentifier(elem) {
-					continue
+			childName := getIdentifierName(child)
+			if child.Kind == ast.KindIdentifier && slices.Contains(names, childName) {
+				if isWriteReference(child) {
+					if !isNameShadowed(child, symbols, ctx) {
+						ctx.ReportNode(child, buildExAssignMessage())
+					}
 				}
-				if namesSet[elem.Text()] {
-					ctx.ReportNode(expression, buildExAssignMessage())
-				}
+			} else {
+				walk(child)
 			}
-		} else if ast.IsObjectLiteralExpression(left) {
-			for _, elem := range left.PropertyList().Nodes {
-				if elem == nil || !ast.IsPropertyAssignment(elem) {
-					continue
-				}
-				checkExpressionForExAssign(elem.AsPropertyAssignment().Initializer, namesSet, ctx)
-			}
-		}
-	} else if ast.IsParenthesizedExpression(expression) {
-		checkExpressionForExAssign(expression.AsParenthesizedExpression().Expression, namesSet, ctx)
+
+			return false
+		})
 	}
+
+	walk(block)
 }
 
 var NoExAssignRule = rule.Rule{
@@ -93,32 +244,13 @@ var NoExAssignRule = rule.Rule{
 					return
 				}
 
-				names := collectCatchBindingNames(varDecl.Name())
-				if len(names) == 0 {
-					return
-				}
-
-				namesSet := make(map[string]bool)
-				for _, n := range names {
-					namesSet[n] = true
-				}
-
-				block := node.AsCatchClause().Block.AsBlock()
+				block := node.AsCatchClause().Block
 				if block == nil {
 					return
 				}
 
-				for _, stmt := range block.Statements.Nodes {
-					if stmt == nil {
-						continue
-					}
-
-					if ast.IsExpressionStatement(stmt) {
-						checkExpressionForExAssign(stmt.AsExpressionStatement().Expression, namesSet, ctx)
-					} else if ast.IsParenthesizedExpression(stmt) {
-						checkExpressionForExAssign(stmt.AsParenthesizedExpression().Expression, namesSet, ctx)
-					}
-				}
+				names, symbols := collectCatchBindingNamesAndSymbols(varDecl.Name(), ctx)
+				checkReassignments(block, names, symbols, ctx)
 			},
 		}
 	},

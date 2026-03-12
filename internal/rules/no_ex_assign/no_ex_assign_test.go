@@ -18,6 +18,7 @@ func TestNoExAssignRule(t *testing.T) {
 			{Code: "try { } catch (e) { three = 2 + 1; }"},
 			{Code: "try { } catch ({e}) { this.something = 2; }"},
 			{Code: "function foo() { try { } catch (e) { return false; } }"},
+			{Code: "try { } catch (e) { let e = 10; e = 10; }"},
 		},
 		// Invalid cases - ported from ESLint
 		[]rule_tester.InvalidTestCase{
@@ -36,7 +37,7 @@ func TestNoExAssignRule(t *testing.T) {
 			{
 				Code: "try { } catch (ex) { [ex] = []; }",
 				Errors: []rule_tester.InvalidTestCaseError{
-					{MessageId: "unexpected", Line: 1, Column: 22},
+					{MessageId: "unexpected", Line: 1, Column: 23},
 				},
 			},
 			{
@@ -49,6 +50,12 @@ func TestNoExAssignRule(t *testing.T) {
 				Code: "try { } catch ({message}) { message = 10; }",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 29},
+				},
+			},
+			{
+				Code: "try { } catch (e) { for (;;) { e = 10; } }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 32},
 				},
 			},
 		},
