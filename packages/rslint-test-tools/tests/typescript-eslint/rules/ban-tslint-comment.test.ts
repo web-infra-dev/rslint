@@ -121,9 +121,9 @@ ruleTester.run('ban-tslint-comment', {
     },
     {
       code: `
-const woah = doSomeStuff();
+const whoa = doSomeStuff();
 // tslint:disable-line
-console.log(woah);
+console.log(whoa);
       `,
       errors: [
         {
@@ -136,8 +136,8 @@ console.log(woah);
         },
       ],
       output: `
-const woah = doSomeStuff();
-console.log(woah);
+const whoa = doSomeStuff();
+console.log(whoa);
       `,
     },
   ],
