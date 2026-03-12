@@ -55,6 +55,7 @@
       "@typescript-eslint/prefer-readonly": "warn",
       "@typescript-eslint/no-non-null-assertion": "warn",
       "@typescript-eslint/prefer-regexp-exec": "off",
+      "@typescript-eslint/prefer-ts-expect-error": "off",
       "no-console": "warn"
     },
     "plugins": ["@typescript-eslint"]
