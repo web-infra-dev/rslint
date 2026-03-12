@@ -463,6 +463,7 @@ exports[`dot-notation > invalid 15`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -489,6 +490,7 @@ exports[`dot-notation > invalid 16`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -542,6 +544,7 @@ exports[`dot-notation > invalid 18`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -622,6 +625,7 @@ exports[`dot-notation > invalid 21`] = `
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;

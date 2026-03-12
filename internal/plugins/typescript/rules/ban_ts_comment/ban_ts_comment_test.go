@@ -26,6 +26,15 @@ func TestBanTsCommentRule(t *testing.T) {
 		{Code: "// @ts-expect-error: This is a very long description that exceeds minimum\nconst a = 0;", Options: map[string]interface{}{"ts-expect-error": "allow-with-description", "minimumDescriptionLength": 10}},
 		{Code: "// @ts-expect-error 0123456789012345678901\nconst a = 0;", Options: map[string]interface{}{"ts-expect-error": "allow-with-description", "minimumDescriptionLength": 21}},
 
+		// Description length includes colon separator (": ab" = 4 chars >= 3)
+		{Code: "// @ts-expect-error: ab\nconst a = 0;", Options: map[string]interface{}{"ts-expect-error": "allow-with-description"}},
+		// Description length includes dash separator ("-- ab" = 5 chars >= 3)
+		{Code: "// @ts-expect-error -- ab\nconst a = 0;", Options: map[string]interface{}{"ts-expect-error": "allow-with-description"}},
+		// Colon with single char (": a" = 3 chars, exactly at minimum)
+		{Code: "// @ts-expect-error: a\nconst a = 0;", Options: map[string]interface{}{"ts-expect-error": "allow-with-description"}},
+		// Multi-line with colon separator
+		{Code: "/* @ts-expect-error: ab */\nconst a = 0;", Options: map[string]interface{}{"ts-expect-error": "allow-with-description"}},
+
 		// ts-expect-error - description format
 		{Code: "// @ts-expect-error: TS1234 because reasons\nconst a = 0;", Options: map[string]interface{}{"ts-expect-error": map[string]interface{}{"descriptionFormat": "^: TS\\d+ because .+$"}}},
 		{Code: "// @ts-expect-error: TS2345 because type mismatch\nconst a = 0;", Options: map[string]interface{}{"ts-expect-error": map[string]interface{}{"descriptionFormat": "^: TS\\d+ because .+$"}}},
@@ -96,17 +105,41 @@ func TestBanTsCommentRule(t *testing.T) {
 
 		// ts-expect-error - description too short
 		{
-			Code:    "// @ts-expect-error: ab\nconst a = 0;",
+			Code:    "// @ts-expect-error ab\nconst a = 0;",
 			Options: map[string]interface{}{"ts-expect-error": "allow-with-description"},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "tsDirectiveCommentDescriptionNotMatchPattern"},
+				{MessageId: "tsDirectiveCommentRequiresDescription"},
 			},
 		},
 		{
 			Code:    "// @ts-expect-error 0123456789012345678\nconst a = 0;",
 			Options: map[string]interface{}{"ts-expect-error": "allow-with-description", "minimumDescriptionLength": 21},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "tsDirectiveCommentDescriptionNotMatchPattern"},
+				{MessageId: "tsDirectiveCommentRequiresDescription"},
+			},
+		},
+		// Just colon, no real description (length 1 < 3)
+		{
+			Code:    "// @ts-expect-error:\nconst a = 0;",
+			Options: map[string]interface{}{"ts-expect-error": "allow-with-description"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "tsDirectiveCommentRequiresDescription"},
+			},
+		},
+		// Just dashes, too short (length 2 < 3)
+		{
+			Code:    "// @ts-expect-error --\nconst a = 0;",
+			Options: map[string]interface{}{"ts-expect-error": "allow-with-description"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "tsDirectiveCommentRequiresDescription"},
+			},
+		},
+		// Colon + space only (": " trimmed to ":" = length 1 < 3)
+		{
+			Code:    "// @ts-expect-error: \nconst a = 0;",
+			Options: map[string]interface{}{"ts-expect-error": "allow-with-description"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "tsDirectiveCommentRequiresDescription"},
 			},
 		},
 
@@ -133,12 +166,12 @@ func TestBanTsCommentRule(t *testing.T) {
 			},
 		},
 
-		// ts-expect-error - Unicode/emoji too short
+		// ts-expect-error - Unicode/emoji too short (": 💩💩💩" = 6 runes, but with minimumDescriptionLength: 8)
 		{
 			Code:    "// @ts-expect-error: 💩💩💩\nconst a = 0;",
-			Options: map[string]interface{}{"ts-expect-error": "allow-with-description", "minimumDescriptionLength": 4},
+			Options: map[string]interface{}{"ts-expect-error": "allow-with-description", "minimumDescriptionLength": 8},
 			Errors: []rule_tester.InvalidTestCaseError{
-				{MessageId: "tsDirectiveCommentDescriptionNotMatchPattern"},
+				{MessageId: "tsDirectiveCommentRequiresDescription"},
 			},
 		},
 

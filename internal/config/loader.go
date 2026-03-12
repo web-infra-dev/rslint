@@ -3,8 +3,12 @@ package config
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
+	"sort"
+	"strings"
 
+	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/utils"
@@ -64,6 +68,7 @@ func (loader *ConfigLoader) LoadDefaultRslintConfig() (RslintConfig, string, err
 // LoadTsConfigsFromRslintConfig extracts and validates TypeScript configuration paths from rslint config
 func (loader *ConfigLoader) LoadTsConfigsFromRslintConfig(rslintConfig RslintConfig, configDirectory string) ([]string, error) {
 	tsConfigs := []string{}
+	seenPaths := make(map[string]struct{})
 
 	for _, entry := range rslintConfig {
 		if entry.LanguageOptions == nil || entry.LanguageOptions.ParserOptions == nil {
@@ -71,13 +76,27 @@ func (loader *ConfigLoader) LoadTsConfigsFromRslintConfig(rslintConfig RslintCon
 		}
 
 		for _, config := range entry.LanguageOptions.ParserOptions.Project {
+			if containsGlobPattern(config) {
+				matches, err := loader.expandProjectGlob(configDirectory, config)
+				if err != nil {
+					return nil, err
+				}
+				if len(matches) == 0 {
+					return nil, fmt.Errorf("glob pattern %q matched no files", config)
+				}
+				for _, match := range matches {
+					tsConfigs = appendUniqueConfigPath(tsConfigs, seenPaths, match)
+				}
+				continue
+			}
+
 			tsconfigPath := tspath.ResolvePath(configDirectory, config)
 
 			if !loader.fs.FileExists(tsconfigPath) {
 				return nil, fmt.Errorf("tsconfig file %q doesn't exist", tsconfigPath)
 			}
 
-			tsConfigs = append(tsConfigs, tsconfigPath)
+			tsConfigs = appendUniqueConfigPath(tsConfigs, seenPaths, tsconfigPath)
 		}
 	}
 
@@ -86,6 +105,85 @@ func (loader *ConfigLoader) LoadTsConfigsFromRslintConfig(rslintConfig RslintCon
 	}
 
 	return tsConfigs, nil
+}
+
+func appendUniqueConfigPath(paths []string, seenPaths map[string]struct{}, configPath string) []string {
+	normalizedPath := tspath.NormalizePath(configPath)
+	if _, exists := seenPaths[normalizedPath]; exists {
+		return paths
+	}
+	seenPaths[normalizedPath] = struct{}{}
+	return append(paths, normalizedPath)
+}
+
+func (loader *ConfigLoader) expandProjectGlob(configDirectory string, pattern string) ([]string, error) {
+	resolvedPattern := normalizeGlobPath(tspath.ResolvePath(configDirectory, pattern))
+	searchRoot := globSearchRoot(resolvedPattern, normalizeGlobPath(configDirectory))
+
+	if !loader.fs.DirectoryExists(searchRoot) {
+		return nil, nil
+	}
+
+	relativePattern := strings.TrimPrefix(resolvedPattern, searchRoot+"/")
+	fsys := &vfsAdapter{vfs: loader.fs, root: searchRoot}
+
+	matches := []string{}
+	err := doublestar.GlobWalk(fsys, relativePattern, func(path string, d fs.DirEntry) error {
+		fullPath := tspath.ResolvePath(searchRoot, path)
+		matches = append(matches, tspath.NormalizePath(fullPath))
+		return nil
+	}, doublestar.WithFilesOnly())
+	if err != nil {
+		return nil, fmt.Errorf("error expanding glob pattern %q: %w", pattern, err)
+	}
+
+	sort.Strings(matches)
+	return matches, nil
+}
+
+func containsGlobPattern(path string) bool {
+	return strings.ContainsAny(path, "*?[")
+}
+
+func globSearchRoot(pattern string, fallback string) string {
+	firstGlob := strings.IndexAny(pattern, "*?[")
+	if firstGlob == -1 {
+		return pattern
+	}
+
+	prefix := pattern[:firstGlob]
+	if prefix == "" {
+		return fallback
+	}
+
+	if strings.HasSuffix(prefix, "/") {
+		root := strings.TrimSuffix(prefix, "/")
+		if root == "" {
+			return "/"
+		}
+		if strings.HasSuffix(root, ":") {
+			return root + "/"
+		}
+		return root
+	}
+
+	lastSlash := strings.LastIndex(prefix, "/")
+	if lastSlash == -1 {
+		return fallback
+	}
+
+	root := strings.TrimSuffix(prefix[:lastSlash], "/")
+	if root == "" {
+		return "/"
+	}
+	if strings.HasSuffix(root, ":") {
+		return root + "/"
+	}
+	return root
+}
+
+func normalizeGlobPath(path string) string {
+	return strings.ReplaceAll(tspath.NormalizePath(path), "\\", "/")
 }
 
 // LoadConfiguration is a convenience method that loads both rslint and tsconfig configurations

@@ -6,8 +6,18 @@ export default defineConfig({
   include: [
     // cli
     './tests/cli/basic.test.ts',
+    './tests/cli/disable-comments.test.ts',
 
     // eslint
+    './tests/eslint/rules/default-case.test.ts',
+    './tests/eslint/rules/no-case-declarations.test.ts',
+    './tests/eslint/rules/no-console.test.ts',
+    './tests/eslint/rules/no-dupe-args.test.ts',
+    './tests/eslint/rules/no-dupe-keys.test.ts',
+    './tests/eslint/rules/no-duplicate-case.test.ts',
+    './tests/eslint/rules/no-empty.test.ts',
+    './tests/eslint/rules/no-empty-pattern.test.ts',
+    './tests/eslint/rules/getter-return.test.ts',
     './tests/eslint/rules/no-loss-of-precision.test.ts',
 
     // eslint-plugin-import
@@ -19,7 +29,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/array-type.test.ts',
     './tests/typescript-eslint/rules/await-thenable.test.ts',
     // './tests/typescript-eslint/rules/ban-ts-comment.test.ts',
-    // './tests/typescript-eslint/rules/ban-tslint-comment.test.ts',
+    './tests/typescript-eslint/rules/ban-tslint-comment.test.ts',
     './tests/typescript-eslint/rules/class-literal-property-style.test.ts',
     // './tests/typescript-eslint/rules/class-methods-use-this/class-methods-use-this-core.test.ts',
     // './tests/typescript-eslint/rules/class-methods-use-this/class-methods-use-this.test.ts',
@@ -83,7 +93,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-implied-eval.test.ts',
     './tests/typescript-eslint/rules/no-inferrable-types.test.ts',
     // './tests/typescript-eslint/rules/no-invalid-this.test.ts',
-    // './tests/typescript-eslint/rules/no-invalid-void-type.test.ts',
+    './tests/typescript-eslint/rules/no-invalid-void-type.test.ts',
     // './tests/typescript-eslint/rules/no-loop-func.test.ts',
     // './tests/typescript-eslint/rules/no-loss-of-precision.test.ts',
     // './tests/typescript-eslint/rules/no-magic-numbers.test.ts',
@@ -105,7 +115,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/no-shadow/no-shadow.test.ts',
     './tests/typescript-eslint/rules/no-this-alias.test.ts',
     // './tests/typescript-eslint/rules/no-type-alias.test.ts',
-    // './tests/typescript-eslint/rules/no-unnecessary-boolean-literal-compare.test.ts',
+    './tests/typescript-eslint/rules/no-unnecessary-boolean-literal-compare.test.ts',
     // './tests/typescript-eslint/rules/no-unnecessary-condition.test.ts',
     // './tests/typescript-eslint/rules/no-unnecessary-parameter-property-assignment.test.ts',
     // './tests/typescript-eslint/rules/no-unnecessary-qualifier.test.ts',
@@ -135,7 +145,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/no-wrapper-object-types.test.ts',
     './tests/typescript-eslint/rules/no_namespace.test.ts',
     './tests/typescript-eslint/rules/non-nullable-type-assertion-style.test.ts',
-    // './tests/typescript-eslint/rules/only-throw-error.test.ts',
+    './tests/typescript-eslint/rules/only-throw-error.test.ts',
     // './tests/typescript-eslint/rules/parameter-properties.test.ts',
     './tests/typescript-eslint/rules/prefer-as-const.test.ts',
     // './tests/typescript-eslint/rules/prefer-destructuring.test.ts',

@@ -371,50 +371,10 @@ func hasBranchingWithEarlyReturn(body *ast.Node) bool {
 	return false
 }
 
-// allPathsTerminateEarly checks if all code paths terminate early (return/throw) without calling super
-func allPathsTerminateEarly(body *ast.Node) bool {
-	if body == nil || body.Kind != ast.KindBlock {
-		return false
-	}
-
-	statements := body.Statements()
-	if len(statements) == 0 {
-		return false
-	}
-
-	// Check if all paths lead to early termination
-	return statementTerminatesEarly(statements)
-}
-
-// statementTerminatesEarly checks if a statement or sequence of statements terminates early
-func statementTerminatesEarly(statements []*ast.Node) bool {
-	for _, stmt := range statements {
-		if stmt == nil {
-			continue
-		}
-
-		// Direct termination
-		if stmt.Kind == ast.KindReturnStatement || stmt.Kind == ast.KindThrowStatement {
-			return true
-		}
-
-		// If-else where both branches terminate
-		if stmt.Kind == ast.KindIfStatement {
-			ifStmt := stmt.AsIfStatement()
-			if ifStmt != nil && ifStmt.ElseStatement != nil {
-				thenTerminates := branchTerminates(ifStmt.ThenStatement)
-				elseTerminates := branchTerminates(ifStmt.ElseStatement)
-				if thenTerminates && elseTerminates {
-					return true
-				}
-			}
-		}
-	}
-
-	return false
-}
-
-// branchTerminates checks if a branch (statement or block) terminates early
+// branchTerminates does a shallow check for whether a branch contains a return/throw.
+// It intentionally does not recurse into nested if-else chains because it is only used
+// by hasBranchingWithEarlyReturn to pick between missingSome vs missingAll error messages.
+// The actual "do all paths terminate" check is handled by IsFunctionEndReachable.
 func branchTerminates(stmt *ast.Node) bool {
 	if stmt == nil {
 		return false
@@ -425,7 +385,11 @@ func branchTerminates(stmt *ast.Node) bool {
 	}
 
 	if stmt.Kind == ast.KindBlock {
-		return statementTerminatesEarly(stmt.Statements())
+		for _, s := range stmt.Statements() {
+			if s != nil && (s.Kind == ast.KindReturnStatement || s.Kind == ast.KindThrowStatement) {
+				return true
+			}
+		}
 	}
 
 	return false
@@ -742,7 +706,7 @@ var ConstructorSuperRule = rule.CreateRule(rule.Rule{
 					// Derived class: must call super()
 					if !analysis.hasSuperCall {
 						// No super() call at all
-						if allPathsTerminateEarly(body) {
+						if !utils.IsFunctionEndReachable(node) {
 							// All paths terminate early, no error
 						} else if hasBranchingWithEarlyReturn(body) {
 							// Some paths have early return/throw, report missingSome
