@@ -66,6 +66,7 @@ qwer
 readonlyness
 realpath
 recurser
+rethrowing
 reducable
 reqs
 rsbuild
@@ -160,3 +161,9 @@ marginx
 marginy
 Readonlys
 exclam
+relint
+relints
+relinting
+lifecycles
+fsys
+tsconfiga

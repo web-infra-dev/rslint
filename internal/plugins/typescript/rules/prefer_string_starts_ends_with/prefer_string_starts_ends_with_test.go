@@ -386,6 +386,22 @@ function f(s: string) {
 }
 `},
 		},
+		// s[+0] === 'a'
+		{
+			Code: `
+function f(s: string) {
+  s[+0] === 'a';
+}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferStartsWith"},
+			},
+			Output: []string{`
+function f(s: string) {
+  s.startsWith('a');
+}
+`},
+		},
 		// s?.[0] === 'a'
 		{
 			Code: `
@@ -523,6 +539,22 @@ function f(s: string) {
 			Code: `
 function f(s: string) {
   s.charAt(0) === 'a';
+}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferStartsWith"},
+			},
+			Output: []string{`
+function f(s: string) {
+  s.startsWith('a');
+}
+`},
+		},
+		// s.charAt(+0) === 'a'
+		{
+			Code: `
+function f(s: string) {
+  s.charAt(+0) === 'a';
 }
 `,
 			Errors: []rule_tester.InvalidTestCaseError{
@@ -1027,6 +1059,22 @@ function f(s: string) {
 			Output: []string{`
 function f(s: string) {
   s.startsWith('bar');
+}
+`},
+		},
+		// s.slice(0, 1) === 'あ'
+		{
+			Code: `
+function f(s: string) {
+  s.slice(0, 1) === 'あ';
+}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "preferStartsWith"},
+			},
+			Output: []string{`
+function f(s: string) {
+  s.startsWith('あ');
 }
 `},
 		},
