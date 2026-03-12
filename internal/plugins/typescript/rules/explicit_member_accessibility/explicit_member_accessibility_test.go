@@ -10,6 +10,8 @@ import (
 func TestExplicitMemberAccessibilityRule(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &ExplicitMemberAccessibilityRule, []rule_tester.ValidTestCase{
 		{Code: "class Test {\n  public getX() {}\n}\n"},
+		{Code: "const obj = {\n  getX() {}\n}\n"},
+		{Code: "const obj = {\n  get value() { return 1 },\n  set value(v: number) {}\n}\n"},
 		{
 			Code:    "class Test {\n  constructor(public foo: number) {}\n}\n",
 			Options: []interface{}{map[string]interface{}{"accessibility": "no-public"}},

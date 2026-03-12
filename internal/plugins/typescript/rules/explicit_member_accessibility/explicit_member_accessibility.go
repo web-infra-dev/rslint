@@ -55,9 +55,11 @@ func parseOptions(rawOpts any) options {
 
 	var optsMap map[string]interface{}
 	if arr, ok := rawOpts.([]interface{}); ok && len(arr) > 0 {
-		optsMap, _ = arr[0].(map[string]interface{})
-	} else {
-		optsMap, _ = rawOpts.(map[string]interface{})
+		if m, ok := arr[0].(map[string]interface{}); ok {
+			optsMap = m
+		}
+	} else if m, ok := rawOpts.(map[string]interface{}); ok {
+		optsMap = m
 	}
 
 	if optsMap == nil {
@@ -295,6 +297,10 @@ func isParameterProperty(node *ast.Node) bool {
 	return flags&(ast.ModifierFlagsPublic|ast.ModifierFlagsPrivate|ast.ModifierFlagsProtected|ast.ModifierFlagsReadonly) != 0
 }
 
+func isClassMemberNode(node *ast.Node) bool {
+	return node != nil && node.Parent != nil && ast.IsClassLike(node.Parent)
+}
+
 func checkMemberAccessibility(ctx rule.RuleContext, node *ast.Node, nameNode *ast.Node, check accessibilityLevel, memberType string, ignored map[string]struct{}) {
 	if isPrivateIdentifierName(nameNode) {
 		return
@@ -396,15 +402,24 @@ var ExplicitMemberAccessibilityRule = rule.CreateRule(rule.Rule{
 
 		return rule.RuleListeners{
 			ast.KindMethodDeclaration: func(node *ast.Node) {
+				if !isClassMemberNode(node) {
+					return
+				}
 				checkMemberAccessibility(ctx, node, node.AsMethodDeclaration().Name(), methodCheck, "method definition", opts.IgnoredMethodNames)
 			},
 			ast.KindConstructor: func(node *ast.Node) {
 				checkMemberAccessibility(ctx, node, nil, ctorCheck, "method definition", opts.IgnoredMethodNames)
 			},
 			ast.KindGetAccessor: func(node *ast.Node) {
+				if !isClassMemberNode(node) {
+					return
+				}
 				checkMemberAccessibility(ctx, node, node.AsGetAccessorDeclaration().Name(), accessorCheck, "get property accessor", opts.IgnoredMethodNames)
 			},
 			ast.KindSetAccessor: func(node *ast.Node) {
+				if !isClassMemberNode(node) {
+					return
+				}
 				checkMemberAccessibility(ctx, node, node.AsSetAccessorDeclaration().Name(), accessorCheck, "set property accessor", opts.IgnoredMethodNames)
 			},
 			ast.KindPropertyDeclaration: func(node *ast.Node) {

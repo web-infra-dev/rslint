@@ -26,6 +26,7 @@ export class XXXX {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -56,6 +57,7 @@ export class WithParameterProperty {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -86,6 +88,7 @@ export class XXXX {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -116,6 +119,7 @@ class Test {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -149,6 +153,7 @@ class Test {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -182,6 +187,7 @@ class Test {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -230,6 +236,7 @@ class Test {
   ],
   "errorCount": 2,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -426,6 +433,7 @@ class Test {
   ],
   "errorCount": 2,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -495,6 +503,7 @@ class Test {
   ],
   "errorCount": 3,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -528,6 +537,7 @@ class Test {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -558,6 +568,7 @@ class Test {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -623,6 +634,7 @@ class Test {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -690,6 +702,7 @@ class Test {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -1090,6 +1103,7 @@ abstract class SomeClass {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -1155,6 +1169,7 @@ abstract class SomeClass {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -1367,6 +1382,7 @@ class DecoratedClass {
   ],
   "errorCount": 6,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;
@@ -1397,6 +1413,7 @@ abstract class SomeClass {
   ],
   "errorCount": 1,
   "fileCount": 1,
+  "output": null,
   "ruleCount": 1,
 }
 `;

@@ -119,6 +119,23 @@ class Test {
     },
     {
       code: `
+const obj = {
+  getX() {},
+};
+      `,
+    },
+    {
+      code: `
+const obj = {
+  get value() {
+    return 1;
+  },
+  set value(v: number) {},
+};
+      `,
+    },
+    {
+      code: `
 class Test {
   public constructor({ x, y }: { x: number; y: number }) {}
 }
