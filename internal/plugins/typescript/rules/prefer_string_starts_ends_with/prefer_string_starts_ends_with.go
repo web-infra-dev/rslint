@@ -86,6 +86,9 @@ func isNumber(node *ast.Node, value int) bool {
 		if unary == nil {
 			return false
 		}
+		if unary.Operator == ast.KindPlusToken {
+			return isNumber(unary.Operand, value)
+		}
 		if unary.Operator == ast.KindMinusToken {
 			return isNumber(unary.Operand, -value)
 		}
@@ -143,7 +146,8 @@ func getStringLength(node *ast.Node) int {
 		if lit == nil {
 			return -1
 		}
-		return len(lit.Text)
+		// Match JS semantics: string length is UTF-16 code units.
+		return jsStringLength(lit.Text)
 	}
 	return -1
 }

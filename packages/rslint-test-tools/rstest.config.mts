@@ -6,6 +6,7 @@ export default defineConfig({
   include: [
     // cli
     './tests/cli/basic.test.ts',
+    './tests/cli/disable-comments.test.ts',
 
     // eslint
     './tests/eslint/rules/default-case.test.ts',
@@ -24,12 +25,25 @@ export default defineConfig({
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
     './tests/eslint-plugin-import/rules/no-webpack-loader-syntax.test.ts',
 
+    // eslint-plugin-react
+    './tests/eslint-plugin-react/rules/self-closing-comp.test.ts',
+    './tests/eslint-plugin-react/rules/void-dom-elements-no-children.test.ts',
+    './tests/eslint-plugin-react/rules/style-prop-object.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-boolean-value.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-equals-spacing.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-filename-extension.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-first-prop-new-line.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-max-props-per-line.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-props-no-multi-spaces.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-closing-tag-location.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-wrap-multilines.test.ts',
+
     // typescript-eslint
     './tests/typescript-eslint/rules/adjacent-overload-signatures.test.ts',
     './tests/typescript-eslint/rules/array-type.test.ts',
     './tests/typescript-eslint/rules/await-thenable.test.ts',
     // './tests/typescript-eslint/rules/ban-ts-comment.test.ts',
-    // './tests/typescript-eslint/rules/ban-tslint-comment.test.ts',
+    './tests/typescript-eslint/rules/ban-tslint-comment.test.ts',
     './tests/typescript-eslint/rules/class-literal-property-style.test.ts',
     // './tests/typescript-eslint/rules/class-methods-use-this/class-methods-use-this-core.test.ts',
     // './tests/typescript-eslint/rules/class-methods-use-this/class-methods-use-this.test.ts',
@@ -93,7 +107,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-implied-eval.test.ts',
     './tests/typescript-eslint/rules/no-inferrable-types.test.ts',
     // './tests/typescript-eslint/rules/no-invalid-this.test.ts',
-    // './tests/typescript-eslint/rules/no-invalid-void-type.test.ts',
+    './tests/typescript-eslint/rules/no-invalid-void-type.test.ts',
     // './tests/typescript-eslint/rules/no-loop-func.test.ts',
     // './tests/typescript-eslint/rules/no-loss-of-precision.test.ts',
     // './tests/typescript-eslint/rules/no-magic-numbers.test.ts',
@@ -145,7 +159,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/no-wrapper-object-types.test.ts',
     './tests/typescript-eslint/rules/no_namespace.test.ts',
     './tests/typescript-eslint/rules/non-nullable-type-assertion-style.test.ts',
-    // './tests/typescript-eslint/rules/only-throw-error.test.ts',
+    './tests/typescript-eslint/rules/only-throw-error.test.ts',
     // './tests/typescript-eslint/rules/parameter-properties.test.ts',
     './tests/typescript-eslint/rules/prefer-as-const.test.ts',
     // './tests/typescript-eslint/rules/prefer-destructuring.test.ts',
@@ -162,10 +176,10 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/prefer-readonly-parameter-types.test.ts',
     './tests/typescript-eslint/rules/prefer-readonly.test.ts',
     './tests/typescript-eslint/rules/prefer-reduce-type-parameter.test.ts',
-    // './tests/typescript-eslint/rules/prefer-regexp-exec.test.ts',
+    './tests/typescript-eslint/rules/prefer-regexp-exec.test.ts',
     './tests/typescript-eslint/rules/prefer-return-this-type.test.ts',
     './tests/typescript-eslint/rules/prefer-string-starts-ends-with.test.ts',
-    // './tests/typescript-eslint/rules/prefer-ts-expect-error.test.ts',
+    './tests/typescript-eslint/rules/prefer-ts-expect-error.test.ts',
     // './tests/typescript-eslint/rules/promise-function-async.test.ts',
     './tests/typescript-eslint/rules/related-getter-setter-pairs.test.ts',
     // './tests/typescript-eslint/rules/require-array-sort-compare.test.ts',

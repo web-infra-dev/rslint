@@ -171,12 +171,96 @@ throw new Map();
         import { createError } from 'errors';
         throw createError();
       `,
-			// TODO(port): type_matches_specifier doesn't support this yet
+			// Skip: 'errors' module doesn't exist in test fixtures, so createError()
+			// resolves to 'any' and can't match the package specifier.
 			Skip: true,
 			Options: OnlyThrowErrorOptions{
 				Allow:                []utils.TypeOrValueSpecifier{{From: utils.TypeOrValueSpecifierFromPackage, Name: []string{"ErrorLike"}, Package: "errors"}},
 				AllowThrowingAny:     utils.Ref(false),
 				AllowThrowingUnknown: utils.Ref(false),
+			},
+		},
+		// allowRethrowing: valid cases
+		{
+			Code: `
+try {
+} catch (e) {
+  throw e;
+}
+      `,
+			Options: OnlyThrowErrorOptions{
+				AllowRethrowing:      utils.Ref(true),
+				AllowThrowingAny:     utils.Ref(false),
+				AllowThrowingUnknown: utils.Ref(false),
+			},
+		},
+		{
+			Code: `
+try {
+} catch (eOuter) {
+  try {
+    if (Math.random() > 0.5) {
+      throw eOuter;
+    }
+  } catch (eInner) {
+    if (Math.random() > 0.5) {
+      throw eOuter;
+    } else {
+      throw eInner;
+    }
+  }
+}
+      `,
+			Options: OnlyThrowErrorOptions{
+				AllowRethrowing:      utils.Ref(true),
+				AllowThrowingAny:     utils.Ref(false),
+				AllowThrowingUnknown: utils.Ref(false),
+			},
+		},
+		{
+			Code: `
+Promise.reject('foo').catch(e => {
+  throw e;
+});
+      `,
+			Options: OnlyThrowErrorOptions{
+				AllowRethrowing:      utils.Ref(true),
+				AllowThrowingAny:     utils.Ref(false),
+				AllowThrowingUnknown: utils.Ref(false),
+			},
+		},
+		// allow string shorthand with generic union
+		{
+			Code: `
+function func<T1, T2>() {
+  let err: Promise<T1> | Promise<T2>;
+  throw err;
+}
+      `,
+			Options: OnlyThrowErrorOptions{
+				Allow: []utils.TypeOrValueSpecifier{{From: utils.TypeOrValueSpecifierFromString, Name: []string{"Promise"}}},
+			},
+		},
+		// throw await resolving to Error with allowThrowingAny: false
+		{
+			Code: `
+async function foo() {
+  throw await Promise.resolve(new Error('error'));
+}
+      `,
+			Options: OnlyThrowErrorOptions{
+				AllowThrowingAny: utils.Ref(false),
+			},
+		},
+		// generator with typed return
+		{
+			Code: `
+function* foo(): Generator<number, void, Error> {
+  throw yield 303;
+}
+      `,
+			Options: OnlyThrowErrorOptions{
+				AllowThrowingAny: utils.Ref(false),
 			},
 		},
 	}, []rule_tester.InvalidTestCase{
@@ -557,6 +641,180 @@ throw new UnknownError();
 				Allow:                []utils.TypeOrValueSpecifier{{From: utils.TypeOrValueSpecifierFromFile, Name: []string{"CustomError"}}},
 				AllowThrowingAny:     utils.Ref(false),
 				AllowThrowingUnknown: utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "object",
+				},
+			},
+		},
+		// allowRethrowing: invalid cases
+		{
+			Code: `
+let x = 1;
+Promise.reject('foo').catch(e => {
+  throw x;
+});
+      `,
+			Options: OnlyThrowErrorOptions{
+				AllowRethrowing:      utils.Ref(true),
+				AllowThrowingAny:     utils.Ref(false),
+				AllowThrowingUnknown: utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "object",
+				},
+			},
+		},
+		{
+			Code: `
+Promise.reject('foo').catch((...e) => {
+  throw e;
+});
+      `,
+			Options: OnlyThrowErrorOptions{
+				AllowRethrowing:      utils.Ref(true),
+				AllowThrowingAny:     utils.Ref(false),
+				AllowThrowingUnknown: utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "object",
+				},
+			},
+		},
+		{
+			Code: `
+declare const x: any[];
+Promise.reject('foo').catch(...x, e => {
+  throw e;
+});
+      `,
+			Options: OnlyThrowErrorOptions{
+				AllowRethrowing:      utils.Ref(true),
+				AllowThrowingAny:     utils.Ref(false),
+				AllowThrowingUnknown: utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "object",
+				},
+			},
+		},
+		{
+			Code: `
+declare const x: any[];
+Promise.reject('foo').then(...x, e => {
+  throw e;
+});
+      `,
+			Options: OnlyThrowErrorOptions{
+				AllowRethrowing:      utils.Ref(true),
+				AllowThrowingAny:     utils.Ref(false),
+				AllowThrowingUnknown: utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "object",
+				},
+			},
+		},
+		{
+			Code: `
+declare const onFulfilled: any;
+declare const x: any[];
+Promise.reject('foo').then(onFulfilled, ...x, e => {
+  throw e;
+});
+      `,
+			Options: OnlyThrowErrorOptions{
+				AllowRethrowing:      utils.Ref(true),
+				AllowThrowingAny:     utils.Ref(false),
+				AllowThrowingUnknown: utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "object",
+				},
+			},
+		},
+		{
+			Code: `
+Promise.reject('foo').then((...e) => {
+  throw e;
+});
+      `,
+			Options: OnlyThrowErrorOptions{
+				AllowRethrowing:      utils.Ref(true),
+				AllowThrowingAny:     utils.Ref(false),
+				AllowThrowingUnknown: utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "object",
+				},
+			},
+		},
+		{
+			Code: `
+Promise.reject('foo').then(e => {
+  throw globalThis;
+});
+      `,
+			Options: OnlyThrowErrorOptions{
+				AllowRethrowing:      utils.Ref(true),
+				AllowThrowingAny:     utils.Ref(false),
+				AllowThrowingUnknown: utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "object",
+				},
+			},
+		},
+		// allow string shorthand with generic union including void
+		{
+			Code: `
+function func<T1, T2>() {
+  let err: Promise<T1> | Promise<T2> | void;
+  throw err;
+}
+      `,
+			Options: OnlyThrowErrorOptions{
+				Allow: []utils.TypeOrValueSpecifier{{From: utils.TypeOrValueSpecifierFromString, Name: []string{"Promise"}}},
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "object",
+				},
+			},
+		},
+		// throw await bar with allowThrowingAny: false
+		{
+			Code: `
+async function foo() {
+  throw await bar;
+}
+      `,
+			Options: OnlyThrowErrorOptions{
+				AllowThrowingAny: utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "object",
+				},
+			},
+		},
+		// throw await resolving to number with allowThrowingAny: false
+		{
+			Code: `
+async function foo() {
+  throw await Promise.resolve<number>(303);
+}
+      `,
+			Options: OnlyThrowErrorOptions{
+				AllowThrowingAny: utils.Ref(false),
 			},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{

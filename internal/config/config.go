@@ -10,10 +10,12 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
+	reactPlugin "github.com/web-infra-dev/rslint/internal/plugins/react"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/adjacent_overload_signatures"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/array_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/await_thenable"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/ban_ts_comment"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/ban_tslint_comment"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/ban_types"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/class_literal_property_style"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/consistent_generic_constructors"
@@ -78,8 +80,10 @@ import (
 
 	// "github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_readonly_parameter_types" // Temporarily disabled - incomplete implementation
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_reduce_type_parameter"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_regexp_exec"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_return_this_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_string_starts_ends_with"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_ts_expect_error"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/promise_function_async"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/related_getter_setter_pairs"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/require_array_sort_compare"
@@ -281,6 +285,8 @@ func GetAllRulesForPlugin(plugin string) []rule.Rule {
 		return importPlugin.GetAllRules()
 	case "eslint-plugin-import/recommended":
 		return importPlugin.GetRecommendedRules()
+	case "react":
+		return reactPlugin.GetAllRules()
 	default:
 		return []rule.Rule{} // Return empty slice for unsupported plugins
 	}
@@ -381,7 +387,14 @@ func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConf
 func RegisterAllRules() {
 	registerAllTypeScriptEslintPluginRules()
 	registerAllEslintImportPluginRules()
+	registerAllReactPluginRules()
 	registerAllCoreEslintRules()
+}
+
+func registerAllReactPluginRules() {
+	for _, rule := range reactPlugin.GetAllRules() {
+		GlobalRuleRegistry.Register(rule.Name, rule)
+	}
 }
 
 // registerAllTypeScriptEslintPluginRules registers all available rules in the global registry
@@ -390,6 +403,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/array-type", array_type.ArrayTypeRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/await-thenable", await_thenable.AwaitThenableRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/ban-ts-comment", ban_ts_comment.BanTsCommentRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/ban-tslint-comment", ban_tslint_comment.BanTslintCommentRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/ban-types", ban_types.BanTypesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/class-literal-property-style", class_literal_property_style.ClassLiteralPropertyStyleRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/consistent-generic-constructors", consistent_generic_constructors.ConsistentGenericConstructorsRule)
@@ -456,8 +470,10 @@ func registerAllTypeScriptEslintPluginRules() {
 	// detection of readonly arrays, readonly objects, function types, and other edge cases
 	// GlobalRuleRegistry.Register("@typescript-eslint/prefer-readonly-parameter-types", prefer_readonly_parameter_types.PreferReadonlyParameterTypesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-reduce-type-parameter", prefer_reduce_type_parameter.PreferReduceTypeParameterRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/prefer-regexp-exec", prefer_regexp_exec.PreferRegExpExecRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-return-this-type", prefer_return_this_type.PreferReturnThisTypeRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/prefer-string-starts-ends-with", prefer_string_starts_ends_with.PreferStringStartsEndsWithRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/prefer-ts-expect-error", prefer_ts_expect_error.PreferTsExpectErrorRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/promise-function-async", promise_function_async.PromiseFunctionAsyncRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/related-getter-setter-pairs", related_getter_setter_pairs.RelatedGetterSetterPairsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/require-array-sort-compare", require_array_sort_compare.RequireArraySortCompareRule)
