@@ -9,7 +9,7 @@ exports[`no-ex-assign > invalid 1`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 27,
+          "column": 22,
           "line": 1,
         },
         "start": {
@@ -35,7 +35,7 @@ exports[`no-ex-assign > invalid 2`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 29,
+          "column": 24,
           "line": 1,
         },
         "start": {
@@ -61,11 +61,11 @@ exports[`no-ex-assign > invalid 3`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 31,
+          "column": 25,
           "line": 1,
         },
         "start": {
-          "column": 22,
+          "column": 23,
           "line": 1,
         },
       },
@@ -87,7 +87,7 @@ exports[`no-ex-assign > invalid 4`] = `
       "messageId": "unexpected",
       "range": {
         "end": {
-          "column": 33,
+          "column": 29,
           "line": 1,
         },
         "start": {
