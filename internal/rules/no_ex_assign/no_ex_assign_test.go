@@ -58,6 +58,12 @@ func TestNoExAssignRule(t *testing.T) {
 					{MessageId: "unexpected", Line: 1, Column: 32},
 				},
 			},
+			{
+				Code: "try { } catch (e) { for (e in obj) {} }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 26},
+				},
+			},
 		},
 	)
 }

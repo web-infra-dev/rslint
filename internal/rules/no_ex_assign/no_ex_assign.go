@@ -148,6 +148,18 @@ func isWriteReference(node *ast.Node) bool {
 		case ast.KindPlusPlusToken, ast.KindMinusMinusToken:
 			return prefix.Operand == node
 		}
+	case ast.KindForInStatement:
+		forIn := parent.AsForInOrOfStatement()
+		if forIn == nil {
+			return false
+		}
+		return forIn.Initializer == node
+	case ast.KindForOfStatement:
+		forOf := parent.AsForInOrOfStatement()
+		if forOf == nil {
+			return false
+		}
+		return forOf.Initializer == node
 	case ast.KindObjectBindingPattern:
 		return isBindingPatternInAssignment(parent)
 	case ast.KindArrayBindingPattern:
