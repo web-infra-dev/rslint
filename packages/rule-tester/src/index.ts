@@ -264,10 +264,9 @@ export class RuleTester {
           );
           // eslint-disable-next-line
           checkDiagnosticEqual(diags.diagnostics, errors);
-          const hasOutput = Object.prototype.hasOwnProperty.call(
-            item,
-            'output',
-          );
+          const hasOutput =
+            Object.prototype.hasOwnProperty.call(item, 'output') &&
+            output !== null;
           if (hasOutput) {
             // check autofix
             const fixedCode = await applyFixes({
