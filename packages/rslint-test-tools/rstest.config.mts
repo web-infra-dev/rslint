@@ -24,6 +24,19 @@ export default defineConfig({
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
     './tests/eslint-plugin-import/rules/no-webpack-loader-syntax.test.ts',
 
+    // eslint-plugin-react
+    './tests/eslint-plugin-react/rules/self-closing-comp.test.ts',
+    './tests/eslint-plugin-react/rules/void-dom-elements-no-children.test.ts',
+    './tests/eslint-plugin-react/rules/style-prop-object.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-boolean-value.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-equals-spacing.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-filename-extension.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-first-prop-new-line.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-max-props-per-line.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-props-no-multi-spaces.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-closing-tag-location.test.ts',
+    './tests/eslint-plugin-react/rules/jsx-wrap-multilines.test.ts',
+
     // typescript-eslint
     './tests/typescript-eslint/rules/adjacent-overload-signatures.test.ts',
     './tests/typescript-eslint/rules/array-type.test.ts',
