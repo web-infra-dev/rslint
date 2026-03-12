@@ -193,3 +193,20 @@ func Must[T any](v T, err error) T {
 	}
 	return v
 }
+
+// GetOptionsMap extracts a map[string]interface{} from rule options.
+// It handles both array format [{ option: value }] and direct object format { option: value }.
+func GetOptionsMap(opts any) map[string]interface{} {
+	if opts == nil {
+		return nil
+	}
+
+	var optsMap map[string]interface{}
+	if arr, ok := opts.([]interface{}); ok && len(arr) > 0 {
+		optsMap, _ = arr[0].(map[string]interface{})
+	} else {
+		optsMap, _ = opts.(map[string]interface{})
+	}
+
+	return optsMap
+}

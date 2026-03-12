@@ -15,6 +15,10 @@ ruleTester.run('consistent-type-definitions', {
       options: ['interface'],
     },
     {
+      code: 'interface A { x: number; }',
+      options: ['interface'],
+    },
+    {
       code: `
 interface A extends B {
   x: number;
@@ -31,6 +35,10 @@ interface A extends B {
       options: ['interface'],
     },
     {
+      code: 'type V = { x: number } & { y: string };',
+      options: ['interface'],
+    },
+    {
       code: `
 type Record<T, U> = {
   [K in T]: U;
@@ -39,7 +47,43 @@ type Record<T, U> = {
       options: ['interface'],
     },
     {
+      code: 'type T = string | number;',
+      options: ['interface'],
+    },
+    {
+      code: 'type T = () => void;',
+      options: ['interface'],
+    },
+    {
+      code: 'type T = new () => void;',
+      options: ['interface'],
+    },
+    {
+      code: 'type T = [number, string];',
+      options: ['interface'],
+    },
+    {
+      code: 'type T = number[];',
+      options: ['interface'],
+    },
+    {
+      code: 'type T = readonly number[];',
+      options: ['interface'],
+    },
+    {
+      code: 'type T<U> = U & { x: number };',
+      options: ['interface'],
+    },
+    {
       code: 'type T = { x: number };',
+      options: ['type'],
+    },
+    {
+      code: 'type T = { x: number; };',
+      options: ['type'],
+    },
+    {
+      code: 'type T = { x: number; y: string; };',
       options: ['type'],
     },
     {
@@ -54,6 +98,31 @@ type Record<T, U> = {
       code: `
 export type W<T> = {
   x: T;
+};
+      `,
+      options: ['type'],
+    },
+    {
+      code: `
+export type W<T> = {
+  x: T;
+  y: U;
+};
+      `,
+      options: ['type'],
+    },
+    {
+      code: 'type U = string;',
+      options: ['type'],
+    },
+    {
+      code: 'type V = { x: number } | { y: string };',
+      options: ['type'],
+    },
+    {
+      code: `
+type Record<T, U> = {
+  [K in T]: U;
 };
       `,
       options: ['type'],
@@ -127,6 +196,86 @@ export interface W<T> {
   x: T;
 }
       `,
+    },
+    {
+      code: noFormat`type T = { [K: string]: number };`,
+      errors: [
+        {
+          messageId: 'interfaceOverType',
+        },
+      ],
+      options: ['interface'],
+      output: `interface T { [K: string]: number }`,
+    },
+    {
+      code: noFormat`type T= { x: number; };`,
+      errors: [
+        {
+          messageId: 'interfaceOverType',
+        },
+      ],
+      options: ['interface'],
+      output: `interface T { x: number; }`,
+    },
+    {
+      code: noFormat`type T = { x: number };`,
+      errors: [
+        {
+          messageId: 'interfaceOverType',
+        },
+      ],
+      options: ['interface'],
+      output: `interface T { x: number }`,
+    },
+    {
+      code: noFormat`type T = { x: number; y: string; };`,
+      errors: [
+        {
+          messageId: 'interfaceOverType',
+        },
+      ],
+      options: ['interface'],
+      output: `interface T { x: number; y: string; }`,
+    },
+    {
+      code: noFormat`type T = { x: number; y: { z: string; }; };`,
+      errors: [
+        {
+          messageId: 'interfaceOverType',
+        },
+      ],
+      options: ['interface'],
+      output: `interface T { x: number; y: { z: string; }; }`,
+    },
+    {
+      code: noFormat`type T<U> = { x: U; };`,
+      errors: [
+        {
+          messageId: 'interfaceOverType',
+        },
+      ],
+      options: ['interface'],
+      output: `interface T<U> { x: U; }`,
+    },
+    {
+      code: noFormat`type Foo = { a: string; };`,
+      errors: [
+        {
+          messageId: 'interfaceOverType',
+        },
+      ],
+      options: ['interface'],
+      output: `interface Foo { a: string; }`,
+    },
+    {
+      code: noFormat`type Foo = (  { a: string; });`,
+      errors: [
+        {
+          messageId: 'interfaceOverType',
+        },
+      ],
+      options: ['interface'],
+      output: `interface Foo { a: string; }`,
     },
     {
       code: noFormat`interface T { x: number; }`,
@@ -207,6 +356,66 @@ export type W<T> = {
   x: T;
 }
       `,
+    },
+    {
+      code: noFormat`interface T { x: number }`,
+      errors: [
+        {
+          messageId: 'typeOverInterface',
+        },
+      ],
+      options: ['type'],
+      output: `type T = { x: number }`,
+    },
+    {
+      code: noFormat`interface T { x: number; y: string; }`,
+      errors: [
+        {
+          messageId: 'typeOverInterface',
+        },
+      ],
+      options: ['type'],
+      output: `type T = { x: number; y: string; }`,
+    },
+    {
+      code: noFormat`export interface W<T> { x: T; };`,
+      errors: [
+        {
+          messageId: 'typeOverInterface',
+        },
+      ],
+      options: ['type'],
+      output: `export type W<T> = { x: T; };`,
+    },
+    {
+      code: noFormat`interface T<U> { x: U; };`,
+      errors: [
+        {
+          messageId: 'typeOverInterface',
+        },
+      ],
+      options: ['type'],
+      output: `type T<U> = { x: U; };`,
+    },
+    {
+      code: noFormat`interface Foo { a: string; }`,
+      errors: [
+        {
+          messageId: 'typeOverInterface',
+        },
+      ],
+      options: ['type'],
+      output: `type Foo = { a: string; }`,
+    },
+    {
+      code: noFormat`namespace Foo { export interface Bar {} }`,
+      errors: [
+        {
+          messageId: 'typeOverInterface',
+        },
+      ],
+      options: ['type'],
+      output: `namespace Foo { export type Bar = {} }`,
     },
     {
       code: `

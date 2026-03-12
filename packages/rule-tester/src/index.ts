@@ -214,7 +214,7 @@ export class RuleTester {
             ruleOptions: {
               [ruleName]: options,
             },
-            languageOptions,
+            languageOptions: languageOptions as any,
           });
 
           assert(
@@ -255,7 +255,7 @@ export class RuleTester {
             ruleOptions: {
               [ruleName]: options,
             },
-            languageOptions,
+            languageOptions: languageOptions as any,
           });
 
           assert(

@@ -129,6 +129,38 @@ class Foo {
 }`,
 			Options: map[string]interface{}{"allow": []interface{}{"generatorMethods"}},
 		},
+		// Functions with comments are not empty
+		{
+			Code: `function foo() { /* comment */ }`,
+		},
+		{
+			Code: `const foo = () => { // comment
+};`,
+		},
+		{
+			Code: `class Foo {
+  bar() { /* comment */ }
+}`,
+		},
+		{
+			Code: `class Foo {
+  constructor() { /* initializing */ }
+}`,
+		},
+		{
+			Code: `class Foo {
+  get bar() { /* TODO */ }
+}`,
+		},
+		{
+			Code: `class Foo {
+  set bar(value: string) { /* noop */ }
+}`,
+		},
+		{
+			Code: `const foo = function() { // comment
+};`,
+		},
 	}, []rule_tester.InvalidTestCase{
 		// Invalid cases - exactly mirroring TypeScript tests
 		{
