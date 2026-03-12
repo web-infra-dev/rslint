@@ -3,6 +3,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"sort"
 	"strings"
@@ -119,18 +120,19 @@ func (loader *ConfigLoader) expandProjectGlob(configDirectory string, pattern st
 	resolvedPattern := normalizeGlobPath(tspath.ResolvePath(configDirectory, pattern))
 	searchRoot := globSearchRoot(resolvedPattern, normalizeGlobPath(configDirectory))
 
+	if !loader.fs.DirectoryExists(searchRoot) {
+		return nil, nil
+	}
+
+	relativePattern := strings.TrimPrefix(resolvedPattern, searchRoot+"/")
+	fsys := &vfsAdapter{vfs: loader.fs, root: searchRoot}
+
 	matches := []string{}
-	err := loader.walkProjectFiles(searchRoot, func(path string) error {
-		normalizedPath := normalizeGlobPath(path)
-		matched, err := doublestar.Match(resolvedPattern, normalizedPath)
-		if err != nil {
-			return err
-		}
-		if matched {
-			matches = append(matches, tspath.NormalizePath(path))
-		}
+	err := doublestar.GlobWalk(fsys, relativePattern, func(path string, d fs.DirEntry) error {
+		fullPath := tspath.ResolvePath(searchRoot, path)
+		matches = append(matches, tspath.NormalizePath(fullPath))
 		return nil
-	})
+	}, doublestar.WithFilesOnly())
 	if err != nil {
 		return nil, fmt.Errorf("error expanding glob pattern %q: %w", pattern, err)
 	}
@@ -141,43 +143,6 @@ func (loader *ConfigLoader) expandProjectGlob(configDirectory string, pattern st
 
 func containsGlobPattern(path string) bool {
 	return strings.ContainsAny(path, "*?[")
-}
-
-func (loader *ConfigLoader) walkProjectFiles(root string, visit func(path string) error) error {
-	if !loader.fs.DirectoryExists(root) {
-		return nil
-	}
-
-	visitedDirectories := make(map[string]struct{})
-	var walk func(path string) error
-
-	walk = func(path string) error {
-		normalizedPath := tspath.NormalizePath(path)
-		if _, visited := visitedDirectories[normalizedPath]; visited {
-			return nil
-		}
-		visitedDirectories[normalizedPath] = struct{}{}
-
-		entries := loader.fs.GetAccessibleEntries(path)
-		sort.Strings(entries.Files)
-		sort.Strings(entries.Directories)
-
-		for _, fileName := range entries.Files {
-			if err := visit(tspath.ResolvePath(path, fileName)); err != nil {
-				return err
-			}
-		}
-
-		for _, directoryName := range entries.Directories {
-			if err := walk(tspath.ResolvePath(path, directoryName)); err != nil {
-				return err
-			}
-		}
-
-		return nil
-	}
-
-	return walk(root)
 }
 
 func globSearchRoot(pattern string, fallback string) string {
