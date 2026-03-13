@@ -126,15 +126,18 @@ import (
 // RslintConfig represents the top-level configuration array
 type RslintConfig []ConfigEntry
 
-// ConfigEntry represents a single configuration entry in the rslint.json array
+// ConfigEntry represents a single configuration entry in the config array
 type ConfigEntry struct {
-	Language        string           `json:"language"`
-	Files           []string         `json:"files"`
-	Ignores         []string         `json:"ignores,omitempty"` // List of file patterns to ignore
+	Files           []string         `json:"files,omitempty"`
+	Ignores         []string         `json:"ignores,omitempty"`
 	LanguageOptions *LanguageOptions `json:"languageOptions,omitempty"`
 	Rules           Rules            `json:"rules"`
-	Plugins         []string         `json:"plugins,omitempty"` // List of plugin names
+	Plugins         []string         `json:"plugins,omitempty"`
+	Settings        Settings         `json:"settings,omitempty"`
 }
+
+// Settings represents shared settings accessible to rules
+type Settings map[string]interface{}
 
 // LanguageOptions contains language-specific configuration options
 type LanguageOptions struct {
@@ -162,80 +165,27 @@ func (p *ProjectPaths) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// ParserOptions contains parser-specific configuration
+// ParserOptions contains parser-specific configuration.
+// ProjectService uses *bool to distinguish "not set" (nil) from "explicitly false".
 type ParserOptions struct {
-	ProjectService bool         `json:"projectService"`
+	ProjectService *bool        `json:"projectService,omitempty"`
 	Project        ProjectPaths `json:"project,omitempty"`
+}
+
+// BoolPtr returns a pointer to the given bool value.
+func BoolPtr(b bool) *bool {
+	return &b
 }
 
 // Rules represents the rules configuration
 // This can be extended to include specific rule configurations
 type Rules map[string]interface{}
 
-// Alternative: If you want type-safe rule configurations
-type TypedRules struct {
-	// Example rule configurations - extend as needed
-	AdjacentOverloadSignatures         *RuleConfig `json:"@typescript-eslint/adjacent-overload-signatures,omitempty"`
-	ArrayType                          *RuleConfig `json:"@typescript-eslint/array-type,omitempty"`
-	ClassLiteralPropertyStyle          *RuleConfig `json:"@typescript-eslint/class-literal-property-style,omitempty"`
-	NoArrayDelete                      *RuleConfig `json:"@typescript-eslint/no-array-delete,omitempty"`
-	NoBaseToString                     *RuleConfig `json:"@typescript-eslint/no-base-to-string,omitempty"`
-	NoForInArray                       *RuleConfig `json:"@typescript-eslint/no-for-in-array,omitempty"`
-	NoImpliedEval                      *RuleConfig `json:"@typescript-eslint/no-implied-eval,omitempty"`
-	OnlyThrowError                     *RuleConfig `json:"@typescript-eslint/only-throw-error,omitempty"`
-	AwaitThenable                      *RuleConfig `json:"@typescript-eslint/await-thenable,omitempty"`
-	NoConfusingVoidExpression          *RuleConfig `json:"@typescript-eslint/no-confusing-void-expression,omitempty"`
-	NoDuplicateTypeConstituents        *RuleConfig `json:"@typescript-eslint/no-duplicate-type-constituents,omitempty"`
-	NoFloatingPromises                 *RuleConfig `json:"@typescript-eslint/no-floating-promises,omitempty"`
-	NoMeaninglessVoidOperator          *RuleConfig `json:"@typescript-eslint/no-meaningless-void-operator,omitempty"`
-	NoMisusedPromises                  *RuleConfig `json:"@typescript-eslint/no-misused-promises,omitempty"`
-	NoMisusedSpread                    *RuleConfig `json:"@typescript-eslint/no-misused-spread,omitempty"`
-	NoMixedEnums                       *RuleConfig `json:"@typescript-eslint/no-mixed-enums,omitempty"`
-	NoRedundantTypeConstituents        *RuleConfig `json:"@typescript-eslint/no-redundant-type-constituents,omitempty"`
-	NoUnnecessaryBooleanLiteralCompare *RuleConfig `json:"@typescript-eslint/no-unnecessary-boolean-literal-compare,omitempty"`
-	NoUnnecessaryTemplateExpression    *RuleConfig `json:"@typescript-eslint/no-unnecessary-template-expression,omitempty"`
-	NoUnnecessaryTypeArguments         *RuleConfig `json:"@typescript-eslint/no-unnecessary-type-arguments,omitempty"`
-	NoUnnecessaryTypeAssertion         *RuleConfig `json:"@typescript-eslint/no-unnecessary-type-assertion,omitempty"`
-	NoUnsafeArgument                   *RuleConfig `json:"@typescript-eslint/no-unsafe-argument,omitempty"`
-	NoUnsafeAssignment                 *RuleConfig `json:"@typescript-eslint/no-unsafe-assignment,omitempty"`
-	NoUnsafeCall                       *RuleConfig `json:"@typescript-eslint/no-unsafe-call,omitempty"`
-	NoUnsafeEnumComparison             *RuleConfig `json:"@typescript-eslint/no-unsafe-enum-comparison,omitempty"`
-	NoUnsafeMemberAccess               *RuleConfig `json:"@typescript-eslint/no-unsafe-member-access,omitempty"`
-	NoUnsafeReturn                     *RuleConfig `json:"@typescript-eslint/no-unsafe-return,omitempty"`
-	NoUnsafeTypeAssertion              *RuleConfig `json:"@typescript-eslint/no-unsafe-type-assertion,omitempty"`
-	NoUnsafeUnaryMinus                 *RuleConfig `json:"@typescript-eslint/no-unsafe-unary-minus,omitempty"`
-}
-
 // RuleConfig represents individual rule configuration
 type RuleConfig struct {
 	Level   string                 `json:"level,omitempty"`   // "error", "warn", "off"
 	Options map[string]interface{} `json:"options,omitempty"` // Rule-specific options
 }
-
-const defaultJsonc = `
-[
-  {
-    // ignore files and folders for linting
-    "ignores": [],
-    "languageOptions": {
-      "parserOptions": {
-        // Rslint will lint all files included in your typescript projects defined here
-        // support lint multi packages in monorepo
-        "project": ["./tsconfig.json"]
-      }
-    },
-    // same configuration as https://typescript-eslint.io/rules/
-    "rules": {
-      "@typescript-eslint/require-await": "off",
-      "@typescript-eslint/no-unnecessary-type-assertion": "warn",
-      "@typescript-eslint/array-type": ["warn", { "default": "array-simple" }]
-    },
-    "plugins": [
-      "@typescript-eslint" // will enable all implemented @typescript-eslint rules by default
-    ]
-  }
-]
-`
 
 // IsEnabled returns true if the rule is enabled (not "off")
 func (rc *RuleConfig) IsEnabled() bool {
@@ -326,60 +276,6 @@ func parseArrayRuleConfig(ruleArray []interface{}) *RuleConfig {
 
 	// Additional elements are ignored (following ESLint behavior)
 	return ruleConfig
-}
-
-// GetRulesForFile returns enabled rules for a given file based on the configuration
-func (config RslintConfig) GetRulesForFile(filePath string) map[string]*RuleConfig {
-	enabledRules := make(map[string]*RuleConfig)
-
-	for _, entry := range config {
-		// First check if the file should be ignored
-		if isFileIgnored(filePath, entry.Ignores) {
-			continue // Skip this config entry for ignored files
-		}
-
-		// Check if the file matches the files pattern
-		matches := true
-
-		if matches {
-
-			/// Merge rules from plugin
-			for _, plugin := range entry.Plugins {
-
-				for _, rule := range GetAllRulesForPlugin(plugin) {
-					enabledRules[rule.Name] = &RuleConfig{Level: "error"} // Default level for plugin rules
-				}
-			}
-			// Merge rules from this entry
-			for ruleName, ruleValue := range entry.Rules {
-
-				switch v := ruleValue.(type) {
-				case string:
-					// Handle simple string values like "error", "warn", "off"
-					enabledRules[ruleName] = &RuleConfig{Level: v}
-				case map[string]interface{}:
-					// Handle object configuration
-					ruleConfig := &RuleConfig{}
-					if level, ok := v["level"].(string); ok {
-						ruleConfig.Level = level
-					}
-					if options, ok := v["options"].(map[string]interface{}); ok {
-						ruleConfig.Options = options
-					}
-					if ruleConfig.IsEnabled() {
-						enabledRules[ruleName] = ruleConfig
-					}
-				case []interface{}:
-					// Handle array format like ["error", {...options}] or ["warn"] or ["off"]
-					ruleConfig := parseArrayRuleConfig(v)
-					if ruleConfig != nil && ruleConfig.IsEnabled() {
-						enabledRules[ruleName] = ruleConfig
-					}
-				}
-			}
-		}
-	}
-	return enabledRules
 }
 
 func RegisterAllRules() {
@@ -521,7 +417,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-sparse-arrays", no_sparse_arrays.NoSparseArraysRule)
 }
 
-// getAllTypeScriptEslintPluginRules returns all registered rules (for backward compatibility when no config is provided)
+// getAllTypeScriptEslintPluginRules returns all rules from the global registry.
 func getAllTypeScriptEslintPluginRules() []rule.Rule {
 	allRules := GlobalRuleRegistry.GetAllRules()
 	var rules []rule.Rule
@@ -531,12 +427,8 @@ func getAllTypeScriptEslintPluginRules() []rule.Rule {
 	return rules
 }
 
-// isFileIgnored checks if a file should be ignored based on ignore patterns
-func isFileIgnored(filePath string, ignorePatterns []string) bool {
-	// Get current working directory for relative path resolution
-	cwd, err := os.Getwd()
-	if err != nil {
-		// If we can't get cwd, fall back to simple matching
+func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {
+	if cwd == "" {
 		return isFileIgnoredSimple(filePath, ignorePatterns)
 	}
 
@@ -585,19 +477,261 @@ func isFileIgnoredSimple(filePath string, ignorePatterns []string) bool {
 	return false
 }
 
-// initialize a default config in the directory
-func InitDefaultConfig(directory string) error {
-	configPath := filepath.Join(directory, "rslint.jsonc")
+// MergedConfig is the final computed configuration for a single file
+type MergedConfig struct {
+	Rules           map[string]*RuleConfig
+	Settings        Settings
+	LanguageOptions *LanguageOptions
+}
 
-	// if the config exists
-	if _, err := os.Stat(configPath); err == nil {
-		return fmt.Errorf("rslint.json already exists in %s", directory)
+// GetConfigForFile computes the merged configuration for a file following ESLint flat config semantics.
+// Returns nil if the file is globally ignored or no entry matches (should not be linted).
+// Both JS and JSON configs are processed identically here — any differences in default rule
+// behavior are handled during config loading (see normalizeJSONConfig).
+// cwd is the directory the config lives in; file paths are resolved relative to it
+// for files/ignores glob matching.
+func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *MergedConfig {
+	merged := &MergedConfig{
+		Rules: make(map[string]*RuleConfig),
 	}
 
-	// write file content
-	err := os.WriteFile(configPath, []byte(defaultJsonc), 0644)
+	// Track whether any non-global entry matched this file
+	entryMatched := false
+
+	for _, entry := range config {
+		// 1. Global ignores: entry with only ignores means "skip this file entirely"
+		if isGlobalIgnoreEntry(entry) {
+			if isFileIgnored(filePath, entry.Ignores, cwd) {
+				return nil
+			}
+			continue
+		}
+
+		// 2. files matching
+		if len(entry.Files) > 0 && !isFileMatched(filePath, entry.Files, cwd) {
+			continue
+		}
+
+		// 3. Entry-level ignores
+		if isFileIgnored(filePath, entry.Ignores, cwd) {
+			continue
+		}
+
+		entryMatched = true
+
+		// 4. Rules: shallow merge, later entries override earlier ones
+		for ruleName, ruleValue := range entry.Rules {
+			switch v := ruleValue.(type) {
+			case string:
+				merged.Rules[ruleName] = &RuleConfig{Level: v}
+			case []interface{}:
+				if rc := parseArrayRuleConfig(v); rc != nil {
+					merged.Rules[ruleName] = rc
+				}
+			case map[string]interface{}:
+				ruleConfig := &RuleConfig{}
+				if level, ok := v["level"].(string); ok {
+					ruleConfig.Level = level
+				}
+				if options, ok := v["options"].(map[string]interface{}); ok {
+					ruleConfig.Options = options
+				}
+				merged.Rules[ruleName] = ruleConfig
+			}
+		}
+
+		// 5. Settings: shallow merge
+		if entry.Settings != nil {
+			if merged.Settings == nil {
+				merged.Settings = make(Settings)
+			}
+			for k, v := range entry.Settings {
+				merged.Settings[k] = v
+			}
+		}
+
+		// 6. LanguageOptions: deep merge
+		merged.LanguageOptions = mergeLanguageOptions(merged.LanguageOptions, entry.LanguageOptions)
+	}
+
+	// No entry matched this file — do not lint it
+	if !entryMatched {
+		return nil
+	}
+
+	return merged
+}
+
+// isGlobalIgnoreEntry returns true if the entry is a global ignore entry
+// (has only ignores, no other fields).
+func isGlobalIgnoreEntry(entry ConfigEntry) bool {
+	return len(entry.Files) == 0 &&
+		len(entry.Rules) == 0 &&
+		len(entry.Plugins) == 0 &&
+		entry.Settings == nil &&
+		entry.LanguageOptions == nil &&
+		len(entry.Ignores) > 0
+}
+
+// isFileMatched checks if a file matches any of the given glob patterns
+func isFileMatched(filePath string, patterns []string, cwd string) bool {
+	var normalizedPath string
+	if cwd != "" {
+		normalizedPath = normalizePath(filePath, cwd)
+	} else {
+		normalizedPath = filePath
+	}
+
+	for _, pattern := range patterns {
+		if matched, err := doublestar.Match(pattern, normalizedPath); err == nil && matched {
+			return true
+		}
+		if normalizedPath != filePath {
+			if matched, err := doublestar.Match(pattern, filePath); err == nil && matched {
+				return true
+			}
+		}
+		unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
+		if unixPath != normalizedPath {
+			if matched, err := doublestar.Match(pattern, unixPath); err == nil && matched {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// mergeLanguageOptions deep-merges two LanguageOptions, with override taking precedence
+func mergeLanguageOptions(base, override *LanguageOptions) *LanguageOptions {
+	if override == nil {
+		return base
+	}
+	if base == nil {
+		return override
+	}
+	merged := *base
+	if override.ParserOptions != nil {
+		if merged.ParserOptions == nil {
+			merged.ParserOptions = override.ParserOptions
+		} else {
+			po := *merged.ParserOptions
+			if override.ParserOptions.ProjectService != nil {
+				po.ProjectService = override.ParserOptions.ProjectService
+			}
+			if len(override.ParserOptions.Project) > 0 {
+				po.Project = override.ParserOptions.Project
+			}
+			merged.ParserOptions = &po
+		}
+	}
+	return &merged
+}
+
+// GetPluginRules returns only rules under the given plugin namespace (prefix match).
+func GetPluginRules(pluginName string) []rule.Rule {
+	prefix := pluginName + "/"
+	var rules []rule.Rule
+	for name, r := range GlobalRuleRegistry.GetAllRules() {
+		if strings.HasPrefix(name, prefix) {
+			rules = append(rules, r)
+		}
+	}
+	return rules
+}
+
+// GetCoreRules returns core ESLint rules (those without a "/" prefix).
+func GetCoreRules() []rule.Rule {
+	var rules []rule.Rule
+	for name, r := range GlobalRuleRegistry.GetAllRules() {
+		if !strings.Contains(name, "/") {
+			rules = append(rules, r)
+		}
+	}
+	return rules
+}
+
+const defaultTSConfig = `import { defineConfig } from '@rslint/core';
+import configs from '@rslint/core/configs';
+
+export default defineConfig([
+  configs.ts.recommended,
+  {
+    rules: {
+      // customize rules here
+    },
+  },
+]);
+`
+
+const defaultJSConfig = `import { defineConfig } from '@rslint/core';
+import configs from '@rslint/core/configs';
+
+export default defineConfig([
+  configs.js.recommended,
+  {
+    rules: {
+      // customize rules here
+    },
+  },
+]);
+`
+
+// isESMPackage checks if the package.json in the given directory has "type": "module".
+func isESMPackage(directory string) bool {
+	data, err := os.ReadFile(filepath.Join(directory, "package.json"))
 	if err != nil {
-		return fmt.Errorf("failed to create rslint.json: %w", err)
+		return false
+	}
+	var pkg struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(data, &pkg); err != nil {
+		return false
+	}
+	return pkg.Type == "module"
+}
+
+// InitDefaultConfig initializes a default config file in the directory.
+// - If tsconfig.json exists → rslint.config.ts (ESM syntax, handled by TS loaders)
+// - Otherwise, follows the ESLint convention based on package.json "type" field:
+//   - "type": "module" → rslint.config.js  (ESM syntax, .js is ESM in this context)
+//   - no "type": "module" → rslint.config.mjs (ESM syntax, .mjs is always ESM)
+func InitDefaultConfig(directory string) error {
+	allConfigs := []string{
+		"rslint.config.ts", "rslint.config.mts",
+		"rslint.config.js", "rslint.config.mjs",
+		"rslint.json", "rslint.jsonc",
+	}
+	for _, name := range allConfigs {
+		p := filepath.Join(directory, name)
+		if _, err := os.Stat(p); err == nil {
+			return fmt.Errorf("config file already exists: %s", name)
+		}
+	}
+
+	tsconfigPath := filepath.Join(directory, "tsconfig.json")
+	if _, err := os.Stat(tsconfigPath); err == nil {
+		configPath := filepath.Join(directory, "rslint.config.ts")
+		if err := os.WriteFile(configPath, []byte(defaultTSConfig), 0644); err != nil {
+			return fmt.Errorf("failed to create rslint.config.ts: %w", err)
+		}
+		fmt.Println("Created rslint.config.ts with TypeScript recommended config.")
+	} else {
+		// Use .js when the project is ESM ("type": "module" in package.json),
+		// otherwise .mjs to ensure Node.js treats the file as ESM regardless.
+		var configName, content string
+		if isESMPackage(directory) {
+			configName = "rslint.config.js"
+			content = defaultJSConfig
+		} else {
+			configName = "rslint.config.mjs"
+			content = defaultJSConfig
+		}
+		configPath := filepath.Join(directory, configName)
+		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
+			return fmt.Errorf("failed to create %s: %w", configName, err)
+		}
+		fmt.Printf("Created %s with JavaScript recommended config.\n", configName)
 	}
 
 	return nil

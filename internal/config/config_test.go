@@ -100,3 +100,52 @@ func TestParserOptionsUnmarshalJSON(t *testing.T) {
 		})
 	}
 }
+
+func TestParserOptionsProjectServicePtr(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		expectNil     bool
+		expectedValue bool
+	}{
+		{
+			name:      "not set",
+			input:     `{}`,
+			expectNil: true,
+		},
+		{
+			name:          "explicitly true",
+			input:         `{"projectService": true}`,
+			expectNil:     false,
+			expectedValue: true,
+		},
+		{
+			name:          "explicitly false",
+			input:         `{"projectService": false}`,
+			expectNil:     false,
+			expectedValue: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var opts ParserOptions
+			err := json.Unmarshal([]byte(tt.input), &opts)
+			if err != nil {
+				t.Fatalf("Failed to unmarshal: %v", err)
+			}
+			if tt.expectNil {
+				if opts.ProjectService != nil {
+					t.Errorf("Expected ProjectService to be nil, got %v", *opts.ProjectService)
+				}
+			} else {
+				if opts.ProjectService == nil {
+					t.Fatalf("Expected ProjectService to be non-nil")
+				}
+				if *opts.ProjectService != tt.expectedValue {
+					t.Errorf("Expected ProjectService to be %v, got %v", tt.expectedValue, *opts.ProjectService)
+				}
+			}
+		})
+	}
+}
