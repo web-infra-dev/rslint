@@ -124,5 +124,27 @@ type sum = (a: number, b: number) => number;
       errors: [{ messageId: 'exceed' }],
       options: [{ max: 1 }],
     },
+    {
+      code: `
+interface Foo {
+  method(a: number, b: number, c: number, d: number): void;
+}
+      `,
+      errors: [{ messageId: 'exceed' }],
+    },
+    {
+      code: `
+type CallSig = {
+  (a: number, b: number, c: number, d: number): void;
+};
+      `,
+      errors: [{ messageId: 'exceed' }],
+    },
+    {
+      code: `
+type Ctor = new (a: number, b: number, c: number, d: number) => Foo;
+      `,
+      errors: [{ messageId: 'exceed' }],
+    },
   ],
 });
