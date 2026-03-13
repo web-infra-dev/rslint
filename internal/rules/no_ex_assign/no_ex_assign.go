@@ -5,6 +5,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // Message builder
@@ -33,7 +34,9 @@ func collectCatchBindingNamesAndSymbols(name *ast.Node, ctx rule.RuleContext) ([
 			if be == nil || be.Name() == nil {
 				continue
 			}
-			names = append(names, be.Name().Text())
+			utils.CollectBindingNames(be.Name(), func(ident *ast.Node, name string) {
+				names = append(names, name)
+			})
 			symbols = append(symbols, ctx.TypeChecker.GetSymbolAtLocation(be.Name()))
 		}
 		return names, symbols
@@ -78,7 +81,7 @@ func isInDestructuringAssignment(node *ast.Node) bool {
 
 	for parent != nil {
 		if parent.Kind == ast.KindObjectLiteralExpression || parent.Kind == ast.KindArrayLiteralExpression {
-			return true
+			return false
 		}
 		if parent.Kind == ast.KindBinaryExpression {
 			binary := parent.AsBinaryExpression()
@@ -163,7 +166,10 @@ func isWriteReference(node *ast.Node) bool {
 	case ast.KindObjectBindingPattern:
 		return isBindingPatternInAssignment(parent)
 	case ast.KindArrayBindingPattern:
-		return isBindingPatternInAssignment(parent)
+		shorthand := parent.AsShorthandPropertyAssignment()
+		if shorthand != nil && shorthand.Name() == node {
+			return isInDestructuringAssignment(parent)
+		}
 	case ast.KindBindingElement:
 		return isWriteReference(parent)
 	case ast.KindShorthandPropertyAssignment:

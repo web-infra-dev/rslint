@@ -19,6 +19,8 @@ func TestNoExAssignRule(t *testing.T) {
 			{Code: "try { } catch ({e}) { this.something = 2; }"},
 			{Code: "function foo() { try { } catch (e) { return false; } }"},
 			{Code: "try { } catch (e) { let e = 10; e = 10; }"},
+			{Code: "try { } catch (e) { console.log({e}); }"},
+			{Code: "try { } catch (e) { foo({x: e}); }"},
 		},
 		// Invalid cases - ported from ESLint
 		[]rule_tester.InvalidTestCase{
@@ -60,6 +62,30 @@ func TestNoExAssignRule(t *testing.T) {
 			},
 			{
 				Code: "try { } catch (e) { for (e in obj) {} }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 26},
+				},
+			},
+			{
+				Code: "try { } catch (e) { e += 1; }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 21},
+				},
+			},
+			{
+				Code: "try { } catch (e) { e++; }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 21},
+				},
+			},
+			{
+				Code: "try { } catch (e) { --e; }",
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected", Line: 1, Column: 23},
+				},
+			},
+			{
+				Code: "try { } catch (e) { for (e of arr) {} }",
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "unexpected", Line: 1, Column: 26},
 				},
