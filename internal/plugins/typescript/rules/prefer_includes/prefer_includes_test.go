@@ -77,6 +77,15 @@ function f(a: UserDefined): void {
 }`},
 		},
 		{
+			Code: `function f(a: string): void {
+  a.indexOf(b) == -1;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes"}},
+			Output: []string{`function f(a: string): void {
+  !a.includes(b);
+}`},
+		},
+		{
 			Code: `function f(a?: string): void {
   a?.indexOf(b) === -1;
 }`,
@@ -220,6 +229,15 @@ function f(a: string, b: string): void {
 }`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes"}},
 			Output: []string{`function f(a: ReadonlyArray<any>): void {
+  a.includes(b);
+}`},
+		},
+		{
+			Code: `function f(a: Readonly<any[]>): void {
+  a.indexOf(b) !== -1;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes"}},
+			Output: []string{`function f(a: Readonly<any[]>): void {
   a.includes(b);
 }`},
 		},
