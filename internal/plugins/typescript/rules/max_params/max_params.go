@@ -105,10 +105,66 @@ func isVoidThisParameter(param *ast.Node) bool {
 	return decl.Type != nil && decl.Type.Kind == ast.KindVoidKeyword
 }
 
-func buildExceedMessage(count int, maxCount int) rule.RuleMessage {
+func getNamedFunctionLabel(prefix string, nameNode *ast.Node) string {
+	if nameNode != nil && nameNode.Kind == ast.KindIdentifier {
+		return fmt.Sprintf("%s '%s'", prefix, nameNode.AsIdentifier().Text)
+	}
+	return prefix
+}
+
+func getFunctionLabel(node *ast.Node) string {
+	switch node.Kind {
+	case ast.KindFunctionDeclaration:
+		if decl := node.AsFunctionDeclaration(); decl != nil {
+			return getNamedFunctionLabel("Function", decl.Name())
+		}
+		return "Function"
+	case ast.KindFunctionExpression:
+		if expr := node.AsFunctionExpression(); expr != nil {
+			return getNamedFunctionLabel("Function", expr.Name())
+		}
+		return "Function"
+	case ast.KindArrowFunction:
+		return "Arrow function"
+	case ast.KindMethodDeclaration:
+		if decl := node.AsMethodDeclaration(); decl != nil {
+			return getNamedFunctionLabel("Method", decl.Name())
+		}
+		return "Method"
+	case ast.KindMethodSignature:
+		if sig := node.AsMethodSignatureDeclaration(); sig != nil {
+			return getNamedFunctionLabel("Method", sig.Name())
+		}
+		return "Method"
+	case ast.KindConstructor:
+		return "Constructor"
+	case ast.KindGetAccessor:
+		if accessor := node.AsGetAccessorDeclaration(); accessor != nil {
+			return getNamedFunctionLabel("Getter", accessor.Name())
+		}
+		return "Getter"
+	case ast.KindSetAccessor:
+		if accessor := node.AsSetAccessorDeclaration(); accessor != nil {
+			return getNamedFunctionLabel("Setter", accessor.Name())
+		}
+		return "Setter"
+	case ast.KindFunctionType:
+		return "Function type"
+	case ast.KindCallSignature:
+		return "Call signature"
+	case ast.KindConstructSignature:
+		return "Constructor signature"
+	case ast.KindConstructorType:
+		return "Constructor type"
+	default:
+		return "Function"
+	}
+}
+
+func buildExceedMessage(node *ast.Node, count int, maxCount int) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "exceed",
-		Description: fmt.Sprintf("Function has too many parameters (%d). Maximum allowed is %d.", count, maxCount),
+		Description: fmt.Sprintf("%s has too many parameters (%d). Maximum allowed is %d.", getFunctionLabel(node), count, maxCount),
 	}
 }
 
@@ -129,7 +185,7 @@ var MaxParamsRule = rule.CreateRule(rule.Rule{
 			}
 
 			if count > opts.Max {
-				ctx.ReportNode(node, buildExceedMessage(count, opts.Max))
+				ctx.ReportNode(node, buildExceedMessage(node, count, opts.Max))
 			}
 		}
 
