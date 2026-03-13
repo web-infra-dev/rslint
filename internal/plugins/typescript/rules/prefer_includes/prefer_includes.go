@@ -492,10 +492,9 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 				}
 
 				fixes := []rule.RuleFix{}
-				allowFix := isStringLikeFixableType(ctx, argType) &&
-					!hasOptionalChain(access.Expression)
+				allowFix := isStringLikeFixableType(ctx, argType)
 				optChain := "."
-				if call.QuestionDotToken != nil || access.QuestionDotToken != nil {
+				if call.QuestionDotToken != nil || access.QuestionDotToken != nil || hasOptionalChain(access.Expression) {
 					optChain = "?."
 				}
 				if allowFix {

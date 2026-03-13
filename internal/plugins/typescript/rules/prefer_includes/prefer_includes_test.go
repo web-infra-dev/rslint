@@ -102,7 +102,34 @@ function f(a: UserDefined): void {
 		},
 		{
 			Code: `function f(a: string): void {
+  a.indexOf(b) > -1;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes"}},
+			Output: []string{`function f(a: string): void {
+  a.includes(b);
+}`},
+		},
+		{
+			Code: `function f(a: string): void {
+  a.indexOf(b) != -1;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes"}},
+			Output: []string{`function f(a: string): void {
+  a.includes(b);
+}`},
+		},
+		{
+			Code: `function f(a: string): void {
   a.indexOf(b) < 0;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes"}},
+			Output: []string{`function f(a: string): void {
+  !a.includes(b);
+}`},
+		},
+		{
+			Code: `function f(a: string): void {
+  a.indexOf(b) <= -1;
 }`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes"}},
 			Output: []string{`function f(a: string): void {
@@ -149,6 +176,17 @@ function f(a: UserDefined): void {
 		},
 		{
 			Code: `const pattern = /bar/;
+function f(a: string): void {
+  pattern?.test(a);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferStringIncludes"}},
+			Output: []string{`const pattern = /bar/;
+function f(a: string): void {
+  a?.includes('bar');
+}`},
+		},
+		{
+			Code: `const pattern = /bar/;
 function f(a: string, b: string): void {
   pattern.test(a + b);
 }`,
@@ -156,6 +194,51 @@ function f(a: string, b: string): void {
 			Output: []string{`const pattern = /bar/;
 function f(a: string, b: string): void {
   (a + b).includes('bar');
+}`},
+		},
+		{
+			Code: `function f(a: Int32Array): void {
+  a.indexOf(b) !== -1;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes"}},
+			Output: []string{`function f(a: Int32Array): void {
+  a.includes(b);
+}`},
+		},
+		{
+			Code: `function f(a: Float64Array): void {
+  a.indexOf(b) !== -1;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes"}},
+			Output: []string{`function f(a: Float64Array): void {
+  a.includes(b);
+}`},
+		},
+		{
+			Code: `function f(a: ReadonlyArray<any>): void {
+  a.indexOf(b) !== -1;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes"}},
+			Output: []string{`function f(a: ReadonlyArray<any>): void {
+  a.includes(b);
+}`},
+		},
+		{
+			Code: `function f<T>(a: T[] | ReadonlyArray<T>): void {
+  a.indexOf(b) !== -1;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes"}},
+			Output: []string{`function f<T>(a: T[] | ReadonlyArray<T>): void {
+  a.includes(b);
+}`},
+		},
+		{
+			Code: `function f(a: string): void {
+  /\0'\\\n\r\v\t\f/.test(a);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferStringIncludes"}},
+			Output: []string{`function f(a: string): void {
+  a.includes('\0\'\\\n\r\v\t\f');
 }`},
 		},
 	})

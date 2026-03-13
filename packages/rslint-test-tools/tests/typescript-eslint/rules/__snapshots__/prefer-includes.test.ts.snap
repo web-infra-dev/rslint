@@ -693,22 +693,23 @@ exports[`prefer-includes > invalid 20`] = `
 exports[`prefer-includes > invalid 21`] = `
 {
   "code": "
-        function f(a: any[]): void {
-          a.indexOf(b) !== -1;
+        const pattern = /bar/;
+        function f(a: string): void {
+          pattern?.test(a);
         }
       ",
   "diagnostics": [
     {
-      "message": "Use 'includes()' method instead.",
-      "messageId": "preferIncludes",
+      "message": "Use \`String#includes()\` method with a string instead.",
+      "messageId": "preferStringIncludes",
       "range": {
         "end": {
-          "column": 30,
-          "line": 3,
+          "column": 27,
+          "line": 4,
         },
         "start": {
           "column": 11,
-          "line": 3,
+          "line": 4,
         },
       },
       "ruleName": "@typescript-eslint/prefer-includes",
@@ -717,8 +718,9 @@ exports[`prefer-includes > invalid 21`] = `
   "errorCount": 1,
   "fileCount": 1,
   "output": "
-        function f(a: any[]): void {
-          a.includes(b);
+        const pattern = /bar/;
+        function f(a: string): void {
+          a?.includes('bar');
         }
       ",
   "ruleCount": 1,
@@ -728,7 +730,7 @@ exports[`prefer-includes > invalid 21`] = `
 exports[`prefer-includes > invalid 22`] = `
 {
   "code": "
-        function f(a: ReadonlyArray<any>): void {
+        function f(a: any[]): void {
           a.indexOf(b) !== -1;
         }
       ",
@@ -752,7 +754,7 @@ exports[`prefer-includes > invalid 22`] = `
   "errorCount": 1,
   "fileCount": 1,
   "output": "
-        function f(a: ReadonlyArray<any>): void {
+        function f(a: any[]): void {
           a.includes(b);
         }
       ",
@@ -763,7 +765,7 @@ exports[`prefer-includes > invalid 22`] = `
 exports[`prefer-includes > invalid 23`] = `
 {
   "code": "
-        function f(a: Int8Array): void {
+        function f(a: ReadonlyArray<any>): void {
           a.indexOf(b) !== -1;
         }
       ",
@@ -787,7 +789,7 @@ exports[`prefer-includes > invalid 23`] = `
   "errorCount": 1,
   "fileCount": 1,
   "output": "
-        function f(a: Int8Array): void {
+        function f(a: ReadonlyArray<any>): void {
           a.includes(b);
         }
       ",
@@ -798,7 +800,7 @@ exports[`prefer-includes > invalid 23`] = `
 exports[`prefer-includes > invalid 24`] = `
 {
   "code": "
-        function f(a: Int16Array): void {
+        function f(a: Int8Array): void {
           a.indexOf(b) !== -1;
         }
       ",
@@ -822,7 +824,7 @@ exports[`prefer-includes > invalid 24`] = `
   "errorCount": 1,
   "fileCount": 1,
   "output": "
-        function f(a: Int16Array): void {
+        function f(a: Int8Array): void {
           a.includes(b);
         }
       ",
@@ -833,7 +835,7 @@ exports[`prefer-includes > invalid 24`] = `
 exports[`prefer-includes > invalid 25`] = `
 {
   "code": "
-        function f(a: Int32Array): void {
+        function f(a: Int16Array): void {
           a.indexOf(b) !== -1;
         }
       ",
@@ -857,7 +859,7 @@ exports[`prefer-includes > invalid 25`] = `
   "errorCount": 1,
   "fileCount": 1,
   "output": "
-        function f(a: Int32Array): void {
+        function f(a: Int16Array): void {
           a.includes(b);
         }
       ",
@@ -868,7 +870,7 @@ exports[`prefer-includes > invalid 25`] = `
 exports[`prefer-includes > invalid 26`] = `
 {
   "code": "
-        function f(a: Uint8Array): void {
+        function f(a: Int32Array): void {
           a.indexOf(b) !== -1;
         }
       ",
@@ -892,7 +894,7 @@ exports[`prefer-includes > invalid 26`] = `
   "errorCount": 1,
   "fileCount": 1,
   "output": "
-        function f(a: Uint8Array): void {
+        function f(a: Int32Array): void {
           a.includes(b);
         }
       ",
@@ -903,7 +905,7 @@ exports[`prefer-includes > invalid 26`] = `
 exports[`prefer-includes > invalid 27`] = `
 {
   "code": "
-        function f(a: Uint16Array): void {
+        function f(a: Uint8Array): void {
           a.indexOf(b) !== -1;
         }
       ",
@@ -927,7 +929,7 @@ exports[`prefer-includes > invalid 27`] = `
   "errorCount": 1,
   "fileCount": 1,
   "output": "
-        function f(a: Uint16Array): void {
+        function f(a: Uint8Array): void {
           a.includes(b);
         }
       ",
@@ -938,7 +940,7 @@ exports[`prefer-includes > invalid 27`] = `
 exports[`prefer-includes > invalid 28`] = `
 {
   "code": "
-        function f(a: Uint32Array): void {
+        function f(a: Uint16Array): void {
           a.indexOf(b) !== -1;
         }
       ",
@@ -962,7 +964,7 @@ exports[`prefer-includes > invalid 28`] = `
   "errorCount": 1,
   "fileCount": 1,
   "output": "
-        function f(a: Uint32Array): void {
+        function f(a: Uint16Array): void {
           a.includes(b);
         }
       ",
@@ -973,7 +975,7 @@ exports[`prefer-includes > invalid 28`] = `
 exports[`prefer-includes > invalid 29`] = `
 {
   "code": "
-        function f(a: Float32Array): void {
+        function f(a: Uint32Array): void {
           a.indexOf(b) !== -1;
         }
       ",
@@ -997,7 +999,7 @@ exports[`prefer-includes > invalid 29`] = `
   "errorCount": 1,
   "fileCount": 1,
   "output": "
-        function f(a: Float32Array): void {
+        function f(a: Uint32Array): void {
           a.includes(b);
         }
       ",
@@ -1008,7 +1010,7 @@ exports[`prefer-includes > invalid 29`] = `
 exports[`prefer-includes > invalid 30`] = `
 {
   "code": "
-        function f(a: Float64Array): void {
+        function f(a: Float32Array): void {
           a.indexOf(b) !== -1;
         }
       ",
@@ -1032,7 +1034,7 @@ exports[`prefer-includes > invalid 30`] = `
   "errorCount": 1,
   "fileCount": 1,
   "output": "
-        function f(a: Float64Array): void {
+        function f(a: Float32Array): void {
           a.includes(b);
         }
       ",
@@ -1043,7 +1045,7 @@ exports[`prefer-includes > invalid 30`] = `
 exports[`prefer-includes > invalid 31`] = `
 {
   "code": "
-        function f<T>(a: T[] | ReadonlyArray<T>): void {
+        function f(a: Float64Array): void {
           a.indexOf(b) !== -1;
         }
       ",
@@ -1067,7 +1069,7 @@ exports[`prefer-includes > invalid 31`] = `
   "errorCount": 1,
   "fileCount": 1,
   "output": "
-        function f<T>(a: T[] | ReadonlyArray<T>): void {
+        function f(a: Float64Array): void {
           a.includes(b);
         }
       ",
@@ -1078,6 +1080,41 @@ exports[`prefer-includes > invalid 31`] = `
 exports[`prefer-includes > invalid 32`] = `
 {
   "code": "
+        function f<T>(a: T[] | ReadonlyArray<T>): void {
+          a.indexOf(b) !== -1;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "Use 'includes()' method instead.",
+      "messageId": "preferIncludes",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 11,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/prefer-includes",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "output": "
+        function f<T>(a: T[] | ReadonlyArray<T>): void {
+          a.includes(b);
+        }
+      ",
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-includes > invalid 33`] = `
+{
+  "code": "
         function f<
           T,
           U extends
@@ -1136,7 +1173,7 @@ exports[`prefer-includes > invalid 32`] = `
 }
 `;
 
-exports[`prefer-includes > invalid 33`] = `
+exports[`prefer-includes > invalid 34`] = `
 {
   "code": "
         type UserDefined = {
@@ -1179,7 +1216,7 @@ exports[`prefer-includes > invalid 33`] = `
 }
 `;
 
-exports[`prefer-includes > invalid 34`] = `
+exports[`prefer-includes > invalid 35`] = `
 {
   "code": "
         function f(a: Readonly<any[]>): void {
