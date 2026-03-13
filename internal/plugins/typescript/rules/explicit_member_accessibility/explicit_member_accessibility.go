@@ -279,11 +279,7 @@ func isPrivateIdentifierName(nameNode *ast.Node) bool {
 }
 
 func isConstructorParameter(node *ast.Node) bool {
-	if node.Parent != nil && node.Parent.Kind == ast.KindConstructor {
-		return true
-	}
-	parentFunction := utils.GetParentFunctionNode(node)
-	return parentFunction != nil && parentFunction.Kind == ast.KindConstructor
+	return node != nil && node.Parent != nil && node.Parent.Kind == ast.KindConstructor
 }
 
 func isParameterProperty(node *ast.Node) bool {
