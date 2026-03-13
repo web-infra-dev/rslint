@@ -35,13 +35,19 @@ function f(a: UserDefined): void {
 	  /bar/.test(a);
 	}`},
 		{Code: `function f(a: string): void {
-	  let pattern = /foo/;
-	  pattern = /bar/;
-	  pattern.test(a);
-	}`},
+		  let pattern = /foo/;
+		  pattern = /bar/;
+		  pattern.test(a);
+		}`},
+		{Code: `function f(a: string): void {
+		  /bar/y.test(a);
+		}`},
+		{Code: `function f(a: string): void {
+		  /\01/.test(a);
+		}`},
 		{Code: `function f(a: string, undefined: string): void {
-	  new RegExp('bar', undefined).test(a);
-	}`},
+		  new RegExp('bar', undefined).test(a);
+		}`},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: `function f(a: string): void {
@@ -80,39 +86,77 @@ function f(a: UserDefined): void {
 			Code: `function f(a: Uint8Array): void {
   a.indexOf(b) !== -1;
 }`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes", Line: 2, Column: 3}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes"}},
 			Output: []string{`function f(a: Uint8Array): void {
   a.includes(b);
 }`},
 		},
 		{
 			Code: `function f(a: string): void {
+  a.indexOf(b) >= 0x0;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes"}},
+			Output: []string{`function f(a: string): void {
+  a.includes(b);
+}`},
+		},
+		{
+			Code: `function f(a: string): void {
+  a.indexOf(b) < 0;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes"}},
+			Output: []string{`function f(a: string): void {
+  !a.includes(b);
+}`},
+		},
+		{
+			Code: `function f(a: string): void {
   /bar/.test(a);
 }`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferStringIncludes", Line: 2, Column: 3}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferStringIncludes"}},
 			Output: []string{`function f(a: string): void {
   a.includes('bar');
 }`},
 		},
 		{
 			Code: `function f(a: string): void {
-	  new RegExp('bar', undefined).test(a);
-	}`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferStringIncludes", Line: 2, Column: 4}},
+  new RegExp('bar', undefined).test(a);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferStringIncludes"}},
 			Output: []string{`function f(a: string): void {
-	  a.includes('bar');
-	}`},
+  a.includes('bar');
+}`},
 		},
 		{
 			Code: `function f(a: string): void {
-	  const pattern = /bar/;
-	  pattern.test(a);
-	}`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferStringIncludes", Line: 3, Column: 4}},
+  const pattern = /bar/;
+  pattern.test(a);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferStringIncludes"}},
 			Output: []string{`function f(a: string): void {
-	  const pattern = /bar/;
-	  a.includes('bar');
-	}`},
+  const pattern = /bar/;
+  a.includes('bar');
+}`},
+		},
+		{
+			Code: `function f(a: string): void {
+  /bar/u.test(a);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferStringIncludes"}},
+			Output: []string{`function f(a: string): void {
+  a.includes('bar');
+}`},
+		},
+		{
+			Code: `const pattern = /bar/;
+function f(a: string, b: string): void {
+  pattern.test(a + b);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferStringIncludes"}},
+			Output: []string{`const pattern = /bar/;
+function f(a: string, b: string): void {
+  (a + b).includes('bar');
+}`},
 		},
 	})
 }

@@ -83,6 +83,11 @@ ruleTester.run('prefer-includes', {
     `,
     `
       function f(a: string): void {
+        /\\01/.test(a);
+      }
+    `,
+    `
+      function f(a: string): void {
         /foo|bar/.test(a);
       }
     `,
@@ -159,6 +164,19 @@ ruleTester.run('prefer-includes', {
       code: `
         function f(a: string): void {
           a.indexOf(b) >= 0;
+        }
+      `,
+      errors: [{ messageId: 'preferIncludes' }],
+      output: `
+        function f(a: string): void {
+          a.includes(b);
+        }
+      `,
+    },
+    {
+      code: `
+        function f(a: string): void {
+          a.indexOf(b) >= 0x0;
         }
       `,
       errors: [{ messageId: 'preferIncludes' }],
@@ -345,7 +363,19 @@ ruleTester.run('prefer-includes', {
         }
       `,
     },
-
+    {
+      code: `
+        function f(a: string): void {
+          /bar/u.test(a);
+        }
+      `,
+      errors: [{ messageId: 'preferStringIncludes' }],
+      output: `
+        function f(a: string): void {
+          a.includes('bar');
+        }
+      `,
+    },
     // type variation
     {
       code: `

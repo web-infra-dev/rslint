@@ -127,9 +127,13 @@ func extractRegexStaticString(pattern string) (string, bool) {
 			}
 			next := pattern[i+1]
 			switch next {
-			case 'd', 'D', 'w', 'W', 's', 'S', 'b', 'B', 'p', 'P', 'k', 'x', 'u':
+			case 'd', 'D', 'w', 'W', 's', 'S', 'b', 'B', 'p', 'P', 'k', 'x', 'u', 'c',
+				'1', '2', '3', '4', '5', '6', '7', '8', '9':
 				return "", false
 			case '0':
+				if i+2 < len(pattern) && pattern[i+2] >= '0' && pattern[i+2] <= '9' {
+					return "", false
+				}
 				out.WriteByte(0)
 			case 'n':
 				out.WriteByte('\n')
@@ -152,8 +156,26 @@ func extractRegexStaticString(pattern string) (string, bool) {
 	return out.String(), true
 }
 
+func supportsRegexFlags(flags string) bool {
+	seen := map[rune]bool{}
+	for _, flag := range flags {
+		if seen[flag] {
+			return false
+		}
+		seen[flag] = true
+		switch flag {
+		case 'd', 'm', 's', 'u', 'v':
+		case 'i', 'g', 'y':
+			return false
+		default:
+			return false
+		}
+	}
+	return true
+}
+
 func parseRegexPattern(pattern, flags string) (string, bool) {
-	if flags != "" {
+	if !supportsRegexFlags(flags) {
 		return "", false
 	}
 	return extractRegexStaticString(pattern)
@@ -211,6 +233,10 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 			return sf.Text()[rng.Pos():rng.End()]
 		}
 
+		parseNumericLiteralText := func(text string) (int64, error) {
+			return strconv.ParseInt(strings.ReplaceAll(text, "_", ""), 0, 64)
+		}
+
 		isNumber := func(node *ast.Node, value int) bool {
 			if node == nil {
 				return false
@@ -220,13 +246,13 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 				pref := node.AsPrefixUnaryExpression()
 				if pref != nil && pref.Operator == ast.KindMinusToken {
 					if ast.IsNumericLiteral(pref.Operand) {
-						v, err := strconv.Atoi(pref.Operand.AsNumericLiteral().Text)
-						return err == nil && -v == value
+						v, err := parseNumericLiteralText(pref.Operand.AsNumericLiteral().Text)
+						return err == nil && -v == int64(value)
 					}
 				}
 			case ast.KindNumericLiteral:
-				v, err := strconv.Atoi(node.AsNumericLiteral().Text)
-				return err == nil && v == value
+				v, err := parseNumericLiteralText(node.AsNumericLiteral().Text)
+				return err == nil && v == int64(value)
 			}
 			return false
 		}
@@ -467,17 +493,22 @@ var PreferIncludesRule = rule.CreateRule(rule.Rule{
 
 				fixes := []rule.RuleFix{}
 				allowFix := isStringLikeFixableType(ctx, argType) &&
-					access.QuestionDotToken == nil &&
 					!hasOptionalChain(access.Expression)
+				optChain := "."
+				if call.QuestionDotToken != nil || access.QuestionDotToken != nil {
+					optChain = "?."
+				}
 				if allowFix {
+					insertAfterText := optChain + "includes(" + escapeForSingleQuotedString(text) + ")"
 					fixes = append(fixes,
 						rule.RuleFixRemoveRange(core.NewTextRange(callRange.Pos(), argRange.Pos())),
 						rule.RuleFixRemoveRange(core.NewTextRange(argRange.End(), callRange.End())),
-						rule.RuleFixInsertAfter(arg, ".includes("+escapeForSingleQuotedString(text)+")"),
 					)
 					if needsParentheses(arg) {
 						fixes = append(fixes, rule.RuleFixInsertBefore(ctx.SourceFile, arg, "("))
-						fixes = append(fixes, rule.RuleFixInsertAfter(arg, ")"))
+						fixes = append(fixes, rule.RuleFixInsertAfter(arg, ")"+insertAfterText))
+					} else {
+						fixes = append(fixes, rule.RuleFixInsertAfter(arg, insertAfterText))
 					}
 				}
 
