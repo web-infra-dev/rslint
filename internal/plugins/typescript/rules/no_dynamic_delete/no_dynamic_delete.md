@@ -10,6 +10,7 @@ Examples of **incorrect** code for this rule:
 const container: { [i: string]: 0 } = {};
 delete container[name];
 delete container['aa' + 'b'];
+delete container[`name`];
 ```
 
 Examples of **correct** code for this rule:
