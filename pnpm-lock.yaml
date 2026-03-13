@@ -101,8 +101,8 @@ importers:
   packages/rslint-api:
     devDependencies:
       '@rslib/core':
-        specifier: 0.18.0
-        version: 0.18.0(@microsoft/api-extractor@7.57.4(@types/node@24.3.0))(@typescript/native-preview@7.0.0-dev.20250904.1)(typescript@5.9.3)
+        specifier: 0.20.0
+        version: 0.20.0(@microsoft/api-extractor@7.57.4(@types/node@24.3.0))(@typescript/native-preview@7.0.0-dev.20250904.1)(core-js@3.47.0)(typescript@5.9.3)
       '@types/node':
         specifier: 24.3.0
         version: 24.3.0
@@ -1513,9 +1513,9 @@ packages:
     peerDependencies:
       '@rsbuild/core': ^1.3.0 || ^2.0.0-0
 
-  '@rslib/core@0.18.0':
-    resolution: {integrity: sha512-ZLonxKnef5Hx4zZj2ZckicVnM0KwTP9x8XcNnZBuXo82maXVmSSERtvMrB7aufxlFjqEThOHG6RNuLZToM1eFQ==}
-    engines: {node: '>=18.12.0'}
+  '@rslib/core@0.20.0':
+    resolution: {integrity: sha512-hsRwjMbBla8lyKIVR0gFsK5M3j+LSbFOTafvbT0QR90ehZXwlu+EhpHJv8v/uIRT50RVlgCrcT+LCVr1oU3pbA==}
+    engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
     peerDependencies:
       '@microsoft/api-extractor': ^7
@@ -1854,9 +1854,6 @@ packages:
   '@sindresorhus/merge-streams@2.3.0':
     resolution: {integrity: sha512-LtoMMhxAlorcGhmFYI+LhPgbPZCkgP6ra1YL604EeF6U98pLlQ3iWIGMdWSC+vWmPBWBNgmDBAhnAobLROJmwg==}
     engines: {node: '>=18'}
-
-  '@swc/helpers@0.5.17':
-    resolution: {integrity: sha512-5IKx/Y13RsYd+sauPb2x+U/xZikHjolzfuDgTAl/Tdf3Q8rslRvC19NKDLgAJQ6wsqADk10ntlv08nPFw/gO/A==}
 
   '@swc/helpers@0.5.19':
     resolution: {integrity: sha512-QamiFeIK3txNjgUTNppE6MiG3p7TdninpZu0E0PbqVh1a9FNLT2FRhisaa4NcaX52XVhA5l7Pk58Ft7Sqi/2sA==}
@@ -4315,12 +4312,12 @@ packages:
     engines: {node: '>=18.0.0', npm: '>=8.0.0'}
     hasBin: true
 
-  rsbuild-plugin-dts@0.18.0:
-    resolution: {integrity: sha512-GzzcnYDoILabBddQH5wMQK93peZbHXnoF9wtFz0INRotAS2xIwBb1rIeFRpfn/fgXfSlFu4C8QbqD6U8PgXzJA==}
-    engines: {node: '>=18.12.0'}
+  rsbuild-plugin-dts@0.20.0:
+    resolution: {integrity: sha512-CnTJTB59zzQFjPVEjpOaaEw5BeK/eTY6kwt4l5Lr9d3HQk3VRDSKfLWY/hpeZMbZzpCk2TqLrqIhS6a+jg7k7g==}
+    engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
       '@microsoft/api-extractor': ^7
-      '@rsbuild/core': 1.x
+      '@rsbuild/core': ^1.0.0 || ^2.0.0-0
       '@typescript/native-preview': 7.x
       typescript: ^5
     peerDependenciesMeta:
@@ -5380,7 +5377,7 @@ snapshots:
   '@eslint/config-array@0.21.0':
     dependencies:
       '@eslint/object-schema': 2.1.6
-      debug: 4.4.1(supports-color@8.1.1)
+      debug: 4.4.3
       minimatch: 3.1.2
     transitivePeerDependencies:
       - supports-color
@@ -5394,7 +5391,7 @@ snapshots:
   '@eslint/eslintrc@3.3.1':
     dependencies:
       ajv: 6.12.6
-      debug: 4.4.1(supports-color@8.1.1)
+      debug: 4.4.3
       espree: 10.4.0
       globals: 14.0.0
       ignore: 5.3.2
@@ -6109,9 +6106,9 @@ snapshots:
 
   '@rsbuild/core@1.6.6':
     dependencies:
-      '@rspack/core': 1.6.3(@swc/helpers@0.5.17)
+      '@rspack/core': 1.6.3(@swc/helpers@0.5.19)
       '@rspack/lite-tapable': 1.1.0
-      '@swc/helpers': 0.5.17
+      '@swc/helpers': 0.5.19
       core-js: 3.46.0
       jiti: 2.6.1
 
@@ -6141,15 +6138,17 @@ snapshots:
       reduce-configs: 1.1.1
       sass-embedded: 1.97.3
 
-  '@rslib/core@0.18.0(@microsoft/api-extractor@7.57.4(@types/node@24.3.0))(@typescript/native-preview@7.0.0-dev.20250904.1)(typescript@5.9.3)':
+  '@rslib/core@0.20.0(@microsoft/api-extractor@7.57.4(@types/node@24.3.0))(@typescript/native-preview@7.0.0-dev.20250904.1)(core-js@3.47.0)(typescript@5.9.3)':
     dependencies:
-      '@rsbuild/core': 1.6.6
-      rsbuild-plugin-dts: 0.18.0(@microsoft/api-extractor@7.57.4(@types/node@24.3.0))(@rsbuild/core@1.6.6)(@typescript/native-preview@7.0.0-dev.20250904.1)(typescript@5.9.3)
+      '@rsbuild/core': 2.0.0-beta.8(core-js@3.47.0)
+      rsbuild-plugin-dts: 0.20.0(@microsoft/api-extractor@7.57.4(@types/node@24.3.0))(@rsbuild/core@2.0.0-beta.8(core-js@3.47.0))(@typescript/native-preview@7.0.0-dev.20250904.1)(typescript@5.9.3)
     optionalDependencies:
       '@microsoft/api-extractor': 7.57.4(@types/node@24.3.0)
       typescript: 5.9.3
     transitivePeerDependencies:
+      - '@module-federation/runtime-tools'
       - '@typescript/native-preview'
+      - core-js
 
   '@rspack/binding-darwin-arm64@1.6.3':
     optional: true
@@ -6241,13 +6240,13 @@ snapshots:
       '@rspack/binding-win32-ia32-msvc': 2.0.0-beta.6
       '@rspack/binding-win32-x64-msvc': 2.0.0-beta.6
 
-  '@rspack/core@1.6.3(@swc/helpers@0.5.17)':
+  '@rspack/core@1.6.3(@swc/helpers@0.5.19)':
     dependencies:
       '@module-federation/runtime-tools': 0.21.4
       '@rspack/binding': 1.6.3
       '@rspack/lite-tapable': 1.1.0
     optionalDependencies:
-      '@swc/helpers': 0.5.17
+      '@swc/helpers': 0.5.19
 
   '@rspack/core@2.0.0-beta.6(@swc/helpers@0.5.19)':
     dependencies:
@@ -6552,10 +6551,6 @@ snapshots:
   '@shikijs/vscode-textmate@10.0.2': {}
 
   '@sindresorhus/merge-streams@2.3.0': {}
-
-  '@swc/helpers@0.5.17':
-    dependencies:
-      tslib: 2.8.1
 
   '@swc/helpers@0.5.19':
     dependencies:
@@ -7547,7 +7542,7 @@ snapshots:
       ajv: 6.12.6
       chalk: 4.1.2
       cross-spawn: 7.0.6
-      debug: 4.4.1(supports-color@8.1.1)
+      debug: 4.4.3
       escape-string-regexp: 4.0.0
       eslint-scope: 8.4.0
       eslint-visitor-keys: 4.2.1
@@ -9531,10 +9526,10 @@ snapshots:
       '@rollup/rollup-win32-x64-msvc': 4.53.3
       fsevents: 2.3.3
 
-  rsbuild-plugin-dts@0.18.0(@microsoft/api-extractor@7.57.4(@types/node@24.3.0))(@rsbuild/core@1.6.6)(@typescript/native-preview@7.0.0-dev.20250904.1)(typescript@5.9.3):
+  rsbuild-plugin-dts@0.20.0(@microsoft/api-extractor@7.57.4(@types/node@24.3.0))(@rsbuild/core@2.0.0-beta.8(core-js@3.47.0))(@typescript/native-preview@7.0.0-dev.20250904.1)(typescript@5.9.3):
     dependencies:
       '@ast-grep/napi': 0.37.0
-      '@rsbuild/core': 1.6.6
+      '@rsbuild/core': 2.0.0-beta.8(core-js@3.47.0)
     optionalDependencies:
       '@microsoft/api-extractor': 7.57.4(@types/node@24.3.0)
       '@typescript/native-preview': 7.0.0-dev.20250904.1
