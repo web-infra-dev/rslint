@@ -87,7 +87,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		configLanguageOptions := &rslintconfig.LanguageOptions{}
 		if req.LanguageOptions.ParserOptions != nil {
 			configLanguageOptions.ParserOptions = &rslintconfig.ParserOptions{
-				ProjectService: req.LanguageOptions.ParserOptions.ProjectService,
+				ProjectService: rslintconfig.BoolPtr(req.LanguageOptions.ParserOptions.ProjectService),
 				Project:        rslintconfig.ProjectPaths(req.LanguageOptions.ParserOptions.Project),
 			}
 		}
