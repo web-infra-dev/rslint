@@ -77,16 +77,13 @@ func buildNotInitializedMessage(name string) rule.RuleMessage {
 }
 
 func getDeclarationNameText(sourceFile *ast.SourceFile, name *ast.Node) string {
-	if name == nil || sourceFile == nil {
+	if name == nil || sourceFile == nil || name.Kind != ast.KindIdentifier {
 		return ""
 	}
-	if name.Kind == ast.KindIdentifier {
-		if id := name.AsIdentifier(); id != nil {
-			return id.Text
-		}
+	if id := name.AsIdentifier(); id != nil {
+		return id.Text
 	}
-	nameRange := utils.TrimNodeTextRange(sourceFile, name)
-	return sourceFile.Text()[nameRange.Pos():nameRange.End()]
+	return ""
 }
 
 func isConstDeclaration(varDecl *ast.VariableDeclaration) bool {
