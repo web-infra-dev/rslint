@@ -12,6 +12,7 @@ func TestInitDeclarationsRule(t *testing.T) {
 		{Code: "var foo = null;"},
 		{Code: "for (var i = 0; i < 1; i++) {}"},
 		{Code: "for (var foo in []) {}"},
+		{Code: "for (var foo of []) {}"},
 		{Code: "let a = true;", Options: []interface{}{"always"}},
 		{Code: "var foo;", Options: []interface{}{"never"}},
 		{Code: "const foo = 1;", Options: []interface{}{"never"}},
@@ -21,6 +22,10 @@ func TestInitDeclarationsRule(t *testing.T) {
 		},
 		{
 			Code:    "for (var foo in []) {}",
+			Options: []interface{}{"never", map[string]interface{}{"ignoreForLoopInit": true}},
+		},
+		{
+			Code:    "for (var foo of []) {}",
 			Options: []interface{}{"never", map[string]interface{}{"ignoreForLoopInit": true}},
 		},
 		{
@@ -44,6 +49,19 @@ declare namespace myLib {
 		{
 			Code:    "var foo;",
 			Options: []interface{}{"always"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "initialized",
+					Line:      1,
+					Column:    5,
+					EndLine:   1,
+					EndColumn: 8,
+				},
+			},
+		},
+		{
+			Code:    "var foo;",
+			Options: []interface{}{"invalid-mode"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "initialized",
@@ -90,6 +108,15 @@ declare namespace myLib {
 		},
 		{
 			Code:    "for (var foo in []) {}",
+			Options: []interface{}{"never"},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "notInitialized",
+				},
+			},
+		},
+		{
+			Code:    "for (var foo of []) {}",
 			Options: []interface{}{"never"},
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
