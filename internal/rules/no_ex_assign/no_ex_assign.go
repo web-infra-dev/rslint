@@ -166,14 +166,14 @@ func isWriteReference(node *ast.Node) bool {
 	case ast.KindObjectBindingPattern:
 		return isBindingPatternInAssignment(parent)
 	case ast.KindArrayBindingPattern:
+		return isBindingPatternInAssignment(parent)
+	case ast.KindBindingElement:
+		return isWriteReference(parent)
+	case ast.KindShorthandPropertyAssignment:
 		shorthand := parent.AsShorthandPropertyAssignment()
 		if shorthand != nil && shorthand.Name() == node {
 			return isInDestructuringAssignment(parent)
 		}
-	case ast.KindBindingElement:
-		return isWriteReference(parent)
-	case ast.KindShorthandPropertyAssignment:
-		return isInDestructuringAssignment(parent)
 	case ast.KindPropertyAssignment:
 		return isInDestructuringAssignment(parent)
 	case ast.KindObjectLiteralExpression:
