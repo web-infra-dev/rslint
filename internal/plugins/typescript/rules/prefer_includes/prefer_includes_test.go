@@ -31,6 +31,20 @@ function f(a: UserDefined): void {
 function f(a: UserDefined): void {
   a.indexOf(b) !== -1;
 }`},
+		{Code: `type UserDefined = {
+  indexOf(x: any, fromIndex?: number): number;
+  includes(x: any, fromIndex: number): boolean;
+};
+function f(a: UserDefined): void {
+  a.indexOf(b) !== -1;
+}`},
+		{Code: `type UserDefined = {
+  indexOf(x: any, fromIndex?: number): number;
+  includes: boolean;
+};
+function f(a: UserDefined): void {
+  a.indexOf(b) !== -1;
+}`},
 		{Code: `function f(a?: string): void {
 	  /bar/.test(a);
 	}`},
@@ -90,6 +104,18 @@ function f(a: UserDefined): void {
   a?.indexOf(b) === -1;
 }`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes", Line: 2, Column: 3}},
+		},
+		{
+			Code: `function f(a?: string): void {
+  a?.indexOf(b) !== -1;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes"}},
+		},
+		{
+			Code: `function f(a?: { b: string[] }, c: string): void {
+  a?.b.indexOf(c) === -1;
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferIncludes"}},
 		},
 		{
 			Code: `function f(a: Uint8Array): void {
@@ -153,6 +179,12 @@ function f(a: UserDefined): void {
 			Output: []string{`function f(a: string): void {
   a.includes('bar');
 }`},
+		},
+		{
+			Code: `function f(a: string[]): void {
+  /bar/.test(a);
+}`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "preferStringIncludes"}},
 		},
 		{
 			Code: `function f(a: string): void {
