@@ -3,10 +3,13 @@ package lsp
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	"github.com/web-infra-dev/rslint/internal/config"
 )
 
@@ -136,7 +139,7 @@ func TestHandleDidChangeWatchedFiles_ConfigDeleted(t *testing.T) {
 	s.fs = &mockFS{files: map[string]bool{}} // empty — config file doesn't exist
 	s.cwd = "/project"
 	s.rslintConfigPath = "/project/rslint.json"
-	s.rslintConfig = config.RslintConfig{{}} // non-empty config
+	s.jsonConfig = config.RslintConfig{{}} // non-empty config
 	ctx := context.Background()
 
 	err := s.handleDidChangeWatchedFiles(ctx, &lsproto.DidChangeWatchedFilesParams{
@@ -152,8 +155,8 @@ func TestHandleDidChangeWatchedFiles_ConfigDeleted(t *testing.T) {
 	if s.rslintConfigPath != "" {
 		t.Errorf("rslintConfigPath should be empty after config deletion, got %q", s.rslintConfigPath)
 	}
-	if len(s.rslintConfig) != 0 {
-		t.Errorf("rslintConfig should be empty after config deletion, got %d entries", len(s.rslintConfig))
+	if len(s.jsonConfig) != 0 {
+		t.Errorf("rslintConfig should be empty after config deletion, got %d entries", len(s.jsonConfig))
 	}
 }
 
@@ -162,7 +165,7 @@ func TestHandleDidChangeWatchedFiles_MixedConfigAndNonConfig(t *testing.T) {
 	s.fs = &mockFS{files: map[string]bool{}}
 	s.cwd = "/project"
 	s.rslintConfigPath = "/project/rslint.json"
-	s.rslintConfig = config.RslintConfig{{}}
+	s.jsonConfig = config.RslintConfig{{}}
 	ctx := context.Background()
 
 	// A batch containing both non-config and config changes
@@ -233,7 +236,7 @@ func TestHandleDidChangeWatchedFiles_AllChangeTypes(t *testing.T) {
 			s.fs = &mockFS{files: map[string]bool{}}
 			s.cwd = "/project"
 			s.rslintConfigPath = "/project/rslint.json"
-			s.rslintConfig = config.RslintConfig{{}}
+			s.jsonConfig = config.RslintConfig{{}}
 			ctx := context.Background()
 
 			err := s.handleDidChangeWatchedFiles(ctx, &lsproto.DidChangeWatchedFilesParams{
@@ -332,6 +335,32 @@ func TestRefreshDiagnostics_MultipleCalls(t *testing.T) {
 
 // ======== reloadConfigAndRelint tests ========
 
+// TestReloadConfig_NoTsConfigsIsAccepted verifies that a JSON config without
+// parserOptions.project is accepted by the LSP (no "no TypeScript configurations" error).
+// The LSP session discovers tsconfig files on its own via projectService.
+func TestReloadConfig_NoTsConfigsIsAccepted(t *testing.T) {
+	dir := t.TempDir()
+	// JSON config with rules but no parserOptions.project → zero tsconfigs
+	configContent := `[{"rules": {"no-console": "error"}}]`
+	if err := os.WriteFile(filepath.Join(dir, "rslint.json"), []byte(configContent), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	s := newTestServer()
+	s.fs = osvfs.FS()
+	s.cwd = dir
+	s.rslintConfigPath = filepath.Join(dir, "rslint.json")
+
+	config.RegisterAllRules()
+	err := s.reloadConfig()
+	if err != nil {
+		t.Fatalf("reloadConfig should accept config without tsconfigs, got error: %v", err)
+	}
+	if len(s.jsonConfig) != 1 {
+		t.Errorf("expected 1 config entry, got %d", len(s.jsonConfig))
+	}
+}
+
 func TestReloadConfigAndRelint_RelintOpenDocuments(t *testing.T) {
 	s := newTestServer()
 	s.fs = &mockFS{files: map[string]bool{}}
@@ -355,15 +384,15 @@ func TestReloadConfigAndRelint_ConfigCleared(t *testing.T) {
 	s.fs = &mockFS{files: map[string]bool{}}
 	s.cwd = "/project"
 	s.rslintConfigPath = "/project/rslint.json"
-	s.rslintConfig = config.RslintConfig{{}}
+	s.jsonConfig = config.RslintConfig{{}}
 
 	s.reloadConfigAndRelint()
 
 	if s.rslintConfigPath != "" {
 		t.Errorf("expected config path cleared, got %q", s.rslintConfigPath)
 	}
-	if len(s.rslintConfig) != 0 {
-		t.Errorf("expected empty config, got %d entries", len(s.rslintConfig))
+	if len(s.jsonConfig) != 0 {
+		t.Errorf("expected empty config, got %d entries", len(s.jsonConfig))
 	}
 }
 
@@ -454,6 +483,93 @@ func TestHandleInitialized_WatchDisabledWhenCapabilitiesNil(t *testing.T) {
 
 	if s.watchEnabled {
 		t.Error("watchEnabled should be false when capabilities are nil")
+	}
+}
+
+// ======== isBlockingMethod tests ========
+
+func TestIsBlockingMethod_ConfigUpdate(t *testing.T) {
+	if !isBlockingMethod(lsproto.Method("rslint/configUpdate")) {
+		t.Error("rslint/configUpdate must be a blocking method to avoid data races on jsConfigs")
+	}
+}
+
+func TestIsBlockingMethod_CodeAction(t *testing.T) {
+	if !isBlockingMethod(lsproto.MethodTextDocumentCodeAction) {
+		t.Error("textDocument/codeAction must be a blocking method to avoid data races on s.diagnostics")
+	}
+}
+
+// TestDispatchLoop_ConfigUpdateBeforeDidOpen verifies that when a configUpdate
+// notification and a didOpen notification are queued sequentially, the dispatch
+// loop processes configUpdate first (both are blocking), so didOpen sees the
+// updated jsConfigs.
+func TestDispatchLoop_ConfigUpdateBeforeDidOpen(t *testing.T) {
+	s, _ := newTestServerWithQueue()
+	s.requestQueue = make(chan *lsproto.RequestMessage, 10)
+
+	// Build a configUpdate notification with a test config
+	configPayload := map[string]any{
+		"configs": []map[string]any{
+			{
+				"configDirectory": "file:///project",
+				"entries": []map[string]any{
+					{
+						"files": []string{"**/*.ts"},
+						"rules": map[string]string{"no-console": "error"},
+					},
+				},
+			},
+		},
+	}
+	configReq := &lsproto.RequestMessage{
+		Method: lsproto.Method("rslint/configUpdate"),
+		Params: configPayload,
+	}
+
+	// Build a didOpen notification as a sentinel — once it's processed,
+	// we know all prior blocking messages have completed.
+	openReq := &lsproto.RequestMessage{
+		Method: lsproto.MethodTextDocumentDidOpen,
+		Params: &lsproto.DidOpenTextDocumentParams{
+			TextDocument: &lsproto.TextDocumentItem{
+				Uri:     "file:///project/test.ts",
+				Text:    "const x = 1;",
+				Version: 1,
+			},
+		},
+	}
+
+	// Queue both messages before starting the loop
+	s.requestQueue <- configReq
+	s.requestQueue <- openReq
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- s.dispatchLoop(ctx)
+	}()
+
+	// Wait for both messages to be processed, then cancel
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+	<-done
+
+	// Verify configUpdate was applied before didOpen ran
+	if len(s.jsConfigs) == 0 {
+		t.Fatal("jsConfigs should have been populated by configUpdate before didOpen")
+	}
+	cfg, ok := s.jsConfigs["file:///project"]
+	if !ok {
+		t.Fatal("jsConfigs missing 'file:///project' key")
+	}
+	if len(cfg) == 0 {
+		t.Fatal("config entries should not be empty")
+	}
+
+	// Verify didOpen also ran (the sentinel)
+	if _, ok := s.documents["file:///project/test.ts"]; !ok {
+		t.Fatal("didOpen should have stored the document")
 	}
 }
 

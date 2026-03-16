@@ -152,6 +152,7 @@ shadcn
 Nullishness
 constantness
 testdata
+textnodes
 Metas
 Reparsed
 tmpl
@@ -171,7 +172,11 @@ keygen
 lifecycles
 multilines
 nbsp
+noconfig
+nonconstructor
+nonoctal
 relint
 relinting
 relints
+stdjson
 tsconfiga
