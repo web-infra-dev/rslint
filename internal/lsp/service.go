@@ -2,23 +2,24 @@ package lsp
 
 import (
 	"context"
-	"errors"
+	stdjson "encoding/json"
 	"fmt"
 	"io"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/scanner"
-
 	"github.com/microsoft/typescript-go/shim/vfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
@@ -95,40 +96,78 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 		Logger:     project.NewLogger(io.Discard),
 		ParseCache: s.parseCache,
 	})
-	// Try to find rslint configuration files with multiple strategies
-	var rslintConfigPath string
-	var configFound bool
 
-	// Use helper function to find config
-	rslintConfigPath, configFound = findRslintConfig(s.fs, s.cwd)
+	// Register all rules before loading config so that normalizeJSONConfig
+	// can inject default core/plugin rules into the registry.
+	config.RegisterAllRules()
 
-	if !configFound {
-		return nil
-	}
-
-	s.rslintConfigPath = rslintConfigPath
-	if err := s.reloadConfig(); err != nil {
-		return err
+	// Try to load JSON config as fallback.
+	// If JS/TS configs exist, the VS Code extension will send them via
+	// rslint/configUpdate notification, which takes priority per-file.
+	rslintConfigPath, configFound := findRslintConfig(s.fs, s.cwd)
+	if configFound {
+		s.rslintConfigPath = rslintConfigPath
+		if err := s.reloadConfig(); err != nil {
+			return err
+		}
 	}
 
 	return nil
 }
 
-// reloadConfig loads (or reloads) the rslint configuration from s.rslintConfigPath.
+// reloadConfig loads (or reloads) the rslint JSON configuration from s.rslintConfigPath.
+// Unlike the CLI, the LSP does not need tsConfigs here — the session discovers
+// tsconfig files on its own via projectService.
 func (s *Server) reloadConfig() error {
 	loader := config.NewConfigLoader(s.fs, s.cwd)
-	rslintConfig, configDirectory, err := loader.LoadRslintConfig(s.rslintConfigPath)
+	rslintConfig, _, err := loader.LoadRslintConfig(s.rslintConfigPath)
 	if err != nil {
 		return fmt.Errorf("could not load rslint config: %w", err)
 	}
-	s.rslintConfig = rslintConfig
-	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, configDirectory)
+	s.jsonConfig = rslintConfig
+	return nil
+}
+
+func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
+	// params is raw JSON from the custom notification
+	data, err := stdjson.Marshal(params)
 	if err != nil {
-		return fmt.Errorf("could not load TypeScript configs from rslint config: %w", err)
+		return fmt.Errorf("failed to marshal config update params: %w", err)
 	}
 
-	if len(tsConfigs) == 0 {
-		return errors.New("no TypeScript configurations found in rslint config")
+	var payload struct {
+		Configs []struct {
+			ConfigDirectory string              `json:"configDirectory"`
+			Entries         config.RslintConfig `json:"entries"`
+		} `json:"configs"`
+	}
+	if err := stdjson.Unmarshal(data, &payload); err != nil {
+		return fmt.Errorf("failed to parse config update: %w", err)
+	}
+
+	// Distinguish nil (malformed/missing "configs" field) from an explicitly
+	// empty array (all JS configs were deleted — legitimate clear signal).
+	// Go JSON: {"configs":[]} → non-nil empty slice; null/{}/missing → nil.
+	if payload.Configs == nil {
+		log.Printf("[rslint] Config update has no configs field; keeping existing JS configs intact")
+		return nil
+	}
+
+	// Replace all JS configs with the new set (may be empty when all deleted).
+	// Keys are URI strings (e.g. "file:///project") sent from VS Code,
+	// matching the URI format used throughout the LSP protocol.
+	s.jsConfigs = make(map[string]config.RslintConfig, len(payload.Configs))
+	for _, cfg := range payload.Configs {
+		s.jsConfigs[cfg.ConfigDirectory] = cfg.Entries
+	}
+	// Clear the JSON config path so that a subsequent JSON file-watcher event
+	// does not silently overwrite the JS/TS configs.
+	s.rslintConfigPath = ""
+	log.Printf("[rslint] Config updated from JS/TS configs (%d config files)", len(payload.Configs))
+
+	// Ask the client to re-pull diagnostics with the updated config.
+	if err := s.RefreshDiagnostics(ctx); err != nil {
+		log.Printf("[rslint] Failed to refresh diagnostics after config update: %v", err)
 	}
 
 	return nil
@@ -172,7 +211,7 @@ func (s *Server) reloadConfigAndRelint() {
 	configPath, found := findRslintConfig(s.fs, s.cwd)
 	if !found {
 		log.Printf("rslint config file no longer exists, clearing config")
-		s.rslintConfig = config.RslintConfig{}
+		s.jsonConfig = config.RslintConfig{}
 		s.rslintConfigPath = ""
 	} else {
 		s.rslintConfigPath = configPath
@@ -186,6 +225,7 @@ func (s *Server) reloadConfigAndRelint() {
 		s.pushDiagnostics(uri)
 	}
 }
+
 // lintDebounceDelay is how long to wait after the last keystroke before
 // running the linter. This avoids linting on every keystroke against
 // incomplete/broken syntax that can cause panics or waste CPU.
@@ -369,15 +409,27 @@ func isTypeScriptFile(uri string) bool {
 }
 
 func uriToPath(uri lsproto.DocumentUri) string {
-	// Convert file:// URI to file path
+	// Convert file:// URI to file path using net/url for proper percent-decoding.
+	// Handles spaces (%20), CJK characters, and other encoded chars in paths.
+	// file:///home/user       → /home/user  (Unix)
+	// file:///C:/Users        → C:/Users    (Windows — strip the leading slash)
+	// file:///path%20name/f   → /path name/f
 	uriStr := string(uri)
-	if strings.HasPrefix(uriStr, "file://") {
-		return strings.TrimPrefix(uriStr, "file://")
+	if uriStr == "" {
+		return ""
 	}
-	return uriStr
+	u, err := url.ParseRequestURI(uriStr)
+	if err != nil {
+		return uriStr // fallback: return as-is for non-URI strings
+	}
+	p := u.Path
+	// Windows drive letter: /C:/... → C:/...
+	if len(p) >= 3 && p[0] == '/' && unicode.IsLetter(rune(p[1])) && p[2] == ':' {
+		return p[1:]
+	}
+	return p
 }
 
-// findRslintConfig searches for rslint configuration files using multiple strategies
 func findRslintConfig(fs vfs.FS, workingDir string) (string, bool) {
 	defaultConfigs := []string{"rslint.json", "rslint.jsonc"}
 
@@ -399,7 +451,7 @@ type LintResponse struct {
 	RuleCount   int                  `json:"ruleCount"`
 }
 
-func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig) ([]rule.RuleDiagnostic, error) {
+func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string) ([]rule.RuleDiagnostic, error) {
 	filename := uriToPath(uri)
 
 	// GetLanguageService flushes any pending changes (from DidChangeFile) and
@@ -422,7 +474,7 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 
 	linter.RunLinterInProgram(program, []string{filename}, util.ExcludePaths,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			activeRules := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
+			activeRules, _ := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), cwd)
 			return activeRules
 		}, diagnosticCollector)
 
@@ -653,6 +705,47 @@ func createDisableRuleForFileAction(ruleDiag rule.RuleDiagnostic, uri lsproto.Do
 	}
 }
 
+// getConfigForURI resolves the rslint config for a given file URI.
+// It walks upward from the file's directory looking for the closest
+// JS/TS config (matching ESLint v10 flat config behavior).
+// Falls back to the JSON config if no JS/TS config matches.
+// Returns the config entries and the directory to use as cwd for glob matching.
+// For JS configs the cwd is the config's own directory (URI → path);
+// for the JSON fallback it is s.cwd.
+func (s *Server) getConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, string) {
+	if len(s.jsConfigs) > 0 {
+		// Both keys and lookups use URI strings (e.g. "file:///project"),
+		// so path separators are always forward slashes — no platform issues.
+		dir := uriDirname(string(uri))
+		for {
+			if cfg, ok := s.jsConfigs[dir]; ok {
+				return cfg, uriToPath(lsproto.DocumentUri(dir))
+			}
+			parent := uriDirname(dir)
+			if parent == dir {
+				break
+			}
+			dir = parent
+		}
+	}
+	return s.jsonConfig, s.cwd
+}
+
+// uriDirname returns the parent directory of a URI string.
+// e.g. "file:///project/src/index.ts" → "file:///project/src"
+func uriDirname(uri string) string {
+	// Find the last '/' after the scheme (file://)
+	idx := strings.LastIndex(uri, "/")
+	if idx <= 0 {
+		return uri
+	}
+	// Don't strip past the authority part (file:///)
+	if strings.HasPrefix(uri, "file:///") && idx < len("file:///") {
+		return uri
+	}
+	return uri[:idx]
+}
+
 // pushDiagnostics runs the linter for the given URI and pushes results to the client.
 // Must be called synchronously from the LSP message loop (not from a goroutine)
 // because session is not goroutine-safe.
@@ -668,7 +761,8 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 		return
 	}
 
-	ruleDiags, err := runLintWithSession(uri, s.session, ctx, s.rslintConfig)
+	rslintConfig, configCwd := s.getConfigForURI(uri)
+	ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd)
 	if err != nil {
 		log.Printf("Error running lint for push diagnostics: %v", err)
 		return
