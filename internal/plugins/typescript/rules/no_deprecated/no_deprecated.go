@@ -470,6 +470,10 @@ func declarationInCurrentFile(symbol *ast.Symbol, sourceFile *ast.SourceFile) bo
 		if declaration == nil {
 			continue
 		}
+		switch declaration.Kind {
+		case ast.KindImportSpecifier, ast.KindImportClause, ast.KindNamespaceImport, ast.KindImportEqualsDeclaration:
+			continue
+		}
 		if ast.GetSourceFileOfNode(declaration) == sourceFile {
 			return true
 		}

@@ -207,7 +207,7 @@ oldValue;
 		`,
 	}
 
-	t.Run("allow-from-file-suppresses-imported-value", func(t *testing.T) {
+	t.Run("allow-from-file-does-not-suppress-imported-value", func(t *testing.T) {
 		t.Parallel()
 		diagnostics := runNoDeprecatedDiagnosticsForFiles(
 			t,
@@ -224,8 +224,11 @@ oldValue;
 				},
 			},
 		)
-		if len(diagnostics) != 0 {
-			t.Fatalf("expected no diagnostics, got %d", len(diagnostics))
+		if len(diagnostics) != 1 {
+			t.Fatalf("expected 1 diagnostic, got %d", len(diagnostics))
+		}
+		if diagnostics[0].Message.Id != "deprecated" {
+			t.Fatalf("expected message id deprecated, got %s", diagnostics[0].Message.Id)
 		}
 	})
 
