@@ -69,7 +69,7 @@ func TestCwdHandling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isFileIgnored(tt.filePath, tt.patterns)
+			result := isFileIgnored(tt.filePath, tt.patterns, originalCwd)
 			if result != tt.shouldIgnore {
 				t.Errorf("%s: isFileIgnored(%q, %v) = %v, expected %v",
 					tt.description, tt.filePath, tt.patterns, result, tt.shouldIgnore)
