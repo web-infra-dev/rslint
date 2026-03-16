@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -56,6 +57,7 @@ func NewServer(opts *ServerOptions) *Server {
 		defaultLibraryPath:    opts.DefaultLibraryPath,
 		typingsLocation:       opts.TypingsLocation,
 		parseCache:            opts.ParseCache,
+		jsConfigs:             make(map[string]config.RslintConfig),
 		documents:             make(map[lsproto.DocumentUri]string),
 		diagnostics:           make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
 		refreshCh:             make(chan struct{}, 1),
@@ -160,8 +162,9 @@ type Server struct {
 	compilerOptionsForInferredProjects *core.CompilerOptions
 
 	// rslint config
-	rslintConfig     config.RslintConfig
-	rslintConfigPath string // path to rslint.json/rslint.jsonc, empty if not found
+	jsConfigs        map[string]config.RslintConfig                // configDirectory -> config entries (from JS/TS configs)
+	jsonConfig       config.RslintConfig                           // fallback JSON config (rslint.json/rslint.jsonc)
+	rslintConfigPath string                                        // path to rslint.json/rslint.jsonc, empty if not found
 	documents        map[lsproto.DocumentUri]string                // URI -> content
 	diagnostics      map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
 
@@ -543,6 +546,15 @@ var handlers = sync.OnceValue(func() handlerMap {
 	registerNotificationHandler(handlers, lsproto.TextDocumentDidCloseInfo, (*Server).handleDidClose)
 	registerNotificationHandler(handlers, lsproto.WorkspaceDidChangeWatchedFilesInfo, (*Server).handleDidChangeWatchedFiles)
 	registerRequestHandler(handlers, lsproto.TextDocumentCodeActionInfo, (*Server).handleCodeAction)
+
+	// Custom rslint notification
+	handlers[lsproto.Method("rslint/configUpdate")] = func(s *Server, ctx context.Context, req *lsproto.RequestMessage) error {
+		if err := s.handleConfigUpdate(ctx, req.Params); err != nil {
+			log.Printf("[rslint] Error handling config update: %v", err)
+		}
+		return nil
+	}
+
 	return handlers
 })
 
@@ -608,7 +620,12 @@ func isBlockingMethod(method lsproto.Method) bool {
 		lsproto.MethodTextDocumentDidChange,
 		lsproto.MethodTextDocumentDidSave,
 		lsproto.MethodTextDocumentDidClose,
-		lsproto.MethodWorkspaceDidChangeWatchedFiles:
+		lsproto.MethodWorkspaceDidChangeWatchedFiles,
+		lsproto.MethodTextDocumentCodeAction,
+		// rslint/configUpdate writes to s.jsConfigs, which is read by handlers
+		// dispatched on the main loop (e.g. didOpen/didChange). Running it on
+		// the same serialized dispatch loop avoids a data race without locks.
+		lsproto.Method("rslint/configUpdate"):
 		return true
 	}
 	return false

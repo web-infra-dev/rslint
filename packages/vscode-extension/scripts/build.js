@@ -17,6 +17,16 @@ const config = {
   },
   plugins: [
     {
+      name: 'bundle-config-loader',
+      setup(build) {
+        // Override @rslint/core external for config-loader subpath,
+        // so it gets bundled into the extension
+        build.onResolve({ filter: /^@rslint\/core\/config-loader$/ }, () => ({
+          path: require.resolve('@rslint/core/config-loader'),
+        }));
+      },
+    },
+    {
       name: 'copy-files',
       setup(build) {
         build.onStart(() => {
