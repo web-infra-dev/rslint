@@ -2,24 +2,31 @@ import * as path from 'path';
 
 import { runTests } from '@vscode/test-electron';
 
+function resolveFixture(name: string): string {
+  return path.resolve(require.resolve('@rslint/core'), '../..', name);
+}
+
 async function main() {
+  const extensionDevelopmentPath = path.resolve(__dirname, '..');
+  let failed = false;
+
+  // --- Existing tests (JSON config workspace) ---
+  const testWorkspace = resolveFixture('fixtures');
+  const extensionTestsPath = path.resolve(__dirname, './suite');
+
   try {
-    const extensionDevelopmentPath = path.resolve(__dirname, '..');
-    const testWorkspace = path.resolve(
-      require.resolve('@rslint/core'),
-      '../..',
-      'fixtures',
-    );
-
-    const extensionTestsPath = path.resolve(__dirname, './suite');
-
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath,
       launchArgs: ['--disable-extensions', testWorkspace],
       version: 'stable',
     });
+  } catch (err) {
+    console.error('JSON config tests (stable) failed:', err);
+    failed = true;
+  }
 
+  try {
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath,
@@ -27,8 +34,61 @@ async function main() {
       version: '1.106.3',
     });
   } catch (err) {
-    console.error(err);
-    console.error('Failed to run tests');
+    console.error('JSON config tests (1.106.3) failed:', err);
+    failed = true;
+  }
+
+  // --- JS config tests ---
+  const testsSourceDir = path.resolve(extensionDevelopmentPath, '__tests__');
+  const jsConfigWorkspace = path.resolve(testsSourceDir, 'fixtures-jsconfig');
+  const jsConfigTestsPath = path.resolve(__dirname, './suite-jsconfig');
+
+  try {
+    await runTests({
+      extensionDevelopmentPath,
+      extensionTestsPath: jsConfigTestsPath,
+      launchArgs: ['--disable-extensions', jsConfigWorkspace],
+      version: 'stable',
+    });
+  } catch (err) {
+    console.error('JS config tests failed:', err);
+    failed = true;
+  }
+
+  // --- Monorepo multi-config tests ---
+  const monorepoWorkspace = path.resolve(testsSourceDir, 'fixtures-monorepo');
+  const monorepoTestsPath = path.resolve(__dirname, './suite-monorepo');
+
+  try {
+    await runTests({
+      extensionDevelopmentPath,
+      extensionTestsPath: monorepoTestsPath,
+      launchArgs: ['--disable-extensions', monorepoWorkspace],
+      version: 'stable',
+    });
+  } catch (err) {
+    console.error('Monorepo config tests failed:', err);
+    failed = true;
+  }
+
+  // --- No config fallback tests ---
+  const noConfigWorkspace = path.resolve(testsSourceDir, 'fixtures-noconfig');
+  const noConfigTestsPath = path.resolve(__dirname, './suite-noconfig');
+
+  try {
+    await runTests({
+      extensionDevelopmentPath,
+      extensionTestsPath: noConfigTestsPath,
+      launchArgs: ['--disable-extensions', noConfigWorkspace],
+      version: 'stable',
+    });
+  } catch (err) {
+    console.error('No config tests failed:', err);
+    failed = true;
+  }
+
+  if (failed) {
+    console.error('Some test suites failed');
     process.exit(1);
   }
 }
