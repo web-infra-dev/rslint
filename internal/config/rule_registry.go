@@ -33,19 +33,22 @@ func (r *RuleRegistry) GetAllRules() map[string]rule.Rule {
 	return r.rules
 }
 
-// GetEnabledRules returns rules that are enabled in the configuration for a given file
-func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string) []linter.ConfiguredRule {
-	enabledRuleConfigs := config.GetRulesForFile(filePath)
+// GetEnabledRules returns rules that are enabled in the configuration for a given file.
+// Returns nil if no config entry matches the file (file should not be linted).
+// cwd is the config directory used to resolve files/ignores patterns.
+func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd string) ([]linter.ConfiguredRule, *MergedConfig) {
+	mergedConfig := config.GetConfigForFile(filePath, cwd)
+	if mergedConfig == nil {
+		return nil, nil // file is globally ignored
+	}
+
 	var enabledRules []linter.ConfiguredRule
-
-	for ruleName, ruleConfig := range enabledRuleConfigs {
-
+	for ruleName, ruleConfig := range mergedConfig.Rules {
 		if ruleConfig.IsEnabled() {
 			if ruleImpl, exists := r.rules[ruleName]; exists {
-				// Capture the ruleConfig in the closure to pass options correctly
 				ruleConfigCopy := ruleConfig
 				enabledRules = append(enabledRules, linter.ConfiguredRule{
-					Name:     ruleName, // Use the registered rule name, not the implementation name
+					Name:     ruleName,
 					Severity: ruleConfig.GetSeverity(),
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
 						return ruleImpl.Run(ctx, ruleConfigCopy.Options)
@@ -55,7 +58,7 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string) []l
 		}
 	}
 
-	return enabledRules
+	return enabledRules, mergedConfig
 }
 
 // Global rule registry instance
