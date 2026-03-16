@@ -26,8 +26,23 @@ func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath stri
 
 	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(tsconfigPath, &core.CompilerOptions{}, nil, host, nil)
 
+	return createProgramFromConfig(singleThreaded, configParseResult, host)
+}
+
+// CreateProgramFromOptions creates a program from in-memory compiler options and root file names,
+// without requiring a tsconfig file on disk.
+func CreateProgramFromOptions(singleThreaded bool, compilerOptions *core.CompilerOptions, rootFileNames []string, host compiler.CompilerHost) (*compiler.Program, error) {
+	configParseResult := tsoptions.NewParsedCommandLine(compilerOptions, rootFileNames, tspath.ComparePathsOptions{
+		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
+		CurrentDirectory:          host.GetCurrentDirectory(),
+	})
+
+	return createProgramFromConfig(singleThreaded, configParseResult, host)
+}
+
+func createProgramFromConfig(singleThreaded bool, config *tsoptions.ParsedCommandLine, host compiler.CompilerHost) (*compiler.Program, error) {
 	opts := compiler.ProgramOptions{
-		Config:         configParseResult,
+		Config:         config,
 		SingleThreaded: core.TSTrue,
 		Host:           host,
 	}

@@ -20,3 +20,4 @@ npm/tsgo/**/lib/
 binaries/
 target/
 internal/plugins/**/rules/**/*.md
+packages/vscode-extension/__tests__/fixtures-monorepo/packages/broken/
