@@ -13,5 +13,6 @@
     "emitDeclarationOnly": false
   },
   "references": [],
-  "include": ["__tests__"]
+  "include": ["__tests__"],
+  "exclude": ["__tests__/fixtures-*"]
 }
