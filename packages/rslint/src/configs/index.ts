@@ -1,0 +1,25 @@
+import type { RslintConfigEntry } from '../define-config.js';
+import { recommended as tsRecommended } from './typescript.js';
+import { recommended as jsRecommended } from './javascript.js';
+import { recommended as reactRecommended } from './react.js';
+import { recommended as importRecommended } from './import.js';
+
+interface PluginExport {
+  configs: { recommended: RslintConfigEntry };
+}
+
+export const ts: PluginExport = {
+  configs: { recommended: tsRecommended },
+};
+
+export const js: PluginExport = {
+  configs: { recommended: jsRecommended },
+};
+
+export const reactPlugin: PluginExport = {
+  configs: { recommended: reactRecommended },
+};
+
+export const importPlugin: PluginExport = {
+  configs: { recommended: importRecommended },
+};
