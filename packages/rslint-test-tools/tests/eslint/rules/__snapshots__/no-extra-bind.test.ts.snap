@@ -1,0 +1,79 @@
+// Rstest Snapshot v1
+
+exports[`no-extra-bind > invalid 1`] = `
+{
+  "code": "var a = function() { return 1; }.bind(b)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 2`] = `
+{
+  "code": "var a = function() { return 1; }.bind(this)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 3`] = `
+{
+  "code": "var a = function() { (function(){ this.c }) }.bind(b)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
