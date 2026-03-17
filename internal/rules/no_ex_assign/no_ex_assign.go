@@ -16,17 +16,17 @@ func buildExAssignMessage() rule.RuleMessage {
 	}
 }
 
-func collectCatchBindingNamesAndSymbols(name *ast.Node, ctx rule.RuleContext) ([]string, []*ast.Symbol) {
-	if name == nil {
+func collectCatchBindingNamesAndSymbols(node *ast.Node, ctx rule.RuleContext) ([]string, []*ast.Symbol) {
+	if node == nil {
 		return nil, nil
 	}
-	if ast.IsIdentifier(name) {
-		return []string{name.Text()}, []*ast.Symbol{ctx.TypeChecker.GetSymbolAtLocation(name)}
+	if ast.IsIdentifier(node) {
+		return []string{node.Text()}, []*ast.Symbol{ctx.TypeChecker.GetSymbolAtLocation(node)}
 	}
-	if ast.IsBindingPattern(name) {
+	if ast.IsBindingPattern(node) {
 		var names []string
 		var symbols []*ast.Symbol
-		for _, elem := range name.Elements() {
+		for _, elem := range node.Elements() {
 			if elem == nil || !ast.IsBindingElement(elem) {
 				continue
 			}
@@ -36,8 +36,8 @@ func collectCatchBindingNamesAndSymbols(name *ast.Node, ctx rule.RuleContext) ([
 			}
 			utils.CollectBindingNames(be.Name(), func(ident *ast.Node, name string) {
 				names = append(names, name)
+				symbols = append(symbols, ctx.TypeChecker.GetSymbolAtLocation(ident))
 			})
-			symbols = append(symbols, ctx.TypeChecker.GetSymbolAtLocation(be.Name()))
 		}
 		return names, symbols
 	}
@@ -73,30 +73,32 @@ func isBindingPatternInAssignment(node *ast.Node) bool {
 }
 
 func isInDestructuringAssignment(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-
-	parent := node.Parent
-
-	for parent != nil {
-		if parent.Kind == ast.KindObjectLiteralExpression || parent.Kind == ast.KindArrayLiteralExpression {
+	current := node
+	for current != nil {
+		parent := current.Parent
+		if parent == nil {
 			return false
 		}
-		if parent.Kind == ast.KindBinaryExpression {
-			binary := parent.AsBinaryExpression()
-			if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindEqualsToken {
-				return binary.Left == node
-			}
-		}
-		if parent.Kind == ast.KindParenthesizedExpression {
-			parent = parent.Parent
-		} else {
-			break
-		}
-		parent = parent.Parent
-	}
 
+		switch parent.Kind {
+		case ast.KindBinaryExpression:
+			binary := parent.AsBinaryExpression()
+			if binary != nil && binary.OperatorToken != nil &&
+				binary.OperatorToken.Kind == ast.KindEqualsToken {
+				return binary.Left == current
+			}
+			return false
+		case ast.KindParenthesizedExpression,
+			ast.KindObjectLiteralExpression,
+			ast.KindArrayLiteralExpression,
+			ast.KindPropertyAssignment,
+			ast.KindShorthandPropertyAssignment,
+			ast.KindSpreadAssignment:
+			current = parent
+		default:
+			return false
+		}
+	}
 	return false
 }
 
@@ -175,7 +177,10 @@ func isWriteReference(node *ast.Node) bool {
 			return isInDestructuringAssignment(parent)
 		}
 	case ast.KindPropertyAssignment:
-		return isInDestructuringAssignment(parent)
+		propAssignment := parent.AsPropertyAssignment()
+		if propAssignment != nil && propAssignment.Initializer == node {
+			return isInDestructuringAssignment(parent)
+		}
 	case ast.KindObjectLiteralExpression:
 		return isInDestructuringAssignment(parent)
 	case ast.KindArrayLiteralExpression:
@@ -189,12 +194,30 @@ func isWriteReference(node *ast.Node) bool {
 	return false
 }
 
+func getReferenceSymbol(node *ast.Node, ctx rule.RuleContext) *ast.Symbol {
+	if node == nil || ctx.TypeChecker == nil {
+		return nil
+	}
+
+	parent := node.Parent
+	if parent != nil && parent.Kind == ast.KindShorthandPropertyAssignment {
+		shorthand := parent.AsShorthandPropertyAssignment()
+		if shorthand != nil && shorthand.Name() == node {
+			if symbol := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(parent); symbol != nil {
+				return symbol
+			}
+		}
+	}
+
+	return ctx.TypeChecker.GetSymbolAtLocation(node)
+}
+
 func isNameShadowed(node *ast.Node, symbols []*ast.Symbol, ctx rule.RuleContext) bool {
 	if node == nil || ctx.TypeChecker == nil || len(symbols) == 0 {
 		return false
 	}
 
-	symbol := ctx.TypeChecker.GetSymbolAtLocation(node)
+	symbol := getReferenceSymbol(node, ctx)
 	if symbol == nil {
 		return false
 	}
@@ -233,7 +256,8 @@ func checkReassignments(block *ast.Node, names []string, symbols []*ast.Symbol, 
 			childName := getIdentifierName(child)
 			if child.Kind == ast.KindIdentifier && slices.Contains(names, childName) {
 				if isWriteReference(child) {
-					if !isNameShadowed(child, symbols, ctx) {
+					shadowed := isNameShadowed(child, symbols, ctx)
+					if !shadowed {
 						ctx.ReportNode(child, buildExAssignMessage())
 					}
 				}

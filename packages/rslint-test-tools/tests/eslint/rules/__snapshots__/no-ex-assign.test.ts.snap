@@ -285,3 +285,55 @@ exports[`no-ex-assign > invalid 11`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`no-ex-assign > invalid 12`] = `
+{
+  "code": "try { } catch (ex) { ({ex} = {}); }",
+  "diagnostics": [
+    {
+      "message": "Do not assign to the exception parameter.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-ex-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-ex-assign > invalid 13`] = `
+{
+  "code": "try { } catch (ex) { ({x: ex} = {}); }",
+  "diagnostics": [
+    {
+      "message": "Do not assign to the exception parameter.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-ex-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

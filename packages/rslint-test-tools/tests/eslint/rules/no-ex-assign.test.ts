@@ -10,6 +10,7 @@ ruleTester.run('no-ex-assign', {
     'try { } catch (e) { let e = 10; e = 10; }',
     'try { } catch (e) { console.log({e}); }',
     'try { } catch (e) { foo({x: e}); }',
+    'try { } catch (ex) { ({ex: y} = {}); }',
   ],
   invalid: [
     {
@@ -54,6 +55,14 @@ ruleTester.run('no-ex-assign', {
     },
     {
       code: 'try { } catch (e) { for (e of arr) {} }',
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'try { } catch (ex) { ({ex} = {}); }',
+      errors: [{ messageId: 'unexpected' }],
+    },
+    {
+      code: 'try { } catch (ex) { ({x: ex} = {}); }',
       errors: [{ messageId: 'unexpected' }],
     },
   ],
