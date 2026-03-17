@@ -907,3 +907,11 @@ func CollectBindingNames(nameNode *ast.Node, callback func(ident *ast.Node, name
 		})
 	}
 }
+
+// IsNullLiteral checks if a node is the null keyword, unwrapping parentheses.
+func IsNullLiteral(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	return ast.SkipParentheses(node).Kind == ast.KindNullKeyword
+}
