@@ -101,6 +101,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/array_callback_return"
 	"github.com/web-infra-dev/rslint/internal/rules/constructor_super"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case"
+	"github.com/web-infra-dev/rslint/internal/rules/default_case_last"
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_async_promise_executor"
@@ -455,6 +456,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("array-callback-return", array_callback_return.ArrayCallbackReturnRule)
 	GlobalRuleRegistry.Register("constructor-super", constructor_super.ConstructorSuperRule)
 	GlobalRuleRegistry.Register("default-case", default_case.DefaultCaseRule)
+	GlobalRuleRegistry.Register("default-case-last", default_case_last.DefaultCaseLastRule)
 	GlobalRuleRegistry.Register("for-direction", for_direction.ForDirectionRule)
 	GlobalRuleRegistry.Register("getter-return", getter_return.GetterReturnRule)
 	GlobalRuleRegistry.Register("no-async-promise-executor", no_async_promise_executor.NoAsyncPromiseExecutorRule)
