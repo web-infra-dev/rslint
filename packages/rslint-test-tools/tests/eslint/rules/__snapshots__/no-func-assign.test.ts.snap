@@ -1,0 +1,53 @@
+// Rstest Snapshot v1
+
+exports[`no-func-assign > invalid 1`] = `
+{
+  "code": "function foo() { foo = 1; }",
+  "diagnostics": [
+    {
+      "message": "'foo' is a function.",
+      "messageId": "isAFunction",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-func-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-func-assign > invalid 2`] = `
+{
+  "code": "function foo() {} foo = 1;",
+  "diagnostics": [
+    {
+      "message": "'foo' is a function.",
+      "messageId": "isAFunction",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-func-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
