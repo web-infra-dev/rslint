@@ -89,6 +89,7 @@ describe('CLI Configuration Tests', () => {
             },
           },
           rules: {
+            'prefer-const': 'off',
             '@typescript-eslint/no-unsafe-member-access': 'error',
           },
           plugins: ['@typescript-eslint'],
@@ -131,6 +132,7 @@ describe('CLI Configuration Tests', () => {
             },
           },
           rules: {
+            'prefer-const': 'off',
             '@typescript-eslint/no-unsafe-assignment': 'error',
           },
           plugins: ['@typescript-eslint'],
@@ -175,6 +177,7 @@ describe('CLI Configuration Tests', () => {
             },
           },
           rules: {
+            'prefer-const': 'off',
             '@typescript-eslint/no-unsafe-member-access': 'error',
           },
           plugins: ['@typescript-eslint'],
@@ -224,6 +227,7 @@ describe('CLI Configuration Tests', () => {
             },
           },
           rules: {
+            'prefer-const': 'off',
             '@typescript-eslint/no-explicit-any': 'warn',
             '@typescript-eslint/no-unsafe-member-access': 'error',
           },
@@ -277,6 +281,7 @@ describe('CLI Configuration Tests', () => {
             },
           },
           rules: {
+            'prefer-const': 'off',
             '@typescript-eslint/no-unsafe-member-access': 'error',
             '@typescript-eslint/return-await': 'warn',
           },
@@ -364,7 +369,9 @@ describe('CLI Configuration Tests', () => {
               project: ['./tsconfig.json'],
             },
           },
-          rules: {},
+          rules: {
+            'prefer-const': 'off',
+          },
           plugins: ['@typescript-eslint'],
         },
       ]),
@@ -402,6 +409,7 @@ describe('CLI Configuration Tests', () => {
             },
           },
           rules: {
+            'prefer-const': 'off',
             'no-unsafe-member-access': 'error',
           },
           plugins: ['@typescript-eslint'],
@@ -444,6 +452,7 @@ describe('CLI Configuration Tests', () => {
             },
           },
           rules: {
+            'prefer-const': 'off',
             'no-unsafe-member-access': 'error',
             'no-console': 'off',
           },

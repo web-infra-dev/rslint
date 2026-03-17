@@ -21,7 +21,8 @@
       "@typescript-eslint/no-require-imports": "error",
       "@typescript-eslint/no-namespace": "error",
       "@typescript-eslint/ban-types": "error",
-      "@typescript-eslint/no-inferrable-types": "error"
+      "@typescript-eslint/no-inferrable-types": "error",
+      "prefer-const": "off"
     },
     "plugins": ["@typescript-eslint"]
   }
