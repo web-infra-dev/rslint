@@ -1,0 +1,53 @@
+// Rstest Snapshot v1
+
+exports[`no-unsafe-finally > invalid 1`] = `
+{
+  "code": "try { return 1; } finally { return 3; }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ReturnStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 2`] = `
+{
+  "code": "try {} finally { throw new Error() }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ThrowStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

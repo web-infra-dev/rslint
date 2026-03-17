@@ -101,6 +101,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/array_callback_return"
 	"github.com/web-infra-dev/rslint/internal/rules/constructor_super"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case"
+	"github.com/web-infra-dev/rslint/internal/rules/eqeqeq"
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_async_promise_executor"
@@ -116,13 +117,29 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_constructor_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_debugger"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_args"
+	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_else_if"
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_keys"
 	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_case"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty"
+	"github.com/web-infra-dev/rslint/internal/rules/no_empty_character_class"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_pattern"
+	"github.com/web-infra-dev/rslint/internal/rules/no_extra_boolean_cast"
+	"github.com/web-infra-dev/rslint/internal/rules/no_fallthrough"
+	"github.com/web-infra-dev/rslint/internal/rules/no_invalid_regexp"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
+	"github.com/web-infra-dev/rslint/internal/rules/no_new_symbol"
+	"github.com/web-infra-dev/rslint/internal/rules/no_obj_calls"
+	"github.com/web-infra-dev/rslint/internal/rules/no_setter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_sparse_arrays"
 	"github.com/web-infra-dev/rslint/internal/rules/no_template_curly_in_string"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unmodified_loop_condition"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unreachable"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_finally"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_negation"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_optional_chaining"
+	"github.com/web-infra-dev/rslint/internal/rules/no_useless_catch"
+	"github.com/web-infra-dev/rslint/internal/rules/use_isnan"
+	"github.com/web-infra-dev/rslint/internal/rules/valid_typeof"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -400,6 +417,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("array-callback-return", array_callback_return.ArrayCallbackReturnRule)
 	GlobalRuleRegistry.Register("constructor-super", constructor_super.ConstructorSuperRule)
 	GlobalRuleRegistry.Register("default-case", default_case.DefaultCaseRule)
+	GlobalRuleRegistry.Register("eqeqeq", eqeqeq.EqeqeqRule)
 	GlobalRuleRegistry.Register("for-direction", for_direction.ForDirectionRule)
 	GlobalRuleRegistry.Register("getter-return", getter_return.GetterReturnRule)
 	GlobalRuleRegistry.Register("no-async-promise-executor", no_async_promise_executor.NoAsyncPromiseExecutorRule)
@@ -415,13 +433,29 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-constructor-return", no_constructor_return.NoConstructorReturnRule)
 	GlobalRuleRegistry.Register("no-debugger", no_debugger.NoDebuggerRule)
 	GlobalRuleRegistry.Register("no-dupe-args", no_dupe_args.NoDupeArgsRule)
+	GlobalRuleRegistry.Register("no-dupe-else-if", no_dupe_else_if.NoDupeElseIfRule)
 	GlobalRuleRegistry.Register("no-dupe-keys", no_dupe_keys.NoDupeKeysRule)
 	GlobalRuleRegistry.Register("no-duplicate-case", no_duplicate_case.NoDuplicateCaseRule)
 	GlobalRuleRegistry.Register("no-empty", no_empty.NoEmptyRule)
+	GlobalRuleRegistry.Register("no-empty-character-class", no_empty_character_class.NoEmptyCharacterClassRule)
 	GlobalRuleRegistry.Register("no-empty-pattern", no_empty_pattern.NoEmptyPatternRule)
+	GlobalRuleRegistry.Register("no-extra-boolean-cast", no_extra_boolean_cast.NoExtraBooleanCastRule)
+	GlobalRuleRegistry.Register("no-fallthrough", no_fallthrough.NoFallthroughRule)
+	GlobalRuleRegistry.Register("no-invalid-regexp", no_invalid_regexp.NoInvalidRegexpRule)
 	GlobalRuleRegistry.Register("no-loss-of-precision", no_loss_of_precision.NoLossOfPrecisionRule)
+	GlobalRuleRegistry.Register("no-new-symbol", no_new_symbol.NoNewSymbolRule)
+	GlobalRuleRegistry.Register("no-obj-calls", no_obj_calls.NoObjCallsRule)
+	GlobalRuleRegistry.Register("no-setter-return", no_setter_return.NoSetterReturnRule)
+	GlobalRuleRegistry.Register("no-unreachable", no_unreachable.NoUnreachableRule)
+	GlobalRuleRegistry.Register("no-unmodified-loop-condition", no_unmodified_loop_condition.NoUnmodifiedLoopConditionRule)
 	GlobalRuleRegistry.Register("no-template-curly-in-string", no_template_curly_in_string.NoTemplateCurlyInString)
 	GlobalRuleRegistry.Register("no-sparse-arrays", no_sparse_arrays.NoSparseArraysRule)
+	GlobalRuleRegistry.Register("no-unsafe-finally", no_unsafe_finally.NoUnsafeFinallyRule)
+	GlobalRuleRegistry.Register("no-unsafe-negation", no_unsafe_negation.NoUnsafeNegationRule)
+	GlobalRuleRegistry.Register("no-unsafe-optional-chaining", no_unsafe_optional_chaining.NoUnsafeOptionalChainingRule)
+	GlobalRuleRegistry.Register("no-useless-catch", no_useless_catch.NoUselessCatchRule)
+	GlobalRuleRegistry.Register("use-isnan", use_isnan.UseIsNaNRule)
+	GlobalRuleRegistry.Register("valid-typeof", valid_typeof.ValidTypeofRule)
 }
 
 // getAllTypeScriptEslintPluginRules returns all rules from the global registry.

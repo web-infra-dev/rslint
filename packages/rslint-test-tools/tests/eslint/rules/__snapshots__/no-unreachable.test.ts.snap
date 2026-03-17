@@ -1,0 +1,53 @@
+// Rstest Snapshot v1
+
+exports[`no-unreachable > invalid 1`] = `
+{
+  "code": "function foo() { return; x = 1; }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable > invalid 2`] = `
+{
+  "code": "function foo() { throw error; x = 1; }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

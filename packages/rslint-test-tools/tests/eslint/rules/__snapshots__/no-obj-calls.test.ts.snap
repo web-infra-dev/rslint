@@ -1,0 +1,53 @@
+// Rstest Snapshot v1
+
+exports[`no-obj-calls > invalid 1`] = `
+{
+  "code": "Math();",
+  "diagnostics": [
+    {
+      "message": "'Math' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 2`] = `
+{
+  "code": "new Math();",
+  "diagnostics": [
+    {
+      "message": "'Math' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

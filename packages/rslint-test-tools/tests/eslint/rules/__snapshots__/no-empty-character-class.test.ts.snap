@@ -1,0 +1,53 @@
+// Rstest Snapshot v1
+
+exports[`no-empty-character-class > invalid 1`] = `
+{
+  "code": "var foo = /^abc[]/;",
+  "diagnostics": [
+    {
+      "message": "Empty class.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-empty-character-class > invalid 2`] = `
+{
+  "code": "var foo = /foo[]bar/;",
+  "diagnostics": [
+    {
+      "message": "Empty class.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-empty-character-class",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -1,0 +1,27 @@
+// Rstest Snapshot v1
+
+exports[`no-new-symbol > invalid 1`] = `
+{
+  "code": "var foo = new Symbol('foo');",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

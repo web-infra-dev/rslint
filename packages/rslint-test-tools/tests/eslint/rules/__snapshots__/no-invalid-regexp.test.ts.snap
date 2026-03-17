@@ -1,0 +1,27 @@
+// Rstest Snapshot v1
+
+exports[`no-invalid-regexp > invalid 1`] = `
+{
+  "code": "RegExp('.', 'z');",
+  "diagnostics": [
+    {
+      "message": "Invalid flags supplied to RegExp constructor 'z'.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

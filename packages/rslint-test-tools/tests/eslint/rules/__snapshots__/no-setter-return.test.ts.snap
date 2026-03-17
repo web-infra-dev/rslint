@@ -1,0 +1,53 @@
+// Rstest Snapshot v1
+
+exports[`no-setter-return > invalid 1`] = `
+{
+  "code": "var foo = { set a(val) { return 1; } };",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "setter",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-setter-return > invalid 2`] = `
+{
+  "code": "class A { set a(val) { return val; } }",
+  "diagnostics": [
+    {
+      "message": "Setter cannot return a value.",
+      "messageId": "setter",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-setter-return",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

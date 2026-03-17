@@ -1,0 +1,53 @@
+// Rstest Snapshot v1
+
+exports[`no-useless-catch > invalid 1`] = `
+{
+  "code": "try { foo(); } catch (err) { throw err; }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary try/catch wrapper.",
+      "messageId": "unnecessaryCatch",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-catch",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-useless-catch > invalid 2`] = `
+{
+  "code": "try { foo(); } catch (err) { throw err; } finally { foo(); }",
+  "diagnostics": [
+    {
+      "message": "Unnecessary catch clause.",
+      "messageId": "unnecessaryCatchClause",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-useless-catch",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

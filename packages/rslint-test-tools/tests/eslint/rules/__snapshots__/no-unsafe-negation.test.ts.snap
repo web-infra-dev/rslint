@@ -1,0 +1,53 @@
+// Rstest Snapshot v1
+
+exports[`no-unsafe-negation > invalid 1`] = `
+{
+  "code": "!a in b",
+  "diagnostics": [
+    {
+      "message": "Unexpected negating the left operand of 'in' operator.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-negation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-negation > invalid 2`] = `
+{
+  "code": "!a instanceof b",
+  "diagnostics": [
+    {
+      "message": "Unexpected negating the left operand of 'instanceof' operator.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 3,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-negation",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

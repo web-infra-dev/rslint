@@ -1,0 +1,53 @@
+// Rstest Snapshot v1
+
+exports[`no-dupe-else-if > invalid 1`] = `
+{
+  "code": "if (a) {} else if (a) {}",
+  "diagnostics": [
+    {
+      "message": "This branch can never execute. Its condition is a duplicate or covered by previous conditions in the if-else-if chain.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-else-if",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-dupe-else-if > invalid 2`] = `
+{
+  "code": "if (a) {} else if (b) {} else if (a) {}",
+  "diagnostics": [
+    {
+      "message": "This branch can never execute. Its condition is a duplicate or covered by previous conditions in the if-else-if chain.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-dupe-else-if",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
