@@ -38,6 +38,7 @@ export default defineConfig({
     './tests/eslint/rules/no-inner-declarations.test.ts',
     './tests/eslint/rules/no-self-assign.test.ts',
     './tests/eslint/rules/no-undef.test.ts',
+    './tests/eslint/rules/no-var.test.ts',
     './tests/eslint/rules/prefer-const.test.ts',
     './tests/eslint/rules/no-this-before-super.test.ts',
     // eslint-plugin-import
