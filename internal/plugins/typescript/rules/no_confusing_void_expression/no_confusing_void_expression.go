@@ -169,7 +169,18 @@ var NoConfusingVoidExpressionRule = rule.CreateRule(rule.Rule{
 			functionType := checker.Checker_getContextualType(ctx.TypeChecker, functionNode, checker.ContextFlagsNone)
 
 			if functionType == nil {
-				return false
+				// getContextualType may return nil for expressions inside JSX attributes.
+				// Fall back to getTypeAtLocation on the parent JsxAttribute to get the expected prop type.
+				parent := functionNode.Parent
+				if ast.IsJsxExpression(parent) {
+					parent = parent.Parent
+				}
+				if ast.IsJsxAttribute(parent) {
+					functionType = ctx.TypeChecker.GetTypeAtLocation(parent.AsNode())
+				}
+				if functionType == nil {
+					return false
+				}
 			}
 			return utils.Some(utils.UnionTypeParts(functionType), func(t *checker.Type) bool {
 				callSignatures := utils.GetCallSignatures(ctx.TypeChecker, t)

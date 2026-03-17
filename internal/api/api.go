@@ -412,5 +412,5 @@ func IsIPCMode() bool {
 }
 
 func EncodeAST(sourceFile *ast.SourceFile, id string) ([]byte, error) {
-	return encoder.EncodeSourceFile(sourceFile, id)
+	return encoder.EncodeSourceFile(sourceFile)
 }

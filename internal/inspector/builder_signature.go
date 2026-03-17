@@ -12,7 +12,7 @@ func (b *Builder) BuildShallowSignatureInfo(sig *checker.Signature) *SignatureIn
 	}
 
 	// Get flags
-	flags := checker.Signature_flags(sig)
+	flags := sig.Flags()
 
 	info := &SignatureInfo{
 		Flags:     uint32(flags),
@@ -55,7 +55,7 @@ func (b *Builder) BuildSignatureInfo(sig *checker.Signature) *SignatureInfo {
 	}
 
 	// Get flags
-	flags := checker.Signature_flags(sig)
+	flags := sig.Flags()
 
 	// Get parameters
 	params := checker.Signature_parameters(sig)
@@ -100,12 +100,12 @@ func (b *Builder) BuildSignatureInfo(sig *checker.Signature) *SignatureInfo {
 	}
 
 	// This parameter as symbol (full for detailed info)
-	if thisSym := checker.Signature_thisParameter(sig); thisSym != nil {
+	if thisSym := sig.ThisParameter(); thisSym != nil {
 		info.ThisParameter = b.BuildSymbolInfo(thisSym)
 	}
 
 	// Type parameters as full types
-	typeParams := checker.Signature_typeParameters(sig)
+	typeParams := sig.TypeParameters()
 	if len(typeParams) > 0 {
 		info.TypeParameters = make([]*TypeInfo, 0, len(typeParams))
 		for _, tp := range typeParams {
@@ -139,7 +139,7 @@ func (b *Builder) buildTypePredicateInfo(pred *checker.TypePredicate) *TypePredi
 	}
 
 	// Get kind and convert to string with checker. prefix
-	kind := checker.TypePredicate_kind(pred)
+	kind := pred.Kind()
 	var kindName string
 	switch kind {
 	case checker.TypePredicateKindThis:
@@ -157,8 +157,8 @@ func (b *Builder) buildTypePredicateInfo(pred *checker.TypePredicate) *TypePredi
 	info := &TypePredicateInfo{
 		Kind:           int(kind),
 		KindName:       kindName,
-		ParameterName:  checker.TypePredicate_parameterName(pred),
-		ParameterIndex: int(checker.TypePredicate_parameterIndex(pred)),
+		ParameterName:  pred.ParameterName(),
+		ParameterIndex: int(pred.ParameterIndex()),
 	}
 
 	// Predicate type (full)
