@@ -405,6 +405,36 @@ test((() => {
       `,
 			Options: NoConfusingVoidExpressionOptions{IgnoreVoidReturningFunctions: true},
 		},
+		// JSX: arrow function in onClick (void-returning) should be valid
+		{
+			Code:    `const foo = <button onClick={() => console.log()} />;`,
+			Tsx:     true,
+			Options: NoConfusingVoidExpressionOptions{IgnoreVoidReturningFunctions: true},
+		},
+		// JSX: arrow function with body in void-returning prop
+		{
+			Code:    `const foo = <button onClick={() => { console.log(); return console.log(); }} />;`,
+			Tsx:     true,
+			Options: NoConfusingVoidExpressionOptions{IgnoreVoidReturningFunctions: true},
+		},
+		// JSX: custom component with void-returning callback prop
+		{
+			Code: `
+declare function Comp(props: { handler: () => void }): any;
+const foo = <Comp handler={() => console.log()} />;
+`,
+			Tsx:     true,
+			Options: NoConfusingVoidExpressionOptions{IgnoreVoidReturningFunctions: true},
+		},
+		// JSX: union type prop including void
+		{
+			Code: `
+declare function Comp(props: { handler: (() => void) | (() => number) }): any;
+const foo = <Comp handler={() => console.log()} />;
+`,
+			Tsx:     true,
+			Options: NoConfusingVoidExpressionOptions{IgnoreVoidReturningFunctions: true},
+		},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
@@ -1387,6 +1417,31 @@ function test(arg?: string): any | void {
 					Line:      8,
 					Column:    10,
 				},
+			},
+		},
+		// JSX: without ignoreVoidReturningFunctions, should still report
+		{
+			Code:   `const foo = <button onClick={() => console.log()} />;`,
+			Output: []string{`const foo = <button onClick={() =>{  console.log(); }} />;`},
+			Tsx:    true,
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidVoidExprArrow"},
+			},
+		},
+		// JSX: non-void returning prop (e.g. returns string) should still report
+		{
+			Code: `
+declare function Comp(props: { getValue: () => string }): any;
+const foo = <Comp getValue={() => console.log()} />;
+`,
+			Output: []string{`
+declare function Comp(props: { getValue: () => string }): any;
+const foo = <Comp getValue={() =>{  console.log(); }} />;
+`},
+			Tsx:     true,
+			Options: NoConfusingVoidExpressionOptions{IgnoreVoidReturningFunctions: true},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{MessageId: "invalidVoidExprArrow"},
 			},
 		},
 	})

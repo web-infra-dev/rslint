@@ -163,8 +163,8 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		diagnosticStart := d.Range.Pos()
 		diagnosticEnd := d.Range.End()
 
-		startLine, startColumn := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticStart)
-		endLine, endColumn := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
+		startLine, startColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticStart)
+		endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticEnd)
 
 		diagnostic := api.Diagnostic{
 			RuleName:  d.RuleName,
@@ -174,11 +174,11 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 			Range: api.Range{
 				Start: api.Position{
 					Line:   startLine + 1, // Convert to 1-based indexing
-					Column: startColumn + 1,
+					Column: int(startColumn) + 1,
 				},
 				End: api.Position{
 					Line:   endLine + 1,
-					Column: endColumn + 1,
+					Column: int(endColumn) + 1,
 				},
 			},
 		}

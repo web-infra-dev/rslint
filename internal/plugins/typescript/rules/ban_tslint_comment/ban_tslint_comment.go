@@ -87,8 +87,9 @@ func buildFix(sourceFile *ast.SourceFile, comment *ast.CommentRange, textLen int
 	start := comment.Pos()
 	end := comment.End()
 
-	startLine, _ := scanner.GetECMALineAndCharacterOfPosition(sourceFile, start)
-	lineStart := scanner.GetECMAPositionOfLineAndCharacter(sourceFile, startLine, 0)
+	startLine, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, start)
+	lineStarts := scanner.GetECMALineStarts(sourceFile)
+	lineStart := int(lineStarts[startLine])
 
 	lineEnd := textLen
 	for i := end; i < textLen; i++ {
