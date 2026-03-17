@@ -1,0 +1,2416 @@
+// Rstest Snapshot v1
+
+exports[`no-global-assign > invalid 1`] = `
+{
+  "code": "String = 'hello world';",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'String' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 2`] = `
+{
+  "code": "String++;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'String' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 3`] = `
+{
+  "code": "Array = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Array' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 4`] = `
+{
+  "code": "Number = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Number' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 5`] = `
+{
+  "code": "Math += 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Math' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 6`] = `
+{
+  "code": "--Object;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 7`] = `
+{
+  "code": "undefined = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'undefined' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 8`] = `
+{
+  "code": "NaN = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'NaN' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 9`] = `
+{
+  "code": "Infinity = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Infinity' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 10`] = `
+{
+  "code": "String = 1; Array = 2;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'String' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+    {
+      "message": "Read-only global 'Array' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 11`] = `
+{
+  "code": "({Object} = {});",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 12`] = `
+{
+  "code": "({Object = 0, String = 0} = {});",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+    {
+      "message": "Read-only global 'String' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 13`] = `
+{
+  "code": "[String] = ['x'];",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'String' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 14`] = `
+{
+  "code": "({a: Object} = {});",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 15`] = `
+{
+  "code": "[...Array] = [1, 2];",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Array' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 16`] = `
+{
+  "code": "for (Object in {}) {}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 17`] = `
+{
+  "code": "for (Array of []) {}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Array' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 18`] = `
+{
+  "code": "Object ??= {};",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 19`] = `
+{
+  "code": "function f() { Object = 1; function inner() { var Object: any; } }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 20`] = `
+{
+  "code": "interface JSON { x: number } JSON = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'JSON' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 21`] = `
+{
+  "code": "type RegExp = string; RegExp = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'RegExp' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 22`] = `
+{
+  "code": "function outer() { Object = 1; }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 23`] = `
+{
+  "code": "const f = () => { String = 'x'; };",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'String' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 24`] = `
+{
+  "code": "class C { method() { Object = 1; } }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 25`] = `
+{
+  "code": "[[[String]]] = [[['x']]];",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'String' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 26`] = `
+{
+  "code": "Object = Array = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+    {
+      "message": "Read-only global 'Array' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 27`] = `
+{
+  "code": "const x = function Number() {}; Number = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Number' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 28`] = `
+{
+  "code": "for ({Object} of [{}]) {}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 29`] = `
+{
+  "code": "for ([Object] of [[1]]) {}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 30`] = `
+{
+  "code": "function f() { const fn = () => { var Object: any; }; Object = 1; }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 31`] = `
+{
+  "code": "function f() { class C { m() { var Object: any; } } Object = 1; }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 53,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 32`] = `
+{
+  "code": "function f() { for (let Object = 0;;) { break; } Object = 1; }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 33`] = `
+{
+  "code": "function f() { for (const Object of []) {} Object = 1; }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 34`] = `
+{
+  "code": "for ({a: {b: Object}} of [{a: {b: 1}}]) {}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 35`] = `
+{
+  "code": "for ([...Object] of [[1,2]]) {}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 36`] = `
+{
+  "code": "for ({Object = 0} of [{}]) {}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 37`] = `
+{
+  "code": "(Object!) = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 38`] = `
+{
+  "code": "(((((Object))))) = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 39`] = `
+{
+  "code": "class C { static { var Object: any; } } Object = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 40`] = `
+{
+  "code": "class C { field = (Object = 1); }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 41`] = `
+{
+  "code": "(0, Object = 1);",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 42`] = `
+{
+  "code": "function f(x = (Object = 1)) {}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 43`] = `
+{
+  "code": "function* gen() { Object = 1; }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 44`] = `
+{
+  "code": "async function af() { Object = 1; }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 45`] = `
+{
+  "code": "(function() { var Object: any; })(); Object = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 46`] = `
+{
+  "code": "while (Object = 1) { break; }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 47`] = `
+{
+  "code": "for (let i = 0; i < 1; Object++) {}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 48`] = `
+{
+  "code": "declare module "test" {
+  interface Object { custom: string; }
+}
+Object = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 49`] = `
+{
+  "code": "declare module "foo" {
+  var Object: any;
+}
+Object = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 50`] = `
+{
+  "code": "namespace Foo {
+  var Object: any;
+}
+Object = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 51`] = `
+{
+  "code": "declare global {
+  var Object: any;
+}
+Object = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 4,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 52`] = `
+{
+  "code": "const s = \`\${Object = 1}\`;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 53`] = `
+{
+  "code": "const a = [Object = 1];",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 54`] = `
+{
+  "code": "function f() {
+  if (true) {
+    using Object = { [Symbol.dispose]() {} };
+  }
+  Object = 1;
+}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 55`] = `
+{
+  "code": "({...Object} = {a: 1});",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 56`] = `
+{
+  "code": "({a: [Object]} = {a: [1]});",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 57`] = `
+{
+  "code": "([{a: Object}] = [{a: 1}]);",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 58`] = `
+{
+  "code": "[, ...Object] = [1, 2, 3];",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 59`] = `
+{
+  "code": "async function f() { for await (Object of []) {} }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 60`] = `
+{
+  "code": "export default Object = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 61`] = `
+{
+  "code": "const key = "x"; ({[key]: Object} = {x: 1});",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 62`] = `
+{
+  "code": "function f() { const o = { get x() { var Object: any; return 1; } }; Object = 1; }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 76,
+          "line": 1,
+        },
+        "start": {
+          "column": 70,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 63`] = `
+{
+  "code": "for ({Object} in {}) {}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 64`] = `
+{
+  "code": "for ([Object] in {}) {}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 65`] = `
+{
+  "code": "for ({a: Object} in {}) {}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 66`] = `
+{
+  "code": "for ([...Object] in {}) {}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 67`] = `
+{
+  "code": "const o = { m() { Object = 1; } };",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 68`] = `
+{
+  "code": "class C { static m() { Object = 1; } }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 69`] = `
+{
+  "code": "try {} catch { Object = 1; }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 70`] = `
+{
+  "code": "class C { prop = () => { Object = 1; }; }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 71`] = `
+{
+  "code": "function f() { const o = { set x(v: any) { var Object: any; } }; Object = 1; }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 72,
+          "line": 1,
+        },
+        "start": {
+          "column": 66,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 72`] = `
+{
+  "code": "async function f() {
+  if (true) {
+    await using Object = { async [Symbol.asyncDispose]() {} };
+  }
+  Object = 1;
+}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 73`] = `
+{
+  "code": "AggregateError = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'AggregateError' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 74`] = `
+{
+  "code": "FinalizationRegistry = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'FinalizationRegistry' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 75`] = `
+{
+  "code": "Intl = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Intl' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 76`] = `
+{
+  "code": "for ({...Object} in {}) {}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 77`] = `
+{
+  "code": "for ({Object = 0} in {}) {}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 78`] = `
+{
+  "code": "for ({a: {b: Object}} in {}) {}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 79`] = `
+{
+  "code": "true ? (String = 1) : (Array = 2);",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'String' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+    {
+      "message": "Read-only global 'Array' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 80`] = `
+{
+  "code": "try { try {} catch (Object) {} Object = 1; } catch(e) {}",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 81`] = `
+{
+  "code": "[Object, Array, ...String] = [1, 2, 3, 4];",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+    {
+      "message": "Read-only global 'Array' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+    {
+      "message": "Read-only global 'String' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 82`] = `
+{
+  "code": "({x: Object = Array = 1} = {});",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+    {
+      "message": "Read-only global 'Array' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 83`] = `
+{
+  "code": "function* g() { Object = yield 1; }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 84`] = `
+{
+  "code": "async function f() { Object = await Promise.resolve(1); }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 85`] = `
+{
+  "code": "function f() { Object = 1; class Inner { m() { class Object {} } } }",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Object' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 86`] = `
+{
+  "code": "Iterator = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Iterator' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 87`] = `
+{
+  "code": "SuppressedError = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'SuppressedError' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 88`] = `
+{
+  "code": "DisposableStack = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'DisposableStack' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
