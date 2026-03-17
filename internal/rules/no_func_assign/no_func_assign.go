@@ -411,7 +411,7 @@ func checkFuncReassignments(searchRoot *ast.Node, funcName string, funcNode *ast
 }
 
 // NoFuncAssignRule disallows reassigning function declarations
-var NoFuncAssignRule = rule.CreateRule(rule.Rule{
+var NoFuncAssignRule = rule.Rule{
 	Name: "no-func-assign",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		return rule.RuleListeners{
@@ -453,4 +453,4 @@ var NoFuncAssignRule = rule.CreateRule(rule.Rule{
 			},
 		}
 	},
-})
+}

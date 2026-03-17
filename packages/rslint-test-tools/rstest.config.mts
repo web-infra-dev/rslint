@@ -25,7 +25,7 @@ export default defineConfig({
     './tests/eslint/rules/no-new-wrappers.test.ts',
     './tests/eslint/rules/prefer-rest-params.test.ts',
     './tests/eslint/rules/no-var.test.ts',
-    // './tests/eslint/rules/no-func-assign.test.ts',
+    './tests/eslint/rules/no-func-assign.test.ts',
     './tests/eslint/rules/no-self-assign.test.ts',
     './tests/eslint/rules/no-inner-declarations.test.ts',
     './tests/eslint/rules/no-import-assign.test.ts',
