@@ -718,6 +718,142 @@ func NormalizeBigIntLiteral(text string) string {
 	return strconv.FormatInt(i, 10)
 }
 
+// GetStaticExpressionValue returns the static string value of a literal expression,
+// or ("", false) if the value cannot be statically determined.
+//
+// Unlike [GetStaticPropertyName], which is designed for property name nodes
+// (Identifier, ComputedPropertyName, etc.) and treats Identifier as a static name,
+// this function is for arbitrary value expressions — it only recognizes
+// compile-time-constant literals and does NOT treat Identifier as static
+// (since a[b] where b is a variable is dynamic).
+//
+// Supported node kinds:
+//   - StringLiteral: returns the string value
+//   - NumericLiteral: returns the normalized numeric string (e.g. "0x1" → "1")
+//   - NoSubstitutionTemplateLiteral: returns the template text
+//   - RegularExpressionLiteral: returns the source text (e.g. /foo/g),
+//     matching JavaScript's implicit toString coercion when used as a property key
+//
+// This is the expression-level complement to [GetStaticPropertyName]:
+// use GetStaticPropertyName for property name nodes (object keys, class members),
+// and GetStaticExpressionValue for value positions (element access arguments, etc.).
+func GetStaticExpressionValue(node *ast.Node) (string, bool) {
+	if node == nil {
+		return "", false
+	}
+	switch node.Kind {
+	case ast.KindStringLiteral:
+		return node.AsStringLiteral().Text, true
+	case ast.KindNumericLiteral:
+		return NormalizeNumericLiteral(node.AsNumericLiteral().Text), true
+	case ast.KindNoSubstitutionTemplateLiteral:
+		return node.AsNoSubstitutionTemplateLiteral().Text, true
+	case ast.KindRegularExpressionLiteral:
+		return node.AsRegularExpressionLiteral().Text, true
+	}
+	return "", false
+}
+
+// IsSameReference reports whether two AST nodes refer to the same runtime value.
+// It recursively compares member expression chains (PropertyAccessExpression,
+// ElementAccessExpression), walking through the object/property structure.
+//
+// Behavior details:
+//   - Parenthesized expressions and type assertions (as, <T>) are transparently
+//     unwrapped on both sides via [ast.SkipOuterExpressions].
+//   - Optional chaining is ignored: a.b and a?.b are considered the same reference,
+//     matching ESLint's isSameReference semantics.
+//   - Cross-syntax comparison is supported via static property names:
+//     a.b and a['b'] are the same reference; a[0] and a['0'] likewise.
+//   - For non-static element access (a[x]), falls back to comparing the argument
+//     nodes structurally (same Kind + same Identifier/ThisKeyword).
+//   - Function calls break the chain: a.b() and a.b() are NOT the same reference,
+//     because each call may return a different value.
+//
+// This implements the same logic as ESLint's astUtils.isSameReference combined
+// with astUtils.getStaticPropertyName, adapted for the TypeScript AST.
+func IsSameReference(left, right *ast.Node) bool {
+	left = ast.SkipOuterExpressions(left, ast.OEKParentheses|ast.OEKTypeAssertions)
+	right = ast.SkipOuterExpressions(right, ast.OEKParentheses|ast.OEKTypeAssertions)
+
+	if left == nil || right == nil {
+		return false
+	}
+
+	// Base cases: Identifier and ThisKeyword.
+	if left.Kind == ast.KindIdentifier && right.Kind == ast.KindIdentifier {
+		return left.AsIdentifier().Text == right.AsIdentifier().Text
+	}
+	if left.Kind == ast.KindThisKeyword && right.Kind == ast.KindThisKeyword {
+		return true
+	}
+
+	// Member expression comparison.
+	if ast.IsAccessExpression(left) && ast.IsAccessExpression(right) {
+		// Try static property name comparison first (handles cross-type: a.b vs a['b']).
+		leftName, leftOK := accessExpressionStaticName(left)
+		if leftOK {
+			rightName, rightOK := accessExpressionStaticName(right)
+			if rightOK && leftName == rightName {
+				return IsSameReference(accessExpressionObject(left), accessExpressionObject(right))
+			}
+			return false
+		}
+
+		// Non-static: fall back to same-kind, same-index comparison (e.g. a[x] = a[x]).
+		if left.Kind == right.Kind && left.Kind == ast.KindElementAccessExpression {
+			leftArg := left.AsElementAccessExpression().ArgumentExpression
+			rightArg := right.AsElementAccessExpression().ArgumentExpression
+			if isSameSimpleNode(leftArg, rightArg) {
+				return IsSameReference(left.AsElementAccessExpression().Expression, right.AsElementAccessExpression().Expression)
+			}
+		}
+	}
+
+	return false
+}
+
+// accessExpressionStaticName returns the static property name of an access expression
+// (PropertyAccessExpression or ElementAccessExpression), or ("", false) if not static.
+func accessExpressionStaticName(node *ast.Node) (string, bool) {
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		name := node.AsPropertyAccessExpression().Name()
+		if name != nil {
+			return name.Text(), true
+		}
+	case ast.KindElementAccessExpression:
+		return GetStaticExpressionValue(node.AsElementAccessExpression().ArgumentExpression)
+	}
+	return "", false
+}
+
+// accessExpressionObject returns the object expression of an access expression.
+func accessExpressionObject(node *ast.Node) *ast.Node {
+	switch node.Kind {
+	case ast.KindPropertyAccessExpression:
+		return node.AsPropertyAccessExpression().Expression
+	case ast.KindElementAccessExpression:
+		return node.AsElementAccessExpression().Expression
+	}
+	return nil
+}
+
+// isSameSimpleNode checks if two nodes are the same simple reference (Identifier or ThisKeyword).
+// Used as a fallback for comparing non-static element access arguments like a[x] vs a[x].
+func isSameSimpleNode(left, right *ast.Node) bool {
+	if left == nil || right == nil || left.Kind != right.Kind {
+		return false
+	}
+	switch left.Kind {
+	case ast.KindIdentifier:
+		return left.AsIdentifier().Text == right.AsIdentifier().Text
+	case ast.KindThisKeyword:
+		return true
+	}
+	return false
+}
+
 // CollectBindingNames recursively extracts all identifier names from a binding
 // pattern (ObjectBindingPattern, ArrayBindingPattern) or plain Identifier.
 // For each identifier found, it calls the callback with the identifier node and its name.
