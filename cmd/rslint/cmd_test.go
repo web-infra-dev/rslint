@@ -212,7 +212,7 @@ func TestPrintDiagnosticFold(t *testing.T) {
 	var sb strings.Builder
 	sb.WriteString("const a = 1;\n")                // line 1
 	for i := 2; i <= 20; i++ {
-		sb.WriteString(fmt.Sprintf("const v%d = %d;\n", i, i)) // lines 2-20
+		fmt.Fprintf(&sb, "const v%d = %d;\n", i, i) // lines 2-20
 	}
 	source := sb.String()
 
