@@ -57,20 +57,28 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          # Pre-build shared dependencies to warm the build cache
+          go build ./internal/...
+
           $packages = go list ./internal/... | Where-Object { $_ -ne "" }
-          $batchSize = 15
+          $batchSize = 50
           $batch = @()
+          $cacheDir = go env GOCACHE
 
           foreach ($pkg in $packages) {
             $batch += $pkg
 
             if ($batch.Count -ge $batchSize) {
               Write-Host "Running batch of $($batch.Count) packages..."
+              $marker = New-TemporaryFile
               go test -parallel 4 $batch
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-              # Clean build cache after each batch to free disk space
-              go clean -cache
+              # Remove only test-generated cache files, keeping build cache warm
+              Get-ChildItem -Path $cacheDir -Recurse -File |
+                Where-Object { $_.LastWriteTime -gt $marker.LastWriteTime } |
+                Remove-Item -Force -ErrorAction SilentlyContinue
+              Remove-Item $marker -Force
               $batch = @()
             }
           }
