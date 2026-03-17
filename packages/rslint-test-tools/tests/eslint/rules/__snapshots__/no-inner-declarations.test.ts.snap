@@ -1,0 +1,53 @@
+// Rstest Snapshot v1
+
+exports[`no-inner-declarations > invalid 1`] = `
+{
+  "code": "if (foo) function f(){}",
+  "diagnostics": [
+    {
+      "message": "Move function declaration to program root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-inner-declarations > invalid 2`] = `
+{
+  "code": "function bar() { if (foo) function f(){}; }",
+  "diagnostics": [
+    {
+      "message": "Move function declaration to function body root.",
+      "messageId": "moveDeclToRoot",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-inner-declarations",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
