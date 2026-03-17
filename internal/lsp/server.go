@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -17,13 +18,13 @@ import (
 	"github.com/go-json-experiment/json"
 	"github.com/microsoft/typescript-go/shim/collections"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/jsonrpc"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/text/language"
 )
 
 type ServerOptions struct {
@@ -49,13 +50,14 @@ func NewServer(opts *ServerOptions) *Server {
 		stderr:                opts.Err,
 		requestQueue:          make(chan *lsproto.RequestMessage, 100),
 		outgoingQueue:         make(chan *lsproto.Message, 100),
-		pendingClientRequests: make(map[lsproto.ID]pendingClientRequest),
-		pendingServerRequests: make(map[lsproto.ID]chan *lsproto.ResponseMessage),
+		pendingClientRequests: make(map[jsonrpc.ID]pendingClientRequest),
+		pendingServerRequests: make(map[jsonrpc.ID]chan *lsproto.ResponseMessage),
 		cwd:                   opts.Cwd,
 		fs:                    opts.FS,
 		defaultLibraryPath:    opts.DefaultLibraryPath,
 		typingsLocation:       opts.TypingsLocation,
 		parseCache:            opts.ParseCache,
+		jsConfigs:             make(map[string]config.RslintConfig),
 		documents:             make(map[lsproto.DocumentUri]string),
 		diagnostics:           make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
 		refreshCh:             make(chan struct{}, 1),
@@ -97,7 +99,7 @@ func (r *lspReader) Read() (*lsproto.Message, error) {
 
 	req := &lsproto.Message{}
 	if err := json.Unmarshal(data, req); err != nil {
-		return nil, fmt.Errorf("%w: %w", lsproto.ErrInvalidRequest, err)
+		return nil, fmt.Errorf("%w: %w", lsproto.ErrorCodeInvalidRequest, err)
 	}
 
 	return req, nil
@@ -133,9 +135,9 @@ type Server struct {
 	clientSeq               atomic.Int32
 	requestQueue            chan *lsproto.RequestMessage
 	outgoingQueue           chan *lsproto.Message
-	pendingClientRequests   map[lsproto.ID]pendingClientRequest
+	pendingClientRequests   map[jsonrpc.ID]pendingClientRequest
 	pendingClientRequestsMu sync.Mutex
-	pendingServerRequests   map[lsproto.ID]chan *lsproto.ResponseMessage
+	pendingServerRequests   map[jsonrpc.ID]chan *lsproto.ResponseMessage
 	pendingServerRequestsMu sync.Mutex
 
 	cwd                string
@@ -146,8 +148,6 @@ type Server struct {
 	backgroundCtx    context.Context
 	initializeParams *lsproto.InitializeParams
 	positionEncoding lsproto.PositionEncodingKind
-	locale           language.Tag
-
 	watchEnabled bool
 	watchers     collections.SyncSet[project.WatcherID]
 
@@ -160,8 +160,9 @@ type Server struct {
 	compilerOptionsForInferredProjects *core.CompilerOptions
 
 	// rslint config
-	rslintConfig     config.RslintConfig
-	rslintConfigPath string // path to rslint.json/rslint.jsonc, empty if not found
+	jsConfigs        map[string]config.RslintConfig                // configDirectory -> config entries (from JS/TS configs)
+	jsonConfig       config.RslintConfig                           // fallback JSON config (rslint.json/rslint.jsonc)
+	rslintConfigPath string                                        // path to rslint.json/rslint.jsonc, empty if not found
 	documents        map[lsproto.DocumentUri]string                // URI -> content
 	diagnostics      map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
 
@@ -320,14 +321,14 @@ func (s *Server) readLoop(ctx context.Context) error {
 		}
 		msg, err := s.read()
 		if err != nil {
-			if errors.Is(err, lsproto.ErrInvalidRequest) {
+			if errors.Is(err, lsproto.ErrorCodeInvalidRequest) {
 				s.sendError(nil, err)
 				continue
 			}
 			return err
 		}
 
-		if s.initializeParams == nil && msg.Kind == lsproto.MessageKindRequest {
+		if s.initializeParams == nil && msg.Kind == jsonrpc.MessageKindRequest {
 			req := msg.AsRequest()
 			if req.Method == lsproto.MethodInitialize {
 				resp, err := s.handleInitialize(ctx, req.Params.(*lsproto.InitializeParams))
@@ -336,12 +337,12 @@ func (s *Server) readLoop(ctx context.Context) error {
 				}
 				s.sendResult(req.ID, resp)
 			} else {
-				s.sendError(req.ID, lsproto.ErrServerNotInitialized)
+				s.sendError(req.ID, lsproto.ErrorCodeServerNotInitialized)
 			}
 			continue
 		}
 
-		if msg.Kind == lsproto.MessageKindResponse {
+		if msg.Kind == jsonrpc.MessageKindResponse {
 			resp := msg.AsResponse()
 			s.pendingServerRequestsMu.Lock()
 			if respChan, ok := s.pendingServerRequests[*resp.ID]; ok {
@@ -395,7 +396,7 @@ func (s *Server) dispatchLoop(ctx context.Context) error {
 			}
 			clear(s.pendingLintURIs)
 		case req := <-s.requestQueue:
-			requestCtx := core.WithLocale(ctx, s.locale)
+			requestCtx := ctx
 			if req.ID != nil {
 				var cancel context.CancelFunc
 				requestCtx, cancel = context.WithCancel(core.WithRequestID(requestCtx, req.ID.String()))
@@ -416,7 +417,7 @@ func (s *Server) dispatchLoop(ctx context.Context) error {
 							lspExit()
 						} else {
 							if req.ID != nil {
-								s.sendError(req.ID, fmt.Errorf("%w: panic handling request %s: %v", lsproto.ErrInternalError, req.Method, r))
+								s.sendError(req.ID, fmt.Errorf("%w: panic handling request %s: %v", lsproto.ErrorCodeInternalError, req.Method, r))
 							} else {
 								s.Log("unhandled panic in notification", req.Method, r)
 							}
@@ -425,7 +426,7 @@ func (s *Server) dispatchLoop(ctx context.Context) error {
 				}()
 				if err := s.handleRequestOrNotification(requestCtx, req); err != nil {
 					if errors.Is(err, context.Canceled) {
-						s.sendError(req.ID, lsproto.ErrRequestCancelled)
+						s.sendError(req.ID, lsproto.ErrorCodeRequestCancelled)
 					} else if errors.Is(err, io.EOF) {
 						lspExit()
 					} else {
@@ -463,8 +464,12 @@ func (s *Server) writeLoop(ctx context.Context) error {
 }
 
 func (s *Server) sendRequest(ctx context.Context, method lsproto.Method, params any) (any, error) {
-	id := lsproto.NewIDString(fmt.Sprintf("ts%d", s.clientSeq.Add(1)))
-	req := lsproto.NewRequestMessage(method, id, params)
+	id := jsonrpc.NewIDString(fmt.Sprintf("ts%d", s.clientSeq.Add(1)))
+	req := &lsproto.RequestMessage{
+		ID:     id,
+		Method: method,
+		Params: params,
+	}
 
 	responseChan := make(chan *lsproto.ResponseMessage, 1)
 	s.pendingServerRequestsMu.Lock()
@@ -490,22 +495,23 @@ func (s *Server) sendRequest(ctx context.Context, method lsproto.Method, params 
 	}
 }
 
-func (s *Server) sendResult(id *lsproto.ID, result any) {
+func (s *Server) sendResult(id *jsonrpc.ID, result any) {
 	s.sendResponse(&lsproto.ResponseMessage{
 		ID:     id,
 		Result: result,
 	})
 }
 
-func (s *Server) sendError(id *lsproto.ID, err error) {
-	code := lsproto.ErrInternalError.Code
-	if lspErr := (*lsproto.LSPError)(nil); errors.As(err, &lspErr) {
-		code = lspErr.Code
+func (s *Server) sendError(id *jsonrpc.ID, err error) {
+	code := int32(lsproto.ErrorCodeInternalError)
+	var errCode lsproto.ErrorCode
+	if errors.As(err, &errCode) {
+		code = int32(errCode)
 	}
 	// TODO(jakebailey): error data
 	s.sendResponse(&lsproto.ResponseMessage{
 		ID: id,
-		Error: &lsproto.ResponseError{
+		Error: &jsonrpc.ResponseError{
 			Code:    code,
 			Message: err.Error(),
 		},
@@ -522,7 +528,7 @@ func (s *Server) handleRequestOrNotification(ctx context.Context, req *lsproto.R
 	}
 	s.Log("unknown method", req.Method)
 	if req.ID != nil {
-		s.sendError(req.ID, lsproto.ErrInvalidRequest)
+		s.sendError(req.ID, lsproto.ErrorCodeInvalidRequest)
 	}
 	return nil
 }
@@ -543,6 +549,15 @@ var handlers = sync.OnceValue(func() handlerMap {
 	registerNotificationHandler(handlers, lsproto.TextDocumentDidCloseInfo, (*Server).handleDidClose)
 	registerNotificationHandler(handlers, lsproto.WorkspaceDidChangeWatchedFilesInfo, (*Server).handleDidChangeWatchedFiles)
 	registerRequestHandler(handlers, lsproto.TextDocumentCodeActionInfo, (*Server).handleCodeAction)
+
+	// Custom rslint notification
+	handlers[lsproto.Method("rslint/configUpdate")] = func(s *Server, ctx context.Context, req *lsproto.RequestMessage) error {
+		if err := s.handleConfigUpdate(ctx, req.Params); err != nil {
+			log.Printf("[rslint] Error handling config update: %v", err)
+		}
+		return nil
+	}
+
 	return handlers
 })
 
@@ -608,7 +623,12 @@ func isBlockingMethod(method lsproto.Method) bool {
 		lsproto.MethodTextDocumentDidChange,
 		lsproto.MethodTextDocumentDidSave,
 		lsproto.MethodTextDocumentDidClose,
-		lsproto.MethodWorkspaceDidChangeWatchedFiles:
+		lsproto.MethodWorkspaceDidChangeWatchedFiles,
+		lsproto.MethodTextDocumentCodeAction,
+		// rslint/configUpdate writes to s.jsConfigs, which is read by handlers
+		// dispatched on the main loop (e.g. didOpen/didChange). Running it on
+		// the same serialized dispatch loop avoids a data race without locks.
+		lsproto.Method("rslint/configUpdate"):
 		return true
 	}
 	return false

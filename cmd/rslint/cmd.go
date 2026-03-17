@@ -3,8 +3,10 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"math"
 	"os"
 	"runtime"
@@ -25,8 +27,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
+	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
+	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
@@ -83,6 +87,32 @@ func setupColors() *ColorScheme {
 	}
 }
 
+// reportSyntacticErrors renders syntax errors with code snippets (like tsc --pretty).
+// Returns true if syntactic errors were found and reported.
+func reportSyntacticErrors(err error, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions) bool {
+	var syntacticErr *utils.SyntacticError
+	if !errors.As(err, &syntacticErr) {
+		return false
+	}
+	rendered := false
+	for _, d := range syntacticErr.Diagnostics {
+		if d.File() == nil {
+			continue
+		}
+		diag := rule.RuleDiagnostic{
+			RuleName:   fmt.Sprintf("TS%d", d.Code()),
+			SourceFile: d.File(),
+			Range:      d.Loc(),
+			Message:    rule.RuleMessage{Description: d.String()},
+			Severity:   rule.SeverityError,
+		}
+		printDiagnosticDefault(diag, w, comparePathOptions)
+		rendered = true
+	}
+	w.Flush()
+	return rendered
+}
+
 func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions, format string) {
 	switch format {
 	case "default":
@@ -111,8 +141,8 @@ func printDiagnosticGitHub(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOp
 	diagnosticStart := d.Range.Pos()
 	diagnosticEnd := d.Range.End()
 
-	startLine, startColumn := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticStart)
-	endLine, endColumn := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
+	startLine, startColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticStart)
+	endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticEnd)
 
 	filePath := tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions)
 	output := fmt.Sprintf(
@@ -121,8 +151,8 @@ func printDiagnosticGitHub(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOp
 		escapeProperty(filePath),
 		startLine+1,
 		endLine+1,
-		startColumn+1,
-		endColumn+1,
+		int(startColumn)+1,
+		int(endColumn)+1,
 		d.RuleName,
 		escapeData(d.Message.Description),
 	)
@@ -151,8 +181,8 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 	diagnosticStart := d.Range.Pos()
 	diagnosticEnd := d.Range.End()
 
-	startLine, startColumn := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticStart)
-	endLine, endColumn := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
+	startLine, startColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticStart)
+	endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticEnd)
 
 	type Location struct {
 		Line   int `json:"line"`
@@ -179,11 +209,11 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 		Range: Range{
 			Start: Location{
 				Line:   startLine + 1, // Convert to 1-based indexing
-				Column: startColumn + 1,
+				Column: int(startColumn) + 1,
 			},
 			End: Location{
 				Line:   endLine + 1,
-				Column: endColumn + 1,
+				Column: int(endColumn) + 1,
 			},
 		},
 		Severity: d.Severity.String(),
@@ -213,8 +243,8 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	diagnosticStart := d.Range.Pos()
 	diagnosticEnd := d.Range.End()
 
-	diagnosticStartLine, diagnosticStartColumn := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticStart)
-	diagnosticEndline, _ := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
+	diagnosticStartLine, diagnosticStartColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticStart)
+	diagnosticEndline, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticEnd)
 
 	lineMap := scanner.GetECMALineStarts(d.SourceFile)
 	text := d.SourceFile.Text()
@@ -222,14 +252,13 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	codeboxStartLine := max(diagnosticStartLine-1, 0)
 	codeboxEndLine := min(diagnosticEndline+1, len(lineMap)-1)
 
-	codeboxStart := scanner.GetECMAPositionOfLineAndCharacter(d.SourceFile, codeboxStartLine, 0)
-	var codeboxEndColumn int
+	codeboxStart := int(lineMap[codeboxStartLine])
+	var codeboxEnd int
 	if codeboxEndLine == len(lineMap)-1 {
-		codeboxEndColumn = len(text) - int(lineMap[len(lineMap)-1])
+		codeboxEnd = len(text)
 	} else {
-		codeboxEndColumn = int(lineMap[codeboxEndLine+1]-lineMap[codeboxEndLine]) - 1
+		codeboxEnd = int(lineMap[codeboxEndLine+1]) - 1
 	}
-	codeboxEnd := scanner.GetECMAPositionOfLineAndCharacter(d.SourceFile, codeboxEndLine, codeboxEndColumn)
 
 	// Rule name with conditional coloring
 	w.WriteByte(' ')
@@ -274,18 +303,9 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	lineIndentCalculated := false
 	lastNonSpaceByteIndex := -1
 
-	lineStarts := make([]int, 13)
-	lineEnds := make([]int, 13)
-
-	if codeboxEndLine-codeboxStartLine >= len(lineEnds) {
-		w.WriteString("  ")
-		w.WriteString(colors.BorderText("│"))
-		w.WriteString("  Error range is too big. Skipping code block printing.\n  ")
-		w.WriteString(colors.BorderText("╰────────────────────────────────"))
-		w.WriteByte('\n')
-		w.WriteByte('\n')
-		return
-	}
+	numLines := codeboxEndLine - codeboxStartLine + 1
+	lineStarts := make([]int, numLines)
+	lineEnds := make([]int, numLines)
 
 	// Iterate by runes to correctly handle multi-byte UTF-8 characters,
 	// but track byte positions for string slicing
@@ -322,8 +342,25 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 
 	diagnosticHighlightActive := false
 	lastLineNumber := strconv.Itoa(codeboxEndLine + 1)
+	// Fold when codebox spans 5+ lines: show first 2 + "..." + last 2 (same as tsc)
+	shouldFold := codeboxEndLine-codeboxStartLine >= 4
 
 	for line := codeboxStartLine; line <= codeboxEndLine; line++ {
+		// Fold: skip middle lines, show first 2 and last 2
+		if shouldFold && codeboxStartLine+1 < line && line < codeboxEndLine-1 {
+			w.WriteString("  ")
+			w.WriteString(colors.BorderText("│ "))
+			foldDots := strings.Repeat(".", len(lastLineNumber))
+			w.WriteString(colors.DimText("%s", foldDots))
+			w.WriteString(colors.BorderText(" │"))
+			w.WriteByte('\n')
+
+			line = codeboxEndLine - 1
+			// Update highlight state for the jumped-to line
+			diagnosticHighlightActive = diagnosticStart < int(lineMap[line]) && diagnosticEnd >= int(lineMap[line])
+			// Fall through to render this line
+		}
+
 		w.WriteString("  ")
 		w.WriteString(colors.BorderText("│ "))
 		if line == codeboxEndLine {
@@ -376,13 +413,13 @@ Usage:
   rslint [OPTIONS]
 
 Options:
-  --init				Initialize a default config in the current directory.
-  --config PATH         Which rslint config file to use. Defaults to rslint.json.
+  --init                Initialize a default config in the current directory.
+  --config PATH         Which rslint config file to use.
   --format FORMAT       Output format: default | jsonline | github
   --fix                 Automatically fix problems
   --no-color            Disable colored output
   --force-color         Force colored output
-  --quiet               Report errors only 
+  --quiet               Report errors only
   --max-warnings Int    Number of warnings to trigger nonzero exit code
   -h, --help            Show help
 `
@@ -391,10 +428,11 @@ func runCMD() int {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
 	var (
-		init   bool
-		help   bool
-		config string
-		fix    bool
+		init        bool
+		help        bool
+		config      string
+		configStdin bool
+		fix         bool
 
 		traceOut       string
 		cpuprofOut     string
@@ -407,6 +445,7 @@ func runCMD() int {
 	)
 	flag.StringVar(&format, "format", "default", "output format")
 	flag.StringVar(&config, "config", "", "which rslint config to use")
+	flag.BoolVar(&configStdin, "config-stdin", false, "read config from stdin (used internally by JS config loader)")
 	flag.BoolVar(&init, "init", false, "initialize a default config in the current directory")
 	flag.BoolVar(&fix, "fix", false, "automatically fix problems")
 	flag.BoolVar(&help, "help", false, "show help")
@@ -484,8 +523,51 @@ func runCMD() int {
 	rslintconfig.RegisterAllRules()
 	var rslintConfig rslintconfig.RslintConfig
 	var tsConfigs []string
-	// Load rslint configuration and determine which rules to enable
-	rslintConfig, tsConfigs, currentDirectory = rslintconfig.LoadConfigurationWithFallback(config, currentDirectory, fs)
+
+	if configStdin {
+		// Read config JSON from stdin (sent by JS config loader).
+		// Read up to maxConfigSize+1 so we can detect truncation.
+		const maxConfigSize = 50 << 20 // 50 MB
+		data, err := io.ReadAll(io.LimitReader(os.Stdin, maxConfigSize+1))
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error reading config from stdin: %v\n", err)
+			return 1
+		}
+		if len(data) > maxConfigSize {
+			fmt.Fprintf(os.Stderr, "error: config from stdin exceeds maximum size of %d bytes\n", maxConfigSize)
+			return 1
+		}
+
+		var payload struct {
+			ConfigDirectory string                    `json:"configDirectory"`
+			Entries         rslintconfig.RslintConfig `json:"entries"`
+		}
+		if err := json.Unmarshal(data, &payload); err != nil {
+			fmt.Fprintf(os.Stderr, "error parsing config from stdin: %v\n", err)
+			return 1
+		}
+
+		rslintConfig = payload.Entries
+		currentDirectory = payload.ConfigDirectory
+
+		loader := rslintconfig.NewConfigLoader(fs, currentDirectory)
+		tsConfigs, err = loader.LoadTsConfigsFromRslintConfig(rslintConfig, currentDirectory)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+	} else {
+		// Load configuration from file (JSON config path, isJSConfig stays false)
+		rslintConfig, tsConfigs, currentDirectory = rslintconfig.LoadConfigurationWithFallback(config, currentDirectory, fs)
+	}
+
+	// When no tsconfig is specified in rslint config, auto-detect tsconfig.json in the working directory.
+	if len(tsConfigs) == 0 {
+		defaultTsConfig := tspath.ResolvePath(currentDirectory, "tsconfig.json")
+		if fs.FileExists(defaultTsConfig) {
+			tsConfigs = []string{defaultTsConfig}
+		}
+	}
 
 	host := utils.CreateCompilerHost(currentDirectory, fs)
 
@@ -494,14 +576,35 @@ func runCMD() int {
 		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
 	}
 	programs := []*compiler.Program{}
-	for _, configFileName := range tsConfigs {
-		program, err := utils.CreateProgram(singleThreaded, fs, currentDirectory, configFileName, host)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
-			return 1
+	if len(tsConfigs) > 0 {
+		for _, configFileName := range tsConfigs {
+			program, err := utils.CreateProgram(singleThreaded, fs, currentDirectory, configFileName, host)
+			if err != nil {
+				w := bufio.NewWriter(os.Stderr)
+				if !reportSyntacticErrors(err, w, comparePathOptions) {
+					fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
+				}
+				return 1
+			}
+			programs = append(programs, program)
 		}
-		programs = append(programs, program)
-
+	} else {
+		// No tsconfig available — create program in memory for pure JS projects.
+		sourceExts := []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".mjs"}
+		excludes := []string{"node_modules"}
+		includes := []string{"**/*"}
+		rootFiles := vfs.ReadDirectory(fs, currentDirectory, currentDirectory, sourceExts, excludes, includes, nil)
+		if len(rootFiles) > 0 {
+			program, err := utils.CreateProgramFromOptions(singleThreaded, &core.CompilerOptions{AllowJs: core.TSTrue}, rootFiles, host)
+			if err != nil {
+				w := bufio.NewWriter(os.Stderr)
+				if !reportSyntacticErrors(err, w, comparePathOptions) {
+					fmt.Fprintf(os.Stderr, "error creating program: %v", err)
+				}
+				return 1
+			}
+			programs = append(programs, program)
+		}
 	}
 
 	var wg sync.WaitGroup
@@ -557,7 +660,7 @@ func runCMD() int {
 		utils.ExcludePaths,
 
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			activeRules := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName())
+			activeRules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), currentDirectory)
 			return activeRules
 		},
 		func(d rule.RuleDiagnostic) {

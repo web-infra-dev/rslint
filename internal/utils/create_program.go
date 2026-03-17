@@ -4,14 +4,28 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
+	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tsoptions"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 )
+
+// SyntacticError carries structured diagnostics for syntax errors.
+// Callers can type-assert to access the raw diagnostics for rich rendering.
+type SyntacticError struct {
+	Diagnostics []*ast.Diagnostic
+	msg         string
+}
+
+func (e *SyntacticError) Error() string {
+	return e.msg
+}
 
 func CreateCompilerHost(cwd string, fs vfs.FS) compiler.CompilerHost {
 	defaultLibraryPath := bundled.LibPath()
@@ -26,8 +40,23 @@ func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath stri
 
 	configParseResult, _ := tsoptions.GetParsedCommandLineOfConfigFile(tsconfigPath, &core.CompilerOptions{}, nil, host, nil)
 
+	return createProgramFromConfig(singleThreaded, configParseResult, host)
+}
+
+// CreateProgramFromOptions creates a program from in-memory compiler options and root file names,
+// without requiring a tsconfig file on disk.
+func CreateProgramFromOptions(singleThreaded bool, compilerOptions *core.CompilerOptions, rootFileNames []string, host compiler.CompilerHost) (*compiler.Program, error) {
+	configParseResult := tsoptions.NewParsedCommandLine(compilerOptions, rootFileNames, tspath.ComparePathsOptions{
+		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
+		CurrentDirectory:          host.GetCurrentDirectory(),
+	})
+
+	return createProgramFromConfig(singleThreaded, configParseResult, host)
+}
+
+func createProgramFromConfig(singleThreaded bool, config *tsoptions.ParsedCommandLine, host compiler.CompilerHost) (*compiler.Program, error) {
 	opts := compiler.ProgramOptions{
-		Config:         configParseResult,
+		Config:         config,
 		SingleThreaded: core.TSTrue,
 		Host:           host,
 	}
@@ -39,14 +68,22 @@ func CreateProgram(singleThreaded bool, fs vfs.FS, cwd string, tsconfigPath stri
 		return nil, errors.New("couldn't create program")
 	}
 
-	diagnostics := program.GetSyntacticDiagnostics(context.Background(), nil)
-	if len(diagnostics) != 0 {
-		// convert diagnostics to a string for better error reporting
-		var diagnosticStrings []string
-		for _, diagnostic := range diagnostics {
-			diagnosticStrings = append(diagnosticStrings, diagnostic.String(), diagnostic.File().Text())
+	syntacticDiags := program.GetSyntacticDiagnostics(context.Background(), nil)
+	if len(syntacticDiags) != 0 {
+		var msgs []string
+		for _, d := range syntacticDiags {
+			if d.File() != nil {
+				line, col := scanner.GetECMALineAndUTF16CharacterOfPosition(d.File(), d.Pos())
+				msgs = append(msgs, fmt.Sprintf("  %s(%d,%d): error TS%d: %s",
+					d.File().FileName(), line+1, col+1, d.Code(), d.String()))
+			} else {
+				msgs = append(msgs, fmt.Sprintf("  error TS%d: %s", d.Code(), d.String()))
+			}
 		}
-		return nil, fmt.Errorf("found %v syntactic errors. %v", len(diagnostics), diagnosticStrings)
+		return nil, &SyntacticError{
+			Diagnostics: syntacticDiags,
+			msg:         fmt.Sprintf("found %d syntactic error(s):\n%s", len(syntacticDiags), strings.Join(msgs, "\n")),
+		}
 	}
 
 	program.BindSourceFiles()

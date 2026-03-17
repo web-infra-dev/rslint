@@ -7,6 +7,7 @@ export default defineConfig({
     // cli
     './tests/cli/basic.test.ts',
     './tests/cli/disable-comments.test.ts',
+    './tests/cli/js-config.test.ts',
 
     // eslint
     './tests/eslint/rules/default-case.test.ts',
@@ -167,7 +168,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/prefer-find.test.ts',
     // './tests/typescript-eslint/rules/prefer-for-of.test.ts',
     // './tests/typescript-eslint/rules/prefer-function-type.test.ts',
-    // './tests/typescript-eslint/rules/prefer-includes.test.ts',
+    './tests/typescript-eslint/rules/prefer-includes.test.ts',
     './tests/typescript-eslint/rules/prefer-literal-enum-member.test.ts',
     './tests/typescript-eslint/rules/prefer-namespace-keyword.test.ts',
     // './tests/typescript-eslint/rules/prefer-nullish-coalescing.test.ts',
