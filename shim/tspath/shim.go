@@ -8,6 +8,8 @@ import _ "unsafe"
 
 var AllSupportedExtensions = tspath.AllSupportedExtensions
 var AllSupportedExtensionsWithJson = tspath.AllSupportedExtensionsWithJson
+//go:linkname ChangeAnyExtension github.com/microsoft/typescript-go/internal/tspath.ChangeAnyExtension
+func ChangeAnyExtension(path string, ext string, extensions []string, ignoreCase bool) string
 //go:linkname ChangeExtension github.com/microsoft/typescript-go/internal/tspath.ChangeExtension
 func ChangeExtension(path string, newExtension string) string
 //go:linkname ChangeFullExtension github.com/microsoft/typescript-go/internal/tspath.ChangeFullExtension
@@ -74,6 +76,8 @@ func GetDirectoryPath(path string) string
 func GetEncodedRootLength(path string) int
 //go:linkname GetNormalizedAbsolutePath github.com/microsoft/typescript-go/internal/tspath.GetNormalizedAbsolutePath
 func GetNormalizedAbsolutePath(fileName string, currentDirectory string) string
+//go:linkname GetNormalizedAbsolutePathWithoutRoot github.com/microsoft/typescript-go/internal/tspath.GetNormalizedAbsolutePathWithoutRoot
+func GetNormalizedAbsolutePathWithoutRoot(fileName string, currentDirectory string) string
 //go:linkname GetNormalizedPathComponents github.com/microsoft/typescript-go/internal/tspath.GetNormalizedPathComponents
 func GetNormalizedPathComponents(path string, currentDirectory string) []string
 //go:linkname GetPathComponents github.com/microsoft/typescript-go/internal/tspath.GetPathComponents
@@ -82,6 +86,8 @@ func GetPathComponents(path string, currentDirectory string) []string
 func GetPathComponentsRelativeTo(from string, to string, options tspath.ComparePathsOptions) []string
 //go:linkname GetPathFromPathComponents github.com/microsoft/typescript-go/internal/tspath.GetPathFromPathComponents
 func GetPathFromPathComponents(pathComponents []string) string
+//go:linkname GetPossibleOriginalInputExtensionForExtension github.com/microsoft/typescript-go/internal/tspath.GetPossibleOriginalInputExtensionForExtension
+func GetPossibleOriginalInputExtensionForExtension(path string) []string
 //go:linkname GetRelativePathFromDirectory github.com/microsoft/typescript-go/internal/tspath.GetRelativePathFromDirectory
 func GetRelativePathFromDirectory(fromDirectory string, to string, options tspath.ComparePathsOptions) string
 //go:linkname GetRelativePathFromFile github.com/microsoft/typescript-go/internal/tspath.GetRelativePathFromFile
@@ -106,6 +112,8 @@ func HasTrailingDirectorySeparator(path string) bool
 func IsDeclarationFileName(fileName string) bool
 //go:linkname IsDiskPathRoot github.com/microsoft/typescript-go/internal/tspath.IsDiskPathRoot
 func IsDiskPathRoot(path string) bool
+//go:linkname IsDynamicFileName github.com/microsoft/typescript-go/internal/tspath.IsDynamicFileName
+func IsDynamicFileName(fileName string) bool
 //go:linkname IsExternalModuleNameRelative github.com/microsoft/typescript-go/internal/tspath.IsExternalModuleNameRelative
 func IsExternalModuleNameRelative(moduleName string) bool
 //go:linkname IsRootedDiskPath github.com/microsoft/typescript-go/internal/tspath.IsRootedDiskPath
@@ -137,12 +145,16 @@ func ResolvePath(path string, paths ...string) string
 func ResolveTripleslashReference(moduleName string, containingFile string) string
 //go:linkname SplitVolumePath github.com/microsoft/typescript-go/internal/tspath.SplitVolumePath
 func SplitVolumePath(path string) (volume string, rest string, ok bool)
+//go:linkname StartsWithDirectory github.com/microsoft/typescript-go/internal/tspath.StartsWithDirectory
+func StartsWithDirectory(fileName string, directoryName string, useCaseSensitiveFileNames bool) bool
+var SupportedDeclarationExtensions = tspath.SupportedDeclarationExtensions
 var SupportedJSExtensions = tspath.SupportedJSExtensions
 var SupportedJSExtensionsFlat = tspath.SupportedJSExtensionsFlat
 var SupportedTSExtensions = tspath.SupportedTSExtensions
 var SupportedTSExtensionsFlat = tspath.SupportedTSExtensionsFlat
 var SupportedTSExtensionsWithJson = tspath.SupportedTSExtensionsWithJson
 var SupportedTSExtensionsWithJsonFlat = tspath.SupportedTSExtensionsWithJsonFlat
+var SupportedTSImplementationExtensions = tspath.SupportedTSImplementationExtensions
 //go:linkname ToFileNameLowerCase github.com/microsoft/typescript-go/internal/tspath.ToFileNameLowerCase
 func ToFileNameLowerCase(fileName string) string
 //go:linkname ToPath github.com/microsoft/typescript-go/internal/tspath.ToPath

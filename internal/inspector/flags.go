@@ -41,7 +41,7 @@ func GetNodeFlagNames(flags ast.NodeFlags) []string {
 		ast.NodeFlagsAmbient:                         "ast.NodeFlagsAmbient",
 		ast.NodeFlagsInWithStatement:                 "ast.NodeFlagsInWithStatement",
 		ast.NodeFlagsJsonFile:                        "ast.NodeFlagsJsonFile",
-		ast.NodeFlagsDeprecated:                      "ast.NodeFlagsDeprecated",
+		ast.NodeFlagsPossiblyContainsDeprecatedTag:    "ast.NodeFlagsPossiblyContainsDeprecatedTag",
 	}
 
 	for flag, name := range flagMap {
