@@ -3,6 +3,7 @@ package no_const_assign
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // Message builder
@@ -38,202 +39,10 @@ func getIdentifierName(node *ast.Node) string {
 	return node.Text()
 }
 
-// isWriteReference checks if a reference is a write operation (assignment, increment, decrement, etc.)
-func isWriteReference(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-
-	parent := node.Parent
-	if parent == nil {
-		return false
-	}
-
-	switch parent.Kind {
-	case ast.KindBinaryExpression:
-		// Check if this is an assignment operation
-		binary := parent.AsBinaryExpression()
-		if binary == nil {
-			return false
-		}
-
-		// Check if the node is on the left side of an assignment
-		if binary.Left != node {
-			return false
-		}
-
-		// Check for all assignment operators
-		switch binary.OperatorToken.Kind {
-		case ast.KindEqualsToken, // =
-			ast.KindPlusEqualsToken,                              // +=
-			ast.KindMinusEqualsToken,                             // -=
-			ast.KindAsteriskEqualsToken,                          // *=
-			ast.KindSlashEqualsToken,                             // /=
-			ast.KindPercentEqualsToken,                           // %=
-			ast.KindAsteriskAsteriskEqualsToken,                  // **=
-			ast.KindLessThanLessThanEqualsToken,                  // <<=
-			ast.KindGreaterThanGreaterThanEqualsToken,            // >>=
-			ast.KindGreaterThanGreaterThanGreaterThanEqualsToken, // >>>=
-			ast.KindAmpersandEqualsToken,                         // &=
-			ast.KindBarEqualsToken,                               // |=
-			ast.KindCaretEqualsToken,                             // ^=
-			ast.KindQuestionQuestionEqualsToken,                  // ??=
-			ast.KindAmpersandAmpersandEqualsToken,                // &&=
-			ast.KindBarBarEqualsToken:                            // ||=
-			return true
-		}
-
-	case ast.KindPrefixUnaryExpression:
-		// Check for ++ and -- prefix operators
-		prefix := parent.AsPrefixUnaryExpression()
-		if prefix == nil {
-			return false
-		}
-
-		switch prefix.Operator {
-		case ast.KindPlusPlusToken, // ++
-			ast.KindMinusMinusToken: // --
-			return prefix.Operand == node
-		}
-
-	case ast.KindPostfixUnaryExpression:
-		// Check for ++ and -- postfix operators
-		postfix := parent.AsPostfixUnaryExpression()
-		if postfix == nil {
-			return false
-		}
-
-		switch postfix.Operator {
-		case ast.KindPlusPlusToken, // ++
-			ast.KindMinusMinusToken: // --
-			return postfix.Operand == node
-		}
-
-	case ast.KindObjectBindingPattern:
-		// In destructuring like {x} = obj, x is a write reference
-		return isBindingPatternInAssignment(parent)
-
-	case ast.KindArrayBindingPattern:
-		// In array destructuring like [x] = arr, x is a write reference
-		return isBindingPatternInAssignment(parent)
-
-	case ast.KindBindingElement:
-		// Check if the binding element is part of a write context
-		return isWriteReference(parent)
-
-	case ast.KindShorthandPropertyAssignment:
-		// In destructuring like {x} = obj or ({x} = obj), x is a write reference
-		// Check if the parent shorthand property is in a destructuring assignment
-		return isInDestructuringAssignment(parent)
-
-	case ast.KindPropertyAssignment:
-		// In destructuring like {b: x} = obj, x is a write reference
-		propAssignment := parent.AsPropertyAssignment()
-		if propAssignment != nil && propAssignment.Initializer == node {
-			return isInDestructuringAssignment(parent)
-		}
-
-	case ast.KindObjectLiteralExpression:
-		// In object destructuring like {x} = obj, x is a write reference
-		return isInDestructuringAssignment(parent)
-
-	case ast.KindArrayLiteralExpression:
-		// In array destructuring like [x] = arr, x is a write reference
-		return isInDestructuringAssignment(parent)
-
-	case ast.KindParenthesizedExpression:
-		// Unwrap parentheses and check the parent context
-		return isWriteReference(parent)
-
-	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
-		// Type assertions like (x as any) = 0
-		// The type assertion wraps the identifier, check if the assertion is a write target
-		return isWriteReference(parent)
-	}
-
-	return false
-}
-
-// isBindingPatternInAssignment checks if a binding pattern is the left side of an assignment
-func isBindingPatternInAssignment(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-
-	// The binding pattern's parent might be wrapped in parentheses
-	parent := node.Parent
-
-	// Unwrap parentheses
-	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		parent = parent.Parent
-	}
-
-	// Check if the parent is a binary expression with = operator
-	if parent != nil && parent.Kind == ast.KindBinaryExpression {
-		binary := parent.AsBinaryExpression()
-		if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindEqualsToken {
-			// Check if the binding pattern is on the left side
-			leftNode := binary.Left
-			// Unwrap parentheses on the left side
-			for leftNode != nil && leftNode.Kind == ast.KindParenthesizedExpression {
-				parenExpr := leftNode.AsParenthesizedExpression()
-				if parenExpr != nil {
-					leftNode = parenExpr.Expression
-				} else {
-					break
-				}
-			}
-			return leftNode == node
-		}
-	}
-
-	return false
-}
-
-// isInDestructuringAssignment checks if a node is part of a destructuring assignment pattern
-func isInDestructuringAssignment(node *ast.Node) bool {
-	current := node
-	for current != nil {
-		if current.Kind == ast.KindObjectLiteralExpression || current.Kind == ast.KindArrayLiteralExpression {
-			// Check if this literal is the left side of an assignment
-			// May be wrapped in parentheses
-			parent := current.Parent
-
-			// Unwrap parentheses
-			for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-				parent = parent.Parent
-			}
-
-			if parent != nil && parent.Kind == ast.KindBinaryExpression {
-				binary := parent.AsBinaryExpression()
-				if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindEqualsToken {
-					// Check if the literal (or its parent parenthesized expression) is on the left
-					leftNode := binary.Left
-					// Unwrap parentheses on left side
-					for leftNode != nil && leftNode.Kind == ast.KindParenthesizedExpression {
-						parenExpr := leftNode.AsParenthesizedExpression()
-						if parenExpr != nil {
-							leftNode = parenExpr.Expression
-						} else {
-							break
-						}
-					}
-					if leftNode == current {
-						return true
-					}
-				}
-			}
-			return false
-		}
-		current = current.Parent
-	}
-	return false
-}
-
 // checkIdentifierWrite checks if an identifier is a write reference to a const variable
 func checkIdentifierWrite(node *ast.Node, ctx *rule.RuleContext, constSymbols map[*ast.Symbol]bool) {
 	// Check if this is a write reference (assignment, increment, etc.)
-	if !isWriteReference(node) {
+	if !utils.IsWriteReference(node) {
 		return
 	}
 
@@ -305,7 +114,7 @@ var NoConstAssignRule = rule.CreateRule(rule.Rule{
 				}
 
 				// Check if this shorthand is in a destructuring assignment
-				if !isInDestructuringAssignment(node) {
+				if !utils.IsInDestructuringAssignment(node) {
 					return
 				}
 

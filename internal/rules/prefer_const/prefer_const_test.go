@@ -57,12 +57,11 @@ func TestPreferConstRule(t *testing.T) {
 			// Reassigned in if
 			{Code: `let x = 1; if (true) { x = 2; }`},
 
-			// Reassigned via destructuring
+			// Reassigned via array destructuring
 			{Code: `let x = 1; [x] = [2];`},
 
-			// TODO: Reassigned via object destructuring - shorthand in destructuring assignment
-			// not yet detected by symbol-based approach
-			// {Code: `let x = 1; ({x} = {x: 2});`},
+			// Reassigned via object destructuring
+			{Code: `let x = 1; ({x} = {x: 2});`},
 
 			// For loop counter
 			{Code: `for (let i = 0; i < 10; i++) {}`},
@@ -165,6 +164,24 @@ func TestPreferConstRule(t *testing.T) {
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "useConst", Line: 1, Column: 5},
 					{MessageId: "useConst", Line: 1, Column: 12},
+				},
+			},
+
+			// Destructuring: none reassigned
+			{
+				Code: `let {a, b} = {a: 1, b: 2};`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 6},
+					{MessageId: "useConst", Line: 1, Column: 9},
+				},
+			},
+
+			// Array destructuring: none reassigned
+			{
+				Code: `let [x, y] = [1, 2];`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "useConst", Line: 1, Column: 6},
+					{MessageId: "useConst", Line: 1, Column: 9},
 				},
 			},
 		},

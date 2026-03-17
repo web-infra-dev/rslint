@@ -3,6 +3,7 @@ package no_func_assign
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // Message builder
@@ -19,165 +20,6 @@ func getIdentifierName(node *ast.Node) string {
 		return ""
 	}
 	return node.Text()
-}
-
-// isWriteReference checks if a node is a write reference (assignment target)
-func isWriteReference(node *ast.Node) bool {
-	if node == nil || node.Parent == nil {
-		return false
-	}
-
-	parent := node.Parent
-
-	switch parent.Kind {
-	case ast.KindBinaryExpression:
-		binary := parent.AsBinaryExpression()
-		if binary == nil || binary.OperatorToken == nil {
-			return false
-		}
-
-		// Check if it's an assignment operator and node is on the left side
-		switch binary.OperatorToken.Kind {
-		case ast.KindEqualsToken,
-			ast.KindPlusEqualsToken,
-			ast.KindMinusEqualsToken,
-			ast.KindAsteriskAsteriskEqualsToken,
-			ast.KindAsteriskEqualsToken,
-			ast.KindSlashEqualsToken,
-			ast.KindPercentEqualsToken,
-			ast.KindLessThanLessThanEqualsToken,
-			ast.KindGreaterThanGreaterThanEqualsToken,
-			ast.KindGreaterThanGreaterThanGreaterThanEqualsToken,
-			ast.KindAmpersandEqualsToken,
-			ast.KindBarEqualsToken,
-			ast.KindCaretEqualsToken,
-			ast.KindBarBarEqualsToken,
-			ast.KindAmpersandAmpersandEqualsToken,
-			ast.KindQuestionQuestionEqualsToken:
-			return binary.Left == node
-		}
-
-	case ast.KindPostfixUnaryExpression:
-		postfix := parent.AsPostfixUnaryExpression()
-		if postfix == nil {
-			return false
-		}
-		switch postfix.Operator {
-		case ast.KindPlusPlusToken, ast.KindMinusMinusToken:
-			return postfix.Operand == node
-		}
-
-	case ast.KindPrefixUnaryExpression:
-		prefix := parent.AsPrefixUnaryExpression()
-		if prefix == nil {
-			return false
-		}
-		switch prefix.Operator {
-		case ast.KindPlusPlusToken, ast.KindMinusMinusToken:
-			return prefix.Operand == node
-		}
-
-	case ast.KindObjectBindingPattern:
-		return isBindingPatternInAssignment(parent)
-
-	case ast.KindArrayBindingPattern:
-		return isBindingPatternInAssignment(parent)
-
-	case ast.KindBindingElement:
-		return isWriteReference(parent)
-
-	case ast.KindShorthandPropertyAssignment:
-		shorthand := parent.AsShorthandPropertyAssignment()
-		if shorthand != nil && shorthand.Name() == node {
-			return isInDestructuringAssignment(parent)
-		}
-
-	case ast.KindPropertyAssignment:
-		propAssignment := parent.AsPropertyAssignment()
-		if propAssignment != nil && propAssignment.Initializer == node {
-			return isInDestructuringAssignment(parent)
-		}
-
-	case ast.KindArrayLiteralExpression:
-		return isInDestructuringAssignment(parent)
-
-	case ast.KindObjectLiteralExpression:
-		return isInDestructuringAssignment(parent)
-
-	case ast.KindParenthesizedExpression:
-		return isWriteReference(parent)
-
-	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
-		return isWriteReference(parent)
-	}
-
-	return false
-}
-
-// isBindingPatternInAssignment checks if a binding pattern is the left side of an assignment
-func isBindingPatternInAssignment(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-
-	parent := node.Parent
-
-	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		parent = parent.Parent
-	}
-
-	if parent != nil && parent.Kind == ast.KindBinaryExpression {
-		binary := parent.AsBinaryExpression()
-		if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindEqualsToken {
-			leftNode := binary.Left
-			for leftNode != nil && leftNode.Kind == ast.KindParenthesizedExpression {
-				parenExpr := leftNode.AsParenthesizedExpression()
-				if parenExpr != nil {
-					leftNode = parenExpr.Expression
-				} else {
-					break
-				}
-			}
-			return leftNode == node
-		}
-	}
-
-	return false
-}
-
-// isInDestructuringAssignment checks if a node is part of a destructuring assignment pattern
-func isInDestructuringAssignment(node *ast.Node) bool {
-	current := node
-	for current != nil {
-		if current.Kind == ast.KindObjectLiteralExpression || current.Kind == ast.KindArrayLiteralExpression {
-			parent := current.Parent
-
-			for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-				parent = parent.Parent
-			}
-
-			if parent != nil && parent.Kind == ast.KindBinaryExpression {
-				binary := parent.AsBinaryExpression()
-				if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindEqualsToken {
-					leftNode := binary.Left
-					for leftNode != nil && leftNode.Kind == ast.KindParenthesizedExpression {
-						parenExpr := leftNode.AsParenthesizedExpression()
-						if parenExpr != nil {
-							leftNode = parenExpr.Expression
-						} else {
-							break
-						}
-					}
-					if leftNode == current {
-						return true
-					}
-				}
-			}
-			return false
-		}
-		current = current.Parent
-	}
-	return false
 }
 
 // getFuncSymbol gets the symbol for a function node
@@ -392,7 +234,7 @@ func checkFuncReassignments(searchRoot *ast.Node, funcName string, funcNode *ast
 			}
 
 			// Check if this is a write reference
-			if isWriteReference(node) {
+			if utils.IsWriteReference(node) {
 				// Check if the name is shadowed by a local variable
 				if !isNameShadowed(node, funcName, funcNode, ctx) {
 					ctx.ReportNode(node, buildMessage(funcName))

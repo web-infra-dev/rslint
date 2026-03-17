@@ -3,29 +3,24 @@ package prefer_const
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // https://eslint.org/docs/latest/rules/prefer-const
 var PreferConstRule = rule.Rule{
 	Name: "prefer-const",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+		if ctx.TypeChecker == nil {
+			return rule.RuleListeners{}
+		}
+
 		return rule.RuleListeners{
 			ast.KindVariableDeclarationList: func(node *ast.Node) {
 				declList := node.AsVariableDeclarationList()
-				if declList == nil {
+				if declList == nil || node.Flags&ast.NodeFlagsLet == 0 || declList.Declarations == nil {
 					return
 				}
 
-				// Only check `let` declarations
-				if node.Flags&ast.NodeFlagsLet == 0 {
-					return
-				}
-
-				if declList.Declarations == nil {
-					return
-				}
-
-				// Check if this declaration list is the initializer of a for-in or for-of statement
 				isForInOrOf := isInForInOrOf(node)
 
 				for _, decl := range declList.Declarations.Nodes {
@@ -39,17 +34,14 @@ var PreferConstRule = rule.Rule{
 						continue
 					}
 
-					// For simple identifier declarations
-					if varDecl.Name().Kind == ast.KindIdentifier {
-						checkIdentifier(varDecl.Name(), decl, &ctx)
-					}
+					checkBindingNames(varDecl.Name(), decl, &ctx)
 				}
 			},
 		}
 	},
 }
 
-// isInForInOrOf checks if a VariableDeclarationList is the initializer of a for-in or for-of statement
+// isInForInOrOf checks if a VariableDeclarationList is the initializer of a for-in or for-of statement.
 func isInForInOrOf(node *ast.Node) bool {
 	if node.Parent == nil {
 		return false
@@ -57,18 +49,33 @@ func isInForInOrOf(node *ast.Node) bool {
 	return node.Parent.Kind == ast.KindForInStatement || node.Parent.Kind == ast.KindForOfStatement
 }
 
-// checkIdentifier checks a single identifier to see if it should be const
-func checkIdentifier(nameNode *ast.Node, declNode *ast.Node, ctx *rule.RuleContext) {
-	if ctx.TypeChecker == nil {
-		return
-	}
+// checkBindingNames recursively checks all identifier nodes from a binding pattern.
+func checkBindingNames(nameNode *ast.Node, declNode *ast.Node, ctx *rule.RuleContext) {
+	switch nameNode.Kind {
+	case ast.KindIdentifier:
+		checkIdentifier(nameNode, declNode, ctx)
 
+	case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
+		nameNode.ForEachChild(func(child *ast.Node) bool {
+			if child.Kind == ast.KindBindingElement {
+				bindingName := child.Name()
+				if bindingName != nil {
+					checkBindingNames(bindingName, declNode, ctx)
+				}
+			}
+			return false
+		})
+	}
+}
+
+// checkIdentifier checks a single identifier to see if it should be const.
+func checkIdentifier(nameNode *ast.Node, declNode *ast.Node, ctx *rule.RuleContext) {
 	sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
 	if sym == nil {
 		return
 	}
 
-	if !isReassigned(sym, declNode, ctx) {
+	if !isReassigned(sym, nameNode.Text(), declNode, ctx) {
 		name := nameNode.Text()
 		ctx.ReportNode(nameNode, rule.RuleMessage{
 			Id:          "useConst",
@@ -77,8 +84,15 @@ func checkIdentifier(nameNode *ast.Node, declNode *ast.Node, ctx *rule.RuleConte
 	}
 }
 
-// isReassigned checks if a symbol is ever assigned to after its declaration
-func isReassigned(sym *ast.Symbol, declNode *ast.Node, ctx *rule.RuleContext) bool {
+// isReassigned checks if a symbol is ever assigned to after its declaration.
+// Uses a single-pass walk from the enclosing scope rather than the entire source file.
+func isReassigned(sym *ast.Symbol, declName string, declNode *ast.Node, ctx *rule.RuleContext) bool {
+	// Find enclosing scope to limit the walk
+	scope := findEnclosingScope(declNode)
+	if scope == nil {
+		scope = ctx.SourceFile.AsNode()
+	}
+
 	found := false
 	var walk func(*ast.Node)
 	walk = func(n *ast.Node) {
@@ -88,9 +102,23 @@ func isReassigned(sym *ast.Symbol, declNode *ast.Node, ctx *rule.RuleContext) bo
 
 		if n.Kind == ast.KindIdentifier && !isPartOfDeclaration(n, declNode) {
 			refSym := ctx.TypeChecker.GetSymbolAtLocation(n)
-			if refSym == sym && isWriteReference(n) {
+			if refSym == sym && utils.IsWriteReference(n) {
 				found = true
 				return
+			}
+		}
+
+		// Also check ShorthandPropertyAssignment — in ({x} = {x: 2}), the TypeChecker
+		// resolves the shorthand name to the property symbol, not the variable symbol.
+		// Use name-based matching combined with scope check for this case.
+		if n.Kind == ast.KindShorthandPropertyAssignment && !isPartOfDeclaration(n, declNode) {
+			shorthand := n.AsShorthandPropertyAssignment()
+			if shorthand != nil && shorthand.Name() != nil && utils.IsInDestructuringAssignment(n) {
+				name := shorthand.Name().Text()
+				if name == declName && isInSameScope(n, declNode) {
+					found = true
+					return
+				}
 			}
 		}
 
@@ -99,144 +127,42 @@ func isReassigned(sym *ast.Symbol, declNode *ast.Node, ctx *rule.RuleContext) bo
 			return found
 		})
 	}
-	walk(ctx.SourceFile.AsNode())
+	walk(scope)
 	return found
 }
 
-// isPartOfDeclaration checks if an identifier node is part of the variable declaration itself
-// (i.e., it's the declaration name, not a reference usage)
+// findEnclosingScope finds the nearest function/module/source file scope.
+func findEnclosingScope(node *ast.Node) *ast.Node {
+	current := node.Parent
+	for current != nil {
+		switch current.Kind {
+		case ast.KindSourceFile, ast.KindModuleBlock:
+			return current
+		case ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
+			ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
+			return current
+		}
+		current = current.Parent
+	}
+	return nil
+}
+
+// isPartOfDeclaration checks if an identifier node is part of the variable declaration itself.
 func isPartOfDeclaration(identNode *ast.Node, declNode *ast.Node) bool {
 	current := identNode
 	for current != nil {
 		if current == declNode {
 			return true
 		}
-		current = current.Parent
-	}
-	return false
-}
-
-// isWriteReference checks if a reference is a write operation (assignment, increment, decrement, etc.)
-func isWriteReference(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-
-	parent := node.Parent
-	if parent == nil {
-		return false
-	}
-
-	switch parent.Kind {
-	case ast.KindBinaryExpression:
-		binary := parent.AsBinaryExpression()
-		if binary == nil {
-			return false
-		}
-
-		// Check if the node is on the left side of an assignment
-		if binary.Left != node {
-			return false
-		}
-
-		// Check for all assignment operators
-		switch binary.OperatorToken.Kind {
-		case ast.KindEqualsToken,
-			ast.KindPlusEqualsToken,
-			ast.KindMinusEqualsToken,
-			ast.KindAsteriskEqualsToken,
-			ast.KindSlashEqualsToken,
-			ast.KindPercentEqualsToken,
-			ast.KindAsteriskAsteriskEqualsToken,
-			ast.KindLessThanLessThanEqualsToken,
-			ast.KindGreaterThanGreaterThanEqualsToken,
-			ast.KindGreaterThanGreaterThanGreaterThanEqualsToken,
-			ast.KindAmpersandEqualsToken,
-			ast.KindBarEqualsToken,
-			ast.KindCaretEqualsToken,
-			ast.KindQuestionQuestionEqualsToken,
-			ast.KindAmpersandAmpersandEqualsToken,
-			ast.KindBarBarEqualsToken:
-			return true
-		}
-
-	case ast.KindPrefixUnaryExpression:
-		prefix := parent.AsPrefixUnaryExpression()
-		if prefix == nil {
-			return false
-		}
-		switch prefix.Operator {
-		case ast.KindPlusPlusToken, ast.KindMinusMinusToken:
-			return prefix.Operand == node
-		}
-
-	case ast.KindPostfixUnaryExpression:
-		postfix := parent.AsPostfixUnaryExpression()
-		if postfix == nil {
-			return false
-		}
-		switch postfix.Operator {
-		case ast.KindPlusPlusToken, ast.KindMinusMinusToken:
-			return postfix.Operand == node
-		}
-
-	case ast.KindShorthandPropertyAssignment:
-		return isInDestructuringAssignment(parent)
-
-	case ast.KindPropertyAssignment:
-		propAssignment := parent.AsPropertyAssignment()
-		if propAssignment != nil && propAssignment.Initializer == node {
-			return isInDestructuringAssignment(parent)
-		}
-
-	case ast.KindArrayLiteralExpression:
-		return isInDestructuringAssignment(parent)
-
-	case ast.KindObjectLiteralExpression:
-		return isInDestructuringAssignment(parent)
-
-	case ast.KindParenthesizedExpression:
-		return isWriteReference(parent)
-
-	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
-		return isWriteReference(parent)
-	}
-
-	return false
-}
-
-// isInDestructuringAssignment checks if a node is part of a destructuring assignment pattern
-func isInDestructuringAssignment(node *ast.Node) bool {
-	current := node
-	for current != nil {
-		if current.Kind == ast.KindObjectLiteralExpression || current.Kind == ast.KindArrayLiteralExpression {
-			parent := current.Parent
-
-			// Unwrap parentheses
-			for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-				parent = parent.Parent
-			}
-
-			if parent != nil && parent.Kind == ast.KindBinaryExpression {
-				binary := parent.AsBinaryExpression()
-				if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindEqualsToken {
-					leftNode := binary.Left
-					for leftNode != nil && leftNode.Kind == ast.KindParenthesizedExpression {
-						parenExpr := leftNode.AsParenthesizedExpression()
-						if parenExpr != nil {
-							leftNode = parenExpr.Expression
-						} else {
-							break
-						}
-					}
-					if leftNode == current {
-						return true
-					}
-				}
-			}
+		if current.Kind == ast.KindVariableDeclaration {
 			return false
 		}
 		current = current.Parent
 	}
 	return false
+}
+
+// isInSameScope checks if two nodes share the same enclosing function/module/source scope.
+func isInSameScope(a *ast.Node, b *ast.Node) bool {
+	return findEnclosingScope(a) == findEnclosingScope(b)
 }

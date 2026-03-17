@@ -3,6 +3,7 @@ package no_class_assign
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // Message builder
@@ -19,189 +20,6 @@ func getIdentifierName(node *ast.Node) string {
 		return ""
 	}
 	return node.Text()
-}
-
-// isWriteReference checks if a node is a write reference (assignment target)
-func isWriteReference(node *ast.Node) bool {
-	if node == nil || node.Parent == nil {
-		return false
-	}
-
-	parent := node.Parent
-
-	switch parent.Kind {
-	case ast.KindBinaryExpression:
-		binary := parent.AsBinaryExpression()
-		if binary == nil || binary.OperatorToken == nil {
-			return false
-		}
-
-		// Check if it's an assignment operator and node is on the left side
-		switch binary.OperatorToken.Kind {
-		case ast.KindEqualsToken,
-			ast.KindPlusEqualsToken,
-			ast.KindMinusEqualsToken,
-			ast.KindAsteriskAsteriskEqualsToken,
-			ast.KindAsteriskEqualsToken,
-			ast.KindSlashEqualsToken,
-			ast.KindPercentEqualsToken,
-			ast.KindLessThanLessThanEqualsToken,
-			ast.KindGreaterThanGreaterThanEqualsToken,
-			ast.KindGreaterThanGreaterThanGreaterThanEqualsToken,
-			ast.KindAmpersandEqualsToken,
-			ast.KindBarEqualsToken,
-			ast.KindCaretEqualsToken,
-			ast.KindBarBarEqualsToken,
-			ast.KindAmpersandAmpersandEqualsToken,
-			ast.KindQuestionQuestionEqualsToken:
-			return binary.Left == node
-		}
-
-	case ast.KindPostfixUnaryExpression:
-		postfix := parent.AsPostfixUnaryExpression()
-		if postfix == nil {
-			return false
-		}
-		// ++ and -- are write operations
-		switch postfix.Operator {
-		case ast.KindPlusPlusToken, ast.KindMinusMinusToken:
-			return postfix.Operand == node
-		}
-
-	case ast.KindPrefixUnaryExpression:
-		prefix := parent.AsPrefixUnaryExpression()
-		if prefix == nil {
-			return false
-		}
-		// ++ and -- are write operations
-		switch prefix.Operator {
-		case ast.KindPlusPlusToken, ast.KindMinusMinusToken:
-			return prefix.Operand == node
-		}
-
-	case ast.KindObjectBindingPattern:
-		// In destructuring like {A} = obj, A is a write reference
-		// ObjectBindingPattern is used in destructuring assignments
-		// Check if this pattern is on the left side of an assignment
-		return isBindingPatternInAssignment(parent)
-
-	case ast.KindArrayBindingPattern:
-		// In array destructuring like [A] = arr, A is a write reference
-		return isBindingPatternInAssignment(parent)
-
-	case ast.KindBindingElement:
-		// Check if the binding element is part of a write context
-		return isWriteReference(parent)
-
-	case ast.KindShorthandPropertyAssignment:
-		// In destructuring like {A} = obj or ({A} = obj), A is a write reference
-		shorthand := parent.AsShorthandPropertyAssignment()
-		if shorthand != nil && shorthand.Name() == node {
-			return isInDestructuringAssignment(parent)
-		}
-
-	case ast.KindPropertyAssignment:
-		// In destructuring like {b: A} = obj, A is a write reference
-		propAssignment := parent.AsPropertyAssignment()
-		if propAssignment != nil && propAssignment.Initializer == node {
-			return isInDestructuringAssignment(parent)
-		}
-
-	case ast.KindArrayLiteralExpression:
-		// In array destructuring like [A] = arr, A is a write reference
-		return isInDestructuringAssignment(parent)
-
-	case ast.KindObjectLiteralExpression:
-		// In object destructuring like {A} = obj, A is a write reference
-		return isInDestructuringAssignment(parent)
-
-	case ast.KindParenthesizedExpression:
-		// Unwrap parentheses and check the parent context
-		return isWriteReference(parent)
-
-	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
-		// Type assertions like (A as any) = 0
-		// The type assertion wraps the identifier, check if the assertion is a write target
-		return isWriteReference(parent)
-	}
-
-	return false
-}
-
-// isBindingPatternInAssignment checks if a binding pattern is the left side of an assignment
-func isBindingPatternInAssignment(node *ast.Node) bool {
-	if node == nil {
-		return false
-	}
-
-	// The binding pattern's parent might be wrapped in parentheses
-	parent := node.Parent
-
-	// Unwrap parentheses
-	for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-		parent = parent.Parent
-	}
-
-	// Check if the parent is a binary expression with = operator
-	if parent != nil && parent.Kind == ast.KindBinaryExpression {
-		binary := parent.AsBinaryExpression()
-		if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindEqualsToken {
-			// Check if the binding pattern is on the left side
-			leftNode := binary.Left
-			// Unwrap parentheses on the left side
-			for leftNode != nil && leftNode.Kind == ast.KindParenthesizedExpression {
-				parenExpr := leftNode.AsParenthesizedExpression()
-				if parenExpr != nil {
-					leftNode = parenExpr.Expression
-				} else {
-					break
-				}
-			}
-			return leftNode == node
-		}
-	}
-
-	return false
-}
-
-// isInDestructuringAssignment checks if a node is part of a destructuring assignment pattern
-func isInDestructuringAssignment(node *ast.Node) bool {
-	current := node
-	for current != nil {
-		if current.Kind == ast.KindObjectLiteralExpression || current.Kind == ast.KindArrayLiteralExpression {
-			// Check if this literal is the left side of an assignment
-			// May be wrapped in parentheses
-			parent := current.Parent
-
-			// Unwrap parentheses
-			for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-				parent = parent.Parent
-			}
-
-			if parent != nil && parent.Kind == ast.KindBinaryExpression {
-				binary := parent.AsBinaryExpression()
-				if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindEqualsToken {
-					// Check if the literal (or its parent parenthesized expression) is on the left
-					leftNode := binary.Left
-					// Unwrap parentheses on left side
-					for leftNode != nil && leftNode.Kind == ast.KindParenthesizedExpression {
-						parenExpr := leftNode.AsParenthesizedExpression()
-						if parenExpr != nil {
-							leftNode = parenExpr.Expression
-						} else {
-							break
-						}
-					}
-					if leftNode == current {
-						return true
-					}
-				}
-			}
-			return false
-		}
-		current = current.Parent
-	}
-	return false
 }
 
 // getClassSymbol gets the symbol for a class node
@@ -419,7 +237,7 @@ func checkClassReassignments(classNode *ast.Node, className string, ctx *rule.Ru
 			}
 
 			// Check if this is a write reference
-			if isWriteReference(node) {
+			if utils.IsWriteReference(node) {
 				// Check if the name is shadowed by a local variable
 				if !isNameShadowed(node, className, classNode, ctx) {
 					ctx.ReportNode(node, buildClassReassignmentMessage(className))

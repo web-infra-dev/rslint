@@ -353,31 +353,18 @@ func checkSwitchStatement(stmt *ast.Node, status superStatus, ctx *rule.RuleCont
 		}
 	}
 
-	// Get case clauses
-	var caseBlock *ast.Node
-	stmt.ForEachChild(func(child *ast.Node) bool {
-		if child != nil && child.Kind == ast.KindCaseBlock {
-			caseBlock = child
-			return true
-		}
-		return false
-	})
-
-	if caseBlock == nil {
+	// Get case clauses via direct accessors
+	switchStmt := stmt.AsSwitchStatement()
+	if switchStmt == nil || switchStmt.CaseBlock == nil {
 		return status
 	}
 
-	var clauses []*ast.Node
-	caseBlock.ForEachChild(func(child *ast.Node) bool {
-		if child != nil && (child.Kind == ast.KindCaseClause || child.Kind == ast.KindDefaultClause) {
-			clauses = append(clauses, child)
-		}
-		return false
-	})
-
-	if len(clauses) == 0 {
+	caseBlock := switchStmt.CaseBlock.AsCaseBlock()
+	if caseBlock == nil || caseBlock.Clauses == nil || len(caseBlock.Clauses.Nodes) == 0 {
 		return status
 	}
+
+	clauses := caseBlock.Clauses.Nodes
 
 	hasDefault := false
 	allHaveSuper := true
@@ -390,16 +377,7 @@ func checkSwitchStatement(stmt *ast.Node, status superStatus, ctx *rule.RuleCont
 			hasDefault = true
 		}
 
-		var stmts []*ast.Node
-		clause.ForEachChild(func(child *ast.Node) bool {
-			// Skip the case expression
-			if child.Kind != ast.KindCaseClause && child.Kind != ast.KindDefaultClause {
-				stmts = append(stmts, child)
-			}
-			return false
-		})
-
-		clauseStatus := checkStatements(stmts, ctx)
+		clauseStatus := checkStatements(clause.Statements(), ctx)
 		if clauseStatus != superAll {
 			allHaveSuper = false
 		}
@@ -418,61 +396,37 @@ func checkSwitchStatement(stmt *ast.Node, status superStatus, ctx *rule.RuleCont
 
 // checkTryStatement handles try/catch/finally statements.
 func checkTryStatement(stmt *ast.Node, status superStatus, ctx *rule.RuleContext) superStatus {
-	// Simple handling: check the try block and catch block for violations
-	// This doesn't perfectly model control flow but handles common cases
-	var tryBlock *ast.Node
-	var catchClause *ast.Node
-	var finallyBlock *ast.Node
-
-	stmt.ForEachChild(func(child *ast.Node) bool {
-		if child == nil {
-			return false
-		}
-		switch child.Kind {
-		case ast.KindBlock:
-			if tryBlock == nil {
-				tryBlock = child
-			} else {
-				finallyBlock = child
-			}
-		case ast.KindCatchClause:
-			catchClause = child
-		}
-		return false
-	})
+	// Use direct accessors for try/catch/finally blocks
+	tryStmt := stmt.AsTryStatement()
+	if tryStmt == nil {
+		return status
+	}
 
 	// Check the try block
 	tryStatus := status
-	if tryBlock != nil {
-		tryStatus = checkStatements(tryBlock.Statements(), ctx)
+	if tryStmt.TryBlock != nil {
+		tryStatus = checkStatements(tryStmt.TryBlock.Statements(), ctx)
 	}
 
 	// Check the catch block
 	catchStatus := status
-	if catchClause != nil {
-		var catchBlock *ast.Node
-		catchClause.ForEachChild(func(child *ast.Node) bool {
-			if child != nil && child.Kind == ast.KindBlock {
-				catchBlock = child
-				return true
-			}
-			return false
-		})
-		if catchBlock != nil {
-			catchStatus = checkStatements(catchBlock.Statements(), ctx)
+	if tryStmt.CatchClause != nil {
+		catchBlock := tryStmt.CatchClause.AsCatchClause()
+		if catchBlock != nil && catchBlock.Block != nil {
+			catchStatus = checkStatements(catchBlock.Block.Statements(), ctx)
 		}
 	}
 
 	// Check the finally block
-	if finallyBlock != nil {
-		finallyStatus := checkStatements(finallyBlock.Statements(), ctx)
+	if tryStmt.FinallyBlock != nil {
+		finallyStatus := checkStatements(tryStmt.FinallyBlock.Statements(), ctx)
 		if finallyStatus == superAll {
 			return superAll
 		}
 	}
 
 	// If both try and catch have super, super is called on all paths
-	if catchClause != nil {
+	if tryStmt.CatchClause != nil {
 		if tryStatus == superAll && catchStatus == superAll {
 			return superAll
 		}

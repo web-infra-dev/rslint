@@ -3,6 +3,7 @@ package no_import_assign
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 // importedBinding holds information about a single imported binding.
@@ -11,135 +12,6 @@ type importedBinding struct {
 	isNamespace bool
 	nameNode    *ast.Node
 	symbol      *ast.Symbol
-}
-
-// isWriteReference checks if a node is a write reference (assignment target).
-// This mirrors the logic in no_func_assign / no_class_assign.
-func isWriteReference(node *ast.Node) bool {
-	if node == nil || node.Parent == nil {
-		return false
-	}
-
-	parent := node.Parent
-
-	switch parent.Kind {
-	case ast.KindBinaryExpression:
-		binary := parent.AsBinaryExpression()
-		if binary == nil || binary.OperatorToken == nil {
-			return false
-		}
-		switch binary.OperatorToken.Kind {
-		case ast.KindEqualsToken,
-			ast.KindPlusEqualsToken,
-			ast.KindMinusEqualsToken,
-			ast.KindAsteriskAsteriskEqualsToken,
-			ast.KindAsteriskEqualsToken,
-			ast.KindSlashEqualsToken,
-			ast.KindPercentEqualsToken,
-			ast.KindLessThanLessThanEqualsToken,
-			ast.KindGreaterThanGreaterThanEqualsToken,
-			ast.KindGreaterThanGreaterThanGreaterThanEqualsToken,
-			ast.KindAmpersandEqualsToken,
-			ast.KindBarEqualsToken,
-			ast.KindCaretEqualsToken,
-			ast.KindBarBarEqualsToken,
-			ast.KindAmpersandAmpersandEqualsToken,
-			ast.KindQuestionQuestionEqualsToken:
-			return binary.Left == node
-		}
-
-	case ast.KindPostfixUnaryExpression:
-		postfix := parent.AsPostfixUnaryExpression()
-		if postfix == nil {
-			return false
-		}
-		switch postfix.Operator {
-		case ast.KindPlusPlusToken, ast.KindMinusMinusToken:
-			return postfix.Operand == node
-		}
-
-	case ast.KindPrefixUnaryExpression:
-		prefix := parent.AsPrefixUnaryExpression()
-		if prefix == nil {
-			return false
-		}
-		switch prefix.Operator {
-		case ast.KindPlusPlusToken, ast.KindMinusMinusToken:
-			return prefix.Operand == node
-		}
-
-	case ast.KindForInStatement, ast.KindForOfStatement:
-		return parent.Initializer() == node
-
-	case ast.KindShorthandPropertyAssignment:
-		shorthand := parent.AsShorthandPropertyAssignment()
-		if shorthand != nil && shorthand.Name() == node {
-			return isInDestructuringAssignment(parent)
-		}
-
-	case ast.KindPropertyAssignment:
-		propAssignment := parent.AsPropertyAssignment()
-		if propAssignment != nil && propAssignment.Initializer == node {
-			return isInDestructuringAssignment(parent)
-		}
-
-	case ast.KindArrayLiteralExpression:
-		return isInDestructuringAssignment(parent)
-
-	case ast.KindObjectLiteralExpression:
-		return isInDestructuringAssignment(parent)
-
-	case ast.KindSpreadElement:
-		return isWriteReference(parent)
-
-	case ast.KindParenthesizedExpression:
-		return isWriteReference(parent)
-
-	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
-		return isWriteReference(parent)
-	}
-
-	return false
-}
-
-// isInDestructuringAssignment checks if a node is part of a destructuring assignment pattern.
-func isInDestructuringAssignment(node *ast.Node) bool {
-	current := node
-	for current != nil {
-		if current.Kind == ast.KindObjectLiteralExpression || current.Kind == ast.KindArrayLiteralExpression {
-			parent := current.Parent
-
-			for parent != nil && parent.Kind == ast.KindParenthesizedExpression {
-				parent = parent.Parent
-			}
-
-			if parent != nil && parent.Kind == ast.KindBinaryExpression {
-				binary := parent.AsBinaryExpression()
-				if binary != nil && binary.OperatorToken != nil && binary.OperatorToken.Kind == ast.KindEqualsToken {
-					leftNode := binary.Left
-					for leftNode != nil && leftNode.Kind == ast.KindParenthesizedExpression {
-						parenExpr := leftNode.AsParenthesizedExpression()
-						if parenExpr != nil {
-							leftNode = parenExpr.Expression
-						} else {
-							break
-						}
-					}
-					if leftNode == current {
-						return true
-					}
-				}
-			}
-
-			if parent != nil && (parent.Kind == ast.KindForInStatement || parent.Kind == ast.KindForOfStatement) {
-				return parent.Initializer() == current
-			}
-
-			return false
-		}
-		current = current.Parent
-	}
-	return false
 }
 
 // isMemberWrite checks if an identifier is the object in a member-write expression.
@@ -161,14 +33,14 @@ func isMemberWrite(node *ast.Node) bool {
 	if parent.Kind == ast.KindPropertyAccessExpression {
 		propAccess := parent.AsPropertyAccessExpression()
 		if propAccess != nil && propAccess.Expression == node {
-			return isWriteReference(parent)
+			return utils.IsWriteReference(parent)
 		}
 	}
 
 	if parent.Kind == ast.KindElementAccessExpression {
 		elemAccess := parent.AsElementAccessExpression()
 		if elemAccess != nil && elemAccess.Expression == node {
-			return isWriteReference(parent)
+			return utils.IsWriteReference(parent)
 		}
 	}
 
@@ -194,7 +66,7 @@ func isMemberWrite(node *ast.Node) bool {
 
 	// Check spread into destructuring assignment target: ({...ns} = obj)
 	if parent.Kind == ast.KindSpreadAssignment {
-		return isInDestructuringAssignment(parent)
+		return utils.IsInDestructuringAssignment(parent)
 	}
 
 	// Check for...in/of: for (ns.prop in ...) or for (ns.prop of ...)
@@ -326,7 +198,7 @@ var NoImportAssignRule = rule.Rule{
 								}
 							}
 
-							if isWriteReference(n) {
+							if utils.IsWriteReference(n) {
 								ctx.ReportNode(n, rule.RuleMessage{
 									Id:          "readonly",
 									Description: "'" + binding.name + "' is read-only.",
