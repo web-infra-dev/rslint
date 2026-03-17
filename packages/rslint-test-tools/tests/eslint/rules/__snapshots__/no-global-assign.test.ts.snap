@@ -1,0 +1,79 @@
+// Rstest Snapshot v1
+
+exports[`no-global-assign > invalid 1`] = `
+{
+  "code": "String = 'hello world';",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'String' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 2`] = `
+{
+  "code": "String++;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'String' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-global-assign > invalid 3`] = `
+{
+  "code": "Array = 1;",
+  "diagnostics": [
+    {
+      "message": "Read-only global 'Array' should not be modified.",
+      "messageId": "globalShouldNotBeModified",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-global-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
