@@ -4,11 +4,11 @@
 package tsoptions
 
 import "github.com/microsoft/typescript-go/internal/ast"
+import "github.com/microsoft/typescript-go/internal/collections"
 import "github.com/microsoft/typescript-go/internal/core"
 import "github.com/microsoft/typescript-go/internal/diagnostics"
 import "github.com/microsoft/typescript-go/internal/tsoptions"
 import "github.com/microsoft/typescript-go/internal/tspath"
-import "github.com/microsoft/typescript-go/shim/collections"
 import "reflect"
 import _ "unsafe"
 
@@ -91,6 +91,8 @@ func ParseCompilerOptions(key string, value any, allOptions *core.CompilerOption
 //go:linkname ParseConfigFileTextToJson github.com/microsoft/typescript-go/internal/tsoptions.ParseConfigFileTextToJson
 func ParseConfigFileTextToJson(fileName string, path tspath.Path, jsonText string) (any, []*ast.Diagnostic)
 type ParseConfigHost = tsoptions.ParseConfigHost
+//go:linkname ParseExtendedConfig github.com/microsoft/typescript-go/internal/tsoptions.ParseExtendedConfig
+func ParseExtendedConfig(fileName string, path tspath.Path, resolutionStack []string, host tsoptions.ParseConfigHost, extendedConfigCache tsoptions.ExtendedConfigCache) *tsoptions.ExtendedConfigCacheEntry
 //go:linkname ParseListTypeOption github.com/microsoft/typescript-go/internal/tsoptions.ParseListTypeOption
 func ParseListTypeOption(opt *tsoptions.CommandLineOption, value string) ([]any, []*ast.Diagnostic)
 //go:linkname ParseString github.com/microsoft/typescript-go/internal/tsoptions.ParseString
