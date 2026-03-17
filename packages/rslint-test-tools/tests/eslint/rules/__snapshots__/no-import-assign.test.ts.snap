@@ -1,0 +1,105 @@
+// Rstest Snapshot v1
+
+exports[`no-import-assign > invalid 1`] = `
+{
+  "code": "import mod from 'mod'; mod = 0",
+  "diagnostics": [
+    {
+      "message": "'mod' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 2`] = `
+{
+  "code": "import {named} from 'mod'; named = 0",
+  "diagnostics": [
+    {
+      "message": "'named' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 3`] = `
+{
+  "code": "import * as mod from 'mod'; mod = 0",
+  "diagnostics": [
+    {
+      "message": "'mod' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 4`] = `
+{
+  "code": "import * as mod from 'mod'; mod.named = 0",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
