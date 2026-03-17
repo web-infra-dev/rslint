@@ -1,5 +1,5 @@
 {
-  "ExtraFunctions": ["isNonDeferredTypeReference", "getFunctionFlags"],
+  "ExtraFunctions": ["isNonDeferredTypeReference"],
   "ExtraMethods": {
     "Checker": [
       "getBaseConstraintOfType",
@@ -26,12 +26,14 @@
       "getBaseTypeOfLiteralType",
       "getWidenedType",
       "isTypeAssignableTo",
-      "isTypeStrictSubtypeOf"
+      "isTypeStrictSubtypeOf",
+      "getIndexInfosOfType"
     ]
   },
   "ExtraFields": {
     "Type": ["alias", "flags", "symbol", "objectFlags"],
     "TupleType": ["combinedFlags"],
+    "LiteralType": ["freshType", "regularType"],
     "Signature": ["parameters", "declaration"],
     "Checker": ["numberType", "booleanType", "globalRegExpType"],
     "InterfaceType": ["thisType"]

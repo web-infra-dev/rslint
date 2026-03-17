@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/microsoft/typescript-go/shim/api"
 	"github.com/microsoft/typescript-go/shim/api/encoder"
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
@@ -190,7 +189,7 @@ func runMain() int {
 		checkResult.ModuleList = append(checkResult.ModuleList, file.FileName())
 		sourceFile := file.AsSourceFile()
 
-		encodedSourceFile, err := encoder.EncodeSourceFile(sourceFile, string(api.FileHandle(sourceFile)))
+		encodedSourceFile, err := encoder.EncodeSourceFile(sourceFile)
 		if err != nil {
 			log.Printf("error encoding source file %v: %v", file.Path(), err)
 			return 1

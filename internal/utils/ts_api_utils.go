@@ -162,6 +162,12 @@ func GetWellKnownSymbolPropertyOfType(t *checker.Type, name string, typeChecker 
 func GetChildren(node *ast.Node, sourceFile *ast.SourceFile) []*ast.Node {
 	var childNodes []*ast.Node
 	node.ForEachChild(func(child *ast.Node) bool {
+		// Skip reparsed nodes (synthesized from JSDoc) as they have positions
+		// in the JSDoc comment range rather than the actual code range, which
+		// causes token cache parent mismatches during gap-filling.
+		if child.Flags&ast.NodeFlagsReparsed != 0 {
+			return false
+		}
 		childNodes = append(childNodes, child)
 		return false
 	})

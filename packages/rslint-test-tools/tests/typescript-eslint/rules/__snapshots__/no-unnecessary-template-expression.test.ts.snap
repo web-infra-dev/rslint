@@ -3109,7 +3109,7 @@ exports[`no-unnecessary-template-expression > invalid 96`] = `
       "messageId": "noUnnecessaryTemplateExpression",
       "range": {
         "end": {
-          "column": 15,
+          "column": 19,
           "line": 1,
         },
         "start": {
