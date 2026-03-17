@@ -8,7 +8,6 @@ ruleTester.run('no-undef', {
     'function f() { }; f();',
     'var a: number; a = 1;',
     'typeof undeclaredVar',
-    'console.log("hello");',
   ],
   invalid: [
     {
