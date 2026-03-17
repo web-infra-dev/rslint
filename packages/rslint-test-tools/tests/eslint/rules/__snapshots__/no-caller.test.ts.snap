@@ -1,0 +1,53 @@
+// Rstest Snapshot v1
+
+exports[`no-caller > invalid 1`] = `
+{
+  "code": "var x = arguments.callee",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 2`] = `
+{
+  "code": "var x = arguments.caller",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.caller.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
