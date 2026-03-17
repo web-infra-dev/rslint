@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -84,6 +85,32 @@ func setupColors() *ColorScheme {
 		BorderText:  borderColor,
 		WarnText:    WarnColor,
 	}
+}
+
+// reportSyntacticErrors renders syntax errors with code snippets (like tsc --pretty).
+// Returns true if syntactic errors were found and reported.
+func reportSyntacticErrors(err error, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions) bool {
+	var syntacticErr *utils.SyntacticError
+	if !errors.As(err, &syntacticErr) {
+		return false
+	}
+	rendered := false
+	for _, d := range syntacticErr.Diagnostics {
+		if d.File() == nil {
+			continue
+		}
+		diag := rule.RuleDiagnostic{
+			RuleName:   fmt.Sprintf("TS%d", d.Code()),
+			SourceFile: d.File(),
+			Range:      d.Loc(),
+			Message:    rule.RuleMessage{Description: d.String()},
+			Severity:   rule.SeverityError,
+		}
+		printDiagnosticDefault(diag, w, comparePathOptions)
+		rendered = true
+	}
+	w.Flush()
+	return rendered
 }
 
 func printDiagnostic(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOptions tspath.ComparePathsOptions, format string) {
@@ -277,18 +304,9 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	lineIndentCalculated := false
 	lastNonSpaceByteIndex := -1
 
-	lineStarts := make([]int, 13)
-	lineEnds := make([]int, 13)
-
-	if codeboxEndLine-codeboxStartLine >= len(lineEnds) {
-		w.WriteString("  ")
-		w.WriteString(colors.BorderText("│"))
-		w.WriteString("  Error range is too big. Skipping code block printing.\n  ")
-		w.WriteString(colors.BorderText("╰────────────────────────────────"))
-		w.WriteByte('\n')
-		w.WriteByte('\n')
-		return
-	}
+	numLines := codeboxEndLine - codeboxStartLine + 1
+	lineStarts := make([]int, numLines)
+	lineEnds := make([]int, numLines)
 
 	// Iterate by runes to correctly handle multi-byte UTF-8 characters,
 	// but track byte positions for string slicing
@@ -325,8 +343,25 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 
 	diagnosticHighlightActive := false
 	lastLineNumber := strconv.Itoa(codeboxEndLine + 1)
+	// Fold when codebox spans 5+ lines: show first 2 + "..." + last 2 (same as tsc)
+	shouldFold := codeboxEndLine-codeboxStartLine >= 4
 
 	for line := codeboxStartLine; line <= codeboxEndLine; line++ {
+		// Fold: skip middle lines, show first 2 and last 2
+		if shouldFold && codeboxStartLine+1 < line && line < codeboxEndLine-1 {
+			w.WriteString("  ")
+			w.WriteString(colors.BorderText("│ "))
+			foldDots := strings.Repeat(".", len(lastLineNumber))
+			w.WriteString(colors.DimText("%s", foldDots))
+			w.WriteString(colors.BorderText(" │"))
+			w.WriteByte('\n')
+
+			line = codeboxEndLine - 1
+			// Update highlight state for the jumped-to line
+			diagnosticHighlightActive = diagnosticStart < int(lineMap[line]) && diagnosticEnd >= int(lineMap[line])
+			// Fall through to render this line
+		}
+
 		w.WriteString("  ")
 		w.WriteString(colors.BorderText("│ "))
 		if line == codeboxEndLine {
@@ -546,7 +581,10 @@ func runCMD() int {
 		for _, configFileName := range tsConfigs {
 			program, err := utils.CreateProgram(singleThreaded, fs, currentDirectory, configFileName, host)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
+				w := bufio.NewWriter(os.Stderr)
+				if !reportSyntacticErrors(err, w, comparePathOptions) {
+					fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
+				}
 				return 1
 			}
 			programs = append(programs, program)
@@ -560,7 +598,10 @@ func runCMD() int {
 		if len(rootFiles) > 0 {
 			program, err := utils.CreateProgramFromOptions(singleThreaded, &core.CompilerOptions{AllowJs: core.TSTrue}, rootFiles, host)
 			if err != nil {
-				fmt.Fprintf(os.Stderr, "error creating program: %v", err)
+				w := bufio.NewWriter(os.Stderr)
+				if !reportSyntacticErrors(err, w, comparePathOptions) {
+					fmt.Fprintf(os.Stderr, "error creating program: %v", err)
+				}
 				return 1
 			}
 			programs = append(programs, program)
