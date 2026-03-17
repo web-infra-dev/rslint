@@ -19,6 +19,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
 	"github.com/microsoft/typescript-go/shim/project"
+	"github.com/microsoft/typescript-go/shim/project/logging"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/vfs"
 
@@ -31,7 +32,7 @@ import (
 func (s *Server) handleInitialize(ctx context.Context, params *lsproto.InitializeParams) (lsproto.InitializeResponse, error) {
 	log.Printf("handle initialize with pid: %d\n", os.Getpid())
 	if s.initializeParams != nil {
-		return nil, lsproto.ErrInvalidRequest
+		return nil, lsproto.ErrorCodeInvalidRequest
 	}
 
 	s.initializeParams = params
@@ -93,7 +94,7 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 		},
 		FS:         s.fs,
 		Client:     s,
-		Logger:     project.NewLogger(io.Discard),
+		Logger:     logging.NewLogger(io.Discard),
 		ParseCache: s.parseCache,
 	})
 
@@ -336,8 +337,8 @@ func (s *Server) handleCodeAction(ctx context.Context, params *lsproto.CodeActio
 	// Find diagnostics that overlap with the requested range
 	for _, ruleDiag := range ruleDiagnostics {
 		// Check if diagnostic range overlaps with requested range
-		diagStartLine, diagStartChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
-		diagEndLine, diagEndChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
+		diagStartLine, diagStartChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
+		diagEndLine, diagEndChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
 
 		diagRange := lsproto.Range{
 			Start: lsproto.Position{Line: uint32(diagStartLine), Character: uint32(diagStartChar)},
@@ -380,8 +381,8 @@ func (s *Server) handleCodeAction(ctx context.Context, params *lsproto.CodeActio
 func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic, content string) *lsproto.Diagnostic {
 	diagnosticStart := ruleDiag.Range.Pos()
 	diagnosticEnd := ruleDiag.Range.End()
-	startLine, startColumn := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, diagnosticStart)
-	endLine, endColumn := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, diagnosticEnd)
+	startLine, startColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, diagnosticStart)
+	endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, diagnosticEnd)
 
 	return &lsproto.Diagnostic{
 		Range: lsproto.Range{
@@ -505,8 +506,8 @@ func createCodeActionFromRuleDiagnostic(ruleDiag rule.RuleDiagnostic, uri lsprot
 	// Convert rule fixes to LSP text edits
 	var textEdits []*lsproto.TextEdit
 	for _, fix := range fixes {
-		startLine, startChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, fix.Range.Pos())
-		endLine, endChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, fix.Range.End())
+		startLine, startChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, fix.Range.Pos())
+		endLine, endChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, fix.Range.End())
 
 		textEdit := &lsproto.TextEdit{
 			Range: lsproto.Range{
@@ -526,8 +527,8 @@ func createCodeActionFromRuleDiagnostic(ruleDiag rule.RuleDiagnostic, uri lsprot
 	}
 
 	// Create the corresponding LSP diagnostic for reference
-	diagStartLine, diagStartChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
-	diagEndLine, diagEndChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
+	diagStartLine, diagStartChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
+	diagEndLine, diagEndChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
 
 	lspDiagnostic := &lsproto.Diagnostic{
 		Range: lsproto.Range{
@@ -558,8 +559,8 @@ func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rul
 	// Convert rule fixes to LSP text edits
 	var textEdits []*lsproto.TextEdit
 	for _, fix := range fixes {
-		startLine, startChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, fix.Range.Pos())
-		endLine, endChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, fix.Range.End())
+		startLine, startChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, fix.Range.Pos())
+		endLine, endChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, fix.Range.End())
 
 		textEdit := &lsproto.TextEdit{
 			Range: lsproto.Range{
@@ -579,8 +580,8 @@ func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rul
 	}
 
 	// Create the corresponding LSP diagnostic for reference
-	diagStartLine, diagStartChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
-	diagEndLine, diagEndChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
+	diagStartLine, diagStartChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
+	diagEndLine, diagEndChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
 
 	lspDiagnostic := &lsproto.Diagnostic{
 		Range: lsproto.Range{
@@ -606,8 +607,8 @@ func createDisableRuleActions(ruleDiag rule.RuleDiagnostic, uri lsproto.Document
 	var actions []lsproto.CommandOrCodeAction
 
 	// Create the corresponding LSP diagnostic for reference
-	diagStartLine, diagStartChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
-	diagEndLine, diagEndChar := scanner.GetECMALineAndCharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
+	diagStartLine, diagStartChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
+	diagEndLine, diagEndChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
 
 	lspDiagnostic := &lsproto.Diagnostic{
 		Range: lsproto.Range{

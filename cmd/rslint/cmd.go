@@ -141,8 +141,8 @@ func printDiagnosticGitHub(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOp
 	diagnosticStart := d.Range.Pos()
 	diagnosticEnd := d.Range.End()
 
-	startLine, startColumn := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticStart)
-	endLine, endColumn := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
+	startLine, startColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticStart)
+	endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticEnd)
 
 	filePath := tspath.ConvertToRelativePath(d.SourceFile.FileName(), comparePathOptions)
 	output := fmt.Sprintf(
@@ -151,8 +151,8 @@ func printDiagnosticGitHub(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOp
 		escapeProperty(filePath),
 		startLine+1,
 		endLine+1,
-		startColumn+1,
-		endColumn+1,
+		int(startColumn)+1,
+		int(endColumn)+1,
 		d.RuleName,
 		escapeData(d.Message.Description),
 	)
@@ -181,8 +181,8 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 	diagnosticStart := d.Range.Pos()
 	diagnosticEnd := d.Range.End()
 
-	startLine, startColumn := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticStart)
-	endLine, endColumn := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
+	startLine, startColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticStart)
+	endLine, endColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticEnd)
 
 	type Location struct {
 		Line   int `json:"line"`
@@ -209,11 +209,11 @@ func printDiagnosticJsonLine(d rule.RuleDiagnostic, w *bufio.Writer, comparePath
 		Range: Range{
 			Start: Location{
 				Line:   startLine + 1, // Convert to 1-based indexing
-				Column: startColumn + 1,
+				Column: int(startColumn) + 1,
 			},
 			End: Location{
 				Line:   endLine + 1,
-				Column: endColumn + 1,
+				Column: int(endColumn) + 1,
 			},
 		},
 		Severity: d.Severity.String(),
@@ -243,8 +243,8 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	diagnosticStart := d.Range.Pos()
 	diagnosticEnd := d.Range.End()
 
-	diagnosticStartLine, diagnosticStartColumn := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticStart)
-	diagnosticEndline, _ := scanner.GetECMALineAndCharacterOfPosition(d.SourceFile, diagnosticEnd)
+	diagnosticStartLine, diagnosticStartColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticStart)
+	diagnosticEndline, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(d.SourceFile, diagnosticEnd)
 
 	lineMap := scanner.GetECMALineStarts(d.SourceFile)
 	text := d.SourceFile.Text()
@@ -252,14 +252,13 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	codeboxStartLine := max(diagnosticStartLine-1, 0)
 	codeboxEndLine := min(diagnosticEndline+1, len(lineMap)-1)
 
-	codeboxStart := scanner.GetECMAPositionOfLineAndCharacter(d.SourceFile, codeboxStartLine, 0)
-	var codeboxEndColumn int
+	codeboxStart := int(lineMap[codeboxStartLine])
+	var codeboxEnd int
 	if codeboxEndLine == len(lineMap)-1 {
-		codeboxEndColumn = len(text) - int(lineMap[len(lineMap)-1])
+		codeboxEnd = len(text)
 	} else {
-		codeboxEndColumn = int(lineMap[codeboxEndLine+1]-lineMap[codeboxEndLine]) - 1
+		codeboxEnd = int(lineMap[codeboxEndLine+1]) - 1
 	}
-	codeboxEnd := scanner.GetECMAPositionOfLineAndCharacter(d.SourceFile, codeboxEndLine, codeboxEndColumn)
 
 	// Rule name with conditional coloring
 	w.WriteByte(' ')

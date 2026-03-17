@@ -73,7 +73,7 @@ func createProgramFromConfig(singleThreaded bool, config *tsoptions.ParsedComman
 		var msgs []string
 		for _, d := range syntacticDiags {
 			if d.File() != nil {
-				line, col := scanner.GetECMALineAndCharacterOfPosition(d.File(), d.Pos())
+				line, col := scanner.GetECMALineAndUTF16CharacterOfPosition(d.File(), d.Pos())
 				msgs = append(msgs, fmt.Sprintf("  %s(%d,%d): error TS%d: %s",
 					d.File().FileName(), line+1, col+1, d.Code(), d.String()))
 			} else {
