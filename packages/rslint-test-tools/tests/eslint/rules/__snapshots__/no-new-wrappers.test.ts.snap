@@ -1,0 +1,79 @@
+// Rstest Snapshot v1
+
+exports[`no-new-wrappers > invalid 1`] = `
+{
+  "code": "var a = new String('hello');",
+  "diagnostics": [
+    {
+      "message": "Do not use String as a constructor.",
+      "messageId": "noConstructor",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-wrappers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-wrappers > invalid 2`] = `
+{
+  "code": "var a = new Number(10);",
+  "diagnostics": [
+    {
+      "message": "Do not use Number as a constructor.",
+      "messageId": "noConstructor",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-wrappers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-wrappers > invalid 3`] = `
+{
+  "code": "var a = new Boolean(false);",
+  "diagnostics": [
+    {
+      "message": "Do not use Boolean as a constructor.",
+      "messageId": "noConstructor",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-wrappers",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

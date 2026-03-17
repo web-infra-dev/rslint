@@ -1,0 +1,79 @@
+// Rstest Snapshot v1
+
+exports[`no-this-before-super > invalid 1`] = `
+{
+  "code": "class A extends B { constructor() { this.c = 0; } }",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "thisBeforeSuper",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 2`] = `
+{
+  "code": "class A extends B { constructor() { this.c = 0; super(); } }",
+  "diagnostics": [
+    {
+      "message": "'this' is not allowed before 'super()'.",
+      "messageId": "thisBeforeSuper",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-this-before-super > invalid 3`] = `
+{
+  "code": "class A extends B { constructor() { super.c(); super(); } }",
+  "diagnostics": [
+    {
+      "message": "'super' is not allowed before 'super()'.",
+      "messageId": "superBeforeSuper",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-this-before-super",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -101,10 +101,12 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/array_callback_return"
 	"github.com/web-infra-dev/rslint/internal/rules/constructor_super"
 	"github.com/web-infra-dev/rslint/internal/rules/default_case"
+	"github.com/web-infra-dev/rslint/internal/rules/default_case_last"
 	"github.com/web-infra-dev/rslint/internal/rules/for_direction"
 	"github.com/web-infra-dev/rslint/internal/rules/getter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_async_promise_executor"
 	"github.com/web-infra-dev/rslint/internal/rules/no_await_in_loop"
+	"github.com/web-infra-dev/rslint/internal/rules/no_caller"
 	"github.com/web-infra-dev/rslint/internal/rules/no_case_declarations"
 	"github.com/web-infra-dev/rslint/internal/rules/no_class_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_compare_neg_zero"
@@ -120,9 +122,21 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_case"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_pattern"
+	"github.com/web-infra-dev/rslint/internal/rules/no_extra_bind"
+	"github.com/web-infra-dev/rslint/internal/rules/no_func_assign"
+	"github.com/web-infra-dev/rslint/internal/rules/no_global_assign"
+	"github.com/web-infra-dev/rslint/internal/rules/no_import_assign"
+	"github.com/web-infra-dev/rslint/internal/rules/no_inner_declarations"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
+	"github.com/web-infra-dev/rslint/internal/rules/no_new_wrappers"
+	"github.com/web-infra-dev/rslint/internal/rules/no_self_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_sparse_arrays"
 	"github.com/web-infra-dev/rslint/internal/rules/no_template_curly_in_string"
+	"github.com/web-infra-dev/rslint/internal/rules/no_this_before_super"
+	"github.com/web-infra-dev/rslint/internal/rules/no_undef"
+	"github.com/web-infra-dev/rslint/internal/rules/no_var"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_rest_params"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -400,6 +414,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("array-callback-return", array_callback_return.ArrayCallbackReturnRule)
 	GlobalRuleRegistry.Register("constructor-super", constructor_super.ConstructorSuperRule)
 	GlobalRuleRegistry.Register("default-case", default_case.DefaultCaseRule)
+	GlobalRuleRegistry.Register("default-case-last", default_case_last.DefaultCaseLastRule)
 	GlobalRuleRegistry.Register("for-direction", for_direction.ForDirectionRule)
 	GlobalRuleRegistry.Register("getter-return", getter_return.GetterReturnRule)
 	GlobalRuleRegistry.Register("no-async-promise-executor", no_async_promise_executor.NoAsyncPromiseExecutorRule)
@@ -419,9 +434,22 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-duplicate-case", no_duplicate_case.NoDuplicateCaseRule)
 	GlobalRuleRegistry.Register("no-empty", no_empty.NoEmptyRule)
 	GlobalRuleRegistry.Register("no-empty-pattern", no_empty_pattern.NoEmptyPatternRule)
+	GlobalRuleRegistry.Register("no-extra-bind", no_extra_bind.NoExtraBindRule)
+	GlobalRuleRegistry.Register("no-func-assign", no_func_assign.NoFuncAssignRule)
+	GlobalRuleRegistry.Register("no-global-assign", no_global_assign.NoGlobalAssignRule)
+	GlobalRuleRegistry.Register("no-import-assign", no_import_assign.NoImportAssignRule)
+	GlobalRuleRegistry.Register("no-inner-declarations", no_inner_declarations.NoInnerDeclarationsRule)
 	GlobalRuleRegistry.Register("no-loss-of-precision", no_loss_of_precision.NoLossOfPrecisionRule)
+	GlobalRuleRegistry.Register("no-new-wrappers", no_new_wrappers.NoNewWrappersRule)
+	GlobalRuleRegistry.Register("no-self-assign", no_self_assign.NoSelfAssignRule)
 	GlobalRuleRegistry.Register("no-template-curly-in-string", no_template_curly_in_string.NoTemplateCurlyInString)
+	GlobalRuleRegistry.Register("no-undef", no_undef.NoUndefRule)
+	GlobalRuleRegistry.Register("no-this-before-super", no_this_before_super.NoThisBeforeSuperRule)
 	GlobalRuleRegistry.Register("no-sparse-arrays", no_sparse_arrays.NoSparseArraysRule)
+	GlobalRuleRegistry.Register("no-var", no_var.NoVarRule)
+	GlobalRuleRegistry.Register("no-caller", no_caller.NoCallerRule)
+	GlobalRuleRegistry.Register("prefer-const", prefer_const.PreferConstRule)
+	GlobalRuleRegistry.Register("prefer-rest-params", prefer_rest_params.PreferRestParamsRule)
 }
 
 // getAllTypeScriptEslintPluginRules returns all rules from the global registry.

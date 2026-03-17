@@ -1,0 +1,77 @@
+package no_extra_bind
+
+import (
+	"testing"
+
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/fixtures"
+	"github.com/web-infra-dev/rslint/internal/rule_tester"
+)
+
+func TestNoExtraBindRule(t *testing.T) {
+	rule_tester.RunRuleTester(
+		fixtures.GetRootDir(),
+		"tsconfig.json",
+		t,
+		&NoExtraBindRule,
+		// Valid cases
+		[]rule_tester.ValidTestCase{
+			// .bind() with 2+ args is partial application, not flagged
+			{Code: `var a = function(b) { return b }.bind(c, d)`},
+			// Function uses this, so .bind() is necessary
+			{Code: `var a = function() { this.b }.bind(c)`},
+			// Not a function expression, just a variable
+			{Code: `var a = f.bind(a)`},
+			// Outer function uses this via inner .bind(this)
+			{Code: `(function() { (function() { this.b }.bind(this)) }.bind(c))`},
+			// No .bind() at all
+			{Code: `var a = function() { return 1; }`},
+			// .bind() with spread argument
+			{Code: `var a = function() { return 1; }.bind(...args)`},
+		},
+		// Invalid cases
+		[]rule_tester.InvalidTestCase{
+			// Function doesn't use this
+			{
+				Code: `var a = function() { return 1; }.bind(b)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected"},
+				},
+			},
+			// Arrow function with .bind() is always unnecessary
+			{
+				Code: `var a = (() => { return 1; }).bind(b)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected"},
+				},
+			},
+			// this is in nested function, not in outer
+			{
+				Code: `var a = function() { (function(){ this.c }) }.bind(b)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected"},
+				},
+			},
+			// .bind(this) is also unnecessary if the function doesn't use this
+			{
+				Code: `var a = function() { return 1; }.bind(this)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected"},
+				},
+			},
+			// .bind() with no arguments and no this usage
+			{
+				Code: `var a = function() { return 1; }.bind()`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected"},
+				},
+			},
+			// Arrow function never needs .bind()
+			{
+				Code: `var a = (() => { this.b }).bind(c)`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "unexpected"},
+				},
+			},
+		},
+	)
+}
