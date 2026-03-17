@@ -7,13 +7,25 @@ import "github.com/microsoft/typescript-go/internal/api/encoder"
 import "github.com/microsoft/typescript-go/internal/ast"
 import _ "unsafe"
 
+//go:linkname DecodeNodes github.com/microsoft/typescript-go/internal/api/encoder.DecodeNodes
+func DecodeNodes(data []byte) (*ast.Node, error)
+//go:linkname DecodeSourceFile github.com/microsoft/typescript-go/internal/api/encoder.DecodeSourceFile
+func DecodeSourceFile(data []byte) (*ast.SourceFile, error)
+//go:linkname EncodeNode github.com/microsoft/typescript-go/internal/api/encoder.EncodeNode
+func EncodeNode(node *ast.Node, sourceFile *ast.SourceFile) ([]byte, error)
 //go:linkname EncodeSourceFile github.com/microsoft/typescript-go/internal/api/encoder.EncodeSourceFile
-func EncodeSourceFile(sourceFile *ast.SourceFile, id string) ([]byte, error)
+func EncodeSourceFile(sourceFile *ast.SourceFile) ([]byte, error)
 const HeaderOffsetExtendedData = encoder.HeaderOffsetExtendedData
+const HeaderOffsetHashHi0 = encoder.HeaderOffsetHashHi0
+const HeaderOffsetHashHi1 = encoder.HeaderOffsetHashHi1
+const HeaderOffsetHashLo0 = encoder.HeaderOffsetHashLo0
+const HeaderOffsetHashLo1 = encoder.HeaderOffsetHashLo1
 const HeaderOffsetMetadata = encoder.HeaderOffsetMetadata
 const HeaderOffsetNodes = encoder.HeaderOffsetNodes
+const HeaderOffsetParseOptions = encoder.HeaderOffsetParseOptions
 const HeaderOffsetStringData = encoder.HeaderOffsetStringData
 const HeaderOffsetStringOffsets = encoder.HeaderOffsetStringOffsets
+const HeaderOffsetStructuredData = encoder.HeaderOffsetStructuredData
 const HeaderSize = encoder.HeaderSize
 const NodeDataChildMask = encoder.NodeDataChildMask
 const NodeDataStringIndexMask = encoder.NodeDataStringIndexMask
@@ -23,10 +35,13 @@ const NodeDataTypeMask = encoder.NodeDataTypeMask
 const NodeDataTypeString = encoder.NodeDataTypeString
 const NodeOffsetData = encoder.NodeOffsetData
 const NodeOffsetEnd = encoder.NodeOffsetEnd
+const NodeOffsetFlags = encoder.NodeOffsetFlags
 const NodeOffsetKind = encoder.NodeOffsetKind
 const NodeOffsetNext = encoder.NodeOffsetNext
 const NodeOffsetParent = encoder.NodeOffsetParent
 const NodeOffsetPos = encoder.NodeOffsetPos
 const NodeSize = encoder.NodeSize
 const ProtocolVersion = encoder.ProtocolVersion
+//go:linkname SourceFileHash github.com/microsoft/typescript-go/internal/api/encoder.SourceFileHash
+func SourceFileHash(sourceFile *ast.SourceFile) string
 const SyntaxKindNodeList = encoder.SyntaxKindNodeList
