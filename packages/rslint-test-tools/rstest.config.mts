@@ -33,6 +33,7 @@ export default defineConfig({
     './tests/eslint/rules/no-constant-binary-expression.test.ts',
 
     './tests/eslint/rules/no-extra-bind.test.ts',
+    './tests/eslint/rules/no-func-assign.test.ts',
     './tests/eslint/rules/no-global-assign.test.ts',
     './tests/eslint/rules/no-import-assign.test.ts',
     './tests/eslint/rules/no-inner-declarations.test.ts',
