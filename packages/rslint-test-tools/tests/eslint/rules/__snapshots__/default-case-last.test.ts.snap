@@ -1,0 +1,131 @@
+// Rstest Snapshot v1
+
+exports[`default-case-last > invalid 1`] = `
+{
+  "code": "switch (foo) { default: bar(); break; case 1: baz(); break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 2`] = `
+{
+  "code": "switch (foo) { default: break; case 1: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 3`] = `
+{
+  "code": "switch (foo) { default: case 1: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 4`] = `
+{
+  "code": "switch (foo) { case 1: break; default: break; case 2: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`default-case-last > invalid 5`] = `
+{
+  "code": "switch (foo) { case 1: default: break; case 2: break; }",
+  "diagnostics": [
+    {
+      "message": "Default clause should be the last clause.",
+      "messageId": "notLast",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "default-case-last",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
