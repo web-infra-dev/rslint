@@ -131,6 +131,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_inner_declarations"
 	"github.com/web-infra-dev/rslint/internal/rules/no_invalid_regexp"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
+	"github.com/web-infra-dev/rslint/internal/rules/no_new_symbol"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_wrappers"
 	"github.com/web-infra-dev/rslint/internal/rules/no_obj_calls"
 	"github.com/web-infra-dev/rslint/internal/rules/no_self_assign"
@@ -507,6 +508,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-setter-return", no_setter_return.NoSetterReturnRule)
 	GlobalRuleRegistry.Register("no-unsafe-negation", no_unsafe_negation.NoUnsafeNegationRule)
 	GlobalRuleRegistry.Register("no-obj-calls", no_obj_calls.NoObjCallsRule)
+	GlobalRuleRegistry.Register("no-new-symbol", no_new_symbol.NoNewSymbolRule)
 }
 
 // isFileIgnored checks if a file is matched by ignore patterns, evaluated sequentially.
