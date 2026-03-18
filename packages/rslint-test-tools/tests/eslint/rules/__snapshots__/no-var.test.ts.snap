@@ -1,0 +1,53 @@
+// Rstest Snapshot v1
+
+exports[`no-var > invalid 1`] = `
+{
+  "code": "var foo = bar;",
+  "diagnostics": [
+    {
+      "message": "Unexpected var, use let or const instead.",
+      "messageId": "unexpectedVar",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-var > invalid 2`] = `
+{
+  "code": "var foo = bar, toast = most;",
+  "diagnostics": [
+    {
+      "message": "Unexpected var, use let or const instead.",
+      "messageId": "unexpectedVar",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-var",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
