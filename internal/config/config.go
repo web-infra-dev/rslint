@@ -120,6 +120,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_keys"
 	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_case"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty"
+	"github.com/web-infra-dev/rslint/internal/rules/no_empty_character_class"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_pattern"
 	"github.com/web-infra-dev/rslint/internal/rules/no_ex_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
@@ -425,6 +426,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-loss-of-precision", no_loss_of_precision.NoLossOfPrecisionRule)
 	GlobalRuleRegistry.Register("no-template-curly-in-string", no_template_curly_in_string.NoTemplateCurlyInString)
 	GlobalRuleRegistry.Register("no-sparse-arrays", no_sparse_arrays.NoSparseArraysRule)
+	GlobalRuleRegistry.Register("no-empty-character-class", no_empty_character_class.NoEmptyCharacterClassRule)
 }
 
 // getAllTypeScriptEslintPluginRules returns all rules from the global registry.
