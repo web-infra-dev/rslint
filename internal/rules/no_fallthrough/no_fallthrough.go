@@ -223,12 +223,12 @@ func isTryASTTerminal(node *ast.Node) bool {
 	}
 
 	// If finally has a terminal, it overrides try/catch completion.
-	if ts.FinallyBlock != nil && blockEndsWithTerminal(ts.FinallyBlock) {
+	if ts.FinallyBlock != nil && utils.BlockEndsWithTerminal(ts.FinallyBlock) {
 		return true
 	}
 
 	// If the try body cannot throw before its terminal, catch is unreachable.
-	if ts.TryBlock != nil && !canBlockThrow(ts.TryBlock) {
+	if ts.TryBlock != nil && !utils.CanBlockThrow(ts.TryBlock) {
 		return true
 	}
 
@@ -300,55 +300,6 @@ func hasBreakInLoopBody(loopNode *ast.Node) bool {
 		return true
 	})
 	return found
-}
-
-// canBlockThrow checks if a block can throw before reaching a non-throwing
-// terminal. Used to determine if a catch clause is reachable.
-func canBlockThrow(block *ast.Node) bool {
-	statements := block.Statements()
-	if len(statements) == 0 {
-		return false
-	}
-	for _, stmt := range statements {
-		switch stmt.Kind {
-		case ast.KindBreakStatement, ast.KindContinueStatement:
-			return false
-		case ast.KindReturnStatement:
-			rs := stmt.AsReturnStatement()
-			return rs != nil && rs.Expression != nil
-		case ast.KindEmptyStatement:
-			continue
-		case ast.KindBlock:
-			return canBlockThrow(stmt)
-		case ast.KindTryStatement:
-			ts := stmt.AsTryStatement()
-			if ts != nil && ts.FinallyBlock != nil && blockEndsWithTerminal(ts.FinallyBlock) {
-				return false
-			}
-			return true
-		default:
-			return true
-		}
-	}
-	return true
-}
-
-// blockEndsWithTerminal checks if a block's last statement is a control flow
-// terminal (break/return/throw/continue).
-func blockEndsWithTerminal(block *ast.Node) bool {
-	nodes := block.Statements()
-	if len(nodes) == 0 {
-		return false
-	}
-	last := nodes[len(nodes)-1]
-	switch last.Kind {
-	case ast.KindBreakStatement, ast.KindContinueStatement,
-		ast.KindReturnStatement, ast.KindThrowStatement:
-		return true
-	case ast.KindBlock:
-		return blockEndsWithTerminal(last)
-	}
-	return false
 }
 
 // forEachDescendant walks all descendants of a node depth-first.

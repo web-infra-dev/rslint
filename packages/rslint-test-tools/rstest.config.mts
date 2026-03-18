@@ -237,6 +237,7 @@ export default defineConfig({
     './tests/eslint/rules/no-new-symbol.test.ts',
     './tests/eslint/rules/no-obj-calls.test.ts',
     './tests/eslint/rules/no-setter-return.test.ts',
+    './tests/eslint/rules/no-unreachable.test.ts',
     './tests/eslint/rules/no-unsafe-finally.test.ts',
     './tests/eslint/rules/no-unsafe-negation.test.ts',
     './tests/eslint/rules/no-unsafe-optional-chaining.test.ts',
