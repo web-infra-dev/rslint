@@ -1,0 +1,79 @@
+// Rstest Snapshot v1
+
+exports[`use-isnan > invalid 1`] = `
+{
+  "code": "123 == NaN;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 2`] = `
+{
+  "code": "123 === NaN;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`use-isnan > invalid 3`] = `
+{
+  "code": "NaN !== 123;",
+  "diagnostics": [
+    {
+      "message": "Use the isNaN function to compare with NaN.",
+      "messageId": "comparisonWithNaN",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "use-isnan",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
