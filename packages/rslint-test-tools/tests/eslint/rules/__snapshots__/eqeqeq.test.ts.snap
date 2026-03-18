@@ -1,0 +1,53 @@
+// Rstest Snapshot v1
+
+exports[`eqeqeq > invalid 1`] = `
+{
+  "code": "a == b",
+  "diagnostics": [
+    {
+      "message": "Expected '===' and instead saw '=='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`eqeqeq > invalid 2`] = `
+{
+  "code": "a != b",
+  "diagnostics": [
+    {
+      "message": "Expected '!==' and instead saw '!='.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 1,
+        },
+        "start": {
+          "column": 3,
+          "line": 1,
+        },
+      },
+      "ruleName": "eqeqeq",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
