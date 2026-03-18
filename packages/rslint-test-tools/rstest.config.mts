@@ -232,6 +232,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/unified-signatures.test.ts',
     // './tests/typescript-eslint/rules/use-unknown-in-catch-callback-variable.test.ts',
     './tests/eslint/rules/no-empty-character-class.test.ts',
+    './tests/eslint/rules/no-fallthrough.test.ts',
     './tests/eslint/rules/no-invalid-regexp.test.ts',
     './tests/eslint/rules/no-new-symbol.test.ts',
     './tests/eslint/rules/no-obj-calls.test.ts',
