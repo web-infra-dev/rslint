@@ -1,0 +1,131 @@
+// Rstest Snapshot v1
+
+exports[`no-extra-boolean-cast > invalid 1`] = `
+{
+  "code": "if (!!foo) {}",
+  "diagnostics": [
+    {
+      "message": "Redundant double negation.",
+      "messageId": "unexpectedNegation",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-boolean-cast",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-boolean-cast > invalid 2`] = `
+{
+  "code": "if (Boolean(foo)) {}",
+  "diagnostics": [
+    {
+      "message": "Redundant Boolean call.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-boolean-cast",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-boolean-cast > invalid 3`] = `
+{
+  "code": "while (!!foo) {}",
+  "diagnostics": [
+    {
+      "message": "Redundant double negation.",
+      "messageId": "unexpectedNegation",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-boolean-cast",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-boolean-cast > invalid 4`] = `
+{
+  "code": "if (new Boolean(foo)) {}",
+  "diagnostics": [
+    {
+      "message": "Redundant Boolean call.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-boolean-cast",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-boolean-cast > invalid 5`] = `
+{
+  "code": "Boolean(!!foo)",
+  "diagnostics": [
+    {
+      "message": "Redundant double negation.",
+      "messageId": "unexpectedNegation",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-boolean-cast",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
