@@ -1,0 +1,79 @@
+// Rstest Snapshot v1
+
+exports[`no-self-assign > invalid 1`] = `
+{
+  "code": "a = a",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 2`] = `
+{
+  "code": "a.b = a.b",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-self-assign > invalid 3`] = `
+{
+  "code": "a.b.c = a.b.c",
+  "diagnostics": [
+    {
+      "message": "'a' is assigned to itself.",
+      "messageId": "selfAssignment",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-self-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
