@@ -232,6 +232,7 @@ export default defineConfig({
     './tests/eslint/rules/no-empty-character-class.test.ts',
     './tests/eslint/rules/no-invalid-regexp.test.ts',
     './tests/eslint/rules/no-setter-return.test.ts',
+    './tests/eslint/rules/no-unsafe-negation.test.ts',
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/no-disabled-tests.test.ts',
