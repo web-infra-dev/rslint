@@ -1,6 +1,6 @@
 {
   "name": "@rslint/linux-arm64",
-  "version": "0.2.3",
+  "version": "0.2.4-canary.1773806564",
   "license": "MIT",
   "description": "binary for rslint",
   "bugs": "https://github.com/web-infra-dev/rslint/issues",

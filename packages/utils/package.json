@@ -1,6 +1,6 @@
 {
   "name": "@typescript-eslint/utils",
-  "version": "0.2.3",
+  "version": "0.2.4-canary.1773806564",
   "description": "",
   "main": "index.ts",
   "private": true,
