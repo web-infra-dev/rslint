@@ -50,6 +50,7 @@ hotpink
 hujson
 imul
 instane
+isnan
 jsonline
 lintedfile
 lsproto
