@@ -1,0 +1,982 @@
+// Rstest Snapshot v1
+
+exports[`no-unsafe-finally > invalid 1`] = `
+{
+  "code": "var foo = function() { try { return 1; } catch(err) { return 2; } finally { return 3; } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ReturnStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 86,
+          "line": 1,
+        },
+        "start": {
+          "column": 77,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 2`] = `
+{
+  "code": "var foo = function() { try { return 1; } finally { return 3; } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ReturnStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 3`] = `
+{
+  "code": "var foo = function() { try { return 1 } catch(err) { return 2 } finally { throw new Error() } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ThrowStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 92,
+          "line": 1,
+        },
+        "start": {
+          "column": 75,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 4`] = `
+{
+  "code": "var foo = function() { try {} finally { throw new Error() } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ThrowStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 5`] = `
+{
+  "code": "while (true) try {} finally { break; }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of BreakStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 6`] = `
+{
+  "code": "while (true) try {} finally { continue; }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ContinueStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 7`] = `
+{
+  "code": "for (;;) try {} finally { break; }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of BreakStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 8`] = `
+{
+  "code": "for (var x in obj) try {} finally { continue; }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ContinueStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 9`] = `
+{
+  "code": "for (var x of arr) try {} finally { break; }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of BreakStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 10`] = `
+{
+  "code": "do { try {} finally { break; } } while (true)",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of BreakStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 11`] = `
+{
+  "code": "label: try { return 0; } finally { break label; }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of BreakStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 12`] = `
+{
+  "code": "label: try {} finally { break label; }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of BreakStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 13`] = `
+{
+  "code": "outer: { try {} finally { inner: { break outer; } } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of BreakStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 14`] = `
+{
+  "code": "label: while (true) try {} finally { continue label; }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ContinueStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 15`] = `
+{
+  "code": "label: for (;;) try {} finally { continue label; }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ContinueStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 16`] = `
+{
+  "code": "while (true) try {} finally { switch (true) { case true: continue; } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ContinueStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 58,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 17`] = `
+{
+  "code": "var foo = function() { try {} finally { if (true) { return 1; } } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ReturnStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 53,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 18`] = `
+{
+  "code": "var foo = function() { try {} finally { if (true) { return 1; } else { return 2; } } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ReturnStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 53,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+    {
+      "message": "Unsafe usage of ReturnStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 81,
+          "line": 1,
+        },
+        "start": {
+          "column": 72,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 19`] = `
+{
+  "code": "var foo = function() { try {} finally { if (cond) throw new Error() } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ThrowStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 68,
+          "line": 1,
+        },
+        "start": {
+          "column": 51,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 20`] = `
+{
+  "code": "var foo = function() { try {} finally { { { return 1; } } } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ReturnStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 21`] = `
+{
+  "code": "var foo = function() { try {} finally { try { return 1; } catch(e) {} } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ReturnStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 22`] = `
+{
+  "code": "var foo = function() { try {} finally { try { x } catch(e) { return 1; } } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ReturnStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 62,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 23`] = `
+{
+  "code": "var foo = function() { try {} finally { try { x } catch(e) { throw e; } } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ThrowStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 62,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 24`] = `
+{
+  "code": "var foo = function() { try {} finally { try {} finally { return 1; } } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ReturnStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 58,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 25`] = `
+{
+  "code": "var foo = function() { try {} finally { try {} finally { throw new Error(); } } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ThrowStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 76,
+          "line": 1,
+        },
+        "start": {
+          "column": 58,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 26`] = `
+{
+  "code": "var foo = function() { try {} finally { try {} finally { try {} finally { return 1; } } } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ReturnStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 84,
+          "line": 1,
+        },
+        "start": {
+          "column": 75,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 27`] = `
+{
+  "code": "var foo = function() { try {} finally { return 1; return 2; } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ReturnStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+    {
+      "message": "Unsafe usage of ReturnStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 51,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 28`] = `
+{
+  "code": "var foo = function() { try {} finally { return 1; throw new Error(); } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ReturnStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+    {
+      "message": "Unsafe usage of ThrowStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 51,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 29`] = `
+{
+  "code": "var foo = function() { try {} finally { for (var i = 0; i < 1; i++) { return 1; } } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ReturnStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 80,
+          "line": 1,
+        },
+        "start": {
+          "column": 71,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 30`] = `
+{
+  "code": "var foo = function() { try {} finally { switch (x) { case 1: throw new Error(); } } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ThrowStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 80,
+          "line": 1,
+        },
+        "start": {
+          "column": 62,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 31`] = `
+{
+  "code": "var foo = function() { try {} finally { if (true) { for (var i = 0; i < 1; i++) { switch (x) { default: return 1; } } } } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ReturnStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 114,
+          "line": 1,
+        },
+        "start": {
+          "column": 105,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 32`] = `
+{
+  "code": "var foo = function() { try { return 1 } catch(err) { return 2 } finally { return function(x) { return y } } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ReturnStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 106,
+          "line": 1,
+        },
+        "start": {
+          "column": 75,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 33`] = `
+{
+  "code": "var foo = function() { try { return 1 } catch(err) { return 2 } finally { return { x: function(c) { return c } } } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of ReturnStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 113,
+          "line": 1,
+        },
+        "start": {
+          "column": 75,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 34`] = `
+{
+  "code": "var foo = function() { switch (true) { case true: try {} finally { break; } } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of BreakStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 74,
+          "line": 1,
+        },
+        "start": {
+          "column": 68,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 35`] = `
+{
+  "code": "var foo = function() { a: while (true) try {} finally { switch (true) { case true: break a; } } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of BreakStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 92,
+          "line": 1,
+        },
+        "start": {
+          "column": 84,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-finally > invalid 36`] = `
+{
+  "code": "var foo = function() { a: switch (true) { case true: try {} finally { switch (true) { case true: break a; } } } }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of BreakStatement.",
+      "messageId": "unsafeUsage",
+      "range": {
+        "end": {
+          "column": 106,
+          "line": 1,
+        },
+        "start": {
+          "column": 98,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-finally",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
