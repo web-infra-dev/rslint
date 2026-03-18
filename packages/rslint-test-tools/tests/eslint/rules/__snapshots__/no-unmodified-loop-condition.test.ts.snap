@@ -1,0 +1,172 @@
+// Rstest Snapshot v1
+
+exports[`no-unmodified-loop-condition > invalid 1`] = `
+{
+  "code": "var foo = 0; while (foo) { }",
+  "diagnostics": [
+    {
+      "message": "'foo' is not modified in this loop.",
+      "messageId": "loopConditionNotModified",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unmodified-loop-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unmodified-loop-condition > invalid 2`] = `
+{
+  "code": "var a = 0, b = 0; while (a < b) { }",
+  "diagnostics": [
+    {
+      "message": "'a' is not modified in this loop.",
+      "messageId": "loopConditionNotModified",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unmodified-loop-condition",
+    },
+    {
+      "message": "'b' is not modified in this loop.",
+      "messageId": "loopConditionNotModified",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unmodified-loop-condition",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unmodified-loop-condition > invalid 3`] = `
+{
+  "code": "var foo = 0; while (foo) { let foo = 1; foo++; }",
+  "diagnostics": [
+    {
+      "message": "'foo' is not modified in this loop.",
+      "messageId": "loopConditionNotModified",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unmodified-loop-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unmodified-loop-condition > invalid 4`] = `
+{
+  "code": "var a = 0, b = 10; while (a && b) { a++; }",
+  "diagnostics": [
+    {
+      "message": "'b' is not modified in this loop.",
+      "messageId": "loopConditionNotModified",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unmodified-loop-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unmodified-loop-condition > invalid 5`] = `
+{
+  "code": "var a = 0, b = 0; while (a || b) { a++; }",
+  "diagnostics": [
+    {
+      "message": "'b' is not modified in this loop.",
+      "messageId": "loopConditionNotModified",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unmodified-loop-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unmodified-loop-condition > invalid 6`] = `
+{
+  "code": "var x = 0; function inc() { x++; } while (x < 10) { }",
+  "diagnostics": [
+    {
+      "message": "'x' is not modified in this loop.",
+      "messageId": "loopConditionNotModified",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unmodified-loop-condition",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
