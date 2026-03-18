@@ -1,0 +1,573 @@
+// Rstest Snapshot v1
+
+exports[`valid-typeof > invalid 1`] = `
+{
+  "code": "typeof foo === 'strnig'",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 2`] = `
+{
+  "code": "'strnig' === typeof foo",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 3`] = `
+{
+  "code": "typeof foo !== 'strnig'",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 4`] = `
+{
+  "code": "typeof foo == 'strnig'",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 5`] = `
+{
+  "code": "typeof foo != 'strnig'",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 6`] = `
+{
+  "code": "typeof foo === undefined",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 7`] = `
+{
+  "code": "typeof foo === undefined",
+  "diagnostics": [
+    {
+      "message": "Typeof comparisons should be to string literals.",
+      "messageId": "notString",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 8`] = `
+{
+  "code": "typeof foo === Object",
+  "diagnostics": [
+    {
+      "message": "Typeof comparisons should be to string literals.",
+      "messageId": "notString",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 9`] = `
+{
+  "code": "typeof foo === 'foobar'",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 10`] = `
+{
+  "code": "typeof foo === ''",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 11`] = `
+{
+  "code": "typeof foo === \`strnig\`",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 12`] = `
+{
+  "code": "typeof foo === \`foobar\`",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 13`] = `
+{
+  "code": "typeof foo === null",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 14`] = `
+{
+  "code": "typeof foo === 42",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 15`] = `
+{
+  "code": "typeof foo === true",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 16`] = `
+{
+  "code": "typeof foo === false",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 17`] = `
+{
+  "code": "function f(undefined: string) { typeof foo === undefined }",
+  "diagnostics": [
+    {
+      "message": "Typeof comparisons should be to string literals.",
+      "messageId": "notString",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 48,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 18`] = `
+{
+  "code": "(typeof foo) === "strnig"",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 19`] = `
+{
+  "code": "typeof foo === ("strnig")",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 20`] = `
+{
+  "code": "((typeof foo)) === "strnig"",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 21`] = `
+{
+  "code": "typeof foo === (("strnig"))",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 22`] = `
+{
+  "code": "(typeof foo) === ("strnig")",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

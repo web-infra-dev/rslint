@@ -147,6 +147,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_rest_params"
 	"github.com/web-infra-dev/rslint/internal/rules/use_isnan"
+	"github.com/web-infra-dev/rslint/internal/rules/valid_typeof"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -515,6 +516,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("use-isnan", use_isnan.UseIsNaNRule)
 	GlobalRuleRegistry.Register("eqeqeq", eqeqeq.EqeqeqRule)
 	GlobalRuleRegistry.Register("no-fallthrough", no_fallthrough.NoFallthroughRule)
+	GlobalRuleRegistry.Register("valid-typeof", valid_typeof.ValidTypeofRule)
 }
 
 // isFileIgnored checks if a file is matched by ignore patterns, evaluated sequentially.

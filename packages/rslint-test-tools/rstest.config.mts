@@ -240,6 +240,7 @@ export default defineConfig({
     './tests/eslint/rules/no-unsafe-negation.test.ts',
     './tests/eslint/rules/use-isnan.test.ts',
     './tests/eslint/rules/eqeqeq.test.ts',
+    './tests/eslint/rules/valid-typeof.test.ts',
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/no-disabled-tests.test.ts',
