@@ -1,0 +1,889 @@
+// Rstest Snapshot v1
+
+exports[`no-obj-calls > invalid 1`] = `
+{
+  "code": "Math();",
+  "diagnostics": [
+    {
+      "message": "'Math' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 2`] = `
+{
+  "code": "var x = JSON();",
+  "diagnostics": [
+    {
+      "message": "'JSON' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 3`] = `
+{
+  "code": "var x = Reflect();",
+  "diagnostics": [
+    {
+      "message": "'Reflect' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 4`] = `
+{
+  "code": "Atomics();",
+  "diagnostics": [
+    {
+      "message": "'Atomics' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 5`] = `
+{
+  "code": "Intl();",
+  "diagnostics": [
+    {
+      "message": "'Intl' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 6`] = `
+{
+  "code": "new Math();",
+  "diagnostics": [
+    {
+      "message": "'Math' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 7`] = `
+{
+  "code": "new JSON();",
+  "diagnostics": [
+    {
+      "message": "'JSON' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 8`] = `
+{
+  "code": "new Reflect();",
+  "diagnostics": [
+    {
+      "message": "'Reflect' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 9`] = `
+{
+  "code": "new Atomics();",
+  "diagnostics": [
+    {
+      "message": "'Atomics' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 10`] = `
+{
+  "code": "new Intl();",
+  "diagnostics": [
+    {
+      "message": "'Intl' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 11`] = `
+{
+  "code": "var x = globalThis.Math();",
+  "diagnostics": [
+    {
+      "message": "'Math' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 12`] = `
+{
+  "code": "var x = new globalThis.Math();",
+  "diagnostics": [
+    {
+      "message": "'Math' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 13`] = `
+{
+  "code": "var x = globalThis.JSON();",
+  "diagnostics": [
+    {
+      "message": "'JSON' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 14`] = `
+{
+  "code": "var x = globalThis.Reflect();",
+  "diagnostics": [
+    {
+      "message": "'Reflect' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 15`] = `
+{
+  "code": "globalThis.Atomics();",
+  "diagnostics": [
+    {
+      "message": "'Atomics' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 16`] = `
+{
+  "code": "globalThis.Intl();",
+  "diagnostics": [
+    {
+      "message": "'Intl' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 17`] = `
+{
+  "code": "var x = globalThis?.Reflect();",
+  "diagnostics": [
+    {
+      "message": "'Reflect' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 18`] = `
+{
+  "code": "var x = (globalThis?.Reflect)();",
+  "diagnostics": [
+    {
+      "message": "'Reflect' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 19`] = `
+{
+  "code": "Math( JSON() );",
+  "diagnostics": [
+    {
+      "message": "'Math' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+    {
+      "message": "'JSON' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 20`] = `
+{
+  "code": "globalThis.Math( globalThis.JSON() );",
+  "diagnostics": [
+    {
+      "message": "'Math' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+    {
+      "message": "'JSON' is not a function.",
+      "messageId": "unexpectedCall",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 21`] = `
+{
+  "code": "var foo = JSON; foo();",
+  "diagnostics": [
+    {
+      "message": "'foo' is reference to 'JSON', which is not a function.",
+      "messageId": "unexpectedRefCall",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 22`] = `
+{
+  "code": "var foo = Math; new foo();",
+  "diagnostics": [
+    {
+      "message": "'foo' is reference to 'Math', which is not a function.",
+      "messageId": "unexpectedRefCall",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 23`] = `
+{
+  "code": "var foo = bar ? baz : JSON; foo();",
+  "diagnostics": [
+    {
+      "message": "'foo' is reference to 'JSON', which is not a function.",
+      "messageId": "unexpectedRefCall",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 24`] = `
+{
+  "code": "var foo = globalThis.JSON; foo();",
+  "diagnostics": [
+    {
+      "message": "'foo' is reference to 'JSON', which is not a function.",
+      "messageId": "unexpectedRefCall",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 25`] = `
+{
+  "code": "var foo = undefined || JSON; foo();",
+  "diagnostics": [
+    {
+      "message": "'foo' is reference to 'JSON', which is not a function.",
+      "messageId": "unexpectedRefCall",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 26`] = `
+{
+  "code": "var foo = undefined ?? Reflect; foo();",
+  "diagnostics": [
+    {
+      "message": "'foo' is reference to 'Reflect', which is not a function.",
+      "messageId": "unexpectedRefCall",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 27`] = `
+{
+  "code": "var foo = JSON as any; foo();",
+  "diagnostics": [
+    {
+      "message": "'foo' is reference to 'JSON', which is not a function.",
+      "messageId": "unexpectedRefCall",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 28`] = `
+{
+  "code": "var foo = JSON satisfies any; foo();",
+  "diagnostics": [
+    {
+      "message": "'foo' is reference to 'JSON', which is not a function.",
+      "messageId": "unexpectedRefCall",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 29`] = `
+{
+  "code": "var foo = <any>JSON; foo();",
+  "diagnostics": [
+    {
+      "message": "'foo' is reference to 'JSON', which is not a function.",
+      "messageId": "unexpectedRefCall",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 30`] = `
+{
+  "code": "var foo = JSON!; foo();",
+  "diagnostics": [
+    {
+      "message": "'foo' is reference to 'JSON', which is not a function.",
+      "messageId": "unexpectedRefCall",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 31`] = `
+{
+  "code": "var foo = (0, JSON); foo();",
+  "diagnostics": [
+    {
+      "message": "'foo' is reference to 'JSON', which is not a function.",
+      "messageId": "unexpectedRefCall",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 32`] = `
+{
+  "code": "var a = JSON; var b = a; b();",
+  "diagnostics": [
+    {
+      "message": "'b' is reference to 'JSON', which is not a function.",
+      "messageId": "unexpectedRefCall",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-obj-calls > invalid 33`] = `
+{
+  "code": "(JSON as any)();",
+  "diagnostics": [
+    {
+      "message": "'undefined' is reference to 'JSON', which is not a function.",
+      "messageId": "unexpectedRefCall",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-obj-calls",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
