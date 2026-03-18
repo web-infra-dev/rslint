@@ -1,0 +1,53 @@
+// Rstest Snapshot v1
+
+exports[`valid-typeof > invalid 1`] = `
+{
+  "code": "typeof foo === 'strnig'",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`valid-typeof > invalid 2`] = `
+{
+  "code": "typeof foo === 'nubmer'",
+  "diagnostics": [
+    {
+      "message": "Invalid typeof comparison value.",
+      "messageId": "invalidValue",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "valid-typeof",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
