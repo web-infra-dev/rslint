@@ -22,6 +22,7 @@ export default defineConfig({
     './tests/eslint/rules/no-loss-of-precision.test.ts',
     './tests/eslint/rules/no-ex-assign.test.ts',
 
+    './tests/eslint/rules/no-undef.test.ts',
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
     './tests/eslint-plugin-import/rules/no-webpack-loader-syntax.test.ts',

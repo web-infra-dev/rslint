@@ -1,0 +1,27 @@
+// Rstest Snapshot v1
+
+exports[`no-undef > invalid 1`] = `
+{
+  "code": "unknownVariable123 = 1;",
+  "diagnostics": [
+    {
+      "message": "'unknownVariable123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
