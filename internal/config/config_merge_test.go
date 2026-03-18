@@ -2,9 +2,6 @@ package config
 
 import (
 	"testing"
-
-	"github.com/web-infra-dev/rslint/internal/linter"
-	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 func TestGetConfigForFile_ExplicitRulesOnly(t *testing.T) {
@@ -27,91 +24,6 @@ func TestGetConfigForFile_ExplicitRulesOnly(t *testing.T) {
 	}
 	if len(merged.Rules) != 1 {
 		t.Errorf("Expected exactly 1 rule, got %d", len(merged.Rules))
-	}
-}
-
-func TestNormalizeJSONConfig_CoreRulesDefault(t *testing.T) {
-	RegisterAllRules()
-
-	config := normalizeJSONConfig(RslintConfig{
-		{
-			Rules: Rules{},
-		},
-	})
-
-	merged := config.GetConfigForFile("src/app.ts", "")
-	if merged == nil {
-		t.Fatal("Expected non-nil merged config")
-	}
-
-	// After normalization, core rules should be present
-	coreRules := GetCoreRules()
-	if len(coreRules) == 0 {
-		t.Fatal("Expected at least one core rule to be registered")
-	}
-
-	for _, r := range coreRules {
-		rc, ok := merged.Rules[r.Name]
-		if !ok {
-			t.Errorf("Expected core rule %q to be in merged config", r.Name)
-			continue
-		}
-		if rc.Level != "error" {
-			t.Errorf("Expected core rule %q level to be 'error', got %q", r.Name, rc.Level)
-		}
-	}
-}
-
-func TestNormalizeJSONConfig_PluginAutoEnablesRules(t *testing.T) {
-	RegisterAllRules()
-
-	config := normalizeJSONConfig(RslintConfig{
-		{
-			Plugins: []string{"@typescript-eslint"},
-		},
-	})
-
-	merged := config.GetConfigForFile("src/app.ts", "")
-	if merged == nil {
-		t.Fatal("Expected non-nil merged config")
-	}
-
-	// Should have TS rules enabled
-	if _, ok := merged.Rules["@typescript-eslint/no-explicit-any"]; !ok {
-		t.Error("Expected @typescript-eslint/no-explicit-any to be enabled via plugin")
-	}
-
-	// Should NOT have import rules (only @typescript-eslint/ prefix)
-	for name := range merged.Rules {
-		if len(name) > 7 && name[:7] == "import/" {
-			t.Errorf("Unexpected import rule %q enabled by @typescript-eslint plugin", name)
-		}
-	}
-}
-
-func TestNormalizeJSONConfig_UserRulesTakePrecedence(t *testing.T) {
-	RegisterAllRules()
-
-	config := normalizeJSONConfig(RslintConfig{
-		{
-			Rules: Rules{
-				"no-debugger": "off",
-			},
-		},
-	})
-
-	merged := config.GetConfigForFile("src/app.ts", "")
-	if merged == nil {
-		t.Fatal("Expected non-nil merged config")
-	}
-
-	// User's "off" should override the auto-enabled "error"
-	rc := merged.Rules["no-debugger"]
-	if rc == nil {
-		t.Fatal("Expected no-debugger rule to be present")
-	}
-	if rc.IsEnabled() {
-		t.Error("Expected no-debugger to be disabled (user set 'off')")
 	}
 }
 
@@ -408,55 +320,6 @@ func TestIsGlobalIgnoreEntry(t *testing.T) {
 	}
 }
 
-func TestGetPluginRules(t *testing.T) {
-	RegisterAllRules()
-
-	tsRules := GetPluginRules("@typescript-eslint")
-	if len(tsRules) == 0 {
-		t.Error("Expected at least one TS rule")
-	}
-
-	// Verify we only get TS-ESLint rules, not core or import rules.
-	// GetPluginRules filters by registry key prefix, so the returned count
-	// should be less than all rules.
-	allRules := GlobalRuleRegistry.GetAllRules()
-	if len(tsRules) >= len(allRules) {
-		t.Errorf("Expected fewer plugin rules than total rules, got %d vs %d", len(tsRules), len(allRules))
-	}
-}
-
-func TestGetCoreRules(t *testing.T) {
-	RegisterAllRules()
-
-	coreRules := GetCoreRules()
-	if len(coreRules) == 0 {
-		t.Error("Expected at least one core rule")
-	}
-
-	// Core rules are registered with keys that don't contain "/"
-	// The total should be much less than all rules
-	allRules := GlobalRuleRegistry.GetAllRules()
-	if len(coreRules) >= len(allRules) {
-		t.Errorf("Expected fewer core rules than total, got %d vs %d", len(coreRules), len(allRules))
-	}
-}
-
-func TestGetPluginRules_Disjoint(t *testing.T) {
-	RegisterAllRules()
-
-	tsRules := GetPluginRules("@typescript-eslint")
-	coreRules := GetCoreRules()
-	importRules := GetPluginRules("import")
-	reactRules := GetPluginRules("react")
-
-	// Together they should cover all registered rules
-	total := len(tsRules) + len(coreRules) + len(importRules) + len(reactRules)
-	allRules := GlobalRuleRegistry.GetAllRules()
-	if total != len(allRules) {
-		t.Errorf("Expected total %d to equal all rules %d", total, len(allRules))
-	}
-}
-
 func TestGetConfigForFile_ArrayRuleConfig(t *testing.T) {
 	config := RslintConfig{
 		{
@@ -549,62 +412,6 @@ func TestGetConfigForFile_MultipleEntries_LanguageOptionsMerge(t *testing.T) {
 	}
 }
 
-func TestNormalizeJSONConfig_IgnoredFilesNotLinted(t *testing.T) {
-	RegisterAllRules()
-
-	config := normalizeJSONConfig(RslintConfig{
-		{
-			Ignores: []string{"**/*.test.ts"},
-			Rules: Rules{
-				"no-template-curly-in-string": "off",
-			},
-			Plugins: []string{"@typescript-eslint"},
-		},
-	})
-
-	// Ignored file should return nil (not linted)
-	merged := config.GetConfigForFile("src/app.test.ts", "")
-	if merged != nil {
-		t.Error("Expected nil for ignored file — should not be linted at all")
-	}
-
-	// Non-ignored file should have the "off" rule honored
-	merged = config.GetConfigForFile("src/app.ts", "")
-	if merged == nil {
-		t.Fatal("Expected non-nil for non-ignored file")
-	}
-	rc := merged.Rules["no-template-curly-in-string"]
-	if rc == nil {
-		t.Fatal("Expected no-template-curly-in-string in merged rules")
-	}
-	if rc.IsEnabled() {
-		t.Error("Expected no-template-curly-in-string to be disabled (user set 'off')")
-	}
-}
-
-func TestNormalizeJSONConfig_SkipsGlobalIgnoreEntries(t *testing.T) {
-	RegisterAllRules()
-
-	config := normalizeJSONConfig(RslintConfig{
-		{
-			Ignores: []string{"dist/**"},
-		},
-		{
-			Rules: Rules{},
-		},
-	})
-
-	// Global ignore entry should not get rules injected
-	if len(config[0].Rules) != 0 {
-		t.Errorf("Expected global ignore entry to have 0 rules, got %d", len(config[0].Rules))
-	}
-
-	// Regular entry should get core rules
-	if len(config[1].Rules) == 0 {
-		t.Error("Expected regular entry to have injected core rules")
-	}
-}
-
 func TestGetConfigForFile_ArrayRuleOff(t *testing.T) {
 	config := RslintConfig{
 		{
@@ -659,98 +466,6 @@ func TestGetConfigForFile_EmptyConfig(t *testing.T) {
 	merged := config.GetConfigForFile("src/app.ts", "")
 	if merged != nil {
 		t.Error("Expected nil for empty config (no entries)")
-	}
-}
-
-func TestGetEnabledRules_FiltersByEnabledState(t *testing.T) {
-	RegisterAllRules()
-
-	config := RslintConfig{
-		{
-			Rules: Rules{
-				"no-debugger":   "error",
-				"no-console":    "warn",
-				"for-direction": "off",
-			},
-		},
-	}
-
-	rules, mergedConfig := GlobalRuleRegistry.GetEnabledRules(config, "src/app.ts", "")
-	if mergedConfig == nil {
-		t.Fatal("Expected non-nil merged config")
-	}
-
-	// Build lookup for returned enabled rules
-	ruleMap := make(map[string]linter.ConfiguredRule)
-	for _, r := range rules {
-		ruleMap[r.Name] = r
-	}
-
-	// "error" rule should be included with error severity
-	if r, ok := ruleMap["no-debugger"]; !ok {
-		t.Error("Expected no-debugger to be enabled")
-	} else if r.Severity != rule.SeverityError {
-		t.Errorf("Expected no-debugger severity to be error, got %v", r.Severity)
-	}
-
-	// "warn" rule should be included with warning severity
-	if r, ok := ruleMap["no-console"]; !ok {
-		t.Error("Expected no-console to be enabled")
-	} else if r.Severity != rule.SeverityWarning {
-		t.Errorf("Expected no-console severity to be warning, got %v", r.Severity)
-	}
-
-	// "off" rule should NOT be included
-	if _, ok := ruleMap["for-direction"]; ok {
-		t.Error("Expected for-direction to be excluded (set to off)")
-	}
-}
-
-func TestGetEnabledRules_IgnoredFileReturnsNil(t *testing.T) {
-	config := RslintConfig{
-		{
-			Ignores: []string{"dist/**"},
-		},
-		{
-			Rules: Rules{"no-debugger": "error"},
-		},
-	}
-
-	rules, mergedConfig := GlobalRuleRegistry.GetEnabledRules(config, "dist/bundle.js", "")
-	if rules != nil {
-		t.Error("Expected nil rules for ignored file")
-	}
-	if mergedConfig != nil {
-		t.Error("Expected nil merged config for ignored file")
-	}
-}
-
-func TestNormalizeJSONConfig_ArrayUserRuleTakesPrecedence(t *testing.T) {
-	RegisterAllRules()
-
-	config := normalizeJSONConfig(RslintConfig{
-		{
-			Rules: Rules{
-				"no-console": []interface{}{"warn", map[string]interface{}{"allow": []interface{}{"error"}}},
-			},
-		},
-	})
-
-	merged := config.GetConfigForFile("src/app.ts", "")
-	if merged == nil {
-		t.Fatal("Expected non-nil config")
-	}
-
-	rc := merged.Rules["no-console"]
-	if rc == nil {
-		t.Fatal("Expected no-console rule to be present")
-	}
-	// User's ["warn", {allow: ["error"]}] should take precedence over auto-enabled "error"
-	if rc.Level != "warn" {
-		t.Errorf("Expected level 'warn' from user config, got %q", rc.Level)
-	}
-	if rc.Options == nil {
-		t.Fatal("Expected options to be set")
 	}
 }
 
@@ -955,97 +670,6 @@ func TestGetConfigForFile_GlobalIgnore_PlusEntryIgnores(t *testing.T) {
 	}
 	if _, ok := merged.Rules["no-debugger"]; !ok {
 		t.Error("Expected no-debugger from entry2")
-	}
-}
-
-func TestNormalizeJSONConfig_MultipleEntries_DifferentPlugins(t *testing.T) {
-	RegisterAllRules()
-
-	config := normalizeJSONConfig(RslintConfig{
-		{
-			Files:   []string{"**/*.ts"},
-			Plugins: []string{"@typescript-eslint"},
-			Rules:   Rules{},
-		},
-		{
-			Files: []string{"**/*.js"},
-			Rules: Rules{},
-		},
-	})
-
-	// Entry1 should have TS plugin rules + core rules
-	if _, exists := config[0].Rules["@typescript-eslint/no-explicit-any"]; !exists {
-		t.Error("Expected TS plugin rule in entry1")
-	}
-	if _, exists := config[0].Rules["no-debugger"]; !exists {
-		t.Error("Expected core rule in entry1")
-	}
-
-	// Entry2 should have core rules only (no plugins)
-	if _, exists := config[1].Rules["@typescript-eslint/no-explicit-any"]; exists {
-		t.Error("Expected no TS plugin rule in entry2 (no plugin declared)")
-	}
-	if _, exists := config[1].Rules["no-debugger"]; !exists {
-		t.Error("Expected core rule in entry2")
-	}
-
-	// Verify via GetConfigForFile: .ts file gets TS rules, .js file doesn't
-	merged := config.GetConfigForFile("src/app.ts", "")
-	if merged == nil {
-		t.Fatal("Expected non-nil for .ts file")
-	}
-	if _, ok := merged.Rules["@typescript-eslint/no-explicit-any"]; !ok {
-		t.Error("Expected TS rule for .ts file")
-	}
-
-	merged = config.GetConfigForFile("src/app.js", "")
-	if merged == nil {
-		t.Fatal("Expected non-nil for .js file")
-	}
-	if _, ok := merged.Rules["@typescript-eslint/no-explicit-any"]; ok {
-		t.Error("Expected no TS rule for .js file")
-	}
-}
-
-func TestNormalizeJSONConfig_IgnoresWithRulesOff(t *testing.T) {
-	RegisterAllRules()
-
-	// Simulates the real rslint.json: single entry with ignores + rules (including "off")
-	config := normalizeJSONConfig(RslintConfig{
-		{
-			Ignores: []string{
-				"packages/rslint-test-tools/tests/**/*.test.ts",
-			},
-			Rules: Rules{
-				"no-template-curly-in-string": "off",
-				"no-console":                  "warn",
-			},
-			Plugins: []string{"@typescript-eslint"},
-		},
-	})
-
-	// Non-ignored file: all rules apply, "off" honored, plugin rules enabled
-	merged := config.GetConfigForFile("src/app.ts", "")
-	if merged == nil {
-		t.Fatal("Expected non-nil for non-ignored file")
-	}
-	if merged.Rules["no-template-curly-in-string"].IsEnabled() {
-		t.Error("Expected no-template-curly-in-string to be disabled")
-	}
-	if !merged.Rules["no-console"].IsEnabled() {
-		t.Error("Expected no-console to be enabled")
-	}
-	if merged.Rules["no-console"].Level != "warn" {
-		t.Errorf("Expected no-console level 'warn', got %q", merged.Rules["no-console"].Level)
-	}
-	if _, ok := merged.Rules["@typescript-eslint/no-explicit-any"]; !ok {
-		t.Error("Expected TS plugin rules to be present")
-	}
-
-	// Ignored test file: should return nil (not linted at all)
-	merged = config.GetConfigForFile("packages/rslint-test-tools/tests/some-rule.test.ts", "")
-	if merged != nil {
-		t.Error("Expected nil for ignored test file")
 	}
 }
 

@@ -7,7 +7,11 @@ export default defineConfig({
     // cli
     './tests/cli/basic.test.ts',
     './tests/cli/disable-comments.test.ts',
-    './tests/cli/js-config.test.ts',
+    './tests/cli/js-config/normalize-config.test.ts',
+    './tests/cli/js-config/load-config.test.ts',
+    './tests/cli/js-config/cli-integration.test.ts',
+    './tests/cli/js-config/plugin-enforcement.test.ts',
+    './tests/cli/js-config/presets.test.ts',
 
     // eslint
     './tests/eslint/rules/default-case.test.ts',
