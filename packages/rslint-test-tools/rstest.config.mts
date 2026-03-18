@@ -252,6 +252,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/unified-signatures.test.ts',
     // './tests/typescript-eslint/rules/use-unknown-in-catch-callback-variable.test.ts',
     './tests/eslint/rules/no-control-regex.test.ts',
+    './tests/eslint/rules/no-dupe-else-if.test.ts',
     './tests/eslint/rules/no-extra-boolean-cast.test.ts',
     './tests/eslint/rules/no-empty-character-class.test.ts',
     './tests/eslint/rules/no-fallthrough.test.ts',
