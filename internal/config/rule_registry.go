@@ -35,8 +35,11 @@ func (r *RuleRegistry) GetAllRules() map[string]rule.Rule {
 
 // GetEnabledRules returns rules that are enabled in the configuration for a given file.
 // Returns nil if no config entry matches the file (file should not be linted).
+// When enforcePlugins is true (JS/TS config), rules with a plugin prefix (e.g. "@typescript-eslint/")
+// are only included if the corresponding plugin is declared in the merged config's Plugins set.
+// Core rules (no "/" prefix) are always included regardless of enforcePlugins.
 // cwd is the config directory used to resolve files/ignores patterns.
-func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd string) ([]linter.ConfiguredRule, *MergedConfig) {
+func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd string, enforcePlugins bool) ([]linter.ConfiguredRule, *MergedConfig) {
 	mergedConfig := config.GetConfigForFile(filePath, cwd)
 	if mergedConfig == nil {
 		return nil, nil // file is globally ignored
@@ -45,6 +48,17 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 	var enabledRules []linter.ConfiguredRule
 	for ruleName, ruleConfig := range mergedConfig.Rules {
 		if ruleConfig.IsEnabled() {
+			// Plugin gate: when enforcePlugins is true, skip plugin rules
+			// whose plugin is not declared in the merged plugins set.
+			if enforcePlugins {
+				prefix := RulePluginPrefix(ruleName)
+				if prefix != "" {
+					if _, declared := mergedConfig.Plugins[prefix]; !declared {
+						continue
+					}
+				}
+			}
+
 			if ruleImpl, exists := r.rules[ruleName]; exists {
 				ruleConfigCopy := ruleConfig
 				enabledRules = append(enabledRules, linter.ConfiguredRule{

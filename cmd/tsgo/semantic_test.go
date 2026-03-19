@@ -63,6 +63,7 @@ func buildSemanticFixture(t *testing.T, source string) semanticFixture {
 
 func snapshotSemantic(semantic Semantic, file *ast.SourceFile, fileID int) []string {
 	sourceText := file.Text()
+	positionMap := file.GetPositionMap()
 	lines := []string{}
 
 	var visit func(node *ast.Node, depth int)
@@ -74,8 +75,8 @@ func snapshotSemantic(semantic Semantic, file *ast.SourceFile, fileID int) []str
 		if node.Kind != ast.KindSourceFile && node.Kind != ast.KindEndOfFile {
 			key := NodeReference{
 				SourceFileId: fileID,
-				Start:        node.Pos(),
-				End:          node.End(),
+				Start:        positionMap.UTF8ToUTF16(node.Pos()),
+				End:          positionMap.UTF8ToUTF16(node.End()),
 			}
 
 			typeStr := "<none>"
@@ -202,6 +203,40 @@ func TestSym2sym_ImportAlias(t *testing.T) {
 			targetInfo := semantic.Symtab[targetID]
 			t.Logf("  Alias %s (id=%d) -> Target %s (id=%d)",
 				string(aliasInfo.Name), aliasID, string(targetInfo.Name), targetID)
+		}
+	}
+}
+
+func TestSemanticSnapshot_NonBMPCharPositions(t *testing.T) {
+	// 💀 is U+1F480: 4 bytes in UTF-8, 2 code units in UTF-16.
+	// After the emoji, UTF-8 and UTF-16 offsets diverge.
+	// This test verifies that semantic data uses UTF-16 positions (matching the AST encoder).
+	fixture := buildSemanticFixture(t, "let a = `💀`;\nlet b = 1;")
+	snapshot := snapshotSemantic(fixture.semantic, fixture.sourceFile, fixture.sourceFileID)
+
+	// Verify that identifier 'b' has a matching type and symbol in the snapshot.
+	// If positions were still in UTF-8, the lookup would miss 'b' due to the offset shift.
+	found := false
+	for _, line := range snapshot {
+		if strings.Contains(line, `"b"`) && strings.Contains(line, "sym=b(") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("identifier 'b' not found with symbol in semantic snapshot (position encoding mismatch?)\nGot:\n%s", strings.Join(snapshot, "\n"))
+	}
+}
+
+func TestSemanticSnapshot_InternalSymbolNameSanitized(t *testing.T) {
+	// Arrow functions produce an internal symbol with name "\xFEfunction".
+	// Verify that the \xFE prefix is sanitized to "__" in the output.
+	fixture := buildSemanticFixture(t, "const f = () => 1;")
+
+	for _, sym := range fixture.semantic.Symtab {
+		name := string(sym.Name)
+		if strings.Contains(name, "\xFE") {
+			t.Fatalf("symbol name contains unsanitized \\xFE: %q", name)
 		}
 	}
 }

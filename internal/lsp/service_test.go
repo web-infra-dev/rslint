@@ -891,7 +891,7 @@ func TestJSConfigDeletedFallsBackToJSON(t *testing.T) {
 	s.rslintConfigPath = "/project/rslint.json"
 
 	// Verify JSON config is active
-	cfg, _ := s.getConfigForURI("file:///project/src/index.ts")
+	cfg, _, _ := s.getConfigForURI("file:///project/src/index.ts")
 	if len(cfg) != 1 || cfg[0].Rules["no-debugger"] != "error" {
 		t.Fatalf("expected JSON config, got %v", cfg)
 	}
@@ -911,7 +911,7 @@ func TestJSConfigDeletedFallsBackToJSON(t *testing.T) {
 		t.Fatalf("handleConfigUpdate failed: %v", err)
 	}
 
-	cfg, _ = s.getConfigForURI("file:///project/src/index.ts")
+	cfg, _, _ = s.getConfigForURI("file:///project/src/index.ts")
 	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "warn" {
 		t.Fatalf("expected JS config, got %v", cfg)
 	}
@@ -929,7 +929,7 @@ func TestJSConfigDeletedFallsBackToJSON(t *testing.T) {
 	}
 
 	// 4. No JS configs remain → should fall back to JSON config
-	cfg, _ = s.getConfigForURI("file:///project/src/index.ts")
+	cfg, _, _ = s.getConfigForURI("file:///project/src/index.ts")
 	if len(cfg) != 1 || cfg[0].Rules["no-debugger"] != "error" {
 		t.Errorf("after all JS configs deleted, should fall back to JSON config, got %v", cfg)
 	}
@@ -946,7 +946,7 @@ func TestGetConfigForURI_ClosestJSConfig(t *testing.T) {
 	s.jsConfigs["file:///project/packages/foo"] = config.RslintConfig{fooRule}
 
 	// File in foo should use foo's config, cwd = foo's directory
-	fooCfg, fooCwd := s.getConfigForURI("file:///project/packages/foo/src/index.ts")
+	fooCfg, fooCwd, _ := s.getConfigForURI("file:///project/packages/foo/src/index.ts")
 	if len(fooCfg) != 1 || fooCfg[0].Rules["no-console"] != "warn" {
 		t.Errorf("foo file should use foo config, got %v", fooCfg)
 	}
@@ -955,7 +955,7 @@ func TestGetConfigForURI_ClosestJSConfig(t *testing.T) {
 	}
 
 	// File in bar should use root config, cwd = root directory
-	barCfg, barCwd := s.getConfigForURI("file:///project/packages/bar/src/index.ts")
+	barCfg, barCwd, _ := s.getConfigForURI("file:///project/packages/bar/src/index.ts")
 	if len(barCfg) != 1 || barCfg[0].Rules["no-console"] != "error" {
 		t.Errorf("bar file should use root config, got %v", barCfg)
 	}
@@ -971,7 +971,7 @@ func TestGetConfigForURI_FallbackToJSON(t *testing.T) {
 	s.jsonConfig = config.RslintConfig{jsonRule}
 
 	// No JS configs — should fall back to JSON config; cwd = s.cwd
-	cfg, cwd := s.getConfigForURI("file:///project/src/index.ts")
+	cfg, cwd, _ := s.getConfigForURI("file:///project/src/index.ts")
 	if len(cfg) != 1 || cfg[0].Rules["no-debugger"] != "error" {
 		t.Errorf("should fall back to JSON config, got %v", cfg)
 	}
@@ -990,7 +990,7 @@ func TestGetConfigForURI_JSConfigOverridesJSON(t *testing.T) {
 	s.jsConfigs["file:///project"] = config.RslintConfig{jsRule}
 
 	// JS config should take priority over JSON; cwd = JS config's dir
-	cfg, cwd := s.getConfigForURI("file:///project/src/index.ts")
+	cfg, cwd, _ := s.getConfigForURI("file:///project/src/index.ts")
 	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "warn" {
 		t.Errorf("JS config should override JSON, got %v", cfg)
 	}
@@ -1002,7 +1002,7 @@ func TestGetConfigForURI_JSConfigOverridesJSON(t *testing.T) {
 func TestGetConfigForURI_NoConfig(t *testing.T) {
 	s := newTestServer()
 
-	cfg, _ := s.getConfigForURI("file:///project/src/index.ts")
+	cfg, _, _ := s.getConfigForURI("file:///project/src/index.ts")
 	if cfg != nil {
 		t.Errorf("should return nil when no config exists, got %v", cfg)
 	}
@@ -1015,7 +1015,7 @@ func TestGetConfigForURI_DeeplyNestedFile(t *testing.T) {
 	s.jsConfigs["file:///project"] = config.RslintConfig{rootRule}
 
 	// Deeply nested file should still find root config
-	cfg, _ := s.getConfigForURI("file:///project/a/b/c/d/e/f/index.ts")
+	cfg, _, _ := s.getConfigForURI("file:///project/a/b/c/d/e/f/index.ts")
 	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "error" {
 		t.Errorf("deeply nested file should find root config, got %v", cfg)
 	}
@@ -1028,7 +1028,7 @@ func TestGetConfigForURI_FileAtConfigDir(t *testing.T) {
 	s.jsConfigs["file:///project"] = config.RslintConfig{rootRule}
 
 	// File in the same directory as config
-	cfg, _ := s.getConfigForURI("file:///project/index.ts")
+	cfg, _, _ := s.getConfigForURI("file:///project/index.ts")
 	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "error" {
 		t.Errorf("file at config dir should use that config, got %v", cfg)
 	}
@@ -1065,7 +1065,7 @@ func TestGetConfigForURI_MonorepoMultiplePackages(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg, _ := s.getConfigForURI(tt.uri)
+			cfg, _, _ := s.getConfigForURI(tt.uri)
 			if tt.wantLen == 0 {
 				if cfg != nil {
 					t.Errorf("expected nil config, got %v", cfg)
@@ -1097,7 +1097,7 @@ func TestGetConfigForURI_NestedConfigs(t *testing.T) {
 	}
 
 	// File in sub should use sub's config (closest)
-	cfg, cwd := s.getConfigForURI("file:///project/packages/foo/sub/src/index.ts")
+	cfg, cwd, _ := s.getConfigForURI("file:///project/packages/foo/sub/src/index.ts")
 	if cfg[0].Rules["level"] != "sub" {
 		t.Errorf("sub file should use sub config, got %v", cfg[0].Rules["level"])
 	}
@@ -1106,7 +1106,7 @@ func TestGetConfigForURI_NestedConfigs(t *testing.T) {
 	}
 
 	// File in foo (but not in sub) should use foo's config
-	cfg, cwd = s.getConfigForURI("file:///project/packages/foo/src/index.ts")
+	cfg, cwd, _ = s.getConfigForURI("file:///project/packages/foo/src/index.ts")
 	if cfg[0].Rules["level"] != "foo" {
 		t.Errorf("foo file should use foo config, got %v", cfg[0].Rules["level"])
 	}
@@ -1115,7 +1115,7 @@ func TestGetConfigForURI_NestedConfigs(t *testing.T) {
 	}
 
 	// File at root should use root config
-	cfg, cwd = s.getConfigForURI("file:///project/src/index.ts")
+	cfg, cwd, _ = s.getConfigForURI("file:///project/src/index.ts")
 	if cfg[0].Rules["level"] != "root" {
 		t.Errorf("root file should use root config, got %v", cfg[0].Rules["level"])
 	}
@@ -1132,7 +1132,7 @@ func TestGetConfigForURI_WindowsURI(t *testing.T) {
 		{Rules: map[string]any{"no-console": "error"}},
 	}
 
-	cfg, cwd := s.getConfigForURI("file:///C:/Users/project/src/index.ts")
+	cfg, cwd, _ := s.getConfigForURI("file:///C:/Users/project/src/index.ts")
 	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "error" {
 		t.Errorf("Windows URI should match, got %v", cfg)
 	}
@@ -1150,7 +1150,7 @@ func TestGetConfigForURI_PercentEncodedPaths(t *testing.T) {
 	}
 
 	// File in a subdirectory — walk up should match the encoded config key
-	cfg, cwd := s.getConfigForURI("file:///Users/John%20Doe/my%20project/src/index.ts")
+	cfg, cwd, _ := s.getConfigForURI("file:///Users/John%20Doe/my%20project/src/index.ts")
 	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "error" {
 		t.Errorf("Percent-encoded URI should match config, got %v", cfg)
 	}
@@ -1160,7 +1160,7 @@ func TestGetConfigForURI_PercentEncodedPaths(t *testing.T) {
 	}
 
 	// Deeply nested file — walk must traverse multiple encoded segments
-	cfg2, cwd2 := s.getConfigForURI("file:///Users/John%20Doe/my%20project/src/components/deep/file.ts")
+	cfg2, cwd2, _ := s.getConfigForURI("file:///Users/John%20Doe/my%20project/src/components/deep/file.ts")
 	if len(cfg2) != 1 || cfg2[0].Rules["no-console"] != "error" {
 		t.Errorf("Deeply nested file in encoded path should match config, got %v", cfg2)
 	}
@@ -1169,9 +1169,31 @@ func TestGetConfigForURI_PercentEncodedPaths(t *testing.T) {
 	}
 
 	// File outside the config dir should fallback
-	cfg3, _ := s.getConfigForURI("file:///Users/John%20Doe/other%20project/src/file.ts")
+	cfg3, _, _ := s.getConfigForURI("file:///Users/John%20Doe/other%20project/src/file.ts")
 	if len(cfg3) != 0 {
 		t.Errorf("File outside config dir should fallback to empty JSON config, got %v", cfg3)
+	}
+}
+
+func TestGetConfigForURI_IsJSConfig(t *testing.T) {
+	s := newTestServer()
+
+	jsonRule := config.ConfigEntry{Rules: map[string]any{"no-debugger": "error"}}
+	s.jsonConfig = config.RslintConfig{jsonRule}
+
+	jsRule := config.ConfigEntry{Rules: map[string]any{"no-console": "warn"}}
+	s.jsConfigs["file:///project"] = config.RslintConfig{jsRule}
+
+	// JS config should return isJSConfig=true
+	_, _, isJS := s.getConfigForURI("file:///project/src/index.ts")
+	if !isJS {
+		t.Error("Expected isJSConfig=true when JS config matches")
+	}
+
+	// File outside JS config range falls back to JSON → isJSConfig=false
+	_, _, isJS = s.getConfigForURI("file:///other/src/index.ts")
+	if isJS {
+		t.Error("Expected isJSConfig=false when falling back to JSON config")
 	}
 }
 
