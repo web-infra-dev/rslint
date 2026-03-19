@@ -96,6 +96,8 @@ jobs:
 
       - name: Move binaries
         uses: ./.github/actions/move-artifacts
+      - name: Build @rslint/core dist
+        run: pnpm --filter @rslint/core build:js
       - name: Publish npm packages
         if: ${{ inputs.dry_run == false }}
         run: |
@@ -222,7 +224,7 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.25.0
+          go-version: 1.26.0
           cache-name: ${{ matrix.node_os }}-${{ matrix.node_arch }}
 
       - name: Install pnpm
@@ -309,7 +311,7 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.25.0
+          go-version: 1.26.0
           cache-name: ${{ matrix.node_os }}-${{ matrix.node_arch }}
 
       - name: Setup Rust

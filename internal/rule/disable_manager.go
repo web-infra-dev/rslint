@@ -53,7 +53,7 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 			continue
 		}
 
-		lineNum, _ := scanner.GetECMALineAndCharacterOfPosition(dm.sourceFile, comment.Pos())
+		lineNum, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, comment.Pos())
 		rulePos := 0
 
 		if strings.HasPrefix(commentContent, "eslint-disable") {
@@ -119,7 +119,7 @@ func parseRuleNames(rulesStr string) []string {
 
 // IsRuleDisabled checks if a rule is disabled at the given position
 func (dm *DisableManager) IsRuleDisabled(ruleName string, pos int) bool {
-	line, _ := scanner.GetECMALineAndCharacterOfPosition(dm.sourceFile, pos)
+	line, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, pos)
 
 	// Check block disable/enable directives (range-based)
 	if dm.isBlockDisabled(ruleName, line) {

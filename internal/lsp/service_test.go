@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/microsoft/typescript-go/shim/lsp/lsproto"
+	"github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -14,6 +15,7 @@ import (
 // Session is nil so session calls are safely skipped via nil guards.
 func newTestServer() *Server {
 	return &Server{
+		jsConfigs:       make(map[string]config.RslintConfig),
 		documents:       make(map[lsproto.DocumentUri]string),
 		diagnostics:     make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
 		refreshCh:       make(chan struct{}, 1),
@@ -106,7 +108,7 @@ func TestHandleDidChange_EmptyChanges(t *testing.T) {
 	s.documents[uri] = "original"
 
 	err := s.handleDidChange(ctx, &lsproto.DidChangeTextDocumentParams{
-		TextDocument: lsproto.VersionedTextDocumentIdentifier{Uri: uri},
+		TextDocument:   lsproto.VersionedTextDocumentIdentifier{Uri: uri},
 		ContentChanges: []lsproto.TextDocumentContentChangePartialOrWholeDocument{},
 	})
 	if err != nil {
@@ -385,6 +387,7 @@ func TestRapidChanges_VersionTracking(t *testing.T) {
 func newTestServerWithQueue() (*Server, chan *lsproto.Message) {
 	queue := make(chan *lsproto.Message, 10)
 	return &Server{
+		jsConfigs:       make(map[string]config.RslintConfig),
 		documents:       make(map[lsproto.DocumentUri]string),
 		diagnostics:     make(map[lsproto.DocumentUri][]rule.RuleDiagnostic),
 		outgoingQueue:   queue,
@@ -654,6 +657,602 @@ func TestHandleDidChange_UsesDebounce(t *testing.T) {
 
 	if s.lintTimer != nil {
 		s.lintTimer.Stop()
+	}
+}
+
+// ======== handleConfigUpdate tests ========
+
+func TestHandleConfigUpdate_ClearsConfigPath(t *testing.T) {
+	s := newTestServer()
+	ctx := context.Background()
+
+	// Simulate a previously loaded JSON config
+	s.rslintConfigPath = "/project/rslint.json"
+
+	// Send a JS config update — should clear the JSON config path
+	err := s.handleConfigUpdate(ctx, map[string]any{
+		"configs": []any{
+			map[string]any{
+				"configDirectory": "file:///project",
+				"entries": []any{
+					map[string]any{
+						"files": []string{"**/*.ts"},
+						"rules": map[string]any{"no-console": "error"},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("handleConfigUpdate failed: %v", err)
+	}
+
+	if s.rslintConfigPath != "" {
+		t.Errorf("rslintConfigPath should be cleared after JS config update, got %q", s.rslintConfigPath)
+	}
+
+	cfg, ok := s.jsConfigs["file:///project"]
+	if !ok {
+		t.Fatal("jsConfigs should have file:///project entry")
+	}
+	if len(cfg) != 1 {
+		t.Errorf("config should have 1 entry, got %d", len(cfg))
+	}
+}
+
+func TestHandleConfigUpdate_MultipleConfigs(t *testing.T) {
+	s := newTestServer()
+	ctx := context.Background()
+
+	err := s.handleConfigUpdate(ctx, map[string]any{
+		"configs": []any{
+			map[string]any{
+				"configDirectory": "file:///project",
+				"entries": []any{
+					map[string]any{"ignores": []string{"dist/**"}},
+					map[string]any{
+						"files": []string{"**/*.ts"},
+						"rules": map[string]any{"no-console": "error"},
+					},
+				},
+			},
+			map[string]any{
+				"configDirectory": "file:///project/packages/foo",
+				"entries": []any{
+					map[string]any{
+						"files": []string{"**/*.ts"},
+						"rules": map[string]any{"no-console": "warn"},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("handleConfigUpdate failed: %v", err)
+	}
+
+	if len(s.jsConfigs) != 2 {
+		t.Errorf("jsConfigs should have 2 entries, got %d", len(s.jsConfigs))
+	}
+	rootCfg := s.jsConfigs["file:///project"]
+	if len(rootCfg) != 2 {
+		t.Errorf("root config should have 2 entries, got %d", len(rootCfg))
+	}
+	fooCfg := s.jsConfigs["file:///project/packages/foo"]
+	if len(fooCfg) != 1 {
+		t.Errorf("foo config should have 1 entry, got %d", len(fooCfg))
+	}
+}
+
+func TestHandleConfigUpdate_EmptyConfigs(t *testing.T) {
+	s := newTestServer()
+	ctx := context.Background()
+
+	// Pre-populate with old configs
+	s.jsConfigs["file:///old"] = config.RslintConfig{}
+	s.rslintConfigPath = "/project/rslint.json"
+
+	// An explicitly empty configs array ({"configs":[]}) is a legitimate
+	// "all JS configs deleted" signal — it SHOULD clear existing state.
+	err := s.handleConfigUpdate(ctx, map[string]any{
+		"configs": []any{},
+	})
+	if err != nil {
+		t.Fatalf("handleConfigUpdate failed: %v", err)
+	}
+
+	if len(s.jsConfigs) != 0 {
+		t.Errorf("jsConfigs should be empty after explicit empty configs, got %v", s.jsConfigs)
+	}
+	if s.rslintConfigPath != "" {
+		t.Errorf("rslintConfigPath should be cleared, got %q", s.rslintConfigPath)
+	}
+}
+
+func TestHandleConfigUpdate_ReplacesOldConfigs(t *testing.T) {
+	s := newTestServer()
+	ctx := context.Background()
+
+	// First update with old config
+	s.jsConfigs["file:///old-project"] = config.RslintConfig{{}}
+
+	// New update should completely replace
+	err := s.handleConfigUpdate(ctx, map[string]any{
+		"configs": []any{
+			map[string]any{
+				"configDirectory": "file:///new-project",
+				"entries":         []any{map[string]any{"files": []string{"**/*.ts"}}},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("handleConfigUpdate failed: %v", err)
+	}
+
+	if _, ok := s.jsConfigs["file:///old-project"]; ok {
+		t.Error("old config should be replaced")
+	}
+	if _, ok := s.jsConfigs["file:///new-project"]; !ok {
+		t.Error("new config should exist")
+	}
+}
+
+func TestHandleConfigUpdate_MalformedPayload(t *testing.T) {
+	s := newTestServer()
+	ctx := context.Background()
+
+	// Pre-populate to verify malformed update doesn't corrupt state
+	origConfig := config.RslintConfig{{Rules: map[string]any{"r": "error"}}}
+	s.jsConfigs["file:///old"] = origConfig
+	s.rslintConfigPath = "/project/rslint.json"
+
+	tests := []struct {
+		name   string
+		params any
+	}{
+		{"nil params", nil},
+		{"string params", "not an object"},
+		{"number params", 42},
+		{"missing configs field", map[string]any{"other": "data"}},
+		{"configs is not an array", map[string]any{"configs": "bad"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := s.handleConfigUpdate(ctx, tt.params)
+			// Some payloads may succeed (e.g. missing configs field → empty Configs slice),
+			// others may fail. Either way, the server should not panic and existing
+			// configs must remain intact.
+			_ = err
+
+			cfg, ok := s.jsConfigs["file:///old"]
+			if !ok {
+				t.Error("existing jsConfigs entry should be preserved after malformed payload")
+			} else if len(cfg) != 1 || cfg[0].Rules["r"] != "error" {
+				t.Errorf("existing jsConfigs entry was corrupted: %v", cfg)
+			}
+			if s.rslintConfigPath != "/project/rslint.json" {
+				t.Errorf("rslintConfigPath should be preserved, got %q", s.rslintConfigPath)
+			}
+		})
+	}
+}
+
+func TestHandleConfigUpdate_MissingConfigDirectory(t *testing.T) {
+	s := newTestServer()
+	ctx := context.Background()
+
+	// Entry with empty configDirectory — should still be stored (keyed by "")
+	err := s.handleConfigUpdate(ctx, map[string]any{
+		"configs": []any{
+			map[string]any{
+				"entries": []any{
+					map[string]any{"rules": map[string]any{"no-console": "error"}},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("handleConfigUpdate failed: %v", err)
+	}
+
+	// Empty key should exist
+	if _, ok := s.jsConfigs[""]; !ok {
+		t.Error("config with empty configDirectory should still be stored")
+	}
+}
+
+func TestHandleConfigUpdate_InvalidEntriesType(t *testing.T) {
+	s := newTestServer()
+	ctx := context.Background()
+
+	// entries is a string instead of an array — Go JSON unmarshal will fail
+	err := s.handleConfigUpdate(ctx, map[string]any{
+		"configs": []any{
+			map[string]any{
+				"configDirectory": "file:///project",
+				"entries":         "not-an-array",
+			},
+		},
+	})
+	if err != nil {
+		// Expected: unmarshal error for entries field
+		t.Logf("got expected error: %v", err)
+	}
+}
+
+func TestJSConfigDeletedFallsBackToJSON(t *testing.T) {
+	s := newTestServer()
+	ctx := context.Background()
+
+	// 1. Start with a JSON config
+	jsonRule := config.ConfigEntry{Rules: map[string]any{"no-debugger": "error"}}
+	s.jsonConfig = config.RslintConfig{jsonRule}
+	s.rslintConfigPath = "/project/rslint.json"
+
+	// Verify JSON config is active
+	cfg, _, _ := s.getConfigForURI("file:///project/src/index.ts")
+	if len(cfg) != 1 || cfg[0].Rules["no-debugger"] != "error" {
+		t.Fatalf("expected JSON config, got %v", cfg)
+	}
+
+	// 2. JS config arrives — overrides JSON
+	err := s.handleConfigUpdate(ctx, map[string]any{
+		"configs": []any{
+			map[string]any{
+				"configDirectory": "file:///project",
+				"entries": []any{
+					map[string]any{"rules": map[string]any{"no-console": "warn"}},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("handleConfigUpdate failed: %v", err)
+	}
+
+	cfg, _, _ = s.getConfigForURI("file:///project/src/index.ts")
+	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "warn" {
+		t.Fatalf("expected JS config, got %v", cfg)
+	}
+	if s.rslintConfigPath != "" {
+		t.Fatalf("rslintConfigPath should be cleared, got %q", s.rslintConfigPath)
+	}
+
+	// 3. All JS configs deleted — send explicitly empty configs array.
+	// This is a legitimate "all configs removed" signal from the extension.
+	err = s.handleConfigUpdate(ctx, map[string]any{
+		"configs": []any{},
+	})
+	if err != nil {
+		t.Fatalf("handleConfigUpdate (empty) failed: %v", err)
+	}
+
+	// 4. No JS configs remain → should fall back to JSON config
+	cfg, _, _ = s.getConfigForURI("file:///project/src/index.ts")
+	if len(cfg) != 1 || cfg[0].Rules["no-debugger"] != "error" {
+		t.Errorf("after all JS configs deleted, should fall back to JSON config, got %v", cfg)
+	}
+}
+
+// ======== getConfigForURI tests ========
+
+func TestGetConfigForURI_ClosestJSConfig(t *testing.T) {
+	s := newTestServer()
+
+	rootRule := config.ConfigEntry{Rules: map[string]any{"no-console": "error"}}
+	fooRule := config.ConfigEntry{Rules: map[string]any{"no-console": "warn"}}
+	s.jsConfigs["file:///project"] = config.RslintConfig{rootRule}
+	s.jsConfigs["file:///project/packages/foo"] = config.RslintConfig{fooRule}
+
+	// File in foo should use foo's config, cwd = foo's directory
+	fooCfg, fooCwd, _ := s.getConfigForURI("file:///project/packages/foo/src/index.ts")
+	if len(fooCfg) != 1 || fooCfg[0].Rules["no-console"] != "warn" {
+		t.Errorf("foo file should use foo config, got %v", fooCfg)
+	}
+	if fooCwd != "/project/packages/foo" {
+		t.Errorf("foo cwd should be /project/packages/foo, got %q", fooCwd)
+	}
+
+	// File in bar should use root config, cwd = root directory
+	barCfg, barCwd, _ := s.getConfigForURI("file:///project/packages/bar/src/index.ts")
+	if len(barCfg) != 1 || barCfg[0].Rules["no-console"] != "error" {
+		t.Errorf("bar file should use root config, got %v", barCfg)
+	}
+	if barCwd != "/project" {
+		t.Errorf("bar cwd should be /project, got %q", barCwd)
+	}
+}
+
+func TestGetConfigForURI_FallbackToJSON(t *testing.T) {
+	s := newTestServer()
+
+	jsonRule := config.ConfigEntry{Rules: map[string]any{"no-debugger": "error"}}
+	s.jsonConfig = config.RslintConfig{jsonRule}
+
+	// No JS configs — should fall back to JSON config; cwd = s.cwd
+	cfg, cwd, _ := s.getConfigForURI("file:///project/src/index.ts")
+	if len(cfg) != 1 || cfg[0].Rules["no-debugger"] != "error" {
+		t.Errorf("should fall back to JSON config, got %v", cfg)
+	}
+	if cwd != s.cwd {
+		t.Errorf("fallback cwd should be s.cwd %q, got %q", s.cwd, cwd)
+	}
+}
+
+func TestGetConfigForURI_JSConfigOverridesJSON(t *testing.T) {
+	s := newTestServer()
+
+	jsonRule := config.ConfigEntry{Rules: map[string]any{"no-debugger": "error"}}
+	s.jsonConfig = config.RslintConfig{jsonRule}
+
+	jsRule := config.ConfigEntry{Rules: map[string]any{"no-console": "warn"}}
+	s.jsConfigs["file:///project"] = config.RslintConfig{jsRule}
+
+	// JS config should take priority over JSON; cwd = JS config's dir
+	cfg, cwd, _ := s.getConfigForURI("file:///project/src/index.ts")
+	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "warn" {
+		t.Errorf("JS config should override JSON, got %v", cfg)
+	}
+	if cwd != "/project" {
+		t.Errorf("JS config cwd should be /project, got %q", cwd)
+	}
+}
+
+func TestGetConfigForURI_NoConfig(t *testing.T) {
+	s := newTestServer()
+
+	cfg, _, _ := s.getConfigForURI("file:///project/src/index.ts")
+	if cfg != nil {
+		t.Errorf("should return nil when no config exists, got %v", cfg)
+	}
+}
+
+func TestGetConfigForURI_DeeplyNestedFile(t *testing.T) {
+	s := newTestServer()
+
+	rootRule := config.ConfigEntry{Rules: map[string]any{"no-console": "error"}}
+	s.jsConfigs["file:///project"] = config.RslintConfig{rootRule}
+
+	// Deeply nested file should still find root config
+	cfg, _, _ := s.getConfigForURI("file:///project/a/b/c/d/e/f/index.ts")
+	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "error" {
+		t.Errorf("deeply nested file should find root config, got %v", cfg)
+	}
+}
+
+func TestGetConfigForURI_FileAtConfigDir(t *testing.T) {
+	s := newTestServer()
+
+	rootRule := config.ConfigEntry{Rules: map[string]any{"no-console": "error"}}
+	s.jsConfigs["file:///project"] = config.RslintConfig{rootRule}
+
+	// File in the same directory as config
+	cfg, _, _ := s.getConfigForURI("file:///project/index.ts")
+	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "error" {
+		t.Errorf("file at config dir should use that config, got %v", cfg)
+	}
+}
+
+func TestGetConfigForURI_MonorepoMultiplePackages(t *testing.T) {
+	s := newTestServer()
+
+	// Simulate a monorepo with root config + 3 sub-package configs
+	rootRule := config.ConfigEntry{Rules: map[string]any{"no-console": "error", "no-debugger": "error"}}
+	fooRule := config.ConfigEntry{Rules: map[string]any{"no-console": "warn"}}
+	barRule := config.ConfigEntry{Rules: map[string]any{"no-console": "off"}}
+	bazRule := config.ConfigEntry{Rules: map[string]any{"no-console": "error", "no-eval": "error"}}
+
+	s.jsConfigs["file:///monorepo"] = config.RslintConfig{rootRule}
+	s.jsConfigs["file:///monorepo/packages/foo"] = config.RslintConfig{fooRule}
+	s.jsConfigs["file:///monorepo/packages/bar"] = config.RslintConfig{barRule}
+	s.jsConfigs["file:///monorepo/packages/baz"] = config.RslintConfig{bazRule}
+
+	tests := []struct {
+		name     string
+		uri      lsproto.DocumentUri
+		wantRule string // expected value of "no-console"
+		wantLen  int    // expected number of entries
+	}{
+		{"foo file uses foo config", "file:///monorepo/packages/foo/src/index.ts", "warn", 1},
+		{"foo nested file uses foo config", "file:///monorepo/packages/foo/src/utils/helper.ts", "warn", 1},
+		{"bar file uses bar config", "file:///monorepo/packages/bar/src/index.ts", "off", 1},
+		{"baz file uses baz config", "file:///monorepo/packages/baz/src/index.ts", "error", 1},
+		{"root file uses root config", "file:///monorepo/src/index.ts", "error", 1},
+		{"unknown package uses root config", "file:///monorepo/packages/qux/src/index.ts", "error", 1},
+		{"file outside monorepo has no config", "file:///other-project/src/index.ts", "", 0},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, _, _ := s.getConfigForURI(tt.uri)
+			if tt.wantLen == 0 {
+				if cfg != nil {
+					t.Errorf("expected nil config, got %v", cfg)
+				}
+				return
+			}
+			if len(cfg) != tt.wantLen {
+				t.Fatalf("expected %d entries, got %d", tt.wantLen, len(cfg))
+			}
+			if cfg[0].Rules["no-console"] != tt.wantRule {
+				t.Errorf("no-console = %v, want %v", cfg[0].Rules["no-console"], tt.wantRule)
+			}
+		})
+	}
+}
+
+func TestGetConfigForURI_NestedConfigs(t *testing.T) {
+	s := newTestServer()
+
+	// 3-level nesting: root → packages/foo → packages/foo/sub
+	s.jsConfigs["file:///project"] = config.RslintConfig{
+		{Rules: map[string]any{"level": "root"}},
+	}
+	s.jsConfigs["file:///project/packages/foo"] = config.RslintConfig{
+		{Rules: map[string]any{"level": "foo"}},
+	}
+	s.jsConfigs["file:///project/packages/foo/sub"] = config.RslintConfig{
+		{Rules: map[string]any{"level": "sub"}},
+	}
+
+	// File in sub should use sub's config (closest)
+	cfg, cwd, _ := s.getConfigForURI("file:///project/packages/foo/sub/src/index.ts")
+	if cfg[0].Rules["level"] != "sub" {
+		t.Errorf("sub file should use sub config, got %v", cfg[0].Rules["level"])
+	}
+	if cwd != "/project/packages/foo/sub" {
+		t.Errorf("sub cwd should be /project/packages/foo/sub, got %q", cwd)
+	}
+
+	// File in foo (but not in sub) should use foo's config
+	cfg, cwd, _ = s.getConfigForURI("file:///project/packages/foo/src/index.ts")
+	if cfg[0].Rules["level"] != "foo" {
+		t.Errorf("foo file should use foo config, got %v", cfg[0].Rules["level"])
+	}
+	if cwd != "/project/packages/foo" {
+		t.Errorf("foo cwd should be /project/packages/foo, got %q", cwd)
+	}
+
+	// File at root should use root config
+	cfg, cwd, _ = s.getConfigForURI("file:///project/src/index.ts")
+	if cfg[0].Rules["level"] != "root" {
+		t.Errorf("root file should use root config, got %v", cfg[0].Rules["level"])
+	}
+	if cwd != "/project" {
+		t.Errorf("root cwd should be /project, got %q", cwd)
+	}
+}
+
+func TestGetConfigForURI_WindowsURI(t *testing.T) {
+	s := newTestServer()
+
+	// Windows file URIs use forward slashes: file:///C:/Users/project
+	s.jsConfigs["file:///C:/Users/project"] = config.RslintConfig{
+		{Rules: map[string]any{"no-console": "error"}},
+	}
+
+	cfg, cwd, _ := s.getConfigForURI("file:///C:/Users/project/src/index.ts")
+	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "error" {
+		t.Errorf("Windows URI should match, got %v", cfg)
+	}
+	if cwd != "C:/Users/project" {
+		t.Errorf("Windows cwd should be C:/Users/project, got %q", cwd)
+	}
+}
+
+func TestGetConfigForURI_PercentEncodedPaths(t *testing.T) {
+	s := newTestServer()
+
+	// Config directory with spaces — VS Code sends percent-encoded URIs
+	s.jsConfigs["file:///Users/John%20Doe/my%20project"] = config.RslintConfig{
+		{Rules: map[string]any{"no-console": "error"}},
+	}
+
+	// File in a subdirectory — walk up should match the encoded config key
+	cfg, cwd, _ := s.getConfigForURI("file:///Users/John%20Doe/my%20project/src/index.ts")
+	if len(cfg) != 1 || cfg[0].Rules["no-console"] != "error" {
+		t.Errorf("Percent-encoded URI should match config, got %v", cfg)
+	}
+	// cwd should be decoded for filesystem use
+	if cwd != "/Users/John Doe/my project" {
+		t.Errorf("cwd should be decoded path, got %q", cwd)
+	}
+
+	// Deeply nested file — walk must traverse multiple encoded segments
+	cfg2, cwd2, _ := s.getConfigForURI("file:///Users/John%20Doe/my%20project/src/components/deep/file.ts")
+	if len(cfg2) != 1 || cfg2[0].Rules["no-console"] != "error" {
+		t.Errorf("Deeply nested file in encoded path should match config, got %v", cfg2)
+	}
+	if cwd2 != "/Users/John Doe/my project" {
+		t.Errorf("deep file cwd should be decoded, got %q", cwd2)
+	}
+
+	// File outside the config dir should fallback
+	cfg3, _, _ := s.getConfigForURI("file:///Users/John%20Doe/other%20project/src/file.ts")
+	if len(cfg3) != 0 {
+		t.Errorf("File outside config dir should fallback to empty JSON config, got %v", cfg3)
+	}
+}
+
+func TestGetConfigForURI_IsJSConfig(t *testing.T) {
+	s := newTestServer()
+
+	jsonRule := config.ConfigEntry{Rules: map[string]any{"no-debugger": "error"}}
+	s.jsonConfig = config.RslintConfig{jsonRule}
+
+	jsRule := config.ConfigEntry{Rules: map[string]any{"no-console": "warn"}}
+	s.jsConfigs["file:///project"] = config.RslintConfig{jsRule}
+
+	// JS config should return isJSConfig=true
+	_, _, isJS := s.getConfigForURI("file:///project/src/index.ts")
+	if !isJS {
+		t.Error("Expected isJSConfig=true when JS config matches")
+	}
+
+	// File outside JS config range falls back to JSON → isJSConfig=false
+	_, _, isJS = s.getConfigForURI("file:///other/src/index.ts")
+	if isJS {
+		t.Error("Expected isJSConfig=false when falling back to JSON config")
+	}
+}
+
+// ======== uriToPath tests ========
+
+func TestUriToPath(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		// Unix
+		{"file:///home/user/project", "/home/user/project"},
+		{"file:///project/src/index.ts", "/project/src/index.ts"},
+		// Windows (uppercase and lowercase drive letters)
+		{"file:///C:/Users/project", "C:/Users/project"},
+		{"file:///D:/src/index.ts", "D:/src/index.ts"},
+		{"file:///c:/Users/project", "c:/Users/project"},
+		// Percent-encoded paths (spaces, CJK, VS Code colon encoding)
+		{"file:///path%20with%20spaces/file.ts", "/path with spaces/file.ts"},
+		{"file:///C%3A/Users/project", "C:/Users/project"},
+		{"file:///project/%E4%B8%AD%E6%96%87/file.ts", "/project/中文/file.ts"},
+		{"file:///Users/John%20Doe/my%20project/src/index.ts", "/Users/John Doe/my project/src/index.ts"},
+		// Edge cases
+		{"file:///", "/"},
+		{"file://host/share", "/share"}, // UNC: authority is host, path is /share
+		{"not-a-uri", "not-a-uri"},
+		{"", ""},
+	}
+
+	for _, tt := range tests {
+		got := uriToPath(lsproto.DocumentUri(tt.input))
+		if got != tt.want {
+			t.Errorf("uriToPath(%q) = %q, want %q", tt.input, got, tt.want)
+		}
+	}
+}
+
+// ======== uriDirname tests ========
+
+func TestUriDirname(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"file:///project/src/index.ts", "file:///project/src"},
+		{"file:///project/index.ts", "file:///project"},
+		{"file:///project", "file:///project"}, // stops at authority
+		{"file:///C:/Users/project/src", "file:///C:/Users/project"},
+		{"file:///C:/Users", "file:///C:"},
+		{"file:///C:", "file:///C:"}, // stops at authority
+		{"", ""},                     // empty string
+		{"file:///", "file:///"},     // root URI
+	}
+
+	for _, tt := range tests {
+		got := uriDirname(tt.input)
+		if got != tt.want {
+			t.Errorf("uriDirname(%q) = %q, want %q", tt.input, got, tt.want)
+		}
 	}
 }
 
