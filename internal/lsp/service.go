@@ -452,7 +452,7 @@ type LintResponse struct {
 	RuleCount   int                  `json:"ruleCount"`
 }
 
-func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string) ([]rule.RuleDiagnostic, error) {
+func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool) ([]rule.RuleDiagnostic, error) {
 	filename := uriToPath(uri)
 
 	// GetLanguageService flushes any pending changes (from DidChangeFile) and
@@ -475,7 +475,7 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 
 	linter.RunLinterInProgram(program, []string{filename}, util.ExcludePaths,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			activeRules, _ := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), cwd)
+			activeRules, _ := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), cwd, enforcePlugins)
 			return activeRules
 		}, diagnosticCollector)
 
@@ -710,17 +710,18 @@ func createDisableRuleForFileAction(ruleDiag rule.RuleDiagnostic, uri lsproto.Do
 // It walks upward from the file's directory looking for the closest
 // JS/TS config (matching ESLint v10 flat config behavior).
 // Falls back to the JSON config if no JS/TS config matches.
-// Returns the config entries and the directory to use as cwd for glob matching.
+// Returns the config entries, the directory to use as cwd for glob matching,
+// and whether the config is from a JS/TS config (for plugin enforcement).
 // For JS configs the cwd is the config's own directory (URI → path);
 // for the JSON fallback it is s.cwd.
-func (s *Server) getConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, string) {
+func (s *Server) getConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, string, bool) {
 	if len(s.jsConfigs) > 0 {
 		// Both keys and lookups use URI strings (e.g. "file:///project"),
 		// so path separators are always forward slashes — no platform issues.
 		dir := uriDirname(string(uri))
 		for {
 			if cfg, ok := s.jsConfigs[dir]; ok {
-				return cfg, uriToPath(lsproto.DocumentUri(dir))
+				return cfg, uriToPath(lsproto.DocumentUri(dir)), true
 			}
 			parent := uriDirname(dir)
 			if parent == dir {
@@ -729,7 +730,7 @@ func (s *Server) getConfigForURI(uri lsproto.DocumentUri) (config.RslintConfig, 
 			dir = parent
 		}
 	}
-	return s.jsonConfig, s.cwd
+	return s.jsonConfig, s.cwd, false
 }
 
 // uriDirname returns the parent directory of a URI string.
@@ -762,8 +763,8 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 		return
 	}
 
-	rslintConfig, configCwd := s.getConfigForURI(uri)
-	ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd)
+	rslintConfig, configCwd, isJSConfig := s.getConfigForURI(uri)
+	ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig)
 	if err != nil {
 		log.Printf("Error running lint for push diagnostics: %v", err)
 		return
