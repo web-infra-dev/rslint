@@ -470,14 +470,16 @@ func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {
 	normalizedPath := normalizePath(filePath, cwd)
 
 	for _, pattern := range ignorePatterns {
+		normalizedPattern := normalizePattern(pattern)
+
 		// Try matching against normalized path
-		if matched, err := doublestar.Match(pattern, normalizedPath); err == nil && matched {
+		if matched, err := doublestar.Match(normalizedPattern, normalizedPath); err == nil && matched {
 			return true
 		}
 
 		// Also try matching against original path for absolute patterns
 		if normalizedPath != filePath {
-			if matched, err := doublestar.Match(pattern, filePath); err == nil && matched {
+			if matched, err := doublestar.Match(normalizedPattern, filePath); err == nil && matched {
 				return true
 			}
 		}
@@ -485,12 +487,19 @@ func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {
 		// Try Unix-style path for cross-platform compatibility
 		unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
 		if unixPath != normalizedPath {
-			if matched, err := doublestar.Match(pattern, unixPath); err == nil && matched {
+			if matched, err := doublestar.Match(normalizedPattern, unixPath); err == nil && matched {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+// normalizePattern cleans up a glob pattern to match paths produced by normalizePath.
+// normalizePath uses tspath.NormalizePath on file paths (strips leading "./", collapses
+// "/./", resolves ".."), so patterns must undergo the same transformation.
+func normalizePattern(pattern string) string {
+	return tspath.NormalizePath(pattern)
 }
 
 // normalizePath converts file path to be relative to cwd for consistent matching
@@ -504,7 +513,8 @@ func normalizePath(filePath, cwd string) string {
 // isFileIgnoredSimple provides fallback matching when cwd is unavailable
 func isFileIgnoredSimple(filePath string, ignorePatterns []string) bool {
 	for _, pattern := range ignorePatterns {
-		if matched, err := doublestar.Match(pattern, filePath); err == nil && matched {
+		normalizedPattern := normalizePattern(pattern)
+		if matched, err := doublestar.Match(normalizedPattern, filePath); err == nil && matched {
 			return true
 		}
 	}
@@ -624,17 +634,19 @@ func isFileMatched(filePath string, patterns []string, cwd string) bool {
 	}
 
 	for _, pattern := range patterns {
-		if matched, err := doublestar.Match(pattern, normalizedPath); err == nil && matched {
+		normalizedPattern := normalizePattern(pattern)
+
+		if matched, err := doublestar.Match(normalizedPattern, normalizedPath); err == nil && matched {
 			return true
 		}
 		if normalizedPath != filePath {
-			if matched, err := doublestar.Match(pattern, filePath); err == nil && matched {
+			if matched, err := doublestar.Match(normalizedPattern, filePath); err == nil && matched {
 				return true
 			}
 		}
 		unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
 		if unixPath != normalizedPath {
-			if matched, err := doublestar.Match(pattern, unixPath); err == nil && matched {
+			if matched, err := doublestar.Match(normalizedPattern, unixPath); err == nil && matched {
 				return true
 			}
 		}
