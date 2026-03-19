@@ -1,1 +1,17 @@
-["index"]
+[
+  {
+    "type": "file",
+    "name": "index",
+    "label": "Getting Started"
+  },
+  {
+    "type": "file",
+    "name": "cli",
+    "label": "CLI Reference"
+  },
+  {
+    "type": "file",
+    "name": "inline-directives",
+    "label": "Inline Directives"
+  }
+]

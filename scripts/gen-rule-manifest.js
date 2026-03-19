@@ -26,7 +26,7 @@ function getCoreRuleEntries() {
   return fs
     .readdirSync(CORE_RULES_DIR, { withFileTypes: true })
     .filter(d => d.isDirectory() && !d.name.startsWith('.'))
-    .map(d => ({ rule: d.name, group: 'eslint' }));
+    .map(d => ({ rule: d.name, group: 'eslint', pluginDir: null }));
 }
 
 function getPluginRuleEntries() {
@@ -65,7 +65,7 @@ function getPluginRuleEntries() {
       )
       .map(d => d.name);
     for (const rule of ruleDirs) {
-      entries.push({ rule, group: pluginDisplayName });
+      entries.push({ rule, group: pluginDisplayName, pluginDir: plugin });
     }
   }
   return entries;
@@ -154,19 +154,34 @@ function getSkipCases(rule, group) {
   return skipCases;
 }
 
+function getDocPath(rule, pluginDir) {
+  let mdFile;
+  let relPath;
+  if (pluginDir) {
+    mdFile = path.join(PLUGINS_DIR, pluginDir, 'rules', rule, `${rule}.md`);
+    relPath = `internal/plugins/${pluginDir}/rules/${rule}/${rule}.md`;
+  } else {
+    mdFile = path.join(CORE_RULES_DIR, rule, `${rule}.md`);
+    relPath = `internal/rules/${rule}/${rule}.md`;
+  }
+  return fs.existsSync(mdFile) ? relPath : null;
+}
+
 function buildManifest() {
   const included = getIncludedRules();
   const ruleEntries = [...getPluginRuleEntries(), ...getCoreRuleEntries()];
-  const ruleSet = new Set(ruleEntries.map(e => e.rule));
-  const ruleToGroup = new Map();
-  for (const e of ruleEntries) ruleToGroup.set(e.rule, e.group);
-  const rules = Array.from(ruleSet)
+  // Deduplicate by rule name, keeping first entry
+  const seen = new Map();
+  for (const e of ruleEntries) {
+    if (!seen.has(e.rule)) seen.set(e.rule, e);
+  }
+  const rules = Array.from(seen.keys())
     .sort((a, b) => a.localeCompare(b))
     .map(rule => {
+      const entry = seen.get(rule);
       let status = 'full';
       let failing_case = [];
-      // Group now derived from PLUGIN_NAME constant; fallback to 'typescript-eslint'
-      let group = ruleToGroup.get(rule) || 'typescript-eslint';
+      const group = entry.group;
       if (!included.has(rule)) {
         status = 'partial-test';
       } else {
@@ -176,7 +191,14 @@ function buildManifest() {
           failing_case = skipCases;
         }
       }
-      return { name: rule.replace(/_/g, '-'), group, status, failing_case };
+      const docPath = getDocPath(rule, entry.pluginDir);
+      return {
+        name: rule.replace(/_/g, '-'),
+        group,
+        status,
+        failing_case,
+        docPath,
+      };
     });
   return { rules };
 }
