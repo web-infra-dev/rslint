@@ -2,6 +2,7 @@
 const path = require('node:path');
 const os = require('node:os');
 const fs = require('node:fs');
+
 function getBinPath() {
   if (fs.existsSync(path.resolve(__dirname, './rslint'))) {
     return path.resolve(__dirname, './rslint');
@@ -15,20 +16,15 @@ function getBinPath() {
     `@rslint/${platformKey}/rslint${process.platform === 'win32' ? '.exe' : ''}`,
   );
 }
-function main() {
+
+async function main() {
   const binPath = getBinPath();
-  try {
-    require('child_process').execFileSync(binPath, process.argv.slice(2), {
-      stdio: 'inherit',
-    });
-  } catch (error) {
-    // Preserve the exit code from the child process
-    if (error.status != null) {
-      process.exit(error.status);
-    } else {
-      console.error(`Failed to execute ${binPath}: ${error.message}`);
-      process.exit(1);
-    }
-  }
+  const { run } = await import(path.resolve(__dirname, '../dist/cli.js'));
+  const exitCode = await run(binPath, process.argv.slice(2));
+  process.exit(exitCode);
 }
-main();
+
+main().catch(err => {
+  process.stderr.write(`rslint: ${err}\n`);
+  process.exit(1);
+});

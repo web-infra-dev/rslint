@@ -9,17 +9,19 @@ import "github.com/microsoft/typescript-go/internal/compiler"
 import "github.com/microsoft/typescript-go/internal/core"
 import "github.com/microsoft/typescript-go/internal/ls"
 import "github.com/microsoft/typescript-go/internal/ls/lsconv"
+import "github.com/microsoft/typescript-go/internal/ls/lsutil"
 import "github.com/microsoft/typescript-go/internal/lsp/lsproto"
+import "github.com/microsoft/typescript-go/internal/tspath"
 import _ "unsafe"
 
-type AddAsTypeOnly = ls.AddAsTypeOnly
-const AddAsTypeOnlyAllowed = ls.AddAsTypeOnlyAllowed
-const AddAsTypeOnlyNotAllowed = ls.AddAsTypeOnlyNotAllowed
-const AddAsTypeOnlyRequired = ls.AddAsTypeOnlyRequired
-type AutoImportData = ls.AutoImportData
-type CachedSymbolExportInfo = ls.CachedSymbolExportInfo
+type CallHierarchyDeclaration = ls.CallHierarchyDeclaration
 type CandidateOrTypeInfo = ls.CandidateOrTypeInfo
-type CompletionItemData = ls.CompletionItemData
+type CodeAction = ls.CodeAction
+type CodeFixContext = ls.CodeFixContext
+type CodeFixProvider = ls.CodeFixProvider
+type CombinedCodeActions = ls.CombinedCodeActions
+//go:linkname CompareCompletionEntries github.com/microsoft/typescript-go/internal/ls.CompareCompletionEntries
+func CompareCompletionEntries(a *lsproto.CompletionItem, b *lsproto.CompletionItem) int
 type CompletionKind = ls.CompletionKind
 const CompletionKindGlobal = ls.CompletionKindGlobal
 const CompletionKindMemberLike = ls.CompletionKindMemberLike
@@ -28,40 +30,27 @@ const CompletionKindObjectPropertyDeclaration = ls.CompletionKindObjectPropertyD
 const CompletionKindPropertyAccess = ls.CompletionKindPropertyAccess
 const CompletionKindString = ls.CompletionKindString
 type CompletionsTriggerCharacter = ls.CompletionsTriggerCharacter
+type CrossProjectOrchestrator = ls.CrossProjectOrchestrator
 type DeclarationInfo = ls.DeclarationInfo
 type Definition = ls.Definition
 type DefinitionKind = ls.DefinitionKind
+var ErrNeedsAutoImports = ls.ErrNeedsAutoImports
 var ErrNoSourceFile = ls.ErrNoSourceFile
 var ErrNoTokenAtPosition = ls.ErrNoTokenAtPosition
 type ExportInfo = ls.ExportInfo
-type ExportInfoMap = ls.ExportInfoMap
-type ExportInfoMapKey = ls.ExportInfoMapKey
 type ExportKind = ls.ExportKind
 const ExportKindDefault = ls.ExportKindDefault
 const ExportKindExportEquals = ls.ExportKindExportEquals
 const ExportKindModule = ls.ExportKindModule
 const ExportKindNamed = ls.ExportKindNamed
 const ExportKindUMD = ls.ExportKindUMD
-type FixAddToExistingImportInfo = ls.FixAddToExistingImportInfo
 type Host = ls.Host
 type ImpExpKind = ls.ImpExpKind
 const ImpExpKindExport = ls.ImpExpKindExport
 const ImpExpKindImport = ls.ImpExpKindImport
 const ImpExpKindUnknown = ls.ImpExpKindUnknown
-type Import = ls.Import
 type ImportExportSymbol = ls.ImportExportSymbol
-type ImportFix = ls.ImportFix
-type ImportFixKind = ls.ImportFixKind
-const ImportFixKindAddNew = ls.ImportFixKindAddNew
-const ImportFixKindAddToExisting = ls.ImportFixKindAddToExisting
-const ImportFixKindJsdocTypeImport = ls.ImportFixKindJsdocTypeImport
-const ImportFixKindPromoteTypeOnly = ls.ImportFixKindPromoteTypeOnly
-const ImportFixKindUseNamespace = ls.ImportFixKindUseNamespace
-type ImportKind = ls.ImportKind
-const ImportKindCommonJS = ls.ImportKindCommonJS
-const ImportKindDefault = ls.ImportKindDefault
-const ImportKindNamed = ls.ImportKindNamed
-const ImportKindNamespace = ls.ImportKindNamespace
+var ImportFixProvider = ls.ImportFixProvider
 type ImportTracker = ls.ImportTracker
 type ImportsResult = ls.ImportsResult
 //go:linkname IsInString github.com/microsoft/typescript-go/internal/ls.IsInString
@@ -84,80 +73,15 @@ type ModuleReferenceKind = ls.ModuleReferenceKind
 const ModuleReferenceKindImplicit = ls.ModuleReferenceKindImplicit
 const ModuleReferenceKindImport = ls.ModuleReferenceKindImport
 const ModuleReferenceKindReference = ls.ModuleReferenceKindReference
-//go:linkname NewExportInfoMap github.com/microsoft/typescript-go/internal/ls.NewExportInfoMap
-func NewExportInfoMap(globalsTypingCacheLocation string) *ls.ExportInfoMap
 //go:linkname NewLanguageService github.com/microsoft/typescript-go/internal/ls.NewLanguageService
-func NewLanguageService(program *compiler.Program, host ls.Host) *ls.LanguageService
+func NewLanguageService(projectPath tspath.Path, program *compiler.Program, host ls.Host, activeFile string) *ls.LanguageService
 type PossibleTypeArgumentInfo = ls.PossibleTypeArgumentInfo
+type Project = ls.Project
 //go:linkname ProvideWorkspaceSymbols github.com/microsoft/typescript-go/internal/ls.ProvideWorkspaceSymbols
-func ProvideWorkspaceSymbols(ctx context.Context, programs []*compiler.Program, converters *lsconv.Converters, query string) (lsproto.WorkspaceSymbolResponse, error)
-type Qualification = ls.Qualification
+func ProvideWorkspaceSymbols(ctx context.Context, programs []*compiler.Program, converters *lsconv.Converters, preferences *lsutil.UserPreferences, query string) (lsproto.WorkspaceSymbolResponse, error)
 //go:linkname RangeContainsRange github.com/microsoft/typescript-go/internal/ls.RangeContainsRange
 func RangeContainsRange(r1 core.TextRange, r2 core.TextRange) bool
 type ReferenceEntry = ls.ReferenceEntry
-type ScriptElementKind = ls.ScriptElementKind
-const ScriptElementKindAlias = ls.ScriptElementKindAlias
-const ScriptElementKindCallSignatureElement = ls.ScriptElementKindCallSignatureElement
-const ScriptElementKindClassElement = ls.ScriptElementKindClassElement
-const ScriptElementKindConstElement = ls.ScriptElementKindConstElement
-const ScriptElementKindConstructSignatureElement = ls.ScriptElementKindConstructSignatureElement
-const ScriptElementKindConstructorImplementationElement = ls.ScriptElementKindConstructorImplementationElement
-const ScriptElementKindDirectory = ls.ScriptElementKindDirectory
-const ScriptElementKindEnumElement = ls.ScriptElementKindEnumElement
-const ScriptElementKindEnumMemberElement = ls.ScriptElementKindEnumMemberElement
-const ScriptElementKindExternalModuleName = ls.ScriptElementKindExternalModuleName
-const ScriptElementKindFunctionElement = ls.ScriptElementKindFunctionElement
-const ScriptElementKindIndexSignatureElement = ls.ScriptElementKindIndexSignatureElement
-const ScriptElementKindInterfaceElement = ls.ScriptElementKindInterfaceElement
-const ScriptElementKindKeyword = ls.ScriptElementKindKeyword
-const ScriptElementKindLabel = ls.ScriptElementKindLabel
-const ScriptElementKindLetElement = ls.ScriptElementKindLetElement
-const ScriptElementKindLink = ls.ScriptElementKindLink
-const ScriptElementKindLinkName = ls.ScriptElementKindLinkName
-const ScriptElementKindLinkText = ls.ScriptElementKindLinkText
-const ScriptElementKindLocalClassElement = ls.ScriptElementKindLocalClassElement
-const ScriptElementKindLocalFunctionElement = ls.ScriptElementKindLocalFunctionElement
-const ScriptElementKindLocalVariableElement = ls.ScriptElementKindLocalVariableElement
-const ScriptElementKindMemberAccessorVariableElement = ls.ScriptElementKindMemberAccessorVariableElement
-const ScriptElementKindMemberFunctionElement = ls.ScriptElementKindMemberFunctionElement
-const ScriptElementKindMemberGetAccessorElement = ls.ScriptElementKindMemberGetAccessorElement
-const ScriptElementKindMemberSetAccessorElement = ls.ScriptElementKindMemberSetAccessorElement
-const ScriptElementKindMemberVariableElement = ls.ScriptElementKindMemberVariableElement
-type ScriptElementKindModifier = ls.ScriptElementKindModifier
-const ScriptElementKindModifierAbstract = ls.ScriptElementKindModifierAbstract
-const ScriptElementKindModifierAmbient = ls.ScriptElementKindModifierAmbient
-const ScriptElementKindModifierCjs = ls.ScriptElementKindModifierCjs
-const ScriptElementKindModifierCts = ls.ScriptElementKindModifierCts
-const ScriptElementKindModifierDcts = ls.ScriptElementKindModifierDcts
-const ScriptElementKindModifierDeprecated = ls.ScriptElementKindModifierDeprecated
-const ScriptElementKindModifierDmts = ls.ScriptElementKindModifierDmts
-const ScriptElementKindModifierDts = ls.ScriptElementKindModifierDts
-const ScriptElementKindModifierExported = ls.ScriptElementKindModifierExported
-const ScriptElementKindModifierJs = ls.ScriptElementKindModifierJs
-const ScriptElementKindModifierJson = ls.ScriptElementKindModifierJson
-const ScriptElementKindModifierJsx = ls.ScriptElementKindModifierJsx
-const ScriptElementKindModifierMjs = ls.ScriptElementKindModifierMjs
-const ScriptElementKindModifierMts = ls.ScriptElementKindModifierMts
-const ScriptElementKindModifierNone = ls.ScriptElementKindModifierNone
-const ScriptElementKindModifierOptional = ls.ScriptElementKindModifierOptional
-const ScriptElementKindModifierPrivate = ls.ScriptElementKindModifierPrivate
-const ScriptElementKindModifierProtected = ls.ScriptElementKindModifierProtected
-const ScriptElementKindModifierPublic = ls.ScriptElementKindModifierPublic
-const ScriptElementKindModifierStatic = ls.ScriptElementKindModifierStatic
-const ScriptElementKindModifierTs = ls.ScriptElementKindModifierTs
-const ScriptElementKindModifierTsx = ls.ScriptElementKindModifierTsx
-const ScriptElementKindModuleElement = ls.ScriptElementKindModuleElement
-const ScriptElementKindParameterElement = ls.ScriptElementKindParameterElement
-const ScriptElementKindPrimitiveType = ls.ScriptElementKindPrimitiveType
-const ScriptElementKindScriptElement = ls.ScriptElementKindScriptElement
-const ScriptElementKindString = ls.ScriptElementKindString
-const ScriptElementKindTypeElement = ls.ScriptElementKindTypeElement
-const ScriptElementKindTypeParameterElement = ls.ScriptElementKindTypeParameterElement
-const ScriptElementKindUnknown = ls.ScriptElementKindUnknown
-const ScriptElementKindVariableAwaitUsingElement = ls.ScriptElementKindVariableAwaitUsingElement
-const ScriptElementKindVariableElement = ls.ScriptElementKindVariableElement
-const ScriptElementKindVariableUsingElement = ls.ScriptElementKindVariableUsingElement
-const ScriptElementKindWarning = ls.ScriptElementKindWarning
 type SortText = ls.SortText
 const SortTextAutoImportSuggestions = ls.SortTextAutoImportSuggestions
 const SortTextClassMemberSnippets = ls.SortTextClassMemberSnippets
@@ -175,5 +99,5 @@ const SourceSwitchCases = ls.SourceSwitchCases
 const SourceThisProperty = ls.SourceThisProperty
 const SourceTypeOnlyAlias = ls.SourceTypeOnlyAlias
 type SymbolAndEntries = ls.SymbolAndEntries
-type SymbolExportInfo = ls.SymbolExportInfo
+type SymbolAndEntriesData = ls.SymbolAndEntriesData
 var TriggerCharacters = ls.TriggerCharacters

@@ -1,15 +1,17 @@
 {
   "compilerOptions": {
     "jsx": "preserve",
-    "target": "es5",
+    "target": "es2015",
     "module": "commonjs",
     "strict": true,
     "esModuleInterop": true,
     "lib": [
       "es2015",
       "es2017",
-      "esnext"
+      "esnext",
+      "DOM"
     ],
+    "types": [],
     "experimentalDecorators": true
   },
   "include": [

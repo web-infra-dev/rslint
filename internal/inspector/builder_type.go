@@ -93,7 +93,7 @@ func (b *Builder) BuildTypeInfo(t *checker.Type) *TypeInfo {
 	// We use buildLiteralTypeShallow to get info with id but without recursion
 	if t.Flags()&checker.TypeFlagsLiteral != 0 {
 		if literal := t.AsLiteralType(); literal != nil {
-			info.Value = checker.LiteralType_value(literal)
+			info.Value = literal.Value()
 			// Build shallow info for freshType/regularType to avoid infinite recursion
 			// but include id to indicate it's complete data
 			if freshType := checker.LiteralType_freshType(literal); freshType != nil {
@@ -200,12 +200,12 @@ func (b *Builder) BuildTypeInfo(t *checker.Type) *TypeInfo {
 			info.IndexInfos = make([]*IndexInfoType, 0, len(indexInfos))
 			for _, ii := range indexInfos {
 				indexInfo := &IndexInfoType{
-					IsReadonly: checker.IndexInfo_isReadonly(ii),
+					IsReadonly: ii.IsReadonly(),
 				}
-				if keyType := checker.IndexInfo_keyType(ii); keyType != nil {
+				if keyType := ii.KeyType(); keyType != nil {
 					indexInfo.KeyType = b.BuildTypeInfo(keyType)
 				}
-				if valueType := checker.IndexInfo_valueType(ii); valueType != nil {
+				if valueType := ii.ValueType(); valueType != nil {
 					indexInfo.ValueType = b.BuildTypeInfo(valueType)
 				}
 				info.IndexInfos = append(info.IndexInfos, indexInfo)
@@ -247,7 +247,7 @@ func (b *Builder) buildLiteralTypeShallow(t *checker.Type) *TypeInfo {
 	// Include value for literal types
 	if t.Flags()&checker.TypeFlagsLiteral != 0 {
 		if literal := t.AsLiteralType(); literal != nil {
-			info.Value = checker.LiteralType_value(literal)
+			info.Value = literal.Value()
 		}
 	}
 

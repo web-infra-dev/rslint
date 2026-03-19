@@ -55,6 +55,8 @@
       "@typescript-eslint/prefer-readonly": "warn",
       "@typescript-eslint/no-non-null-assertion": "warn",
       "@typescript-eslint/class-methods-use-this": "off",
+      "@typescript-eslint/no-dynamic-delete": "off",
+      "@typescript-eslint/prefer-includes": "off",
       "@typescript-eslint/prefer-regexp-exec": "off",
       "@typescript-eslint/prefer-ts-expect-error": "off",
       "no-console": "warn"

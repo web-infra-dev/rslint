@@ -36,7 +36,7 @@ jobs:
             rspack-windows-2022-large,
             rspack-darwin-14-medium,
           ]
-        go-version: ['1.25.0']
+        go-version: ['1.26.0']
     steps:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -57,20 +57,28 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          # Pre-build shared dependencies to warm the build cache
+          go build ./internal/...
+
           $packages = go list ./internal/... | Where-Object { $_ -ne "" }
-          $batchSize = 15
+          $batchSize = 50
           $batch = @()
+          $cacheDir = go env GOCACHE
 
           foreach ($pkg in $packages) {
             $batch += $pkg
 
             if ($batch.Count -ge $batchSize) {
               Write-Host "Running batch of $($batch.Count) packages..."
+              $marker = New-TemporaryFile
               go test -parallel 4 $batch
               if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-              # Clean build cache after each batch to free disk space
-              go clean -cache
+              # Remove only test-generated cache files, keeping build cache warm
+              Get-ChildItem -Path $cacheDir -Recurse -File |
+                Where-Object { $_.LastWriteTime -gt $marker.LastWriteTime } |
+                Remove-Item -Force -ErrorAction SilentlyContinue
+              Remove-Item $marker -Force
               $batch = @()
             }
           }
@@ -100,13 +108,13 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.25.0
+          go-version: 1.26.0
           cache-name: go-lint
 
       - name: golangci-lint
         uses: golangci/golangci-lint-action@4afd733a84b1f43292c63897423277bb7f4313a9 # v8
         with:
-          version: v2.4.0
+          version: v2.11.3
           args: --timeout=5m ./cmd/... ./internal/...
 
       - name: go vet
@@ -125,7 +133,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [rspack-ubuntu-22.04-large, windows-latest]
-        go-version: ['1.25.0']
+        go-version: ['1.26.0']
     steps:
       - name: Checkout code
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -190,7 +198,7 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.25.0
+          go-version: 1.26.0
           cache-name: test-wasm
 
       - name: Setup Node.js
@@ -234,7 +242,7 @@ jobs:
       - name: Setup Go
         uses: ./.github/actions/setup-go
         with:
-          go-version: 1.25.0
+          go-version: 1.26.0
           cache-name: test-wasm
       - name: Build
         run: |
