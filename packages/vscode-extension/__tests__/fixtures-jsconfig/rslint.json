@@ -1,0 +1,16 @@
+[
+  {
+    "files": ["**/*.ts"],
+    "languageOptions": {
+      "parserOptions": {
+        "projectService": false,
+        "project": ["./tsconfig.json"]
+      }
+    },
+    "rules": {
+      "@typescript-eslint/no-explicit-any": "error",
+      "@typescript-eslint/no-unsafe-member-access": "off"
+    },
+    "plugins": ["@typescript-eslint"]
+  }
+]

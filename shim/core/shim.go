@@ -5,7 +5,6 @@ package core
 
 import "context"
 import "github.com/microsoft/typescript-go/internal/core"
-import "golang.org/x/text/language"
 import "iter"
 import _ "unsafe"
 
@@ -19,15 +18,16 @@ type BreadthFirstSearchResult[N any] = core.BreadthFirstSearchResult[N]
 type BuildOptions = core.BuildOptions
 //go:linkname CompareBooleans github.com/microsoft/typescript-go/internal/core.CompareBooleans
 func CompareBooleans(a bool, b bool) int
+//go:linkname CompareTextRanges github.com/microsoft/typescript-go/internal/core.CompareTextRanges
+func CompareTextRanges(r1 core.TextRange, r2 core.TextRange) int
 type CompilerOptions = core.CompilerOptions
 //go:linkname ComputeECMALineStarts github.com/microsoft/typescript-go/internal/core.ComputeECMALineStarts
 func ComputeECMALineStarts(text string) core.ECMALineStarts
 //go:linkname ComputeECMALineStartsSeq github.com/microsoft/typescript-go/internal/core.ComputeECMALineStartsSeq
 func ComputeECMALineStartsSeq(text string) iter.Seq[core.TextPos]
 type ECMALineStarts = core.ECMALineStarts
+var EmptyCompilerOptions = core.EmptyCompilerOptions
 var ExclusivelyPrefixedNodeCoreModules = core.ExclusivelyPrefixedNodeCoreModules
-//go:linkname GetLocale github.com/microsoft/typescript-go/internal/core.GetLocale
-func GetLocale(ctx context.Context) language.Tag
 //go:linkname GetNewLineKind github.com/microsoft/typescript-go/internal/core.GetNewLineKind
 func GetNewLineKind(s string) core.NewLineKind
 //go:linkname GetRequestID github.com/microsoft/typescript-go/internal/core.GetRequestID
@@ -97,8 +97,8 @@ const PollingKindFixedInterval = core.PollingKindFixedInterval
 const PollingKindNone = core.PollingKindNone
 const PollingKindPriorityInterval = core.PollingKindPriorityInterval
 type Pool[T any] = core.Pool[T]
-//go:linkname PositionToLineAndCharacter github.com/microsoft/typescript-go/internal/core.PositionToLineAndCharacter
-func PositionToLineAndCharacter(position int, lineStarts []core.TextPos) (line int, character int)
+//go:linkname PositionToLineAndByteOffset github.com/microsoft/typescript-go/internal/core.PositionToLineAndByteOffset
+func PositionToLineAndByteOffset(position int, lineStarts []core.TextPos) (line int, byteOffset int)
 type ProjectReference = core.ProjectReference
 type ResolutionMode = core.ResolutionMode
 const ResolutionModeCommonJS = core.ResolutionModeCommonJS
@@ -128,15 +128,15 @@ const ScriptTargetES2021 = core.ScriptTargetES2021
 const ScriptTargetES2022 = core.ScriptTargetES2022
 const ScriptTargetES2023 = core.ScriptTargetES2023
 const ScriptTargetES2024 = core.ScriptTargetES2024
-const ScriptTargetES3 = core.ScriptTargetES3
+const ScriptTargetES2025 = core.ScriptTargetES2025
 const ScriptTargetES5 = core.ScriptTargetES5
 const ScriptTargetESNext = core.ScriptTargetESNext
 const ScriptTargetJSON = core.ScriptTargetJSON
 const ScriptTargetLatest = core.ScriptTargetLatest
+const ScriptTargetLatestStandard = core.ScriptTargetLatestStandard
 const ScriptTargetNone = core.ScriptTargetNone
 //go:linkname ShouldRewriteModuleSpecifier github.com/microsoft/typescript-go/internal/core.ShouldRewriteModuleSpecifier
 func ShouldRewriteModuleSpecifier(specifier string, compilerOptions *core.CompilerOptions) bool
-type SourceFileAffectingCompilerOptions = core.SourceFileAffectingCompilerOptions
 type Stack[T any] = core.Stack[T]
 //go:linkname StringifyJson github.com/microsoft/typescript-go/internal/core.StringifyJson
 func StringifyJson(input any, prefix string, indent string) (string, error)
@@ -151,6 +151,9 @@ type Tristate = core.Tristate
 //go:linkname TryParsePattern github.com/microsoft/typescript-go/internal/core.TryParsePattern
 func TryParsePattern(pattern string) core.Pattern
 type TypeAcquisition = core.TypeAcquisition
+//go:linkname UTF16Len github.com/microsoft/typescript-go/internal/core.UTF16Len
+func UTF16Len(s string) core.UTF16Offset
+type UTF16Offset = core.UTF16Offset
 //go:linkname UndefinedTextRange github.com/microsoft/typescript-go/internal/core.UndefinedTextRange
 func UndefinedTextRange() core.TextRange
 var UnprefixedNodeCoreModules = core.UnprefixedNodeCoreModules
@@ -173,8 +176,6 @@ const WatchFileKindPriorityPollingInterval = core.WatchFileKindPriorityPollingIn
 const WatchFileKindUseFsEvents = core.WatchFileKindUseFsEvents
 const WatchFileKindUseFsEventsOnParentDirectory = core.WatchFileKindUseFsEventsOnParentDirectory
 type WatchOptions = core.WatchOptions
-//go:linkname WithLocale github.com/microsoft/typescript-go/internal/locale.WithLocale
-func WithLocale(ctx context.Context, locale language.Tag) context.Context
 //go:linkname WithRequestID github.com/microsoft/typescript-go/internal/core.WithRequestID
 func WithRequestID(ctx context.Context, id string) context.Context
 type WorkGroup = core.WorkGroup

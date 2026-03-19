@@ -59,7 +59,7 @@ var NonNullableTypeAssertionStyleRule = rule.CreateRule(rule.Rule{
 				return
 			}
 
-			typeAnnotation := ast.GetAssertedTypeNode(node)
+			typeAnnotation := node.Type()
 			assertedTypes := getTypesIfNotLoose(typeAnnotation)
 			if assertedTypes == nil {
 				return
