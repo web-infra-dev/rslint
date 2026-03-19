@@ -269,9 +269,38 @@ type SourceCodeFixer struct {
 
 ## 8. Configuration & Directives
 
-### Configuration Format
+### Configuration Formats
 
-Rslint uses a JSON array format in `rslint.json`:
+Rslint supports two configuration formats following ESLint flat config semantics (array of config entries):
+
+#### JS/TS Configuration (Recommended)
+
+JS/TS config files (`rslint.config.ts`, `rslint.config.js`, `rslint.config.mjs`, `rslint.config.mts`) are the recommended approach. They support preset composition via `defineConfig()`:
+
+```typescript
+import { defineConfig, ts } from '@rslint/core';
+
+export default defineConfig([
+  // Global ignores — entry with only `ignores` excludes matching files from all rules
+  {
+    ignores: ['**/dist/**', '**/fixtures/**'],
+  },
+  ts.configs.recommended,
+  {
+    // Override or customize rule settings on top of the preset
+    rules: {
+      '@typescript-eslint/no-unused-vars': 'error',
+      '@typescript-eslint/array-type': ['warn', { default: 'array' }],
+    },
+  },
+]);
+```
+
+Available presets: `ts.configs.recommended`, `js.configs.recommended`, `reactPlugin.configs.recommended`, `importPlugin.configs.recommended`.
+
+#### JSON Configuration (Deprecated)
+
+JSON config files (`rslint.json`, `rslint.jsonc`) are deprecated and will be removed in a future version. A deprecation warning is printed to stderr when used. Run `rslint --init` to generate a recommended JS/TS config.
 
 ```json
 [
@@ -282,6 +311,7 @@ Rslint uses a JSON array format in `rslint.json`:
         "project": ["./tsconfig.json", "packages/app1/tsconfig.json"]
       }
     },
+    "plugins": ["@typescript-eslint"],
     "rules": {
       "@typescript-eslint/no-unused-vars": "error",
       "@typescript-eslint/array-type": ["warn", { "default": "array" }]
@@ -290,16 +320,54 @@ Rslint uses a JSON array format in `rslint.json`:
 ]
 ```
 
+**Key difference**: JSON configs auto-enable all core rules and declared plugin rules as `"error"` via `normalizeJSONConfig()`. JS/TS configs do not — only explicitly configured rules (typically via presets) are enabled.
+
+### Config Entry Structure
+
+Each entry in the config array supports:
+
+| Field             | Type                | Description                                                                    |
+| ----------------- | ------------------- | ------------------------------------------------------------------------------ |
+| `files`           | `string[]`          | Glob patterns for files this entry applies to                                  |
+| `ignores`         | `string[]`          | Glob patterns for files to exclude                                             |
+| `languageOptions` | `object`            | Parser options (`parserOptions.project`, `parserOptions.projectService`)       |
+| `rules`           | `Record<string, …>` | Rule name → severity (`"off"` / `"warn"` / `"error"`) or `[severity, options]` |
+| `plugins`         | `string[]`          | Plugin names (`@typescript-eslint`, `react`, `eslint-plugin-import`)           |
+| `settings`        | `Record<string, …>` | Shared settings accessible to rules                                            |
+
 ### Configuration Loading
 
-1. **Discovery**: Search for `rslint.json` in current directory and parents
-2. **Parsing**: Parse JSON configuration with validation
-3. **Merging**: **TODO**: Document configuration merging strategy
-4. **Rule Registry**: Map rule names to implementations in `internal/config/rule_registry.go`
+The loading flow differs by config type:
+
+**JS/TS config** (two-layer architecture):
+
+1. **TS wrapper** (`packages/rslint/src/cli.ts`): discovers JS/TS config via `findJSConfig()`, loads it with `import()` or `jiti`, validates with `normalizeConfig()`
+2. **Serialization**: config entries + config directory are serialized to JSON
+3. **Stdin pipe**: JSON payload is piped to Go binary via `--config-stdin` flag
+4. **Go binary**: deserializes the payload and extracts tsconfig paths
+
+**JSON config** (direct loading):
+
+1. **Go binary** (`internal/config/loader.go`): searches for `rslint.json` / `rslint.jsonc` in the current directory
+2. **JSONC parsing**: supports comments and trailing commas
+3. **Auto-injection**: `normalizeJSONConfig()` adds all core and plugin rules as defaults
+
+### Configuration Merging
+
+Config merging follows ESLint flat config semantics in `GetConfigForFile()` (`internal/config/config.go`):
+
+1. **Global ignores**: entries with only `ignores` (no `files` or other fields) act as global file exclusions
+2. **Files matching**: skip entries whose `files` patterns don't match the current file
+3. **Entry-level ignores**: skip entries whose `ignores` patterns match the current file
+4. **Shallow merge rules**: later entries override earlier ones for the same rule name
+5. **Shallow merge settings**: later entries override earlier ones for the same key
+6. **Deep merge languageOptions**: `ParserOptions` fields are merged at field level
+
+If no entry matches a file, it is not linted (returns `nil`).
 
 ### Inline Directives
 
-**TODO**: Document support for inline rule directives like:
+Rslint supports ESLint-compatible inline directives:
 
 - `// eslint-disable-next-line @typescript-eslint/no-unused-vars`
 - `/* eslint-disable @typescript-eslint/no-unsafe-assignment */`
@@ -316,19 +384,23 @@ rslint [options] [files...]
 
 ### CLI Processing Flow
 
-1. **Argument Parsing**: Parse command line options and file patterns
-2. **Mode Selection**:
+The CLI has a two-layer architecture: a Node.js wrapper (`packages/rslint/src/cli.ts`) and the Go binary (`cmd/rslint/`).
+
+1. **Node.js Wrapper**: Parses `--config` and `--init` flags
+2. **Config Discovery**: Looks for JS/TS config files first; falls back to Go binary for JSON configs
+3. **JS/TS Config Path**: Loads config → serializes to JSON → pipes to Go binary via `--config-stdin`
+4. **JSON Config Path**: Passes all args directly to Go binary, which loads JSON config itself
+5. **Mode Selection** (Go binary):
    - `--lsp`: Start Language Server Protocol server
    - `--api`: Start API server for JavaScript integration
    - Default: Direct CLI linting
-3. **Configuration Loading**: Load and validate `rslint.json`
-4. **Project Discovery**: Find TypeScript projects and source files
-5. **File Scheduling**: Determine which files to lint based on patterns and ignores
-6. **Worker Model**: **TODO**: Document concurrency model and worker pools
-7. **Rule Execution**: Run configured rules on each file
-8. **Result Aggregation**: Collect diagnostics from all files
-9. **Output Formatting**: Format and display results
-10. **Exit Code**: Return appropriate exit code based on errors/warnings
+6. **Project Discovery**: Find TypeScript projects and source files
+7. **File Scheduling**: Determine which files to lint based on patterns and ignores
+8. **Worker Model**: **TODO**: Document concurrency model and worker pools
+9. **Rule Execution**: Run configured rules on each file
+10. **Result Aggregation**: Collect diagnostics from all files
+11. **Output Formatting**: Format and display results
+12. **Exit Code**: Return appropriate exit code based on errors/warnings
 
 ### Concurrency Model
 
@@ -565,9 +637,9 @@ func parseOptions(options any) Config {
 ## 15. Data Flow (Textual Diagram)
 
 ```
-Configuration Files (rslint.json)
+Configuration Files (rslint.config.ts / rslint.json)
     ↓
-Config Loader (internal/config/)
+Config Loader (packages/rslint/src/ → internal/config/)
     ↓
 Rule Registry & Project Discovery
     ↓
@@ -626,7 +698,7 @@ User Interface / CI System
 ### Feature Documentation
 
 - [ ] Document inline directive support (eslint-disable comments)
-- [ ] Explain configuration merging and inheritance rules
+- [x] Explain configuration merging and inheritance rules
 - [ ] Detail source map support for transformed files
 - [ ] Document plugin architecture and extensibility model
 - [ ] Clarify incremental linting capabilities
