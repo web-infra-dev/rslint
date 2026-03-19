@@ -1,0 +1,71 @@
+import { PackageManagerTabs } from '@rspress/core/theme';
+
+# Getting Started
+
+Rslint is a high-performance JavaScript and TypeScript linter written in Go.
+
+## Installation
+
+<PackageManagerTabs command="install @rslint/core -D" />
+
+## Quick Start
+
+### Initialize Configuration
+
+Run the following command to generate a default configuration file:
+
+```bash
+npx rslint --init
+```
+
+This creates a `rslint.config.ts` (or `.js` / `.mjs` depending on your project setup) with recommended rules enabled.
+
+### Run the Linter
+
+```bash
+# Lint all files
+npx rslint .
+
+# Lint with auto-fix
+npx rslint --fix .
+```
+
+### Configuration Preview
+
+The generated config uses the flat config format (an array of config entries), similar to ESLint v10:
+
+```ts
+import { defineConfig, ts } from '@rslint/core';
+
+export default defineConfig([
+  ts.configs.recommended,
+  {
+    rules: {
+      '@typescript-eslint/no-unused-vars': 'error',
+    },
+  },
+]);
+```
+
+For full configuration options, see the [Configuration](/config/) page.
+
+## Editor Integration
+
+### VS Code
+
+Install the official extension from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=rstack.rslint). It provides:
+
+- Real-time diagnostics as you type
+- Code actions for auto-fixable rules
+- Multi-workspace support
+
+The extension works out of the box — it uses the built-in rslint binary and automatically picks up your `rslint.config.ts`.
+
+#### Settings
+
+| Setting                | Default    | Description                                                 |
+| ---------------------- | ---------- | ----------------------------------------------------------- |
+| `rslint.enable`        | `true`     | Enable or disable the linter                                |
+| `rslint.binPath`       | `built-in` | Binary source: `built-in`, `local` (workspace), or `custom` |
+| `rslint.customBinPath` | —          | Path to a custom rslint binary (when `binPath` is `custom`) |
+| `rslint.trace.server`  | `off`      | LSP trace level: `off`, `messages`, or `verbose`            |
