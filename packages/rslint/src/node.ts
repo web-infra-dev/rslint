@@ -86,7 +86,7 @@ export class NodeRslintService implements RslintServiceInterface {
         this.expectedSize = combined.readUInt32LE(0);
 
         // Remove length bytes from buffer
-        this.chunks = [combined.slice(4)];
+        this.chunks = [combined.subarray(4)];
         this.chunkSize -= 4;
       }
 
@@ -95,7 +95,7 @@ export class NodeRslintService implements RslintServiceInterface {
 
       // Read the message content
       const combined = Buffer.concat(this.chunks);
-      const message = combined.slice(0, this.expectedSize).toString('utf8');
+      const message = combined.subarray(0, this.expectedSize).toString('utf8');
 
       // Handle the message
       try {
@@ -106,7 +106,7 @@ export class NodeRslintService implements RslintServiceInterface {
       }
 
       // Reset for next message
-      this.chunks = [combined.slice(this.expectedSize)];
+      this.chunks = [combined.subarray(this.expectedSize)];
       this.chunkSize = this.chunks[0].length;
       this.expectedSize = null;
     }

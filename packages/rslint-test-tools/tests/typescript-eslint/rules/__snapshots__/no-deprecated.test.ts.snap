@@ -1,0 +1,4303 @@
+// Rstest Snapshot v1
+
+exports[`no-deprecated > invalid 1`] = `
+{
+  "code": "
+        /** @deprecated */ var a = undefined;
+        a;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 2`] = `
+{
+  "code": "
+        /** @deprecated */ export var a = undefined;
+        a;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 3`] = `
+{
+  "code": "
+        /** @deprecated */ let a = undefined;
+        a;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 4`] = `
+{
+  "code": "
+        /** @deprecated */ export let a = undefined;
+        a;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 5`] = `
+{
+  "code": "
+        /** @deprecated */ let aLongName = undefined;
+        aLongName;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`aLongName\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 6`] = `
+{
+  "code": "
+        /** @deprecated */ const a = { b: 1 };
+        const c = a;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 19,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 7`] = `
+{
+  "code": "
+        /** @deprecated Reason. */ const a = { b: 1 };
+        const c = a;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated. Reason.",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 19,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 8`] = `
+{
+  "code": "
+        /** @deprecated */ const a = { b: 1 };
+        const { c = a } = {};
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 9`] = `
+{
+  "code": "
+        /** @deprecated */ const a = { b: 1 };
+        const [c = a] = [];
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 20,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 10`] = `
+{
+  "code": "
+        /** @deprecated */ const a = { b: 1 };
+        console.log(a);
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 11`] = `
+{
+  "code": "
+        /** @deprecated */ const a = 'foo';
+        import(\`./path/\${a}.js\`);
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 26,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 12`] = `
+{
+  "code": "
+        declare function log(...args: unknown): void;
+
+        /** @deprecated */ const a = { b: 1 };
+
+        log(a);
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 6,
+        },
+        "start": {
+          "column": 13,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 13`] = `
+{
+  "code": "
+        /** @deprecated */ const a = { b: 1 };
+        console.log(a.b);
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 14`] = `
+{
+  "code": "
+        /** @deprecated */ const a = { b: 1 };
+        console.log(a?.b);
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 21,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 15`] = `
+{
+  "code": "
+        /** @deprecated */ const a = { b: { c: 1 } };
+        a.b.c;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 16`] = `
+{
+  "code": "
+        /** @deprecated */ const a = { b: { c: 1 } };
+        a.b?.c;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 17`] = `
+{
+  "code": "
+        /** @deprecated */ const a = { b: { c: 1 } };
+        a?.b?.c;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 18`] = `
+{
+  "code": "
+        const a = {
+          /** @deprecated */ b: { c: 1 },
+        };
+        a.b.c;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 19`] = `
+{
+  "code": "
+        declare const a: {
+          /** @deprecated */ b: { c: 1 };
+        };
+        a.b.c;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 20`] = `
+{
+  "code": "
+        /** @deprecated */ const a = { b: 1 };
+        const c = a.b;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 19,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 21`] = `
+{
+  "code": "
+        /** @deprecated */ const a = { b: 1 };
+        const { c } = a.b;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 3,
+        },
+        "start": {
+          "column": 23,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 22`] = `
+{
+  "code": "
+        /** @deprecated */
+        declare const test: string;
+        const myObj = {
+          prop: test,
+          deep: {
+            prop: test,
+          },
+        };
+      ",
+  "diagnostics": [
+    {
+      "message": "\`test\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 5,
+        },
+        "start": {
+          "column": 17,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+    {
+      "message": "\`test\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 7,
+        },
+        "start": {
+          "column": 19,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 23`] = `
+{
+  "code": "
+        /** @deprecated */
+        declare const test: string;
+        const bar = {
+          test,
+        };
+      ",
+  "diagnostics": [
+    {
+      "message": "\`test\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 5,
+        },
+        "start": {
+          "column": 11,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 24`] = `
+{
+  "code": "
+        /** @deprecated */ const a = { b: 1 };
+        const { c = 'd' } = a.b;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 3,
+        },
+        "start": {
+          "column": 29,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 25`] = `
+{
+  "code": "
+        /** @deprecated */ const a = { b: 1 };
+        const { c: d } = a.b;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 3,
+        },
+        "start": {
+          "column": 26,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 26`] = `
+{
+  "code": "
+        /** @deprecated */
+        declare const a: string[];
+        const [b] = [a];
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 4,
+        },
+        "start": {
+          "column": 22,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 27`] = `
+{
+  "code": "
+        /** @deprecated */
+        class A {}
+
+        new A();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`A\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 28`] = `
+{
+  "code": "
+        /** @deprecated */
+        export class A {}
+
+        new A();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`A\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 29`] = `
+{
+  "code": "
+        /** @deprecated */
+        const A = class {};
+
+        new A();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`A\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 30`] = `
+{
+  "code": "
+        /** @deprecated */
+        declare class A {}
+
+        new A();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`A\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 5,
+        },
+        "start": {
+          "column": 13,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 31`] = `
+{
+  "code": "
+        const A = class {
+          /** @deprecated */
+          constructor() {}
+        };
+
+        new A();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`A\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 7,
+        },
+        "start": {
+          "column": 13,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 32`] = `
+{
+  "code": "
+        const A = class {
+          /** @deprecated */
+          constructor();
+          constructor(arg: string);
+          constructor(arg?: string) {}
+        };
+
+        new A();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`A\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 9,
+        },
+        "start": {
+          "column": 13,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 33`] = `
+{
+  "code": "
+        declare const A: {
+          /** @deprecated */
+          new (): string;
+        };
+
+        new A();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`A\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 7,
+        },
+        "start": {
+          "column": 13,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 34`] = `
+{
+  "code": "
+        /** @deprecated */
+        declare class A {
+          constructor();
+        }
+
+        new A();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`A\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 7,
+        },
+        "start": {
+          "column": 13,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 35`] = `
+{
+  "code": "
+        class A {
+          /** @deprecated */
+          b: string;
+        }
+
+        declare const a: A;
+
+        const { b } = a;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 9,
+        },
+        "start": {
+          "column": 17,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 36`] = `
+{
+  "code": "
+        declare class A {
+          /** @deprecated */
+          b(): string;
+        }
+
+        declare const a: A;
+
+        a.b;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 9,
+        },
+        "start": {
+          "column": 11,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 37`] = `
+{
+  "code": "
+        declare class A {
+          /** @deprecated */
+          b(): string;
+        }
+
+        declare const a: A;
+
+        a.b();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a.b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 9,
+        },
+        "start": {
+          "column": 11,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 38`] = `
+{
+  "code": "
+        declare class A {
+          /** @deprecated */
+          b: () => string;
+        }
+
+        declare const a: A;
+
+        a.b;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 9,
+        },
+        "start": {
+          "column": 11,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 39`] = `
+{
+  "code": "
+        declare class A {
+          /** @deprecated */
+          b: () => string;
+        }
+
+        declare const a: A;
+
+        a.b();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 9,
+        },
+        "start": {
+          "column": 11,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 40`] = `
+{
+  "code": "
+        interface A {
+          /** @deprecated */
+          b: () => string;
+        }
+
+        declare const a: A;
+
+        a.b();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 9,
+        },
+        "start": {
+          "column": 11,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 41`] = `
+{
+  "code": "
+        class A {
+          /** @deprecated */
+          b(): string {
+            return '';
+          }
+        }
+
+        declare const a: A;
+
+        a.b();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a.b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 11,
+        },
+        "start": {
+          "column": 11,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 42`] = `
+{
+  "code": "
+        declare class A {
+          /** @deprecated Use b(value). */
+          b(): string;
+          b(value: string): string;
+        }
+
+        declare const a: A;
+
+        a.b();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a.b\` is deprecated. Use b(value).",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 10,
+        },
+        "start": {
+          "column": 11,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 43`] = `
+{
+  "code": "
+        declare class A {
+          /** @deprecated */
+          static b: string;
+        }
+
+        A.b;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 7,
+        },
+        "start": {
+          "column": 11,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 44`] = `
+{
+  "code": "
+        declare const a: {
+          /** @deprecated */
+          b: string;
+        };
+
+        a.b;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 7,
+        },
+        "start": {
+          "column": 11,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 45`] = `
+{
+  "code": "
+        interface A {
+          /** @deprecated */
+          b: string;
+        }
+
+        declare const a: A;
+
+        a.b;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 9,
+        },
+        "start": {
+          "column": 11,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 46`] = `
+{
+  "code": "
+        export interface A {
+          /** @deprecated */
+          b: string;
+        }
+
+        declare const a: A;
+
+        a.b;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 9,
+        },
+        "start": {
+          "column": 11,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 47`] = `
+{
+  "code": "
+        interface A {
+          /** @deprecated */
+          b: string;
+        }
+
+        declare const a: A;
+
+        const { b } = a;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 9,
+        },
+        "start": {
+          "column": 17,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 48`] = `
+{
+  "code": "
+        type A = {
+          /** @deprecated */
+          b: string;
+        };
+
+        declare const a: A;
+
+        const { b } = a;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 9,
+        },
+        "start": {
+          "column": 17,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 49`] = `
+{
+  "code": "
+        export type A = {
+          /** @deprecated */
+          b: string;
+        };
+
+        declare const a: A;
+
+        const { b } = a;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 9,
+        },
+        "start": {
+          "column": 17,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 50`] = `
+{
+  "code": "
+        type A = () => {
+          /** @deprecated */
+          b: string;
+        };
+
+        declare const a: A;
+
+        const { b } = a();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 9,
+        },
+        "start": {
+          "column": 17,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 51`] = `
+{
+  "code": "
+        /** @deprecated */
+        type A = string[];
+
+        declare const a: A;
+
+        const [b] = a;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`A\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 26,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 52`] = `
+{
+  "code": "
+        namespace A {
+          /** @deprecated */
+          export const b = '';
+        }
+
+        A.b;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 7,
+        },
+        "start": {
+          "column": 11,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 53`] = `
+{
+  "code": "
+        export namespace A {
+          /** @deprecated */
+          export const b = '';
+        }
+
+        A.b;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 7,
+        },
+        "start": {
+          "column": 11,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 54`] = `
+{
+  "code": "
+        namespace A {
+          /** @deprecated */
+          export function b() {}
+        }
+
+        A.b();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`A.b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 7,
+        },
+        "start": {
+          "column": 11,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 55`] = `
+{
+  "code": "
+        namespace assert {
+          export function fail(message?: string | Error): never;
+          /** @deprecated since v10.0.0 - use fail([message]) or other assert functions instead. */
+          export function fail(actual: unknown, expected: unknown): never;
+        }
+
+        assert.fail({}, {});
+      ",
+  "diagnostics": [
+    {
+      "message": "\`assert.fail\` is deprecated. since v10.0.0 - use fail([message]) or other assert functions instead.",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 8,
+        },
+        "start": {
+          "column": 16,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 56`] = `
+{
+  "code": "
+        import assert from 'node:assert';
+
+        assert.fail({}, {});
+      ",
+  "diagnostics": [
+    {
+      "message": "\`assert.fail\` is deprecated. since v10.0.0 - use fail([message]) or other assert functions instead.",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 4,
+        },
+        "start": {
+          "column": 16,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 57`] = `
+{
+  "code": "
+        /** @deprecated */
+        enum A {
+          a,
+        }
+
+        A.a;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`A\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 58`] = `
+{
+  "code": "
+        enum A {
+          /** @deprecated */
+          a,
+        }
+
+        A.a;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 7,
+        },
+        "start": {
+          "column": 11,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 59`] = `
+{
+  "code": "
+        /** @deprecated */
+        function a() {}
+
+        a();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 60`] = `
+{
+  "code": "
+        /** @deprecated */
+        function a(): void;
+        function a() {}
+
+        a();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 6,
+        },
+        "start": {
+          "column": 9,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 61`] = `
+{
+  "code": "
+        function a(): void;
+        /** @deprecated */
+        function a(value: string): void;
+        function a(value?: string) {}
+
+        a('');
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 7,
+        },
+        "start": {
+          "column": 9,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 62`] = `
+{
+  "code": "
+        type A = {
+          (value: 'b'): void;
+          /** @deprecated */
+          (value: 'c'): void;
+        };
+        declare const foo: A;
+        foo('c');
+      ",
+  "diagnostics": [
+    {
+      "message": "\`foo\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 8,
+        },
+        "start": {
+          "column": 9,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 63`] = `
+{
+  "code": "
+        function a(
+          /** @deprecated */
+          b?: boolean,
+        ) {
+          return b;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 6,
+        },
+        "start": {
+          "column": 18,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 64`] = `
+{
+  "code": "
+        export function isTypeFlagSet(
+          type: ts.Type,
+          flagsToCheck: ts.TypeFlags,
+          /** @deprecated This param is not used and will be removed in the future. */
+          isReceiver?: boolean,
+        ): boolean {
+          const flags = getTypeFlags(type);
+
+          if (isReceiver && flags & ANY_OR_UNKNOWN) {
+            return true;
+          }
+
+          return (flags & flagsToCheck) !== 0;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "\`isReceiver\` is deprecated. This param is not used and will be removed in the future.",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 10,
+        },
+        "start": {
+          "column": 15,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 65`] = `
+{
+  "code": "
+        /** @deprecated */
+        declare function a(...args: unknown[]): string;
+
+        a\`\`;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 5,
+        },
+        "start": {
+          "column": 9,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 66`] = `
+{
+  "code": "
+        /** @deprecated */
+        const A = () => <div />;
+
+        const a = <A />;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`A\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 5,
+        },
+        "start": {
+          "column": 20,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 67`] = `
+{
+  "code": "
+        /** @deprecated */
+        const A = () => <div />;
+
+        const a = <A></A>;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`A\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 5,
+        },
+        "start": {
+          "column": 20,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 68`] = `
+{
+  "code": "
+        /** @deprecated */
+        function A() {
+          return <div />;
+        }
+
+        const a = <A />;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`A\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 7,
+        },
+        "start": {
+          "column": 20,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 69`] = `
+{
+  "code": "
+        /** @deprecated */
+        function A() {
+          return <div />;
+        }
+
+        const a = <A></A>;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`A\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 7,
+        },
+        "start": {
+          "column": 20,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 70`] = `
+{
+  "code": "
+        /** @deprecated */
+        export type A = string;
+        export type B = string;
+        export type C = string;
+
+        export type D = A | B | C;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`A\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 7,
+        },
+        "start": {
+          "column": 25,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 71`] = `
+{
+  "code": "
+        namespace A {
+          /** @deprecated */
+          export type B = string;
+          export type C = string;
+          export type D = string;
+        }
+
+        export type D = A.B | A.C | A.D;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`B\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 9,
+        },
+        "start": {
+          "column": 27,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 72`] = `
+{
+  "code": "
+        interface Props {
+          /** @deprecated */
+          anchor: 'foo';
+        }
+        declare const x: Props;
+        const { anchor = '' } = x;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`anchor\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 7,
+        },
+        "start": {
+          "column": 17,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 73`] = `
+{
+  "code": "
+        interface Props {
+          /** @deprecated */
+          anchor: 'foo';
+        }
+        declare const x: { bar: Props };
+        const {
+          bar: { anchor = '' },
+        } = x;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`anchor\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 8,
+        },
+        "start": {
+          "column": 18,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 74`] = `
+{
+  "code": "
+        interface Props {
+          /** @deprecated */
+          anchor: 'foo';
+        }
+        declare const x: [item: Props];
+        const [{ anchor = 'bar' }] = x;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`anchor\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 7,
+        },
+        "start": {
+          "column": 18,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 75`] = `
+{
+  "code": "
+        interface Props {
+          /** @deprecated */
+          foo: Props;
+        }
+        declare const x: Props;
+        const { foo = x } = x;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`foo\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 7,
+        },
+        "start": {
+          "column": 17,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 76`] = `
+{
+  "code": "
+        import { DeprecatedClass } from './deprecated';
+
+        const foo = new DeprecatedClass();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`DeprecatedClass\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 77`] = `
+{
+  "code": "
+        import { DeprecatedClass } from './deprecated';
+
+        declare function inject(something: new () => unknown): void;
+
+        inject(DeprecatedClass);
+      ",
+  "diagnostics": [
+    {
+      "message": "\`DeprecatedClass\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 6,
+        },
+        "start": {
+          "column": 16,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 78`] = `
+{
+  "code": "
+        import { deprecatedVariable } from './deprecated';
+
+        const foo = deprecatedVariable;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`deprecatedVariable\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 79`] = `
+{
+  "code": "
+        import { DeprecatedClass } from './deprecated';
+
+        declare const x: DeprecatedClass;
+
+        const { foo } = x;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`DeprecatedClass\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 4,
+        },
+        "start": {
+          "column": 26,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+    {
+      "message": "\`foo\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 6,
+        },
+        "start": {
+          "column": 17,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 80`] = `
+{
+  "code": "
+        import { deprecatedFunction } from './deprecated';
+
+        deprecatedFunction();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`deprecatedFunction\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 81`] = `
+{
+  "code": "
+        import * as imported from './deprecated';
+
+        const foo = new imported.NormalClass();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`NormalClass\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 4,
+        },
+        "start": {
+          "column": 34,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 82`] = `
+{
+  "code": "
+        import { NormalClass } from './deprecated';
+
+        const foo = new NormalClass();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`NormalClass\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 83`] = `
+{
+  "code": "
+        import * as imported from './deprecated';
+
+        const foo = imported.NormalClass;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`NormalClass\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 4,
+        },
+        "start": {
+          "column": 30,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 84`] = `
+{
+  "code": "
+        import { NormalClass } from './deprecated';
+
+        const foo = NormalClass;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`NormalClass\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 85`] = `
+{
+  "code": "
+        import { normalVariable } from './deprecated';
+
+        const foo = normalVariable;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`normalVariable\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 86`] = `
+{
+  "code": "
+        import * as imported from './deprecated';
+
+        const foo = imported.normalVariable;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`normalVariable\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 4,
+        },
+        "start": {
+          "column": 30,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 87`] = `
+{
+  "code": "
+        import * as imported from './deprecated';
+
+        const { normalVariable } = imported;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`normalVariable\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 88`] = `
+{
+  "code": "
+        import { deprecatedVariable } from './deprecated';
+
+        const test = {
+          someField: deprecatedVariable,
+        };
+      ",
+  "diagnostics": [
+    {
+      "message": "\`deprecatedVariable\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 5,
+        },
+        "start": {
+          "column": 22,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 89`] = `
+{
+  "code": "
+        import { normalFunction } from './deprecated';
+
+        const foo = normalFunction;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`normalFunction\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 90`] = `
+{
+  "code": "
+        import * as imported from './deprecated';
+
+        const foo = imported.normalFunction;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`normalFunction\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 4,
+        },
+        "start": {
+          "column": 30,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 91`] = `
+{
+  "code": "
+        import * as imported from './deprecated';
+
+        const { normalFunction } = imported;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`normalFunction\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 92`] = `
+{
+  "code": "
+        import { normalFunction } from './deprecated';
+
+        const foo = normalFunction();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`normalFunction\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 93`] = `
+{
+  "code": "
+        import * as imported from './deprecated';
+
+        const foo = imported.normalFunction();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`normalFunction\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 4,
+        },
+        "start": {
+          "column": 30,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 94`] = `
+{
+  "code": "
+        import { deprecatedFunctionWithOverloads } from './deprecated';
+
+        const foo = deprecatedFunctionWithOverloads('a');
+      ",
+  "diagnostics": [
+    {
+      "message": "\`deprecatedFunctionWithOverloads\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 95`] = `
+{
+  "code": "
+        import * as imported from './deprecated';
+
+        const foo = imported.deprecatedFunctionWithOverloads('a');
+      ",
+  "diagnostics": [
+    {
+      "message": "\`imported.deprecatedFunctionWithOverloads\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 4,
+        },
+        "start": {
+          "column": 30,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 96`] = `
+{
+  "code": "
+        import { reexportedDeprecatedFunctionWithOverloads } from './deprecated';
+
+        const foo = reexportedDeprecatedFunctionWithOverloads;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`reexportedDeprecatedFunctionWithOverloads\` is deprecated. Reason",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 97`] = `
+{
+  "code": "
+        import * as imported from './deprecated';
+
+        const foo = imported.reexportedDeprecatedFunctionWithOverloads;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`reexportedDeprecatedFunctionWithOverloads\` is deprecated. Reason",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 4,
+        },
+        "start": {
+          "column": 30,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 98`] = `
+{
+  "code": "
+        import * as imported from './deprecated';
+
+        const { reexportedDeprecatedFunctionWithOverloads } = imported;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`reexportedDeprecatedFunctionWithOverloads\` is deprecated. Reason",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 99`] = `
+{
+  "code": "
+        import { reexportedDeprecatedFunctionWithOverloads } from './deprecated';
+
+        const foo = reexportedDeprecatedFunctionWithOverloads();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`reexportedDeprecatedFunctionWithOverloads\` is deprecated. Reason",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 100`] = `
+{
+  "code": "
+        import * as imported from './deprecated';
+
+        const foo = imported.reexportedDeprecatedFunctionWithOverloads();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`reexportedDeprecatedFunctionWithOverloads\` is deprecated. Reason",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 4,
+        },
+        "start": {
+          "column": 30,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 101`] = `
+{
+  "code": "
+        import { reexportedDeprecatedFunctionWithOverloads } from './deprecated';
+
+        const foo = reexportedDeprecatedFunctionWithOverloads('a');
+      ",
+  "diagnostics": [
+    {
+      "message": "\`reexportedDeprecatedFunctionWithOverloads\` is deprecated. Reason",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 102`] = `
+{
+  "code": "
+        import * as imported from './deprecated';
+
+        const foo = imported.reexportedDeprecatedFunctionWithOverloads('a');
+      ",
+  "diagnostics": [
+    {
+      "message": "\`reexportedDeprecatedFunctionWithOverloads\` is deprecated. Reason",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 4,
+        },
+        "start": {
+          "column": 30,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 103`] = `
+{
+  "code": "
+        import { ClassWithDeprecatedConstructor } from './deprecated';
+
+        const foo = new ClassWithDeprecatedConstructor('a');
+      ",
+  "diagnostics": [
+    {
+      "message": "\`ClassWithDeprecatedConstructor\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 4,
+        },
+        "start": {
+          "column": 25,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 104`] = `
+{
+  "code": "
+        import * as imported from './deprecated';
+
+        const foo = new imported.ClassWithDeprecatedConstructor('a');
+      ",
+  "diagnostics": [
+    {
+      "message": "\`imported.ClassWithDeprecatedConstructor\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 4,
+        },
+        "start": {
+          "column": 34,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 105`] = `
+{
+  "code": "
+        import { ReexportedClassWithDeprecatedConstructor } from './deprecated';
+
+        const foo = ReexportedClassWithDeprecatedConstructor;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`ReexportedClassWithDeprecatedConstructor\` is deprecated. Reason",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 106`] = `
+{
+  "code": "
+        import * as imported from './deprecated';
+
+        const foo = imported.ReexportedClassWithDeprecatedConstructor;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`ReexportedClassWithDeprecatedConstructor\` is deprecated. Reason",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 4,
+        },
+        "start": {
+          "column": 30,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 107`] = `
+{
+  "code": "
+        import * as imported from './deprecated';
+
+        const { ReexportedClassWithDeprecatedConstructor } = imported;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`ReexportedClassWithDeprecatedConstructor\` is deprecated. Reason",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 4,
+        },
+        "start": {
+          "column": 17,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 108`] = `
+{
+  "code": "
+        import { ReexportedClassWithDeprecatedConstructor } from './deprecated';
+
+        const foo = ReexportedClassWithDeprecatedConstructor();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`ReexportedClassWithDeprecatedConstructor\` is deprecated. Reason",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 109`] = `
+{
+  "code": "
+        import * as imported from './deprecated';
+
+        const foo = imported.ReexportedClassWithDeprecatedConstructor();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`ReexportedClassWithDeprecatedConstructor\` is deprecated. Reason",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 4,
+        },
+        "start": {
+          "column": 30,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 110`] = `
+{
+  "code": "
+        import { ReexportedClassWithDeprecatedConstructor } from './deprecated';
+
+        const foo = ReexportedClassWithDeprecatedConstructor('a');
+      ",
+  "diagnostics": [
+    {
+      "message": "\`ReexportedClassWithDeprecatedConstructor\` is deprecated. Reason",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 111`] = `
+{
+  "code": "
+        import * as imported from './deprecated';
+
+        const foo = imported.ReexportedClassWithDeprecatedConstructor('a');
+      ",
+  "diagnostics": [
+    {
+      "message": "\`ReexportedClassWithDeprecatedConstructor\` is deprecated. Reason",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 4,
+        },
+        "start": {
+          "column": 30,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 112`] = `
+{
+  "code": "
+        import imported from './deprecated';
+
+        imported;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`imported\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 4,
+        },
+        "start": {
+          "column": 9,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 113`] = `
+{
+  "code": "
+        async function fn() {
+          const d = await import('./deprecated.js');
+          d.default.default;
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "\`default\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 4,
+        },
+        "start": {
+          "column": 21,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 114`] = `
+{
+  "code": "
+        /** @deprecated */
+        interface Foo {}
+
+        class Bar implements Foo {}
+      ",
+  "diagnostics": [
+    {
+      "message": "\`Foo\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 5,
+        },
+        "start": {
+          "column": 30,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 115`] = `
+{
+  "code": "
+        /** @deprecated */
+        interface Foo {}
+
+        export class Bar implements Foo {}
+      ",
+  "diagnostics": [
+    {
+      "message": "\`Foo\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 5,
+        },
+        "start": {
+          "column": 37,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 116`] = `
+{
+  "code": "
+        /** @deprecated */
+        interface Foo {}
+
+        interface Baz {}
+
+        export class Bar implements Baz, Foo {}
+      ",
+  "diagnostics": [
+    {
+      "message": "\`Foo\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 7,
+        },
+        "start": {
+          "column": 42,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 117`] = `
+{
+  "code": "
+        /** @deprecated */
+        class Foo {}
+
+        export class Bar extends Foo {}
+      ",
+  "diagnostics": [
+    {
+      "message": "\`Foo\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 5,
+        },
+        "start": {
+          "column": 34,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 118`] = `
+{
+  "code": "
+        /** @deprecated */
+        declare function decorator(constructor: Function);
+
+        @decorator
+        export class Foo {}
+      ",
+  "diagnostics": [
+    {
+      "message": "\`decorator\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 5,
+        },
+        "start": {
+          "column": 10,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 119`] = `
+{
+  "code": "
+        /** @deprecated */
+        function a(): object {
+          return {};
+        }
+
+        export default a();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`a\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 7,
+        },
+        "start": {
+          "column": 24,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 120`] = `
+{
+  "code": "
+class A {
+  /** @deprecated */
+  constructor() {}
+}
+
+class B extends A {
+  constructor() {
+    /** should report but does not */
+    super();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "\`new (): A\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 10,
+        },
+        "start": {
+          "column": 5,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 121`] = `
+{
+  "code": "
+class A {
+  /** @deprecated test reason*/
+  constructor() {}
+}
+
+class B extends A {
+  constructor() {
+    /** should report but does not */
+    super();
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "\`new (): A\` is deprecated. test reason",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 10,
+        },
+        "start": {
+          "column": 5,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 122`] = `
+{
+  "code": "
+import { exists } from 'fs';
+exists('/foo');
+      ",
+  "diagnostics": [
+    {
+      "message": "\`exists\` is deprecated. Since v1.0.0 - Use {@link stat} or {@link access} instead.",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 123`] = `
+{
+  "code": "
+        declare class A {
+          /** @deprecated */
+          accessor b: () => string;
+        }
+
+        declare const a: A;
+
+        a.b;
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 9,
+        },
+        "start": {
+          "column": 11,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 124`] = `
+{
+  "code": "
+        declare class A {
+          /** @deprecated */
+          accessor b: () => string;
+        }
+
+        declare const a: A;
+
+        a.b();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 9,
+        },
+        "start": {
+          "column": 11,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 125`] = `
+{
+  "code": "
+        class A {
+          /** @deprecated */
+          accessor b = (): string => {
+            return '';
+          };
+        }
+
+        declare const a: A;
+
+        a.b();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 11,
+        },
+        "start": {
+          "column": 11,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 126`] = `
+{
+  "code": "
+        declare class A {
+          /** @deprecated */
+          static accessor b: () => string;
+        }
+
+        A.b();
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 7,
+        },
+        "start": {
+          "column": 11,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 127`] = `
+{
+  "code": "
+        class A {
+          /** @deprecated */
+          #b = () => {};
+
+          c() {
+            this.#b();
+          }
+        }
+      ",
+  "diagnostics": [
+    {
+      "message": "\`#b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 7,
+        },
+        "start": {
+          "column": 18,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 128`] = `
+{
+  "code": "
+        const a = {
+          /** @deprecated */
+          b: 'string',
+        };
+
+        const c = a['b'];
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 7,
+        },
+        "start": {
+          "column": 21,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 129`] = `
+{
+  "code": "
+        const a = {
+          /** @deprecated */
+          b: 'string',
+        };
+        const x = 'b';
+        const c = a[x];
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 7,
+        },
+        "start": {
+          "column": 21,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 130`] = `
+{
+  "code": "
+        const a = {
+          /** @deprecated */
+          [2]: 'string',
+        };
+        const x = 'b';
+        const c = a[2];
+      ",
+  "diagnostics": [
+    {
+      "message": "\`2\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 7,
+        },
+        "start": {
+          "column": 21,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 131`] = `
+{
+  "code": "
+        const a = {
+          /** @deprecated reason for deprecation */
+          b: 'string',
+        };
+
+        const key = 'b';
+        const stringKey = key as const;
+        const c = a[stringKey];
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated. reason for deprecation",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 9,
+        },
+        "start": {
+          "column": 21,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 132`] = `
+{
+  "code": "
+        enum Keys {
+          B = 'b',
+        }
+
+        const a = {
+          /** @deprecated reason for deprecation */
+          b: 'string',
+        };
+
+        const key = Keys.B;
+        const c = a[key];
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated. reason for deprecation",
+      "messageId": "deprecatedWithReason",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 12,
+        },
+        "start": {
+          "column": 21,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 133`] = `
+{
+  "code": "
+        const a = {
+          /** @deprecated */
+          b: 'string',
+        };
+
+        const key = \`b\`;
+        const c = a[key];
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 8,
+        },
+        "start": {
+          "column": 21,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-deprecated > invalid 134`] = `
+{
+  "code": "
+        const stringObj = 'b';
+        const a = {
+          /** @deprecated */
+          b: 'string',
+        };
+        const c = a[stringObj];
+      ",
+  "diagnostics": [
+    {
+      "message": "\`b\` is deprecated.",
+      "messageId": "deprecated",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 7,
+        },
+        "start": {
+          "column": 21,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/no-deprecated",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
