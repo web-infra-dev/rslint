@@ -96,6 +96,8 @@ jobs:
 
       - name: Move binaries
         uses: ./.github/actions/move-artifacts
+      - name: Build @rslint/core dist
+        run: pnpm --filter @rslint/core build:js
       - name: Publish npm packages
         if: ${{ inputs.dry_run == false }}
         run: |

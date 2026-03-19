@@ -6,6 +6,7 @@ import type { RslintConfigEntry } from '../define-config.js';
 // Rules commented out with "not implemented" are in the official preset but not yet available.
 const recommended: RslintConfigEntry = {
   files: ['**/*.ts', '**/*.tsx', '**/*.mts', '**/*.cts'],
+  plugins: ['@typescript-eslint'],
   languageOptions: {
     parserOptions: {
       projectService: true,

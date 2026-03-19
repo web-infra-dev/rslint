@@ -35,6 +35,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_deprecated"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_duplicate_enum_values"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_duplicate_type_constituents"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_dynamic_delete"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_empty_function"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_empty_interface"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_explicit_any"
@@ -80,6 +81,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_namespace_keyword"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_promise_reject_errors"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_readonly"
+
 	// "github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_readonly_parameter_types" // Temporarily disabled - incomplete implementation
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_reduce_type_parameter"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/prefer_regexp_exec"
@@ -121,6 +123,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_case"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_pattern"
+	"github.com/web-infra-dev/rslint/internal/rules/no_ex_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
 	"github.com/web-infra-dev/rslint/internal/rules/no_sparse_arrays"
 	"github.com/web-infra-dev/rslint/internal/rules/no_template_curly_in_string"
@@ -228,19 +231,51 @@ func (rc *RuleConfig) GetSeverity() rule.DiagnosticSeverity {
 	}
 	return rule.ParseSeverity(rc.Level)
 }
-func GetAllRulesForPlugin(plugin string) []rule.Rule {
-	switch plugin {
-	case "@typescript-eslint":
-		return getAllTypeScriptEslintPluginRules()
-	case "eslint-plugin-import":
-		return importPlugin.GetAllRules()
-	case "eslint-plugin-import/recommended":
-		return importPlugin.GetRecommendedRules()
-	case "react":
-		return reactPlugin.GetAllRules()
-	default:
-		return []rule.Rule{} // Return empty slice for unsupported plugins
+// PluginInfo defines a known plugin with its rule prefix and all accepted declaration names.
+type PluginInfo struct {
+	RulePrefix  string   // Rule name prefix, e.g. "import"
+	DeclNames   []string // All accepted declaration names, e.g. ["eslint-plugin-import", "import"]
+	getAllRules  func() []rule.Rule
+}
+
+// KnownPlugins is the single source of truth for all supported plugins.
+var KnownPlugins = []PluginInfo{
+	{
+		RulePrefix: "@typescript-eslint",
+		DeclNames:  []string{"@typescript-eslint"},
+		getAllRules: func() []rule.Rule { return GetPluginRules("@typescript-eslint") },
+	},
+	{
+		RulePrefix: "import",
+		DeclNames:  []string{"eslint-plugin-import", "import"},
+		getAllRules: func() []rule.Rule { return importPlugin.GetAllRules() },
+	},
+	{
+		RulePrefix: "react",
+		DeclNames:  []string{"react"},
+		getAllRules: func() []rule.Rule { return reactPlugin.GetAllRules() },
+	},
+}
+
+// pluginByDeclName is a lookup table built from KnownPlugins: declaration name → *PluginInfo.
+var pluginByDeclName map[string]*PluginInfo
+
+func init() {
+	pluginByDeclName = make(map[string]*PluginInfo)
+	for i := range KnownPlugins {
+		for _, name := range KnownPlugins[i].DeclNames {
+			pluginByDeclName[name] = &KnownPlugins[i]
+		}
 	}
+}
+
+// NormalizePluginName converts a plugin declaration name to its rule prefix form.
+// Looks up KnownPlugins; returns the input unchanged if not found.
+func NormalizePluginName(pluginName string) string {
+	if info, ok := pluginByDeclName[pluginName]; ok {
+		return info.RulePrefix
+	}
+	return pluginName
 }
 
 // parseArrayRuleConfig parses array-style rule configuration like ["error", {...options}]
@@ -323,6 +358,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/no-deprecated", no_deprecated.NoDeprecatedRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-duplicate-enum-values", no_duplicate_enum_values.NoDuplicateEnumValuesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-duplicate-type-constituents", no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-dynamic-delete", no_dynamic_delete.NoDynamicDeleteRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-explicit-any", no_explicit_any.NoExplicitAnyRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-empty-function", no_empty_function.NoEmptyFunctionRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-empty-interface", no_empty_interface.NoEmptyInterfaceRule)
@@ -421,19 +457,10 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-duplicate-case", no_duplicate_case.NoDuplicateCaseRule)
 	GlobalRuleRegistry.Register("no-empty", no_empty.NoEmptyRule)
 	GlobalRuleRegistry.Register("no-empty-pattern", no_empty_pattern.NoEmptyPatternRule)
+	GlobalRuleRegistry.Register("no-ex-assign", no_ex_assign.NoExAssignRule)
 	GlobalRuleRegistry.Register("no-loss-of-precision", no_loss_of_precision.NoLossOfPrecisionRule)
 	GlobalRuleRegistry.Register("no-template-curly-in-string", no_template_curly_in_string.NoTemplateCurlyInString)
 	GlobalRuleRegistry.Register("no-sparse-arrays", no_sparse_arrays.NoSparseArraysRule)
-}
-
-// getAllTypeScriptEslintPluginRules returns all rules from the global registry.
-func getAllTypeScriptEslintPluginRules() []rule.Rule {
-	allRules := GlobalRuleRegistry.GetAllRules()
-	var rules []rule.Rule
-	for _, rule := range allRules {
-		rules = append(rules, rule)
-	}
-	return rules
 }
 
 func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {
@@ -491,6 +518,7 @@ type MergedConfig struct {
 	Rules           map[string]*RuleConfig
 	Settings        Settings
 	LanguageOptions *LanguageOptions
+	Plugins         map[string]struct{}
 }
 
 // GetConfigForFile computes the merged configuration for a file following ESLint flat config semantics.
@@ -501,7 +529,8 @@ type MergedConfig struct {
 // for files/ignores glob matching.
 func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *MergedConfig {
 	merged := &MergedConfig{
-		Rules: make(map[string]*RuleConfig),
+		Rules:   make(map[string]*RuleConfig),
+		Plugins: make(map[string]struct{}),
 	}
 
 	// Track whether any non-global entry matched this file
@@ -549,7 +578,12 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 			}
 		}
 
-		// 5. Settings: shallow merge
+		// 5. Plugins: union from all matching entries (normalized to rule prefix form)
+		for _, plugin := range entry.Plugins {
+			merged.Plugins[NormalizePluginName(plugin)] = struct{}{}
+		}
+
+		// 6. Settings: shallow merge
 		if entry.Settings != nil {
 			if merged.Settings == nil {
 				merged.Settings = make(Settings)
@@ -559,7 +593,7 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 			}
 		}
 
-		// 6. LanguageOptions: deep merge
+		// 7. LanguageOptions: deep merge
 		merged.LanguageOptions = mergeLanguageOptions(merged.LanguageOptions, entry.LanguageOptions)
 	}
 
@@ -634,6 +668,18 @@ func mergeLanguageOptions(base, override *LanguageOptions) *LanguageOptions {
 		}
 	}
 	return &merged
+}
+
+// RulePluginPrefix extracts the plugin prefix from a rule name.
+// "@typescript-eslint/no-explicit-any" → "@typescript-eslint"
+// "import/no-unresolved" → "import"
+// "no-debugger" → "" (core rule)
+func RulePluginPrefix(ruleName string) string {
+	lastSlash := strings.LastIndex(ruleName, "/")
+	if lastSlash < 0 {
+		return ""
+	}
+	return ruleName[:lastSlash]
 }
 
 // GetPluginRules returns only rules under the given plugin namespace (prefix match).

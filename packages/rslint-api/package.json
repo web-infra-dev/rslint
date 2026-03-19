@@ -1,6 +1,6 @@
 {
   "name": "@rslint/api",
-  "version": "0.2.3",
+  "version": "0.3.1",
   "description": "Rslint AST library",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -19,7 +19,7 @@
   "devDependencies": {
     "@typescript/api": "workspace:*",
     "@typescript/ast": "workspace:*",
-    "@rslib/core": "0.18.0",
+    "@rslib/core": "0.20.0",
     "@types/node": "24.3.0",
     "@typescript/native-preview": "7.0.0-dev.20250904.1"
   },

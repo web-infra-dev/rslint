@@ -653,6 +653,7 @@ func runCMD() int {
 		}
 	}()
 
+	enforcePlugins := configStdin // JS/TS configs loaded via stdin require plugin declarations
 	lintedfileCount, err := linter.RunLinter(
 		programs,
 		singleThreaded,
@@ -660,7 +661,7 @@ func runCMD() int {
 		utils.ExcludePaths,
 
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			activeRules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), currentDirectory)
+			activeRules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), currentDirectory, enforcePlugins)
 			return activeRules
 		},
 		func(d rule.RuleDiagnostic) {
