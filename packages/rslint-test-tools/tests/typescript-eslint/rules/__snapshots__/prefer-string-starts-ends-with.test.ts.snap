@@ -258,7 +258,7 @@ exports[`prefer-string-starts-ends-with > invalid 8`] = `
       "messageId": "preferStartsWith",
       "range": {
         "end": {
-          "column": 23,
+          "column": 24,
           "line": 3,
         },
         "start": {
@@ -565,7 +565,7 @@ exports[`prefer-string-starts-ends-with > invalid 17`] = `
       "messageId": "preferStartsWith",
       "range": {
         "end": {
-          "column": 30,
+          "column": 31,
           "line": 3,
         },
         "start": {

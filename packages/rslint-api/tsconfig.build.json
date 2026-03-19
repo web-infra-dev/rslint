@@ -6,9 +6,15 @@
     "types": ["node"],
     "lib": ["esnext", "dom"],
     "noImplicitReturns": false,
-    "noImplicitOverride": false
+    "noImplicitOverride": false,
+    "rootDir": "../.."
   },
 
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "../../typescript-go/_packages/api/src/node/node.ts",
+    "../../typescript-go/_packages/api/src/node/msgpack.ts",
+    "../../typescript-go/_packages/api/src/node/protocol.ts"
+  ],
   "references": []
 }
