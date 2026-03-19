@@ -1,293 +1,215 @@
 # Configuration
 
-Rslint uses a configuration file to define linting rules and behavior. This page describes all the configuration options available.
+Rslint uses a flat config format (an array of config entries), aligned with ESLint v10. JS/TS configuration files are the recommended approach.
 
-## Configuration File
+## Configuration Files
 
-Rslint looks for configuration files in the following order:
+Rslint looks for config files in the following order:
 
-- `rslint.json`
-- `rslint.jsonc` (JSON with comments)
+1. `rslint.config.js`
+2. `rslint.config.mjs`
+3. `rslint.config.ts`
+4. `rslint.config.mts`
 
-You can also specify a custom configuration file using the `--config` option:
+You can also specify a config file explicitly:
 
 ```bash
-rslint --config custom-config.json
+rslint --config path/to/rslint.config.ts .
 ```
 
-### Creating a Configuration File
-
-To create a default configuration file, run:
+To generate a default config, run:
 
 ```bash
 rslint --init
 ```
 
-This creates a `rslint.jsonc` file with sensible defaults.
+## Basic Configuration
 
-## Configuration Format
+A typical TypeScript project configuration:
 
-The configuration file contains an array of configuration entries. Each entry defines rules and options for matching files:
+```ts
+import { defineConfig, ts } from '@rslint/core';
 
-```jsonc
-[
+export default defineConfig([
+  // Global ignores — files excluded from all rules
   {
-    "ignores": ["./dist/**", "./node_modules/**"],
-    "languageOptions": {
-      "parserOptions": {
-        "project": ["./tsconfig.json"],
-      },
-    },
-    "rules": {
-      "@typescript-eslint/no-unused-vars": "error",
-      "@typescript-eslint/array-type": ["warn", { "default": "array-simple" }],
-    },
-    "plugins": ["@typescript-eslint"],
+    ignores: ['**/dist/**', '**/fixtures/**'],
   },
-]
+  // Preset with recommended rules
+  ts.configs.recommended,
+  // Custom rule overrides
+  {
+    rules: {
+      '@typescript-eslint/no-unused-vars': 'error',
+      '@typescript-eslint/array-type': ['warn', { default: 'array-simple' }],
+    },
+  },
+]);
+```
+
+### Available Presets
+
+| Preset                             | Description                                               |
+| ---------------------------------- | --------------------------------------------------------- |
+| `ts.configs.recommended`           | TypeScript recommended rules (includes ESLint core rules) |
+| `js.configs.recommended`           | JavaScript recommended rules                              |
+| `reactPlugin.configs.recommended`  | React rules                                               |
+| `importPlugin.configs.recommended` | Import/export rules                                       |
+
+Import presets from `@rslint/core`:
+
+```ts
+import { defineConfig, ts, js, reactPlugin, importPlugin } from '@rslint/core';
 ```
 
 ## Configuration Options
 
+### files
+
+- **Type:** `string[]`
+
+Glob patterns specifying which files this config entry applies to. If omitted, the entry applies to all files matched by other entries.
+
+```ts
+{
+  files: ['**/*.ts', '**/*.tsx'],
+  rules: { /* ... */ },
+}
+```
+
 ### ignores
 
 - **Type:** `string[]`
-- **Default:** `[]`
 
-An array of glob patterns for files and directories to ignore during linting.
+Glob patterns for files to exclude. An entry with **only** `ignores` (no other fields) acts as a global ignore — matching files are excluded from all rules.
 
-```jsonc
+```ts
+// Global ignore entry
 {
-  "ignores": [
-    "./dist/**",
-    "./build/**",
-    "./node_modules/**",
-    "**/*.d.ts",
-    "./tests/**/fixtures/**",
-  ],
+  ignores: ['**/dist/**', '**/fixtures/**'],
+}
+
+// Entry-level ignore (only applies to this entry)
+{
+  files: ['**/*.ts'],
+  ignores: ['**/*.test.ts'],
+  rules: { /* ... */ },
 }
 ```
 
-Patterns support:
-
-- **Glob patterns**: `*.js`, `**/*.ts`
-- **Directory patterns**: `dist/**`, `node_modules/**`
-- **Negation**: `!important.ts` (when used with other patterns)
-
-### languageOptions
-
-- **Type:** `object`
-- **Default:** `{}`
-
-Language-specific configuration options.
-
-#### languageOptions.parserOptions
-
-- **Type:** `object`
-- **Default:** `{}`
-
-Parser configuration for TypeScript analysis.
-
-##### languageOptions.parserOptions.project
-
-- **Type:** `string[]`
-- **Default:** `["./tsconfig.json"]`
-
-Array of TypeScript project configuration files. Rslint will lint all files included in these TypeScript projects.
-
-```jsonc
-{
-  "languageOptions": {
-    "parserOptions": {
-      "project": [
-        "./tsconfig.json",
-        "./packages/*/tsconfig.json",
-        "./apps/*/tsconfig.json",
-      ],
-    },
-  },
-}
-```
-
-This is especially useful for monorepos where you have multiple TypeScript projects.
+:::tip
+`node_modules` is automatically excluded by rslint — you don't need to add it to ignores.
+:::
 
 ### rules
 
-- **Type:** `object`
-- **Default:** `{}`
+- **Type:** `Record<string, RuleSeverity | [RuleSeverity, ...options]>`
 
-Configuration for linting rules. Rules can be configured in several formats:
+Configure individual rules with a severity level and optional options.
 
-#### String Format
+**Severity levels:**
 
-```jsonc
-{
-  "rules": {
-    "@typescript-eslint/no-unused-vars": "error",
-    "@typescript-eslint/prefer-const": "warn",
-    "@typescript-eslint/no-explicit-any": "off",
-  },
+| Value     | Description                                 |
+| --------- | ------------------------------------------- |
+| `"error"` | Reports as error, causes non-zero exit code |
+| `"warn"`  | Reports as warning                          |
+| `"off"`   | Disables the rule                           |
+
+**String format** (severity only):
+
+```ts
+rules: {
+  '@typescript-eslint/no-explicit-any': 'error',
+  '@typescript-eslint/require-await': 'off',
 }
 ```
 
-Valid severity levels:
+**Array format** (severity + options):
 
-- `"error"` - Rule violations cause linting to fail
-- `"warn"` - Rule violations produce warnings
-- `"off"` - Rule is disabled
-
-#### Array Format
-
-For rules that accept configuration options:
-
-```jsonc
-{
-  "rules": {
-    "@typescript-eslint/array-type": ["error", { "default": "array-simple" }],
-    "@typescript-eslint/no-unused-vars": [
-      "warn",
-      {
-        "vars": "all",
-        "args": "after-used",
-        "ignoreRestSiblings": false,
-      },
-    ],
-  },
-}
-```
-
-#### Object Format
-
-Alternative object-based configuration:
-
-```jsonc
-{
-  "rules": {
-    "@typescript-eslint/no-unused-vars": {
-      "level": "error",
-      "options": {
-        "vars": "all",
-        "args": "after-used",
-      },
-    },
-  },
+```ts
+rules: {
+  '@typescript-eslint/array-type': ['warn', { default: 'array-simple' }],
+  '@typescript-eslint/no-unused-vars': ['error', {
+    argsIgnorePattern: '^_',
+    varsIgnorePattern: '^_',
+  }],
 }
 ```
 
 ### plugins
 
 - **Type:** `string[]`
-- **Default:** `[]`
 
-Array of plugins to enable. When a plugin is enabled, all its implemented rules are automatically available with default configurations.
+Plugin names to enable. Available plugins:
 
-```jsonc
+| Plugin                 | Rules Prefix           |
+| ---------------------- | ---------------------- |
+| `@typescript-eslint`   | `@typescript-eslint/*` |
+| `eslint-plugin-import` | `import/*`             |
+| `react`                | `react/*`              |
+
+:::tip
+When using JS/TS config with presets (e.g., `ts.configs.recommended`), plugins are declared within the preset — you don't need to specify them separately.
+:::
+
+### languageOptions
+
+- **Type:** `object`
+
+#### languageOptions.parserOptions.projectService
+
+- **Type:** `boolean`
+
+Enable TypeScript's project service for automatic tsconfig discovery. This is the default in `ts.configs.recommended`.
+
+```ts
 {
-  "plugins": ["@typescript-eslint", "eslint-plugin-import"],
-}
-```
-
-#### Available Plugins
-
-##### @typescript-eslint
-
-Enables TypeScript-specific linting rules. This is the most commonly used plugin for TypeScript projects.
-
-```jsonc
-{
-  "plugins": ["@typescript-eslint"],
-  "rules": {
-    // TypeScript-specific rules are now available
-    "@typescript-eslint/no-unused-vars": "error",
-    "@typescript-eslint/prefer-const": "warn",
-  },
-}
-```
-
-##### eslint-plugin-import
-
-Enables import/export related rules for better module management.
-
-```jsonc
-{
-  "plugins": ["eslint-plugin-import"],
-  "rules": {
-    // Import rules are now available
-    "import/no-unresolved": "error",
-    "import/order": "warn",
-  },
-}
-```
-
-## Complete Example
-
-Here's a comprehensive configuration example for a typical TypeScript project:
-
-```jsonc
-[
-  {
-    // Ignore build outputs and dependencies
-    "ignores": [
-      "./dist/**",
-      "./build/**",
-      "./node_modules/**",
-      "./coverage/**",
-      "**/*.d.ts",
-      "./tests/**/fixtures/**",
-    ],
-
-    // TypeScript project configuration
-    "languageOptions": {
-      "parserOptions": {
-        "project": ["./tsconfig.json", "./packages/*/tsconfig.json"],
-      },
-    },
-
-    // Enable TypeScript plugin
-    "plugins": ["@typescript-eslint"],
-
-    // Rule configuration
-    "rules": {
-      // Variable and import rules
-      "@typescript-eslint/no-unused-vars": [
-        "error",
-        {
-          "vars": "all",
-          "args": "after-used",
-          "argsIgnorePattern": "^_",
-          "varsIgnorePattern": "^_",
-        },
-      ],
-
-      // Type safety rules
-      "@typescript-eslint/no-unsafe-argument": "error",
-      "@typescript-eslint/no-unsafe-assignment": "error",
-      "@typescript-eslint/no-unsafe-call": "error",
-      "@typescript-eslint/no-unsafe-member-access": "error",
-      "@typescript-eslint/no-unsafe-return": "error",
-      "@typescript-eslint/await-thenable": "error",
-
-      // Code style rules
-      "@typescript-eslint/array-type": ["warn", { "default": "array-simple" }],
-      "@typescript-eslint/prefer-const": "error",
-      "@typescript-eslint/no-unnecessary-type-assertion": "warn",
-
-      // Async/Promise rules
-      "@typescript-eslint/no-floating-promises": [
-        "error",
-        { "ignoreVoid": true },
-      ],
-      "@typescript-eslint/require-await": "warn",
-      "@typescript-eslint/return-await": ["error", "always"],
-
-      // Best practices
-      "@typescript-eslint/no-empty-function": [
-        "error",
-        { "allow": ["constructors"] },
-      ],
-      "@typescript-eslint/no-empty-interface": "error",
-      "@typescript-eslint/prefer-as-const": "error",
+  languageOptions: {
+    parserOptions: {
+      projectService: true,
     },
   },
-]
+}
 ```
+
+#### languageOptions.parserOptions.project
+
+- **Type:** `string | string[]`
+
+Explicit tsconfig.json paths. Supports glob patterns for monorepos.
+
+```ts
+{
+  languageOptions: {
+    parserOptions: {
+      project: ['./tsconfig.json', './packages/*/tsconfig.json'],
+    },
+  },
+}
+```
+
+### settings
+
+- **Type:** `Record<string, unknown>`
+
+Shared settings accessible to all rules. Later entries override earlier ones.
+
+## Config Merging
+
+When multiple config entries match a file, they are merged in array order:
+
+1. **Global ignores** — entries with only `ignores` exclude files from all rules
+2. **Files matching** — entries whose `files` patterns don't match are skipped
+3. **Entry-level ignores** — entries whose `ignores` match are skipped
+4. **Rules** — shallow merge, later entries override earlier ones
+5. **Plugins** — union from all matching entries
+6. **Settings** — shallow merge
+7. **Language options** — deep merge at field level
+
+If no entry matches a file, it is not linted.
+
+## JSON Configuration (Deprecated)
+
+JSON config files (`rslint.json`, `rslint.jsonc`) are deprecated and will be removed in a future version. Run `rslint --init` to generate a JS/TS config.
+
+Key difference: JSON configs automatically enable all core rules and declared plugin rules as `"error"`. JS/TS configs only enable rules explicitly declared in presets or the `rules` field.
