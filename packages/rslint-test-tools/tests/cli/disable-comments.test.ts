@@ -52,7 +52,7 @@ async function cleanupTempDir(tempDir: string): Promise<void> {
   await fs.rm(tempDir, { recursive: true, force: true });
 }
 
-function makeConfig(rules: Record<string, string>) {
+function makeConfig(rules: Record<string, unknown>) {
   return JSON.stringify([
     {
       language: 'javascript',
@@ -276,6 +276,92 @@ describe('eslint-disable comment directives', () => {
       const result = await runRslint([], tempDir);
       expect(result.exitCode).toBe(0);
       expect(result.stdout).not.toContain('no-explicit-any');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  // -------------------------------------------------------------------
+  // multiple disable/enable ranges
+  // -------------------------------------------------------------------
+
+  // -------------------------------------------------------------------
+  // disable-next-line with -- description
+  // -------------------------------------------------------------------
+
+  test('eslint-disable-next-line with -- description suppresses diagnostic', async () => {
+    const tempDir = await createTempDir({
+      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'tsconfig.json': TSCONFIG,
+      'test.ts': [
+        '// eslint-disable-next-line @typescript-eslint/no-explicit-any -- needed for legacy API',
+        'const x: any = 1;',
+      ].join('\n'),
+    });
+
+    try {
+      const result = await runRslint([], tempDir);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).not.toContain('no-explicit-any');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  // -------------------------------------------------------------------
+  // disable-next-line inside function arguments (leading trivia fix)
+  // -------------------------------------------------------------------
+
+  test('eslint-disable-next-line works inside function call arguments', async () => {
+    const ASSERTION_RULE = '@typescript-eslint/consistent-type-assertions';
+    const tempDir = await createTempDir({
+      'rslint.json': makeConfig({
+        [ASSERTION_RULE]: ['error', { assertionStyle: 'never' }],
+      }),
+      'tsconfig.json': TSCONFIG,
+      'test.ts': [
+        'type Foo = Record<string, unknown>;',
+        'const result = [1, 2, 3].reduce(',
+        '  (acc, _item) => acc,',
+        '  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions',
+        '  {} as Foo,',
+        ');',
+      ].join('\n'),
+    });
+
+    try {
+      const result = await runRslint([], tempDir);
+      // Check the specific error format, not just the rule name string,
+      // since the rule name also appears in the disable comment context lines
+      expect(result.stdout).not.toContain(
+        'consistent-type-assertions  \u2014 [error]',
+      );
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('eslint-disable-next-line works inside array literals', async () => {
+    const ASSERTION_RULE = '@typescript-eslint/consistent-type-assertions';
+    const tempDir = await createTempDir({
+      'rslint.json': makeConfig({
+        [ASSERTION_RULE]: ['error', { assertionStyle: 'never' }],
+      }),
+      'tsconfig.json': TSCONFIG,
+      'test.ts': [
+        'type Foo = Record<string, unknown>;',
+        'const arr = [',
+        '  // eslint-disable-next-line @typescript-eslint/consistent-type-assertions',
+        '  {} as Foo,',
+        '];',
+      ].join('\n'),
+    });
+
+    try {
+      const result = await runRslint([], tempDir);
+      expect(result.stdout).not.toContain(
+        'consistent-type-assertions  \u2014 [error]',
+      );
     } finally {
       await cleanupTempDir(tempDir);
     }

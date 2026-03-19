@@ -101,7 +101,14 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 }
 
 // parseRuleNames parses rule names from a string like " rule1, rule2, rule3"
+// It also strips inline descriptions after " -- " (e.g., "rule1 -- reason")
 func parseRuleNames(rulesStr string) []string {
+	// Strip inline description after " -- " before trimming, so that
+	// wildcard-with-description like " -- reason" is correctly handled.
+	if idx := strings.Index(rulesStr, " -- "); idx != -1 {
+		rulesStr = rulesStr[:idx]
+	}
+
 	rulesStr = strings.TrimSpace(rulesStr)
 	if rulesStr == "" {
 		return nil
