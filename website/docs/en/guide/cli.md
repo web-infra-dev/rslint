@@ -20,6 +20,20 @@ rslint [options] [files...]
 | `--force-color`      | Force colored output                                    |
 | `--help`, `-h`       | Show help information                                   |
 
+## File Arguments
+
+When file paths are provided, rslint only lints the specified files instead of scanning all files from configuration. Configuration rules still apply to the matched files.
+
+```bash
+# Lint specific files
+rslint src/index.ts src/utils.ts
+
+# Use with --fix
+rslint --fix src/index.ts src/utils.ts
+```
+
+When no file arguments are given, rslint scans all files based on the project configuration.
+
 ## Output Formats
 
 ### default

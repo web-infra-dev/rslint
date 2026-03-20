@@ -9,6 +9,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"runtime/trace"
@@ -410,7 +411,7 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 const usage = `🚀 Rslint - Rocket Speed Linter
 
 Usage:
-  rslint [OPTIONS]
+  rslint [OPTIONS] [files...]
 
 Options:
   --init                Initialize a default config in the current directory.
@@ -460,6 +461,19 @@ func runCMD() int {
 	flag.BoolVar(&singleThreaded, "singleThreaded", false, "run in single threaded mode")
 
 	flag.Parse()
+
+	// Collect file arguments for targeted linting (e.g. rslint file1.ts file2.ts)
+	var allowFiles []string
+	if args := flag.Args(); len(args) > 0 {
+		for _, arg := range args {
+			absPath, err := filepath.Abs(arg)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error resolving path %s: %v\n", arg, err)
+				return 1
+			}
+			allowFiles = append(allowFiles, tspath.NormalizePath(absPath))
+		}
+	}
 
 	if help {
 		flag.Usage()
@@ -657,7 +671,7 @@ func runCMD() int {
 	lintedfileCount, err := linter.RunLinter(
 		programs,
 		singleThreaded,
-		nil,
+		allowFiles,
 		utils.ExcludePaths,
 
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
@@ -676,6 +690,12 @@ func runCMD() int {
 	}
 
 	wg.Wait()
+
+	// Error if file arguments were provided but none were found in the program
+	if len(allowFiles) > 0 && lintedfileCount == 0 {
+		fmt.Fprintf(os.Stderr, "error: none of the specified files were found in the project\n")
+		return 1
+	}
 
 	// Apply fixes if --fix flag is enabled
 	if fix && len(diagnosticsByFile) > 0 {

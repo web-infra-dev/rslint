@@ -2,6 +2,7 @@ package linter
 
 import (
 	"context"
+	"os"
 	"strings"
 	"sync/atomic"
 
@@ -19,9 +20,51 @@ type ConfiguredRule struct {
 	Run      func(ctx rule.RuleContext) rule.RuleListeners
 }
 
+// isFileAllowed checks if fileName matches any path in allowFiles.
+// It first tries fast string equality, then falls back to os.SameFile
+// (using pre-computed FileInfo) to handle symlinks (e.g. /var vs /private/var on macOS).
+func isFileAllowed(fileName string, allowFiles []string, allowFileInfos []os.FileInfo) bool {
+	for _, filePath := range allowFiles {
+		if filePath == fileName {
+			return true
+		}
+	}
+	// Fallback: compare by inode to handle directory symlinks
+	fileInfo, err := os.Stat(fileName)
+	if err != nil {
+		return false
+	}
+	for _, info := range allowFileInfos {
+		if os.SameFile(fileInfo, info) {
+			return true
+		}
+	}
+	return false
+}
+
+// precomputeAllowFileInfos collects os.FileInfo for each allowFile once,
+// so that isFileAllowed can use os.SameFile without repeated os.Stat calls.
+// Files that do not exist are silently skipped.
+func precomputeAllowFileInfos(allowFiles []string) []os.FileInfo {
+	infos := make([]os.FileInfo, 0, len(allowFiles))
+	for _, f := range allowFiles {
+		if info, err := os.Stat(f); err == nil {
+			infos = append(infos, info)
+		}
+	}
+	return infos
+}
+
 func RunLinterInProgram(program *compiler.Program, allowFiles []string, skipFiles []string, getRulesForFile RuleHandler, onDiagnostic DiagnosticHandler) int32 {
 	checker, done := program.GetTypeChecker(context.Background())
 	defer done()
+
+	// Pre-compute FileInfo for allowFiles once to avoid N×M stat calls in the loop.
+	var allowFileInfos []os.FileInfo
+	if allowFiles != nil {
+		allowFileInfos = precomputeAllowFileInfos(allowFiles)
+	}
+
 	var lintedFileCount int32 = 0
 	for _, file := range program.GetSourceFiles() {
 		p := string(file.Path())
@@ -39,15 +82,7 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, skipFile
 		}
 		// only lint allowedFiles if allowedFiles is not empty
 		if allowFiles != nil {
-			found := false
-			for _, filePath := range allowFiles {
-
-				if filePath == file.FileName() {
-					found = true
-					break
-				}
-			}
-			if !found {
+			if !isFileAllowed(file.FileName(), allowFiles, allowFileInfos) {
 				continue
 			}
 		}
