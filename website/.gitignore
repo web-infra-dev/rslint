@@ -8,6 +8,10 @@ node_modules
 dist/
 doc_build/
 
+# Generated rule docs (written by plugin-rule-manifest at build time)
+docs/en/rules/_meta.json
+docs/en/rules/*/
+
 # IDE
 .vscode/*
 !.vscode/extensions.json
