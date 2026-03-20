@@ -92,6 +92,7 @@ describe('eslint-disable comment directives', () => {
       'test.ts': [
         '// eslint-disable-next-line @typescript-eslint/no-explicit-any',
         'const x: any = 1;',
+        'export { x };',
       ].join('\n'),
     });
 
@@ -132,8 +133,10 @@ describe('eslint-disable comment directives', () => {
     const tempDir = await createTempDir({
       'rslint.json': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
-      'test.ts':
+      'test.ts': [
         'const x: any = 1; // eslint-disable-line @typescript-eslint/no-explicit-any',
+        'export { x };',
+      ].join('\n'),
     });
 
     try {
@@ -158,6 +161,7 @@ describe('eslint-disable comment directives', () => {
         'const a: any = 1;',
         'const b: any = 2;',
         '/* eslint-enable @typescript-eslint/no-explicit-any */',
+        'export { a, b };',
       ].join('\n'),
     });
 
@@ -204,6 +208,7 @@ describe('eslint-disable comment directives', () => {
         'const a: any = 1;',
         'const b: any = 2;',
         'const c: any = 3;',
+        'export { a, b, c };',
       ].join('\n'),
     });
 
@@ -269,6 +274,7 @@ describe('eslint-disable comment directives', () => {
       'test.ts': [
         '/* eslint-disable-next-line @typescript-eslint/no-explicit-any */',
         'const x: any = 1;',
+        'export { x };',
       ].join('\n'),
     });
 
@@ -296,6 +302,7 @@ describe('eslint-disable comment directives', () => {
       'test.ts': [
         '// eslint-disable-next-line @typescript-eslint/no-explicit-any -- needed for legacy API',
         'const x: any = 1;',
+        'export { x };',
       ].join('\n'),
     });
 

@@ -3,6 +3,7 @@ package no_unused_vars
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -17,6 +18,10 @@ type Config struct {
 	CaughtErrorsIgnorePattern string `json:"caughtErrorsIgnorePattern"`
 	IgnoreRestSiblings        bool   `json:"ignoreRestSiblings"`
 	ReportUsedIgnorePattern   bool   `json:"reportUsedIgnorePattern"`
+
+	varsIgnoreRe         *regexp.Regexp
+	argsIgnoreRe         *regexp.Regexp
+	caughtErrorsIgnoreRe *regexp.Regexp
 }
 
 type VariableInfo struct {
@@ -40,37 +45,63 @@ func parseOptions(options interface{}) Config {
 	}
 
 	if options == nil {
-		return config
+		return compilePatterns(config)
 	}
 
-	// Handle object options
+	if arr, ok := options.([]interface{}); ok {
+		if len(arr) > 0 {
+			if m, ok := arr[0].(map[string]interface{}); ok {
+				return compilePatterns(parseOptionsFromMap(m, config))
+			}
+		}
+		return compilePatterns(config)
+	}
+
 	if optsMap, ok := options.(map[string]interface{}); ok {
-		if val, ok := optsMap["vars"].(string); ok {
-			config.Vars = val
-		}
-		if val, ok := optsMap["varsIgnorePattern"].(string); ok {
-			config.VarsIgnorePattern = val
-		}
-		if val, ok := optsMap["args"].(string); ok {
-			config.Args = val
-		}
-		if val, ok := optsMap["argsIgnorePattern"].(string); ok {
-			config.ArgsIgnorePattern = val
-		}
-		if val, ok := optsMap["caughtErrors"].(string); ok {
-			config.CaughtErrors = val
-		}
-		if val, ok := optsMap["caughtErrorsIgnorePattern"].(string); ok {
-			config.CaughtErrorsIgnorePattern = val
-		}
-		if val, ok := optsMap["ignoreRestSiblings"].(bool); ok {
-			config.IgnoreRestSiblings = val
-		}
-		if val, ok := optsMap["reportUsedIgnorePattern"].(bool); ok {
-			config.ReportUsedIgnorePattern = val
-		}
+		return compilePatterns(parseOptionsFromMap(optsMap, config))
 	}
 
+	return compilePatterns(config)
+}
+
+func parseOptionsFromMap(optsMap map[string]interface{}, config Config) Config {
+	if val, ok := optsMap["vars"].(string); ok {
+		config.Vars = val
+	}
+	if val, ok := optsMap["varsIgnorePattern"].(string); ok {
+		config.VarsIgnorePattern = val
+	}
+	if val, ok := optsMap["args"].(string); ok {
+		config.Args = val
+	}
+	if val, ok := optsMap["argsIgnorePattern"].(string); ok {
+		config.ArgsIgnorePattern = val
+	}
+	if val, ok := optsMap["caughtErrors"].(string); ok {
+		config.CaughtErrors = val
+	}
+	if val, ok := optsMap["caughtErrorsIgnorePattern"].(string); ok {
+		config.CaughtErrorsIgnorePattern = val
+	}
+	if val, ok := optsMap["ignoreRestSiblings"].(bool); ok {
+		config.IgnoreRestSiblings = val
+	}
+	if val, ok := optsMap["reportUsedIgnorePattern"].(bool); ok {
+		config.ReportUsedIgnorePattern = val
+	}
+	return config
+}
+
+func compilePatterns(config Config) Config {
+	if config.VarsIgnorePattern != "" {
+		config.varsIgnoreRe, _ = regexp.Compile(config.VarsIgnorePattern)
+	}
+	if config.ArgsIgnorePattern != "" {
+		config.argsIgnoreRe, _ = regexp.Compile(config.ArgsIgnorePattern)
+	}
+	if config.CaughtErrorsIgnorePattern != "" {
+		config.caughtErrorsIgnoreRe, _ = regexp.Compile(config.CaughtErrorsIgnorePattern)
+	}
 	return config
 }
 
@@ -90,75 +121,66 @@ func isInTypeContext(node *ast.Node) bool {
 			ast.KindTypeLiteral,
 			ast.KindMappedType:
 			return true
-		case ast.KindAsExpression,
-			ast.KindTypeAssertionExpression,
-			ast.KindSatisfiesExpression:
-			return true
+		// Note: KindAsExpression, KindTypeAssertionExpression, KindSatisfiesExpression
+		// are NOT included here. Their expression operand is a value context;
+		// only the type annotation part is a type context. Since we walk up
+		// from the identifier, a value operand will pass through these nodes
+		// and continue upward without being misclassified as type-only.
 		}
 		parent = parent.Parent
 	}
 	return false
 }
 
-func isPartOfDeclaration(node *ast.Node) bool {
+func isDeclarationName(node *ast.Node) bool {
 	if node == nil || node.Parent == nil {
 		return false
 	}
-
 	parent := node.Parent
 	switch parent.Kind {
 	case ast.KindVariableDeclaration:
 		varDecl := parent.AsVariableDeclaration()
-		if varDecl == nil {
-			return false
-		}
-		return varDecl.Name() == node
+		return varDecl != nil && varDecl.Name() == node
 	case ast.KindFunctionDeclaration:
 		funcDecl := parent.AsFunctionDeclaration()
-		if funcDecl == nil {
-			return false
-		}
-		return funcDecl.Name() == node
+		return funcDecl != nil && funcDecl.Name() == node
 	case ast.KindParameter:
 		paramDecl := parent.AsParameterDeclaration()
-		if paramDecl == nil {
-			return false
-		}
-		return paramDecl.Name() == node
+		return paramDecl != nil && paramDecl.Name() == node
 	case ast.KindClassDeclaration:
 		classDecl := parent.AsClassDeclaration()
-		if classDecl == nil {
-			return false
-		}
-		return classDecl.Name() == node
+		return classDecl != nil && classDecl.Name() == node
 	case ast.KindInterfaceDeclaration:
 		interfaceDecl := parent.AsInterfaceDeclaration()
-		if interfaceDecl == nil {
-			return false
-		}
-		return interfaceDecl.Name() == node
+		return interfaceDecl != nil && interfaceDecl.Name() == node
 	case ast.KindTypeAliasDeclaration:
 		typeAlias := parent.AsTypeAliasDeclaration()
-		if typeAlias == nil {
-			return false
-		}
-		return typeAlias.Name() == node
+		return typeAlias != nil && typeAlias.Name() == node
 	case ast.KindEnumDeclaration:
 		enumDecl := parent.AsEnumDeclaration()
-		if enumDecl == nil {
-			return false
-		}
-		return enumDecl.Name() == node
+		return enumDecl != nil && enumDecl.Name() == node
+	case ast.KindModuleDeclaration:
+		moduleDecl := parent.AsModuleDeclaration()
+		return moduleDecl != nil && moduleDecl.Name() == node
 	case ast.KindCatchClause:
-		// For catch clauses, the identifier is directly the VariableDeclaration
-		// Only the actual catch variable declaration should be considered a declaration
 		catchClause := parent.AsCatchClause()
-		if catchClause == nil {
-			return false
-		}
-		return catchClause.VariableDeclaration == node
+		return catchClause != nil && catchClause.VariableDeclaration == node
+	case ast.KindImportSpecifier:
+		importSpec := parent.AsImportSpecifier()
+		return importSpec != nil && importSpec.Name() == node
+	case ast.KindImportClause:
+		importClause := parent.AsImportClause()
+		return importClause != nil && importClause.Name() == node
+	case ast.KindBindingElement:
+		bindingElem := parent.AsBindingElement()
+		return bindingElem != nil && bindingElem.Name() == node
+	case ast.KindNamespaceImport:
+		nsImport := parent.AsNamespaceImport()
+		return nsImport != nil && nsImport.Name() == node
+	case ast.KindImportEqualsDeclaration:
+		importEquals := parent.AsImportEqualsDeclaration()
+		return importEquals != nil && importEquals.Name() == node
 	}
-
 	return false
 }
 
@@ -166,57 +188,94 @@ func isPartOfAssignment(node *ast.Node) bool {
 	if node == nil || node.Parent == nil {
 		return false
 	}
-
 	parent := node.Parent
 	if parent.Kind == ast.KindBinaryExpression {
 		binaryExpr := parent.AsBinaryExpression()
 		if binaryExpr == nil {
 			return false
 		}
-		// Check if this is the left side of an assignment - assignments should not count as usage
 		if binaryExpr.OperatorToken.Kind == ast.KindEqualsToken && binaryExpr.Left == node {
 			return true
 		}
 	}
-
 	return false
 }
 
-func shouldIgnoreVariable(varName string, varInfo *VariableInfo, opts Config) bool {
-	// Check if it matches ignore patterns
-	if opts.VarsIgnorePattern != "" {
-		if matched, _ := regexp.MatchString(opts.VarsIgnorePattern, varName); matched {
-			if !varInfo.Used || !opts.ReportUsedIgnorePattern {
-				return true
-			}
+func isParameterInWithoutBodyDeclaration(node *ast.Node) bool {
+	if node == nil || node.Parent == nil {
+		return false
+	}
+	parent := node.Parent
+	switch parent.Kind {
+	case ast.KindFunctionDeclaration,
+		ast.KindMethodDeclaration,
+		ast.KindMethodSignature,
+		ast.KindConstructor:
+		return parent.Body() == nil
+	// Type-level function-like constructs never have a body.
+	// Parameters in these are part of type signatures.
+	case ast.KindFunctionType,
+		ast.KindConstructorType,
+		ast.KindCallSignature,
+		ast.KindConstructSignature,
+		ast.KindIndexSignature:
+		return true
+	}
+	return false
+}
+
+func isInsideModuleBlock(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	parent := node.Parent
+	for parent != nil {
+		if parent.Kind == ast.KindModuleBlock {
+			return true
 		}
+		if parent.Kind == ast.KindSourceFile {
+			return false
+		}
+		parent = parent.Parent
 	}
-
-	// Check if it's a function parameter and should be ignored
-	if isParameter(varInfo.Definition) {
-		return shouldIgnoreParameter(varName, opts)
-	}
-
-	// Check if it's a caught error and should be ignored
-	if isCaughtError(varInfo.Definition) {
-		return shouldIgnoreCaughtError(varName, opts)
-	}
-
 	return false
 }
 
-func isParameter(node *ast.Node) bool {
+func isTopLevelDeclaration(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	return node.Kind == ast.KindParameter
+	switch node.Kind {
+	case ast.KindVariableDeclaration,
+		ast.KindFunctionDeclaration,
+		ast.KindClassDeclaration,
+		ast.KindInterfaceDeclaration,
+		ast.KindTypeAliasDeclaration,
+		ast.KindEnumDeclaration,
+		ast.KindModuleDeclaration:
+		return true
+	}
+	return false
 }
 
-func isCaughtError(node *ast.Node) bool {
+func isParameterNode(node *ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	// Check if the node is within a catch clause or is directly a catch variable
+	current := node
+	for current != nil {
+		if current.Kind == ast.KindParameter {
+			return true
+		}
+		current = current.Parent
+	}
+	return false
+}
+
+func isCaughtErrorNode(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
 	parent := node.Parent
 	for parent != nil {
 		if parent.Kind == ast.KindCatchClause {
@@ -227,30 +286,86 @@ func isCaughtError(node *ast.Node) bool {
 	return false
 }
 
-func shouldIgnoreParameter(varName string, opts Config) bool {
-	if opts.Args == "none" {
-		return true
-	}
+// matchesIgnorePattern checks if a variable name matches its category's
+// ignore pattern, and whether the match should result in ignoring or
+// reporting (when reportUsedIgnorePattern is true and the variable is used).
+// Returns: (shouldIgnore bool, matchesPattern bool)
+func matchesIgnorePattern(varName string, varInfo *VariableInfo, opts Config) (bool, bool) {
+	var re *regexp.Regexp
 
-	if opts.ArgsIgnorePattern != "" {
-		if matched, _ := regexp.MatchString(opts.ArgsIgnorePattern, varName); matched {
-			return true
+	if isParameterNode(varInfo.Definition) {
+		if opts.Args == "none" {
+			return true, false
 		}
+		re = opts.argsIgnoreRe
+	} else if isCaughtErrorNode(varInfo.Definition) {
+		if opts.CaughtErrors == "none" {
+			return true, false
+		}
+		re = opts.caughtErrorsIgnoreRe
+	} else {
+		re = opts.varsIgnoreRe
 	}
 
-	// For now, implement basic parameter checking
-	// TODO: Implement "after-used" logic properly
-	return false
+	if re == nil || !re.MatchString(varName) {
+		return false, false
+	}
+
+	// Pattern matches. If used + reportUsedIgnorePattern, don't ignore — report instead.
+	if varInfo.Used && opts.ReportUsedIgnorePattern {
+		return false, true
+	}
+
+	return true, true
 }
 
-func shouldIgnoreCaughtError(varName string, opts Config) bool {
-	if opts.CaughtErrors == "none" {
-		return true
+func isBeforeLastUsedParam(ctx rule.RuleContext, paramNode *ast.Node, allUsages map[*ast.Symbol][]*ast.Node) bool {
+	if paramNode == nil || paramNode.Parent == nil {
+		return false
 	}
 
-	if opts.CaughtErrorsIgnorePattern != "" {
-		if matched, _ := regexp.MatchString(opts.CaughtErrorsIgnorePattern, varName); matched {
+	funcLike := paramNode.Parent
+	params := funcLike.Parameters()
+	if len(params) == 0 {
+		return false
+	}
+
+	paramIndex := -1
+	for i, p := range params {
+		if p.AsNode() == paramNode {
+			paramIndex = i
+			break
+		}
+	}
+	if paramIndex < 0 {
+		return false
+	}
+
+	for i := paramIndex + 1; i < len(params); i++ {
+		sibling := params[i]
+
+		// A parameter with a default value (initializer) counts as a
+		// meaningful position marker. ESLint's after-used skips params
+		// before a later param that has a default value.
+		if sibling.AsNode().Initializer() != nil {
 			return true
+		}
+
+		siblingName := sibling.Name()
+		if siblingName == nil || !ast.IsIdentifier(siblingName) {
+			continue
+		}
+		sym := ctx.TypeChecker.GetSymbolAtLocation(siblingName)
+		if sym == nil {
+			continue
+		}
+		resolved := ctx.TypeChecker.SkipAlias(sym)
+		if usageNodes, exists := allUsages[resolved]; exists {
+			for _, usage := range usageNodes {
+				if usage.Pos() != siblingName.Pos() {
+					return true
+				}
+			}
 		}
 	}
 
@@ -262,25 +377,30 @@ func isExported(varInfo *VariableInfo) bool {
 		return false
 	}
 
-	// Check for export modifier flags first
 	if varInfo.Definition != nil {
 		modifierFlags := ast.GetCombinedModifierFlags(varInfo.Definition)
 		if modifierFlags&ast.ModifierFlagsExport != 0 {
 			return true
 		}
 
-		// Also check parent nodes for export modifiers
-		parent := varInfo.Definition.Parent
-		for parent != nil {
-			modifierFlags := ast.GetCombinedModifierFlags(parent)
-			if modifierFlags&ast.ModifierFlagsExport != 0 {
-				return true
+		if isTopLevelDeclaration(varInfo.Definition) {
+			parent := varInfo.Definition.Parent
+			for parent != nil {
+				switch parent.Kind {
+				case ast.KindVariableDeclarationList, ast.KindVariableStatement:
+					modifierFlags := ast.GetCombinedModifierFlags(parent)
+					if modifierFlags&ast.ModifierFlagsExport != 0 {
+						return true
+					}
+				case ast.KindSourceFile, ast.KindModuleBlock:
+					goto doneParentWalk
+				}
+				parent = parent.Parent
 			}
-			parent = parent.Parent
 		}
 	}
+doneParentWalk:
 
-	// Check for export declarations by looking up the AST
 	parent := varInfo.Variable.Parent
 	for parent != nil {
 		if parent.Kind == ast.KindExportDeclaration {
@@ -289,7 +409,6 @@ func isExported(varInfo *VariableInfo) bool {
 		parent = parent.Parent
 	}
 
-	// Also check if it's referenced in an export
 	for _, ref := range varInfo.References {
 		refParent := ref.Parent
 		for refParent != nil {
@@ -324,30 +443,41 @@ func buildUsedIgnoredVarMessage(varName string) rule.RuleMessage {
 	}
 }
 
-func collectVariableUsages(node *ast.Node, usages map[string][]*ast.Node) {
-	if node == nil {
-		return
-	}
-
-	// Visit current node
-	if ast.IsIdentifier(node) && !isPartOfDeclaration(node) && !isPartOfAssignment(node) {
-		identifier := node.AsIdentifier()
-		if identifier == nil {
+func collectSymbolUsages(ctx rule.RuleContext, sourceFile *ast.Node, usages map[*ast.Symbol][]*ast.Node) {
+	var walk func(*ast.Node)
+	walk = func(node *ast.Node) {
+		if node == nil {
 			return
 		}
-		name := identifier.Text
-		usages[name] = append(usages[name], node)
-	}
 
-	// Recursively visit all children using ForEachChild
-	node.ForEachChild(func(child *ast.Node) bool {
-		collectVariableUsages(child, usages)
-		return false // Continue traversing
-	})
+		if ast.IsIdentifier(node) && !isDeclarationName(node) && !isPartOfAssignment(node) {
+			sym := ctx.TypeChecker.GetSymbolAtLocation(node)
+			if sym != nil {
+				resolved := ctx.TypeChecker.SkipAlias(sym)
+				usages[resolved] = append(usages[resolved], node)
+			}
+			// For shorthand properties like { stats }, the identifier serves
+			// as both the property name and the value reference. GetSymbolAtLocation
+			// returns the property symbol, but we also need the value symbol to
+			// track usage of the referenced variable.
+			if node.Parent != nil && node.Parent.Kind == ast.KindShorthandPropertyAssignment {
+				valSym := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(node.Parent)
+				if valSym != nil {
+					resolved := ctx.TypeChecker.SkipAlias(valSym)
+					usages[resolved] = append(usages[resolved], node)
+				}
+			}
+		}
+
+		node.ForEachChild(func(child *ast.Node) bool {
+			walk(child)
+			return false
+		})
+	}
+	walk(sourceFile)
 }
 
-func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, definition *ast.Node, opts Config, allUsages map[string][]*ast.Node) {
-	// Create variable info
+func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, definition *ast.Node, opts Config, allUsages map[*ast.Symbol][]*ast.Node) {
 	varInfo := &VariableInfo{
 		Variable:       nameNode,
 		Used:           false,
@@ -356,95 +486,94 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 		Definition:     definition,
 	}
 
-	// Check if variable has a type annotation (makes it implicitly "used")
-	hasTypeAnnotation := false
-	if definition != nil && definition.Kind == ast.KindVariableDeclaration {
-		varDecl := definition.AsVariableDeclaration()
-		if varDecl != nil && varDecl.Type != nil {
-			hasTypeAnnotation = true
-		}
-	}
+	sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
+	if sym != nil {
+		resolved := ctx.TypeChecker.SkipAlias(sym)
+		if usageNodes, exists := allUsages[resolved]; exists {
+			varInfo.References = usageNodes
 
-	// Check if this variable is used
-	if usageNodes, exists := allUsages[name]; exists {
-		varInfo.References = usageNodes
-
-		// Remove self-references (the declaration itself)
-		filteredUsages := []*ast.Node{}
-		for _, usage := range usageNodes {
-			if usage.Pos() != varInfo.Variable.Pos() {
-				filteredUsages = append(filteredUsages, usage)
-			}
-		}
-
-		if len(filteredUsages) > 0 {
-			// Check if only used in type context
-			onlyUsedAsType := true
-			for _, usage := range filteredUsages {
-				if !isInTypeContext(usage) {
-					onlyUsedAsType = false
-					break
+			filteredUsages := []*ast.Node{}
+			for _, usage := range usageNodes {
+				if usage.Pos() != varInfo.Variable.Pos() {
+					filteredUsages = append(filteredUsages, usage)
 				}
 			}
-			varInfo.Used = !onlyUsedAsType
-			varInfo.OnlyUsedAsType = onlyUsedAsType
+
+			if len(filteredUsages) > 0 {
+				onlyUsedAsType := true
+				for _, usage := range filteredUsages {
+					if !isInTypeContext(usage) {
+						onlyUsedAsType = false
+						break
+					}
+				}
+				varInfo.Used = !onlyUsedAsType
+				varInfo.OnlyUsedAsType = onlyUsedAsType
+			}
 		}
 	}
 
-	// If variable has type annotation, consider it used
-	if hasTypeAnnotation {
-		varInfo.Used = true
-		varInfo.OnlyUsedAsType = false
-	}
-
-	// Check if we should report this variable
-	if shouldIgnoreVariable(name, varInfo, opts) {
+	// Check ignore patterns (varsIgnorePattern / argsIgnorePattern / caughtErrorsIgnorePattern).
+	// If the variable matches its category's pattern and is unused → ignore silently.
+	// If it matches but IS used and reportUsedIgnorePattern is true → report as usedIgnoredVar.
+	shouldIgnore, matchedPattern := matchesIgnorePattern(name, varInfo, opts)
+	if shouldIgnore {
 		return
 	}
 
-	// Skip exported variables
 	if isExported(varInfo) {
 		return
 	}
 
-	// Special handling for function declarations: don't report function name if it has parameters
-	// The parameters will be handled separately
-	if definition != nil && definition.Kind == ast.KindFunctionDeclaration {
-		funcDecl := definition.AsFunctionDeclaration()
-		if funcDecl != nil && funcDecl.Parameters != nil && len(funcDecl.Parameters.Nodes) > 0 {
-			// Function has parameters, don't report the function name itself
-			// The parameter reporting will handle unused parameters
+	// "after-used" for parameters: skip unused params before the last used param.
+	// Only applies to direct Parameter nodes, not destructured elements within them.
+	if !varInfo.Used && definition != nil && definition.Kind == ast.KindParameter && opts.Args == "after-used" {
+		if isBeforeLastUsedParam(ctx, definition, allUsages) {
 			return
 		}
 	}
 
-	// Report unused variables
-	if varInfo.OnlyUsedAsType && opts.Vars == "all" {
-		// Variable is only used in type contexts
+	// For type-level declarations and imports, being used in a type context
+	// IS valid usage — don't report "only used as type".
+	// The "usedOnlyAsType" message only applies to value declarations
+	// (const, let, function) that are never referenced at runtime.
+	isTypeOrImportDeclaration := definition != nil && (definition.Kind == ast.KindInterfaceDeclaration ||
+		definition.Kind == ast.KindTypeAliasDeclaration ||
+		definition.Kind == ast.KindEnumDeclaration ||
+		definition.Kind == ast.KindImportSpecifier ||
+		definition.Kind == ast.KindImportClause ||
+		definition.Kind == ast.KindNamespaceImport ||
+		definition.Kind == ast.KindImportEqualsDeclaration)
+	if isTypeOrImportDeclaration && varInfo.OnlyUsedAsType {
+		varInfo.Used = true
+		varInfo.OnlyUsedAsType = false
+	}
+
+	if matchedPattern && varInfo.Used && opts.ReportUsedIgnorePattern {
+		ctx.ReportNode(varInfo.Variable, buildUsedIgnoredVarMessage(name))
+	} else if varInfo.OnlyUsedAsType && opts.Vars == "all" {
 		ctx.ReportNode(varInfo.Variable, buildUsedOnlyAsTypeMessage(name))
 	} else if !varInfo.Used {
-		// Variable is not used at all
 		ctx.ReportNode(varInfo.Variable, buildUnusedVarMessage(name))
-	} else if varInfo.Used && opts.ReportUsedIgnorePattern {
-		// Check if used but matches ignore pattern and should be reported
-		if opts.VarsIgnorePattern != "" {
-			if matched, _ := regexp.MatchString(opts.VarsIgnorePattern, name); matched {
-				ctx.ReportNode(varInfo.Variable, buildUsedIgnoredVarMessage(name))
-			}
-		}
 	}
 }
 
 var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 	Name: "no-unused-vars",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+		// .d.ts files: all declarations are ambient type definitions,
+		// ESLint does not check them for unused variables.
+		if strings.HasSuffix(ctx.SourceFile.FileName(), ".d.ts") {
+			return rule.RuleListeners{}
+		}
+
 		opts := parseOptions(options)
 
-		// We need to collect all variable usages once per source file
-		allUsages := make(map[string][]*ast.Node)
+		allUsages := make(map[*ast.Symbol][]*ast.Node)
 		collected := false
 
-		// Helper function to get root source file node
+		seenWithoutBodyFuncSymbols := make(map[*ast.Symbol]bool)
+
 		getRootSourceFile := func(node *ast.Node) *ast.Node {
 			current := node
 			for current.Parent != nil {
@@ -453,83 +582,228 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 			return current
 		}
 
+		ensureCollected := func(node *ast.Node) {
+			if !collected {
+				sourceFile := getRootSourceFile(node)
+				collectSymbolUsages(ctx, sourceFile, allUsages)
+				collected = true
+			}
+		}
+
+		// processBindingName handles both simple identifiers and destructuring patterns.
+		var processBindingName func(nameNode *ast.Node, definition *ast.Node)
+		processBindingName = func(nameNode *ast.Node, definition *ast.Node) {
+			if nameNode == nil {
+				return
+			}
+			if ast.IsIdentifier(nameNode) {
+				identifier := nameNode.AsIdentifier()
+				if identifier == nil {
+					return
+				}
+				ensureCollected(definition)
+				processVariable(ctx, nameNode, identifier.Text, definition, opts, allUsages)
+			} else if nameNode.Kind == ast.KindObjectBindingPattern || nameNode.Kind == ast.KindArrayBindingPattern {
+				hasRestSibling := false
+				if opts.IgnoreRestSiblings {
+					nameNode.ForEachChild(func(child *ast.Node) bool {
+						if child.Kind == ast.KindBindingElement {
+							elem := child.AsBindingElement()
+							if elem != nil && elem.DotDotDotToken != nil {
+								hasRestSibling = true
+								return true
+							}
+						}
+						return false
+					})
+				}
+				nameNode.ForEachChild(func(child *ast.Node) bool {
+					if child.Kind == ast.KindBindingElement {
+						elem := child.AsBindingElement()
+						if elem != nil && elem.Name() != nil {
+							if hasRestSibling && elem.DotDotDotToken == nil {
+								return false
+							}
+							processBindingName(elem.Name(), child)
+						}
+					}
+					return false
+				})
+			}
+		}
+
 		return rule.RuleListeners{
-			// Handle variable declarations
 			ast.KindVariableDeclaration: func(node *ast.Node) {
 				varDecl := node.AsVariableDeclaration()
 				if varDecl == nil {
 					return
 				}
-				if ast.IsIdentifier(varDecl.Name()) {
-					nameNode := varDecl.Name()
-					identifier := nameNode.AsIdentifier()
-					if identifier == nil {
-						return
-					}
-					name := identifier.Text
-
-					// Collect usages for the entire source file on first variable
-					if !collected {
-						sourceFile := getRootSourceFile(node)
-						collectVariableUsages(sourceFile, allUsages)
-						collected = true
-					}
-
-					processVariable(ctx, nameNode, name, node, opts, allUsages)
+				if isInsideModuleBlock(node) {
+					return
 				}
+				processBindingName(varDecl.Name(), node)
 			},
 
-			// Handle function declarations
 			ast.KindFunctionDeclaration: func(node *ast.Node) {
 				funcDecl := node.AsFunctionDeclaration()
 				if funcDecl == nil {
 					return
 				}
-				if funcDecl.Name() != nil && ast.IsIdentifier(funcDecl.Name()) {
-					nameNode := funcDecl.Name()
-					identifier := nameNode.AsIdentifier()
-					if identifier == nil {
+				if funcDecl.Name() == nil || !ast.IsIdentifier(funcDecl.Name()) {
+					return
+				}
+
+				nameNode := funcDecl.Name()
+				identifier := nameNode.AsIdentifier()
+				if identifier == nil {
+					return
+				}
+
+				ensureCollected(node)
+
+				if node.Body() == nil {
+					if isInsideModuleBlock(node) {
 						return
 					}
-					name := identifier.Text
-
-					// Collect usages for the entire source file on first variable
-					if !collected {
-						sourceFile := getRootSourceFile(node)
-						collectVariableUsages(sourceFile, allUsages)
-						collected = true
+					sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
+					if sym != nil {
+						resolved := ctx.TypeChecker.SkipAlias(sym)
+						if seenWithoutBodyFuncSymbols[resolved] {
+							return
+						}
+						seenWithoutBodyFuncSymbols[resolved] = true
 					}
-
-					processVariable(ctx, nameNode, name, node, opts, allUsages)
 				}
+
+				processVariable(ctx, nameNode, identifier.Text, node, opts, allUsages)
 			},
 
-			// Handle function parameters
+			ast.KindModuleDeclaration: func(node *ast.Node) {
+				moduleDecl := node.AsModuleDeclaration()
+				if moduleDecl == nil {
+					return
+				}
+
+				// Skip global scope augmentations: `declare global { ... }`
+				if ast.IsGlobalScopeAugmentation(node) {
+					return
+				}
+
+				nameNode := moduleDecl.Name()
+				if nameNode == nil {
+					return
+				}
+				// Skip module augmentations: `declare module 'foo' { ... }`
+				if nameNode.Kind == ast.KindStringLiteral {
+					return
+				}
+				if !ast.IsIdentifier(nameNode) {
+					return
+				}
+				identifier := nameNode.AsIdentifier()
+				if identifier == nil {
+					return
+				}
+
+				// Skip namespace augmentations — if the namespace symbol has
+				// declarations outside this file, it's augmenting an existing
+				// namespace (e.g., `declare namespace NodeJS { ... }`).
+				sym := ctx.TypeChecker.GetSymbolAtLocation(nameNode)
+				if sym != nil && len(sym.Declarations) > 1 {
+					for _, decl := range sym.Declarations {
+						if decl != node {
+							return
+						}
+					}
+				}
+
+				ensureCollected(node)
+				processVariable(ctx, nameNode, identifier.Text, node, opts, allUsages)
+			},
+
+			ast.KindClassDeclaration: func(node *ast.Node) {
+				classDecl := node.AsClassDeclaration()
+				if classDecl == nil || classDecl.Name() == nil || !ast.IsIdentifier(classDecl.Name()) {
+					return
+				}
+				if isInsideModuleBlock(node) {
+					return
+				}
+				nameNode := classDecl.Name()
+				identifier := nameNode.AsIdentifier()
+				if identifier == nil {
+					return
+				}
+				ensureCollected(node)
+				processVariable(ctx, nameNode, identifier.Text, node, opts, allUsages)
+			},
+
+			ast.KindInterfaceDeclaration: func(node *ast.Node) {
+				interfaceDecl := node.AsInterfaceDeclaration()
+				if interfaceDecl == nil || interfaceDecl.Name() == nil || !ast.IsIdentifier(interfaceDecl.Name()) {
+					return
+				}
+				if isInsideModuleBlock(node) {
+					return
+				}
+				nameNode := interfaceDecl.Name()
+				identifier := nameNode.AsIdentifier()
+				if identifier == nil {
+					return
+				}
+				ensureCollected(node)
+				processVariable(ctx, nameNode, identifier.Text, node, opts, allUsages)
+			},
+
+			ast.KindTypeAliasDeclaration: func(node *ast.Node) {
+				typeAlias := node.AsTypeAliasDeclaration()
+				if typeAlias == nil || typeAlias.Name() == nil || !ast.IsIdentifier(typeAlias.Name()) {
+					return
+				}
+				if isInsideModuleBlock(node) {
+					return
+				}
+				nameNode := typeAlias.Name()
+				identifier := nameNode.AsIdentifier()
+				if identifier == nil {
+					return
+				}
+				ensureCollected(node)
+				processVariable(ctx, nameNode, identifier.Text, node, opts, allUsages)
+			},
+
+			ast.KindEnumDeclaration: func(node *ast.Node) {
+				enumDecl := node.AsEnumDeclaration()
+				if enumDecl == nil || enumDecl.Name() == nil || !ast.IsIdentifier(enumDecl.Name()) {
+					return
+				}
+				if isInsideModuleBlock(node) {
+					return
+				}
+				nameNode := enumDecl.Name()
+				identifier := nameNode.AsIdentifier()
+				if identifier == nil {
+					return
+				}
+				ensureCollected(node)
+				processVariable(ctx, nameNode, identifier.Text, node, opts, allUsages)
+			},
+
 			ast.KindParameter: func(node *ast.Node) {
 				paramDecl := node.AsParameterDeclaration()
 				if paramDecl == nil {
 					return
 				}
-				if paramDecl.Name() != nil && ast.IsIdentifier(paramDecl.Name()) {
-					nameNode := paramDecl.Name()
-					identifier := nameNode.AsIdentifier()
-					if identifier == nil {
-						return
-					}
-					name := identifier.Text
 
-					// Collect usages for the entire source file on first variable
-					if !collected {
-						sourceFile := getRootSourceFile(node)
-						collectVariableUsages(sourceFile, allUsages)
-						collected = true
-					}
+				if isParameterInWithoutBodyDeclaration(node) {
+					return
+				}
 
-					processVariable(ctx, nameNode, name, node, opts, allUsages)
+				if paramDecl.Name() != nil {
+					processBindingName(paramDecl.Name(), node)
 				}
 			},
 
-			// Handle catch clauses
 			ast.KindCatchClause: func(node *ast.Node) {
 				catchClause := node.AsCatchClause()
 				if catchClause == nil {
@@ -541,17 +815,79 @@ var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
 					if identifier == nil {
 						return
 					}
-					name := identifier.Text
-
-					// Collect usages for the entire source file on first variable
-					if !collected {
-						sourceFile := getRootSourceFile(node)
-						collectVariableUsages(sourceFile, allUsages)
-						collected = true
-					}
-
-					processVariable(ctx, nameNode, name, nameNode, opts, allUsages)
+					ensureCollected(node)
+					processVariable(ctx, nameNode, identifier.Text, nameNode, opts, allUsages)
 				}
+			},
+			ast.KindImportSpecifier: func(node *ast.Node) {
+				importSpec := node.AsImportSpecifier()
+				if importSpec == nil {
+					return
+				}
+				nameNode := importSpec.Name()
+				if nameNode == nil || !ast.IsIdentifier(nameNode) {
+					return
+				}
+				identifier := nameNode.AsIdentifier()
+				if identifier == nil {
+					return
+				}
+				ensureCollected(node)
+				processVariable(ctx, nameNode, identifier.Text, node, opts, allUsages)
+			},
+
+			ast.KindImportClause: func(node *ast.Node) {
+				// Default import: `import Foo from './foo'`
+				importClause := node.AsImportClause()
+				if importClause == nil {
+					return
+				}
+				nameNode := importClause.Name()
+				if nameNode == nil || !ast.IsIdentifier(nameNode) {
+					return
+				}
+				identifier := nameNode.AsIdentifier()
+				if identifier == nil {
+					return
+				}
+				ensureCollected(node)
+				processVariable(ctx, nameNode, identifier.Text, node, opts, allUsages)
+			},
+
+			ast.KindNamespaceImport: func(node *ast.Node) {
+				// Namespace import: `import * as ns from './foo'`
+				nsImport := node.AsNamespaceImport()
+				if nsImport == nil {
+					return
+				}
+				nameNode := nsImport.Name()
+				if nameNode == nil || !ast.IsIdentifier(nameNode) {
+					return
+				}
+				identifier := nameNode.AsIdentifier()
+				if identifier == nil {
+					return
+				}
+				ensureCollected(node)
+				processVariable(ctx, nameNode, identifier.Text, node, opts, allUsages)
+			},
+
+			ast.KindImportEqualsDeclaration: func(node *ast.Node) {
+				// `import X = require('foo')` or `import X = Namespace.Y`
+				importEquals := node.AsImportEqualsDeclaration()
+				if importEquals == nil {
+					return
+				}
+				nameNode := importEquals.Name()
+				if nameNode == nil || !ast.IsIdentifier(nameNode) {
+					return
+				}
+				identifier := nameNode.AsIdentifier()
+				if identifier == nil {
+					return
+				}
+				ensureCollected(node)
+				processVariable(ctx, nameNode, identifier.Text, node, opts, allUsages)
 			},
 		}
 	},

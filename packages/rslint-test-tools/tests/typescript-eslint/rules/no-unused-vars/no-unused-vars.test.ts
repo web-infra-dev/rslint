@@ -2363,6 +2363,25 @@ export function foo<T>(a: number | string): T {
   return a;
 }
     `,
+    // https://github.com/web-infra-dev/rslint/issues/555
+    // declare function overloads: parameters should not be reported
+    `
+type NormalizedConfig = { key: string };
+declare function getNormalizedConfig(): NormalizedConfig;
+declare function getNormalizedConfig(options: { environment: string }): NormalizedConfig;
+export { getNormalizedConfig };
+    `,
+    // declare function with parameters should not report params as unused
+    `
+declare function doSomething(options: { a: string }): void;
+export { doSomething };
+    `,
+    // declare function overloads called in value position
+    `
+declare function getNormalizedConfig(): string;
+declare function getNormalizedConfig(options: { env: string }): string;
+getNormalizedConfig();
+    `,
     `
 export type T = {
   new (): T;
