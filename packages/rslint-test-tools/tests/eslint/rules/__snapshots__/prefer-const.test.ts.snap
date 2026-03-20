@@ -1,0 +1,53 @@
+// Rstest Snapshot v1
+
+exports[`prefer-const > invalid 1`] = `
+{
+  "code": "let x = 1;",
+  "diagnostics": [
+    {
+      "message": "'x' is never reassigned. Use 'const' instead.",
+      "messageId": "useConst",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-const",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-const > invalid 2`] = `
+{
+  "code": "let x = 'hello';",
+  "diagnostics": [
+    {
+      "message": "'x' is never reassigned. Use 'const' instead.",
+      "messageId": "useConst",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-const",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

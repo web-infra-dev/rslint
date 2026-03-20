@@ -126,6 +126,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
 	"github.com/web-infra-dev/rslint/internal/rules/no_sparse_arrays"
 	"github.com/web-infra-dev/rslint/internal/rules/no_template_curly_in_string"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -459,6 +460,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-loss-of-precision", no_loss_of_precision.NoLossOfPrecisionRule)
 	GlobalRuleRegistry.Register("no-template-curly-in-string", no_template_curly_in_string.NoTemplateCurlyInString)
 	GlobalRuleRegistry.Register("no-sparse-arrays", no_sparse_arrays.NoSparseArraysRule)
+	GlobalRuleRegistry.Register("prefer-const", prefer_const.PreferConstRule)
 }
 
 func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {

@@ -58,7 +58,8 @@
       "@typescript-eslint/prefer-includes": "off",
       "@typescript-eslint/prefer-regexp-exec": "off",
       "@typescript-eslint/prefer-ts-expect-error": "off",
-      "no-console": "warn"
+      "no-console": "warn",
+      "prefer-const": "off"
     },
     "plugins": ["@typescript-eslint"]
   }
