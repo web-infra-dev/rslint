@@ -25,6 +25,7 @@ export default defineConfig({
     './tests/eslint/rules/getter-return.test.ts',
     './tests/eslint/rules/no-loss-of-precision.test.ts',
     './tests/eslint/rules/no-ex-assign.test.ts',
+    './tests/eslint/rules/no-constant-binary-expression.test.ts',
 
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
