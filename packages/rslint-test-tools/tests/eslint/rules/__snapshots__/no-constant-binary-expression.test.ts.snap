@@ -1,0 +1,2185 @@
+// Rstest Snapshot v1
+
+exports[`no-constant-binary-expression > invalid 1`] = `
+{
+  "code": ""ab" && foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 2`] = `
+{
+  "code": "[] && greeting",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 3`] = `
+{
+  "code": "true && hello",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 4`] = `
+{
+  "code": "'' && foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 5`] = `
+{
+  "code": "100 && foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 6`] = `
+{
+  "code": "/[a-z]/ && foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 7`] = `
+{
+  "code": "Boolean([]) && foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 8`] = `
+{
+  "code": "({}) && foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 9`] = `
+{
+  "code": "(() => {}) && foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 10`] = `
+{
+  "code": "new Foo() && foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 11`] = `
+{
+  "code": "undefined && foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 12`] = `
+{
+  "code": "!true && bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 13`] = `
+{
+  "code": "!undefined && bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 14`] = `
+{
+  "code": "![] && bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 15`] = `
+{
+  "code": "void 0 && bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 16`] = `
+{
+  "code": "typeof foo && bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 17`] = `
+{
+  "code": "(1 + 2) && bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 18`] = `
+{
+  "code": "(x = true) && bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 19`] = `
+{
+  "code": "null && bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 20`] = `
+{
+  "code": "(class {}) && bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 21`] = `
+{
+  "code": "[] || greeting",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant || on the left-hand side of a \`||\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 22`] = `
+{
+  "code": "true || hello",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant || on the left-hand side of a \`||\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 23`] = `
+{
+  "code": "0 || foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant || on the left-hand side of a \`||\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 24`] = `
+{
+  "code": "'' || foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant || on the left-hand side of a \`||\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 25`] = `
+{
+  "code": "!true || bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant || on the left-hand side of a \`||\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 26`] = `
+{
+  "code": "({}) ?? foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant ?? on the left-hand side of a \`??\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 27`] = `
+{
+  "code": "1 ?? foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant ?? on the left-hand side of a \`??\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 28`] = `
+{
+  "code": "null ?? foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant ?? on the left-hand side of a \`??\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 29`] = `
+{
+  "code": "undefined ?? foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant ?? on the left-hand side of a \`??\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 30`] = `
+{
+  "code": "(x > 0) ?? fallback",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant ?? on the left-hand side of a \`??\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 31`] = `
+{
+  "code": "(x === y) ?? fallback",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant ?? on the left-hand side of a \`??\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 32`] = `
+{
+  "code": "!foo ?? bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant ?? on the left-hand side of a \`??\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 33`] = `
+{
+  "code": "typeof foo ?? bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant ?? on the left-hand side of a \`??\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 34`] = `
+{
+  "code": "String(x) ?? foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant ?? on the left-hand side of a \`??\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 35`] = `
+{
+  "code": "Number(x) ?? foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant ?? on the left-hand side of a \`??\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 36`] = `
+{
+  "code": "Boolean(x) ?? foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant ?? on the left-hand side of a \`??\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 37`] = `
+{
+  "code": "void 0 ?? bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant ?? on the left-hand side of a \`??\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 38`] = `
+{
+  "code": "[] == true",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 39`] = `
+{
+  "code": "true == []",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 40`] = `
+{
+  "code": "({}) == true",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 41`] = `
+{
+  "code": "({}) == null",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 42`] = `
+{
+  "code": "({}) == undefined",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 43`] = `
+{
+  "code": "undefined == true",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 44`] = `
+{
+  "code": "true == true",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 45`] = `
+{
+  "code": """ == true",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 46`] = `
+{
+  "code": ""hello" == false",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 47`] = `
+{
+  "code": "0 == true",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 48`] = `
+{
+  "code": "1 == false",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 49`] = `
+{
+  "code": "[1, 2] == true",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 50`] = `
+{
+  "code": "void 0 == undefined",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 51`] = `
+{
+  "code": "({}) != true",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 52`] = `
+{
+  "code": "[] != null",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 53`] = `
+{
+  "code": "true === true",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 54`] = `
+{
+  "code": "[] === null",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 55`] = `
+{
+  "code": "null === null",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 56`] = `
+{
+  "code": "({}) === undefined",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 57`] = `
+{
+  "code": "({}) === null",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 58`] = `
+{
+  "code": "true === false",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 59`] = `
+{
+  "code": """ === true",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 60`] = `
+{
+  "code": "42 === true",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 61`] = `
+{
+  "code": "typeof x === true",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 62`] = `
+{
+  "code": "!true == 42",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 63`] = `
+{
+  "code": "[] !== null",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 64`] = `
+{
+  "code": "({}) !== undefined",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant binary expression. Comparisons will always evaluate the same.",
+      "messageId": "constantBinaryOperand",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 65`] = `
+{
+  "code": "[a] == [a]",
+  "diagnostics": [
+    {
+      "message": "Unexpected comparison of two newly constructed objects. These two values can never be equal.",
+      "messageId": "bothAlwaysNew",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 66`] = `
+{
+  "code": "({}) == []",
+  "diagnostics": [
+    {
+      "message": "Unexpected comparison of two newly constructed objects. These two values can never be equal.",
+      "messageId": "bothAlwaysNew",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 67`] = `
+{
+  "code": "[] === []",
+  "diagnostics": [
+    {
+      "message": "Unexpected comparison to newly constructed object. These two values can never be equal.",
+      "messageId": "alwaysNew",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 68`] = `
+{
+  "code": "({}) === ({})",
+  "diagnostics": [
+    {
+      "message": "Unexpected comparison to newly constructed object. These two values can never be equal.",
+      "messageId": "alwaysNew",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 69`] = `
+{
+  "code": "x === {}",
+  "diagnostics": [
+    {
+      "message": "Unexpected comparison to newly constructed object. These two values can never be equal.",
+      "messageId": "alwaysNew",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 70`] = `
+{
+  "code": "x === []",
+  "diagnostics": [
+    {
+      "message": "Unexpected comparison to newly constructed object. These two values can never be equal.",
+      "messageId": "alwaysNew",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 71`] = `
+{
+  "code": "x === (() => {})",
+  "diagnostics": [
+    {
+      "message": "Unexpected comparison to newly constructed object. These two values can never be equal.",
+      "messageId": "alwaysNew",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 72`] = `
+{
+  "code": "x === /[a-z]/",
+  "diagnostics": [
+    {
+      "message": "Unexpected comparison to newly constructed object. These two values can never be equal.",
+      "messageId": "alwaysNew",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 73`] = `
+{
+  "code": "({}) === x",
+  "diagnostics": [
+    {
+      "message": "Unexpected comparison to newly constructed object. These two values can never be equal.",
+      "messageId": "alwaysNew",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 74`] = `
+{
+  "code": "/[a-z]/ === x",
+  "diagnostics": [
+    {
+      "message": "Unexpected comparison to newly constructed object. These two values can never be equal.",
+      "messageId": "alwaysNew",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 75`] = `
+{
+  "code": "(class {}) === x",
+  "diagnostics": [
+    {
+      "message": "Unexpected comparison to newly constructed object. These two values can never be equal.",
+      "messageId": "alwaysNew",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 76`] = `
+{
+  "code": "x === (true ? [] : {})",
+  "diagnostics": [
+    {
+      "message": "Unexpected comparison to newly constructed object. These two values can never be equal.",
+      "messageId": "alwaysNew",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 77`] = `
+{
+  "code": "Boolean(true) && foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 78`] = `
+{
+  "code": "Boolean(false) || foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant || on the left-hand side of a \`||\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 79`] = `
+{
+  "code": "(!true) && bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 80`] = `
+{
+  "code": "(null) ?? bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant ?? on the left-hand side of a \`??\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 81`] = `
+{
+  "code": "(x ||= 1) && foo",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 82`] = `
+{
+  "code": "(x &&= 0) || bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant || on the left-hand side of a \`||\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 83`] = `
+{
+  "code": "(1, 2) && bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-constant-binary-expression > invalid 84`] = `
+{
+  "code": "(x = []) && bar",
+  "diagnostics": [
+    {
+      "message": "Unexpected constant && on the left-hand side of a \`&&\` expression.",
+      "messageId": "constantShortCircuit",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-constant-binary-expression",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
