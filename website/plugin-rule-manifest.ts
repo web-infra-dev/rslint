@@ -206,8 +206,9 @@ export function pluginRuleManifest(): RspressPlugin {
   return {
     name: 'rule-manifest',
 
-    async beforeBuild() {
+    config(config) {
       writeRuleDocsToDir(getRules());
+      return config;
     },
   };
 }
