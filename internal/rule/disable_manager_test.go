@@ -21,6 +21,13 @@ func TestParseRuleNames(t *testing.T) {
 		{"whitespace only", "   ", nil},
 		{"typescript-eslint scoped rule", "@typescript-eslint/no-unsafe-member-access", []string{"@typescript-eslint/no-unsafe-member-access"}},
 		{"mixed rules", "no-console, @typescript-eslint/no-unsafe-member-access, no-unused-vars", []string{"no-console", "@typescript-eslint/no-unsafe-member-access", "no-unused-vars"}},
+		{"single rule with -- description", "@typescript-eslint/consistent-type-assertions -- needed here", []string{"@typescript-eslint/consistent-type-assertions"}},
+		{"multiple rules with -- description", "no-console, no-debugger -- reason for disabling", []string{"no-console", "no-debugger"}},
+		{"rule with -- description and extra spaces", " no-console -- reason ", []string{"no-console"}},
+		{"wildcard with -- description", " -- just a description", nil},
+		{"empty description after --", "no-console -- ", []string{"no-console"}},
+		{"multiple -- separators", "no-console, no-debugger -- reason1 -- reason2", []string{"no-console", "no-debugger"}},
+		{"-- without space before is not separator", "no-console--not-stripped", []string{"no-console--not-stripped"}},
 	}
 
 	for _, tt := range tests {

@@ -114,26 +114,28 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, skipFile
 						})
 					},
 					ReportNode: func(node *ast.Node, msg rule.RuleMessage) {
-						// Check if rule is disabled at this position
-						if disableManager.IsRuleDisabled(r.Name, node.Pos()) {
+						// Trim leading trivia (comments/whitespace) so the line number
+						// matches the actual code, not a preceding disable comment.
+						trimmedRange := utils.TrimNodeTextRange(file, node)
+						if disableManager.IsRuleDisabled(r.Name, trimmedRange.Pos()) {
 							return
 						}
 						onDiagnostic(rule.RuleDiagnostic{
 							RuleName:   r.Name,
-							Range:      utils.TrimNodeTextRange(file, node),
+							Range:      trimmedRange,
 							Message:    msg,
 							SourceFile: file,
 							Severity:   r.Severity,
 						})
 					},
 					ReportNodeWithFixes: func(node *ast.Node, msg rule.RuleMessage, fixes ...rule.RuleFix) {
-						// Check if rule is disabled at this position
-						if disableManager.IsRuleDisabled(r.Name, node.Pos()) {
+						trimmedRange := utils.TrimNodeTextRange(file, node)
+						if disableManager.IsRuleDisabled(r.Name, trimmedRange.Pos()) {
 							return
 						}
 						onDiagnostic(rule.RuleDiagnostic{
 							RuleName:   r.Name,
-							Range:      utils.TrimNodeTextRange(file, node),
+							Range:      trimmedRange,
 							Message:    msg,
 							FixesPtr:   &fixes,
 							SourceFile: file,
@@ -142,13 +144,13 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, skipFile
 					},
 
 					ReportNodeWithSuggestions: func(node *ast.Node, msg rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
-						// Check if rule is disabled at this position
-						if disableManager.IsRuleDisabled(r.Name, node.Pos()) {
+						trimmedRange := utils.TrimNodeTextRange(file, node)
+						if disableManager.IsRuleDisabled(r.Name, trimmedRange.Pos()) {
 							return
 						}
 						onDiagnostic(rule.RuleDiagnostic{
 							RuleName:    r.Name,
-							Range:       utils.TrimNodeTextRange(file, node),
+							Range:       trimmedRange,
 							Message:     msg,
 							Suggestions: &suggestions,
 							SourceFile:  file,
