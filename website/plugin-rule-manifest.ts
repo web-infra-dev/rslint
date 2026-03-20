@@ -1,9 +1,4 @@
-import type {
-  RspressPlugin,
-  Sidebar,
-  SidebarGroup,
-  SidebarItem,
-} from '@rspress/core';
+import type { RspressPlugin } from '@rspress/core';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -11,6 +6,7 @@ import path from 'node:path';
 const REPO_ROOT = path.resolve(__dirname, '..');
 const MANIFEST_PATH = path.resolve(__dirname, 'generated/rule-manifest.json');
 const SCRIPT_PATH = path.resolve(REPO_ROOT, 'scripts/gen-rule-manifest.js');
+const RULES_DOCS_DIR = path.resolve(__dirname, 'docs/en/rules');
 
 /** Shape of each rule entry in rule-manifest.json. */
 interface RuleEntry {
@@ -52,58 +48,152 @@ function loadManifest(): RuleEntry[] {
 }
 
 /**
- * Build the /rules/ sidebar structure from manifest data.
- * Groups are sorted with eslint first, typescript-eslint second,
- * then the rest alphabetically. Rules within each group are alphabetical.
+ * Transform a rule's source .md into a .mdx string that imports and renders
+ * the <RuleConfig> component right after the first heading.
+ *
+ * Input (source .md):
+ *   # no-console
+ *   ## Rule Details
+ *   ...
+ *
+ * Output (.mdx):
+ *   import RuleConfig from '@/theme/components/RuleConfig.tsx';
+ *
+ *   # no-console
+ *
+ *   ## Configuration
+ *
+ *   <RuleConfig name="no-console" group="eslint" />
+ *
+ *   ## Rule Details
+ *   ...
  */
-function buildRulesSidebar(rules: RuleEntry[]): (SidebarGroup | SidebarItem)[] {
-  const rulesWithDocs = rules.filter(r => r.docPath);
+function buildRuleDocContent(rule: RuleEntry): string {
+  const sourceContent = fs.readFileSync(
+    path.resolve(REPO_ROOT, rule.docPath!),
+    'utf-8',
+  );
+  const fullName = getFullRuleName(rule);
+  const importLine = `import RuleConfig from '@/theme/components/RuleConfig.tsx';`;
+  const configSection =
+    `## Configuration\n\n` +
+    `<RuleConfig name="${fullName}" group="${rule.group}" />`;
 
-  // Collect rules into groups keyed by route slug
-  const groups = new Map<string, SidebarItem[]>();
-  for (const rule of rulesWithDocs) {
-    const slug = groupToRouteSlug(rule.group);
-    if (!groups.has(slug)) groups.set(slug, []);
-    groups.get(slug)!.push({
-      text: rule.name,
-      link: `/rules/${slug}/${rule.name}`,
-    });
+  const headingEnd = sourceContent.indexOf('\n');
+  if (headingEnd === -1) {
+    return `${importLine}\n\n${sourceContent}\n\n${configSection}\n`;
   }
-
   return [
-    { text: 'Overview', link: '/rules/' },
-    ...Array.from(groups.entries())
-      .sort(([a], [b]) => {
-        // Pin eslint and typescript-eslint to the top; rest alphabetical
-        const order: Record<string, number> = {
-          eslint: 0,
-          'typescript-eslint': 1,
-        };
-        const oa = order[a] ?? 2;
-        const ob = order[b] ?? 2;
-        return oa !== ob ? oa - ob : a.localeCompare(b);
-      })
-      .map(
-        ([groupSlug, items]): SidebarGroup => ({
-          text: groupSlug,
-          collapsed: true,
-          collapsible: true,
-          items: items.sort((a, b) => a.text.localeCompare(b.text)),
-        }),
-      ),
-  ];
+    importLine,
+    '',
+    sourceContent.slice(0, headingEnd),
+    '',
+    configSection,
+    '',
+    sourceContent.slice(headingEnd + 1),
+  ].join('\n');
 }
 
 /**
- * Rspress plugin that:
- * 1. Generates rule-manifest.json from Go source (beforeBuild via loadManifest)
- * 2. Registers <RuleConfig> as a global MDX component (markdown.globalComponents)
- * 3. Injects /rules/ sidebar and preserves the top nav bar (config hook)
- * 4. Registers a doc page for every rule that has a .md file (addPages hook),
- *    reading the source .md and inserting a <RuleConfig> component after the heading
+ * Write rule doc .mdx files and `_meta.json` to docs/en/rules/ so that
+ * Rspress auto-sidebar picks them up alongside other sections (/guide, /config).
+ *
+ * Generated structure:
+ *   docs/en/rules/
+ *     _meta.json                        ← Overview + one entry per group dir
+ *     index.mdx                         ← already exists (Overview page)
+ *     eslint/
+ *       _meta.json                      ← lists individual rules
+ *       no-console.mdx                  ← imports <RuleConfig> via @/ alias
+ *       ...
+ *     typescript-eslint/
+ *       _meta.json
+ *       no-explicit-any.mdx
+ *       ...
+ */
+function writeRuleDocsToDir(rules: RuleEntry[]): void {
+  // Clean all generated files, keeping only the source-controlled index.mdx
+  for (const name of fs.readdirSync(RULES_DOCS_DIR)) {
+    if (name !== 'index.mdx') {
+      fs.rmSync(path.join(RULES_DOCS_DIR, name), {
+        recursive: true,
+        force: true,
+      });
+    }
+  }
+
+  const rulesWithDocs = rules.filter(r => r.docPath);
+
+  // Group rules by slug
+  const groups = new Map<string, RuleEntry[]>();
+  for (const rule of rulesWithDocs) {
+    const slug = groupToRouteSlug(rule.group);
+    if (!groups.has(slug)) groups.set(slug, []);
+    groups.get(slug)!.push(rule);
+  }
+
+  // Sort groups: eslint first, typescript-eslint second, rest alphabetical
+  const sortedGroups = Array.from(groups.entries()).sort(([a], [b]) => {
+    const order: Record<string, number> = {
+      eslint: 0,
+      'typescript-eslint': 1,
+    };
+    const oa = order[a] ?? 2;
+    const ob = order[b] ?? 2;
+    return oa !== ob ? oa - ob : a.localeCompare(b);
+  });
+
+  // Write top-level _meta.json: Overview + one dir per group
+  const topMeta: unknown[] = [
+    { type: 'file', name: 'index', label: 'Overview' },
+    ...sortedGroups.map(([slug]) => ({
+      type: 'dir',
+      name: slug,
+      label: slug,
+      collapsed: true,
+    })),
+  ];
+  fs.writeFileSync(
+    path.join(RULES_DOCS_DIR, '_meta.json'),
+    JSON.stringify(topMeta, null, 2) + '\n',
+  );
+
+  // Write each group directory with _meta.json and rule .mdx files
+  for (const [slug, groupRules] of sortedGroups) {
+    const groupDir = path.join(RULES_DOCS_DIR, slug);
+    fs.mkdirSync(groupDir, { recursive: true });
+
+    const sorted = groupRules.sort((a, b) => a.name.localeCompare(b.name));
+
+    const groupMeta = sorted.map(rule => ({
+      type: 'file',
+      name: rule.name,
+    }));
+    fs.writeFileSync(
+      path.join(groupDir, '_meta.json'),
+      JSON.stringify(groupMeta, null, 2) + '\n',
+    );
+
+    for (const rule of sorted) {
+      fs.writeFileSync(
+        path.join(groupDir, `${rule.name}.mdx`),
+        buildRuleDocContent(rule),
+      );
+    }
+  }
+}
+
+/**
+ * Rspress plugin that generates rule documentation pages from Go source:
+ *
+ * 1. Runs scripts/gen-rule-manifest.js to produce generated/rule-manifest.json
+ * 2. Writes .mdx files + _meta.json into docs/en/rules/<group>/ in beforeBuild,
+ *    so Rspress auto-sidebar handles /rules/ the same way as /guide/ and /config/
+ *
+ * Each generated .mdx imports <RuleConfig> via the @/ alias to render a
+ * copyable configuration snippet for the rule.
  */
 export function pluginRuleManifest(): RspressPlugin {
-  // Cache manifest across hooks — generated once, reused by config and addPages
   let rules: RuleEntry[] | null = null;
 
   function getRules(): RuleEntry[] {
@@ -116,78 +206,8 @@ export function pluginRuleManifest(): RspressPlugin {
   return {
     name: 'rule-manifest',
 
-    /**
-     * Register <RuleConfig> as a global MDX component so rule doc pages
-     * can use it without an explicit import statement.
-     */
-    markdown: {
-      globalComponents: [
-        path.resolve(__dirname, 'theme/components/RuleConfig.tsx'),
-      ],
-    },
-
-    /**
-     * Inject sidebar for /rules/ and re-supply the nav bar.
-     * Setting themeConfig.sidebar explicitly disables Rspress's auto-generation
-     * for the entire site, so we must also provide themeConfig.nav from _nav.json.
-     */
-    config(config) {
-      const allRules = getRules();
-      const sidebar: Sidebar = {
-        ...(config.themeConfig?.sidebar as Sidebar),
-        '/rules/': buildRulesSidebar(allRules),
-      };
-
-      const navPath = path.resolve(__dirname, 'docs/en/_nav.json');
-      const nav = JSON.parse(fs.readFileSync(navPath, 'utf-8'));
-
-      return {
-        ...config,
-        themeConfig: {
-          ...config.themeConfig,
-          nav,
-          sidebar,
-        },
-      };
-    },
-
-    /**
-     * Register a page for each rule that has a source .md doc.
-     * We read the source content and insert a <RuleConfig> component
-     * (rendered by CodeBlockRuntime with syntax highlighting + copy button)
-     * right after the first heading.
-     *
-     * Route structure: /rules/<group-slug>/<rule-name>
-     * e.g. /rules/typescript-eslint/no-explicit-any
-     */
-    addPages() {
-      const allRules = getRules();
-      return allRules
-        .filter(r => r.docPath)
-        .map(rule => {
-          const sourceContent = fs.readFileSync(
-            path.resolve(REPO_ROOT, rule.docPath!),
-            'utf-8',
-          );
-          const fullName = getFullRuleName(rule);
-          const configBlock =
-            `## Configuration\n\n` +
-            `<RuleConfig name="${fullName}" group="${rule.group}" />\n`;
-          // Insert <RuleConfig> component right after the first line (# heading)
-          const headingEnd = sourceContent.indexOf('\n');
-          const content =
-            headingEnd === -1
-              ? `${sourceContent}\n\n${configBlock}`
-              : sourceContent.slice(0, headingEnd + 1) +
-                '\n' +
-                configBlock +
-                '\n' +
-                sourceContent.slice(headingEnd + 1);
-          return {
-            routePath: `/rules/${groupToRouteSlug(rule.group)}/${rule.name}`,
-            content,
-          };
-        });
+    async beforeBuild() {
+      writeRuleDocsToDir(getRules());
     },
   };
 }

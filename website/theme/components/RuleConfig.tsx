@@ -22,8 +22,8 @@ const GROUP_CONFIG: Record<string, { importName: string; preset: string }> = {
  * Displays a complete rslint configuration snippet that users can copy
  * for a specific rule. Includes the correct import, preset, and rule override.
  *
- * Registered as a global MDX component via the rule-manifest plugin,
- * so rule pages can use <RuleConfig name="..." group="..." /> without importing.
+ * Imported in each generated rule .mdx file via:
+ *   import RuleConfig from '@/theme/components/RuleConfig.tsx';
  */
 export const RuleConfig: React.FC<{ name: string; group: string }> = ({
   name,
