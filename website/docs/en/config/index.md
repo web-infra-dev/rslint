@@ -11,7 +11,30 @@ Rslint looks for config files in the following order:
 3. `rslint.config.ts`
 4. `rslint.config.mts`
 
-You can also specify a config file explicitly:
+### Config Discovery
+
+When you run `rslint`, it searches for the config file by walking **upward** from the target file or directory to the filesystem root, stopping at the first config found.
+
+- `rslint src/foo.ts` — searches from `src/` upward
+- `rslint src/` — searches from `src/` upward
+- `rslint` (no args) — searches from the current working directory upward
+
+In a monorepo, different files can automatically use different config files based on their location:
+
+```
+monorepo/
+├── rslint.config.ts              ← root config
+├── packages/
+│   ├── foo/
+│   │   ├── rslint.config.ts      ← used for files under foo/
+│   │   └── src/
+│   └── bar/
+│       └── src/                   ← no config, inherits root
+```
+
+When linting from the monorepo root, rslint automatically discovers all nested configs and applies the nearest one to each file:
+
+You can also specify a config file explicitly (overrides automatic discovery):
 
 ```bash
 rslint --config path/to/rslint.config.ts .

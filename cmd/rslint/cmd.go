@@ -28,10 +28,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
@@ -502,8 +500,9 @@ func runCMD() int {
 
 	flag.Parse()
 
-	// Collect file arguments for targeted linting (e.g. rslint file1.ts file2.ts)
+	// Collect file/directory arguments for targeted linting (e.g. rslint file1.ts src/)
 	var allowFiles []string
+	var allowDirs []string
 	if args := flag.Args(); len(args) > 0 {
 		for _, arg := range args {
 			absPath, err := filepath.Abs(arg)
@@ -511,7 +510,18 @@ func runCMD() int {
 				fmt.Fprintf(os.Stderr, "error resolving path %s: %v\n", arg, err)
 				return 1
 			}
-			allowFiles = append(allowFiles, tspath.NormalizePath(absPath))
+			// Resolve symlinks so paths are consistent with os.Getwd() and
+			// TypeScript's SourceFile.FileName() which both return real paths.
+			if resolved, err := filepath.EvalSymlinks(absPath); err == nil {
+				absPath = resolved
+			}
+			normalized := tspath.NormalizePath(absPath)
+			info, statErr := os.Stat(absPath)
+			if statErr == nil && info.IsDir() {
+				allowDirs = append(allowDirs, normalized)
+			} else {
+				allowFiles = append(allowFiles, normalized)
+			}
 		}
 	}
 
@@ -576,7 +586,12 @@ func runCMD() int {
 	// Initialize rule registry with all available rules
 	rslintconfig.RegisterAllRules()
 	var rslintConfig rslintconfig.RslintConfig
-	var tsConfigs []string
+
+	// configMap holds per-directory configs for multi-config (monorepo) support.
+	// Only populated in the configStdin path; nil otherwise (single-config mode).
+	var configMap map[string]rslintconfig.RslintConfig
+
+	programs := []*compiler.Program{}
 
 	if configStdin {
 		// Read config JSON from stdin (sent by JS config loader).
@@ -592,76 +607,83 @@ func runCMD() int {
 			return 1
 		}
 
-		var payload struct {
-			ConfigDirectory string                    `json:"configDirectory"`
-			Entries         rslintconfig.RslintConfig `json:"entries"`
-		}
-		if err := json.Unmarshal(data, &payload); err != nil {
-			fmt.Fprintf(os.Stderr, "error parsing config from stdin: %v\n", err)
+		payload, parseErr := parseConfigPayload(data)
+		if parseErr != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", parseErr)
 			return 1
 		}
 
-		rslintConfig = payload.Entries
-		currentDirectory = payload.ConfigDirectory
+		if payload.IsMultiConfig {
+			// Multi-config format
+			configMap = payload.ConfigMap
+			seenTsConfigs := make(map[string]struct{})
 
-		loader := rslintconfig.NewConfigLoader(fs, currentDirectory)
-		tsConfigs, err = loader.LoadTsConfigsFromRslintConfig(rslintConfig, currentDirectory)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			return 1
+			for configDir, entries := range configMap {
+				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seenTsConfigs)
+				if exitCode != 0 {
+					return exitCode
+				}
+				programs = append(programs, progs...)
+			}
+		} else {
+			// Legacy single-config format
+			rslintConfig = payload.SingleConfig
+			currentDirectory = payload.SingleConfigDir
+
+			progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil)
+			if exitCode != 0 {
+				return exitCode
+			}
+			programs = append(programs, progs...)
 		}
 	} else {
 		// Load configuration from file (JSON config path, isJSConfig stays false)
-		rslintConfig, tsConfigs, currentDirectory = rslintconfig.LoadConfigurationWithFallback(config, currentDirectory, fs)
-	}
+		rslintConfig, _, currentDirectory = rslintconfig.LoadConfigurationWithFallback(config, currentDirectory, fs)
 
-	// When no tsconfig is specified in rslint config, auto-detect tsconfig.json in the working directory.
-	if len(tsConfigs) == 0 {
-		defaultTsConfig := tspath.ResolvePath(currentDirectory, "tsconfig.json")
-		if fs.FileExists(defaultTsConfig) {
-			tsConfigs = []string{defaultTsConfig}
+		progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil)
+		if exitCode != 0 {
+			return exitCode
 		}
+		programs = append(programs, progs...)
 	}
 
-	host := utils.CreateCompilerHost(currentDirectory, fs)
+	// Use CWD for display paths (not any config directory).
+	// In multi-config mode, currentDirectory was never reassigned from os.Getwd(),
+	// so it already holds the normalized CWD.
+	cwd := currentDirectory
 
 	comparePathOptions := tspath.ComparePathsOptions{
-		CurrentDirectory:          host.GetCurrentDirectory(),
-		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
-	}
-	createPrograms := func() ([]*compiler.Program, error) {
-		var progs []*compiler.Program
-		if len(tsConfigs) > 0 {
-			for _, configFileName := range tsConfigs {
-				p, err := utils.CreateProgram(singleThreaded, fs, currentDirectory, configFileName, host)
-				if err != nil {
-					return nil, err
-				}
-				progs = append(progs, p)
-			}
-		} else {
-			sourceExts := []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".mjs"}
-			excludes := []string{"node_modules"}
-			includes := []string{"**/*"}
-			rootFiles := vfs.ReadDirectory(fs, currentDirectory, currentDirectory, sourceExts, excludes, includes, nil)
-			if len(rootFiles) > 0 {
-				p, err := utils.CreateProgramFromOptions(singleThreaded, &core.CompilerOptions{AllowJs: core.TSTrue}, rootFiles, host)
-				if err != nil {
-					return nil, err
-				}
-				progs = append(progs, p)
-			}
-		}
-		return progs, nil
+		CurrentDirectory:          cwd,
+		UseCaseSensitiveFileNames: fs.UseCaseSensitiveFileNames(),
 	}
 
-	programs, err := createPrograms()
-	if err != nil {
-		w := bufio.NewWriter(os.Stderr)
-		if !reportSyntacticErrors(err, w, comparePathOptions) {
-			fmt.Fprintf(os.Stderr, "error creating program: %v", err)
+	// No args → implicit CWD scoping (same as `rslint .`).
+	// Only applies to multi-config stdin path. In this mode, configs may include
+	// parent or nested configs, so Programs may contain files outside CWD.
+	// Without scoping, all those files would be linted unexpectedly.
+	if len(allowFiles) == 0 && len(allowDirs) == 0 && configStdin && configMap != nil {
+		allowDirs = []string{cwd}
+	}
+
+	// createPrograms rebuilds programs (needed for multi-pass --fix re-linting).
+	createPrograms := func() ([]*compiler.Program, error) {
+		if configMap != nil {
+			var allProgs []*compiler.Program
+			seen := make(map[string]struct{})
+			for configDir, entries := range configMap {
+				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seen)
+				if exitCode != 0 {
+					return nil, fmt.Errorf("failed to create programs for %s", configDir)
+				}
+				allProgs = append(allProgs, progs...)
+			}
+			return allProgs, nil
 		}
-		return 1
+		progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil)
+		if exitCode != 0 {
+			return nil, errors.New("failed to create programs")
+		}
+		return progs, nil
 	}
 
 	// Phase 1: Collect all diagnostics (no printing yet).
@@ -682,16 +704,27 @@ func runCMD() int {
 	}()
 
 	enforcePlugins := configStdin // JS/TS configs loaded via stdin require plugin declarations
+	getRulesForFile := func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+		filePath := sourceFile.FileName()
+		if configMap != nil {
+			cfgDir, cfg := rslintconfig.FindNearestConfig(filePath, configMap)
+			if cfg == nil {
+				return nil
+			}
+			activeRules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(cfg, filePath, cfgDir, enforcePlugins)
+			return activeRules
+		}
+		activeRules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, filePath, currentDirectory, enforcePlugins)
+		return activeRules
+	}
+
 	lintedfileCount, err := linter.RunLinter(
 		programs,
 		singleThreaded,
 		allowFiles,
+		allowDirs,
 		utils.ExcludePaths,
-
-		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			activeRules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), currentDirectory, enforcePlugins)
-			return activeRules
-		},
+		getRulesForFile,
 		func(d rule.RuleDiagnostic) {
 			diagnosticsChan <- d
 		},
@@ -705,8 +738,8 @@ func runCMD() int {
 
 	wg.Wait()
 
-	// Error if file arguments were provided but none were found in the program
-	if len(allowFiles) > 0 && lintedfileCount == 0 {
+	// Error if file/dir arguments were provided but none were found in the program
+	if (len(allowFiles) > 0 || len(allowDirs) > 0) && lintedfileCount == 0 {
 		fmt.Fprintf(os.Stderr, "error: none of the specified files were found in the project\n")
 		return 1
 	}
@@ -734,11 +767,9 @@ func runCMD() int {
 				newPrograms,
 				singleThreaded,
 				allowFiles,
+				allowDirs,
 				utils.ExcludePaths,
-				func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-					activeRules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), currentDirectory, enforcePlugins)
-					return activeRules
-				},
+				getRulesForFile,
 				func(d rule.RuleDiagnostic) {
 					diagsMu.Lock()
 					passDiags = append(passDiags, d)

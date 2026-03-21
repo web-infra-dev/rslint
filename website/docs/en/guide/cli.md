@@ -3,7 +3,7 @@
 ## Usage
 
 ```bash
-rslint [options] [files...]
+rslint [options] [files/directories...]
 ```
 
 ## Options
@@ -20,19 +20,48 @@ rslint [options] [files...]
 | `--force-color`      | Force colored output                                    |
 | `--help`, `-h`       | Show help information                                   |
 
-## File Arguments
+## File and Directory Arguments
 
-When file paths are provided, rslint only lints the specified files instead of scanning all files from configuration. Configuration rules still apply to the matched files.
+You can pass file paths, directory paths, or a mix of both. Rslint discovers the config file by walking upward from the target location.
 
 ```bash
 # Lint specific files
 rslint src/index.ts src/utils.ts
 
+# Lint a directory (only files under that directory are linted)
+rslint src/
+
+# Mix files and directories
+rslint src/ lib/utils.ts
+
 # Use with --fix
-rslint --fix src/index.ts src/utils.ts
+rslint --fix src/index.ts
 ```
 
-When no file arguments are given, rslint scans all files based on the project configuration.
+When no arguments are given, rslint scopes linting to the current working directory.
+
+### Config Discovery
+
+For each target file or directory, rslint searches for `rslint.config.{js,mjs,ts,mts}` starting from that location and walking upward to the filesystem root. The first config found is used.
+
+In monorepo setups, rslint automatically discovers nested configs and applies the nearest one to each file:
+
+```bash
+# Lint from monorepo root (discovers all sub-package configs)
+rslint
+
+# Lint a specific package
+rslint packages/foo/
+
+# Lint files from different packages (each uses its nearest config)
+rslint packages/foo/src/a.ts packages/bar/src/b.ts
+```
+
+Use `--config` to override automatic config discovery:
+
+```bash
+rslint --config custom.config.ts src/
+```
 
 ## Output Formats
 
