@@ -18,6 +18,65 @@ export function findJSConfig(cwd: string): string | null {
 }
 
 /**
+ * Walk upward from startDir to the filesystem root, returning the first
+ * rslint JS/TS config file found. Returns null if none is found.
+ */
+export function findJSConfigUp(startDir: string): string | null {
+  let dir = path.resolve(startDir);
+  while (true) {
+    const found = findJSConfig(dir);
+    if (found) return found;
+    const parent = path.dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+const SCAN_EXCLUDE_DIRS = new Set(['node_modules', '.git']);
+
+/**
+ * Recursively scan a directory for all rslint JS/TS config files.
+ * Skips node_modules and .git directories (aligned with ESLint defaults).
+ * Uses native fs.globSync when available (Node 22+, C++ impl), falls back
+ * to hand-written recursive walk.
+ */
+export function findJSConfigsInDir(startDir: string): string[] {
+  const resolved = path.resolve(startDir);
+
+  // Node 22+ native globSync (C++ implementation, faster)
+  if (typeof (fs as any).globSync === 'function') {
+    const pattern = '**/rslint.config.{js,mjs,ts,mts}';
+    return (fs as any)
+      .globSync(pattern, {
+        cwd: resolved,
+        exclude: (f: string) => SCAN_EXCLUDE_DIRS.has(path.basename(f)),
+      })
+      .map((p: string) => path.join(resolved, p));
+  }
+
+  // Fallback: recursive walk
+  const configs: string[] = [];
+  const walk = (dir: string): void => {
+    let entries: fs.Dirent[];
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        if (SCAN_EXCLUDE_DIRS.has(entry.name)) continue;
+        walk(path.join(dir, entry.name));
+      } else if (JS_CONFIG_FILES.includes(entry.name)) {
+        configs.push(path.join(dir, entry.name));
+      }
+    }
+  };
+  walk(resolved);
+  return configs;
+}
+
+/**
  * Load a JS/TS config file.
  * - .js/.mjs: native import()
  * - .ts/.mts: native import() when Node.js has TypeScript support (>= 22.6),

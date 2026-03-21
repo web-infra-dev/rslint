@@ -13,6 +13,8 @@ export default defineConfig({
     './tests/cli/js-config/cli-integration.test.ts',
     './tests/cli/js-config/plugin-enforcement.test.ts',
     './tests/cli/js-config/presets.test.ts',
+    './tests/cli/js-config/config-discovery.test.ts',
+    './tests/cli/js-config/dir-args.test.ts',
 
     // eslint
     './tests/eslint/rules/default-case.test.ts',
