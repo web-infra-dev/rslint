@@ -11,6 +11,7 @@
       "packages/rslint-test-tools/tests/typescript-eslint/rules/prefer-optional-chain/base-cases.ts",
       "packages/rslint-test-tools/tests/typescript-eslint/rules/naming-convention/cases/createTestCases.ts",
       "packages/rslint-test-tools/tests/typescript-eslint/areOptionsValid.ts",
+      "packages/vscode-extension/__tests__/**",
       "packages/rslint-wasm/src/worker.ts",
       "packages/rule-tester/src/index.ts",
       "typescript-go/**"
