@@ -210,6 +210,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		programs,
 		false, // Don't use single-threaded mode for IPC
 		allowedFiles,
+		nil, // no allowDirs in API mode
 		utils.ExcludePaths,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			// Track source file for encoding
