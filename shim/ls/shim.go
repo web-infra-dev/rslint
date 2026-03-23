@@ -82,6 +82,7 @@ func ProvideWorkspaceSymbols(ctx context.Context, programs []*compiler.Program, 
 //go:linkname RangeContainsRange github.com/microsoft/typescript-go/internal/ls.RangeContainsRange
 func RangeContainsRange(r1 core.TextRange, r2 core.TextRange) bool
 type ReferenceEntry = ls.ReferenceEntry
+type RenameInfo = ls.RenameInfo
 type SortText = ls.SortText
 const SortTextAutoImportSuggestions = ls.SortTextAutoImportSuggestions
 const SortTextClassMemberSnippets = ls.SortTextClassMemberSnippets

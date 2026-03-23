@@ -13,6 +13,7 @@ import "github.com/microsoft/typescript-go/internal/evaluator"
 import "github.com/microsoft/typescript-go/internal/jsnum"
 import "github.com/microsoft/typescript-go/internal/nodebuilder"
 import "github.com/microsoft/typescript-go/internal/printer"
+import "github.com/microsoft/typescript-go/internal/scanner"
 import "sync"
 import "unsafe"
 
@@ -234,6 +235,7 @@ type extra_Checker struct {
   markedAssignmentSymbolLinks core.LinkStore[*ast.Symbol, checker.MarkedAssignmentSymbolLinks]
   symbolContainerLinks core.LinkStore[*ast.Symbol, checker.ContainingSymbolLinks]
   sourceFileLinks core.LinkStore[*ast.SourceFile, checker.SourceFileLinks]
+  regExpScanner *scanner.Scanner
   patternForType map[*checker.Type]*ast.Node
   contextFreeTypes map[*ast.Node]*checker.Type
   anyType *checker.Type
