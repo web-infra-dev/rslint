@@ -29,6 +29,22 @@ import (
 	util "github.com/web-infra-dev/rslint/internal/utils"
 )
 
+const codeActionKindSourceFixAllRslint = lsproto.CodeActionKind("source.fixAll.rslint")
+
+// ruleFixToTextEdit converts a rule fix into an LSP TextEdit using the
+// source file's line map for position encoding.
+func ruleFixToTextEdit(sourceFile *ast.SourceFile, fix rule.RuleFix) *lsproto.TextEdit {
+	startLine, startChar := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, fix.Range.Pos())
+	endLine, endChar := scanner.GetECMALineAndUTF16CharacterOfPosition(sourceFile, fix.Range.End())
+	return &lsproto.TextEdit{
+		Range: lsproto.Range{
+			Start: lsproto.Position{Line: uint32(startLine), Character: uint32(startChar)},
+			End:   lsproto.Position{Line: uint32(endLine), Character: uint32(endChar)},
+		},
+		NewText: fix.Text,
+	}
+}
+
 func (s *Server) handleInitialize(ctx context.Context, params *lsproto.InitializeParams) (lsproto.InitializeResponse, error) {
 	log.Printf("handle initialize with pid: %d\n", os.Getpid())
 	if s.initializeParams != nil {
@@ -63,7 +79,13 @@ func (s *Server) handleInitialize(ctx context.Context, params *lsproto.Initializ
 				},
 			},
 			CodeActionProvider: &lsproto.BooleanOrCodeActionOptions{
-				Boolean: ptrTo(true),
+				CodeActionOptions: &lsproto.CodeActionOptions{
+					CodeActionKinds: &[]lsproto.CodeActionKind{
+						lsproto.CodeActionKindQuickFix,
+						lsproto.CodeActionKindSourceFixAll,
+						codeActionKindSourceFixAllRslint,
+					},
+				},
 			},
 		},
 	}
@@ -292,6 +314,10 @@ func (s *Server) handleDidSave(ctx context.Context, params *lsproto.DidSaveTextD
 		s.documents[uri] = *params.Text
 	}
 
+	// Clear pending debounce lint for this URI — pushDiagnostics below
+	// will lint it immediately, so the debounce would be redundant.
+	delete(s.pendingLintURIs, uri)
+
 	// Notify session about the save event
 	if s.session != nil {
 		s.session.DidSaveFile(ctx, uri)
@@ -323,6 +349,11 @@ func (s *Server) handleDidClose(ctx context.Context, params *lsproto.DidCloseTex
 func (s *Server) handleCodeAction(ctx context.Context, params *lsproto.CodeActionParams) (lsproto.CodeActionResponse, error) {
 	log.Printf("Handling codeAction: %+v,%+v", params, ctx)
 	uri := params.TextDocument.Uri
+
+	// Handle source.fixAll requests (triggered by editor.codeActionsOnSave)
+	if isFixAllRequest(params.Context) {
+		return s.handleFixAllCodeAction(ctx, uri)
+	}
 
 	// Get stored diagnostics for this document
 	ruleDiagnostics, exists := s.diagnostics[uri]
@@ -378,7 +409,122 @@ func (s *Server) handleCodeAction(ctx context.Context, params *lsproto.CodeActio
 	}, nil
 }
 
-func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic, content string) *lsproto.Diagnostic {
+// isFixAllRequest returns true if the code action context requests source.fixAll actions.
+func isFixAllRequest(ctx *lsproto.CodeActionContext) bool {
+	if ctx == nil || ctx.Only == nil {
+		return false
+	}
+	for _, kind := range *ctx.Only {
+		if kind == lsproto.CodeActionKindSourceFixAll || kind == codeActionKindSourceFixAllRslint {
+			return true
+		}
+	}
+	return false
+}
+
+// maxFixPasses is the maximum number of lint-fix cycles to prevent infinite loops
+// when two rules produce fixes that undo each other.
+const maxFixPasses = 10
+
+// handleFixAllCodeAction computes all auto-fixes for the given URI using
+// multi-pass fixing: each pass lints → applies fixes → updates the session
+// overlay, repeating until no more fixes are found or maxFixPasses is reached.
+// This handles cascading fixes (e.g. ban-types fix triggers no-inferrable-types).
+// It does NOT push diagnostics or update s.diagnostics — that is left to the
+// subsequent didSave handler in the normal save flow.
+func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.DocumentUri) (lsproto.CodeActionResponse, error) {
+	empty := lsproto.CodeActionResponse{CommandOrCodeActionArray: &[]lsproto.CommandOrCodeAction{}}
+
+	// Clear pending debounce for this URI — we are about to lint it fresh,
+	// so any scheduled debounce lint for the same content is redundant.
+	delete(s.pendingLintURIs, uri)
+
+	if s.session == nil {
+		return empty, nil
+	}
+	if !isTypeScriptFile(string(uri)) {
+		return empty, nil
+	}
+
+	rslintConfig, configCwd, isJSConfig := s.getConfigForURI(uri)
+	originalContent := s.documents[uri]
+	currentContent := originalContent
+
+	for pass := range maxFixPasses {
+		// For passes after the first, update the session overlay so that
+		// runLintWithSession sees the fixed content from the previous pass.
+		if pass > 0 {
+			s.session.DidChangeFile(ctx, uri, int32(pass), []lsproto.TextDocumentContentChangePartialOrWholeDocument{
+				{WholeDocument: &lsproto.TextDocumentContentChangeWholeDocument{Text: currentContent}},
+			})
+		}
+
+		ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig)
+		if err != nil {
+			log.Printf("Error running lint for fixAll pass %d: %v", pass, err)
+			break
+		}
+
+		fixedContent, _, wasFixed := linter.ApplyRuleFixes(currentContent, ruleDiags)
+		if !wasFixed {
+			break
+		}
+		currentContent = fixedContent
+		if currentContent == originalContent {
+			break // cycle detected — fixes reverted to original content
+		}
+	}
+
+	if currentContent == originalContent {
+		return empty, nil
+	}
+
+	// Produce a single TextEdit that replaces the entire document content.
+	// Individual per-fix TextEdits can't be composed across passes (offsets shift),
+	// so we replace the whole document with the final result.
+	lastLine, lastChar := computeEndPosition(originalContent)
+
+	codeAction := &lsproto.CodeAction{
+		Title: "Fix all rslint auto-fixable problems",
+		Kind:  ptrTo(codeActionKindSourceFixAllRslint),
+		Edit: &lsproto.WorkspaceEdit{
+			Changes: &map[lsproto.DocumentUri][]*lsproto.TextEdit{
+				uri: {
+					{
+						Range: lsproto.Range{
+							Start: lsproto.Position{Line: 0, Character: 0},
+							End:   lsproto.Position{Line: uint32(lastLine), Character: uint32(lastChar)},
+						},
+						NewText: currentContent,
+					},
+				},
+			},
+		},
+	}
+
+	return lsproto.CodeActionResponse{
+		CommandOrCodeActionArray: &[]lsproto.CommandOrCodeAction{
+			{CodeAction: codeAction},
+		},
+	}, nil
+}
+
+// computeEndPosition returns the line and UTF-16 character offset of the end
+// of a text string, suitable for constructing an LSP Range that covers the
+// entire document. Uses core.UTF16Len for correct UTF-16 code unit counting.
+func computeEndPosition(text string) (int, int) {
+	line := 0
+	lastLineStart := 0
+	for i := range len(text) {
+		if text[i] == '\n' {
+			line++
+			lastLineStart = i + 1
+		}
+	}
+	return line, int(core.UTF16Len(text[lastLineStart:]))
+}
+
+func convertRuleDiagnosticToLSP(ruleDiag rule.RuleDiagnostic) *lsproto.Diagnostic {
 	diagnosticStart := ruleDiag.Range.Pos()
 	diagnosticEnd := ruleDiag.Range.End()
 	startLine, startColumn := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, diagnosticStart)
@@ -506,17 +652,7 @@ func createCodeActionFromRuleDiagnostic(ruleDiag rule.RuleDiagnostic, uri lsprot
 	// Convert rule fixes to LSP text edits
 	var textEdits []*lsproto.TextEdit
 	for _, fix := range fixes {
-		startLine, startChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, fix.Range.Pos())
-		endLine, endChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, fix.Range.End())
-
-		textEdit := &lsproto.TextEdit{
-			Range: lsproto.Range{
-				Start: lsproto.Position{Line: uint32(startLine), Character: uint32(startChar)},
-				End:   lsproto.Position{Line: uint32(endLine), Character: uint32(endChar)},
-			},
-			NewText: fix.Text,
-		}
-		textEdits = append(textEdits, textEdit)
+		textEdits = append(textEdits, ruleFixToTextEdit(ruleDiag.SourceFile, fix))
 	}
 
 	// Create workspace edit
@@ -526,25 +662,11 @@ func createCodeActionFromRuleDiagnostic(ruleDiag rule.RuleDiagnostic, uri lsprot
 		},
 	}
 
-	// Create the corresponding LSP diagnostic for reference
-	diagStartLine, diagStartChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
-	diagEndLine, diagEndChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
-
-	lspDiagnostic := &lsproto.Diagnostic{
-		Range: lsproto.Range{
-			Start: lsproto.Position{Line: uint32(diagStartLine), Character: uint32(diagStartChar)},
-			End:   lsproto.Position{Line: uint32(diagEndLine), Character: uint32(diagEndChar)},
-		},
-		Severity: ptrTo(lsproto.DiagnosticSeverity(ruleDiag.Severity.Int())),
-		Source:   ptrTo("rslint"),
-		Message:  fmt.Sprintf("[%s] %s", ruleDiag.RuleName, ruleDiag.Message.Description),
-	}
-
 	return &lsproto.CodeAction{
 		Title:       "Fix: " + ruleDiag.Message.Description,
 		Kind:        ptrTo(lsproto.CodeActionKind("quickfix")),
 		Edit:        workspaceEdit,
-		Diagnostics: &[]*lsproto.Diagnostic{lspDiagnostic},
+		Diagnostics: &[]*lsproto.Diagnostic{convertRuleDiagnosticToLSP(ruleDiag)},
 		IsPreferred: ptrTo(true), // Mark auto-fixes as preferred
 	}
 }
@@ -559,17 +681,7 @@ func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rul
 	// Convert rule fixes to LSP text edits
 	var textEdits []*lsproto.TextEdit
 	for _, fix := range fixes {
-		startLine, startChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, fix.Range.Pos())
-		endLine, endChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, fix.Range.End())
-
-		textEdit := &lsproto.TextEdit{
-			Range: lsproto.Range{
-				Start: lsproto.Position{Line: uint32(startLine), Character: uint32(startChar)},
-				End:   lsproto.Position{Line: uint32(endLine), Character: uint32(endChar)},
-			},
-			NewText: fix.Text,
-		}
-		textEdits = append(textEdits, textEdit)
+		textEdits = append(textEdits, ruleFixToTextEdit(ruleDiag.SourceFile, fix))
 	}
 
 	// Create workspace edit
@@ -579,25 +691,11 @@ func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rul
 		},
 	}
 
-	// Create the corresponding LSP diagnostic for reference
-	diagStartLine, diagStartChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
-	diagEndLine, diagEndChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
-
-	lspDiagnostic := &lsproto.Diagnostic{
-		Range: lsproto.Range{
-			Start: lsproto.Position{Line: uint32(diagStartLine), Character: uint32(diagStartChar)},
-			End:   lsproto.Position{Line: uint32(diagEndLine), Character: uint32(diagEndChar)},
-		},
-		Severity: ptrTo(lsproto.DiagnosticSeverity(ruleDiag.Severity.Int())),
-		Source:   ptrTo("rslint"),
-		Message:  fmt.Sprintf("[%s] %s", ruleDiag.RuleName, ruleDiag.Message.Description),
-	}
-
 	return &lsproto.CodeAction{
 		Title:       "Suggestion: " + suggestion.Message.Description,
 		Kind:        ptrTo(lsproto.CodeActionKind("quickfix")),
 		Edit:        workspaceEdit,
-		Diagnostics: &[]*lsproto.Diagnostic{lspDiagnostic},
+		Diagnostics: &[]*lsproto.Diagnostic{convertRuleDiagnosticToLSP(ruleDiag)},
 		IsPreferred: ptrTo(false), // Mark suggestions as not preferred
 	}
 }
@@ -606,19 +704,7 @@ func createCodeActionFromSuggestion(ruleDiag rule.RuleDiagnostic, suggestion rul
 func createDisableRuleActions(ruleDiag rule.RuleDiagnostic, uri lsproto.DocumentUri) []lsproto.CommandOrCodeAction {
 	var actions []lsproto.CommandOrCodeAction
 
-	// Create the corresponding LSP diagnostic for reference
-	diagStartLine, diagStartChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.Pos())
-	diagEndLine, diagEndChar := scanner.GetECMALineAndUTF16CharacterOfPosition(ruleDiag.SourceFile, ruleDiag.Range.End())
-
-	lspDiagnostic := &lsproto.Diagnostic{
-		Range: lsproto.Range{
-			Start: lsproto.Position{Line: uint32(diagStartLine), Character: uint32(diagStartChar)},
-			End:   lsproto.Position{Line: uint32(diagEndLine), Character: uint32(diagEndChar)},
-		},
-		Severity: ptrTo(lsproto.DiagnosticSeverity(ruleDiag.Severity.Int())),
-		Source:   ptrTo("rslint"),
-		Message:  fmt.Sprintf("[%s] %s", ruleDiag.RuleName, ruleDiag.Message.Description),
-	}
+	lspDiagnostic := convertRuleDiagnosticToLSP(ruleDiag)
 
 	// Action 1: Disable rule for this line
 	disableLineAction := createDisableRuleForLineAction(ruleDiag, uri, lspDiagnostic)
@@ -757,7 +843,6 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 	}
 
 	ctx := s.backgroundCtx
-	content := s.documents[uri]
 
 	if !isTypeScriptFile(string(uri)) {
 		return
@@ -775,7 +860,7 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 	// Must use empty slice (not nil) so JSON serializes as [] instead of null
 	lspDiags := make([]*lsproto.Diagnostic, 0, len(ruleDiags))
 	for _, d := range ruleDiags {
-		lspDiags = append(lspDiags, convertRuleDiagnosticToLSP(d, content))
+		lspDiags = append(lspDiags, convertRuleDiagnosticToLSP(d))
 	}
 
 	if err := s.PublishDiagnostics(ctx, &lsproto.PublishDiagnosticsParams{

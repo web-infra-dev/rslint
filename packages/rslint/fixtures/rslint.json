@@ -19,7 +19,9 @@
       "@typescript-eslint/no-empty-function": "error",
       "@typescript-eslint/no-empty-interface": "error",
       "@typescript-eslint/no-require-imports": "error",
-      "@typescript-eslint/no-namespace": "error"
+      "@typescript-eslint/no-namespace": "error",
+      "@typescript-eslint/ban-types": "error",
+      "@typescript-eslint/no-inferrable-types": "error"
     },
     "plugins": ["@typescript-eslint"]
   }

@@ -1292,3 +1292,4 @@ func TestCloseAndReopen(t *testing.T) {
 		t.Error("stale diagnostics should not reappear after reopen")
 	}
 }
+

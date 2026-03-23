@@ -425,6 +425,46 @@ Options:
   -h, --help            Show help
 `
 
+// groupDiagsByFile groups a flat slice of diagnostics by their source file name.
+func groupDiagsByFile(diags []rule.RuleDiagnostic) map[string][]rule.RuleDiagnostic {
+	m := make(map[string][]rule.RuleDiagnostic)
+	for _, d := range diags {
+		f := d.SourceFile.FileName()
+		m[f] = append(m[f], d)
+	}
+	return m
+}
+
+// applyFixPass applies auto-fixes for all files in diagnosticsByFile,
+// writes fixed content to disk, and returns the number of issues fixed.
+func applyFixPass(diagnosticsByFile map[string][]rule.RuleDiagnostic) int {
+	fixed := 0
+	for fileName, fileDiagnostics := range diagnosticsByFile {
+		var diagnosticsWithFixes []rule.RuleDiagnostic
+		for _, d := range fileDiagnostics {
+			if len(d.Fixes()) > 0 {
+				diagnosticsWithFixes = append(diagnosticsWithFixes, d)
+			}
+		}
+		if len(diagnosticsWithFixes) == 0 {
+			continue
+		}
+
+		originalContent := diagnosticsWithFixes[0].SourceFile.Text()
+		fixedContent, unapplied, wasFixed := linter.ApplyRuleFixes(originalContent, diagnosticsWithFixes)
+
+		if wasFixed {
+			err := os.WriteFile(fileName, []byte(fixedContent), 0644)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error writing fixed file %s: %v\n", fileName, err)
+			} else {
+				fixed += len(diagnosticsWithFixes) - len(unapplied)
+			}
+		}
+	}
+	return fixed
+}
+
 func runCMD() int {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
@@ -589,81 +629,55 @@ func runCMD() int {
 		CurrentDirectory:          host.GetCurrentDirectory(),
 		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
 	}
-	programs := []*compiler.Program{}
-	if len(tsConfigs) > 0 {
-		for _, configFileName := range tsConfigs {
-			program, err := utils.CreateProgram(singleThreaded, fs, currentDirectory, configFileName, host)
-			if err != nil {
-				w := bufio.NewWriter(os.Stderr)
-				if !reportSyntacticErrors(err, w, comparePathOptions) {
-					fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
+	createPrograms := func() ([]*compiler.Program, error) {
+		var progs []*compiler.Program
+		if len(tsConfigs) > 0 {
+			for _, configFileName := range tsConfigs {
+				p, err := utils.CreateProgram(singleThreaded, fs, currentDirectory, configFileName, host)
+				if err != nil {
+					return nil, err
 				}
-				return 1
+				progs = append(progs, p)
 			}
-			programs = append(programs, program)
-		}
-	} else {
-		// No tsconfig available — create program in memory for pure JS projects.
-		sourceExts := []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".mjs"}
-		excludes := []string{"node_modules"}
-		includes := []string{"**/*"}
-		rootFiles := vfs.ReadDirectory(fs, currentDirectory, currentDirectory, sourceExts, excludes, includes, nil)
-		if len(rootFiles) > 0 {
-			program, err := utils.CreateProgramFromOptions(singleThreaded, &core.CompilerOptions{AllowJs: core.TSTrue}, rootFiles, host)
-			if err != nil {
-				w := bufio.NewWriter(os.Stderr)
-				if !reportSyntacticErrors(err, w, comparePathOptions) {
-					fmt.Fprintf(os.Stderr, "error creating program: %v", err)
+		} else {
+			sourceExts := []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".mjs"}
+			excludes := []string{"node_modules"}
+			includes := []string{"**/*"}
+			rootFiles := vfs.ReadDirectory(fs, currentDirectory, currentDirectory, sourceExts, excludes, includes, nil)
+			if len(rootFiles) > 0 {
+				p, err := utils.CreateProgramFromOptions(singleThreaded, &core.CompilerOptions{AllowJs: core.TSTrue}, rootFiles, host)
+				if err != nil {
+					return nil, err
 				}
-				return 1
+				progs = append(progs, p)
 			}
-			programs = append(programs, program)
 		}
+		return progs, nil
 	}
 
-	var wg sync.WaitGroup
+	programs, err := createPrograms()
+	if err != nil {
+		w := bufio.NewWriter(os.Stderr)
+		if !reportSyntacticErrors(err, w, comparePathOptions) {
+			fmt.Fprintf(os.Stderr, "error creating program: %v", err)
+		}
+		return 1
+	}
 
-	diagnosticsChan := make(chan rule.RuleDiagnostic, 4096)
-	errorsCount := 0
-	warningsCount := 0
+	// Phase 1: Collect all diagnostics (no printing yet).
+	// Like ESLint, diagnostics are collected first, then printed at the end.
+	// This ensures --fix only shows remaining unfixed issues.
+	var allDiags []rule.RuleDiagnostic
+	var diagsMu sync.Mutex
 	fixedCount := 0
 
-	// Store diagnostics by file for fixing
-	var diagnosticsByFile map[string][]rule.RuleDiagnostic
-	if fix {
-		diagnosticsByFile = make(map[string][]rule.RuleDiagnostic)
-	}
-
+	diagnosticsChan := make(chan rule.RuleDiagnostic, 4096)
+	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		w := bufio.NewWriterSize(os.Stdout, 4096*100)
-		defer w.Flush()
 		for d := range diagnosticsChan {
-			switch d.Severity {
-			case rule.SeverityError:
-				errorsCount++
-			case rule.SeverityWarning:
-				warningsCount++
-			}
-
-			// Store diagnostics by file for fixing
-			if fix {
-				fileName := d.SourceFile.FileName()
-				diagnosticsByFile[fileName] = append(diagnosticsByFile[fileName], d)
-			}
-
-			if errorsCount+warningsCount == 1 {
-				w.WriteByte('\n')
-			}
-			// Only print Error message when quiet is true
-			if quiet && d.Severity != rule.SeverityError {
-				continue
-			}
-			printDiagnostic(d, w, comparePathOptions, format)
-			if w.Available() < 4096 {
-				w.Flush()
-			}
+			allDiags = append(allDiags, d)
 		}
 	}()
 
@@ -697,36 +711,81 @@ func runCMD() int {
 		return 1
 	}
 
-	// Apply fixes if --fix flag is enabled
-	if fix && len(diagnosticsByFile) > 0 {
-		for fileName, fileDiagnostics := range diagnosticsByFile {
-			// Only apply fixes for diagnostics that have fixes
-			diagnosticsWithFixes := make([]rule.RuleDiagnostic, 0)
-			for _, d := range fileDiagnostics {
-				if len(d.Fixes()) > 0 {
-					diagnosticsWithFixes = append(diagnosticsWithFixes, d)
-				}
+	// Phase 2: Apply fixes if --fix flag is enabled.
+	// Uses multi-pass fixing: after applying fixes, rebuild programs and re-lint
+	// to catch cascading issues (e.g. ban-types fix triggers no-inferrable-types).
+	// After fixing, allDiags is replaced with remaining (unfixed) diagnostics.
+	const maxFixPasses = 10
+	if fix && len(allDiags) > 0 {
+		diagnosticsByFile := groupDiagsByFile(allDiags)
+		fixedCount += applyFixPass(diagnosticsByFile)
+
+		// Re-lint → fix → re-lint → fix → ... until stable or maxFixPasses.
+		// Skip if nothing was fixed in the first pass (no need to re-lint).
+		for pass := 1; pass < maxFixPasses && fixedCount > 0; pass++ {
+			newPrograms, err := createPrograms()
+			if err != nil || len(newPrograms) == 0 {
+				break
 			}
 
-			if len(diagnosticsWithFixes) > 0 {
-				// Read the original file content
-				originalContent := diagnosticsWithFixes[0].SourceFile.Text()
+			// Re-lint: collect remaining diagnostics.
+			var passDiags []rule.RuleDiagnostic
+			linter.RunLinter(
+				newPrograms,
+				singleThreaded,
+				allowFiles,
+				utils.ExcludePaths,
+				func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+					activeRules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), currentDirectory, enforcePlugins)
+					return activeRules
+				},
+				func(d rule.RuleDiagnostic) {
+					diagsMu.Lock()
+					passDiags = append(passDiags, d)
+					diagsMu.Unlock()
+				},
+			)
 
-				// Apply fixes
-				fixedContent, unapplied, wasFixed := linter.ApplyRuleFixes(originalContent, diagnosticsWithFixes)
+			// Replace allDiags with latest post-fix diagnostics.
+			allDiags = passDiags
 
-				if wasFixed {
-					// Write the fixed content back to the file
-					err := os.WriteFile(fileName, []byte(fixedContent), 0644)
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "error writing fixed file %s: %v\n", fileName, err)
-					} else {
-						fixedCount += len(diagnosticsWithFixes) - len(unapplied)
-					}
-				}
+			passFixed := applyFixPass(groupDiagsByFile(passDiags))
+			if passFixed == 0 {
+				break // Stable — allDiags reflect final state
 			}
+			fixedCount += passFixed
 		}
 	}
+
+	// Phase 3: Print diagnostics and count errors/warnings.
+	// allDiags contains: original diagnostics (no fix), or remaining after fix.
+	errorsCount := 0
+	warningsCount := 0
+	{
+		w := bufio.NewWriterSize(os.Stdout, 4096*100)
+		for i, d := range allDiags {
+			switch d.Severity {
+			case rule.SeverityError:
+				errorsCount++
+			case rule.SeverityWarning:
+				warningsCount++
+			}
+
+			if i == 0 {
+				w.WriteByte('\n')
+			}
+			// Only print Error message when quiet is true
+			if quiet && d.Severity != rule.SeverityError {
+				continue
+			}
+			printDiagnostic(d, w, comparePathOptions, format)
+			if w.Available() < 4096 {
+				w.Flush()
+			}
+		}
+		w.Flush()
+	}
+
 
 	colors := setupColors()
 	var errorsColorFunc func(string, ...interface{}) string
