@@ -8,17 +8,17 @@ rslint [options] [files/directories...]
 
 ## Options
 
-| Flag                 | Description                                             |
-| -------------------- | ------------------------------------------------------- |
-| `--init`             | Generate a default config file in the current directory |
-| `--config <path>`    | Specify which config file to use                        |
-| `--fix`              | Automatically fix problems                              |
-| `--format <format>`  | Output format: `default`, `jsonline`, or `github`       |
-| `--quiet`            | Report errors only, suppress warnings                   |
-| `--max-warnings <n>` | Exit with error if warning count exceeds this number    |
-| `--no-color`         | Disable colored output                                  |
-| `--force-color`      | Force colored output                                    |
-| `--help`, `-h`       | Show help information                                   |
+| Flag                 | Description                                                                 |
+| -------------------- | --------------------------------------------------------------------------- |
+| `--init`             | Generate a default config file, or migrate an existing JSON config to JS/TS |
+| `--config <path>`    | Specify which config file to use                                            |
+| `--fix`              | Automatically fix problems                                                  |
+| `--format <format>`  | Output format: `default`, `jsonline`, or `github`                           |
+| `--quiet`            | Report errors only, suppress warnings                                       |
+| `--max-warnings <n>` | Exit with error if warning count exceeds this number                        |
+| `--no-color`         | Disable colored output                                                      |
+| `--force-color`      | Force colored output                                                        |
+| `--help`, `-h`       | Show help information                                                       |
 
 ## File and Directory Arguments
 

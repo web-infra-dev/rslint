@@ -2,9 +2,6 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -715,87 +712,5 @@ func GetCoreRules() []rule.Rule {
 	return rules
 }
 
-const defaultTSConfig = `import { defineConfig, ts } from '@rslint/core';
-
-export default defineConfig([
-  ts.configs.recommended,
-  {
-    rules: {
-      // customize rules here
-    },
-  },
-]);
-`
-
-const defaultJSConfig = `import { defineConfig, js } from '@rslint/core';
-
-export default defineConfig([
-  js.configs.recommended,
-  {
-    rules: {
-      // customize rules here
-    },
-  },
-]);
-`
-
-// isESMPackage checks if the package.json in the given directory has "type": "module".
-func isESMPackage(directory string) bool {
-	data, err := os.ReadFile(filepath.Join(directory, "package.json"))
-	if err != nil {
-		return false
-	}
-	var pkg struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &pkg); err != nil {
-		return false
-	}
-	return pkg.Type == "module"
-}
-
-// InitDefaultConfig initializes a default config file in the directory.
-// - If tsconfig.json exists → rslint.config.ts (ESM syntax, handled by TS loaders)
-// - Otherwise, follows the ESLint convention based on package.json "type" field:
-//   - "type": "module" → rslint.config.js  (ESM syntax, .js is ESM in this context)
-//   - no "type": "module" → rslint.config.mjs (ESM syntax, .mjs is always ESM)
-func InitDefaultConfig(directory string) error {
-	allConfigs := []string{
-		"rslint.config.ts", "rslint.config.mts",
-		"rslint.config.js", "rslint.config.mjs",
-		"rslint.json", "rslint.jsonc",
-	}
-	for _, name := range allConfigs {
-		p := filepath.Join(directory, name)
-		if _, err := os.Stat(p); err == nil {
-			return fmt.Errorf("config file already exists: %s", name)
-		}
-	}
-
-	tsconfigPath := filepath.Join(directory, "tsconfig.json")
-	if _, err := os.Stat(tsconfigPath); err == nil {
-		configPath := filepath.Join(directory, "rslint.config.ts")
-		if err := os.WriteFile(configPath, []byte(defaultTSConfig), 0644); err != nil {
-			return fmt.Errorf("failed to create rslint.config.ts: %w", err)
-		}
-		fmt.Println("Created rslint.config.ts with TypeScript recommended config.")
-	} else {
-		// Use .js when the project is ESM ("type": "module" in package.json),
-		// otherwise .mjs to ensure Node.js treats the file as ESM regardless.
-		var configName, content string
-		if isESMPackage(directory) {
-			configName = "rslint.config.js"
-			content = defaultJSConfig
-		} else {
-			configName = "rslint.config.mjs"
-			content = defaultJSConfig
-		}
-		configPath := filepath.Join(directory, configName)
-		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
-			return fmt.Errorf("failed to create %s: %w", configName, err)
-		}
-		fmt.Printf("Created %s with JavaScript recommended config.\n", configName)
-	}
-
-	return nil
-}
+// InitDefaultConfig, createDefaultConfig, migrateJSONConfig and related helpers
+// are in config_init.go.
