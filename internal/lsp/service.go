@@ -619,7 +619,7 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 		diagnostics = append(diagnostics, d)
 	}
 
-	linter.RunLinterInProgram(program, []string{filename}, util.ExcludePaths,
+	linter.RunLinterInProgram(program, []string{filename}, nil, util.ExcludePaths,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules, _ := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), cwd, enforcePlugins)
 			return activeRules
