@@ -2,9 +2,6 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 
@@ -35,6 +32,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_confusing_void_expression"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_duplicate_enum_values"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_duplicate_type_constituents"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_dynamic_delete"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_empty_function"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_empty_interface"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_explicit_any"
@@ -126,6 +124,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
 	"github.com/web-infra-dev/rslint/internal/rules/no_sparse_arrays"
 	"github.com/web-infra-dev/rslint/internal/rules/no_template_curly_in_string"
+	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -230,23 +229,57 @@ func (rc *RuleConfig) GetSeverity() rule.DiagnosticSeverity {
 	}
 	return rule.ParseSeverity(rc.Level)
 }
-func GetAllRulesForPlugin(plugin string) []rule.Rule {
-	switch plugin {
-	case "@typescript-eslint":
-		return getAllTypeScriptEslintPluginRules()
-	case "eslint-plugin-import":
-		return importPlugin.GetAllRules()
-	case "eslint-plugin-import/recommended":
-		return importPlugin.GetRecommendedRules()
-	case "react":
-		return reactPlugin.GetAllRules()
-	case "jest":
-		return jestPlugin.GetAllRules()
-	case "jest/recommended":
-		return jestPlugin.GetRecommendedRules()
-	default:
-		return []rule.Rule{} // Return empty slice for unsupported plugins
+
+// PluginInfo defines a known plugin with its rule prefix and all accepted declaration names.
+type PluginInfo struct {
+	RulePrefix  string   // Rule name prefix, e.g. "import"
+	DeclNames   []string // All accepted declaration names, e.g. ["eslint-plugin-import", "import"]
+	getAllRules func() []rule.Rule
+}
+
+// KnownPlugins is the single source of truth for all supported plugins.
+var KnownPlugins = []PluginInfo{
+	{
+		RulePrefix:  "@typescript-eslint",
+		DeclNames:   []string{"@typescript-eslint"},
+		getAllRules: func() []rule.Rule { return GetPluginRules("@typescript-eslint") },
+	},
+	{
+		RulePrefix:  "import",
+		DeclNames:   []string{"eslint-plugin-import", "import"},
+		getAllRules: func() []rule.Rule { return importPlugin.GetAllRules() },
+	},
+	{
+		RulePrefix:  "jest",
+		DeclNames:   []string{"eslint-plugin-jest", "jest"},
+		getAllRules: func() []rule.Rule { return jestPlugin.GetAllRules() },
+	},
+	{
+		RulePrefix:  "react",
+		DeclNames:   []string{"react"},
+		getAllRules: func() []rule.Rule { return reactPlugin.GetAllRules() },
+	},
+}
+
+// pluginByDeclName is a lookup table built from KnownPlugins: declaration name → *PluginInfo.
+var pluginByDeclName map[string]*PluginInfo
+
+func init() {
+	pluginByDeclName = make(map[string]*PluginInfo)
+	for i := range KnownPlugins {
+		for _, name := range KnownPlugins[i].DeclNames {
+			pluginByDeclName[name] = &KnownPlugins[i]
+		}
 	}
+}
+
+// NormalizePluginName converts a plugin declaration name to its rule prefix form.
+// Looks up KnownPlugins; returns the input unchanged if not found.
+func NormalizePluginName(pluginName string) string {
+	if info, ok := pluginByDeclName[pluginName]; ok {
+		return info.RulePrefix
+	}
+	return pluginName
 }
 
 // parseArrayRuleConfig parses array-style rule configuration like ["error", {...options}]
@@ -335,6 +368,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/no-confusing-void-expression", no_confusing_void_expression.NoConfusingVoidExpressionRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-duplicate-enum-values", no_duplicate_enum_values.NoDuplicateEnumValuesRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-duplicate-type-constituents", no_duplicate_type_constituents.NoDuplicateTypeConstituentsRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/no-dynamic-delete", no_dynamic_delete.NoDynamicDeleteRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-explicit-any", no_explicit_any.NoExplicitAnyRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-empty-function", no_empty_function.NoEmptyFunctionRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-empty-interface", no_empty_interface.NoEmptyInterfaceRule)
@@ -437,16 +471,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-loss-of-precision", no_loss_of_precision.NoLossOfPrecisionRule)
 	GlobalRuleRegistry.Register("no-template-curly-in-string", no_template_curly_in_string.NoTemplateCurlyInString)
 	GlobalRuleRegistry.Register("no-sparse-arrays", no_sparse_arrays.NoSparseArraysRule)
-}
-
-// getAllTypeScriptEslintPluginRules returns all rules from the global registry.
-func getAllTypeScriptEslintPluginRules() []rule.Rule {
-	allRules := GlobalRuleRegistry.GetAllRules()
-	var rules []rule.Rule
-	for _, rule := range allRules {
-		rules = append(rules, rule)
-	}
-	return rules
+	GlobalRuleRegistry.Register("prefer-const", prefer_const.PreferConstRule)
 }
 
 func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {
@@ -458,14 +483,16 @@ func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {
 	normalizedPath := normalizePath(filePath, cwd)
 
 	for _, pattern := range ignorePatterns {
+		normalizedPattern := normalizePattern(pattern)
+
 		// Try matching against normalized path
-		if matched, err := doublestar.Match(pattern, normalizedPath); err == nil && matched {
+		if matched, err := doublestar.Match(normalizedPattern, normalizedPath); err == nil && matched {
 			return true
 		}
 
 		// Also try matching against original path for absolute patterns
 		if normalizedPath != filePath {
-			if matched, err := doublestar.Match(pattern, filePath); err == nil && matched {
+			if matched, err := doublestar.Match(normalizedPattern, filePath); err == nil && matched {
 				return true
 			}
 		}
@@ -473,12 +500,19 @@ func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {
 		// Try Unix-style path for cross-platform compatibility
 		unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
 		if unixPath != normalizedPath {
-			if matched, err := doublestar.Match(pattern, unixPath); err == nil && matched {
+			if matched, err := doublestar.Match(normalizedPattern, unixPath); err == nil && matched {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+// normalizePattern cleans up a glob pattern to match paths produced by normalizePath.
+// normalizePath uses tspath.NormalizePath on file paths (strips leading "./", collapses
+// "/./", resolves ".."), so patterns must undergo the same transformation.
+func normalizePattern(pattern string) string {
+	return tspath.NormalizePath(pattern)
 }
 
 // normalizePath converts file path to be relative to cwd for consistent matching
@@ -492,7 +526,8 @@ func normalizePath(filePath, cwd string) string {
 // isFileIgnoredSimple provides fallback matching when cwd is unavailable
 func isFileIgnoredSimple(filePath string, ignorePatterns []string) bool {
 	for _, pattern := range ignorePatterns {
-		if matched, err := doublestar.Match(pattern, filePath); err == nil && matched {
+		normalizedPattern := normalizePattern(pattern)
+		if matched, err := doublestar.Match(normalizedPattern, filePath); err == nil && matched {
 			return true
 		}
 	}
@@ -504,6 +539,7 @@ type MergedConfig struct {
 	Rules           map[string]*RuleConfig
 	Settings        Settings
 	LanguageOptions *LanguageOptions
+	Plugins         map[string]struct{}
 }
 
 // GetConfigForFile computes the merged configuration for a file following ESLint flat config semantics.
@@ -514,7 +550,8 @@ type MergedConfig struct {
 // for files/ignores glob matching.
 func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *MergedConfig {
 	merged := &MergedConfig{
-		Rules: make(map[string]*RuleConfig),
+		Rules:   make(map[string]*RuleConfig),
+		Plugins: make(map[string]struct{}),
 	}
 
 	// Track whether any non-global entry matched this file
@@ -562,7 +599,12 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 			}
 		}
 
-		// 5. Settings: shallow merge
+		// 5. Plugins: union from all matching entries (normalized to rule prefix form)
+		for _, plugin := range entry.Plugins {
+			merged.Plugins[NormalizePluginName(plugin)] = struct{}{}
+		}
+
+		// 6. Settings: shallow merge
 		if entry.Settings != nil {
 			if merged.Settings == nil {
 				merged.Settings = make(Settings)
@@ -572,7 +614,7 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 			}
 		}
 
-		// 6. LanguageOptions: deep merge
+		// 7. LanguageOptions: deep merge
 		merged.LanguageOptions = mergeLanguageOptions(merged.LanguageOptions, entry.LanguageOptions)
 	}
 
@@ -605,17 +647,19 @@ func isFileMatched(filePath string, patterns []string, cwd string) bool {
 	}
 
 	for _, pattern := range patterns {
-		if matched, err := doublestar.Match(pattern, normalizedPath); err == nil && matched {
+		normalizedPattern := normalizePattern(pattern)
+
+		if matched, err := doublestar.Match(normalizedPattern, normalizedPath); err == nil && matched {
 			return true
 		}
 		if normalizedPath != filePath {
-			if matched, err := doublestar.Match(pattern, filePath); err == nil && matched {
+			if matched, err := doublestar.Match(normalizedPattern, filePath); err == nil && matched {
 				return true
 			}
 		}
 		unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
 		if unixPath != normalizedPath {
-			if matched, err := doublestar.Match(pattern, unixPath); err == nil && matched {
+			if matched, err := doublestar.Match(normalizedPattern, unixPath); err == nil && matched {
 				return true
 			}
 		}
@@ -649,6 +693,18 @@ func mergeLanguageOptions(base, override *LanguageOptions) *LanguageOptions {
 	return &merged
 }
 
+// RulePluginPrefix extracts the plugin prefix from a rule name.
+// "@typescript-eslint/no-explicit-any" → "@typescript-eslint"
+// "import/no-unresolved" → "import"
+// "no-debugger" → "" (core rule)
+func RulePluginPrefix(ruleName string) string {
+	lastSlash := strings.LastIndex(ruleName, "/")
+	if lastSlash < 0 {
+		return ""
+	}
+	return ruleName[:lastSlash]
+}
+
 // GetPluginRules returns only rules under the given plugin namespace (prefix match).
 func GetPluginRules(pluginName string) []rule.Rule {
 	prefix := pluginName + "/"
@@ -672,87 +728,5 @@ func GetCoreRules() []rule.Rule {
 	return rules
 }
 
-const defaultTSConfig = `import { defineConfig, ts } from '@rslint/core';
-
-export default defineConfig([
-  ts.configs.recommended,
-  {
-    rules: {
-      // customize rules here
-    },
-  },
-]);
-`
-
-const defaultJSConfig = `import { defineConfig, js } from '@rslint/core';
-
-export default defineConfig([
-  js.configs.recommended,
-  {
-    rules: {
-      // customize rules here
-    },
-  },
-]);
-`
-
-// isESMPackage checks if the package.json in the given directory has "type": "module".
-func isESMPackage(directory string) bool {
-	data, err := os.ReadFile(filepath.Join(directory, "package.json"))
-	if err != nil {
-		return false
-	}
-	var pkg struct {
-		Type string `json:"type"`
-	}
-	if err := json.Unmarshal(data, &pkg); err != nil {
-		return false
-	}
-	return pkg.Type == "module"
-}
-
-// InitDefaultConfig initializes a default config file in the directory.
-// - If tsconfig.json exists → rslint.config.ts (ESM syntax, handled by TS loaders)
-// - Otherwise, follows the ESLint convention based on package.json "type" field:
-//   - "type": "module" → rslint.config.js  (ESM syntax, .js is ESM in this context)
-//   - no "type": "module" → rslint.config.mjs (ESM syntax, .mjs is always ESM)
-func InitDefaultConfig(directory string) error {
-	allConfigs := []string{
-		"rslint.config.ts", "rslint.config.mts",
-		"rslint.config.js", "rslint.config.mjs",
-		"rslint.json", "rslint.jsonc",
-	}
-	for _, name := range allConfigs {
-		p := filepath.Join(directory, name)
-		if _, err := os.Stat(p); err == nil {
-			return fmt.Errorf("config file already exists: %s", name)
-		}
-	}
-
-	tsconfigPath := filepath.Join(directory, "tsconfig.json")
-	if _, err := os.Stat(tsconfigPath); err == nil {
-		configPath := filepath.Join(directory, "rslint.config.ts")
-		if err := os.WriteFile(configPath, []byte(defaultTSConfig), 0644); err != nil {
-			return fmt.Errorf("failed to create rslint.config.ts: %w", err)
-		}
-		fmt.Println("Created rslint.config.ts with TypeScript recommended config.")
-	} else {
-		// Use .js when the project is ESM ("type": "module" in package.json),
-		// otherwise .mjs to ensure Node.js treats the file as ESM regardless.
-		var configName, content string
-		if isESMPackage(directory) {
-			configName = "rslint.config.js"
-			content = defaultJSConfig
-		} else {
-			configName = "rslint.config.mjs"
-			content = defaultJSConfig
-		}
-		configPath := filepath.Join(directory, configName)
-		if err := os.WriteFile(configPath, []byte(content), 0644); err != nil {
-			return fmt.Errorf("failed to create %s: %w", configName, err)
-		}
-		fmt.Printf("Created %s with JavaScript recommended config.\n", configName)
-	}
-
-	return nil
-}
+// InitDefaultConfig, createDefaultConfig, migrateJSONConfig and related helpers
+// are in config_init.go.

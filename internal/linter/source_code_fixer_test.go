@@ -281,6 +281,79 @@ func TestApplyRuleFixes(t *testing.T) {
 	}
 }
 
+func TestApplyRuleFixes_UnsortedDiagnostics(t *testing.T) {
+	// Diagnostics provided in reverse position order — should be sorted internally
+	code := "aaa bbb ccc"
+	diagnostics := []mockDiagnostic{
+		newMockDiagnostic(newReplaceFix(8, 11, "CCC")), // last
+		newMockDiagnostic(newReplaceFix(0, 3, "AAA")),  // first
+		newMockDiagnostic(newReplaceFix(4, 7, "BBB")),  // middle
+	}
+	result, unapplied, fixed := ApplyRuleFixes(code, diagnostics)
+	if result != "AAA BBB CCC" {
+		t.Errorf("got %q, want %q", result, "AAA BBB CCC")
+	}
+	if len(unapplied) != 0 {
+		t.Errorf("unapplied = %d, want 0", len(unapplied))
+	}
+	if !fixed {
+		t.Error("expected fixed = true")
+	}
+}
+
+func TestApplyRuleFixes_UnsortedFixesWithinDiagnostic(t *testing.T) {
+	// Single diagnostic with multiple fixes in reverse order
+	code := "function foo() { return bar(); }"
+	diagnostics := []mockDiagnostic{
+		// Fixes given in reverse order: await at 24, async at 0
+		newMockDiagnostic(newInsertFix(24, "await "), newInsertFix(0, "async ")),
+	}
+	result, _, fixed := ApplyRuleFixes(code, diagnostics)
+	expected := "async function foo() { return await bar(); }"
+	if result != expected {
+		t.Errorf("got %q, want %q", result, expected)
+	}
+	if !fixed {
+		t.Error("expected fixed = true")
+	}
+}
+
+func TestApplyRuleFixes_ReplaceEntireContent(t *testing.T) {
+	code := "old content here"
+	diagnostics := []mockDiagnostic{
+		newMockDiagnostic(newReplaceFix(0, len(code), "new content")),
+	}
+	result, unapplied, fixed := ApplyRuleFixes(code, diagnostics)
+	if result != "new content" {
+		t.Errorf("got %q, want %q", result, "new content")
+	}
+	if len(unapplied) != 0 {
+		t.Errorf("unapplied = %d, want 0", len(unapplied))
+	}
+	if !fixed {
+		t.Error("expected fixed = true")
+	}
+}
+
+func TestApplyRuleFixes_MixedWithAndWithoutFixes(t *testing.T) {
+	code := "var x = 1;"
+	diagnostics := []mockDiagnostic{
+		{fixes: []rule.RuleFix{}},                       // no fix → unapplied
+		newMockDiagnostic(newReplaceFix(0, 3, "const")), // has fix → applied
+		{fixes: []rule.RuleFix{}},                       // no fix → unapplied
+	}
+	result, unapplied, fixed := ApplyRuleFixes(code, diagnostics)
+	if result != "const x = 1;" {
+		t.Errorf("got %q, want %q", result, "const x = 1;")
+	}
+	if len(unapplied) != 2 {
+		t.Errorf("unapplied = %d, want 2", len(unapplied))
+	}
+	if !fixed {
+		t.Error("expected fixed = true")
+	}
+}
+
 // TestApplyRuleFixes_DuplicateInsertionRegression is a regression test for issue #451
 // where multiple diagnostics at the same position caused "async async async" to be inserted
 func TestApplyRuleFixes_DuplicateInsertionRegression(t *testing.T) {

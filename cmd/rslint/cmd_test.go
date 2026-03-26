@@ -583,3 +583,59 @@ func TestReportSyntacticErrorsNonSyntactic(t *testing.T) {
 		t.Fatal("Should not write anything for non-SyntacticError")
 	}
 }
+
+// ======== groupDiagsByFile tests ========
+
+func TestGroupDiagsByFile_Empty(t *testing.T) {
+	result := groupDiagsByFile(nil)
+	if len(result) != 0 {
+		t.Errorf("expected empty map for nil input, got %d entries", len(result))
+	}
+
+	result = groupDiagsByFile([]rule.RuleDiagnostic{})
+	if len(result) != 0 {
+		t.Errorf("expected empty map for empty input, got %d entries", len(result))
+	}
+}
+
+func TestGroupDiagsByFile_SingleFile(t *testing.T) {
+	source := "const x = 1;\nconst y = 2;\n"
+	d1, _ := createTestDiagnostic(t, source, 0, 5)
+	// Create a second diagnostic from the SAME source file
+	d2 := d1
+	d2.Range = core.NewTextRange(13, 18)
+	d2.Message = rule.RuleMessage{Id: "test2", Description: "Second diagnostic"}
+
+	result := groupDiagsByFile([]rule.RuleDiagnostic{d1, d2})
+
+	if len(result) != 1 {
+		t.Fatalf("expected 1 file group, got %d", len(result))
+	}
+
+	for _, diags := range result {
+		if len(diags) != 2 {
+			t.Errorf("expected 2 diagnostics in group, got %d", len(diags))
+		}
+	}
+}
+
+func TestGroupDiagsByFile_MultipleFiles(t *testing.T) {
+	// Create diagnostics from two different temp directories (different files)
+	sourceA := "const a = 1;"
+	sourceB := "const b = 2;"
+	dA, _ := createTestDiagnostic(t, sourceA, 0, 5)
+	dB, _ := createTestDiagnostic(t, sourceB, 0, 5)
+
+	result := groupDiagsByFile([]rule.RuleDiagnostic{dA, dB})
+
+	// Each diagnostic comes from a different temp dir → different file names
+	if len(result) != 2 {
+		t.Fatalf("expected 2 file groups, got %d", len(result))
+	}
+
+	for _, diags := range result {
+		if len(diags) != 1 {
+			t.Errorf("expected 1 diagnostic per file, got %d", len(diags))
+		}
+	}
+}

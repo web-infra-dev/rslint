@@ -24,6 +24,7 @@ type Rule = {
   group: string;
   status: string;
   failing_case: FailingCase[];
+  docPath: string | null;
 };
 
 type RuleStateDescribe = {
@@ -32,12 +33,26 @@ type RuleStateDescribe = {
   style: 'full' | 'partial-impl' | 'partial-test' | 'total';
 };
 
-function getRuleUrl(rule: Rule): string {
-  if (rule.group === '@typescript-eslint') {
-    return `https://typescript-eslint.io/rules/${rule.name}`;
+function groupToRouteSlug(group: string): string {
+  return group.replace(/^@/, '');
+}
+
+function getRuleUrl(rule: Rule): { url: string; isInternal: boolean } {
+  if (rule.docPath) {
+    const slug = groupToRouteSlug(rule.group);
+    return { url: `/rules/${slug}/${rule.name}`, isInternal: true };
   }
-  // https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/no-self-import.md
-  return `https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/${rule.name}.md`;
+  // Fallback to external docs for rules without local documentation
+  if (rule.group === '@typescript-eslint') {
+    return {
+      url: `https://typescript-eslint.io/rules/${rule.name}`,
+      isInternal: false,
+    };
+  }
+  return {
+    url: `https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/${rule.name}.md`,
+    isInternal: false,
+  };
 }
 
 // Statistics card component
@@ -177,7 +192,12 @@ const RuleImplementationStatus: React.FC = () => {
                       <Button
                         variant="link"
                         onClick={() => {
-                          window.open(getRuleUrl(rule), '_blank');
+                          const { url, isInternal } = getRuleUrl(rule);
+                          if (isInternal) {
+                            window.location.href = url;
+                          } else {
+                            window.open(url, '_blank');
+                          }
                         }}
                         className="p-0"
                       >

@@ -6,8 +6,15 @@ export default defineConfig({
   include: [
     // cli
     './tests/cli/basic.test.ts',
+    './tests/cli/file-args.test.ts',
     './tests/cli/disable-comments.test.ts',
-    './tests/cli/js-config.test.ts',
+    './tests/cli/js-config/normalize-config.test.ts',
+    './tests/cli/js-config/load-config.test.ts',
+    './tests/cli/js-config/cli-integration.test.ts',
+    './tests/cli/js-config/plugin-enforcement.test.ts',
+    './tests/cli/js-config/presets.test.ts',
+    './tests/cli/js-config/config-discovery.test.ts',
+    './tests/cli/js-config/dir-args.test.ts',
 
     // eslint
     './tests/eslint/rules/default-case.test.ts',
@@ -21,7 +28,9 @@ export default defineConfig({
     './tests/eslint/rules/getter-return.test.ts',
     './tests/eslint/rules/no-loss-of-precision.test.ts',
     './tests/eslint/rules/no-ex-assign.test.ts',
+    './tests/eslint/rules/no-constant-binary-expression.test.ts',
 
+    './tests/eslint/rules/prefer-const.test.ts',
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
     './tests/eslint-plugin-import/rules/no-webpack-loader-syntax.test.ts',
@@ -95,7 +104,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/no-dupe-class-members.test.ts',
     './tests/typescript-eslint/rules/no-duplicate-enum-values.test.ts',
     './tests/typescript-eslint/rules/no-duplicate-type-constituents.test.ts',
-    // './tests/typescript-eslint/rules/no-dynamic-delete.test.ts',
+    './tests/typescript-eslint/rules/no-dynamic-delete.test.ts',
     './tests/typescript-eslint/rules/no-empty-function.test.ts',
     './tests/typescript-eslint/rules/no-empty-interface.test.ts',
     // './tests/typescript-eslint/rules/no-empty-object-type.test.ts',
@@ -153,6 +162,7 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/no-unused-expressions.test.ts',
     // './tests/typescript-eslint/rules/no-unused-vars/no-unused-vars-eslint.test.ts',
     // './tests/typescript-eslint/rules/no-unused-vars/no-unused-vars.test.ts',
+    './tests/typescript-eslint/rules/no-unused-vars/no-unused-vars-declare.test.ts',
     // './tests/typescript-eslint/rules/no-use-before-define.test.ts',
     // './tests/typescript-eslint/rules/no-useless-constructor.test.ts',
     // './tests/typescript-eslint/rules/no-useless-empty-export.test.ts',

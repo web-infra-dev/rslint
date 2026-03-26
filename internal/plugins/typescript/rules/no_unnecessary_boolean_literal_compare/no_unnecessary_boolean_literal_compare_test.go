@@ -291,7 +291,7 @@ function test(a?: boolean): boolean {
       `,
 			Output: []string{`
         declare const varBoolean: boolean;
-        if ( varBoolean) {
+        if (varBoolean) {
         }
       `,
 			},
@@ -309,7 +309,7 @@ function test(a?: boolean): boolean {
       `,
 			Output: []string{`
         declare const varBoolean: boolean;
-        if (! varBoolean) {
+        if (!varBoolean) {
         }
       `,
 			},
@@ -345,7 +345,7 @@ function test(a?: boolean): boolean {
       `,
 			Output: []string{`
         declare const x;
-        if (! (x instanceof Error)) {
+        if (!(x instanceof Error)) {
         }
       `,
 			},
@@ -417,7 +417,7 @@ function test(a?: boolean): boolean {
       `,
 			Output: []string{`
         declare const x;
-        if (!( x instanceof Error)) {
+        if (!(x instanceof Error)) {
         }
       `,
 			},
@@ -525,7 +525,7 @@ function test(a?: boolean): boolean {
       `,
 			Output: []string{`
         declare const varBoolean: boolean;
-        if ((varBoolean ?? false)) {
+        if (varBoolean ?? false) {
         }
       `,
 			},
@@ -610,6 +610,378 @@ function test(a?: boolean): boolean {
 			Errors: []rule_tester.InvalidTestCaseError{
 				{
 					MessageId: "negated",
+				},
+			},
+		},
+		// basic === true (most fundamental case)
+		{
+			Code: `
+        declare const varBoolean: boolean;
+        if (varBoolean === true) {
+        }
+      `,
+			Output: []string{`
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "direct",
+				},
+			},
+		},
+		// basic === false
+		{
+			Code: `
+        declare const varBoolean: boolean;
+        if (varBoolean === false) {
+        }
+      `,
+			Output: []string{`
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "direct",
+				},
+			},
+		},
+		// basic !== true
+		{
+			Code: `
+        declare const varBoolean: boolean;
+        if (varBoolean !== true) {
+        }
+      `,
+			Output: []string{`
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "negated",
+				},
+			},
+		},
+		// loose == true
+		{
+			Code: `
+        declare const varBoolean: boolean;
+        if (varBoolean == true) {
+        }
+      `,
+			Output: []string{`
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "direct",
+				},
+			},
+		},
+		// loose == false
+		{
+			Code: `
+        declare const varBoolean: boolean;
+        if (varBoolean == false) {
+        }
+      `,
+			Output: []string{`
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "direct",
+				},
+			},
+		},
+		// loose != true
+		{
+			Code: `
+        declare const varBoolean: boolean;
+        if (varBoolean != true) {
+        }
+      `,
+			Output: []string{`
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "negated",
+				},
+			},
+		},
+		// loose != false
+		{
+			Code: `
+        declare const varBoolean: boolean;
+        if (varBoolean != false) {
+        }
+      `,
+			Output: []string{`
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "negated",
+				},
+			},
+		},
+		// loose == with literal on left
+		{
+			Code: `
+        declare const varBoolean: boolean;
+        if (true == varBoolean) {
+        }
+      `,
+			Output: []string{`
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "direct",
+				},
+			},
+		},
+		// strict === with true literal on left
+		{
+			Code: `
+        declare const varBoolean: boolean;
+        if (true === varBoolean) {
+        }
+      `,
+			Output: []string{`
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "direct",
+				},
+			},
+		},
+		// strict === with false literal on left
+		{
+			Code: `
+        declare const varBoolean: boolean;
+        if (false === varBoolean) {
+        }
+      `,
+			Output: []string{`
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "direct",
+				},
+			},
+		},
+		// loose == with false literal on left
+		{
+			Code: `
+        declare const varBoolean: boolean;
+        if (false == varBoolean) {
+        }
+      `,
+			Output: []string{`
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "direct",
+				},
+			},
+		},
+		// loose != with true literal on left
+		{
+			Code: `
+        declare const varBoolean: boolean;
+        if (true != varBoolean) {
+        }
+      `,
+			Output: []string{`
+        declare const varBoolean: boolean;
+        if (!varBoolean) {
+        }
+      `,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "negated",
+				},
+			},
+		},
+		// loose != with false literal on left
+		{
+			Code: `
+        declare const varBoolean: boolean;
+        if (false != varBoolean) {
+        }
+      `,
+			Output: []string{`
+        declare const varBoolean: boolean;
+        if (varBoolean) {
+        }
+      `,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "negated",
+				},
+			},
+		},
+		// literal false type
+		{
+			Code: `
+        declare const varFalse: false;
+        if (varFalse === false) {
+        }
+      `,
+			Output: []string{`
+        declare const varFalse: false;
+        if (!varFalse) {
+        }
+      `,
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "direct",
+				},
+			},
+		},
+		// both nullable options false — comparing to true
+		{
+			Code: `
+        declare const varBooleanOrNull: boolean | null;
+        if (varBooleanOrNull === true) {
+        }
+      `,
+			Output: []string{`
+        declare const varBooleanOrNull: boolean | null;
+        if (varBooleanOrNull) {
+        }
+      `,
+			},
+			Options: NoUnnecessaryBooleanLiteralCompareOptions{
+				AllowComparingNullableBooleansToTrue:  utils.Ref(false),
+				AllowComparingNullableBooleansToFalse: utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "comparingNullableToTrueDirect",
+				},
+			},
+		},
+		// both nullable options false — comparing to false
+		{
+			Code: `
+        declare const varBooleanOrNull: boolean | null;
+        if (varBooleanOrNull === false) {
+        }
+      `,
+			Output: []string{`
+        declare const varBooleanOrNull: boolean | null;
+        if (!(varBooleanOrNull ?? true)) {
+        }
+      `,
+			},
+			Options: NoUnnecessaryBooleanLiteralCompareOptions{
+				AllowComparingNullableBooleansToTrue:  utils.Ref(false),
+				AllowComparingNullableBooleansToFalse: utils.Ref(false),
+			},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "comparingNullableToFalse",
+				},
+			},
+		},
+		// nullable with literal on left side
+		{
+			Code: `
+        declare const varBooleanOrUndefined: boolean | undefined;
+        if (true === varBooleanOrUndefined) {
+        }
+      `,
+			Output: []string{`
+        declare const varBooleanOrUndefined: boolean | undefined;
+        if (varBooleanOrUndefined) {
+        }
+      `,
+			},
+			Options: NoUnnecessaryBooleanLiteralCompareOptions{AllowComparingNullableBooleansToTrue: utils.Ref(false)},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "comparingNullableToTrueDirect",
+				},
+			},
+		},
+		// nullable with false literal on left side
+		{
+			Code: `
+        declare const varBooleanOrNull: boolean | null;
+        if (false === varBooleanOrNull) {
+        }
+      `,
+			Output: []string{`
+        declare const varBooleanOrNull: boolean | null;
+        if (!(varBooleanOrNull ?? true)) {
+        }
+      `,
+			},
+			Options: NoUnnecessaryBooleanLiteralCompareOptions{AllowComparingNullableBooleansToFalse: utils.Ref(false)},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "comparingNullableToFalse",
+				},
+			},
+		},
+		// nullable + unary negation + !== false: both ! and ?? true blocks fire
+		{
+			Code: `
+        declare const varBooleanOrNull: boolean | null;
+        if (!(varBooleanOrNull !== false)) {
+        }
+      `,
+			Output: []string{`
+        declare const varBooleanOrNull: boolean | null;
+        if (!(varBooleanOrNull ?? true)) {
+        }
+      `,
+			},
+			Options: NoUnnecessaryBooleanLiteralCompareOptions{AllowComparingNullableBooleansToFalse: utils.Ref(false)},
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "comparingNullableToFalse",
 				},
 			},
 		},

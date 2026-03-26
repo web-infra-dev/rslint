@@ -9,6 +9,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"path/filepath"
 	"runtime"
 	"runtime/pprof"
 	"runtime/trace"
@@ -27,10 +28,8 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/bundled"
 	"github.com/microsoft/typescript-go/shim/compiler"
-	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
-	"github.com/microsoft/typescript-go/shim/vfs"
 	"github.com/microsoft/typescript-go/shim/vfs/cachedvfs"
 	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
@@ -410,7 +409,7 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 const usage = `🚀 Rslint - Rocket Speed Linter
 
 Usage:
-  rslint [OPTIONS]
+  rslint [OPTIONS] [files...]
 
 Options:
   --init                Initialize a default config in the current directory.
@@ -423,6 +422,46 @@ Options:
   --max-warnings Int    Number of warnings to trigger nonzero exit code
   -h, --help            Show help
 `
+
+// groupDiagsByFile groups a flat slice of diagnostics by their source file name.
+func groupDiagsByFile(diags []rule.RuleDiagnostic) map[string][]rule.RuleDiagnostic {
+	m := make(map[string][]rule.RuleDiagnostic)
+	for _, d := range diags {
+		f := d.SourceFile.FileName()
+		m[f] = append(m[f], d)
+	}
+	return m
+}
+
+// applyFixPass applies auto-fixes for all files in diagnosticsByFile,
+// writes fixed content to disk, and returns the number of issues fixed.
+func applyFixPass(diagnosticsByFile map[string][]rule.RuleDiagnostic) int {
+	fixed := 0
+	for fileName, fileDiagnostics := range diagnosticsByFile {
+		var diagnosticsWithFixes []rule.RuleDiagnostic
+		for _, d := range fileDiagnostics {
+			if len(d.Fixes()) > 0 {
+				diagnosticsWithFixes = append(diagnosticsWithFixes, d)
+			}
+		}
+		if len(diagnosticsWithFixes) == 0 {
+			continue
+		}
+
+		originalContent := diagnosticsWithFixes[0].SourceFile.Text()
+		fixedContent, unapplied, wasFixed := linter.ApplyRuleFixes(originalContent, diagnosticsWithFixes)
+
+		if wasFixed {
+			err := os.WriteFile(fileName, []byte(fixedContent), 0644)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error writing fixed file %s: %v\n", fileName, err)
+			} else {
+				fixed += len(diagnosticsWithFixes) - len(unapplied)
+			}
+		}
+	}
+	return fixed
+}
 
 func runCMD() int {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
@@ -460,6 +499,31 @@ func runCMD() int {
 	flag.BoolVar(&singleThreaded, "singleThreaded", false, "run in single threaded mode")
 
 	flag.Parse()
+
+	// Collect file/directory arguments for targeted linting (e.g. rslint file1.ts src/)
+	var allowFiles []string
+	var allowDirs []string
+	if args := flag.Args(); len(args) > 0 {
+		for _, arg := range args {
+			absPath, err := filepath.Abs(arg)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "error resolving path %s: %v\n", arg, err)
+				return 1
+			}
+			// Resolve symlinks so paths are consistent with os.Getwd() and
+			// TypeScript's SourceFile.FileName() which both return real paths.
+			if resolved, err := filepath.EvalSymlinks(absPath); err == nil {
+				absPath = resolved
+			}
+			normalized := tspath.NormalizePath(absPath)
+			info, statErr := os.Stat(absPath)
+			if statErr == nil && info.IsDir() {
+				allowDirs = append(allowDirs, normalized)
+			} else {
+				allowFiles = append(allowFiles, normalized)
+			}
+		}
+	}
 
 	if help {
 		flag.Usage()
@@ -522,7 +586,12 @@ func runCMD() int {
 	// Initialize rule registry with all available rules
 	rslintconfig.RegisterAllRules()
 	var rslintConfig rslintconfig.RslintConfig
-	var tsConfigs []string
+
+	// configMap holds per-directory configs for multi-config (monorepo) support.
+	// Only populated in the configStdin path; nil otherwise (single-config mode).
+	var configMap map[string]rslintconfig.RslintConfig
+
+	programs := []*compiler.Program{}
 
 	if configStdin {
 		// Read config JSON from stdin (sent by JS config loader).
@@ -538,131 +607,124 @@ func runCMD() int {
 			return 1
 		}
 
-		var payload struct {
-			ConfigDirectory string                    `json:"configDirectory"`
-			Entries         rslintconfig.RslintConfig `json:"entries"`
-		}
-		if err := json.Unmarshal(data, &payload); err != nil {
-			fmt.Fprintf(os.Stderr, "error parsing config from stdin: %v\n", err)
+		payload, parseErr := parseConfigPayload(data)
+		if parseErr != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", parseErr)
 			return 1
 		}
 
-		rslintConfig = payload.Entries
-		currentDirectory = payload.ConfigDirectory
+		if payload.IsMultiConfig {
+			// Multi-config format
+			configMap = payload.ConfigMap
+			seenTsConfigs := make(map[string]struct{})
 
-		loader := rslintconfig.NewConfigLoader(fs, currentDirectory)
-		tsConfigs, err = loader.LoadTsConfigsFromRslintConfig(rslintConfig, currentDirectory)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
-			return 1
+			for configDir, entries := range configMap {
+				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seenTsConfigs)
+				if exitCode != 0 {
+					return exitCode
+				}
+				programs = append(programs, progs...)
+			}
+		} else {
+			// Legacy single-config format
+			rslintConfig = payload.SingleConfig
+			currentDirectory = payload.SingleConfigDir
+
+			progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil)
+			if exitCode != 0 {
+				return exitCode
+			}
+			programs = append(programs, progs...)
 		}
 	} else {
 		// Load configuration from file (JSON config path, isJSConfig stays false)
-		rslintConfig, tsConfigs, currentDirectory = rslintconfig.LoadConfigurationWithFallback(config, currentDirectory, fs)
-	}
+		rslintConfig, _, currentDirectory = rslintconfig.LoadConfigurationWithFallback(config, currentDirectory, fs)
 
-	// When no tsconfig is specified in rslint config, auto-detect tsconfig.json in the working directory.
-	if len(tsConfigs) == 0 {
-		defaultTsConfig := tspath.ResolvePath(currentDirectory, "tsconfig.json")
-		if fs.FileExists(defaultTsConfig) {
-			tsConfigs = []string{defaultTsConfig}
+		progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil)
+		if exitCode != 0 {
+			return exitCode
 		}
+		programs = append(programs, progs...)
 	}
 
-	host := utils.CreateCompilerHost(currentDirectory, fs)
+	// Use CWD for display paths (not any config directory).
+	// In multi-config mode, currentDirectory was never reassigned from os.Getwd(),
+	// so it already holds the normalized CWD.
+	cwd := currentDirectory
 
 	comparePathOptions := tspath.ComparePathsOptions{
-		CurrentDirectory:          host.GetCurrentDirectory(),
-		UseCaseSensitiveFileNames: host.FS().UseCaseSensitiveFileNames(),
-	}
-	programs := []*compiler.Program{}
-	if len(tsConfigs) > 0 {
-		for _, configFileName := range tsConfigs {
-			program, err := utils.CreateProgram(singleThreaded, fs, currentDirectory, configFileName, host)
-			if err != nil {
-				w := bufio.NewWriter(os.Stderr)
-				if !reportSyntacticErrors(err, w, comparePathOptions) {
-					fmt.Fprintf(os.Stderr, "error creating TS program: %v", err)
-				}
-				return 1
-			}
-			programs = append(programs, program)
-		}
-	} else {
-		// No tsconfig available — create program in memory for pure JS projects.
-		sourceExts := []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".mjs"}
-		excludes := []string{"node_modules"}
-		includes := []string{"**/*"}
-		rootFiles := vfs.ReadDirectory(fs, currentDirectory, currentDirectory, sourceExts, excludes, includes, nil)
-		if len(rootFiles) > 0 {
-			program, err := utils.CreateProgramFromOptions(singleThreaded, &core.CompilerOptions{AllowJs: core.TSTrue}, rootFiles, host)
-			if err != nil {
-				w := bufio.NewWriter(os.Stderr)
-				if !reportSyntacticErrors(err, w, comparePathOptions) {
-					fmt.Fprintf(os.Stderr, "error creating program: %v", err)
-				}
-				return 1
-			}
-			programs = append(programs, program)
-		}
+		CurrentDirectory:          cwd,
+		UseCaseSensitiveFileNames: fs.UseCaseSensitiveFileNames(),
 	}
 
-	var wg sync.WaitGroup
+	// No args → implicit CWD scoping (same as `rslint .`).
+	// Only applies to multi-config stdin path. In this mode, configs may include
+	// parent or nested configs, so Programs may contain files outside CWD.
+	// Without scoping, all those files would be linted unexpectedly.
+	if len(allowFiles) == 0 && len(allowDirs) == 0 && configStdin && configMap != nil {
+		allowDirs = []string{cwd}
+	}
 
-	diagnosticsChan := make(chan rule.RuleDiagnostic, 4096)
-	errorsCount := 0
-	warningsCount := 0
+	// createPrograms rebuilds programs (needed for multi-pass --fix re-linting).
+	createPrograms := func() ([]*compiler.Program, error) {
+		if configMap != nil {
+			var allProgs []*compiler.Program
+			seen := make(map[string]struct{})
+			for configDir, entries := range configMap {
+				progs, exitCode := createProgramsForConfig(configDir, entries, singleThreaded, fs, seen)
+				if exitCode != 0 {
+					return nil, fmt.Errorf("failed to create programs for %s", configDir)
+				}
+				allProgs = append(allProgs, progs...)
+			}
+			return allProgs, nil
+		}
+		progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil)
+		if exitCode != 0 {
+			return nil, errors.New("failed to create programs")
+		}
+		return progs, nil
+	}
+
+	// Phase 1: Collect all diagnostics (no printing yet).
+	// Like ESLint, diagnostics are collected first, then printed at the end.
+	// This ensures --fix only shows remaining unfixed issues.
+	var allDiags []rule.RuleDiagnostic
+	var diagsMu sync.Mutex
 	fixedCount := 0
 
-	// Store diagnostics by file for fixing
-	var diagnosticsByFile map[string][]rule.RuleDiagnostic
-	if fix {
-		diagnosticsByFile = make(map[string][]rule.RuleDiagnostic)
-	}
-
+	diagnosticsChan := make(chan rule.RuleDiagnostic, 4096)
+	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		w := bufio.NewWriterSize(os.Stdout, 4096*100)
-		defer w.Flush()
 		for d := range diagnosticsChan {
-			switch d.Severity {
-			case rule.SeverityError:
-				errorsCount++
-			case rule.SeverityWarning:
-				warningsCount++
-			}
-
-			// Store diagnostics by file for fixing
-			if fix {
-				fileName := d.SourceFile.FileName()
-				diagnosticsByFile[fileName] = append(diagnosticsByFile[fileName], d)
-			}
-
-			if errorsCount+warningsCount == 1 {
-				w.WriteByte('\n')
-			}
-			// Only print Error message when quiet is true
-			if quiet && d.Severity != rule.SeverityError {
-				continue
-			}
-			printDiagnostic(d, w, comparePathOptions, format)
-			if w.Available() < 4096 {
-				w.Flush()
-			}
+			allDiags = append(allDiags, d)
 		}
 	}()
+
+	enforcePlugins := configStdin // JS/TS configs loaded via stdin require plugin declarations
+	getRulesForFile := func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
+		filePath := sourceFile.FileName()
+		if configMap != nil {
+			cfgDir, cfg := rslintconfig.FindNearestConfig(filePath, configMap)
+			if cfg == nil {
+				return nil
+			}
+			activeRules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(cfg, filePath, cfgDir, enforcePlugins)
+			return activeRules
+		}
+		activeRules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, filePath, currentDirectory, enforcePlugins)
+		return activeRules
+	}
 
 	lintedfileCount, err := linter.RunLinter(
 		programs,
 		singleThreaded,
-		nil,
+		allowFiles,
+		allowDirs,
 		utils.ExcludePaths,
-
-		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
-			activeRules, _ := rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), currentDirectory)
-			return activeRules
-		},
+		getRulesForFile,
 		func(d rule.RuleDiagnostic) {
 			diagnosticsChan <- d
 		},
@@ -676,36 +738,101 @@ func runCMD() int {
 
 	wg.Wait()
 
-	// Apply fixes if --fix flag is enabled
-	if fix && len(diagnosticsByFile) > 0 {
-		for fileName, fileDiagnostics := range diagnosticsByFile {
-			// Only apply fixes for diagnostics that have fixes
-			diagnosticsWithFixes := make([]rule.RuleDiagnostic, 0)
-			for _, d := range fileDiagnostics {
-				if len(d.Fixes()) > 0 {
-					diagnosticsWithFixes = append(diagnosticsWithFixes, d)
-				}
+	// Emit per-file warnings for files not found in any tsconfig program.
+	// This avoids breaking lint-staged workflows where config files (e.g. rslint.config.ts)
+	// that are not included in tsconfig.json get passed to rslint as arguments.
+	// Warnings are written to stderr (not lint diagnostics), so they do not affect
+	// --max-warnings and stay visible even under --quiet.
+	if len(allowFiles) > 0 {
+		programFiles := make(map[string]struct{})
+		for _, prog := range programs {
+			for _, sf := range prog.GetSourceFiles() {
+				programFiles[sf.FileName()] = struct{}{}
 			}
-
-			if len(diagnosticsWithFixes) > 0 {
-				// Read the original file content
-				originalContent := diagnosticsWithFixes[0].SourceFile.Text()
-
-				// Apply fixes
-				fixedContent, unapplied, wasFixed := linter.ApplyRuleFixes(originalContent, diagnosticsWithFixes)
-
-				if wasFixed {
-					// Write the fixed content back to the file
-					err := os.WriteFile(fileName, []byte(fixedContent), 0644)
-					if err != nil {
-						fmt.Fprintf(os.Stderr, "error writing fixed file %s: %v\n", fileName, err)
-					} else {
-						fixedCount += len(diagnosticsWithFixes) - len(unapplied)
-					}
-				}
+		}
+		for _, f := range allowFiles {
+			if _, found := programFiles[f]; !found {
+				fmt.Fprintf(os.Stderr, "warning: %s was not found in the project, skipping\n", f)
 			}
 		}
 	}
+	if (len(allowFiles) > 0 || len(allowDirs) > 0) && lintedfileCount == 0 {
+		return 0
+	}
+
+	// Phase 2: Apply fixes if --fix flag is enabled.
+	// Uses multi-pass fixing: after applying fixes, rebuild programs and re-lint
+	// to catch cascading issues (e.g. ban-types fix triggers no-inferrable-types).
+	// After fixing, allDiags is replaced with remaining (unfixed) diagnostics.
+	const maxFixPasses = 10
+	if fix && len(allDiags) > 0 {
+		diagnosticsByFile := groupDiagsByFile(allDiags)
+		fixedCount += applyFixPass(diagnosticsByFile)
+
+		// Re-lint → fix → re-lint → fix → ... until stable or maxFixPasses.
+		// Skip if nothing was fixed in the first pass (no need to re-lint).
+		for pass := 1; pass < maxFixPasses && fixedCount > 0; pass++ {
+			newPrograms, err := createPrograms()
+			if err != nil || len(newPrograms) == 0 {
+				break
+			}
+
+			// Re-lint: collect remaining diagnostics.
+			var passDiags []rule.RuleDiagnostic
+			linter.RunLinter(
+				newPrograms,
+				singleThreaded,
+				allowFiles,
+				allowDirs,
+				utils.ExcludePaths,
+				getRulesForFile,
+				func(d rule.RuleDiagnostic) {
+					diagsMu.Lock()
+					passDiags = append(passDiags, d)
+					diagsMu.Unlock()
+				},
+			)
+
+			// Replace allDiags with latest post-fix diagnostics.
+			allDiags = passDiags
+
+			passFixed := applyFixPass(groupDiagsByFile(passDiags))
+			if passFixed == 0 {
+				break // Stable — allDiags reflect final state
+			}
+			fixedCount += passFixed
+		}
+	}
+
+	// Phase 3: Print diagnostics and count errors/warnings.
+	// allDiags contains: original diagnostics (no fix), or remaining after fix.
+	errorsCount := 0
+	warningsCount := 0
+	{
+		w := bufio.NewWriterSize(os.Stdout, 4096*100)
+		for i, d := range allDiags {
+			switch d.Severity {
+			case rule.SeverityError:
+				errorsCount++
+			case rule.SeverityWarning:
+				warningsCount++
+			}
+
+			if i == 0 {
+				w.WriteByte('\n')
+			}
+			// Only print Error message when quiet is true
+			if quiet && d.Severity != rule.SeverityError {
+				continue
+			}
+			printDiagnostic(d, w, comparePathOptions, format)
+			if w.Available() < 4096 {
+				w.Flush()
+			}
+		}
+		w.Flush()
+	}
+
 
 	colors := setupColors()
 	var errorsColorFunc func(string, ...interface{}) string

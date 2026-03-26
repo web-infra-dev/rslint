@@ -2,6 +2,7 @@ package linter
 
 import (
 	"context"
+	"os"
 	"strings"
 	"sync/atomic"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/tspath"
 )
 
 type ConfiguredRule struct {
@@ -19,9 +21,62 @@ type ConfiguredRule struct {
 	Run      func(ctx rule.RuleContext) rule.RuleListeners
 }
 
-func RunLinterInProgram(program *compiler.Program, allowFiles []string, skipFiles []string, getRulesForFile RuleHandler, onDiagnostic DiagnosticHandler) int32 {
+// isFileAllowed checks if fileName matches any path in allowFiles.
+// It first tries fast string equality, then falls back to os.SameFile
+// (using pre-computed FileInfo) to handle symlinks (e.g. /var vs /private/var on macOS).
+func isFileAllowed(fileName string, allowFiles []string, allowFileInfos []os.FileInfo) bool {
+	for _, filePath := range allowFiles {
+		if filePath == fileName {
+			return true
+		}
+	}
+	// Fallback: compare by inode to handle directory symlinks
+	fileInfo, err := os.Stat(fileName)
+	if err != nil {
+		return false
+	}
+	for _, info := range allowFileInfos {
+		if os.SameFile(fileInfo, info) {
+			return true
+		}
+	}
+	return false
+}
+
+// precomputeAllowFileInfos collects os.FileInfo for each allowFile once,
+// so that isFileAllowed can use os.SameFile without repeated os.Stat calls.
+// Files that do not exist are silently skipped.
+func precomputeAllowFileInfos(allowFiles []string) []os.FileInfo {
+	infos := make([]os.FileInfo, 0, len(allowFiles))
+	for _, f := range allowFiles {
+		if info, err := os.Stat(f); err == nil {
+			infos = append(infos, info)
+		}
+	}
+	return infos
+}
+
+// isDirAllowed checks if fileName is inside any directory in allowDirs.
+// Uses tspath.StartsWithDirectory to correctly handle src/ vs src-other/.
+func isDirAllowed(fileName string, allowDirs []string) bool {
+	for _, dirPath := range allowDirs {
+		if tspath.StartsWithDirectory(fileName, dirPath, true) {
+			return true
+		}
+	}
+	return false
+}
+
+func RunLinterInProgram(program *compiler.Program, allowFiles []string, allowDirs []string, skipFiles []string, getRulesForFile RuleHandler, onDiagnostic DiagnosticHandler) int32 {
 	checker, done := program.GetTypeChecker(context.Background())
 	defer done()
+
+	// Pre-compute FileInfo for allowFiles once to avoid N×M stat calls in the loop.
+	var allowFileInfos []os.FileInfo
+	if allowFiles != nil {
+		allowFileInfos = precomputeAllowFileInfos(allowFiles)
+	}
+
 	var lintedFileCount int32 = 0
 	for _, file := range program.GetSourceFiles() {
 		p := string(file.Path())
@@ -37,17 +92,11 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, skipFile
 		if skipFile {
 			continue
 		}
-		// only lint allowedFiles if allowedFiles is not empty
-		if allowFiles != nil {
-			found := false
-			for _, filePath := range allowFiles {
-
-				if filePath == file.FileName() {
-					found = true
-					break
-				}
-			}
-			if !found {
+		// Filter by allowFiles / allowDirs (OR logic: match either one)
+		if allowFiles != nil || allowDirs != nil {
+			fileAllowed := allowFiles != nil && isFileAllowed(file.FileName(), allowFiles, allowFileInfos)
+			dirAllowed := allowDirs != nil && isDirAllowed(file.FileName(), allowDirs)
+			if !fileAllowed && !dirAllowed {
 				continue
 			}
 		}
@@ -114,26 +163,28 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, skipFile
 						})
 					},
 					ReportNode: func(node *ast.Node, msg rule.RuleMessage) {
-						// Check if rule is disabled at this position
-						if disableManager.IsRuleDisabled(r.Name, node.Pos()) {
+						// Trim leading trivia (comments/whitespace) so the line number
+						// matches the actual code, not a preceding disable comment.
+						trimmedRange := utils.TrimNodeTextRange(file, node)
+						if disableManager.IsRuleDisabled(r.Name, trimmedRange.Pos()) {
 							return
 						}
 						onDiagnostic(rule.RuleDiagnostic{
 							RuleName:   r.Name,
-							Range:      utils.TrimNodeTextRange(file, node),
+							Range:      trimmedRange,
 							Message:    msg,
 							SourceFile: file,
 							Severity:   r.Severity,
 						})
 					},
 					ReportNodeWithFixes: func(node *ast.Node, msg rule.RuleMessage, fixes ...rule.RuleFix) {
-						// Check if rule is disabled at this position
-						if disableManager.IsRuleDisabled(r.Name, node.Pos()) {
+						trimmedRange := utils.TrimNodeTextRange(file, node)
+						if disableManager.IsRuleDisabled(r.Name, trimmedRange.Pos()) {
 							return
 						}
 						onDiagnostic(rule.RuleDiagnostic{
 							RuleName:   r.Name,
-							Range:      utils.TrimNodeTextRange(file, node),
+							Range:      trimmedRange,
 							Message:    msg,
 							FixesPtr:   &fixes,
 							SourceFile: file,
@@ -142,13 +193,13 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, skipFile
 					},
 
 					ReportNodeWithSuggestions: func(node *ast.Node, msg rule.RuleMessage, suggestions ...rule.RuleSuggestion) {
-						// Check if rule is disabled at this position
-						if disableManager.IsRuleDisabled(r.Name, node.Pos()) {
+						trimmedRange := utils.TrimNodeTextRange(file, node)
+						if disableManager.IsRuleDisabled(r.Name, trimmedRange.Pos()) {
 							return
 						}
 						onDiagnostic(rule.RuleDiagnostic{
 							RuleName:    r.Name,
-							Range:       utils.TrimNodeTextRange(file, node),
+							Range:       trimmedRange,
 							Message:     msg,
 							Suggestions: &suggestions,
 							SourceFile:  file,
@@ -252,7 +303,8 @@ type DiagnosticHandler = func(diagnostic rule.RuleDiagnostic)
 
 // when allowedFiles is passed as nil which means all files are allowed
 // when allowedFiles is passed as slice, only files in the slice are allowed
-func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []string, excludedPaths []string, getRulesForFile RuleHandler, onDiagnostic DiagnosticHandler) (int32, error) {
+// when allowDirs is set, files under those directories are also allowed (OR logic with allowFiles)
+func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []string, allowDirs []string, excludedPaths []string, getRulesForFile RuleHandler, onDiagnostic DiagnosticHandler) (int32, error) {
 
 	wg := core.NewWorkGroup(singleThreaded)
 
@@ -260,7 +312,7 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []s
 	for _, program := range programs {
 		{
 			wg.Queue(func() {
-				fileCount := RunLinterInProgram(program, allowFiles, excludedPaths, getRulesForFile, onDiagnostic)
+				fileCount := RunLinterInProgram(program, allowFiles, allowDirs, excludedPaths, getRulesForFile, onDiagnostic)
 				lintedFileCount.Add(fileCount)
 			})
 		}

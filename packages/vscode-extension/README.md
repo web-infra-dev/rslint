@@ -43,6 +43,22 @@ Custom path to Rslint executable. Only used when `rslint.binPath` is set to `cus
 
 Traces the communication between VS Code and the language server.
 
+## 🔧 Auto-fix on Save
+
+To automatically fix lint issues when saving, add the following to your VS Code settings (`.vscode/settings.json`):
+
+```json
+{
+  "editor.codeActionsOnSave": {
+    "source.fixAll.rslint": "explicit"
+  }
+}
+```
+
+- `"explicit"` — Fix on manual save only (Ctrl+S / Cmd+S) — **recommended**
+- `"always"` — Fix on every save, including auto-save
+- `"never"` — Disable auto-fix on save
+
 ## 💬 Community
 
 Join our community:

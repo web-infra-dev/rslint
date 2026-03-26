@@ -1,6 +1,6 @@
 {
   "name": "rslint-monorepo",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "private": true,
   "description": "Rslint Monorepo",
   "homepage": "https://github.com/web-infra-dev/rslint#readme",
@@ -26,7 +26,7 @@
     "test": "pnpm -r --filter=!@typescript/api --filter=!@typescript/ast --filter='@rslint/test-tools...' --filter='rslint...' test",
     "test:go": "go test ./internal/...",
     "typecheck": "pnpm tsgo -b tsconfig.json",
-    "lint": "rslint",
+    "lint": "rslint --config rslint.config.ts",
     "lint:go": "golangci-lint run ./cmd/... ./internal/...",
     "format:go": "golangci-lint fmt ./cmd/... ./internal/...",
     "prepare": "husky",
@@ -36,8 +36,8 @@
     "@rslint/core": "workspace:*",
     "@rstest/core": "^0.9.2",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.6",
-    "prettier": "3.7.4",
+    "lint-staged": "^16.4.0",
+    "prettier": "3.8.1",
     "typescript": "5.9.3",
     "zx": "8.8.5",
     "@typescript/native-preview": "7.0.0-dev.20250904.1"

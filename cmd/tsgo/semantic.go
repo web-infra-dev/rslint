@@ -2,12 +2,22 @@ package main
 
 import (
 	"context"
+	"strings"
 	_ "unsafe"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/microsoft/typescript-go/shim/compiler"
 )
+
+// sanitizeSymbolName replaces the internal symbol name prefix (\xFE) with "__"
+// so that consumers receive valid UTF-8 symbol names.
+func sanitizeSymbolName(name string) []byte {
+	if strings.HasPrefix(name, ast.InternalSymbolNamePrefix) {
+		return []byte("__" + name[len(ast.InternalSymbolNamePrefix):])
+	}
+	return []byte(name)
+}
 
 //go:linkname getAliasedSymbol github.com/microsoft/typescript-go/internal/checker.(*Checker).GetAliasedSymbol
 func getAliasedSymbol(recv *checker.Checker, symbol *ast.Symbol) *ast.Symbol
@@ -80,15 +90,15 @@ type PrimTypes struct {
 	Never     checker.TypeId `json:"never"`
 }
 type Semantic struct {
-	Symtab           map[ast.SymbolId]SymbolInfo      `json:"symtab"`
-	Typetab          map[checker.TypeId]TypeInfo      `json:"typetab"`
-	Sym2type         map[ast.SymbolId]checker.TypeId  `json:"sym2type"`
-	AliasSymbols     map[ast.SymbolId]ast.SymbolId    `json:"alias_symbols"`
-	Node2sym         map[NodeReference]ast.SymbolId   `json:"node2sym"`
-	Node2type        map[NodeReference]checker.TypeId `json:"node2type"`
-	Primtypes        PrimTypes                        `json:"primtypes"`
-	TypeExtra        TypeExtra                        `json:"type_extra"`
-	FuncData         FunctionData                     `json:"func_data"`
+	Symtab       map[ast.SymbolId]SymbolInfo      `json:"symtab"`
+	Typetab      map[checker.TypeId]TypeInfo      `json:"typetab"`
+	Sym2type     map[ast.SymbolId]checker.TypeId  `json:"sym2type"`
+	AliasSymbols map[ast.SymbolId]ast.SymbolId    `json:"alias_symbols"`
+	Node2sym     map[NodeReference]ast.SymbolId   `json:"node2sym"`
+	Node2type    map[NodeReference]checker.TypeId `json:"node2type"`
+	Primtypes    PrimTypes                        `json:"primtypes"`
+	TypeExtra    TypeExtra                        `json:"type_extra"`
+	FuncData     FunctionData                     `json:"func_data"`
 	// ShorthandSymbols maps node reference to the value symbol for shorthand property assignments
 	// (node -> value_symbol_id)
 	ShorthandSymbols map[NodeReference]ast.SymbolId `json:"shorthand_symbols"`
@@ -132,6 +142,13 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 		return
 	}
 
+	// The AST encoder converts positions to UTF-16 code units. We must use the
+	// same encoding here so that the consumer can match semantic data to AST nodes.
+	positionMap := file.GetPositionMap()
+	utf16 := func(pos int) int {
+		return positionMap.UTF8ToUTF16(pos)
+	}
+
 	recordType := func(ty *checker.Type) checker.TypeId {
 		if ty == nil {
 			return 0
@@ -173,8 +190,8 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 		if node.Pos() >= 0 && node.End() >= 0 {
 			key := NodeReference{
 				SourceFileId: sourceFileId,
-				Start:        node.Pos(),
-				End:          node.End(),
+				Start:        utf16(node.Pos()),
+				End:          utf16(node.End()),
 			}
 			// typescript will panic if we pass typeDeclaration to GetTypeAtLocation
 			if !ast.IsTypeDeclaration(node) {
@@ -196,14 +213,14 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 					if symbol.ValueDeclaration != nil && symbol.ValueDeclaration.Pos() >= 0 && symbol.ValueDeclaration.End() >= 0 {
 						declRef = &NodeReference{
 							SourceFileId: sourceFileId,
-							Start:        symbol.ValueDeclaration.Pos(),
-							End:          symbol.ValueDeclaration.End(),
+							Start:        utf16(symbol.ValueDeclaration.Pos()),
+							End:          utf16(symbol.ValueDeclaration.End()),
 						}
 					}
 
 					semantic.Symtab[sym_id] = SymbolInfo{
 						Id:         sym_id,
-						Name:       []byte(symbol.Name),
+						Name:       sanitizeSymbolName(symbol.Name),
 						Flags:      int(symbol.Flags),
 						CheckFlags: int(symbol.CheckFlags),
 						Decl:       declRef,
@@ -241,14 +258,14 @@ func CollectSemanticInFile(tc *checker.Checker, file *ast.SourceFile, semantic *
 						if valueSymbol.ValueDeclaration != nil && valueSymbol.ValueDeclaration.Pos() >= 0 && valueSymbol.ValueDeclaration.End() >= 0 {
 							declRef = &NodeReference{
 								SourceFileId: sourceFileId,
-								Start:        valueSymbol.ValueDeclaration.Pos(),
-								End:          valueSymbol.ValueDeclaration.End(),
+								Start:        utf16(valueSymbol.ValueDeclaration.Pos()),
+								End:          utf16(valueSymbol.ValueDeclaration.End()),
 							}
 						}
 
 						semantic.Symtab[value_sym_id] = SymbolInfo{
 							Id:         value_sym_id,
-							Name:       []byte(valueSymbol.Name),
+							Name:       sanitizeSymbolName(valueSymbol.Name),
 							Flags:      int(valueSymbol.Flags),
 							CheckFlags: int(valueSymbol.CheckFlags),
 							Decl:       declRef,

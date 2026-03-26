@@ -1,6 +1,6 @@
 {
   "name": "@rslint/wasm",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "rslint wasm package",
   "main": "dist/index.mjs",
   "types": "dist/index.d.ts",
@@ -32,7 +32,7 @@
     "buffer": "^6.0.3",
     "cross-env": "^10.1.0",
     "esbuild-plugin-polyfill-node": "0.3.0",
-    "memfs": "^4.51.1",
+    "memfs": "^4.57.1",
     "prebundle": "1.6.0",
     "@typescript/native-preview": "7.0.0-dev.20250904.1"
   },

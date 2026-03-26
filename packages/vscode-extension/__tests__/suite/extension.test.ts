@@ -248,14 +248,14 @@ suite('rslint extension', function () {
       // Verify the action has an edit
       assert.ok(disableLineAction.edit, 'Disable action should have an edit');
 
-      // Verify the edit contains eslint-disable-next-line
+      // Verify the edit contains rslint-disable-next-line
       const workspaceEdit = disableLineAction.edit;
       const edits = workspaceEdit.get(doc.uri);
       if (edits && edits.length > 0) {
         const editText = edits[0].newText;
         assert.ok(
-          editText.includes('eslint-disable-next-line'),
-          'Edit should contain eslint-disable-next-line comment',
+          editText.includes('rslint-disable-next-line'),
+          'Edit should contain rslint-disable-next-line comment',
         );
       }
     }
@@ -300,15 +300,15 @@ suite('rslint extension', function () {
       // Verify the action has an edit
       assert.ok(disableFileAction.edit, 'Disable action should have an edit');
 
-      // Verify the edit contains eslint-disable comment
+      // Verify the edit contains rslint-disable comment
       const workspaceEdit = disableFileAction.edit;
       const edits = workspaceEdit.get(doc.uri);
       if (edits && edits.length > 0) {
         const editText = edits[0].newText;
         assert.ok(
-          editText.includes('eslint-disable') &&
+          editText.includes('rslint-disable') &&
             !editText.includes('-next-line'),
-          'Edit should contain eslint-disable comment for entire file',
+          'Edit should contain rslint-disable comment for entire file',
         );
       }
     }
