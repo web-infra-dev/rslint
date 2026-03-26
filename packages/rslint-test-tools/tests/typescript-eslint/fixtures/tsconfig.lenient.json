@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "jsx": "preserve",
+    "target": "es2015",
+    "module": "commonjs",
+    "moduleDetection": "force",
+    "strict": true,
+    "esModuleInterop": true,
+    "lib": ["es2015", "es2017", "esnext", "DOM"],
+    "types": [],
+    "experimentalDecorators": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": [
+    "virtual.tsx",
+    "virtual.ts",
+    "decl.d.ts",
+    "foo.d.ts",
+    "react.tsx"
+  ]
+}
