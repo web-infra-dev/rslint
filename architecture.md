@@ -367,10 +367,11 @@ If no entry matches a file, it is not linted (returns `nil`).
 
 ### Inline Directives
 
-Rslint supports ESLint-compatible inline directives:
+Rslint supports inline directives with both `rslint-` and `eslint-` prefixes:
 
-- `// eslint-disable-next-line @typescript-eslint/no-unused-vars`
-- `/* eslint-disable @typescript-eslint/no-unsafe-assignment */`
+- `// rslint-disable-next-line @typescript-eslint/no-unused-vars`
+- `/* rslint-disable @typescript-eslint/no-unsafe-assignment */`
+- `// eslint-disable-next-line` (also supported for ESLint compatibility)
 
 The `DisableManager` in `internal/rule/disable_manager.go` handles directive parsing and rule disabling.
 
@@ -697,7 +698,7 @@ User Interface / CI System
 
 ### Feature Documentation
 
-- [ ] Document inline directive support (eslint-disable comments)
+- [ ] Document inline directive support (rslint-disable / eslint-disable comments)
 - [x] Explain configuration merging and inheritance rules
 - [ ] Detail source map support for transformed files
 - [ ] Document plugin architecture and extensibility model
