@@ -65,11 +65,12 @@ var ValidDescribeCallbackRule = rule.Rule{
 
 				argumentLength := len(node.AsCallExpression().Arguments.Nodes)
 
-				if argumentLength == 0 {
+				switch argumentLength {
+				case 0:
 					ctx.ReportNode(node, buildErrorNameAndCallbackMessage())
-				} else if argumentLength == 1 {
+				case 1:
 					ctx.ReportNode(node.AsCallExpression().Arguments.Nodes[0], buildErrorNameAndCallbackMessage())
-				} else {
+				default:
 					switch node.AsCallExpression().Arguments.Nodes[1].Kind {
 					case ast.KindArrowFunction:
 						{
