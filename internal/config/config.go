@@ -11,6 +11,7 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
+	jestPlugin "github.com/web-infra-dev/rslint/internal/plugins/jest"
 	reactPlugin "github.com/web-infra-dev/rslint/internal/plugins/react"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/adjacent_overload_signatures"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/array_type"
@@ -239,6 +240,10 @@ func GetAllRulesForPlugin(plugin string) []rule.Rule {
 		return importPlugin.GetRecommendedRules()
 	case "react":
 		return reactPlugin.GetAllRules()
+	case "jest":
+		return jestPlugin.GetAllRules()
+	case "jest/recommended":
+		return jestPlugin.GetRecommendedRules()
 	default:
 		return []rule.Rule{} // Return empty slice for unsupported plugins
 	}
@@ -289,12 +294,19 @@ func RegisterAllRules() {
 		registerAllTypeScriptEslintPluginRules()
 		registerAllEslintImportPluginRules()
 		registerAllReactPluginRules()
+		registerAllJestPluginRules()
 		registerAllCoreEslintRules()
 	})
 }
 
 func registerAllReactPluginRules() {
 	for _, rule := range reactPlugin.GetAllRules() {
+		GlobalRuleRegistry.Register(rule.Name, rule)
+	}
+}
+
+func registerAllJestPluginRules() {
+	for _, rule := range jestPlugin.GetAllRules() {
 		GlobalRuleRegistry.Register(rule.Name, rule)
 	}
 }
