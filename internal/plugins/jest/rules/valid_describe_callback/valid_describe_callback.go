@@ -102,9 +102,7 @@ var ValidDescribeCallbackRule = rule.Rule{
 								ctx.ReportNode(funcExpression, buildErrorNoAsyncDescribeCallbackMessage())
 							}
 
-if !slices.Contains(jestFnCall.Members, "each") && len(funcExpression.AsFunctionExpression().Parameters.Nodes) > 0 {
-								ctx.ReportNode(funcExpression.AsFunctionExpression().Parameters.Nodes[0], buildErrorUnexpectedDescribeArgumentMessage())
-							}
+							if !slices.Contains(jestFnCall.Members, "each") && len(funcExpression.AsFunctionExpression().Parameters.Nodes) > 0 {
 								ctx.ReportNode(funcExpression.AsFunctionExpression().Parameters.Nodes[0], buildErrorUnexpectedDescribeArgumentMessage())
 							}
 
