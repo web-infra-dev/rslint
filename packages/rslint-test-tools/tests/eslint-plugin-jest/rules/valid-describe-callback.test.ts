@@ -7,7 +7,7 @@ ruleTester.run('valid-describe-callback', {} as never, {
     { code: "describe.each([1, 2, 3])('%s', (a, b) => {});" },
     { code: "describe('foo', function() {})" },
     { code: "describe('foo', () => {})" },
-    { code: "describe(`foo`, () => {})" },
+    { code: 'describe(`foo`, () => {})' },
     { code: "xdescribe('foo', () => {})" },
     { code: "fdescribe('foo', () => {})" },
     { code: "describe.only('foo', () => {})" },
@@ -135,9 +135,7 @@ ruleTester.run('valid-describe-callback', {} as never, {
           })
         })
       })`,
-      errors: [
-        { message: 'Unexpected return statement in describe callback' },
-      ],
+      errors: [{ message: 'Unexpected return statement in describe callback' }],
     },
     {
       code: `describe('foo', () => {
@@ -178,27 +176,19 @@ ruleTester.run('valid-describe-callback', {} as never, {
     },
     {
       code: "describe('foo', () => test('bar', () => {}))",
-      errors: [
-        { message: 'Unexpected return statement in describe callback' },
-      ],
+      errors: [{ message: 'Unexpected return statement in describe callback' }],
     },
     {
       code: "describe('foo', done => {})",
-      errors: [
-        { message: 'Unexpected argument(s) in describe callback' },
-      ],
+      errors: [{ message: 'Unexpected argument(s) in describe callback' }],
     },
     {
       code: "describe('foo', function (done) {})",
-      errors: [
-        { message: 'Unexpected argument(s) in describe callback' },
-      ],
+      errors: [{ message: 'Unexpected argument(s) in describe callback' }],
     },
     {
       code: "describe('foo', function (one, two, three) {})",
-      errors: [
-        { message: 'Unexpected argument(s) in describe callback' },
-      ],
+      errors: [{ message: 'Unexpected argument(s) in describe callback' }],
     },
     {
       code: "describe('foo', async function (done) {})",

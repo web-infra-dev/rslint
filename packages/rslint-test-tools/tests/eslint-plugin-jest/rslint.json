@@ -5,15 +5,10 @@
     "languageOptions": {
       "parserOptions": {
         "projectService": false,
-        "project": [
-          "./tsconfig.files.json",
-          "./tsconfig.virtual.json"
-        ]
+        "project": ["./tsconfig.files.json", "./tsconfig.virtual.json"]
       }
     },
     "rules": {},
-    "plugins": [
-      "jest"
-    ]
+    "plugins": ["jest"]
   }
 ]
