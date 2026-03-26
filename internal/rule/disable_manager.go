@@ -14,6 +14,30 @@ type blockDirective struct {
 	rules     []string // nil means all rules (wildcard)
 }
 
+// directiveKind represents the type of an inline directive comment.
+type directiveKind int
+
+const (
+	directiveNone     directiveKind = iota
+	directiveBlock                        // rslint-disable / eslint-disable (block)
+	directiveEnable                       // rslint-enable / eslint-enable
+	directiveLine                         // rslint-disable-line / eslint-disable-line
+	directiveNextLine                     // rslint-disable-next-line / eslint-disable-next-line
+)
+
+// directivePrefix defines the comment prefixes for disable/enable directives.
+type directivePrefix struct {
+	disable string // e.g. "rslint-disable"
+	enable  string // e.g. "rslint-enable"
+}
+
+// directivePrefixes lists the supported directive prefixes.
+// Both rslint- and eslint- prefixes are supported and fully equivalent.
+var directivePrefixes = []directivePrefix{
+	{"rslint-disable", "rslint-enable"},
+	{"eslint-disable", "eslint-enable"},
+}
+
 // DisableManager tracks which rules are disabled at different locations in a file
 type DisableManager struct {
 	sourceFile            *ast.SourceFile
@@ -34,7 +58,8 @@ func NewDisableManager(sourceFile *ast.SourceFile, comments []*ast.CommentRange)
 	return dm
 }
 
-// parseDirectives parses eslint-disable/enable comments from the source text
+// parseDirectives parses disable/enable directive comments from the source text.
+// Both rslint- and eslint- prefixed directives are recognized.
 func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 	if dm.sourceFile.Text() == "" || len(comments) == 0 {
 		return
@@ -53,44 +78,34 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 			continue
 		}
 
+		kind, rules := matchDirective(commentContent)
+		if kind == directiveNone {
+			continue
+		}
+
 		lineNum, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(dm.sourceFile, comment.Pos())
-		rulePos := 0
 
-		if strings.HasPrefix(commentContent, "eslint-disable") {
-			rulePos += 14
-			rest := commentContent[rulePos:]
-
-			if strings.HasPrefix(rest, "-line") {
-				// eslint-disable-line
-				rulePos += 5
-				rules := parseRuleNames(commentContent[rulePos:])
-				if len(rules) == 0 {
-					dm.lineDisabledRules[lineNum] = append(dm.lineDisabledRules[lineNum], "*")
-				} else {
-					dm.lineDisabledRules[lineNum] = append(dm.lineDisabledRules[lineNum], rules...)
-				}
-			} else if strings.HasPrefix(rest, "-next-line") {
-				// eslint-disable-next-line
-				rulePos += 10
-				rules := parseRuleNames(commentContent[rulePos:])
-				nextLineNum := lineNum + 1
-				if len(rules) == 0 {
-					dm.nextLineDisabledRules[nextLineNum] = append(dm.nextLineDisabledRules[nextLineNum], "*")
-				} else {
-					dm.nextLineDisabledRules[nextLineNum] = append(dm.nextLineDisabledRules[nextLineNum], rules...)
-				}
+		switch kind {
+		case directiveLine:
+			if len(rules) == 0 {
+				dm.lineDisabledRules[lineNum] = append(dm.lineDisabledRules[lineNum], "*")
 			} else {
-				// eslint-disable (block)
-				rules := parseRuleNames(commentContent[rulePos:])
-				dm.blockDirectives = append(dm.blockDirectives, blockDirective{
-					line:      lineNum,
-					isDisable: true,
-					rules:     rules,
-				})
+				dm.lineDisabledRules[lineNum] = append(dm.lineDisabledRules[lineNum], rules...)
 			}
-		} else if strings.HasPrefix(commentContent, "eslint-enable") {
-			rulePos += 13
-			rules := parseRuleNames(commentContent[rulePos:])
+		case directiveNextLine:
+			nextLineNum := lineNum + 1
+			if len(rules) == 0 {
+				dm.nextLineDisabledRules[nextLineNum] = append(dm.nextLineDisabledRules[nextLineNum], "*")
+			} else {
+				dm.nextLineDisabledRules[nextLineNum] = append(dm.nextLineDisabledRules[nextLineNum], rules...)
+			}
+		case directiveBlock:
+			dm.blockDirectives = append(dm.blockDirectives, blockDirective{
+				line:      lineNum,
+				isDisable: true,
+				rules:     rules,
+			})
+		case directiveEnable:
 			dm.blockDirectives = append(dm.blockDirectives, blockDirective{
 				line:      lineNum,
 				isDisable: false,
@@ -98,6 +113,27 @@ func (dm *DisableManager) parseDirectives(comments []*ast.CommentRange) {
 			})
 		}
 	}
+}
+
+// matchDirective checks if a comment content string is a disable/enable directive.
+// Returns the directive kind and any specified rule names.
+func matchDirective(commentContent string) (directiveKind, []string) {
+	for _, p := range directivePrefixes {
+		if strings.HasPrefix(commentContent, p.disable) {
+			rest := commentContent[len(p.disable):]
+			if strings.HasPrefix(rest, "-line") {
+				return directiveLine, parseRuleNames(rest[len("-line"):])
+			}
+			if strings.HasPrefix(rest, "-next-line") {
+				return directiveNextLine, parseRuleNames(rest[len("-next-line"):])
+			}
+			return directiveBlock, parseRuleNames(rest)
+		}
+		if strings.HasPrefix(commentContent, p.enable) {
+			return directiveEnable, parseRuleNames(commentContent[len(p.enable):])
+		}
+	}
+	return directiveNone, nil
 }
 
 // parseRuleNames parses rule names from a string like " rule1, rule2, rule3"

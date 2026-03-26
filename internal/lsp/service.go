@@ -732,8 +732,8 @@ func createDisableRuleForLineAction(ruleDiag rule.RuleDiagnostic, uri lsproto.Do
 	// Get the line where the diagnostic occurs
 	lineStart := lspDiagnostic.Range.Start.Line
 
-	// Create text edit to add eslint-disable-next-line comment
-	disableComment := fmt.Sprintf("// eslint-disable-next-line %s\n", ruleDiag.RuleName)
+	// Create text edit to add rslint-disable-next-line comment
+	disableComment := fmt.Sprintf("// rslint-disable-next-line %s\n", ruleDiag.RuleName)
 
 	// Find the start of the line to insert the comment
 	lineStartPos := lsproto.Position{Line: lineStart, Character: 0}
@@ -763,8 +763,8 @@ func createDisableRuleForLineAction(ruleDiag rule.RuleDiagnostic, uri lsproto.Do
 
 // Helper function to create a "disable rule for entire file" action
 func createDisableRuleForFileAction(ruleDiag rule.RuleDiagnostic, uri lsproto.DocumentUri, lspDiagnostic *lsproto.Diagnostic) *lsproto.CodeAction {
-	// Create text edit to add eslint-disable comment at the top of the file
-	disableComment := fmt.Sprintf("/* eslint-disable %s */\n", ruleDiag.RuleName)
+	// Create text edit to add rslint-disable comment at the top of the file
+	disableComment := fmt.Sprintf("/* rslint-disable %s */\n", ruleDiag.RuleName)
 
 	// Insert at the very beginning of the file
 	fileStartPos := lsproto.Position{Line: 0, Character: 0}

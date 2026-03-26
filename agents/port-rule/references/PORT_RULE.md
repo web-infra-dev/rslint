@@ -25,7 +25,7 @@ Before starting, familiarize yourself with these key source locations:
 | File/Directory                        | Description                                                                                                              |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `internal/rule/rule.go`               | **Core rule interface** - `Rule`, `RuleContext`, `RuleListeners`, `RuleMessage`, `RuleFix`, `RuleSuggestion` definitions |
-| `internal/rule/disable_manager.go`    | Logic for handling `// eslint-disable` comments                                                                          |
+| `internal/rule/disable_manager.go`    | Logic for handling `// rslint-disable` and `// eslint-disable` comments                                                  |
 | `internal/config/config.go`           | Rule registration and config loading                                                                                     |
 | `internal/rule_tester/rule_tester.go` | Go test framework - `RunRuleTester`, `ValidTestCase`, `InvalidTestCase`                                                  |
 

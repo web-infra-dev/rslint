@@ -80,6 +80,269 @@ const TSCONFIG = JSON.stringify({
 
 const RULE = '@typescript-eslint/no-explicit-any';
 
+describe('rslint-disable comment directives', () => {
+  // -------------------------------------------------------------------
+  // rslint-disable-next-line
+  // -------------------------------------------------------------------
+
+  test('rslint-disable-next-line suppresses diagnostic on next line', async () => {
+    const tempDir = await createTempDir({
+      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'tsconfig.json': TSCONFIG,
+      'test.ts': [
+        '// rslint-disable-next-line @typescript-eslint/no-explicit-any',
+        'const x: any = 1;',
+        'export { x };',
+      ].join('\n'),
+    });
+
+    try {
+      const result = await runRslint([], tempDir);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).not.toContain('no-explicit-any');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  // -------------------------------------------------------------------
+  // rslint-disable-line
+  // -------------------------------------------------------------------
+
+  test('rslint-disable-line suppresses diagnostic on same line', async () => {
+    const tempDir = await createTempDir({
+      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'tsconfig.json': TSCONFIG,
+      'test.ts': [
+        'const x: any = 1; // rslint-disable-line @typescript-eslint/no-explicit-any',
+        'export { x };',
+      ].join('\n'),
+    });
+
+    try {
+      const result = await runRslint([], tempDir);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).not.toContain('no-explicit-any');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  // -------------------------------------------------------------------
+  // rslint-disable + rslint-enable (block range)
+  // -------------------------------------------------------------------
+
+  test('rslint-disable + rslint-enable suppresses diagnostics inside range', async () => {
+    const tempDir = await createTempDir({
+      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'tsconfig.json': TSCONFIG,
+      'test.ts': [
+        '/* rslint-disable @typescript-eslint/no-explicit-any */',
+        'const a: any = 1;',
+        'const b: any = 2;',
+        '/* rslint-enable @typescript-eslint/no-explicit-any */',
+        'export { a, b };',
+      ].join('\n'),
+    });
+
+    try {
+      const result = await runRslint([], tempDir);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).not.toContain('no-explicit-any');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  // -------------------------------------------------------------------
+  // rslint-disable without enable (rest of file)
+  // -------------------------------------------------------------------
+
+  test('rslint-disable without enable suppresses rest of file', async () => {
+    const tempDir = await createTempDir({
+      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'tsconfig.json': TSCONFIG,
+      'test.ts': [
+        '/* rslint-disable @typescript-eslint/no-explicit-any */',
+        'const a: any = 1;',
+        'const b: any = 2;',
+        'export { a, b };',
+      ].join('\n'),
+    });
+
+    try {
+      const result = await runRslint([], tempDir);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).not.toContain('no-explicit-any');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  // -------------------------------------------------------------------
+  // wildcard (no rule name)
+  // -------------------------------------------------------------------
+
+  test('rslint-disable without rule name suppresses all rules', async () => {
+    const tempDir = await createTempDir({
+      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'tsconfig.json': TSCONFIG,
+      'test.ts': [
+        '/* rslint-disable */',
+        'const a: any = 1;',
+        '/* rslint-enable */',
+      ].join('\n'),
+    });
+
+    try {
+      const result = await runRslint([], tempDir);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).not.toContain('no-explicit-any');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  // -------------------------------------------------------------------
+  // mixed prefixes: rslint-disable + eslint-enable
+  // -------------------------------------------------------------------
+
+  test('rslint-disable + eslint-enable mixed prefixes work', async () => {
+    const tempDir = await createTempDir({
+      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'tsconfig.json': TSCONFIG,
+      'test.ts': [
+        '/* rslint-disable @typescript-eslint/no-explicit-any */',
+        'const a: any = 1;',
+        '/* eslint-enable @typescript-eslint/no-explicit-any */',
+        'export { a };',
+      ].join('\n'),
+    });
+
+    try {
+      const result = await runRslint([], tempDir);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).not.toContain('no-explicit-any');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('eslint-disable + rslint-enable mixed prefixes work', async () => {
+    const tempDir = await createTempDir({
+      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'tsconfig.json': TSCONFIG,
+      'test.ts': [
+        '/* eslint-disable @typescript-eslint/no-explicit-any */',
+        'const a: any = 1;',
+        '/* rslint-enable @typescript-eslint/no-explicit-any */',
+        'export { a };',
+      ].join('\n'),
+    });
+
+    try {
+      const result = await runRslint([], tempDir);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).not.toContain('no-explicit-any');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  // -------------------------------------------------------------------
+  // negative tests
+  // -------------------------------------------------------------------
+
+  test('rslint-disable-next-line does not suppress other lines', async () => {
+    const tempDir = await createTempDir({
+      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'tsconfig.json': TSCONFIG,
+      'test.ts': [
+        '// rslint-disable-next-line @typescript-eslint/no-explicit-any',
+        'const x: any = 1;',
+        'const y: any = 2;', // not suppressed
+      ].join('\n'),
+    });
+
+    try {
+      const result = await runRslint([], tempDir);
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stdout).toContain('no-explicit-any');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  test('rslint-disable + rslint-enable does NOT suppress diagnostics outside range', async () => {
+    const tempDir = await createTempDir({
+      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'tsconfig.json': TSCONFIG,
+      'test.ts': [
+        '/* rslint-disable @typescript-eslint/no-explicit-any */',
+        'const a: any = 1;',
+        '/* rslint-enable @typescript-eslint/no-explicit-any */',
+        'const b: any = 2;', // outside range — should trigger
+      ].join('\n'),
+    });
+
+    try {
+      const result = await runRslint([], tempDir);
+      expect(result.exitCode).not.toBe(0);
+      expect(result.stdout).toContain('no-explicit-any');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  // -------------------------------------------------------------------
+  // block comment style for line directives
+  // -------------------------------------------------------------------
+
+  test('block comment style works for rslint-disable-next-line', async () => {
+    const tempDir = await createTempDir({
+      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'tsconfig.json': TSCONFIG,
+      'test.ts': [
+        '/* rslint-disable-next-line @typescript-eslint/no-explicit-any */',
+        'const x: any = 1;',
+        'export { x };',
+      ].join('\n'),
+    });
+
+    try {
+      const result = await runRslint([], tempDir);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).not.toContain('no-explicit-any');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+
+  // -------------------------------------------------------------------
+  // rslint-disable-next-line with -- description
+  // -------------------------------------------------------------------
+
+  test('rslint-disable-next-line with -- description suppresses diagnostic', async () => {
+    const tempDir = await createTempDir({
+      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'tsconfig.json': TSCONFIG,
+      'test.ts': [
+        '// rslint-disable-next-line @typescript-eslint/no-explicit-any -- needed for legacy API',
+        'const x: any = 1;',
+        'export { x };',
+      ].join('\n'),
+    });
+
+    try {
+      const result = await runRslint([], tempDir);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).not.toContain('no-explicit-any');
+    } finally {
+      await cleanupTempDir(tempDir);
+    }
+  });
+});
+
 describe('eslint-disable comment directives', () => {
   // -------------------------------------------------------------------
   // eslint-disable-next-line
