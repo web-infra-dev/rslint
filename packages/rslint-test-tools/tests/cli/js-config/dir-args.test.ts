@@ -133,16 +133,16 @@ describe('CLI directory arguments', () => {
     }
   });
 
-  test('should error when directory has no matching files', async () => {
+  test('should warn when directory has no matching files', async () => {
     const tempDir = await createTempDir({
       'tsconfig.json': TS_CONFIG,
       'rslint.config.js': jsConfig(),
       'src/a.ts': 'export const x = 1;\n',
     });
     try {
-      // empty-dir/ doesn't exist in tsconfig — no files match
+      // empty-dir/ doesn't exist in tsconfig — no files match, warn and exit 0
       const result = await runRslint(['empty-dir/'], tempDir);
-      expect(result.exitCode).not.toBe(0);
+      expect(result.exitCode).toBe(0);
     } finally {
       await cleanupTempDir(tempDir);
     }

@@ -738,10 +738,26 @@ func runCMD() int {
 
 	wg.Wait()
 
-	// Error if file/dir arguments were provided but none were found in the program
+	// Emit per-file warnings for files not found in any tsconfig program.
+	// This avoids breaking lint-staged workflows where config files (e.g. rslint.config.ts)
+	// that are not included in tsconfig.json get passed to rslint as arguments.
+	// Warnings are written to stderr (not lint diagnostics), so they do not affect
+	// --max-warnings and stay visible even under --quiet.
+	if len(allowFiles) > 0 {
+		programFiles := make(map[string]struct{})
+		for _, prog := range programs {
+			for _, sf := range prog.GetSourceFiles() {
+				programFiles[sf.FileName()] = struct{}{}
+			}
+		}
+		for _, f := range allowFiles {
+			if _, found := programFiles[f]; !found {
+				fmt.Fprintf(os.Stderr, "warning: %s was not found in the project, skipping\n", f)
+			}
+		}
+	}
 	if (len(allowFiles) > 0 || len(allowDirs) > 0) && lintedfileCount == 0 {
-		fmt.Fprintf(os.Stderr, "error: none of the specified files were found in the project\n")
-		return 1
+		return 0
 	}
 
 	// Phase 2: Apply fixes if --fix flag is enabled.
