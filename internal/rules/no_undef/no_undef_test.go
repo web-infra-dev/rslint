@@ -245,6 +245,10 @@ func TestNoUndefRule(t *testing.T) {
 
 			// === Import type alias (import type { X as Y }) ===
 			{Code: `import type { PlatformPath as PP } from "path";`},
+
+			// === Re-export alias (export { X as Y } from 'module') ===
+			{Code: `export { resolve as r } from "path";`},
+			{Code: `export type { PlatformPath as PP } from "path";`},
 		},
 		[]rule_tester.InvalidTestCase{
 			// === Basic undeclared references ===
@@ -872,6 +876,14 @@ func TestNoUndefRule(t *testing.T) {
 			// === Nested as/satisfies ===
 			{
 				Code: `var v = (undefNestedAs123 as any) satisfies any;`,
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "undef", Line: 1, Column: 10},
+				},
+			},
+
+			// === Local export alias with undeclared (export { X as Y } without `from`) ===
+			{
+				Code: `export { undefLocalExport123 as aliased };`,
 				Errors: []rule_tester.InvalidTestCaseError{
 					{MessageId: "undef", Line: 1, Column: 10},
 				},
