@@ -135,6 +135,15 @@ func shouldSkip(node *ast.Node, checkTypeof bool) bool {
 		return true
 	}
 
+	// Skip the original name in re-export aliases (export { Original as Alias } from 'module')
+	// The propertyName of an ExportSpecifier in a re-export is the source module's export name.
+	// Note: without `from`, export { X as Y } refers to local X, so only skip when moduleSpecifier exists.
+	if parent.Kind == ast.KindExportSpecifier && parent.PropertyName() == node {
+		if isReExport(parent) {
+			return true
+		}
+	}
+
 	// Skip label identifiers
 	if parent.Kind == ast.KindLabeledStatement ||
 		parent.Kind == ast.KindBreakStatement ||
@@ -225,6 +234,21 @@ func isTypeOfOperand(node *ast.Node) bool {
 		current = current.Parent
 	}
 	return current != nil && current.Kind == ast.KindTypeOfExpression
+}
+
+// isReExport checks if an ExportSpecifier belongs to a re-export statement
+// (i.e., `export { ... } from 'module'`).
+// Parent chain: ExportSpecifier → NamedExports → ExportDeclaration.
+func isReExport(exportSpecifier *ast.Node) bool {
+	namedExports := exportSpecifier.Parent
+	if namedExports == nil {
+		return false
+	}
+	exportDecl := namedExports.Parent
+	if exportDecl == nil || exportDecl.Kind != ast.KindExportDeclaration {
+		return false
+	}
+	return exportDecl.AsExportDeclaration().ModuleSpecifier != nil
 }
 
 func isClassExtendsClause(node *ast.Node) bool {
