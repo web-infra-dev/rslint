@@ -107,9 +107,12 @@ var ValidDescribeCallbackRule = rule.Rule{
 								ctx.ReportNode(funcExpression.AsFunctionExpression().Parameters.Nodes[0], buildErrorUnexpectedDescribeArgumentMessage())
 							}
 
-							returnStatement := findFirstReturnStatement(funcExpression.AsFunctionExpression().Body.AsBlock().Statements.Nodes)
-							if returnStatement != nil {
-								ctx.ReportNode(returnStatement, buildErrorUnexpectedReturnInDescribeMessage())
+							body := funcExpression.AsFunctionExpression().Body
+							if body != nil {
+								returnStatement := findFirstReturnStatement(body.AsBlock().Statements.Nodes)
+								if returnStatement != nil {
+									ctx.ReportNode(returnStatement, buildErrorUnexpectedReturnInDescribeMessage())
+								}
 							}
 						}
 					default:
