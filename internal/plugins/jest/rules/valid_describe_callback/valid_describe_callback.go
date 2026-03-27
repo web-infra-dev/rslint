@@ -58,7 +58,7 @@ var ValidDescribeCallbackRule = rule.Rule{
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := utils.ParseJestFnCall(node)
+				jestFnCall := utils.ParseJestFnCall(node, ctx)
 				if jestFnCall == nil || jestFnCall.Kind != utils.JestFnTypeDescribe {
 					return
 				}

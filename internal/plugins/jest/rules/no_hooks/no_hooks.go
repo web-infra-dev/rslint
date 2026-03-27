@@ -72,7 +72,7 @@ var NoHooksRule = rule.Rule{
 
 		return rule.RuleListeners{
 			ast.KindCallExpression: func(node *ast.Node) {
-				jestFnCall := utils.ParseJestFnCall(node, ctx.TypeChecker)
+				jestFnCall := utils.ParseJestFnCall(node, ctx)
 				if jestFnCall == nil || jestFnCall.Kind != utils.JestFnTypeHook {
 					return
 				}
