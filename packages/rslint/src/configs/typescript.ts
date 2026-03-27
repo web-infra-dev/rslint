@@ -108,7 +108,13 @@ const recommended: RslintConfigEntry = {
     // 'no-unused-expressions': 'off', // not implemented
     // '@typescript-eslint/no-unused-expressions': 'error', // not implemented
     'no-unused-vars': 'off',
-    '@typescript-eslint/no-unused-vars': 'error',
+    // Differs from typescript-eslint recommended (which uses bare 'error').
+    // Ignoring _-prefixed vars/args is a widely adopted community convention,
+    // so we include it in our default recommended config for better DX.
+    '@typescript-eslint/no-unused-vars': [
+      'error',
+      { varsIgnorePattern: '^_', argsIgnorePattern: '^_' },
+    ],
     // '@typescript-eslint/no-wrapper-object-types': 'error', // not implemented
     '@typescript-eslint/prefer-as-const': 'error',
     '@typescript-eslint/prefer-namespace-keyword': 'error',

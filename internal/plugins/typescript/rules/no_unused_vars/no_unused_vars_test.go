@@ -7,7 +7,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rule_tester"
 )
 
-func TestNoUnusedVarsRule(t *testing.T) {
+func TestNoUnusedVarsCore(t *testing.T) {
 	validTestCases := []rule_tester.ValidTestCase{
 		// --- basic usage ---
 		{Code: `const foo = 5; console.log(foo);`},
@@ -16,76 +16,9 @@ func TestNoUnusedVarsRule(t *testing.T) {
 		{Code: `function foo() {} foo();`},
 		{Code: `function foo(bar) { console.log(bar); } foo(1);`},
 		{Code: `try {} catch (e) { console.log(e); }`},
-		{Code: `const { foo, ...rest } = { foo: 1, bar: 2 }; console.log(rest);`, Options: map[string]interface{}{"ignoreRestSiblings": true}},
-		{Code: `const _foo = 1;`, Options: map[string]interface{}{"varsIgnorePattern": "^_"}},
-		{Code: `function foo(bar) {} foo(1);`, Options: map[string]interface{}{"args": "none"}},
-		{Code: `try {} catch (e) {}`, Options: map[string]interface{}{"caughtErrors": "none"}},
 		{Code: `export const foo = 1;`},
 		// type-annotated variable that IS used
 		{Code: `const bar: number = 1; console.log(bar);`},
-		// argsIgnorePattern
-		{Code: `function foo(_bar) {} foo(1);`, Options: map[string]interface{}{"argsIgnorePattern": "^_"}},
-		// caughtErrorsIgnorePattern
-		{Code: `try {} catch (_err) {}`, Options: map[string]interface{}{"caughtErrorsIgnorePattern": "^_"}},
-
-		// --- declare function params ---
-		{Code: `declare function doSomething(options: { a: string }): void; export { doSomething };`},
-		{Code: `declare function foo(): void; foo();`},
-		{Code: `
-declare function getNormalizedConfig(): string;
-declare function getNormalizedConfig(options: { env: string }): string;
-getNormalizedConfig();
-`},
-		{Code: `
-declare function getNormalizedConfig(): string;
-declare function getNormalizedConfig(options: { env: string }): string;
-export { getNormalizedConfig };
-`},
-		{Code: `declare function withRest(...args: any[]): void; export { withRest };`},
-		{Code: `declare function multi(a: string, b: number): void; export { multi };`},
-		{Code: `export declare function exportDeclare(x: number): void;`},
-		{Code: `
-declare function genericFunc<T>(input: T): T;
-export { genericFunc };
-`},
-
-		// --- function overloads ---
-		{Code: `
-export function foo(a: number): number;
-export function foo(a: string): string;
-export function foo(a: number | string): number | string {
-  return a;
-}
-`},
-		{Code: `
-function foo(): void;
-function foo(): void {}
-foo();
-`},
-
-		// --- declare namespace ---
-		{Code: `
-declare namespace MyNS {
-  function nsFunc(param: string): void;
-  var nsVar: string;
-}
-console.log(MyNS);
-`},
-		{Code: `export namespace ExportedNS { export const x = 1; }`},
-		{Code: `
-declare module 'some-module' {
-  function moduleFunc(arg: string): void;
-}
-`},
-
-		// --- constructor overloads ---
-		{Code: `
-export class MyClass {
-  constructor(a: number);
-  constructor(a: string);
-  constructor(a: number | string) { console.log(a); }
-}
-`},
 
 		// --- class/interface/type/enum: used ---
 		{Code: `class Foo {} new Foo();`},
@@ -94,59 +27,6 @@ export class MyClass {
 		{Code: `export type Str = string;`},
 		{Code: `enum Color { Red, Blue } console.log(Color.Red);`},
 		{Code: `export enum Color { Red, Blue }`},
-
-		// --- abstract/method/interface without body params ---
-		{Code: `
-abstract class AbstractBase {
-  abstract doSomething(input: string): void;
-}
-export { AbstractBase };
-`},
-		{Code: `
-class MyClass {
-  method(a: number): number;
-  method(a: string): string;
-  method(a: number | string): number | string {
-    return a;
-  }
-}
-export { MyClass };
-`},
-		{Code: `
-export interface IProcessor {
-  process(input: string, options: { debug: boolean }): void;
-}
-`},
-
-		// --- function type literal params (type-level, never reported) ---
-		{Code: `
-export interface Hot {
-  on: <Data = any>(event: string, cb: (data: Data) => void) => void;
-}
-`},
-		// call signature params
-		{Code: `
-export interface Callable {
-  (x: number, y: string): boolean;
-}
-`},
-		// construct signature params
-		{Code: `
-export interface Constructable {
-  new (name: string): object;
-}
-`},
-		// function type in type alias
-		{Code: `
-export type Handler = (event: string, data: unknown) => void;
-`},
-		// index signature param
-		{Code: `export interface Dict { [key: string]: unknown; }`},
-		// declare global (global scope augmentation, never reported)
-		{Code: `declare global { const BUILD_HASH: string; }`},
-		// Note: namespace augmentation (e.g., `declare namespace NodeJS`) is also
-		// skipped when the symbol has declarations in other files, but this requires
-		// @types/node or similar to be present, which can't be tested in fixtures.
 
 		// --- export class/function: params used ---
 		{Code: `export function bar(x: number) { return x; }`},
@@ -165,21 +45,42 @@ console.log(x);
 foo(2);
 `},
 
-		// --- destructuring: used ---
+		// --- basic destructuring: used ---
 		{Code: `const { a } = { a: 1 }; console.log(a);`},
 		{Code: `const [p] = [1]; console.log(p);`},
-		// import: used
-		{Code: `import type { Foo } from "./foo"; const bar: Foo = {} as any; console.log(bar);`},
-		// namespace import: used
-		{Code: `import * as path from "path"; console.log(path.join("a", "b"));`},
-		// import equals: used
-		{Code: `import path = require("path"); console.log(path.join("a", "b"));`},
 		// parameter destructuring: used
 		{Code: `function foo({ a }: { a: number }) { console.log(a); } foo({ a: 1 });`},
-		// parameter destructuring: argsIgnorePattern applies
-		{Code: `function foo({ _a, b }: { _a: number; b: number }) { console.log(b); } foo({ _a: 1, b: 2 });`, Options: map[string]interface{}{"argsIgnorePattern": "^_"}},
-		// parameter destructuring: args "none" skips all
-		{Code: `function foo({ a }: { a: number }) {} foo({ a: 1 });`, Options: map[string]interface{}{"args": "none"}},
+		// local function re-exported (not an import, still valid)
+		{Code: `function foo() {} export { foo };`},
+
+		// --- IIFE patterns ---
+		{Code: `(function() { return 1; })();`},
+		{Code: `(function foo() { return foo(); })();`},
+		// named function expression: name used only inside body (self-reference)
+		{Code: `const foo = function bar() { return bar(); }; foo();`},
+
+		// --- self-referencing / recursive ---
+		{Code: `function foo() { return foo(); } foo();`},
+		{Code: `function foo(n: number): number { return n <= 1 ? 1 : n * foo(n - 1); } foo(5);`},
+		// mutual recursion
+		{Code: `
+function isEven(n: number): boolean { return n === 0 ? true : isOdd(n - 1); }
+function isOdd(n: number): boolean { return n === 0 ? false : isEven(n - 1); }
+console.log(isEven(4));
+`},
+
+		// --- labeled statement ---
+		{Code: `
+var foo = 5;
+label: while (true) {
+  console.log(foo);
+  break label;
+}
+`},
+
+		// --- Function.bind / Function.toString ---
+		{Code: `declare function myFunc(x: any): void; myFunc(function foo() {}.bind(undefined));`},
+		{Code: `declare function myFunc(x: any): void; myFunc(function foo() {}.toString());`},
 	}
 
 	invalidTestCases := []rule_tester.InvalidTestCase{
@@ -210,101 +111,12 @@ foo(2);
 		// assignment without usage
 		{
 			Code:   `let foo = 5; foo = 10;`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 5}},
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 14}},
 		},
 		// type-annotated but unused variable should still be reported
 		{
 			Code:   `const bar: number = 1;`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 7}},
-		},
-		// usedOnlyAsType
-		{
-			Code:    `const foo = 1; type Bar = typeof foo; export type { Bar };`,
-			Options: map[string]interface{}{"vars": "all"},
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedOnlyAsType", Line: 1, Column: 7}},
-		},
-		// varsIgnorePattern no match
-		{
-			Code:    `const foo = 1;`,
-			Options: map[string]interface{}{"varsIgnorePattern": "^_"},
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 7}},
-		},
-		// reportUsedIgnorePattern
-		{
-			Code:    `const _foo = 1; console.log(_foo);`,
-			Options: map[string]interface{}{"varsIgnorePattern": "^_", "reportUsedIgnorePattern": true},
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedIgnoredVar", Line: 1, Column: 7}},
-		},
-		// reportUsedIgnorePattern applies to argsIgnorePattern too
-		{
-			Code:    `function foo(_x: number) { return _x; } foo(1);`,
-			Options: map[string]interface{}{"argsIgnorePattern": "^_", "reportUsedIgnorePattern": true},
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedIgnoredVar", Line: 1, Column: 14}},
-		},
-		// reportUsedIgnorePattern applies to caughtErrorsIgnorePattern too
-		{
-			Code:    `try { throw 1; } catch (_e) { console.log(_e); }`,
-			Options: map[string]interface{}{"caughtErrorsIgnorePattern": "^_", "reportUsedIgnorePattern": true},
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedIgnoredVar", Line: 1, Column: 25}},
-		},
-		// varsIgnorePattern should NOT apply to params
-		{
-			Code:    `function foo(_x: number) {} foo(1);`,
-			Options: map[string]interface{}{"varsIgnorePattern": "^_"},
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 14}},
-		},
-		// varsIgnorePattern should NOT apply to catch
-		{
-			Code:    `try {} catch (_e) {}`,
-			Options: map[string]interface{}{"varsIgnorePattern": "^_"},
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 15}},
-		},
-		// argsIgnorePattern no match
-		{
-			Code:    `export function foo(bar: number) {}`,
-			Options: map[string]interface{}{"argsIgnorePattern": "^_"},
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 21}},
-		},
-		// caughtErrorsIgnorePattern no match
-		{
-			Code:    `try {} catch (err) {}`,
-			Options: map[string]interface{}{"caughtErrorsIgnorePattern": "^_"},
-			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 15}},
-		},
-		// --- declare function ---
-		{
-			Code:   `declare function unusedFunc(): void;`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 18}},
-		},
-		{
-			Code: `
-declare function unusedOverload(): void;
-declare function unusedOverload(x: number): void;
-`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 2, Column: 18}},
-		},
-		{
-			Code: `
-declare function typedFunc(): void;
-type FuncType = typeof typedFunc;
-export type { FuncType };
-`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "usedOnlyAsType", Line: 2, Column: 18}},
-		},
-		// unused declare namespace (with members)
-		{
-			Code:   `declare namespace UnusedNS { export function inner(): void; }`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 19}},
-		},
-		// unused empty declare namespace
-		{
-			Code:   `declare namespace Rspack {}`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 19}},
-		},
-		// unused empty namespace (non-declare)
-		{
-			Code:   `namespace Rspack2 {}`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 11}},
 		},
 		// --- unused class/interface/type/enum ---
 		{
@@ -396,7 +208,7 @@ export function qux(a: number, b: string, c: boolean) {
 			Code:   `export const fn = (_a: string, _b: number, _c = {}) => {};`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 44}},
 		},
-		// --- destructuring: unused element ---
+		// --- basic destructuring: unused element ---
 		{
 			Code:   `const { a, b } = { a: 1, b: 2 }; console.log(a);`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 12}},
@@ -405,21 +217,6 @@ export function qux(a: number, b: string, c: boolean) {
 			Code:   `const [p, q] = [1, 2]; console.log(p);`,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 11}},
 		},
-		// --- import: unused ---
-		{
-			Code:   `import { Foo } from "./foo";`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 10}},
-		},
-		// namespace import: unused
-		{
-			Code:   `import * as ns from "./foo";`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 13}},
-		},
-		// import equals: unused
-		{
-			Code:   `import path = require("path");`,
-			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 1, Column: 8}},
-		},
 		// parameter destructuring: unused element
 		{
 			Code: `
@@ -427,6 +224,34 @@ function foo({ a, b }: { a: number; b: string }) { console.log(a); }
 foo({ a: 1, b: "x" });
 `,
 			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 2, Column: 19}},
+		},
+		// usedOnlyAsType
+		{
+			Code:    `const foo = 1; type Bar = typeof foo; export type { Bar };`,
+			Options: map[string]interface{}{"vars": "all"},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "usedOnlyAsType", Line: 1, Column: 7}},
+		},
+		// --- self-referencing function: unused externally ---
+		{
+			Code: `
+function foox() {
+  return foox();
+}
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 2, Column: 10}},
+		},
+		// nested self-referencing
+		{
+			Code: `
+(function () {
+  function foox() {
+    if (true) {
+      return foox();
+    }
+  }
+})();
+`,
+			Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unusedVar", Line: 3, Column: 12}},
 		},
 	}
 
