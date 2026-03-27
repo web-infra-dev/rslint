@@ -85,6 +85,30 @@ rule.RuleListeners{
 
 ---
 
+## Common Pitfalls
+
+### ParenthesizedExpression
+
+TypeScript's AST preserves `ParenthesizedExpression` nodes (e.g., `(expr)`), while ESTree (used by ESLint) removes them during parsing. This means almost every rule that walks parent/child chains needs to unwrap parentheses explicitly.
+
+```go
+// Walking UP the parent chain: skip ParenthesizedExpression
+current := node.Parent
+for current != nil && current.Kind == ast.KindParenthesizedExpression {
+    current = current.Parent
+}
+
+// Walking DOWN into an expression: unwrap ParenthesizedExpression
+expr := someNode
+for expr != nil && expr.Kind == ast.KindParenthesizedExpression {
+    expr = expr.AsParenthesizedExpression().Expression
+}
+```
+
+**When to unwrap**: Any time you check `node.Parent.Kind` or `expr.Kind` and expect a specific node type, consider whether parentheses could appear in between.
+
+---
+
 ## AST Traversal Patterns
 
 ### 1. ForEachChild - Iterate Direct Children
@@ -265,6 +289,47 @@ func checkCallbackReturn(funcNode *ast.Node) bool {
 }
 ```
 
+### Scope Stack Pattern
+
+Reference: `internal/rules/no_extra_bind/no_extra_bind.go`
+
+For rules that track state across nested scopes (e.g., `this` usage, variable declarations), use enter/exit listeners with a linked-list stack:
+
+```go
+type scopeInfo struct {
+    // Per-scope state
+    thisFound bool
+    upper     *scopeInfo // Link to parent scope
+}
+
+var scope *scopeInfo
+
+enterScope := func(node *ast.Node) {
+    scope = &scopeInfo{upper: scope}
+}
+
+exitScope := func(node *ast.Node) {
+    if scope != nil {
+        // Check scope state before popping
+        scope = scope.upper
+    }
+}
+
+return rule.RuleListeners{
+    ast.KindFunctionExpression:                       enterScope,
+    rule.ListenerOnExit(ast.KindFunctionExpression):  exitScope,
+    ast.KindFunctionDeclaration:                      enterScope,
+    rule.ListenerOnExit(ast.KindFunctionDeclaration): exitScope,
+    // Arrow functions do NOT create a new `this` scope — handle separately
+}
+```
+
+**Key considerations**:
+
+- Different node kinds may create different scope types (e.g., function vs method vs arrow)
+- Arrow functions inherit `this` from the enclosing scope — typically should NOT push a new scope
+- Class methods, getters, setters, and constructors create their own `this` scope
+
 ### Type Annotation Checking
 
 Reference: `internal/plugins/typescript/rules/no_explicit_any/no_explicit_any.go`
@@ -364,13 +429,39 @@ rule.RuleFixRemove(ctx.SourceFile, node)
 rule.RuleFixRemoveRange(textRange)
 ```
 
+### Multi-Range Fixes
+
+To remove or replace multiple non-contiguous ranges in a single fix, pass multiple `RuleFix` values:
+
+```go
+// Example: remove ".bind" and "(arg)" separately from "fn.bind(arg)"
+ctx.ReportNodeWithFixes(node, msg,
+    rule.RuleFixRemoveRange(core.NewTextRange(dotStart, bindEnd)),   // removes ".bind"
+    rule.RuleFixRemoveRange(core.NewTextRange(parenStart, parenEnd)), // removes "(arg)"
+)
+```
+
 ---
 
 ## Token Scanning
 
-When implementing auto-fixes that need to locate specific tokens (parentheses, brackets, operators), use the `scanner.GetScannerForSourceFile` API instead of manual character iteration.
+When implementing auto-fixes that need to locate specific tokens (parentheses, brackets, operators), use the scanner utilities from `shim/scanner/` instead of manual character iteration.
 
-### Basic Scanner Usage
+### SkipTrivia — Quick Token Position Lookup
+
+When you just need to find the start position of the next token (skipping whitespace and comments), use `scanner.SkipTrivia`:
+
+```go
+import "github.com/microsoft/typescript-go/shim/scanner"
+
+// Skip whitespace, line/block comments, BOM, shebang, and conflict markers
+sourceText := ctx.SourceFile.Text()
+nextTokenPos := scanner.SkipTrivia(sourceText, startPos)
+```
+
+This is simpler and more efficient than creating a full scanner when you only need a position.
+
+### Full Scanner — Token-by-Token Scanning
 
 ```go
 import "github.com/microsoft/typescript-go/shim/scanner"
