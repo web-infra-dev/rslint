@@ -1,0 +1,2126 @@
+// Rstest Snapshot v1
+
+exports[`no-undef > invalid 1`] = `
+{
+  "code": "a = 1;",
+  "diagnostics": [
+    {
+      "message": "'a' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 2`] = `
+{
+  "code": "var a = b;",
+  "diagnostics": [
+    {
+      "message": "'b' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 3`] = `
+{
+  "code": "undeclaredFunc();",
+  "diagnostics": [
+    {
+      "message": "'undeclaredFunc' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 4`] = `
+{
+  "code": "typeof anUndefinedVar === 'string'",
+  "diagnostics": [
+    {
+      "message": "'anUndefinedVar' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 5`] = `
+{
+  "code": "var x = foo + bar;",
+  "diagnostics": [
+    {
+      "message": "'foo' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+    {
+      "message": "'bar' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 6`] = `
+{
+  "code": "function foo() { return undeclaredVar123; }",
+  "diagnostics": [
+    {
+      "message": "'undeclaredVar123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 7`] = `
+{
+  "code": "var x = unknownFunc123();",
+  "diagnostics": [
+    {
+      "message": "'unknownFunc123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 8`] = `
+{
+  "code": "if (unknownCondition123) {}",
+  "diagnostics": [
+    {
+      "message": "'unknownCondition123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 9`] = `
+{
+  "code": "/*global otherVar*/ unknownVar123 = 1;",
+  "diagnostics": [
+    {
+      "message": "'unknownVar123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 10`] = `
+{
+  "code": "var obj = { undeclaredShorthand123 };",
+  "diagnostics": [
+    {
+      "message": "'undeclaredShorthand123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 11`] = `
+{
+  "code": "class Child extends undeclaredBase123 {}",
+  "diagnostics": [
+    {
+      "message": "'undeclaredBase123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 12`] = `
+{
+  "code": "var s = \`\${undeclaredTpl123}\`;",
+  "diagnostics": [
+    {
+      "message": "'undeclaredTpl123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 13`] = `
+{
+  "code": "var arr = [undeclaredArr123];",
+  "diagnostics": [
+    {
+      "message": "'undeclaredArr123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 14`] = `
+{
+  "code": "var { d = undeclaredDefault123 } = {};",
+  "diagnostics": [
+    {
+      "message": "'undeclaredDefault123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 15`] = `
+{
+  "code": "var x = undeclaredTernary123 ? 1 : 0;",
+  "diagnostics": [
+    {
+      "message": "'undeclaredTernary123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 16`] = `
+{
+  "code": "var x = undeclaredOptional123?.prop;",
+  "diagnostics": [
+    {
+      "message": "'undeclaredOptional123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 17`] = `
+{
+  "code": "var obj = { [undeclaredComputed123]: 1 };",
+  "diagnostics": [
+    {
+      "message": "'undeclaredComputed123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 18`] = `
+{
+  "code": "var arr = [...undeclaredSpread123];",
+  "diagnostics": [
+    {
+      "message": "'undeclaredSpread123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 19`] = `
+{
+  "code": "var x = undeclaredAsVal123 as any;",
+  "diagnostics": [
+    {
+      "message": "'undeclaredAsVal123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 20`] = `
+{
+  "code": "function f() { class Inner extends undeclaredNested123 {} }",
+  "diagnostics": [
+    {
+      "message": "'undeclaredNested123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 21`] = `
+{
+  "code": "enum E { A = undeclaredEnumVal123 }",
+  "diagnostics": [
+    {
+      "message": "'undeclaredEnumVal123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 22`] = `
+{
+  "code": "var fn = (x: any) => x; fn(undeclaredArg123);",
+  "diagnostics": [
+    {
+      "message": "'undeclaredArg123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 23`] = `
+{
+  "code": "var obj = { nested: { undeclaredNestedShort123 } };",
+  "diagnostics": [
+    {
+      "message": "'undeclaredNestedShort123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 24`] = `
+{
+  "code": "var CE = class extends undefClassExpr123 {};",
+  "diagnostics": [
+    {
+      "message": "'undefClassExpr123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 25`] = `
+{
+  "code": "new undefNew123();",
+  "diagnostics": [
+    {
+      "message": "'undefNew123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 26`] = `
+{
+  "code": "var f1 = () => undefArrow123;",
+  "diagnostics": [
+    {
+      "message": "'undefArrow123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 27`] = `
+{
+  "code": "for (var x1 of undefForOf123) {}",
+  "diagnostics": [
+    {
+      "message": "'undefForOf123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 28`] = `
+{
+  "code": "for (var x2 in undefForIn123) {}",
+  "diagnostics": [
+    {
+      "message": "'undefForIn123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 29`] = `
+{
+  "code": "function throwIt() { throw undefThrow123; }",
+  "diagnostics": [
+    {
+      "message": "'undefThrow123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 30`] = `
+{
+  "code": "var v1 = true && undefAnd123;",
+  "diagnostics": [
+    {
+      "message": "'undefAnd123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 31`] = `
+{
+  "code": "var v2 = null ?? undefNullish123;",
+  "diagnostics": [
+    {
+      "message": "'undefNullish123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 32`] = `
+{
+  "code": "var v3 = !undefNot123;",
+  "diagnostics": [
+    {
+      "message": "'undefNot123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 33`] = `
+{
+  "code": "var v4 = -undefNeg123;",
+  "diagnostics": [
+    {
+      "message": "'undefNeg123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 11,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 34`] = `
+{
+  "code": "undefTag123\`hello\`;",
+  "diagnostics": [
+    {
+      "message": "'undefTag123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 35`] = `
+{
+  "code": "void undefVoid123;",
+  "diagnostics": [
+    {
+      "message": "'undefVoid123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 36`] = `
+{
+  "code": "var v5 = ({}) instanceof undefInst123;",
+  "diagnostics": [
+    {
+      "message": "'undefInst123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 37`] = `
+{
+  "code": "var f2 = () => () => undefDeep123;",
+  "diagnostics": [
+    {
+      "message": "'undefDeep123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 38`] = `
+{
+  "code": "function* gen() { yield undefYield123; }",
+  "diagnostics": [
+    {
+      "message": "'undefYield123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 39`] = `
+{
+  "code": "async function af() { await undefAwait123; }",
+  "diagnostics": [
+    {
+      "message": "'undefAwait123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 40`] = `
+{
+  "code": "var v6 = undefSatisfies123 satisfies any;",
+  "diagnostics": [
+    {
+      "message": "'undefSatisfies123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 41`] = `
+{
+  "code": "var obj1 = { undefShortA123, undefShortB123 };",
+  "diagnostics": [
+    {
+      "message": "'undefShortA123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+    {
+      "message": "'undefShortB123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 42`] = `
+{
+  "code": "var declared = 1; var obj2 = { declared, undefShortMix123 };",
+  "diagnostics": [
+    {
+      "message": "'undefShortMix123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 58,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 43`] = `
+{
+  "code": "class CS { m() { return { undefMethShort123 }; } }",
+  "diagnostics": [
+    {
+      "message": "'undefMethShort123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 44`] = `
+{
+  "code": "if (true) { var v7 = undefIfElse123; }",
+  "diagnostics": [
+    {
+      "message": "'undefIfElse123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 45`] = `
+{
+  "code": "switch (1) { case 1: var v8 = undefSwitch123; break; }",
+  "diagnostics": [
+    {
+      "message": "'undefSwitch123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 46`] = `
+{
+  "code": "var v9: any; v9 ||= undefLogical123;",
+  "diagnostics": [
+    {
+      "message": "'undefLogical123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 47`] = `
+{
+  "code": "export default undefExportDefault123;",
+  "diagnostics": [
+    {
+      "message": "'undefExportDefault123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 48`] = `
+{
+  "code": "class C1 { [undefComputedMethod123]() {} }",
+  "diagnostics": [
+    {
+      "message": "'undefComputedMethod123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 49`] = `
+{
+  "code": "var v1 = undefNonNull123!;",
+  "diagnostics": [
+    {
+      "message": "'undefNonNull123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 50`] = `
+{
+  "code": "var v2 = <any>undefAngleBracket123;",
+  "diagnostics": [
+    {
+      "message": "'undefAngleBracket123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 51`] = `
+{
+  "code": "for (undefForOfTarget123 of [1, 2]) {}",
+  "diagnostics": [
+    {
+      "message": "'undefForOfTarget123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 52`] = `
+{
+  "code": "var arr: number[]; [undefAssignTarget123] = [1];",
+  "diagnostics": [
+    {
+      "message": "'undefAssignTarget123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 53`] = `
+{
+  "code": "function f1(x = undefDefaultParam123) {}",
+  "diagnostics": [
+    {
+      "message": "'undefDefaultParam123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 54`] = `
+{
+  "code": "class C2 { x = undefClassProp123; }",
+  "diagnostics": [
+    {
+      "message": "'undefClassProp123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 55`] = `
+{
+  "code": "class C3 { static x = undefStaticProp123; }",
+  "diagnostics": [
+    {
+      "message": "'undefStaticProp123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 56`] = `
+{
+  "code": "var obj1 = { ...undefObjSpread123 };",
+  "diagnostics": [
+    {
+      "message": "'undefObjSpread123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 57`] = `
+{
+  "code": "var v1 = true ? undefTernaryA123 : undefTernaryB123;",
+  "diagnostics": [
+    {
+      "message": "'undefTernaryA123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+    {
+      "message": "'undefTernaryB123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 58`] = `
+{
+  "code": "var { a: { b = undefNestedDefault123 } = {} as any } = {} as any;",
+  "diagnostics": [
+    {
+      "message": "'undefNestedDefault123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 59`] = `
+{
+  "code": "var v2 = (1, undefComma123);",
+  "diagnostics": [
+    {
+      "message": "'undefComma123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 60`] = `
+{
+  "code": "var v3 = undefExponent123 ** 2;",
+  "diagnostics": [
+    {
+      "message": "'undefExponent123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 61`] = `
+{
+  "code": "var v4: any; v4 += undefPlusAssign123;",
+  "diagnostics": [
+    {
+      "message": "'undefPlusAssign123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 62`] = `
+{
+  "code": "var v5: any; v5 ??= undefNullishAssign123;",
+  "diagnostics": [
+    {
+      "message": "'undefNullishAssign123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 63`] = `
+{
+  "code": "var v6 = 'key' in undefInOperator123;",
+  "diagnostics": [
+    {
+      "message": "'undefInOperator123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 64`] = `
+{
+  "code": "delete undefDelete123.prop;",
+  "diagnostics": [
+    {
+      "message": "'undefDelete123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 65`] = `
+{
+  "code": "(function() { return undefIIFE123; })();",
+  "diagnostics": [
+    {
+      "message": "'undefIIFE123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 66`] = `
+{
+  "code": "(() => undefArrowIIFE123)();",
+  "diagnostics": [
+    {
+      "message": "'undefArrowIIFE123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 67`] = `
+{
+  "code": "var { x: { y: { z = undefDeepDefault123 } = {} as any } = {} as any } = {} as any;",
+  "diagnostics": [
+    {
+      "message": "'undefDeepDefault123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 68`] = `
+{
+  "code": "var v7 = \`\${undefInTemplate123 ? 'a' : 'b'}\`;",
+  "diagnostics": [
+    {
+      "message": "'undefInTemplate123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 69`] = `
+{
+  "code": "var v8 = false || undefLogicalOr123;",
+  "diagnostics": [
+    {
+      "message": "'undefLogicalOr123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 70`] = `
+{
+  "code": "typeof (anUndefinedVar)",
+  "diagnostics": [
+    {
+      "message": "'anUndefinedVar' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 71`] = `
+{
+  "code": "var { [undefComputedKey123]: val } = {} as any;",
+  "diagnostics": [
+    {
+      "message": "'undefComputedKey123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 72`] = `
+{
+  "code": "var obj: any = {}; var v = obj[undefElementAccess123];",
+  "diagnostics": [
+    {
+      "message": "'undefElementAccess123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 73`] = `
+{
+  "code": "class C1 { static { var v = undefStaticBlock123; } }",
+  "diagnostics": [
+    {
+      "message": "'undefStaticBlock123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 74`] = `
+{
+  "code": "var obj = { get x() { return undefGetter123; } };",
+  "diagnostics": [
+    {
+      "message": "'undefGetter123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 75`] = `
+{
+  "code": "var obj = { set x(v: any) { var t = undefSetter123; } };",
+  "diagnostics": [
+    {
+      "message": "'undefSetter123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 76`] = `
+{
+  "code": "class C2 { #x = undefPrivateField123; m() { return this.#x; } }",
+  "diagnostics": [
+    {
+      "message": "'undefPrivateField123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 77`] = `
+{
+  "code": "var v = (undefParenthesized123);",
+  "diagnostics": [
+    {
+      "message": "'undefParenthesized123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 78`] = `
+{
+  "code": "var v = undefDoubleNonNull123!!;",
+  "diagnostics": [
+    {
+      "message": "'undefDoubleNonNull123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 79`] = `
+{
+  "code": "var v = (undefNestedAs123 as any) satisfies any;",
+  "diagnostics": [
+    {
+      "message": "'undefNestedAs123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-undef > invalid 80`] = `
+{
+  "code": "undefOptionalCall123?.();",
+  "diagnostics": [
+    {
+      "message": "'undefOptionalCall123' is not defined.",
+      "messageId": "undef",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-undef",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
