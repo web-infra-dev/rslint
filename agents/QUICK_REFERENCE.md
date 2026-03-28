@@ -19,6 +19,7 @@ A quick reference for common commands, file locations, and checklists when porti
 | Lint check    | `pnpm lint`                                                                       |
 | Format check  | `pnpm format:check`                                                               |
 | Format fix    | `pnpm format`                                                                     |
+| Spell check   | `pnpm -w run check-spell`                                                         |
 | Go lint check | `pnpm lint:go`                                                                    |
 | Go format fix | `pnpm format:go`                                                                  |
 
@@ -55,16 +56,16 @@ GlobalRuleRegistry.Register("rule-name", package.RuleNameRule)
 
 ## Naming Conventions
 
-| Item                          | Convention                     | Example                                                      |
-| ----------------------------- | ------------------------------ | ------------------------------------------------------------ |
-| Go directory name             | snake_case                     | `no_empty_interface/`                                        |
-| Go file name                  | snake_case                     | `no_empty_interface.go`                                      |
-| Go variable name (Rule)       | PascalCase + Rule suffix       | `NoEmptyInterfaceRule`                                       |
-| Rule name (ESLint Core)       | kebab-case                     | `"no-debugger"`                                              |
-| Rule name (typescript-eslint) | kebab-case (auto-prefixed)     | `"no-explicit-any"` → `"@typescript-eslint/no-explicit-any"` |
-| Rule name (import)            | kebab-case (manually prefixed) | `"import/no-self-import"`                                    |
-| JS test file name             | kebab-case                     | `no-empty-interface.test.ts`                                 |
-| MessageId                     | camelCase                      | `"unexpectedAny"`, `"missingSuper"`                          |
+| Item                          | Convention                     | Example                                                                       |
+| ----------------------------- | ------------------------------ | ----------------------------------------------------------------------------- |
+| Go directory name             | snake_case                     | `no_empty_interface/`                                                         |
+| Go file name                  | snake_case                     | `no_empty_interface.go`                                                       |
+| Go variable name (Rule)       | PascalCase + Rule suffix       | `NoEmptyInterfaceRule`                                                        |
+| Rule name (ESLint Core)       | kebab-case                     | `"no-debugger"`                                                               |
+| Rule name (typescript-eslint) | kebab-case (auto-prefixed)     | `"no-explicit-any"` → `"@typescript-eslint/no-explicit-any"`                  |
+| Rule name (import)            | kebab-case (manually prefixed) | `"import/no-self-import"`                                                     |
+| JS test file name             | kebab-case                     | `no-empty-interface.test.ts`                                                  |
+| MessageId                     | camelCase                      | `"unexpectedAny"`, `"missingSuper"` (JS rule-tester auto-converts kebab-case) |
 
 ---
 
@@ -97,10 +98,12 @@ import (
 
 - [ ] Go tests pass (`go test -count=1 ./internal/rules/<name>`)
 - [ ] Build binary (`cd packages/rslint && pnpm run build:bin`)
+- [ ] JS snapshots generated (`npx rstest run <name> -u`)
 - [ ] JS tests pass (`cd packages/rslint-test-tools && npx rstest run <name>`)
 - [ ] Go/JS test coverage aligned (same invalid cases, including comments/multi-line/nested)
 - [ ] Type check passes (`pnpm typecheck`)
 - [ ] Lint check passes (`pnpm lint`)
+- [ ] Spell check passes (`pnpm -w run check-spell`)
 - [ ] Format check passes (`pnpm format:check`)
 - [ ] Go lint check passes (`pnpm lint:go`)
 - [ ] Rule registered (`internal/config/config.go`)

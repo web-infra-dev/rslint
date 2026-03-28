@@ -388,6 +388,28 @@ set.Clear()
 
 ---
 
+## `shim/scanner/` - Scanner Utilities
+
+```go
+import "github.com/microsoft/typescript-go/shim/scanner"
+```
+
+### SkipTrivia
+
+Skip whitespace, comments (line and block), BOM, shebang, and conflict markers to find the next token position:
+
+```go
+// Find the start position of the next meaningful token
+sourceText := ctx.SourceFile.Text()
+nextTokenPos := scanner.SkipTrivia(sourceText, startPos)
+```
+
+### GetScannerForSourceFile
+
+Create a token-by-token scanner for more complex scanning needs. See [AST_PATTERNS.md](./AST_PATTERNS.md#token-scanning) for usage examples.
+
+---
+
 ## See Also
 
 - [PORT_RULE.md](./PORT_RULE.md) - Main rule porting workflow
