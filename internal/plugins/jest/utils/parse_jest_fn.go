@@ -247,26 +247,6 @@ func isValidJestCall(name string, members []string) bool {
 	return ok
 }
 
-func pickExpectModifiers(members []string) []string {
-	if len(members) == 0 {
-		return nil
-	}
-
-	modifiers := make([]string, 0, len(members))
-	for _, member := range members {
-		if !EXPECT_MODIFIER_NAMES[member] {
-			break
-		}
-		modifiers = append(modifiers, member)
-	}
-
-	if len(modifiers) == 0 {
-		return nil
-	}
-
-	return modifiers
-}
-
 func pickExpectModifiersAndEntries(entries []ParsedJestFnMemberEntry) ([]string, []ParsedJestFnMemberEntry) {
 	if len(entries) == 0 {
 		return nil, nil
