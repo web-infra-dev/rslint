@@ -9,11 +9,25 @@ import (
 )
 
 type ParsedJestFnCall struct {
-	Name      string
-	LocalName string
-	Kind      JestFnType
-	Members   []string
-	Modifiers []string
+	Name            string
+	LocalName       string
+	Kind            JestFnType
+	Members         []string
+	MemberEntries   []ParsedJestFnMemberEntry
+	Modifiers       []string
+	ModifierEntries []ParsedJestFnMemberEntry
+	Head            ParsedJestFnCallHead
+}
+
+type ParsedJestFnCallHead struct {
+	Type     JestImportMode
+	Local    ParsedJestFnCallHeadEntry
+	Original ParsedJestFnCallHeadEntry
+}
+
+type ParsedJestFnCallHeadEntry struct {
+	Value string
+	Node  *ast.Node
 }
 
 func IsTypeOfJestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...JestFnType) bool {
@@ -30,12 +44,17 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 		return nil
 	}
 
-	chain := GetMembersChain(node)
-	if len(chain) == 0 {
+	memberEntries := GetJestFnMemberEntries(node)
+	if len(memberEntries) == 0 {
 		return nil
 	}
 
-	members := append([]string(nil), chain[1:]...)
+	localName := memberEntries[0].Name
+	members := make([]string, 0, len(memberEntries)-1)
+	for _, entry := range memberEntries[1:] {
+		members = append(members, entry.Name)
+	}
+
 	callExpr := node.AsCallExpression()
 	if isEachFactoryCall(callExpr, members) {
 		return nil
@@ -44,8 +63,8 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 		return nil
 	}
 
-	localName := chain[0]
-	name := resolveOriginalName(node, localName, ctx)
+	localNode := resolveHeadLocalNode(callExpr)
+	name, originalNode, headType := resolveOriginalName(node, localName, localNode, ctx)
 	if name == "" {
 		return nil
 	}
@@ -66,34 +85,51 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 		LocalName: localName,
 		Kind:      kind,
 		Members:   members,
+		MemberEntries: append(
+			[]ParsedJestFnMemberEntry(nil),
+			memberEntries[1:]...,
+		),
+		Head: ParsedJestFnCallHead{
+			Type: headType,
+			Local: ParsedJestFnCallHeadEntry{
+				Value: localName,
+				Node:  localNode,
+			},
+			Original: ParsedJestFnCallHeadEntry{
+				Value: name,
+				Node:  originalNode,
+			},
+		},
 	}
 
 	if kind == JestFnTypeExpect {
-		parsed.Modifiers = pickExpectModifiers(members)
+		modifiers, modifierEntries := pickExpectModifiersAndEntries(parsed.MemberEntries)
+		parsed.Modifiers = modifiers
+		parsed.ModifierEntries = modifierEntries
 	}
 
 	return parsed
 }
 
-func resolveOriginalName(node *ast.Node, localName string, ctx rule.RuleContext) string {
+func resolveOriginalName(node *ast.Node, localName string, localNode *ast.Node, ctx rule.RuleContext) (string, *ast.Node, JestImportMode) {
 	if ctx.TypeChecker == nil {
-		return localName
+		return localName, localNode, JEST_GLOBAL_MODE
 	}
 
 	typeChecker := ctx.TypeChecker
 	callExpr := node.AsCallExpression()
 	if callExpr == nil {
-		return localName
+		return localName, localNode, JEST_GLOBAL_MODE
 	}
 
 	ident := resolveFirstIdentifier(callExpr.Expression)
 	if ident == nil || ident.Kind != ast.KindIdentifier {
-		return localName
+		return localName, localNode, JEST_GLOBAL_MODE
 	}
 
 	symbol := typeChecker.GetSymbolAtLocation(ident)
 	if symbol == nil {
-		return localName
+		return localName, localNode, JEST_GLOBAL_MODE
 	}
 
 	hasNonJestImportSpecifier := false
@@ -117,20 +153,27 @@ func resolveOriginalName(node *ast.Node, localName string, ctx rule.RuleContext)
 		}
 
 		if spec.PropertyName != nil {
-			return spec.PropertyName.Text()
+			return spec.PropertyName.Text(), spec.PropertyName, JEST_IMPORT_MODE
 		}
 
 		name := spec.Name()
 		if name != nil {
-			return name.Text()
+			return name.Text(), name, JEST_IMPORT_MODE
 		}
 	}
 
 	if hasNonJestImportSpecifier {
-		return ""
+		return "", nil, JEST_GLOBAL_MODE
 	}
 
-	return localName
+	return localName, localNode, JEST_GLOBAL_MODE
+}
+
+func resolveHeadLocalNode(callExpr *ast.CallExpression) *ast.Node {
+	if callExpr == nil {
+		return nil
+	}
+	return resolveFirstIdentifier(callExpr.Expression)
 }
 
 func resolveFirstIdentifier(node *ast.Node) *ast.Node {
@@ -222,4 +265,29 @@ func pickExpectModifiers(members []string) []string {
 	}
 
 	return modifiers
+}
+
+func pickExpectModifiersAndEntries(entries []ParsedJestFnMemberEntry) ([]string, []ParsedJestFnMemberEntry) {
+	if len(entries) == 0 {
+		return nil, nil
+	}
+
+	modifierEntries := make([]ParsedJestFnMemberEntry, 0, len(entries))
+	for _, entry := range entries {
+		if !EXPECT_MODIFIER_NAMES[entry.Name] {
+			break
+		}
+		modifierEntries = append(modifierEntries, entry)
+	}
+
+	if len(modifierEntries) == 0 {
+		return nil, nil
+	}
+
+	modifiers := make([]string, 0, len(modifierEntries))
+	for _, entry := range modifierEntries {
+		modifiers = append(modifiers, entry.Name)
+	}
+
+	return modifiers, modifierEntries
 }
