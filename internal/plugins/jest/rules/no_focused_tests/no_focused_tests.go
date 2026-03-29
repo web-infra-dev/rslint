@@ -27,8 +27,6 @@ func buildErrorSuggestRemoveFocusMessage() rule.RuleMessage {
 	}
 }
 
-func buildFix() {}
-
 var NoFocusedTestsRule = rule.Rule{
 	Name: "jest/no-focused-tests",
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
