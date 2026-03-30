@@ -24,7 +24,7 @@ replace (
 )
 
 require (
-	github.com/bmatcuk/doublestar/v4 v4.9.1
+	github.com/bmatcuk/doublestar/v4 v4.10.0
 	github.com/fatih/color v1.18.0
 	github.com/microsoft/typescript-go/shim/api/encoder v0.0.0
 	github.com/microsoft/typescript-go/shim/ast v0.0.0
