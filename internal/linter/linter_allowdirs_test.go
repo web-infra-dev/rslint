@@ -24,7 +24,7 @@ func TestRunLinterInProgram_AllowDirsBasic(t *testing.T) {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
 		},
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 1 {
@@ -51,7 +51,7 @@ func TestRunLinterInProgram_AllowDirsNoFalsePrefix(t *testing.T) {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
 		},
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 1 {
@@ -82,7 +82,7 @@ func TestRunLinterInProgram_AllowDirsAndFilesOR(t *testing.T) {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
 		},
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 2 {
@@ -102,7 +102,7 @@ func TestRunLinterInProgram_AllowDirsEmpty(t *testing.T) {
 
 	lintedFiles := RunLinterInProgram(program, nil, []string{}, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 0 {
@@ -118,7 +118,7 @@ func TestRunLinterInProgram_BothNilLintsAll(t *testing.T) {
 
 	lintedFiles := RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles < 2 {
@@ -142,7 +142,7 @@ func TestRunLinterInProgram_MultipleAllowDirs(t *testing.T) {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
 		},
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 2 {
@@ -165,7 +165,7 @@ func TestRunLinterInProgram_AllowDirsWithEmptyAllowFiles(t *testing.T) {
 
 	lintedFiles := RunLinterInProgram(program, []string{}, []string{srcDir}, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 1 {
@@ -180,7 +180,7 @@ func TestRunLinterInProgram_AllowDirsNoMatchInProgram(t *testing.T) {
 
 	lintedFiles := RunLinterInProgram(program, nil, []string{"/nonexistent/dir"}, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 0 {
@@ -192,7 +192,7 @@ func TestRunLinterInProgram_NestedAllowDirs(t *testing.T) {
 	program, paths := createTestProgramWithFiles(t, map[string]string{
 		"src/a.ts":            "const a = 1;",
 		"src/components/b.ts": "const b = 2;",
-		"src/utils/c.ts":     "const c = 3;",
+		"src/utils/c.ts":      "const c = 3;",
 	})
 
 	componentsDir := tmpDirPath(t, paths, "src/components/b.ts")
@@ -203,7 +203,7 @@ func TestRunLinterInProgram_NestedAllowDirs(t *testing.T) {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
 		},
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 1 {
@@ -224,7 +224,7 @@ func TestRunLinterInProgram_AllowDirsEmptyString(t *testing.T) {
 	// Empty string as allowDir should not match anything
 	lintedFiles := RunLinterInProgram(program, nil, []string{""}, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 0 {
@@ -242,7 +242,7 @@ func TestRunLinterInProgram_AllowDirsTrailingSlash(t *testing.T) {
 	srcDir := tmpDirPath(t, paths, "src/a.ts") + "/"
 	lintedFiles := RunLinterInProgram(program, nil, []string{srcDir}, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 1 {
@@ -259,7 +259,7 @@ func TestRunLinterInProgram_AllowDirsSameAsFilePath(t *testing.T) {
 	// (a file is not "inside" itself)
 	lintedFiles := RunLinterInProgram(program, nil, []string{paths["src/a.ts"]}, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 0 {
@@ -281,7 +281,7 @@ func TestRunLinterInProgram_AllowDirsAndFilesOverlap(t *testing.T) {
 		[]string{srcDir},
 		utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
-		func(d rule.RuleDiagnostic) { diagnosticCount++ },
+		false, func(d rule.RuleDiagnostic) { diagnosticCount++ },
 	)
 
 	if lintedFiles != 1 {
@@ -361,7 +361,7 @@ func TestRunLinter_AllowDirsIntegration(t *testing.T) {
 	srcDir := tmpDirPath(t, paths, "src/a.ts")
 	lintedCount, err := RunLinter([]*compiler.Program{program}, true, nil, []string{srcDir}, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if err != nil {
@@ -392,7 +392,7 @@ func TestRunLinter_MultiplePrograms(t *testing.T) {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
 		},
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if err != nil {
@@ -423,7 +423,7 @@ func TestRunLinter_MultipleProgramsWithAllowDirs(t *testing.T) {
 		[]string{srcDirA, srcDirB},
 		utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if err != nil {
@@ -446,7 +446,7 @@ func TestRunLinterInProgram_SkipTakesPriorityOverAllowDirs(t *testing.T) {
 	lintedFiles := RunLinterInProgram(program, nil, []string{srcDir},
 		[]string{"src"}, // skip pattern matching "src" in path
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 0 {
@@ -462,7 +462,7 @@ func TestRunLinterInProgram_SkipTakesPriorityOverAllowFiles(t *testing.T) {
 	lintedFiles := RunLinterInProgram(program, []string{paths["src/a.ts"]}, nil,
 		[]string{"src"}, // skip pattern matching "src" in path
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 0 {
@@ -478,7 +478,7 @@ func TestRunLinterInProgram_BothEmptyNonNil(t *testing.T) {
 	// Both non-nil but empty → filter is active, nothing passes
 	lintedFiles := RunLinterInProgram(program, []string{}, []string{}, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 0 {
@@ -494,7 +494,7 @@ func TestRunLinterInProgram_EmptyNonNilRules(t *testing.T) {
 	diagnosticCount := 0
 	lintedFiles := RunLinterInProgram(program, []string{paths["a.ts"]}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return []ConfiguredRule{} }, // empty non-nil
-		func(d rule.RuleDiagnostic) { diagnosticCount++ },
+		false, func(d rule.RuleDiagnostic) { diagnosticCount++ },
 	)
 
 	// Empty rules slice: len(rules) == 0 → skip (same as nil)

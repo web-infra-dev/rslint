@@ -133,7 +133,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 			[]*compiler.Program{program},
 			true,
 			allowedFiles,
-			nil, // no allowDirs in test environment
+			nil,        // no allowDirs in test environment
 			[]string{}, // No files to skip in test environment
 			func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 				return []linter.ConfiguredRule{
@@ -146,6 +146,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 					},
 				}
 			},
+			false, // no type-check in rule tester
 			func(diagnostic rule.RuleDiagnostic) {
 				diagnosticsMu.Lock()
 				defer diagnosticsMu.Unlock()

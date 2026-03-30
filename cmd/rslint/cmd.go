@@ -35,8 +35,6 @@ import (
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 )
 
-const spaces = "                                                                                                    "
-
 // ColorScheme contains all the color functions for different UI elements
 type ColorScheme struct {
 	RuleName    func(format string, a ...interface{}) string
@@ -99,7 +97,7 @@ func reportSyntacticErrors(err error, w *bufio.Writer, comparePathOptions tspath
 			continue
 		}
 		diag := rule.RuleDiagnostic{
-			RuleName:   fmt.Sprintf("TS%d", d.Code()),
+			RuleName:   fmt.Sprintf("TypeScript(TS%d)", d.Code()),
 			SourceFile: d.File(),
 			Range:      d.Loc(),
 			Message:    rule.RuleMessage{Description: d.String()},
@@ -156,6 +154,13 @@ func printDiagnosticGitHub(d rule.RuleDiagnostic, w *bufio.Writer, comparePathOp
 		escapeData(d.Message.Description),
 	)
 	w.WriteString(output)
+}
+
+func pluralize(count int, singular, plural string) string {
+	if count == 1 {
+		return singular
+	}
+	return plural
 }
 
 func escapeData(str string) string {
@@ -271,15 +276,21 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	}
 	w.WriteString(severityColor("[%s] ", d.Severity.String()))
 
-	// Message handling
+	// Message handling — multi-line continuation:
+	// - PreFormatted (e.g. tsc diagnostics): 2-space indent, message already has indentation
+	// - Lint rules: │ border aligned after rule name
 	messageLineStart := 0
 	for i, char := range d.Message.Description {
 		if char == '\n' {
 			w.WriteString(d.Message.Description[messageLineStart : i+1])
 			messageLineStart = i + 1
-			w.WriteString("    ")
-			w.WriteString(colors.BorderText("│"))
-			w.WriteString(spaces[:len(d.RuleName)+1])
+			if d.PreFormatted {
+				w.WriteString("  ")
+			} else {
+				w.WriteString("    ")
+				w.WriteString(colors.BorderText("│"))
+				w.WriteString(strings.Repeat(" ", len(d.RuleName)+1))
+			}
 		}
 	}
 	if messageLineStart <= len(d.Message.Description) {
@@ -416,6 +427,7 @@ Options:
   --config PATH         Which rslint config file to use.
   --format FORMAT       Output format: default | jsonline | github
   --fix                 Automatically fix problems
+  --type-check          Enable TypeScript type checking
   --no-color            Disable colored output
   --force-color         Force colored output
   --quiet               Report errors only
@@ -472,6 +484,7 @@ func runCMD() int {
 		config      string
 		configStdin bool
 		fix         bool
+		typeCheck   bool
 
 		traceOut       string
 		cpuprofOut     string
@@ -487,6 +500,7 @@ func runCMD() int {
 	flag.BoolVar(&configStdin, "config-stdin", false, "read config from stdin (used internally by JS config loader)")
 	flag.BoolVar(&init, "init", false, "initialize a default config in the current directory")
 	flag.BoolVar(&fix, "fix", false, "automatically fix problems")
+	flag.BoolVar(&typeCheck, "type-check", false, "enable TypeScript type checking")
 	flag.BoolVar(&help, "help", false, "show help")
 	flag.BoolVar(&help, "h", false, "show help")
 	flag.BoolVar(&noColor, "no-color", false, "disable colored output")
@@ -725,6 +739,7 @@ func runCMD() int {
 		allowDirs,
 		utils.ExcludePaths,
 		getRulesForFile,
+		typeCheck,
 		func(d rule.RuleDiagnostic) {
 			diagnosticsChan <- d
 		},
@@ -786,6 +801,7 @@ func runCMD() int {
 				allowDirs,
 				utils.ExcludePaths,
 				getRulesForFile,
+				typeCheck,
 				func(d rule.RuleDiagnostic) {
 					diagsMu.Lock()
 					passDiags = append(passDiags, d)
@@ -808,12 +824,16 @@ func runCMD() int {
 	// allDiags contains: original diagnostics (no fix), or remaining after fix.
 	errorsCount := 0
 	warningsCount := 0
+	typeErrorsCount := 0
 	{
 		w := bufio.NewWriterSize(os.Stdout, 4096*100)
 		for i, d := range allDiags {
 			switch d.Severity {
 			case rule.SeverityError:
 				errorsCount++
+				if typeCheck && strings.HasPrefix(d.RuleName, "TypeScript(") {
+					typeErrorsCount++
+				}
 			case rule.SeverityWarning:
 				warningsCount++
 			}
@@ -833,6 +853,7 @@ func runCMD() int {
 		w.Flush()
 	}
 
+	lintErrorsCount := errorsCount - typeErrorsCount
 
 	colors := setupColors()
 	var errorsColorFunc func(string, ...interface{}) string
@@ -849,35 +870,36 @@ func runCMD() int {
 		warningsColorFunc = colors.WarnText
 	}
 
-	errorsText := "errors"
-	if errorsCount == 1 {
-		errorsText = "error"
-	}
-
-	warningsText := "warnings"
-	if warningsCount == 1 {
-		warningsText = "warning"
-	}
-
-	filesText := "files"
-	if lintedfileCount == 1 {
-		filesText = "file"
-	}
+	warningsText := pluralize(warningsCount, "warning", "warnings")
+	filesText := pluralize(int(lintedfileCount), "file", "files")
 	threadsCount := 1
 	if !singleThreaded {
 		threadsCount = runtime.GOMAXPROCS(0)
 	}
 	if format == "default" {
+		// Build the errors summary part.
+		// When type-check is enabled and there are type errors, split the display.
+		var errorsSummary string
+		if typeCheck {
+			errorsSummary = fmt.Sprintf("%s %s, %s %s",
+				errorsColorFunc("%d", lintErrorsCount),
+				pluralize(lintErrorsCount, "lint error", "lint errors"),
+				errorsColorFunc("%d", typeErrorsCount),
+				pluralize(typeErrorsCount, "type error", "type errors"),
+			)
+		} else {
+			errorsSummary = fmt.Sprintf("%s %s",
+				errorsColorFunc("%d", errorsCount),
+				pluralize(errorsCount, "error", "errors"),
+			)
+		}
+
 		if fix && fixedCount > 0 {
-			fixText := "issues"
-			if fixedCount == 1 {
-				fixText = "issue"
-			}
+			fixText := pluralize(fixedCount, "issue", "issues")
 			fmt.Fprintf(
 				os.Stdout,
-				"Found %s %s and %s %s %s(linted %s %s in %s using %s threads, fixed %s %s)%s\n",
-				errorsColorFunc("%d", errorsCount),
-				errorsText,
+				"Found %s and %s %s %s(linted %s %s in %s using %s threads, fixed %s %s)%s\n",
+				errorsSummary,
 				warningsColorFunc("%d", warningsCount),
 				warningsText,
 				colors.DimText(""),
@@ -892,9 +914,8 @@ func runCMD() int {
 		} else {
 			fmt.Fprintf(
 				os.Stdout,
-				"Found %s %s and %s %s %s(linted %s %s with in %s using %s threads)%s\n",
-				errorsColorFunc("%d", errorsCount),
-				errorsText,
+				"Found %s and %s %s %s(linted %s %s in %s using %s threads)%s\n",
+				errorsSummary,
 				warningsColorFunc("%d", warningsCount),
 				warningsText,
 				colors.DimText(""),
