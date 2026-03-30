@@ -43,7 +43,7 @@ require (
 	github.com/microsoft/typescript-go/shim/vfs/cachedvfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/osvfs v0.0.0
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
-	golang.org/x/sync v0.19.0
+	golang.org/x/sync v0.20.0
 	golang.org/x/sys v0.42.0
 	golang.org/x/tools v0.42.0
 	gotest.tools/v3 v3.5.2
@@ -64,5 +64,5 @@ require (
 	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/go-json-experiment/json v0.0.0-20260214004413-d219187c3433
 	github.com/microsoft/typescript-go v0.0.0-20260313230633-c0e5d35a6f8f // indirect
-	golang.org/x/text v0.34.0
+	golang.org/x/text v0.35.0
 )
