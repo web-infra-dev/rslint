@@ -23,7 +23,7 @@
     "type": "git",
     "url": "https://github.com/web-infra-dev/rslint"
   },
-  "packageManager": "pnpm@10.13.1",
+  "packageManager": "pnpm@10.33.0",
   "devDependencies": {
     "@rslint/core": "workspace:*",
     "@microsoft/api-extractor": "7.57.4",
