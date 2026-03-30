@@ -475,6 +475,17 @@ func applyFixPass(diagnosticsByFile map[string][]rule.RuleDiagnostic) int {
 	return fixed
 }
 
+// resolveStartTime returns the start time for timing output.
+// If startTimeMs (epoch millis from the Node.js entry point) is positive,
+// it is used so the reported duration covers end-to-end execution.
+// Otherwise falls back to time.Now().
+func resolveStartTime(startTimeMs int64) time.Time {
+	if startTimeMs > 0 {
+		return time.UnixMilli(startTimeMs)
+	}
+	return time.Now()
+}
+
 func runCMD() int {
 	flag.Usage = func() { fmt.Fprint(os.Stderr, usage) }
 
@@ -494,6 +505,7 @@ func runCMD() int {
 		forceColor     bool
 		quiet          bool
 		maxWarnings    int
+		startTimeMs    int64
 	)
 	flag.StringVar(&format, "format", "default", "output format")
 	flag.StringVar(&config, "config", "", "which rslint config to use")
@@ -511,6 +523,7 @@ func runCMD() int {
 	flag.StringVar(&traceOut, "trace", "", "file to put trace to")
 	flag.StringVar(&cpuprofOut, "cpuprof", "", "file to put cpu profiling to")
 	flag.BoolVar(&singleThreaded, "singleThreaded", false, "run in single threaded mode")
+	flag.Int64Var(&startTimeMs, "start-time", 0, "internal: epoch milliseconds from Node.js entry point")
 
 	flag.Parse()
 
@@ -553,7 +566,7 @@ func runCMD() int {
 	}
 
 	enableVirtualTerminalProcessing()
-	timeBefore := time.Now()
+	timeBefore := resolveStartTime(startTimeMs)
 
 	if traceOut != "" {
 		f, err := os.Create(traceOut)

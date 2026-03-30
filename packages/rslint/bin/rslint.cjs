@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+const startTime = Date.now();
 const path = require('node:path');
 const os = require('node:os');
 const fs = require('node:fs');
@@ -20,7 +21,7 @@ function getBinPath() {
 async function main() {
   const binPath = getBinPath();
   const { run } = await import(path.resolve(__dirname, '../dist/cli.js'));
-  const exitCode = await run(binPath, process.argv.slice(2));
+  const exitCode = await run(binPath, process.argv.slice(2), startTime);
   process.exit(exitCode);
 }
 
