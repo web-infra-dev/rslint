@@ -6,6 +6,7 @@ import (
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/checker"
+	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
 type ParsedJestFnCall struct {
@@ -16,8 +17,8 @@ type ParsedJestFnCall struct {
 	Modifiers []string
 }
 
-func IsTypeOfJestFnCall(node *ast.Node, kinds ...JestFnType) bool {
-	parsed := ParseJestFnCall(node)
+func IsTypeOfJestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...JestFnType) bool {
+	parsed := ParseJestFnCall(node, ctx)
 	if parsed == nil {
 		return false
 	}
@@ -29,7 +30,7 @@ func IsTypeOfJestFnCall(node *ast.Node, kinds ...JestFnType) bool {
 	return slices.Contains(kinds, parsed.Kind)
 }
 
-func ParseJestFnCall(node *ast.Node, typeCheckerOpt ...*checker.Checker) *ParsedJestFnCall {
+func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 	if node == nil || node.Kind != ast.KindCallExpression {
 		return nil
 	}
@@ -49,7 +50,7 @@ func ParseJestFnCall(node *ast.Node, typeCheckerOpt ...*checker.Checker) *Parsed
 	}
 
 	localName := chain[0]
-	name := resolveOriginalName(node, localName, typeCheckerOpt...)
+	name := resolveOriginalName(node, localName, ctx.TypeChecker)
 	if !JEST_METHOD_NAMES[name] {
 		return nil
 	}
