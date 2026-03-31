@@ -24,8 +24,8 @@ replace (
 )
 
 require (
-	github.com/bmatcuk/doublestar/v4 v4.9.1
-	github.com/fatih/color v1.18.0
+	github.com/bmatcuk/doublestar/v4 v4.10.0
+	github.com/fatih/color v1.19.0
 	github.com/microsoft/typescript-go/shim/api/encoder v0.0.0
 	github.com/microsoft/typescript-go/shim/ast v0.0.0
 	github.com/microsoft/typescript-go/shim/bundled v0.0.0
@@ -43,20 +43,20 @@ require (
 	github.com/microsoft/typescript-go/shim/vfs/cachedvfs v0.0.0
 	github.com/microsoft/typescript-go/shim/vfs/osvfs v0.0.0
 	github.com/tailscale/hujson v0.0.0-20250605163823-992244df8c5a
-	golang.org/x/sync v0.19.0
-	golang.org/x/sys v0.41.0
-	golang.org/x/tools v0.42.0
+	golang.org/x/sync v0.20.0
+	golang.org/x/sys v0.42.0
+	golang.org/x/tools v0.43.0
 	gotest.tools/v3 v3.5.2
 )
 
 require (
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.10 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
+	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/zeebo/xxh3 v1.1.0 // indirect
-	golang.org/x/mod v0.33.0 // indirect
+	golang.org/x/mod v0.34.0 // indirect
 )
 
 require (

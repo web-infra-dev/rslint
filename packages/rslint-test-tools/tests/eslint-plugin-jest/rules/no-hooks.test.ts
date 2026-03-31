@@ -17,19 +17,19 @@ ruleTester.run('no-hooks', {} as never, {
   invalid: [
     {
       code: 'beforeAll(() => {})',
-      errors: [{ message: 'Unexpected hook: {{beforeAll}}' }],
+      errors: [{ message: "Unexpected 'beforeAll' hook" }],
     },
     {
       code: 'beforeEach(() => {})',
-      errors: [{ message: 'Unexpected hook: {{beforeEach}}' }],
+      errors: [{ message: "Unexpected 'beforeEach' hook" }],
     },
     {
       code: 'afterAll(() => {})',
-      errors: [{ message: 'Unexpected hook: {{afterAll}}' }],
+      errors: [{ message: "Unexpected 'afterAll' hook" }],
     },
     {
       code: 'afterEach(() => {})',
-      errors: [{ message: 'Unexpected hook: {{afterEach}}' }],
+      errors: [{ message: "Unexpected 'afterEach' hook" }],
     },
     {
       code: `
@@ -37,12 +37,12 @@ ruleTester.run('no-hooks', {} as never, {
 
         afterEachTest(() => {})
       `,
-      errors: [{ message: 'Unexpected hook: {{afterEach}}' }],
+      errors: [{ message: "Unexpected 'afterEach' hook" }],
     },
     {
       code: 'beforeEach(() => {}); afterEach(() => { jest.resetModules() });',
       options: [{ allow: ['afterEach'] }],
-      errors: [{ message: 'Unexpected hook: {{beforeEach}}' }],
+      errors: [{ message: "Unexpected 'beforeEach' hook" }],
     },
     {
       code: `
@@ -52,7 +52,7 @@ ruleTester.run('no-hooks', {} as never, {
         beforeEach(() => { jest.resetModules() });
       `,
       options: [{ allow: ['afterEach'] }],
-      errors: [{ message: 'Unexpected hook: {{beforeEach}}' }],
+      errors: [{ message: "Unexpected 'beforeEach' hook" }],
     },
   ],
 });

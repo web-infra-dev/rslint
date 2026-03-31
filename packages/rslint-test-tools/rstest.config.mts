@@ -15,6 +15,8 @@ export default defineConfig({
     './tests/cli/js-config/presets.test.ts',
     './tests/cli/js-config/config-discovery.test.ts',
     './tests/cli/js-config/dir-args.test.ts',
+    './tests/cli/type-check/type-check.test.ts',
+    './tests/cli/type-check/type-check-snapshot.test.ts',
 
     // eslint
     './tests/eslint/rules/default-case.test.ts',
@@ -30,7 +32,11 @@ export default defineConfig({
     './tests/eslint/rules/no-ex-assign.test.ts',
     './tests/eslint/rules/no-constant-binary-expression.test.ts',
 
+    './tests/eslint/rules/no-extra-bind.test.ts',
+    './tests/eslint/rules/no-global-assign.test.ts',
+    './tests/eslint/rules/no-undef.test.ts',
     './tests/eslint/rules/prefer-const.test.ts',
+    './tests/eslint/rules/no-this-before-super.test.ts',
     // eslint-plugin-import
     './tests/eslint-plugin-import/rules/no-self-import.test.ts',
     './tests/eslint-plugin-import/rules/no-webpack-loader-syntax.test.ts',
@@ -160,8 +166,12 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-unsafe-type-assertion.test.ts',
     './tests/typescript-eslint/rules/no-unsafe-unary-minus.test.ts',
     // './tests/typescript-eslint/rules/no-unused-expressions.test.ts',
-    // './tests/typescript-eslint/rules/no-unused-vars/no-unused-vars-eslint.test.ts',
-    // './tests/typescript-eslint/rules/no-unused-vars/no-unused-vars.test.ts',
+    './tests/typescript-eslint/rules/no-unused-vars/no-unused-vars-eslint-basic.test.ts',
+    './tests/typescript-eslint/rules/no-unused-vars/no-unused-vars-eslint-patterns.test.ts',
+    './tests/typescript-eslint/rules/no-unused-vars/no-unused-vars-eslint-catch-loops.test.ts',
+    './tests/typescript-eslint/rules/no-unused-vars/no-unused-vars-eslint-advanced.test.ts',
+    './tests/typescript-eslint/rules/no-unused-vars/no-unused-vars-eslint-report-used.test.ts',
+    './tests/typescript-eslint/rules/no-unused-vars/no-unused-vars.test.ts',
     './tests/typescript-eslint/rules/no-unused-vars/no-unused-vars-declare.test.ts',
     // './tests/typescript-eslint/rules/no-use-before-define.test.ts',
     // './tests/typescript-eslint/rules/no-useless-constructor.test.ts',

@@ -46,10 +46,7 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 
 	localName := chain[0]
 	name := resolveOriginalName(node, localName, ctx)
-	if name == "" {
-		return nil
-	}
-	if !JEST_METHOD_NAMES[name] {
+	if name == "" || !JEST_METHOD_NAMES[name] {
 		return nil
 	}
 

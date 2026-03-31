@@ -121,9 +121,13 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_pattern"
 	"github.com/web-infra-dev/rslint/internal/rules/no_ex_assign"
+	"github.com/web-infra-dev/rslint/internal/rules/no_extra_bind"
+	"github.com/web-infra-dev/rslint/internal/rules/no_global_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
 	"github.com/web-infra-dev/rslint/internal/rules/no_sparse_arrays"
 	"github.com/web-infra-dev/rslint/internal/rules/no_template_curly_in_string"
+	"github.com/web-infra-dev/rslint/internal/rules/no_this_before_super"
+	"github.com/web-infra-dev/rslint/internal/rules/no_undef"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
 )
 
@@ -468,10 +472,14 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-empty", no_empty.NoEmptyRule)
 	GlobalRuleRegistry.Register("no-empty-pattern", no_empty_pattern.NoEmptyPatternRule)
 	GlobalRuleRegistry.Register("no-ex-assign", no_ex_assign.NoExAssignRule)
+	GlobalRuleRegistry.Register("no-extra-bind", no_extra_bind.NoExtraBindRule)
+	GlobalRuleRegistry.Register("no-global-assign", no_global_assign.NoGlobalAssignRule)
 	GlobalRuleRegistry.Register("no-loss-of-precision", no_loss_of_precision.NoLossOfPrecisionRule)
 	GlobalRuleRegistry.Register("no-template-curly-in-string", no_template_curly_in_string.NoTemplateCurlyInString)
 	GlobalRuleRegistry.Register("no-sparse-arrays", no_sparse_arrays.NoSparseArraysRule)
+	GlobalRuleRegistry.Register("no-undef", no_undef.NoUndefRule)
 	GlobalRuleRegistry.Register("prefer-const", prefer_const.PreferConstRule)
+	GlobalRuleRegistry.Register("no-this-before-super", no_this_before_super.NoThisBeforeSuperRule)
 }
 
 func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {

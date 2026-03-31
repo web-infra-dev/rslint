@@ -1,0 +1,1369 @@
+// Rstest Snapshot v1
+
+exports[`no-extra-bind > invalid 1`] = `
+{
+  "code": "var a = function() { return 1; }.bind(b)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 2`] = `
+{
+  "code": "var a = function() { return 1; }.bind(this)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 3`] = `
+{
+  "code": "var a = (() => { return 1; }).bind(b)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 4`] = `
+{
+  "code": "var a = (() => { this.b }).bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 5`] = `
+{
+  "code": "var a = (() => { return this; }).bind(b)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 6`] = `
+{
+  "code": "var a = (() => 1).bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 7`] = `
+{
+  "code": "var a = function() { (function(){ this.c }) }.bind(b)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 8`] = `
+{
+  "code": "var a = function() { function inner() { this.b; } }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 9`] = `
+{
+  "code": "var a = function() { function c(){ this.d } }.bind(b)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 10`] = `
+{
+  "code": "var a = function() { return 1; }['bind'](b)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 11`] = `
+{
+  "code": "var a = function() { return 1; }[\`bind\`](b)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 12`] = `
+{
+  "code": "var a = (function() { return 1; }.bind)(this)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 13`] = `
+{
+  "code": "var a = (function() { return 1; }).bind(this)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 14`] = `
+{
+  "code": "var a = ((function() { return 1; })).bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 15`] = `
+{
+  "code": "var a = ((function() { return 1; }.bind))(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 16`] = `
+{
+  "code": "var a = ((function() { return 1; }).bind)(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 17`] = `
+{
+  "code": "var a = (function() { return 1; }['bind'])(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 18`] = `
+{
+  "code": "var a = function() { (function(){ (function(){ this.d }.bind(c)) }) }.bind(b)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 78,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 19`] = `
+{
+  "code": "var a = function() { function a() { function b() { this.x } } }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 72,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 20`] = `
+{
+  "code": "var a = function() { var f = () => { return function() { this.x } } }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 78,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 21`] = `
+{
+  "code": "var a = function() { function inner() { var f = () => this } }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 22`] = `
+{
+  "code": "var a = (async function() { return 1; }).bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 23`] = `
+{
+  "code": "var a = (function*() { yield 1; }).bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 24`] = `
+{
+  "code": "var a = (async () => { return 1; }).bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 25`] = `
+{
+  "code": "var a = function() { class Foo { bar() { this.x } } }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 26`] = `
+{
+  "code": "var a = function() { var o = { foo() { this.x } } }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 27`] = `
+{
+  "code": "var a = function() { var o = { get foo() { return this.x } } }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 28`] = `
+{
+  "code": "var a = function() { var o = { set foo(v) { this.x = v } } }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 29`] = `
+{
+  "code": "var a = function() { class Foo { constructor() { this.x = 1 } } }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 74,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 30`] = `
+{
+  "code": "var a = function() { class Foo { bar() { var f = () => this } } }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 74,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 31`] = `
+{
+  "code": "var a = function() { function inner(a = this) {} }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 59,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 32`] = `
+{
+  "code": "var a = function() { var o = { foo: function() { this.x } } }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 70,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 33`] = `
+{
+  "code": "var a = function() { var o = { foo() { var p = { [this.key]() {} } } } }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 81,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 34`] = `
+{
+  "code": "var a = function() { class Foo { static bar() { this.x } } }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 35`] = `
+{
+  "code": "var a = function() { var C = class { method() { this.x } } }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 36`] = `
+{
+  "code": "var a = function() { var f = () => ({ method() { this.x } }) }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 37`] = `
+{
+  "code": "var a = function() { class Foo { constructor() { class Bar { constructor() { this.x } } } } }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 102,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 38`] = `
+{
+  "code": "var a = function() { class Foo { bar() { var f = () => { var g = () => this } } } }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 92,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 39`] = `
+{
+  "code": "var a = function() { class Outer { method() { class Inner { [this.key]() {} } } } }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 92,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 40`] = `
+{
+  "code": "var a = function() {}/**/.bind(b)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 41`] = `
+{
+  "code": "var a = function() {} // comment
+.bind(b)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 2,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 42`] = `
+{
+  "code": "var a = function() {} /* a */ /* b */ .bind(b)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 43`] = `
+{
+  "code": "var a = (function foo() { return 1; }).bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 44`] = `
+{
+  "code": "var a = function() { class Foo { method() { var f = () => { var g = function() { class Bar { constructor() { this.x } } } } } } }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 138,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 45`] = `
+{
+  "code": "var a = function() { var b = function() { return 1 }.bind(d) }.bind(c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 71,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 46`] = `
+{
+  "code": "var a = function() {}.bind(null)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 47`] = `
+{
+  "code": "var a = function() {}.bind(b++)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 48`] = `
+{
+  "code": "var a = function() {}.bind(b())",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 49`] = `
+{
+  "code": "var a = function() {}.bind(b.c)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 50`] = `
+{
+  "code": "var a = function() {}.bind(\`\${b}\`)",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 51`] = `
+{
+  "code": "var a = function() {}.bind([])",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-extra-bind > invalid 52`] = `
+{
+  "code": "var a = function() {}.bind({})",
+  "diagnostics": [
+    {
+      "message": "The function binding is unnecessary.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-extra-bind",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

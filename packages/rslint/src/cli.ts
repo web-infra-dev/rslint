@@ -38,7 +38,7 @@ function isExecError(
 async function runWithJSConfigs(
   binPath: string,
   configs: Map<string, string>,
-  restArgs: string[],
+  goArgs: string[],
   cwd: string,
 ): Promise<number> {
   const configEntries: { configDirectory: string; entries: unknown[] }[] = [];
@@ -80,13 +80,13 @@ async function runWithJSConfigs(
 
   // All configs failed to load — fall back to Go binary (JSON config path)
   if (configEntries.length === 0) {
-    return execBinary(binPath, restArgs);
+    return execBinary(binPath, goArgs);
   }
 
   const payload = JSON.stringify({ configs: configEntries });
 
   try {
-    execFileSync(binPath, ['--config-stdin', ...restArgs], {
+    execFileSync(binPath, ['--config-stdin', ...goArgs], {
       input: payload,
       stdio: ['pipe', 'inherit', 'inherit'],
       cwd,
@@ -99,7 +99,11 @@ async function runWithJSConfigs(
   }
 }
 
-export async function run(binPath: string, argv: string[]): Promise<number> {
+export async function run(
+  binPath: string,
+  argv: string[],
+  startTime: number,
+): Promise<number> {
   const cwd = process.cwd();
   const args = parseArgs(argv);
 
@@ -116,6 +120,10 @@ export async function run(binPath: string, argv: string[]): Promise<number> {
       return 1;
     }
   }
+
+  // Build Go args: rest (user flags, stripped of --config/--init/--start-time
+  // by parseArgs) + the real start time from the Node.js entry point.
+  const goArgs = [...args.rest, `--start-time=${startTime}`];
 
   // Classify positional arguments into files and directories
   const { files, dirs } = classifyArgs(args.positionals, cwd);
@@ -136,9 +144,12 @@ export async function run(binPath: string, argv: string[]): Promise<number> {
   }
 
   if (jsConfigs.size > 0) {
-    return runWithJSConfigs(binPath, jsConfigs, args.rest, cwd);
+    return runWithJSConfigs(binPath, jsConfigs, goArgs, cwd);
   }
 
   // Fall back to Go binary (handles JSON config + deprecation warning)
-  return execBinary(binPath, args.raw);
+  const jsonGoArgs = args.config
+    ? ['--config', args.config, ...goArgs]
+    : goArgs;
+  return execBinary(binPath, jsonGoArgs);
 }

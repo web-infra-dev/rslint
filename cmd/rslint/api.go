@@ -212,6 +212,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		allowedFiles,
 		nil, // no allowDirs in API mode
 		utils.ExcludePaths,
+
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			// Track source file for encoding
 			sourceFilesLock.Lock()
@@ -228,6 +229,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 				}
 			})
 		},
+		false, // no type-check in API mode
 		diagnosticCollector,
 	)
 	if err != nil {

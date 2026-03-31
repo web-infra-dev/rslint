@@ -13,6 +13,7 @@ rslint [options] [files/directories...]
 | `--init`             | Generate a default config file, or migrate an existing JSON config to JS/TS |
 | `--config <path>`    | Specify which config file to use                                            |
 | `--fix`              | Automatically fix problems                                                  |
+| `--type-check`       | Enable TypeScript semantic type checking ([details](/guide/type-checking))  |
 | `--format <format>`  | Output format: `default`, `jsonline`, or `github`                           |
 | `--quiet`            | Report errors only, suppress warnings                                       |
 | `--max-warnings <n>` | Exit with error if warning count exceeds this number                        |
@@ -80,6 +81,22 @@ src/index.ts:5:7
 Found 1 error and 0 warnings (linted 12 files in 42ms using 8 threads)
 ```
 
+With `--type-check`, type errors are also included (see [Type Checking](/guide/type-checking) for details):
+
+```bash
+rslint --type-check .
+```
+
+```
+src/index.ts:5:7
+  error  @typescript-eslint/no-unused-vars  'foo' is declared but its value is never read.
+
+src/utils.ts:3:7
+  error  TypeScript(TS2322)  Type 'string' is not assignable to type 'number'.
+
+Found 1 lint error, 1 type error and 0 warnings (linted 12 files in 85ms using 8 threads)
+```
+
 ### jsonline
 
 One diagnostic per line as compact JSON. Suitable for programmatic consumption.
@@ -95,6 +112,16 @@ GitHub Actions workflow command format. Creates annotations directly on pull req
 ```bash
 rslint --format github .
 ```
+
+## Type Checking
+
+Use `--type-check` to enable TypeScript semantic type checking alongside lint diagnostics. This can fully replace `tsc --noEmit` in your workflow.
+
+```bash
+rslint --type-check .
+```
+
+For details on output format, CI migration, and how it works, see the [Type Checking](/guide/type-checking) page.
 
 ## Exit Codes
 
@@ -131,6 +158,9 @@ Rslint auto-detects the `GITHUB_ACTIONS` environment variable and enables colore
 ```bash
 # Fail on any error
 npx rslint .
+
+# Lint with type checking
+npx rslint --type-check .
 
 # Fail on errors or if warnings exceed threshold
 npx rslint --max-warnings 10 .
