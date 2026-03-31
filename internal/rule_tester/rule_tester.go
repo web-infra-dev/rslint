@@ -342,6 +342,7 @@ func ConvertESLintTestCase(tc ESLintTestCase) ValidTestCase {
 		Only:     tc.Only,
 		Skip:     tc.Skip,
 		Options:  options,
+		Settings: tc.Settings,
 		Tsx:      tsx,
 	}
 }
@@ -401,6 +402,7 @@ func ConvertESLintInvalidTestCase(tc ESLintInvalidTestCase) InvalidTestCase {
 		Output:   output,
 		Errors:   errors,
 		Options:  options,
+		Settings: tc.Settings,
 		Tsx:      tsx,
 	}
 }
