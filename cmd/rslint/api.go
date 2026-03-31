@@ -222,10 +222,7 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 
 			var settings map[string]interface{}
 			if merged := rslintConfig.GetConfigForFile(sourceFile.FileName(), configDirectory); merged != nil && len(merged.Settings) > 0 {
-				settings = make(map[string]interface{}, len(merged.Settings))
-				for k, v := range merged.Settings {
-					settings[k] = v
-				}
+				settings = rslintconfig.CloneSettings(merged.Settings)
 			}
 
 			return utils.Map(rulesWithOptions, func(r RuleWithOption) linter.ConfiguredRule {

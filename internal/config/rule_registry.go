@@ -63,7 +63,7 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 				ruleConfigCopy := ruleConfig
 				enabledRules = append(enabledRules, linter.ConfiguredRule{
 					Name:     ruleName,
-					Settings: cloneSettings(mergedConfig.Settings),
+					Settings: CloneSettings(mergedConfig.Settings),
 					Severity: ruleConfig.GetSeverity(),
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
 						return ruleImpl.Run(ctx, ruleConfigCopy.Options)
@@ -76,7 +76,7 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 	return enabledRules, mergedConfig
 }
 
-func cloneSettings(settings map[string]interface{}) map[string]interface{} {
+func CloneSettings(settings map[string]interface{}) map[string]interface{} {
 	if len(settings) == 0 {
 		return nil
 	}
