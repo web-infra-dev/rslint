@@ -8,6 +8,7 @@ import (
 	"github.com/bmatcuk/doublestar/v4"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	importPlugin "github.com/web-infra-dev/rslint/internal/plugins/import"
+	jestPlugin "github.com/web-infra-dev/rslint/internal/plugins/jest"
 	reactPlugin "github.com/web-infra-dev/rslint/internal/plugins/react"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/adjacent_overload_signatures"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/array_type"
@@ -232,28 +233,34 @@ func (rc *RuleConfig) GetSeverity() rule.DiagnosticSeverity {
 	}
 	return rule.ParseSeverity(rc.Level)
 }
+
 // PluginInfo defines a known plugin with its rule prefix and all accepted declaration names.
 type PluginInfo struct {
 	RulePrefix  string   // Rule name prefix, e.g. "import"
 	DeclNames   []string // All accepted declaration names, e.g. ["eslint-plugin-import", "import"]
-	getAllRules  func() []rule.Rule
+	getAllRules func() []rule.Rule
 }
 
 // KnownPlugins is the single source of truth for all supported plugins.
 var KnownPlugins = []PluginInfo{
 	{
-		RulePrefix: "@typescript-eslint",
-		DeclNames:  []string{"@typescript-eslint"},
+		RulePrefix:  "@typescript-eslint",
+		DeclNames:   []string{"@typescript-eslint"},
 		getAllRules: func() []rule.Rule { return GetPluginRules("@typescript-eslint") },
 	},
 	{
-		RulePrefix: "import",
-		DeclNames:  []string{"eslint-plugin-import", "import"},
+		RulePrefix:  "import",
+		DeclNames:   []string{"eslint-plugin-import", "import"},
 		getAllRules: func() []rule.Rule { return importPlugin.GetAllRules() },
 	},
 	{
-		RulePrefix: "react",
-		DeclNames:  []string{"react"},
+		RulePrefix:  "jest",
+		DeclNames:   []string{"eslint-plugin-jest", "jest"},
+		getAllRules: func() []rule.Rule { return jestPlugin.GetAllRules() },
+	},
+	{
+		RulePrefix:  "react",
+		DeclNames:   []string{"react"},
 		getAllRules: func() []rule.Rule { return reactPlugin.GetAllRules() },
 	},
 }
@@ -324,12 +331,19 @@ func RegisterAllRules() {
 		registerAllTypeScriptEslintPluginRules()
 		registerAllEslintImportPluginRules()
 		registerAllReactPluginRules()
+		registerAllJestPluginRules()
 		registerAllCoreEslintRules()
 	})
 }
 
 func registerAllReactPluginRules() {
 	for _, rule := range reactPlugin.GetAllRules() {
+		GlobalRuleRegistry.Register(rule.Name, rule)
+	}
+}
+
+func registerAllJestPluginRules() {
+	for _, rule := range jestPlugin.GetAllRules() {
 		GlobalRuleRegistry.Register(rule.Name, rule)
 	}
 }

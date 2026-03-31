@@ -181,3 +181,6 @@ relints
 stdjson
 tsconfiga
 fixall
+fdescribe
+xdescribe
+xtest

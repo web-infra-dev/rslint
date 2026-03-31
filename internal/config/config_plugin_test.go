@@ -87,10 +87,11 @@ func TestGetPluginRules_Disjoint(t *testing.T) {
 	tsRules := GetPluginRules("@typescript-eslint")
 	coreRules := GetCoreRules()
 	importRules := GetPluginRules("import")
+	jestRules := GetPluginRules("jest")
 	reactRules := GetPluginRules("react")
 
 	// Together they should cover all registered rules
-	total := len(tsRules) + len(coreRules) + len(importRules) + len(reactRules)
+	total := len(tsRules) + len(coreRules) + len(importRules) + len(jestRules) + len(reactRules)
 	allRules := GlobalRuleRegistry.GetAllRules()
 	if total != len(allRules) {
 		t.Errorf("Expected total %d to equal all rules %d", total, len(allRules))
