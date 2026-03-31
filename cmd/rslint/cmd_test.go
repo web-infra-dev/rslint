@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -637,5 +638,37 @@ func TestGroupDiagsByFile_MultipleFiles(t *testing.T) {
 		if len(diags) != 1 {
 			t.Errorf("expected 1 diagnostic per file, got %d", len(diags))
 		}
+	}
+}
+
+// ======== resolveStartTime tests ========
+
+func TestResolveStartTime_Zero(t *testing.T) {
+	before := time.Now()
+	result := resolveStartTime(0)
+	after := time.Now()
+
+	if result.Before(before) || result.After(after) {
+		t.Errorf("expected time.Now() when startTimeMs is 0, got %v", result)
+	}
+}
+
+func TestResolveStartTime_Positive(t *testing.T) {
+	ms := int64(1711800000000) // a fixed epoch millis
+	result := resolveStartTime(ms)
+	expected := time.UnixMilli(ms)
+
+	if !result.Equal(expected) {
+		t.Errorf("expected %v, got %v", expected, result)
+	}
+}
+
+func TestResolveStartTime_Negative(t *testing.T) {
+	before := time.Now()
+	result := resolveStartTime(-1)
+	after := time.Now()
+
+	if result.Before(before) || result.After(after) {
+		t.Errorf("expected time.Now() when startTimeMs is negative, got %v", result)
 	}
 }
