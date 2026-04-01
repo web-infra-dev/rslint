@@ -92,6 +92,11 @@ func IsWriteReference(node *ast.Node) bool {
 		// ...x in array destructuring assignment context
 		return IsWriteReference(parent)
 
+	case ast.KindSpreadAssignment:
+		// ...x in object destructuring assignment context
+		return IsInDestructuringAssignment(parent)
+
+
 	case ast.KindForInStatement, ast.KindForOfStatement:
 		// for (x in obj) / for (x of arr) — x is a write target
 		stmt := parent.AsForInOrOfStatement()
@@ -103,6 +108,9 @@ func IsWriteReference(node *ast.Node) bool {
 		return IsWriteReference(parent)
 
 	case ast.KindAsExpression, ast.KindTypeAssertionExpression:
+		return IsWriteReference(parent)
+
+	case ast.KindNonNullExpression:
 		return IsWriteReference(parent)
 	}
 
@@ -170,6 +178,14 @@ func IsInDestructuringAssignment(node *ast.Node) bool {
 					}
 				}
 			}
+			// Check if this is a destructuring target in for-in/for-of
+			if parent != nil && (parent.Kind == ast.KindForInStatement || parent.Kind == ast.KindForOfStatement) {
+				stmt := parent.AsForInOrOfStatement()
+				if stmt != nil && stmt.Initializer == current {
+					return true
+				}
+			}
+
 			// Continue walking up — this array/object might be nested inside
 			// another destructuring pattern (e.g. [{a}] = [...]).
 		}

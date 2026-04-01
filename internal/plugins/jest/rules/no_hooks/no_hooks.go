@@ -14,7 +14,7 @@ import (
 func buildErrorUnexpectedHookMessage(hook string) rule.RuleMessage {
 	return rule.RuleMessage{
 		Id:          "unexpectedHook",
-		Description: fmt.Sprintf("Unexpected hook: {{%s}}", hook),
+		Description: fmt.Sprintf("Unexpected '%s' hook", hook),
 	}
 }
 

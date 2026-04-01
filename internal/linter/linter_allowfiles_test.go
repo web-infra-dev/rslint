@@ -20,7 +20,7 @@ func TestRunLinterInProgram_AllowFilesNil(t *testing.T) {
 
 	lintedFiles := RunLinterInProgram(program, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles < 2 {
@@ -41,7 +41,7 @@ func TestRunLinterInProgram_AllowFilesSingle(t *testing.T) {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
 		},
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 1 {
@@ -67,7 +67,7 @@ func TestRunLinterInProgram_AllowFilesMultiple(t *testing.T) {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
 		},
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 2 {
@@ -87,7 +87,7 @@ func TestRunLinterInProgram_AllowFilesEmpty(t *testing.T) {
 
 	lintedFiles := RunLinterInProgram(program, []string{}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 0 {
@@ -103,7 +103,7 @@ func TestRunLinterInProgram_AllowFilesNotInProgram(t *testing.T) {
 	nonexistent := tspath.NormalizePath(filepath.Join(t.TempDir(), "nonexistent.ts"))
 	lintedFiles := RunLinterInProgram(program, []string{nonexistent}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 0 {
@@ -119,7 +119,7 @@ func TestRunLinterInProgram_AllowFilesNoRules(t *testing.T) {
 	diagnostics := []rule.RuleDiagnostic{}
 	lintedFiles := RunLinterInProgram(program, []string{paths["a.ts"]}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return nil },
-		func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) },
+		false, func(d rule.RuleDiagnostic) { diagnostics = append(diagnostics, d) },
 	)
 
 	if lintedFiles != 1 {
@@ -143,7 +143,7 @@ func TestRunLinterInProgram_AllowFilesPartialMatch(t *testing.T) {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
 		},
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 1 {
@@ -158,7 +158,7 @@ func TestRunLinterInProgram_AllowFilesDuplicate(t *testing.T) {
 
 	lintedFiles := RunLinterInProgram(program, []string{paths["a.ts"], paths["a.ts"]}, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if lintedFiles != 1 {
@@ -178,7 +178,7 @@ func TestRunLinter_AllowFilesIntegration(t *testing.T) {
 			lintedFileNames = append(lintedFileNames, sf.FileName())
 			return noopRule()
 		},
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if err != nil {
@@ -197,7 +197,7 @@ func TestRunLinter_AllowFilesNilPassthrough(t *testing.T) {
 
 	lintedCount, err := RunLinter([]*compiler.Program{program}, true, nil, nil, utils.ExcludePaths,
 		func(sf *ast.SourceFile) []ConfiguredRule { return noopRule() },
-		func(d rule.RuleDiagnostic) {},
+		false, func(d rule.RuleDiagnostic) {},
 	)
 
 	if err != nil {

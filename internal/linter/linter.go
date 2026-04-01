@@ -2,6 +2,7 @@ package linter
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -12,11 +13,13 @@ import (
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/compiler"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/microsoft/typescript-go/shim/tspath"
 )
 
 type ConfiguredRule struct {
 	Name     string
+	Settings map[string]interface{}
 	Severity rule.DiagnosticSeverity
 	Run      func(ctx rule.RuleContext) rule.RuleListeners
 }
@@ -67,17 +70,44 @@ func isDirAllowed(fileName string, allowDirs []string) bool {
 	return false
 }
 
-func RunLinterInProgram(program *compiler.Program, allowFiles []string, allowDirs []string, skipFiles []string, getRulesForFile RuleHandler, onDiagnostic DiagnosticHandler) int32 {
-	checker, done := program.GetTypeChecker(context.Background())
-	defer done()
+// flattenDiagnosticMessage builds a human-readable message from a TypeScript
+// diagnostic, including its MessageChain and RelatedInformation.
+// The format follows tsc's output style.
+func flattenDiagnosticMessage(d *ast.Diagnostic) string {
+	var b strings.Builder
+	b.WriteString(d.String())
+	for _, chain := range d.MessageChain() {
+		flattenMessageChain(&b, chain, 1)
+	}
+	for _, related := range d.RelatedInformation() {
+		if related.File() != nil {
+			line, _ := scanner.GetECMALineAndUTF16CharacterOfPosition(related.File(), related.Pos())
+			fmt.Fprintf(&b, "\n  %s:%d: %s", related.File().FileName(), line+1, related.String())
+		}
+	}
+	return b.String()
+}
 
+func flattenMessageChain(b *strings.Builder, chain *ast.Diagnostic, level int) {
+	b.WriteByte('\n')
+	for range level {
+		b.WriteString("  ")
+	}
+	b.WriteString(chain.String())
+	for _, child := range chain.MessageChain() {
+		flattenMessageChain(b, child, level+1)
+	}
+}
+
+func RunLinterInProgram(program *compiler.Program, allowFiles []string, allowDirs []string, skipFiles []string, getRulesForFile RuleHandler, typeCheck bool, onDiagnostic DiagnosticHandler) int32 {
 	// Pre-compute FileInfo for allowFiles once to avoid N×M stat calls in the loop.
 	var allowFileInfos []os.FileInfo
 	if allowFiles != nil {
 		allowFileInfos = precomputeAllowFileInfos(allowFiles)
 	}
 
-	var lintedFileCount int32 = 0
+	// Collect files to lint (applying all filters).
+	var filesToLint []*ast.SourceFile
 	for _, file := range program.GetSourceFiles() {
 		p := string(file.Path())
 		// skip lint node_modules and bundled files
@@ -100,10 +130,17 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, allowDir
 				continue
 			}
 		}
-		lintedFileCount++
+		filesToLint = append(filesToLint, file)
+	}
 
-		registeredListeners := make(map[ast.Kind][](func(node *ast.Node)), 20)
-		{
+	lintedFileCount := int32(len(filesToLint))
+
+	// Phase 1: Run lint rules. Acquires a checker from the pool for type-aware rules.
+	{
+		checker, done := program.GetTypeChecker(context.Background())
+		for _, file := range filesToLint {
+			registeredListeners := make(map[ast.Kind][](func(node *ast.Node)), 20)
+
 			rules := getRulesForFile(file)
 			if len(rules) == 0 {
 				continue
@@ -119,6 +156,7 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, allowDir
 				ctx := rule.RuleContext{
 					SourceFile:     file,
 					Program:        program,
+					Settings:       r.Settings,
 					TypeChecker:    checker,
 					DisableManager: disableManager,
 					ReportRange: func(textRange core.TextRange, msg rule.RuleMessage) {
@@ -293,8 +331,28 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, allowDir
 			file.Node.ForEachChild(childVisitor)
 			clear(registeredListeners)
 		}
-
+		done()
 	}
+
+	// Phase 2: Collect TypeScript semantic diagnostics when type-check is enabled.
+	// This runs after releasing the checker from Phase 1, because GetSemanticDiagnostics
+	// internally acquires its own checker from the pool.
+	if typeCheck {
+		ctx := context.Background()
+		for _, file := range filesToLint {
+			for _, d := range program.GetSemanticDiagnostics(ctx, file) {
+				onDiagnostic(rule.RuleDiagnostic{
+					RuleName:     fmt.Sprintf("TypeScript(TS%d)", d.Code()),
+					Range:        d.Loc(),
+					Message:      rule.RuleMessage{Description: flattenDiagnosticMessage(d)},
+					SourceFile:   file,
+					Severity:     rule.SeverityError,
+					PreFormatted: true,
+				})
+			}
+		}
+	}
+
 	return lintedFileCount
 }
 
@@ -304,7 +362,7 @@ type DiagnosticHandler = func(diagnostic rule.RuleDiagnostic)
 // when allowedFiles is passed as nil which means all files are allowed
 // when allowedFiles is passed as slice, only files in the slice are allowed
 // when allowDirs is set, files under those directories are also allowed (OR logic with allowFiles)
-func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []string, allowDirs []string, excludedPaths []string, getRulesForFile RuleHandler, onDiagnostic DiagnosticHandler) (int32, error) {
+func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []string, allowDirs []string, excludedPaths []string, getRulesForFile RuleHandler, typeCheck bool, onDiagnostic DiagnosticHandler) (int32, error) {
 
 	wg := core.NewWorkGroup(singleThreaded)
 
@@ -312,7 +370,7 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []s
 	for _, program := range programs {
 		{
 			wg.Queue(func() {
-				fileCount := RunLinterInProgram(program, allowFiles, allowDirs, excludedPaths, getRulesForFile, onDiagnostic)
+				fileCount := RunLinterInProgram(program, allowFiles, allowDirs, excludedPaths, getRulesForFile, typeCheck, onDiagnostic)
 				lintedFileCount.Add(fileCount)
 			})
 		}

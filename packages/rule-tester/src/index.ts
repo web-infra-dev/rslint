@@ -189,9 +189,12 @@ export class RuleTester {
 
           const options =
             typeof validCase === 'string' ? [] : validCase.options || [];
+          const filename =
+            typeof validCase === 'string' ? undefined : validCase.filename;
+          const isDts = filename && filename.endsWith('.d.ts');
           let virtual_entry = path.resolve(
             cwd,
-            isJSX ? 'virtual.tsx' : 'virtual.ts',
+            isDts ? 'decl.d.ts' : isJSX ? 'react.tsx' : 'virtual.ts',
           );
           // workaround for this hardcoded path https://github.com/typescript-eslint/typescript-eslint/blob/main/packages/eslint-plugin/tests/rules/no-floating-promises.test.ts#L712
           if (Array.isArray(options)) {
@@ -242,9 +245,10 @@ export class RuleTester {
           const languageOptions =
             item.languageOptions ?? this.options.languageOptions;
           const isJSX = languageOptions?.parserOptions?.ecmaFeatures?.jsx;
+          const isDts = item.filename && item.filename.endsWith('.d.ts');
           const test_virtual_entry = path.resolve(
             cwd,
-            isJSX ? 'virtual.tsx' : 'virtual.ts',
+            isDts ? 'decl.d.ts' : isJSX ? 'react.tsx' : 'virtual.ts',
           );
           const diags = await lint({
             config,

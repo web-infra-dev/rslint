@@ -20,6 +20,8 @@ export function parseArgs(argv: string[]) {
       'max-warnings': { type: 'string' },
       trace: { type: 'string' },
       cpuprof: { type: 'string' },
+      // Consumed by the JS entry point; must not reach Go from user input.
+      'start-time': { type: 'string' },
     },
   });
 
@@ -29,7 +31,12 @@ export function parseArgs(argv: string[]) {
   const positionals: string[] = [];
   for (const token of tokens) {
     if (token.kind === 'option') {
-      if (token.name === 'config' || token.name === 'init') continue;
+      if (
+        token.name === 'config' ||
+        token.name === 'init' ||
+        token.name === 'start-time'
+      )
+        continue;
       rest.push(token.rawName);
       if (token.value != null) rest.push(token.value);
     } else if (token.kind === 'option-terminator') {
@@ -41,7 +48,6 @@ export function parseArgs(argv: string[]) {
   }
 
   return {
-    raw: argv,
     config: (values.config as string) ?? null,
     init: (values.init as boolean) ?? false,
     rest,

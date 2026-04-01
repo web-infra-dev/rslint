@@ -212,22 +212,31 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		allowedFiles,
 		nil, // no allowDirs in API mode
 		utils.ExcludePaths,
+
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			// Track source file for encoding
 			sourceFilesLock.Lock()
 			filePath := tspath.ConvertToRelativePath(sourceFile.FileName(), comparePathOptions)
 			sourceFiles[filePath] = sourceFile
 			sourceFilesLock.Unlock()
+
+			var settings map[string]interface{}
+			if merged := rslintConfig.GetConfigForFile(sourceFile.FileName(), configDirectory); merged != nil && len(merged.Settings) > 0 {
+				settings = rslintconfig.CloneSettings(merged.Settings)
+			}
+
 			return utils.Map(rulesWithOptions, func(r RuleWithOption) linter.ConfiguredRule {
 
 				return linter.ConfiguredRule{
-					Name: r.rule.Name,
+					Name:     r.rule.Name,
+					Settings: settings,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
 						return r.rule.Run(ctx, r.option)
 					},
 				}
 			})
 		},
+		false, // no type-check in API mode
 		diagnosticCollector,
 	)
 	if err != nil {

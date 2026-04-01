@@ -117,10 +117,27 @@ Before starting, familiarize yourself with these key source locations:
    - **Ensure Coverage**: Ensure Line and Column numbers are tested in invalid cases.
 
 4. **Identify Edge Cases**:
-   - Does the rule handle comments?
-   - Does it handle Optional Chaining (`?.`)?
-   - Does it handle TypeScript-specific syntax (if applicable)?
-   - Does it handle empty bodies or malformed code?
+
+   Systematically enumerate edge cases across three dimensions:
+
+   **Dimension 1: AST node types** — List every syntax construct the rule should handle:
+   - All access patterns (e.g., `.prop`, `['prop']`, ``[`prop`]``)
+   - Optional Chaining (`?.`)
+   - TypeScript-specific syntax (type annotations, generics, enums, etc.)
+   - Async functions, generators, arrow functions
+   - Empty bodies, malformed code
+
+   **Dimension 2: Scoping & nesting** — Enumerate nested combinations:
+   - Function / arrow / method / constructor / getter / setter crossed with each other
+   - Class bodies, computed property names, extends clauses, static blocks
+   - `this` / `super` binding semantics across scope boundaries
+   - Deeply nested patterns (3+ levels)
+
+   **Dimension 3: Autofix boundaries** (if the rule has autofix):
+   - Comments between tokens that must be preserved
+   - Arguments with side effects (should suppress autofix)
+   - Parenthesized expressions (multiple levels)
+   - Multi-line code with varying whitespace
 
 5. **Document Intentional Differences**:
 
@@ -155,6 +172,14 @@ Before starting, familiarize yourself with these key source locations:
 - Review AST node types in `shim/ast/shim.go`
 - See [AST_PATTERNS.md](../../AST_PATTERNS.md) for traversal patterns and examples
 
+**Check for reusable shim utilities**: Before implementing custom helpers, check if the `shim/` packages already provide what you need:
+
+- `shim/scanner/` — `SkipTrivia` (skip whitespace/comments to find next token position), `GetScannerForSourceFile`
+- `shim/ast/` — `GetThisContainer`, `IsFunctionLike`, `IsFunctionLikeDeclaration`, and other AST utilities
+- `shim/core/` — `NewTextRange` and other core utilities
+
+> **Warning**: Some shim functions have different semantics from ESLint's model. For example, `ast.GetThisContainer` treats `PropertyDeclaration`, `ClassStaticBlockDeclaration`, `ModuleDeclaration`, etc. as `this` containers, which does not match ESLint's scope model. Always compare the shim function's behavior against ESLint before reusing.
+
 **Rule Interface**:
 
 ```go
@@ -185,6 +210,7 @@ var MyCoreRule = rule.Rule{
 - Each callback receives a `*ast.Node` and reports diagnostics via `ctx.ReportNode()`
 - Options parsing happens inside the `Run` function before returning listeners
 - Use `rule.CreateRule` **ONLY** for `@typescript-eslint` rules (it adds the prefix)
+- **MessageId convention**: Use camelCase for `RuleMessage.Id` (e.g., `"unexpectedAny"`, `"missingSuper"`). Match the original ESLint rule's messageId names. The JS rule-tester has a `toCamelCase` compatibility layer, but new rules should use camelCase directly.
 
 **AST Shim API Warning**: In `github.com/microsoft/typescript-go/shim/ast`:
 
@@ -276,6 +302,23 @@ rule_tester.InvalidTestCase{
 }
 ```
 
+**Autofix Testing**: If the rule provides autofix, use the `Output` field to verify the fixed code:
+
+```go
+// With autofix: provide Output field with the expected fixed code
+rule_tester.InvalidTestCase{
+    Code:   `var a = function() { return 1; }.bind(b)`,
+    Output: []string{`var a = function() { return 1; }`},
+    Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpected"}},
+}
+
+// Without autofix (e.g., side-effect argument): omit Output field
+rule_tester.InvalidTestCase{
+    Code:   `var a = function() {}.bind(b++)`,
+    Errors: []rule_tester.InvalidTestCaseError{{MessageId: "unexpected"}},
+}
+```
+
 **Test Case Structs**: See `internal/rule_tester/rule_tester.go` for `ValidTestCase`, `InvalidTestCase`, and `InvalidTestCaseError` definitions.
 
 ---
@@ -364,6 +407,10 @@ Follow this **strict order** — each step depends on the previous one:
 4. **JS tests** (note: this changes cwd, use absolute paths for subsequent commands):
 
    ```bash
+   # First run for new test cases: generate snapshots with -u flag
+   cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name> -u
+
+   # Subsequent runs: verify against existing snapshots
    cd packages/rslint-test-tools && npx rstest run --testTimeout=10000 <rule-name>
    ```
 
@@ -377,11 +424,23 @@ Follow this **strict order** — each step depends on the previous one:
      - Multi-line expressions
      - Nested structures (e.g., `foo((x), y)`, `foo(bar(), baz())`)
 
+   **Go vs JS test differences**:
+
+   | Aspect           | Go tests                                | JS tests                                    |
+   | ---------------- | --------------------------------------- | ------------------------------------------- |
+   | Autofix          | `Output: []string{...}` field           | Not verified (snapshot filters out `fixes`) |
+   | Position         | `Line`/`Column` fields on each error    | Implicitly covered by snapshot              |
+   | Multiple errors  | `Errors: []...{{...}, {...}}`           | `errors: [{...}, {...}]`                    |
+   | MessageId format | camelCase (e.g., `"noLossOfPrecision"`) | camelCase (e.g., `"noLossOfPrecision"`)     |
+
 6. **Project-wide Checks**:
 
    ```bash
    # Type check and lint
    pnpm typecheck && pnpm lint
+
+   # Spell check (catches typos in comments and strings)
+   pnpm -w run check-spell
 
    # Format and Go lint checks (REQUIRED before commit)
    pnpm format:check && pnpm lint:go
@@ -512,6 +571,16 @@ This step is executed **once**, after all rules are committed (or after the sing
 
    - **Do NOT include AI-related information** in PR title or body
    - If any rules were skipped during batch execution, note them in the PR body
+
+---
+
+## Post-Porting Validation (Optional)
+
+For complex rules (rules involving scope tracking, autofix, or many configuration options), consider running a deeper alignment check after the initial port:
+
+- Use the `validate-rule-alignment` skill to exhaustively verify edge cases
+- Run the rule on real-world projects and compare output with the original ESLint rule
+- This step is especially valuable for rules that track state across nested scopes (e.g., `this` binding, variable declarations)
 
 ---
 

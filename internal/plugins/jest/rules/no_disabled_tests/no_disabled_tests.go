@@ -57,7 +57,7 @@ func isPendingCall(node *ast.Node, ctx rule.RuleContext) bool {
 			return false
 		}
 
-		importDecl := findImportDeclaration(decl)
+		importDecl := utils.FindImportDeclaration(decl)
 		if importDecl == nil || importDecl.ModuleSpecifier == nil {
 			return false
 		}
@@ -66,18 +66,6 @@ func isPendingCall(node *ast.Node, ctx rule.RuleContext) bool {
 	}
 
 	return true
-}
-
-func findImportDeclaration(node *ast.Node) *ast.ImportDeclaration {
-	current := node
-	for current != nil {
-		switch current.Kind {
-		case ast.KindImportDeclaration, ast.KindJSImportDeclaration:
-			return current.AsImportDeclaration()
-		}
-		current = current.Parent
-	}
-	return nil
 }
 
 var NoDisabledTestsRule = rule.Rule{

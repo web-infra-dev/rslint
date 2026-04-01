@@ -138,7 +138,7 @@ func resolveOriginalName(node *ast.Node, localName string, localNode *ast.Node, 
 			continue
 		}
 
-		importDecl := findImportDeclaration(decl)
+		importDecl := FindImportDeclaration(decl)
 		if importDecl == nil || importDecl.ModuleSpecifier == nil {
 			continue
 		}
@@ -197,7 +197,7 @@ func resolveFirstIdentifier(node *ast.Node) *ast.Node {
 	return nil
 }
 
-func findImportDeclaration(node *ast.Node) *ast.ImportDeclaration {
+func FindImportDeclaration(node *ast.Node) *ast.ImportDeclaration {
 	current := node
 	for current != nil {
 		switch current.Kind {
