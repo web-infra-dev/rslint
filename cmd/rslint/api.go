@@ -219,10 +219,17 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 			filePath := tspath.ConvertToRelativePath(sourceFile.FileName(), comparePathOptions)
 			sourceFiles[filePath] = sourceFile
 			sourceFilesLock.Unlock()
+
+			var settings map[string]interface{}
+			if merged := rslintConfig.GetConfigForFile(sourceFile.FileName(), configDirectory); merged != nil && len(merged.Settings) > 0 {
+				settings = rslintconfig.CloneSettings(merged.Settings)
+			}
+
 			return utils.Map(rulesWithOptions, func(r RuleWithOption) linter.ConfiguredRule {
 
 				return linter.ConfiguredRule{
-					Name: r.rule.Name,
+					Name:     r.rule.Name,
+					Settings: settings,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
 						return r.rule.Run(ctx, r.option)
 					},

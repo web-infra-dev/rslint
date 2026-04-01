@@ -19,6 +19,7 @@ import (
 
 type ConfiguredRule struct {
 	Name     string
+	Settings map[string]interface{}
 	Severity rule.DiagnosticSeverity
 	Run      func(ctx rule.RuleContext) rule.RuleListeners
 }
@@ -155,6 +156,7 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, allowDir
 				ctx := rule.RuleContext{
 					SourceFile:     file,
 					Program:        program,
+					Settings:       r.Settings,
 					TypeChecker:    checker,
 					DisableManager: disableManager,
 					ReportRange: func(textRange core.TextRange, msg rule.RuleMessage) {
