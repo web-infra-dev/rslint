@@ -96,6 +96,7 @@ func IsWriteReference(node *ast.Node) bool {
 		// ...x in object destructuring assignment context
 		return IsInDestructuringAssignment(parent)
 
+
 	case ast.KindForInStatement, ast.KindForOfStatement:
 		// for (x in obj) / for (x of arr) — x is a write target
 		stmt := parent.AsForInOrOfStatement()

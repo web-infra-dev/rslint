@@ -1,0 +1,1535 @@
+// Rstest Snapshot v1
+
+exports[`no-import-assign > invalid 1`] = `
+{
+  "code": "import mod1 from 'mod'; mod1 = 0",
+  "diagnostics": [
+    {
+      "message": "'mod1' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 2`] = `
+{
+  "code": "import mod2 from 'mod'; mod2 += 0",
+  "diagnostics": [
+    {
+      "message": "'mod2' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 3`] = `
+{
+  "code": "import mod3 from 'mod'; mod3++",
+  "diagnostics": [
+    {
+      "message": "'mod3' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 4`] = `
+{
+  "code": "import mod4 from 'mod'; for (mod4 in foo);",
+  "diagnostics": [
+    {
+      "message": "'mod4' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 5`] = `
+{
+  "code": "import mod5 from 'mod'; for (mod5 of foo);",
+  "diagnostics": [
+    {
+      "message": "'mod5' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 6`] = `
+{
+  "code": "import mod6 from 'mod'; [mod6] = foo",
+  "diagnostics": [
+    {
+      "message": "'mod6' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 7`] = `
+{
+  "code": "import mod7 from 'mod'; [mod7 = 0] = foo",
+  "diagnostics": [
+    {
+      "message": "'mod7' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 8`] = `
+{
+  "code": "import mod8 from 'mod'; [...mod8] = foo",
+  "diagnostics": [
+    {
+      "message": "'mod8' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 9`] = `
+{
+  "code": "import mod9 from 'mod'; ({ bar: mod9 } = foo)",
+  "diagnostics": [
+    {
+      "message": "'mod9' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 10`] = `
+{
+  "code": "import mod10 from 'mod'; ({ bar: mod10 = 0 } = foo)",
+  "diagnostics": [
+    {
+      "message": "'mod10' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 11`] = `
+{
+  "code": "import mod11 from 'mod'; ({ ...mod11 } = foo)",
+  "diagnostics": [
+    {
+      "message": "'mod11' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 12`] = `
+{
+  "code": "import {named1} from 'mod'; named1 = 0",
+  "diagnostics": [
+    {
+      "message": "'named1' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 13`] = `
+{
+  "code": "import {named2} from 'mod'; named2 += 0",
+  "diagnostics": [
+    {
+      "message": "'named2' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 14`] = `
+{
+  "code": "import {named3} from 'mod'; named3++",
+  "diagnostics": [
+    {
+      "message": "'named3' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 15`] = `
+{
+  "code": "import {named4} from 'mod'; for (named4 in foo);",
+  "diagnostics": [
+    {
+      "message": "'named4' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 16`] = `
+{
+  "code": "import {named5} from 'mod'; for (named5 of foo);",
+  "diagnostics": [
+    {
+      "message": "'named5' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 17`] = `
+{
+  "code": "import {named6} from 'mod'; [named6] = foo",
+  "diagnostics": [
+    {
+      "message": "'named6' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 18`] = `
+{
+  "code": "import {named7} from 'mod'; [named7 = 0] = foo",
+  "diagnostics": [
+    {
+      "message": "'named7' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 19`] = `
+{
+  "code": "import {named8} from 'mod'; [...named8] = foo",
+  "diagnostics": [
+    {
+      "message": "'named8' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 20`] = `
+{
+  "code": "import {named9} from 'mod'; ({ bar: named9 } = foo)",
+  "diagnostics": [
+    {
+      "message": "'named9' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 21`] = `
+{
+  "code": "import {named10} from 'mod'; ({ bar: named10 = 0 } = foo)",
+  "diagnostics": [
+    {
+      "message": "'named10' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 22`] = `
+{
+  "code": "import {named11} from 'mod'; ({ ...named11 } = foo)",
+  "diagnostics": [
+    {
+      "message": "'named11' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 23`] = `
+{
+  "code": "import * as mod1 from 'mod'; mod1 = 0",
+  "diagnostics": [
+    {
+      "message": "'mod1' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 24`] = `
+{
+  "code": "import * as mod2 from 'mod'; mod2 += 0",
+  "diagnostics": [
+    {
+      "message": "'mod2' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 25`] = `
+{
+  "code": "import * as mod3 from 'mod'; mod3++",
+  "diagnostics": [
+    {
+      "message": "'mod3' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 26`] = `
+{
+  "code": "import * as mod4 from 'mod'; for (mod4 in foo);",
+  "diagnostics": [
+    {
+      "message": "'mod4' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 27`] = `
+{
+  "code": "import * as mod5 from 'mod'; for (mod5 of foo);",
+  "diagnostics": [
+    {
+      "message": "'mod5' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 28`] = `
+{
+  "code": "import * as mod6 from 'mod'; [mod6] = foo",
+  "diagnostics": [
+    {
+      "message": "'mod6' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 29`] = `
+{
+  "code": "import * as mod7 from 'mod'; [mod7 = 0] = foo",
+  "diagnostics": [
+    {
+      "message": "'mod7' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 30`] = `
+{
+  "code": "import * as mod8 from 'mod'; [...mod8] = foo",
+  "diagnostics": [
+    {
+      "message": "'mod8' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 31`] = `
+{
+  "code": "import * as mod9 from 'mod'; ({ bar: mod9 } = foo)",
+  "diagnostics": [
+    {
+      "message": "'mod9' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 32`] = `
+{
+  "code": "import * as mod10 from 'mod'; ({ bar: mod10 = 0 } = foo)",
+  "diagnostics": [
+    {
+      "message": "'mod10' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 33`] = `
+{
+  "code": "import * as mod11 from 'mod'; ({ ...mod11 } = foo)",
+  "diagnostics": [
+    {
+      "message": "'mod11' is read-only.",
+      "messageId": "readonly",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 34`] = `
+{
+  "code": "import * as mod1 from 'mod'; mod1.named = 0",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod1' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 35`] = `
+{
+  "code": "import * as mod2 from 'mod'; mod2.named += 0",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod2' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 36`] = `
+{
+  "code": "import * as mod3 from 'mod'; mod3.named++",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod3' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 37`] = `
+{
+  "code": "import * as mod4 from 'mod'; for (mod4.named in foo);",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod4' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 38`] = `
+{
+  "code": "import * as mod5 from 'mod'; for (mod5.named of foo);",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod5' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 39`] = `
+{
+  "code": "import * as mod6 from 'mod'; [mod6.named] = foo",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod6' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 40`] = `
+{
+  "code": "import * as mod7 from 'mod'; [mod7.named = 0] = foo",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod7' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 41`] = `
+{
+  "code": "import * as mod8 from 'mod'; [...mod8.named] = foo",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod8' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 42`] = `
+{
+  "code": "import * as mod9 from 'mod'; ({ bar: mod9.named } = foo)",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod9' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 43`] = `
+{
+  "code": "import * as mod10 from 'mod'; ({ bar: mod10.named = 0 } = foo)",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod10' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 44`] = `
+{
+  "code": "import * as mod11 from 'mod'; ({ ...mod11.named } = foo)",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod11' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 37,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 45`] = `
+{
+  "code": "import * as mod12 from 'mod'; delete mod12.named",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod12' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 46`] = `
+{
+  "code": "import * as mod from 'mod'; Object.assign(mod, obj)",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 47`] = `
+{
+  "code": "import * as mod from 'mod'; Object.defineProperty(mod, key, d)",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 51,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 48`] = `
+{
+  "code": "import * as mod from 'mod'; Object.defineProperties(mod, d)",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 53,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 49`] = `
+{
+  "code": "import * as mod from 'mod'; Object.setPrototypeOf(mod, proto)",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 51,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 50`] = `
+{
+  "code": "import * as mod from 'mod'; Object.freeze(mod)",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 51`] = `
+{
+  "code": "import * as mod from 'mod'; Reflect.defineProperty(mod, key, d)",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 52`] = `
+{
+  "code": "import * as mod from 'mod'; Reflect.deleteProperty(mod, key)",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 53`] = `
+{
+  "code": "import * as mod from 'mod'; Reflect.set(mod, key, value)",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 54`] = `
+{
+  "code": "import * as mod from 'mod'; Reflect.setPrototypeOf(mod, proto)",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 55`] = `
+{
+  "code": "import * as mod from 'mod'; mod["named"] = 0",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 56`] = `
+{
+  "code": "import * as mod from 'mod'; Object?.defineProperty(mod, key, d)",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 57`] = `
+{
+  "code": "import * as mod from 'mod'; (Object?.defineProperty)(mod, key, d)",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 54,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 58`] = `
+{
+  "code": "import * as mod from 'mod'; delete mod?.named",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-import-assign > invalid 59`] = `
+{
+  "code": "import mod, * as mod_ns from 'mod'; mod.prop = 0; mod_ns.prop = 0",
+  "diagnostics": [
+    {
+      "message": "The members of 'mod_ns' are read-only.",
+      "messageId": "readonlyMember",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 51,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-import-assign",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
