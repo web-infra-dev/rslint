@@ -20,13 +20,14 @@ import (
 )
 
 type ValidTestCase struct {
-	Code     string `json:"code"`
-	FileName string `json:"fileName"`
-	Only     bool   `json:"only"`
-	Skip     bool   `json:"skip"`
-	Options  any    `json:"options"`
-	TSConfig string `json:"tsConfig"`
-	Tsx      bool   `json:"tsx"`
+	Code     string                 `json:"code"`
+	FileName string                 `json:"fileName"`
+	Only     bool                   `json:"only"`
+	Skip     bool                   `json:"skip"`
+	Options  any                    `json:"options"`
+	Settings map[string]interface{} `json:"settings"`
+	TSConfig string                 `json:"tsConfig"`
+	Tsx      bool                   `json:"tsx"`
 }
 
 type InvalidTestCaseError struct {
@@ -50,6 +51,7 @@ type InvalidTestCase struct {
 	Skip     bool                   `json:"skip"`
 	Output   []string               `json:"output"`
 	Errors   []InvalidTestCaseError `json:"errors"`
+	Settings map[string]interface{} `json:"settings"`
 	TSConfig string                 `json:"tsConfig"`
 	Options  any                    `json:"options"`
 	Tsx      bool                   `json:"tsx"`
@@ -111,7 +113,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 	onlyMode := slices.ContainsFunc(validTestCases, func(c ValidTestCase) bool { return c.Only }) ||
 		slices.ContainsFunc(invalidTestCases, func(c InvalidTestCase) bool { return c.Only })
 
-	runLinter := func(t *testing.T, code string, options any, tsconfigPathOverride string, fileName string) []rule.RuleDiagnostic {
+	runLinter := func(t *testing.T, code string, options any, settings map[string]interface{}, tsconfigPathOverride string, fileName string) []rule.RuleDiagnostic {
 		var diagnosticsMu sync.Mutex
 		diagnostics := make([]rule.RuleDiagnostic, 0, 3)
 
@@ -139,6 +141,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 				return []linter.ConfiguredRule{
 					{
 						Name:     "test",
+						Settings: settings,
 						Severity: rule.SeverityError,
 						Run: func(ctx rule.RuleContext) rule.RuleListeners {
 							return r.Run(ctx, options)
@@ -175,7 +178,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 				fileName = testCase.FileName
 			}
 
-			diagnostics := runLinter(t, testCase.Code, testCase.Options, testCase.TSConfig, fileName)
+			diagnostics := runLinter(t, testCase.Code, testCase.Options, testCase.Settings, testCase.TSConfig, fileName)
 			if len(diagnostics) != 0 {
 				// TODO: pretty errors
 				t.Errorf("Expected valid test case not to contain errors. Code:\n%v", testCase.Code)
@@ -208,7 +211,7 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 			}
 
 			for i := range 10 {
-				diagnostics := runLinter(t, code, testCase.Options, testCase.TSConfig, fileName)
+				diagnostics := runLinter(t, code, testCase.Options, testCase.Settings, testCase.TSConfig, fileName)
 				if i == 0 {
 					initialDiagnostics = diagnostics
 				}
@@ -339,6 +342,7 @@ func ConvertESLintTestCase(tc ESLintTestCase) ValidTestCase {
 		Only:     tc.Only,
 		Skip:     tc.Skip,
 		Options:  options,
+		Settings: tc.Settings,
 		Tsx:      tsx,
 	}
 }
@@ -398,6 +402,7 @@ func ConvertESLintInvalidTestCase(tc ESLintInvalidTestCase) InvalidTestCase {
 		Output:   output,
 		Errors:   errors,
 		Options:  options,
+		Settings: tc.Settings,
 		Tsx:      tsx,
 	}
 }

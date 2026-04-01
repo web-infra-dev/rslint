@@ -167,6 +167,7 @@ func (d RuleDiagnostic) Fixes() []RuleFix {
 
 type RuleContext struct {
 	SourceFile                 *ast.SourceFile
+	Settings                   map[string]interface{}
 	Program                    *compiler.Program
 	TypeChecker                *checker.Checker
 	DisableManager             *DisableManager
