@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
-	"github.com/microsoft/typescript-go/shim/checker"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
 
@@ -19,12 +18,8 @@ type ParsedJestFnCall struct {
 
 func IsTypeOfJestFnCall(node *ast.Node, ctx rule.RuleContext, kinds ...JestFnType) bool {
 	parsed := ParseJestFnCall(node, ctx)
-	if parsed == nil {
+	if parsed == nil || len(kinds) == 0 {
 		return false
-	}
-
-	if len(kinds) == 0 {
-		return true
 	}
 
 	return slices.Contains(kinds, parsed.Kind)
@@ -50,8 +45,8 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 	}
 
 	localName := chain[0]
-	name := resolveOriginalName(node, localName, ctx.TypeChecker)
-	if !JEST_METHOD_NAMES[name] {
+	name := resolveOriginalName(node, localName, ctx)
+	if name == "" || !JEST_METHOD_NAMES[name] {
 		return nil
 	}
 
@@ -77,12 +72,12 @@ func ParseJestFnCall(node *ast.Node, ctx rule.RuleContext) *ParsedJestFnCall {
 	return parsed
 }
 
-func resolveOriginalName(node *ast.Node, localName string, typeCheckerOpt ...*checker.Checker) string {
-	if len(typeCheckerOpt) == 0 || typeCheckerOpt[0] == nil {
+func resolveOriginalName(node *ast.Node, localName string, ctx rule.RuleContext) string {
+	if ctx.TypeChecker == nil {
 		return localName
 	}
 
-	typeChecker := typeCheckerOpt[0]
+	typeChecker := ctx.TypeChecker
 	callExpr := node.AsCallExpression()
 	if callExpr == nil {
 		return localName
@@ -98,13 +93,18 @@ func resolveOriginalName(node *ast.Node, localName string, typeCheckerOpt ...*ch
 		return localName
 	}
 
+	hasNonJestImportSpecifier := false
 	for _, decl := range symbol.Declarations {
 		if decl == nil || decl.Kind != ast.KindImportSpecifier {
 			continue
 		}
 
-		importDecl := findImportDeclaration(decl)
-		if importDecl == nil || importDecl.ModuleSpecifier == nil || importDecl.ModuleSpecifier.Text() != "@jest/globals" {
+		importDecl := FindImportDeclaration(decl)
+		if importDecl == nil || importDecl.ModuleSpecifier == nil {
+			continue
+		}
+		if importDecl.ModuleSpecifier.Text() != "@jest/globals" {
+			hasNonJestImportSpecifier = true
 			continue
 		}
 
@@ -121,6 +121,10 @@ func resolveOriginalName(node *ast.Node, localName string, typeCheckerOpt ...*ch
 		if name != nil {
 			return name.Text()
 		}
+	}
+
+	if hasNonJestImportSpecifier {
+		return ""
 	}
 
 	return localName
@@ -147,7 +151,7 @@ func resolveFirstIdentifier(node *ast.Node) *ast.Node {
 	return nil
 }
 
-func findImportDeclaration(node *ast.Node) *ast.ImportDeclaration {
+func FindImportDeclaration(node *ast.Node) *ast.ImportDeclaration {
 	current := node
 	for current != nil {
 		switch current.Kind {

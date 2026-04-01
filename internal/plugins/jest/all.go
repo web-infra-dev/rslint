@@ -1,6 +1,7 @@
 package jest
 
 import (
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_disabled_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_hooks"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_describe_callback"
 	"github.com/web-infra-dev/rslint/internal/rule"
@@ -8,6 +9,7 @@ import (
 
 func GetAllRules() []rule.Rule {
 	return []rule.Rule{
+		no_disabled_tests.NoDisabledTestsRule,
 		no_hooks.NoHooksRule,
 		valid_describe_callback.ValidDescribeCallbackRule,
 	}
