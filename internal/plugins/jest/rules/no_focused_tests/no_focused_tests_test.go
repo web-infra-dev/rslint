@@ -446,7 +446,7 @@ func TestNoFocusedTests(t *testing.T) {
 						Line:      4,
 						Column:    1,
 						EndLine:   4,
-						EndColumn: 24,
+						EndColumn: 17,
 					},
 				},
 			},

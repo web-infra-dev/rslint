@@ -52,7 +52,12 @@ var NoFocusedTestsRule = rule.Rule{
 
 					calleeRange := rslintUtils.TrimNodeTextRange(ctx.SourceFile, callee)
 					if jestFnCall.Head.Type == jestUtils.JEST_IMPORT_MODE && jestFnCall.Name != jestFnCall.Head.Local.Value {
-						ctx.ReportNode(callee, buildErrorFocusedTestMessage())
+						reportNode := jestFnCall.Head.Local.Node
+						if reportNode == nil {
+							reportNode = callee
+						}
+
+						ctx.ReportNode(reportNode, buildErrorFocusedTestMessage())
 					} else {
 						reportNode := jestFnCall.Head.Local.Node
 						if reportNode == nil {
