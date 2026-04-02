@@ -496,31 +496,39 @@ func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {
 
 	// Normalize the file path relative to cwd
 	normalizedPath := normalizePath(filePath, cwd)
+	unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
 
+	// Evaluate patterns sequentially. Later patterns override earlier ones.
+	// A `!` prefix negates (re-includes) a previously ignored file.
+	// This aligns with ESLint v10's ignore semantics.
+	matchPattern := func(pattern, path string) bool {
+		m, err := doublestar.Match(pattern, path)
+		return err == nil && m
+	}
+
+	ignored := false
 	for _, pattern := range ignorePatterns {
+		negated := false
+		if strings.HasPrefix(pattern, "!") {
+			negated = true
+			pattern = pattern[1:]
+		}
+
 		normalizedPattern := normalizePattern(pattern)
 
-		// Try matching against normalized path
-		if matched, err := doublestar.Match(normalizedPattern, normalizedPath); err == nil && matched {
-			return true
+		matched := matchPattern(normalizedPattern, normalizedPath)
+		if !matched && normalizedPath != filePath {
+			matched = matchPattern(normalizedPattern, filePath)
+		}
+		if !matched && unixPath != normalizedPath {
+			matched = matchPattern(normalizedPattern, unixPath)
 		}
 
-		// Also try matching against original path for absolute patterns
-		if normalizedPath != filePath {
-			if matched, err := doublestar.Match(normalizedPattern, filePath); err == nil && matched {
-				return true
-			}
-		}
-
-		// Try Unix-style path for cross-platform compatibility
-		unixPath := strings.ReplaceAll(normalizedPath, "\\", "/")
-		if unixPath != normalizedPath {
-			if matched, err := doublestar.Match(normalizedPattern, unixPath); err == nil && matched {
-				return true
-			}
+		if matched {
+			ignored = !negated
 		}
 	}
-	return false
+	return ignored
 }
 
 // normalizePattern cleans up a glob pattern to match paths produced by normalizePath.
@@ -540,13 +548,19 @@ func normalizePath(filePath, cwd string) string {
 
 // isFileIgnoredSimple provides fallback matching when cwd is unavailable
 func isFileIgnoredSimple(filePath string, ignorePatterns []string) bool {
+	ignored := false
 	for _, pattern := range ignorePatterns {
+		negated := false
+		if strings.HasPrefix(pattern, "!") {
+			negated = true
+			pattern = pattern[1:]
+		}
 		normalizedPattern := normalizePattern(pattern)
 		if matched, err := doublestar.Match(normalizedPattern, filePath); err == nil && matched {
-			return true
+			ignored = !negated
 		}
 	}
-	return false
+	return ignored
 }
 
 // MergedConfig is the final computed configuration for a single file
@@ -569,15 +583,24 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 		Plugins: make(map[string]struct{}),
 	}
 
+	// 1. Collect all global ignore patterns and evaluate once.
+	// This allows `!` negation patterns in separate entries to work correctly,
+	// aligned with ESLint v10 which merges all global ignores before evaluating.
+	var globalIgnorePatterns []string
+	for _, entry := range config {
+		if isGlobalIgnoreEntry(entry) {
+			globalIgnorePatterns = append(globalIgnorePatterns, entry.Ignores...)
+		}
+	}
+	if len(globalIgnorePatterns) > 0 && isFileIgnored(filePath, globalIgnorePatterns, cwd) {
+		return nil
+	}
+
 	// Track whether any non-global entry matched this file
 	entryMatched := false
 
 	for _, entry := range config {
-		// 1. Global ignores: entry with only ignores means "skip this file entirely"
 		if isGlobalIgnoreEntry(entry) {
-			if isFileIgnored(filePath, entry.Ignores, cwd) {
-				return nil
-			}
 			continue
 		}
 

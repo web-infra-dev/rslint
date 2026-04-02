@@ -16,6 +16,7 @@ export default defineConfig({
     './tests/cli/js-config/config-discovery.test.ts',
     './tests/cli/js-config/dir-args.test.ts',
     './tests/cli/js-config/config-ignores-filter.test.ts',
+    './tests/cli/js-config/ignore-negation.test.ts',
     './tests/cli/type-check/type-check.test.ts',
     './tests/cli/type-check/type-check-snapshot.test.ts',
 
