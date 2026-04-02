@@ -32,7 +32,27 @@ monorepo/
 │       └── src/                   ← no config, inherits root
 ```
 
-When linting from the monorepo root, rslint automatically discovers all nested configs and applies the nearest one to each file:
+When linting from the monorepo root, rslint automatically discovers all nested configs and applies the nearest one to each file.
+
+#### Global Ignores and Nested Configs
+
+Global ignores in a parent config prevent nested configs in ignored directories from being discovered. This aligns with ESLint v10 behavior.
+
+```ts
+// monorepo/rslint.config.ts
+export default defineConfig([
+  // Global ignore — blocks config discovery in these directories
+  { ignores: ['**/fixtures/**', 'e2e/**'] },
+  ts.configs.recommended,
+  // ...
+]);
+```
+
+With this config, a `rslint.config.ts` inside `e2e/` or any `fixtures/` directory will **not** be used when linting from the monorepo root. This prevents test fixture configs from interfering with the main lint run.
+
+:::tip
+Only **global ignore entries** (entries with only `ignores` and no other fields) block nested config discovery. Entry-level ignores (entries with both `files` and `ignores`) do not affect config discovery.
+:::
 
 You can also specify a config file explicitly (overrides automatic discovery):
 
@@ -119,6 +139,22 @@ Glob patterns for files to exclude. An entry with **only** `ignores` (no other f
   rules: { /* ... */ },
 }
 ```
+
+#### Pattern types in global ignores
+
+Global ignore patterns affect both file matching and directory traversal (including config discovery in monorepos):
+
+| Pattern    | Effect                                               |
+| ---------- | ---------------------------------------------------- |
+| `dir/**`   | Ignores directory and all contents, blocks traversal |
+| `dir/**/*` | Ignores files inside, but allows directory traversal |
+| `dir/*`    | Ignores direct children files only                   |
+
+Use `dir/**` to completely exclude a directory (including any nested configs inside it). Use `dir/**/*` if you only want to ignore files but still allow nested configs to be discovered.
+
+:::warning
+`!` negation patterns (e.g., `!build/test.js`) for re-including files are not yet supported. To lint specific files within an ignored directory, pass them explicitly as CLI arguments.
+:::
 
 :::tip
 `node_modules` is automatically excluded by rslint — you don't need to add it to ignores.
