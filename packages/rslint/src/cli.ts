@@ -3,7 +3,10 @@ import fs from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { loadConfigFile, normalizeConfig } from './config-loader.js';
 import { parseArgs, classifyArgs, isJSConfigFile } from './utils/args.js';
-import { discoverConfigs } from './utils/config-discovery.js';
+import {
+  discoverConfigs,
+  filterConfigsByParentIgnores,
+} from './utils/config-discovery.js';
 
 /**
  * Pass-through execution of the Go binary with stdio inherited.
@@ -83,7 +86,13 @@ async function runWithJSConfigs(
     return execBinary(binPath, goArgs);
   }
 
-  const payload = JSON.stringify({ configs: configEntries });
+  // Filter out nested configs whose directory is covered by a parent config's
+  // global ignores. This aligns with ESLint v10 behavior: when walking the
+  // directory tree, global ignores prevent entering directories, so nested
+  // configs in ignored directories are never discovered.
+  const filteredEntries = filterConfigsByParentIgnores(configEntries);
+
+  const payload = JSON.stringify({ configs: filteredEntries });
 
   try {
     execFileSync(binPath, ['--config-stdin', ...goArgs], {
