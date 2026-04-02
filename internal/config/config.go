@@ -122,9 +122,12 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_pattern"
 	"github.com/web-infra-dev/rslint/internal/rules/no_ex_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_extra_bind"
+	"github.com/web-infra-dev/rslint/internal/rules/no_func_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_global_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_import_assign"
+	"github.com/web-infra-dev/rslint/internal/rules/no_inner_declarations"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
+	"github.com/web-infra-dev/rslint/internal/rules/no_self_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_sparse_arrays"
 	"github.com/web-infra-dev/rslint/internal/rules/no_template_curly_in_string"
 	"github.com/web-infra-dev/rslint/internal/rules/no_this_before_super"
@@ -192,8 +195,8 @@ type Rules map[string]interface{}
 
 // RuleConfig represents individual rule configuration
 type RuleConfig struct {
-	Level   string                 `json:"level,omitempty"`   // "error", "warn", "off"
-	Options map[string]interface{} `json:"options,omitempty"` // Rule-specific options
+	Level   string      `json:"level,omitempty"`   // "error", "warn", "off"
+	Options interface{} `json:"options,omitempty"` // Rule-specific options (string, map, array, etc.)
 }
 
 // IsEnabled returns true if the rule is enabled (not "off")
@@ -213,15 +216,15 @@ func (rc *RuleConfig) GetLevel() string {
 }
 
 // GetOptions returns the rule options, ensuring we return a usable value
-func (rc *RuleConfig) GetOptions() map[string]interface{} {
+func (rc *RuleConfig) GetOptions() interface{} {
 	if rc == nil || rc.Options == nil {
-		return make(map[string]interface{})
+		return nil
 	}
 	return rc.Options
 }
 
 // SetOptions sets the rule options
-func (rc *RuleConfig) SetOptions(options map[string]interface{}) {
+func (rc *RuleConfig) SetOptions(options interface{}) {
 	if rc != nil {
 		rc.Options = options
 	}
@@ -293,7 +296,8 @@ func NormalizePluginName(pluginName string) string {
 // - ["error"] -> enabled rule with error severity
 // - ["warn"] -> enabled rule with warning severity
 // - ["error", {...options}] -> enabled rule with error severity and options
-// - ["warn", {...options}] -> enabled rule with warning severity and options
+// - ["error", "both"] -> enabled rule with string option (e.g. no-inner-declarations)
+// - ["error", "both", {...options}] -> enabled rule with string + object options
 func parseArrayRuleConfig(ruleArray []interface{}) *RuleConfig {
 	if len(ruleArray) == 0 {
 		return nil
@@ -307,21 +311,19 @@ func parseArrayRuleConfig(ruleArray []interface{}) *RuleConfig {
 
 	ruleConfig := &RuleConfig{Level: level}
 
-	// Second element (if present) should be the options object
+	// Remaining elements are rule options — pass them through to the rule's
+	// option parser which knows how to interpret its own format.
 	if len(ruleArray) > 1 {
-		switch opts := ruleArray[1].(type) {
-		case map[string]interface{}:
-			ruleConfig.Options = opts
-		case nil:
-			// Explicitly null/nil options are valid
-			ruleConfig.Options = make(map[string]interface{})
-		default:
-			// Invalid options type, but still create the rule config with just the level
-			ruleConfig.Options = make(map[string]interface{})
+		remaining := ruleArray[1:]
+		if len(remaining) == 1 {
+			// Single option element: pass directly (string, map, etc.)
+			ruleConfig.Options = remaining[0]
+		} else {
+			// Multiple option elements: pass as array (e.g. ["both", {blockScopedFunctions: "disallow"}])
+			ruleConfig.Options = remaining
 		}
 	}
 
-	// Additional elements are ignored (following ESLint behavior)
 	return ruleConfig
 }
 
@@ -474,9 +476,12 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-empty-pattern", no_empty_pattern.NoEmptyPatternRule)
 	GlobalRuleRegistry.Register("no-ex-assign", no_ex_assign.NoExAssignRule)
 	GlobalRuleRegistry.Register("no-extra-bind", no_extra_bind.NoExtraBindRule)
+	GlobalRuleRegistry.Register("no-func-assign", no_func_assign.NoFuncAssignRule)
 	GlobalRuleRegistry.Register("no-global-assign", no_global_assign.NoGlobalAssignRule)
 	GlobalRuleRegistry.Register("no-import-assign", no_import_assign.NoImportAssignRule)
+	GlobalRuleRegistry.Register("no-inner-declarations", no_inner_declarations.NoInnerDeclarationsRule)
 	GlobalRuleRegistry.Register("no-loss-of-precision", no_loss_of_precision.NoLossOfPrecisionRule)
+	GlobalRuleRegistry.Register("no-self-assign", no_self_assign.NoSelfAssignRule)
 	GlobalRuleRegistry.Register("no-template-curly-in-string", no_template_curly_in_string.NoTemplateCurlyInString)
 	GlobalRuleRegistry.Register("no-sparse-arrays", no_sparse_arrays.NoSparseArraysRule)
 	GlobalRuleRegistry.Register("no-undef", no_undef.NoUndefRule)

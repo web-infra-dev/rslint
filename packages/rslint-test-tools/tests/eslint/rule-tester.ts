@@ -110,7 +110,11 @@ export class RuleTester {
             workingDirectory: cwd,
             fileContents: { [virtual_entry]: code },
             ruleOptions: {
-              [ruleName]: options ? [options] : [],
+              [ruleName]: options
+                ? Array.isArray(options)
+                  ? options
+                  : [options]
+                : [],
             } as any,
           });
 
@@ -134,7 +138,11 @@ export class RuleTester {
             workingDirectory: cwd,
             fileContents: { [virtual_entry]: code },
             ruleOptions: {
-              [ruleName]: options ? [options] : [],
+              [ruleName]: options
+                ? Array.isArray(options)
+                  ? options
+                  : [options]
+                : [],
             } as any,
           });
 
