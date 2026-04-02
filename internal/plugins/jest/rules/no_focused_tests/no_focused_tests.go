@@ -54,8 +54,13 @@ var NoFocusedTestsRule = rule.Rule{
 					if jestFnCall.Head.Type == jestUtils.JEST_IMPORT_MODE && jestFnCall.Name != jestFnCall.Head.Local.Value {
 						ctx.ReportNode(callee, buildErrorFocusedTestMessage())
 					} else {
+						reportNode := jestFnCall.Head.Local.Node
+						if reportNode == nil {
+							reportNode = callee
+						}
+
 						ctx.ReportNodeWithSuggestions(
-							callee,
+							reportNode,
 							buildErrorFocusedTestMessage(),
 							rule.RuleSuggestion{
 								Message: buildErrorSuggestRemoveFocusMessage(),

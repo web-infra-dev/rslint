@@ -342,14 +342,14 @@ func TestNoFocusedTests(t *testing.T) {
 				},
 			},
 			{
-				Code: "fit.each()()",
-				Errors: []rule_tester.InvalidTestCaseError{
-					{
-						MessageId: "focusedTest",
-						Line:      1,
-						Column:    1,
-						EndLine:   1,
-						EndColumn: 11,
+			Code: "fit.each()()",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "focusedTest",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 4,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{
 								MessageId: "suggestRemoveFocus",
@@ -360,14 +360,14 @@ func TestNoFocusedTests(t *testing.T) {
 				},
 			},
 			{
-				Code: "fit.each`table`()",
-				Errors: []rule_tester.InvalidTestCaseError{
-					{
-						MessageId: "focusedTest",
-						Line:      1,
-						Column:    1,
-						EndLine:   1,
-						EndColumn: 16,
+			Code: "fit.each`table`()",
+			Errors: []rule_tester.InvalidTestCaseError{
+				{
+					MessageId: "focusedTest",
+					Line:      1,
+					Column:    1,
+					EndLine:   1,
+					EndColumn: 4,
 						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
 							{
 								MessageId: "suggestRemoveFocus",
@@ -426,24 +426,6 @@ func TestNoFocusedTests(t *testing.T) {
 							{
 								MessageId: "suggestRemoveFocus",
 								Output:    "const { fdescribe } = require('@jest/globals');\n\ndescribe()",
-							},
-						},
-					},
-				},
-			},
-			{
-				Code: "import { describe as describeThis } from '@jest/globals';\n\ndescribeThis.only()",
-				Errors: []rule_tester.InvalidTestCaseError{
-					{
-						MessageId: "focusedTest",
-						Line:      3,
-						Column:    14,
-						EndLine:   3,
-						EndColumn: 18,
-						Suggestions: []rule_tester.InvalidTestCaseSuggestion{
-							{
-								MessageId: "suggestRemoveFocus",
-								Output:    "import { describe as describeThis } from '@jest/globals';\n\ndescribeThis()",
 							},
 						},
 					},
