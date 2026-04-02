@@ -122,6 +122,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_pattern"
 	"github.com/web-infra-dev/rslint/internal/rules/no_ex_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_extra_bind"
+	"github.com/web-infra-dev/rslint/internal/rules/no_func_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_global_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_import_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_inner_declarations"
@@ -475,6 +476,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-empty-pattern", no_empty_pattern.NoEmptyPatternRule)
 	GlobalRuleRegistry.Register("no-ex-assign", no_ex_assign.NoExAssignRule)
 	GlobalRuleRegistry.Register("no-extra-bind", no_extra_bind.NoExtraBindRule)
+	GlobalRuleRegistry.Register("no-func-assign", no_func_assign.NoFuncAssignRule)
 	GlobalRuleRegistry.Register("no-global-assign", no_global_assign.NoGlobalAssignRule)
 	GlobalRuleRegistry.Register("no-import-assign", no_import_assign.NoImportAssignRule)
 	GlobalRuleRegistry.Register("no-inner-declarations", no_inner_declarations.NoInnerDeclarationsRule)
