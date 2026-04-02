@@ -277,7 +277,7 @@ importers:
   typescript-go/_packages/api:
     dependencies:
       '@types/node':
-        specifier: ^25.3.3
+        specifier: ^25.5.0
         version: 25.5.0
       '@typescript/ast':
         specifier: workspace:*

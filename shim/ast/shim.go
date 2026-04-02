@@ -56,7 +56,6 @@ func CanHaveModifiers(node *ast.Node) bool
 func CanHaveSymbol(node *ast.Node) bool
 type CaseBlock = ast.CaseBlock
 type CaseBlockNode = ast.CaseBlockNode
-type CaseClauseNode = ast.CaseClauseNode
 type CaseClausesList = ast.CaseClausesList
 type CaseOrDefaultClause = ast.CaseOrDefaultClause
 type CaseOrDefaultClauseNode = ast.CaseOrDefaultClauseNode
@@ -114,7 +113,6 @@ const CommentDirectiveKindExpectError = ast.CommentDirectiveKindExpectError
 const CommentDirectiveKindIgnore = ast.CommentDirectiveKindIgnore
 const CommentDirectiveKindUnknown = ast.CommentDirectiveKindUnknown
 type CommentRange = ast.CommentRange
-type CommonJSExport = ast.CommonJSExport
 //go:linkname CompareDiagnostics github.com/microsoft/typescript-go/internal/ast.CompareDiagnostics
 func CompareDiagnostics(d1 *ast.Diagnostic, d2 *ast.Diagnostic) int
 //go:linkname CompareNodePositions github.com/microsoft/typescript-go/internal/ast.CompareNodePositions
@@ -1085,7 +1083,7 @@ func IsOptionalTypeNode(node *ast.Node) bool
 func IsOuterExpression(node *ast.Expression, kinds ast.OuterExpressionKinds) bool
 //go:linkname IsOutermostOptionalChain github.com/microsoft/typescript-go/internal/ast.IsOutermostOptionalChain
 func IsOutermostOptionalChain(node *ast.Expression) bool
-//go:linkname IsParameter github.com/microsoft/typescript-go/internal/ast.IsParameter
+//go:linkname IsParameter github.com/microsoft/typescript-go/internal/ast.IsParameterDeclaration
 func IsParameter(node *ast.Node) bool
 //go:linkname IsParameterLike github.com/microsoft/typescript-go/internal/ast.IsParameterLike
 func IsParameterLike(node *ast.Node) bool
@@ -1365,9 +1363,7 @@ type JSDocOptionalType = ast.JSDocOptionalType
 type JSDocOverloadTag = ast.JSDocOverloadTag
 type JSDocOverrideTag = ast.JSDocOverrideTag
 type JSDocParameterOrPropertyTag = ast.JSDocParameterOrPropertyTag
-type JSDocParameterTag = ast.JSDocParameterTag
 type JSDocPrivateTag = ast.JSDocPrivateTag
-type JSDocPropertyTag = ast.JSDocPropertyTag
 type JSDocProtectedTag = ast.JSDocProtectedTag
 type JSDocPublicTag = ast.JSDocPublicTag
 type JSDocReadonlyTag = ast.JSDocReadonlyTag
@@ -1469,10 +1465,7 @@ const KindCloseBraceToken = ast.KindCloseBraceToken
 const KindCloseBracketToken = ast.KindCloseBracketToken
 const KindCloseParenToken = ast.KindCloseParenToken
 const KindColonToken = ast.KindColonToken
-const KindCommaListExpression = ast.KindCommaListExpression
 const KindCommaToken = ast.KindCommaToken
-const KindComment = ast.KindComment
-const KindCommonJSExport = ast.KindCommonJSExport
 const KindComputedPropertyName = ast.KindComputedPropertyName
 const KindConditionalExpression = ast.KindConditionalExpression
 const KindConditionalType = ast.KindConditionalType
@@ -1594,7 +1587,6 @@ const KindJSDocImportTag = ast.KindJSDocImportTag
 const KindJSDocLink = ast.KindJSDocLink
 const KindJSDocLinkCode = ast.KindJSDocLinkCode
 const KindJSDocLinkPlain = ast.KindJSDocLinkPlain
-const KindJSDocMemberName = ast.KindJSDocMemberName
 const KindJSDocNameReference = ast.KindJSDocNameReference
 const KindJSDocNonNullableType = ast.KindJSDocNonNullableType
 const KindJSDocNullableType = ast.KindJSDocNullableType
@@ -1611,7 +1603,6 @@ const KindJSDocReturnTag = ast.KindJSDocReturnTag
 const KindJSDocSatisfiesTag = ast.KindJSDocSatisfiesTag
 const KindJSDocSeeTag = ast.KindJSDocSeeTag
 const KindJSDocSignature = ast.KindJSDocSignature
-const KindJSDocTag = ast.KindJSDocTag
 const KindJSDocTemplateTag = ast.KindJSDocTemplateTag
 const KindJSDocText = ast.KindJSDocText
 const KindJSDocThisTag = ast.KindJSDocThisTag
@@ -1621,7 +1612,6 @@ const KindJSDocTypeLiteral = ast.KindJSDocTypeLiteral
 const KindJSDocTypeTag = ast.KindJSDocTypeTag
 const KindJSDocTypedefTag = ast.KindJSDocTypedefTag
 const KindJSDocVariadicType = ast.KindJSDocVariadicType
-const KindJSExportAssignment = ast.KindJSExportAssignment
 const KindJSImportDeclaration = ast.KindJSImportDeclaration
 const KindJSTypeAliasDeclaration = ast.KindJSTypeAliasDeclaration
 const KindJsxAttribute = ast.KindJsxAttribute
@@ -1809,9 +1799,8 @@ const KindYieldKeyword = ast.KindYieldKeyword
 type LabeledStatement = ast.LabeledStatement
 type LeftHandSideExpression = ast.LeftHandSideExpression
 type LiteralExpression = ast.LiteralExpression
-type LiteralLikeBase = ast.LiteralLikeBase
 type LiteralLikeNode = ast.LiteralLikeNode
-type LiteralType = ast.LiteralType
+type LiteralLikeNodeBase = ast.LiteralLikeNodeBase
 type LiteralTypeNode = ast.LiteralTypeNode
 type LocalsContainerBase = ast.LocalsContainerBase
 type MappedTypeNode = ast.MappedTypeNode
@@ -1935,7 +1924,6 @@ const NodeFlagsDecoratorContext = ast.NodeFlagsDecoratorContext
 const NodeFlagsDisallowConditionalTypesContext = ast.NodeFlagsDisallowConditionalTypesContext
 const NodeFlagsDisallowInContext = ast.NodeFlagsDisallowInContext
 const NodeFlagsExportContext = ast.NodeFlagsExportContext
-const NodeFlagsHasAggregatedChildData = ast.NodeFlagsHasAggregatedChildData
 const NodeFlagsHasExplicitReturn = ast.NodeFlagsHasExplicitReturn
 const NodeFlagsHasImplicitReturn = ast.NodeFlagsHasImplicitReturn
 const NodeFlagsHasJSDoc = ast.NodeFlagsHasJSDoc
@@ -2260,8 +2248,8 @@ type TemplateExpression = ast.TemplateExpression
 type TemplateHead = ast.TemplateHead
 type TemplateHeadNode = ast.TemplateHeadNode
 type TemplateLiteral = ast.TemplateLiteral
-type TemplateLiteralLikeBase = ast.TemplateLiteralLikeBase
 type TemplateLiteralLikeNode = ast.TemplateLiteralLikeNode
+type TemplateLiteralLikeNodeBase = ast.TemplateLiteralLikeNodeBase
 type TemplateLiteralTypeNode = ast.TemplateLiteralTypeNode
 type TemplateLiteralTypeSpan = ast.TemplateLiteralTypeSpan
 type TemplateLiteralTypeSpanList = ast.TemplateLiteralTypeSpanList
@@ -2328,7 +2316,6 @@ type TypeElement = ast.TypeElement
 type TypeElementBase = ast.TypeElementBase
 type TypeElementList = ast.TypeElementList
 type TypeList = ast.TypeList
-type TypeLiteral = ast.TypeLiteral
 type TypeLiteralNode = ast.TypeLiteralNode
 type TypeNode = ast.TypeNode
 type TypeNodeBase = ast.TypeNodeBase
@@ -2356,7 +2343,6 @@ type TypeQueryNode = ast.TypeQueryNode
 type TypeReferenceNode = ast.TypeReferenceNode
 type UnionOrIntersectionTypeNode = ast.UnionOrIntersectionTypeNode
 type UnionOrIntersectionTypeNodeBase = ast.UnionOrIntersectionTypeNodeBase
-type UnionType = ast.UnionType
 type UnionTypeNode = ast.UnionTypeNode
 type ValidImportTypeNode = ast.ValidImportTypeNode
 type VariableDeclaration = ast.VariableDeclaration

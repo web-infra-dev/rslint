@@ -118,7 +118,7 @@ func GetTypeName(
 		decls := symbol.Declarations
 		if len(decls) > 0 {
 			if ast.IsTypeParameterDeclaration(decls[0]) {
-				typeParamDecl := decls[0].AsTypeParameter()
+				typeParamDecl := decls[0].AsTypeParameterDeclaration()
 				if typeParamDecl.Constraint != nil {
 					return GetTypeName(typeChecker, checker.Checker_getTypeFromTypeNode(typeChecker, typeParamDecl.Constraint))
 				}

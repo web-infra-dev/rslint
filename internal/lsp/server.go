@@ -216,10 +216,9 @@ func (s *Server) WatchFiles(ctx context.Context, id project.WatcherID, watchers 
 	_, err := s.sendRequest(ctx, lsproto.MethodClientRegisterCapability, &lsproto.RegistrationParams{
 		Registrations: []*lsproto.Registration{
 			{
-				Id:     string(id),
-				Method: string(lsproto.MethodWorkspaceDidChangeWatchedFiles),
+				Id: string(id),
 				RegisterOptions: &lsproto.RegisterOptions{
-					DidChangeWatchedFiles: &lsproto.DidChangeWatchedFilesRegistrationOptions{
+					WorkspaceDidChangeWatchedFiles: &lsproto.DidChangeWatchedFilesRegistrationOptions{
 						Watchers: watchers,
 					},
 				},
@@ -285,6 +284,27 @@ func (s *Server) RefreshInlayHints(ctx context.Context) error {
 func (s *Server) RefreshCodeLens(ctx context.Context) error {
 	// TODO: implement code lens refresh
 	return nil
+}
+
+// ProgressStart implements project.Client.
+func (s *Server) ProgressStart(message *project.DiagnosticMessage, args ...any) {
+	// TODO: implement progress reporting
+}
+
+// ProgressFinish implements project.Client.
+func (s *Server) ProgressFinish(message *project.DiagnosticMessage, args ...any) {
+	// TODO: implement progress reporting
+}
+
+// SendTelemetry implements project.Client.
+func (s *Server) SendTelemetry(ctx context.Context, telemetry lsproto.TelemetryEvent) error {
+	// TODO: implement telemetry
+	return nil
+}
+
+// IsActive implements project.Client.
+func (s *Server) IsActive() bool {
+	return s.session != nil
 }
 
 func (s *Server) Run() error {
@@ -594,12 +614,12 @@ func registerRequestHandler[Req, Resp any](handlers handlerMap, info lsproto.Req
 	}
 }
 
-func (s *Server) handleShutdown(ctx context.Context, params any) (lsproto.ShutdownResponse, error) {
+func (s *Server) handleShutdown(ctx context.Context, params lsproto.NoParams) (lsproto.ShutdownResponse, error) {
 	s.session.Close()
 	return lsproto.ShutdownResponse{}, nil
 }
 
-func (s *Server) handleExit(ctx context.Context, params any) error {
+func (s *Server) handleExit(ctx context.Context, params lsproto.NoParams) error {
 	return io.EOF
 }
 

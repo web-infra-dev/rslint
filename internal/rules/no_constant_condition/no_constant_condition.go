@@ -551,14 +551,6 @@ func isConstant(ctx *rule.RuleContext, node *ast.Node, inBooleanPosition bool) b
 	case ast.KindPostfixUnaryExpression:
 		// ++ and -- are not constant (they modify variables)
 		return false
-
-	case ast.KindCommaListExpression:
-		// Sequence expression (comma operator): constant if last expression is constant
-		children := node.Children()
-		if children != nil && len(children.Nodes) > 0 {
-			lastExpr := children.Nodes[len(children.Nodes)-1]
-			return isConstant(ctx, lastExpr, inBooleanPosition)
-		}
 	}
 
 	return false

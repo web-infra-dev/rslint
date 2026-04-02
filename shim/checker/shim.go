@@ -13,6 +13,7 @@ import "github.com/microsoft/typescript-go/internal/evaluator"
 import "github.com/microsoft/typescript-go/internal/jsnum"
 import "github.com/microsoft/typescript-go/internal/nodebuilder"
 import "github.com/microsoft/typescript-go/internal/printer"
+import "github.com/microsoft/typescript-go/internal/scanner"
 import "sync"
 import "unsafe"
 
@@ -160,6 +161,7 @@ type extra_Checker struct {
   exactOptionalPropertyTypes bool
   canCollectSymbolAliasAccessibilityData bool
   wasCanceled bool
+  saveDeferredDiagnostics bool
   arrayVariances []checker.VarianceFlags
   globals ast.SymbolTable
   evaluate evaluator.Evaluator
@@ -203,9 +205,9 @@ type extra_Checker struct {
   propertiesTypes map[checker.PropertiesTypesKey]*checker.Type
   diagnostics ast.DiagnosticsCollection
   suggestionDiagnostics ast.DiagnosticsCollection
-  symbolPool core.Pool[ast.Symbol]
-  signaturePool core.Pool[checker.Signature]
-  indexInfoPool core.Pool[checker.IndexInfo]
+  symbolArena core.Arena[ast.Symbol]
+  signatureArena core.Arena[checker.Signature]
+  indexInfoArena core.Arena[checker.IndexInfo]
   mergedSymbols map[*ast.Symbol]*ast.Symbol
   factory ast.NodeFactory
   nodeLinks core.LinkStore[*ast.Node, checker.NodeLinks]
@@ -234,6 +236,7 @@ type extra_Checker struct {
   markedAssignmentSymbolLinks core.LinkStore[*ast.Symbol, checker.MarkedAssignmentSymbolLinks]
   symbolContainerLinks core.LinkStore[*ast.Symbol, checker.ContainingSymbolLinks]
   sourceFileLinks core.LinkStore[*ast.SourceFile, checker.SourceFileLinks]
+  regExpScanner *scanner.Scanner
   patternForType map[*checker.Type]*ast.Node
   contextFreeTypes map[*ast.Node]*checker.Type
   anyType *checker.Type

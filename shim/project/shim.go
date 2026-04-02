@@ -5,6 +5,7 @@ package project
 
 import "github.com/microsoft/typescript-go/internal/ast"
 import "github.com/microsoft/typescript-go/internal/core"
+import "github.com/microsoft/typescript-go/internal/diagnostics"
 import "github.com/microsoft/typescript-go/internal/ls/autoimport"
 import "github.com/microsoft/typescript-go/internal/ls/lsutil"
 import "github.com/microsoft/typescript-go/internal/project"
@@ -19,6 +20,7 @@ type CheckerPool = project.CheckerPool
 type Client = project.Client
 type ConfigFileRegistry = project.ConfigFileRegistry
 type CreateProgramResult = project.CreateProgramResult
+type DiagnosticMessage = diagnostics.Message
 type ExtendedConfigCache = project.ExtendedConfigCache
 type ExtendedConfigCacheEntry = project.ExtendedConfigCacheEntry
 type ExtendedConfigParseArgs = project.ExtendedConfigParseArgs
@@ -53,7 +55,7 @@ func NewProject(configFileName string, kind project.Kind, currentDirectory strin
 //go:linkname NewSession github.com/microsoft/typescript-go/internal/project.NewSession
 func NewSession(init *project.SessionInit) *project.Session
 //go:linkname NewSnapshot github.com/microsoft/typescript-go/internal/project.NewSnapshot
-func NewSnapshot(id uint64, fs *project.SnapshotFS, sessionOptions *project.SessionOptions, configFileRegistry *project.ConfigFileRegistry, compilerOptionsForInferredProjects *core.CompilerOptions, allUserPreferences *lsutil.UserConfig, autoImports *autoimport.Registry, autoImportsWatch *project.WatchedFiles[map[tspath.Path]string], toPath func(fileName string) tspath.Path) *project.Snapshot
+func NewSnapshot(id uint64, fs *project.SnapshotFS, sessionOptions *project.SessionOptions, configFileRegistry *project.ConfigFileRegistry, compilerOptionsForInferredProjects *core.CompilerOptions, userPreferences lsutil.UserPreferences, autoImports *autoimport.Registry, autoImportsWatch *project.WatchedFiles[map[tspath.Path]string], toPath func(fileName string) tspath.Path) *project.Snapshot
 type Overlay = project.Overlay
 type ParseCache = project.ParseCache
 type ParseCacheKey = project.ParseCacheKey

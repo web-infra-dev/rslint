@@ -10,6 +10,7 @@ import _ "unsafe"
 
 //go:linkname ApplyBulkEdits github.com/microsoft/typescript-go/internal/core.ApplyBulkEdits
 func ApplyBulkEdits(text string, edits []core.TextChange) string
+type Arena[T any] = core.Arena[T]
 //go:linkname BoolToTristate github.com/microsoft/typescript-go/internal/core.BoolToTristate
 func BoolToTristate(b bool) core.Tristate
 type BreadthFirstSearchLevel[K comparable, N any] = core.BreadthFirstSearchLevel[K,N]
@@ -96,7 +97,6 @@ const PollingKindFixedChunkSize = core.PollingKindFixedChunkSize
 const PollingKindFixedInterval = core.PollingKindFixedInterval
 const PollingKindNone = core.PollingKindNone
 const PollingKindPriorityInterval = core.PollingKindPriorityInterval
-type Pool[T any] = core.Pool[T]
 //go:linkname PositionToLineAndByteOffset github.com/microsoft/typescript-go/internal/core.PositionToLineAndByteOffset
 func PositionToLineAndByteOffset(position int, lineStarts []core.TextPos) (line int, byteOffset int)
 type ProjectReference = core.ProjectReference

@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"os"
 
 	"github.com/microsoft/typescript-go/shim/compiler"
@@ -71,7 +72,7 @@ func createProgramsForConfig(
 		sourceExts := []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".mjs"}
 		excludes := []string{"node_modules"}
 		includes := []string{"**/*"}
-		rootFiles := vfs.ReadDirectory(fsys, configDir, configDir, sourceExts, excludes, includes, nil)
+		rootFiles := vfs.ReadDirectory(fsys, configDir, configDir, sourceExts, excludes, includes, math.MaxInt)
 		if len(rootFiles) > 0 {
 			program, err := utils.CreateProgramFromOptions(singleThreaded, &core.CompilerOptions{AllowJs: core.TSTrue}, rootFiles, host)
 			if err != nil {

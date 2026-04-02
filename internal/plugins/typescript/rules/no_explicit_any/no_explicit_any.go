@@ -82,7 +82,7 @@ func isAnyInRestParameter(node *ast.Node) bool {
 			break
 		}
 		if p.Kind == ast.KindTypeReference {
-			typeRef := p.AsTypeReference()
+			typeRef := p.AsTypeReferenceNode()
 			if typeRef != nil && ast.IsIdentifier(typeRef.TypeName) {
 				identifier := typeRef.TypeName.AsIdentifier()
 				if identifier != nil && (identifier.Text == "Array" || identifier.Text == "ReadonlyArray") {
