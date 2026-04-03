@@ -34,6 +34,7 @@ export default defineConfig({
     './tests/eslint/rules/no-ex-assign.test.ts',
     './tests/eslint/rules/no-constant-binary-expression.test.ts',
 
+    './tests/eslint/rules/default-case-last.test.ts',
     './tests/eslint/rules/no-extra-bind.test.ts',
     './tests/eslint/rules/no-func-assign.test.ts',
     './tests/eslint/rules/no-global-assign.test.ts',
