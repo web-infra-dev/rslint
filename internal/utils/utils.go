@@ -16,6 +16,12 @@ func TrimNodeTextRange(sourceFile *ast.SourceFile, node *ast.Node) core.TextRang
 	return scanner.GetRangeOfTokenAtPosition(sourceFile, node.Pos()).WithEnd(node.End())
 }
 
+// TrimmedNodeText returns the source text for node over the same span as TrimNodeTextRange.
+func TrimmedNodeText(sourceFile *ast.SourceFile, node *ast.Node) string {
+	r := TrimNodeTextRange(sourceFile, node)
+	return sourceFile.Text()[r.Pos():r.End()]
+}
+
 func GetCommentsInRange(sourceFile *ast.SourceFile, inRange core.TextRange) iter.Seq[ast.CommentRange] {
 	nodeFactory := ast.NewNodeFactory(ast.NodeFactoryHooks{})
 
