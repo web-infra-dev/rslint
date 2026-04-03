@@ -121,6 +121,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_dupe_keys"
 	"github.com/web-infra-dev/rslint/internal/rules/no_duplicate_case"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty"
+	"github.com/web-infra-dev/rslint/internal/rules/no_empty_character_class"
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_pattern"
 	"github.com/web-infra-dev/rslint/internal/rules/no_ex_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_extra_bind"
@@ -497,6 +498,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-this-before-super", no_this_before_super.NoThisBeforeSuperRule)
 	GlobalRuleRegistry.Register("no-var", no_var.NoVarRule)
 	GlobalRuleRegistry.Register("prefer-rest-params", prefer_rest_params.PreferRestParamsRule)
+	GlobalRuleRegistry.Register("no-empty-character-class", no_empty_character_class.NoEmptyCharacterClassRule)
 }
 
 func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {

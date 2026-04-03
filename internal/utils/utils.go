@@ -3,6 +3,7 @@ package utils
 import (
 	"iter"
 	"slices"
+	"strings"
 	"unicode"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -196,6 +197,19 @@ func Must[T any](v T, err error) T {
 
 // GetOptionsMap extracts a map[string]interface{} from rule options.
 // It handles both array format [{ option: value }] and direct object format { option: value }.
+// ExtractRegexPatternAndFlags splits a RegularExpressionLiteral's text (e.g. "/pattern/gi")
+// into the pattern and flags portions. Returns ("", "") for malformed input.
+func ExtractRegexPatternAndFlags(text string) (pattern string, flags string) {
+	if len(text) < 2 || text[0] != '/' {
+		return "", ""
+	}
+	lastSlash := strings.LastIndex(text[1:], "/")
+	if lastSlash == -1 {
+		return text[1:], ""
+	}
+	return text[1 : lastSlash+1], text[lastSlash+2:]
+}
+
 func GetOptionsMap(opts any) map[string]interface{} {
 	if opts == nil {
 		return nil
