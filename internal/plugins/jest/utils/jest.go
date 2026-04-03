@@ -1,9 +1,16 @@
 package utils
 
 import (
-	"strings"
-
 	"github.com/microsoft/typescript-go/shim/ast"
+)
+
+type JestFnType string
+
+type JestImportMode string
+
+const (
+	JEST_GLOBAL_MODE JestImportMode = "global"
+	JEST_IMPORT_MODE JestImportMode = "import"
 )
 
 const (
@@ -101,7 +108,10 @@ var VALID_JEST_FN_CALL_CHAINS = map[string]bool{
 	"xtest.fails":               true,
 }
 
-type JestFnType string
+type ParsedJestFnMemberEntry struct {
+	Name string
+	Node *ast.Node
+}
 
 func getPropertyName(node *ast.Node) string {
 	switch node.Kind {
@@ -130,40 +140,43 @@ func GetJestKind(name string) JestFnType {
 	}
 }
 
-func GetMembersName(node *ast.Node) string {
-	chain := GetMembersChain(node)
-	if chain == nil {
-		return ""
-	}
-
-	return strings.Join(chain, ".")
-}
-
-func GetMembersChain(node *ast.Node) []string {
+func GetJestFnMemberEntries(node *ast.Node) []ParsedJestFnMemberEntry {
 	if node == nil {
 		return nil
 	}
+
 	switch node.Kind {
 	case ast.KindIdentifier:
-		return []string{node.AsIdentifier().Text}
+		return []ParsedJestFnMemberEntry{{
+			Name: node.AsIdentifier().Text,
+			Node: node,
+		}}
 	case ast.KindPropertyAccessExpression:
-		p := node.AsPropertyAccessExpression()
-		left := GetMembersChain(p.Expression)
-		if name := getPropertyName(p.Name()); name != "" {
-			return append(left, name)
+		property := node.AsPropertyAccessExpression()
+		left := GetJestFnMemberEntries(property.Expression)
+		nameNode := property.Name()
+		if name := getPropertyName(nameNode); name != "" {
+			return append(left, ParsedJestFnMemberEntry{
+				Name: name,
+				Node: nameNode,
+			})
 		}
 		return left
 	case ast.KindElementAccessExpression:
-		p := node.AsElementAccessExpression()
-		left := GetMembersChain(p.Expression)
-		if name := getElementAccessName(p.ArgumentExpression); name != "" {
-			return append(left, name)
+		element := node.AsElementAccessExpression()
+		left := GetJestFnMemberEntries(element.Expression)
+		nameNode := ast.SkipParentheses(element.ArgumentExpression)
+		if name := getElementAccessName(nameNode); name != "" {
+			return append(left, ParsedJestFnMemberEntry{
+				Name: name,
+				Node: nameNode,
+			})
 		}
 		return left
 	case ast.KindCallExpression:
-		return GetMembersChain(node.AsCallExpression().Expression)
+		return GetJestFnMemberEntries(node.AsCallExpression().Expression)
 	case ast.KindTaggedTemplateExpression:
-		return GetMembersChain(node.AsTaggedTemplateExpression().Tag)
+		return GetJestFnMemberEntries(node.AsTaggedTemplateExpression().Tag)
 	default:
 		return nil
 	}
