@@ -152,8 +152,41 @@ Global ignore patterns affect both file matching and directory traversal (includ
 
 Use `dir/**` to completely exclude a directory (including any nested configs inside it). Use `dir/**/*` if you only want to ignore files but still allow nested configs to be discovered.
 
+You can use `!` negation patterns to re-include specific files. Patterns are evaluated sequentially — later patterns override earlier ones:
+
+```ts
+// Global ignore: re-include specific file
+{
+  ignores: ['build/**/*', '!build/test.js'],
+}
+
+// Entry-level ignore: re-include a subdirectory
+{
+  files: ['**/*.ts'],
+  ignores: ['vendor/**/*', '!vendor/keep/**/*'],
+  rules: { /* ... */ },
+}
+
+// Across separate global ignore entries
+{ ignores: ['build/**/*'] },
+{ ignores: ['!build/test.js'] },
+```
+
 :::warning
-`!` negation patterns (e.g., `!build/test.js`) for re-including files are not yet supported. To lint specific files within an ignored directory, pass them explicitly as CLI arguments.
+For directory-level patterns (`dir/**`), `!` negation cannot re-include files because the directory traversal is blocked entirely. Use `dir/**/*` instead if you need negation:
+
+```ts
+// ✅ dir/**/* allows traversal — negation works
+{
+  ignores: ['build/**/*', '!build/test.js'];
+}
+
+// ❌ dir/** blocks traversal — negation has no effect
+{
+  ignores: ['build/**', '!build/test.js'];
+}
+```
+
 :::
 
 :::tip
