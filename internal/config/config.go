@@ -133,6 +133,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_template_curly_in_string"
 	"github.com/web-infra-dev/rslint/internal/rules/no_this_before_super"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef"
+	"github.com/web-infra-dev/rslint/internal/rules/no_var"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
 )
 
@@ -489,6 +490,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-undef", no_undef.NoUndefRule)
 	GlobalRuleRegistry.Register("prefer-const", prefer_const.PreferConstRule)
 	GlobalRuleRegistry.Register("no-this-before-super", no_this_before_super.NoThisBeforeSuperRule)
+	GlobalRuleRegistry.Register("no-var", no_var.NoVarRule)
 }
 
 func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {
