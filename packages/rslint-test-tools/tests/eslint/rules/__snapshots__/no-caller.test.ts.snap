@@ -1,0 +1,1371 @@
+// Rstest Snapshot v1
+
+exports[`no-caller > invalid 1`] = `
+{
+  "code": "var x = arguments.callee",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 2`] = `
+{
+  "code": "var x = arguments.caller",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.caller.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 3`] = `
+{
+  "code": "var x = arguments.callee.bind(this)",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 4`] = `
+{
+  "code": "var x = arguments.caller.toString()",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.caller.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 5`] = `
+{
+  "code": "function foo() { arguments.callee(); }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 6`] = `
+{
+  "code": "var bar = function() { return arguments.callee; };",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 7`] = `
+{
+  "code": "(function() { arguments.callee; })();",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 8`] = `
+{
+  "code": "function outer() {
+  function inner() {
+    arguments.callee;
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 3,
+        },
+        "start": {
+          "column": 5,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 9`] = `
+{
+  "code": "function cond() { if (true) { arguments.callee; } }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 10`] = `
+{
+  "code": "function loop() { for (var i = 0; i < 10; i++) { arguments.caller; } }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.caller.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 11`] = `
+{
+  "code": "function tern() { var x = true ? arguments.callee : null; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 12`] = `
+{
+  "code": "function logic() { var x = arguments.callee || null; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 13`] = `
+{
+  "code": "function assign() { var x; x = arguments.callee; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 14`] = `
+{
+  "code": "function ret() { return arguments.callee; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 15`] = `
+{
+  "code": "function thrw() { throw arguments.callee; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 16`] = `
+{
+  "code": "function arg() { console.log(arguments.callee); }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 17`] = `
+{
+  "code": "function arrowOuter() { var fn = () => arguments.callee; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 18`] = `
+{
+  "code": "function objLit() { var o = { fn: arguments.callee }; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 19`] = `
+{
+  "code": "function arrLit() { var a = [arguments.callee]; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 20`] = `
+{
+  "code": "function tmpl() { var s = \`\${arguments.callee}\`; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 21`] = `
+{
+  "code": "function typ() { var t = typeof arguments.callee; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 22`] = `
+{
+  "code": "function vd() { void arguments.callee; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 23`] = `
+{
+  "code": "function del() { delete arguments.callee; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 24`] = `
+{
+  "code": "function comma() { (0, arguments.callee); }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 25`] = `
+{
+  "code": "function sw() { switch(arguments.callee) { default: break; } }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 26`] = `
+{
+  "code": "function wh() { while(arguments.callee) { break; } }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 27`] = `
+{
+  "code": "function nested() { arguments.callee(arguments.caller); }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+    {
+      "message": "Avoid arguments.caller.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 28`] = `
+{
+  "code": "class MyClass { method() { arguments.callee; } }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 29`] = `
+{
+  "code": "function tryCatch() { try { arguments.callee; } catch(e) {} }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 30`] = `
+{
+  "code": "function multi() { arguments.callee; arguments.caller; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+    {
+      "message": "Avoid arguments.caller.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 31`] = `
+{
+  "code": "var x = (arguments).callee",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 32`] = `
+{
+  "code": "var x = ((arguments)).callee",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 33`] = `
+{
+  "code": "function paramName(arguments) { arguments.callee; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 34`] = `
+{
+  "code": "function* gen() { arguments.callee; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 35`] = `
+{
+  "code": "async function asyncFn() { arguments.callee; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 36`] = `
+{
+  "code": "var obj = { get x() { return arguments.callee; } }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 37`] = `
+{
+  "code": "var obj = { set x(v) { arguments.caller; } }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.caller.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 38`] = `
+{
+  "code": "var obj = { m() { arguments.callee; } }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 39`] = `
+{
+  "code": "function deep() {
+  if (true) {
+    while (true) {
+      for (var i = 0; i < 1; i++) {
+        try {
+          arguments.callee;
+        } catch(e) {}
+      }
+    }
+  }
+}",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 6,
+        },
+        "start": {
+          "column": 11,
+          "line": 6,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 40`] = `
+{
+  "code": "function nestedObj() { var o = { a: { b: { c: arguments.callee } } }; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 63,
+          "line": 1,
+        },
+        "start": {
+          "column": 47,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 41`] = `
+{
+  "code": "function tagged() { String.raw\`\${arguments.callee}\`; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 42`] = `
+{
+  "code": "function newExpr() { new (arguments.callee)(); }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 43`] = `
+{
+  "code": "function spread() { var a = [...arguments.callee]; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 44`] = `
+{
+  "code": "function compKey() { var o = { [arguments.callee]: 1 }; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 45`] = `
+{
+  "code": "function seq() { var x; x = (arguments.callee, 1); }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 46`] = `
+{
+  "code": "function optChain() { arguments?.callee; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 47`] = `
+{
+  "code": "function optChain2() { arguments?.caller; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.caller.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 48`] = `
+{
+  "code": "function varShadow() { var arguments = {}; arguments.callee; }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 49`] = `
+{
+  "code": "function catchArgs() { try {} catch(arguments) { arguments.callee; } }",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 50,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 50`] = `
+{
+  "code": "arguments.callee",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.callee.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-caller > invalid 51`] = `
+{
+  "code": "arguments.caller",
+  "diagnostics": [
+    {
+      "message": "Avoid arguments.caller.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-caller",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
