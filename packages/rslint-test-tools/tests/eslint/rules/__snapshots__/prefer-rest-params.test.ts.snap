@@ -1,0 +1,495 @@
+// Rstest Snapshot v1
+
+exports[`prefer-rest-params > invalid 1`] = `
+{
+  "code": "function foo() { arguments; }",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-rest-params > invalid 2`] = `
+{
+  "code": "function foo() { arguments[0]; }",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-rest-params > invalid 3`] = `
+{
+  "code": "function foo() { arguments[1]; }",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-rest-params > invalid 4`] = `
+{
+  "code": "function foo() { arguments[Symbol.iterator]; }",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-rest-params > invalid 5`] = `
+{
+  "code": "function foo() { var x = arguments; }",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-rest-params > invalid 6`] = `
+{
+  "code": "function foo() { { let arguments: any = 1; } arguments; }",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-rest-params > invalid 7`] = `
+{
+  "code": "function foo() { var f = () => arguments; }",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 32,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-rest-params > invalid 8`] = `
+{
+  "code": "var foo = function() { arguments; };",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-rest-params > invalid 9`] = `
+{
+  "code": "class C { constructor() { arguments; } }",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-rest-params > invalid 10`] = `
+{
+  "code": "function foo({ arguments: a }: any) { arguments; }",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-rest-params > invalid 11`] = `
+{
+  "code": "var foo = function arguments() { arguments; };",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-rest-params > invalid 12`] = `
+{
+  "code": "function foo() { try {} catch(arguments) {} arguments; }",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 54,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-rest-params > invalid 13`] = `
+{
+  "code": "function foo() { var x = { arguments }; }",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-rest-params > invalid 14`] = `
+{
+  "code": "var obj = { method() { arguments; } };",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-rest-params > invalid 15`] = `
+{
+  "code": "var obj = { get x() { arguments; } };",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-rest-params > invalid 16`] = `
+{
+  "code": "var obj = { set x(v: any) { arguments; } };",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-rest-params > invalid 17`] = `
+{
+  "code": "function foo() { var f = () => () => arguments; }",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-rest-params > invalid 18`] = `
+{
+  "code": "function foo() { typeof arguments; }",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-rest-params > invalid 19`] = `
+{
+  "code": "function foo() { bar(...arguments); }",
+  "diagnostics": [
+    {
+      "message": "Use the rest parameters instead of 'arguments'.",
+      "messageId": "preferRestParams",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-rest-params",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
