@@ -46,6 +46,14 @@ var NoAliasMethodsRule = rule.Rule{
 					return
 				}
 
+				if isNestedCallExpressionInMemberChain(node) {
+					return
+				}
+
+				if len(jestFnCall.MemberEntries) == 0 {
+					return
+				}
+
 				for _, memberEntry := range jestFnCall.MemberEntries {
 					if canonicalName, ok := methodNames[memberEntry.Name]; ok {
 						start := memberEntry.Node.Pos()
@@ -63,10 +71,28 @@ var NoAliasMethodsRule = rule.Rule{
 								Range: core.NewTextRange(start, end),
 							},
 						)
-						break
 					}
 				}
 			},
 		}
 	},
+}
+
+func isNestedCallExpressionInMemberChain(node *ast.Node) bool {
+	if node == nil || node.Parent == nil {
+		return false
+	}
+
+	switch node.Parent.Kind {
+	case ast.KindPropertyAccessExpression:
+		return node.Parent.AsPropertyAccessExpression().Expression == node
+	case ast.KindElementAccessExpression:
+		return node.Parent.AsElementAccessExpression().Expression == node
+	case ast.KindCallExpression:
+		return node.Parent.AsCallExpression().Expression == node
+	case ast.KindTaggedTemplateExpression:
+		return node.Parent.AsTaggedTemplateExpression().Tag == node
+	default:
+		return false
+	}
 }
