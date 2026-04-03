@@ -18,10 +18,22 @@ import (
 )
 
 type ConfiguredRule struct {
-	Name     string
-	Settings map[string]interface{}
-	Severity rule.DiagnosticSeverity
-	Run      func(ctx rule.RuleContext) rule.RuleListeners
+	Name             string
+	Settings         map[string]interface{}
+	Severity         rule.DiagnosticSeverity
+	RequiresTypeInfo bool
+	Run              func(ctx rule.RuleContext) rule.RuleListeners
+}
+
+// FilterNonTypeAwareRules returns only rules that do not require type information.
+func FilterNonTypeAwareRules(rules []ConfiguredRule) []ConfiguredRule {
+	filtered := make([]ConfiguredRule, 0, len(rules))
+	for _, r := range rules {
+		if !r.RequiresTypeInfo {
+			filtered = append(filtered, r)
+		}
+	}
+	return filtered
 }
 
 // isFileAllowed checks if fileName matches any path in allowFiles.
@@ -99,7 +111,11 @@ func flattenMessageChain(b *strings.Builder, chain *ast.Diagnostic, level int) {
 	}
 }
 
-func RunLinterInProgram(program *compiler.Program, allowFiles []string, allowDirs []string, skipFiles []string, getRulesForFile RuleHandler, typeCheck bool, onDiagnostic DiagnosticHandler) int32 {
+// RunLinterInProgram lints files in a single Program. Files are filtered through
+// skipFiles, allowFiles/allowDirs, and the optional fileFilter before rule execution.
+// fileFilter is used in multi-config mode for ownership-based deduplication: only files
+// owned by this program's config pass the filter. Pass nil to lint all files.
+func RunLinterInProgram(program *compiler.Program, allowFiles []string, allowDirs []string, skipFiles []string, getRulesForFile RuleHandler, typeCheck bool, onDiagnostic DiagnosticHandler, typeInfoFiles map[string]struct{}, fileFilter func(string) bool) int32 {
 	// Pre-compute FileInfo for allowFiles once to avoid N×M stat calls in the loop.
 	var allowFileInfos []os.FileInfo
 	if allowFiles != nil {
@@ -130,6 +146,11 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, allowDir
 				continue
 			}
 		}
+		// Ownership filter: in multi-config mode, only lint files owned by
+		// the current program's config (nearest config == program's config).
+		if fileFilter != nil && !fileFilter(file.FileName()) {
+			continue
+		}
 		filesToLint = append(filesToLint, file)
 	}
 
@@ -152,12 +173,23 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, allowDir
 			// Create disable manager for this file
 			disableManager := rule.NewDisableManager(file, comments)
 
+			// For gap files (not in typeInfoFiles), pass nil TypeChecker
+			// as defense-in-depth. Type-aware rules are already filtered
+			// out by getRulesForFile, but this ensures rules with optional
+			// TypeChecker usage degrade gracefully.
+			fileChecker := checker
+			if typeInfoFiles != nil {
+				if _, hasTypeInfo := typeInfoFiles[file.FileName()]; !hasTypeInfo {
+					fileChecker = nil
+				}
+			}
+
 			for _, r := range rules {
 				ctx := rule.RuleContext{
 					SourceFile:     file,
 					Program:        program,
 					Settings:       r.Settings,
-					TypeChecker:    checker,
+					TypeChecker:    fileChecker,
 					DisableManager: disableManager,
 					ReportRange: func(textRange core.TextRange, msg rule.RuleMessage) {
 						// Check if rule is disabled at this position
@@ -340,6 +372,12 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, allowDir
 	if typeCheck {
 		ctx := context.Background()
 		for _, file := range filesToLint {
+			// Skip semantic diagnostics for gap files (no reliable type info).
+			if typeInfoFiles != nil {
+				if _, hasTypeInfo := typeInfoFiles[file.FileName()]; !hasTypeInfo {
+					continue
+				}
+			}
 			for _, d := range program.GetSemanticDiagnostics(ctx, file) {
 				onDiagnostic(rule.RuleDiagnostic{
 					RuleName:     fmt.Sprintf("TypeScript(TS%d)", d.Code()),
@@ -359,22 +397,27 @@ func RunLinterInProgram(program *compiler.Program, allowFiles []string, allowDir
 type RuleHandler = func(sourceFile *ast.SourceFile) []ConfiguredRule
 type DiagnosticHandler = func(diagnostic rule.RuleDiagnostic)
 
-// when allowedFiles is passed as nil which means all files are allowed
-// when allowedFiles is passed as slice, only files in the slice are allowed
-// when allowDirs is set, files under those directories are also allowed (OR logic with allowFiles)
-func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []string, allowDirs []string, excludedPaths []string, getRulesForFile RuleHandler, typeCheck bool, onDiagnostic DiagnosticHandler) (int32, error) {
+// RunLinter runs all configured rules across the given programs in parallel.
+//   - allowFiles: if non-nil, only lint files in this list; nil = all files
+//   - allowDirs: if non-nil, also lint files under these dirs (OR with allowFiles)
+//   - typeInfoFiles: files with type info; gap files not in this set skip type-aware rules
+//   - fileFilters: optional per-program ownership filters (parallel to programs).
+//     In multi-config mode, each filter ensures a program only lints files owned by
+//     its nearest config. nil or missing entries = no filter (process all).
+func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []string, allowDirs []string, excludedPaths []string, getRulesForFile RuleHandler, typeCheck bool, onDiagnostic DiagnosticHandler, typeInfoFiles map[string]struct{}, fileFilters []func(string) bool) (int32, error) {
 
 	wg := core.NewWorkGroup(singleThreaded)
 
 	var lintedFileCount atomic.Int32
-	for _, program := range programs {
-		{
-			wg.Queue(func() {
-				fileCount := RunLinterInProgram(program, allowFiles, allowDirs, excludedPaths, getRulesForFile, typeCheck, onDiagnostic)
-				lintedFileCount.Add(fileCount)
-			})
+	for i, program := range programs {
+		var filter func(string) bool
+		if i < len(fileFilters) {
+			filter = fileFilters[i]
 		}
-
+		wg.Queue(func() {
+			fileCount := RunLinterInProgram(program, allowFiles, allowDirs, excludedPaths, getRulesForFile, typeCheck, onDiagnostic, typeInfoFiles, filter)
+			lintedFileCount.Add(fileCount)
+		})
 	}
 	wg.RunAndWait()
 	return lintedFileCount.Load(), nil

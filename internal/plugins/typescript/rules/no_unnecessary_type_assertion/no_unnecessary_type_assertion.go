@@ -34,7 +34,8 @@ type NoUnnecessaryTypeAssertionOptions struct {
 }
 
 var NoUnnecessaryTypeAssertionRule = rule.CreateRule(rule.Rule{
-	Name: "no-unnecessary-type-assertion",
+	Name:             "no-unnecessary-type-assertion",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := NoUnnecessaryTypeAssertionOptions{}
 		if options != nil {

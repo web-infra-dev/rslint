@@ -104,6 +104,12 @@ When `--type-check` is enabled, the summary always splits lint errors and type e
 Found 3 lint errors, 2 type errors and 1 warning (linted 42 files in 120ms using 8 threads)
 ```
 
+## Files Without tsconfig Coverage
+
+Files that match your config's `files` patterns but are not included in any tsconfig (e.g. root-level scripts, config files) are still linted with syntax-level rules. However, `--type-check` will **not** report semantic type errors for these files, since reliable type information requires tsconfig coverage.
+
+To enable full type checking for these files, add them to your tsconfig's `include` or create a separate tsconfig that covers them.
+
 ## Interaction with Other Flags
 
 | Flag             | Behavior with `--type-check`                                                     |

@@ -156,6 +156,8 @@ func RunRuleTester(rootDir string, tsconfigPath string, t *testing.T, r *rule.Ru
 
 				diagnostics = append(diagnostics, diagnostic)
 			},
+			nil, // no typeInfoFiles distinction in rule tester
+			nil, // no file filters in rule tester
 		)
 
 		assert.NilError(t, err, "error running linter. code:\n", code)

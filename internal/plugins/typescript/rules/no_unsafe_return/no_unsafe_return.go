@@ -30,7 +30,8 @@ func buildUnsafeReturnThisMessage(t string) rule.RuleMessage {
 }
 
 var NoUnsafeReturnRule = rule.CreateRule(rule.Rule{
-	Name: "no-unsafe-return",
+	Name:             "no-unsafe-return",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		compilerOptions := ctx.Program.Options()
 		// When noImplicitThis is not enabled (considering strict mode), object literal methods

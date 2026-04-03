@@ -116,7 +116,9 @@ const Playground: React.FC = () => {
         // capture the exact source text from encoded source file
         try {
           sourceTextForTs = (source as any).text as string | undefined;
-        } catch {}
+        } catch {
+          // text property may not exist on all RemoteSourceFile versions
+        }
         // Convert a RemoteNode (from tsgo/rslint-api) to a minimal ESTree node
 
         function RemoteNodeToEstree(node: Node): ASTNode {
