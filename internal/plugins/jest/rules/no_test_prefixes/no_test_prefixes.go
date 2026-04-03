@@ -59,7 +59,8 @@ var NoTestPrefixesRule = rule.Rule{
 
 func reportFix(node *ast.Node, preferredName string, ctx rule.RuleContext) {
 	switch node.Kind {
-	case ast.KindIdentifier, ast.KindPropertyAccessExpression:
+	case ast.KindIdentifier, ast.KindPropertyAccessExpression,
+		ast.KindElementAccessExpression:
 		ctx.ReportNodeWithFixes(node, buildErrorUsePreferredNameMessage(preferredName),
 			rule.RuleFixReplace(ctx.SourceFile, node, preferredName),
 		)
