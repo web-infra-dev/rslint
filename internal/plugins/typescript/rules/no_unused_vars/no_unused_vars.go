@@ -1741,7 +1741,8 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 }
 
 var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
-	Name: "no-unused-vars",
+	Name:             "no-unused-vars",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := parseOptions(options)
 

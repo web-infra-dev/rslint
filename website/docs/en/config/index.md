@@ -113,12 +113,18 @@ import { defineConfig, ts, js, reactPlugin, importPlugin } from '@rslint/core';
 
 Glob patterns specifying which files this config entry applies to. If omitted, the entry applies to all files matched by other entries.
 
+The `files` field determines the **lint scope** — only files matching at least one entry's `files` pattern will be linted. This is independent of tsconfig's `include`: a file in tsconfig but not matching any `files` pattern will not be linted, while a file matching `files` but not in any tsconfig will still be linted with syntax-only rules (type-aware rules require tsconfig coverage).
+
 ```ts
 {
   files: ['**/*.ts', '**/*.tsx'],
   rules: { /* ... */ },
 }
 ```
+
+:::tip
+Files that match `files` but are not included in any tsconfig automatically receive a reduced rule set — only rules that don't require type information will run. To enable type-aware rules for these files, add them to your tsconfig's `include`.
+:::
 
 ### ignores
 
@@ -190,7 +196,7 @@ For directory-level patterns (`dir/**`), `!` negation cannot re-include files be
 :::
 
 :::tip
-`node_modules` is automatically excluded by rslint — you don't need to add it to ignores.
+`node_modules` and `.git` are automatically excluded by rslint — you don't need to add them to ignores.
 :::
 
 ### rules
@@ -268,7 +274,7 @@ Enable TypeScript's project service for automatic tsconfig discovery. This is th
 
 - **Type:** `string | string[]`
 
-Explicit tsconfig.json paths. Supports glob patterns for monorepos.
+Explicit tsconfig.json paths. Supports glob patterns for monorepos. Files included by these tsconfigs receive full type information, enabling type-aware rules (e.g. `@typescript-eslint/no-floating-promises`, `@typescript-eslint/await-thenable`). Files outside all tsconfigs are still linted but only with syntax-level rules.
 
 ```ts
 {

@@ -258,7 +258,8 @@ func getStringLiteralValue(srcFile *ast.SourceFile, n *ast.Node) (string, bool) 
 // via languageOptions.parserOptions.project, but these are ignored by the test runner.
 // See: /packages/rule-tester/src/index.ts line 273 - the lint() call doesn't use per-test config.
 var DotNotationRule = rule.CreateRule(rule.Rule{
-	Name: "dot-notation",
+	Name:             "dot-notation",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := parseOptions(options)
 		var allowRE *regexp.Regexp

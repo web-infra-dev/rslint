@@ -69,7 +69,7 @@ func createProgramsForConfig(
 	} else {
 		// No tsconfig fallback: scan directory for pure JS projects
 		sourceExts := []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".mjs"}
-		excludes := []string{"node_modules"}
+		excludes := utils.DefaultExcludeDirNames
 		includes := []string{"**/*"}
 		rootFiles := vfs.ReadDirectory(fsys, configDir, configDir, sourceExts, excludes, includes, nil)
 		if len(rootFiles) > 0 {
@@ -89,4 +89,60 @@ func createProgramsForConfig(
 	}
 
 	return programs, 0
+}
+
+// createFallbackProgram creates a Program for "gap" files — files matched by
+// config `files` patterns but not included in any tsconfig. Uses minimal
+// compiler options sufficient for AST parsing (no type checking).
+func createFallbackProgram(
+	gapFiles []string,
+	singleThreaded bool,
+	configDir string,
+	fsys vfs.FS,
+) (*compiler.Program, int) {
+	host := utils.CreateCompilerHost(configDir, fsys)
+	program, err := utils.CreateProgramFromOptionsLenient(singleThreaded, &core.CompilerOptions{
+		Target:  core.ScriptTargetESNext,
+		Module:  core.ModuleKindESNext,
+		Jsx:     core.JsxEmitPreserve,
+		AllowJs: core.TSTrue,
+	}, gapFiles, host)
+	if err != nil {
+		// Non-fatal: gap files failing to parse should not block the entire run.
+		// Log to stderr and skip.
+		fmt.Fprintf(os.Stderr, "warning: failed to create program for %d file(s) outside tsconfig: %v\n", len(gapFiles), err)
+		return nil, 0
+	}
+	return program, 0
+}
+
+// buildProgramFileSet collects all source file paths from the given programs
+// into a set for fast lookup.
+func buildProgramFileSet(programs []*compiler.Program) map[string]struct{} {
+	fileSet := make(map[string]struct{})
+	for _, prog := range programs {
+		for _, sf := range prog.GetSourceFiles() {
+			fileSet[sf.FileName()] = struct{}{}
+		}
+	}
+	return fileSet
+}
+
+// buildFileOwnerMap determines which config directory "owns" each file across
+// all programs. Ownership is based on nearest config lookup (deepest matching
+// configDirectory), aligning with ESLint v10's per-file config resolution.
+// This ensures each file is linted exactly once by the program belonging to
+// its nearest config.
+func buildFileOwnerMap(programs []*compiler.Program, configMap map[string]rslintconfig.RslintConfig) map[string]string {
+	fileOwner := make(map[string]string)
+	for _, prog := range programs {
+		for _, sf := range prog.GetSourceFiles() {
+			fn := sf.FileName()
+			if _, ok := fileOwner[fn]; !ok {
+				nearestDir, _ := rslintconfig.FindNearestConfig(fn, configMap)
+				fileOwner[fn] = nearestDir
+			}
+		}
+	}
+	return fileOwner
 }

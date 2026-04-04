@@ -62,9 +62,10 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 			if ruleImpl, exists := r.rules[ruleName]; exists {
 				ruleConfigCopy := ruleConfig
 				enabledRules = append(enabledRules, linter.ConfiguredRule{
-					Name:     ruleName,
-					Settings: CloneSettings(mergedConfig.Settings),
-					Severity: ruleConfig.GetSeverity(),
+					Name:             ruleName,
+					Settings:         CloneSettings(mergedConfig.Settings),
+					Severity:         ruleConfig.GetSeverity(),
+					RequiresTypeInfo: ruleImpl.RequiresTypeInfo,
 					Run: func(ctx rule.RuleContext) rule.RuleListeners {
 						return ruleImpl.Run(ctx, ruleConfigCopy.Options)
 					},

@@ -5,15 +5,23 @@ export default defineConfig([
     ignores: [
       'node_modules/**',
       '**/dist/**',
-      'packages/rslint-test-tools/tests/**/*.test.ts',
-      'packages/rslint/fixtures/**',
-      'packages/rslint-test-tools/tests/typescript-eslint/rules/prefer-optional-chain/base-cases.ts',
-      'packages/rslint-test-tools/tests/typescript-eslint/rules/naming-convention/cases/createTestCases.ts',
-      'packages/rslint-test-tools/tests/typescript-eslint/areOptionsValid.ts',
+      'typescript-go/**',
+
+      // Test fixtures — not real source code
+      '**/fixtures/**',
+      'packages/rslint-test-tools/tests/**',
+
+      // VSCode extension test artifacts
       'packages/vscode-extension/__tests__/**',
+      'packages/vscode-extension/.vscode-test/**',
+
+      // Generated / build artifacts
+      'website/doc_build/**',
+      'website/generated/**',
+
+      // Files that need special handling
       'packages/rslint-wasm/src/worker.ts',
       'packages/rule-tester/src/index.ts',
-      'typescript-go/**',
     ],
   },
   // Start from recommended preset, then override rules and parserOptions
