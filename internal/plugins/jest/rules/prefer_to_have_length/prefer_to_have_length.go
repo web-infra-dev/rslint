@@ -129,7 +129,7 @@ var PreferToHaveLengthRule = rule.Rule{
 				}
 
 				argList := matcherCall.Arguments
-				if argList == nil || len(argList.Nodes) == 0 {
+				if argList == nil || len(argList.Nodes) != 1 {
 					return
 				}
 
