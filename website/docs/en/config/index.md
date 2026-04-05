@@ -199,6 +199,36 @@ For directory-level patterns (`dir/**`), `!` negation cannot re-include files be
 `node_modules` and `.git` are automatically excluded by rslint — you don't need to add them to ignores.
 :::
 
+#### .gitignore integration
+
+Rslint automatically reads `.gitignore` files and treats their patterns as additional global ignores. This means files ignored by git (build outputs, coverage reports, etc.) are also ignored by the linter without extra configuration.
+
+- **Nested `.gitignore` files** are supported — each one only affects its own directory subtree
+- **Parent patterns cascade** to child directories (e.g., root `dist/` also ignores `packages/app/dist/`)
+- **Child `.gitignore` can override** parent patterns with `!` negation
+- Config `!` negation can also override `.gitignore` patterns (they are evaluated sequentially in the same global ignores list)
+
+```text
+# .gitignore
+dist/
+coverage/
+*.log
+
+# packages/app/.gitignore
+!dist/          # re-include dist/ under packages/app/
+```
+
+If you need to lint a file that is in `.gitignore`, add a `!` negation pattern in your config's global ignores:
+
+```ts
+export default [
+  {
+    ignores: ['!dist/important.ts'], // override .gitignore for this file
+  },
+  // ...
+];
+```
+
 ### rules
 
 - **Type:** `Record<string, RuleSeverity | [RuleSeverity, ...options]>`

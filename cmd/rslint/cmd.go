@@ -646,6 +646,22 @@ func runCMD() int {
 		if payload.IsMultiConfig {
 			// Multi-config format
 			configMap = payload.ConfigMap
+
+			// Inject .gitignore patterns as global ignores for each config.
+			// Each config independently reads its own .gitignore tree:
+			// ReadGitignoreAsGlobs walks UP (ancestor inheritance) and DOWN
+			// (nested .gitignore) from each configDir. Sibling configs are
+			// fully isolated — they never share gitignore patterns.
+			for configDir, entries := range configMap {
+				gitGlobs := rslintconfig.ReadGitignoreAsGlobs(configDir, fs)
+				if len(gitGlobs) > 0 {
+					configMap[configDir] = append(
+						rslintconfig.RslintConfig{{Ignores: gitGlobs}},
+						entries...,
+					)
+				}
+			}
+
 			seenTsConfigs := make(map[string]struct{})
 
 			for configDir, entries := range configMap {
@@ -663,6 +679,15 @@ func runCMD() int {
 			rslintConfig = payload.SingleConfig
 			currentDirectory = payload.SingleConfigDir
 
+			// Inject .gitignore patterns as global ignores.
+			gitGlobs := rslintconfig.ReadGitignoreAsGlobs(currentDirectory, fs)
+			if len(gitGlobs) > 0 {
+				rslintConfig = append(
+					rslintconfig.RslintConfig{{Ignores: gitGlobs}},
+					rslintConfig...,
+				)
+			}
+
 			progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil)
 			if exitCode != 0 {
 				return exitCode
@@ -672,6 +697,15 @@ func runCMD() int {
 	} else {
 		// Load configuration from file (JSON config path, isJSConfig stays false)
 		rslintConfig, _, currentDirectory = rslintconfig.LoadConfigurationWithFallback(config, currentDirectory, fs)
+
+		// Inject .gitignore patterns as global ignores.
+		gitGlobs := rslintconfig.ReadGitignoreAsGlobs(currentDirectory, fs)
+		if len(gitGlobs) > 0 {
+			rslintConfig = append(
+				rslintconfig.RslintConfig{{Ignores: gitGlobs}},
+				rslintConfig...,
+			)
+		}
 
 		progs, exitCode := createProgramsForConfig(currentDirectory, rslintConfig, singleThreaded, fs, nil)
 		if exitCode != 0 {

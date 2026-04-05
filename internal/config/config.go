@@ -540,10 +540,12 @@ func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {
 
 		normalizedPattern := normalizePattern(pattern)
 
+		// Match against the relative path only. Do NOT fall back to the
+		// absolute filePath — patterns with **/ prefix (e.g., **/tmp/**/*)
+		// would incorrectly match system directory names in the absolute path
+		// (e.g., /tmp/ on Linux/macOS).
 		matched := matchGlob(normalizedPattern, normalizedPath)
-		if !matched && normalizedPath != filePath {
-			matched = matchGlob(normalizedPattern, filePath)
-		}
+		// Windows path separator fallback.
 		if !matched && unixPath != normalizedPath {
 			matched = matchGlob(normalizedPattern, unixPath)
 		}
