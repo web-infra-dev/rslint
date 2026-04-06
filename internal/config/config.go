@@ -144,6 +144,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_rest_params"
+	"github.com/web-infra-dev/rslint/internal/rules/use_isnan"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -509,6 +510,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-unsafe-negation", no_unsafe_negation.NoUnsafeNegationRule)
 	GlobalRuleRegistry.Register("no-obj-calls", no_obj_calls.NoObjCallsRule)
 	GlobalRuleRegistry.Register("no-new-symbol", no_new_symbol.NoNewSymbolRule)
+	GlobalRuleRegistry.Register("use-isnan", use_isnan.UseIsNaNRule)
 }
 
 // isFileIgnored checks if a file is matched by ignore patterns, evaluated sequentially.
