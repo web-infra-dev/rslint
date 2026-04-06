@@ -655,6 +655,21 @@ func IsInObjectLiteralMethod(functionNode *ast.Node) bool {
 	return false
 }
 
+// IsSymbolDeclaredInFile reports whether the given symbol has at least one
+// declaration in the specified source file. Use this to distinguish locally
+// declared symbols (shadowed) from globals provided by lib.d.ts.
+func IsSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
+	if symbol == nil {
+		return false
+	}
+	for _, decl := range symbol.Declarations {
+		if ast.GetSourceFileOfNode(decl) == sf {
+			return true
+		}
+	}
+	return false
+}
+
 // GetStaticPropertyName extracts the static name from a property name node.
 // It handles Identifier, StringLiteral, NumericLiteral, and ComputedPropertyName
 // (with static string, numeric, BigInt, or template literal expressions).
