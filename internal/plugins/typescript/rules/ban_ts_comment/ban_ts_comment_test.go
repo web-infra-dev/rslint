@@ -11,6 +11,8 @@ func TestBanTsCommentRule(t *testing.T) {
 	rule_tester.RunRuleTester(fixtures.GetRootDir(), "tsconfig.json", t, &BanTsCommentRule, []rule_tester.ValidTestCase{
 		// Comment containing @ts-expect-error without directive formatting
 		{Code: "// Suppress ts-expect-error\nconst a = 0;"},
+		{Code: "const c = \"// @ts-ignore\";"},
+		{Code: "const c = \"/* @ts-expect-error */\";"},
 
 		// ts-expect-error - disabled
 		{Code: "// @ts-expect-error\nconst a = 0;", Options: map[string]interface{}{"ts-expect-error": false}},
