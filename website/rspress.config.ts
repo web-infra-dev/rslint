@@ -1,28 +1,21 @@
 import * as path from 'node:path';
 import { pluginSass } from '@rsbuild/plugin-sass';
 import { defineConfig } from '@rspress/core';
-import { pluginLlms } from '@rspress/plugin-llms';
 import { pluginGoogleAnalytics } from 'rsbuild-plugin-google-analytics';
 import { pluginOpenGraph } from 'rsbuild-plugin-open-graph';
 import { pluginFontOpenSans } from 'rspress-plugin-font-open-sans';
-import pluginSitemap from 'rspress-plugin-sitemap';
+import { pluginSitemap } from '@rspress/plugin-sitemap';
 import { pluginRuleManifest } from './plugin-rule-manifest';
 
 const siteUrl = 'https://rslint.rs';
+const logo = 'https://assets.rspack.rs/rslint/rslint-logo.svg';
 const description = 'The high-performance TypeScript linter';
 
 export default defineConfig({
-  root: path.join(__dirname, 'docs'),
   title: 'Rslint',
-  icon: 'https://assets.rspack.rs/rslint/rslint-logo.svg',
-  logo: {
-    light: 'https://assets.rspack.rs/rslint/rslint-logo.svg',
-    dark: 'https://assets.rspack.rs/rslint/rslint-logo.svg',
-  },
+  icon: logo,
+  logo,
   logoText: 'Rslint',
-  search: {
-    codeBlocks: true,
-  },
   lang: 'en',
   locales: [
     {
@@ -37,6 +30,8 @@ export default defineConfig({
     exclude: ['**/zh/shared/**', '**/en/shared/**', './theme'],
   },
   globalStyles: path.join(__dirname, 'styles/index.css'),
+  // TODO: enable llms when SSG issues had been fixed
+  // llms: true,
   ssg: false,
   themeConfig: {
     socialLinks: [
@@ -60,10 +55,7 @@ export default defineConfig({
   plugins: [
     pluginRuleManifest(),
     pluginFontOpenSans(),
-    pluginSitemap({
-      domain: siteUrl,
-    }),
-    pluginLlms(),
+    pluginSitemap({ siteUrl }),
   ],
   builderConfig: {
     tools: {
