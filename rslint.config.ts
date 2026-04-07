@@ -65,6 +65,7 @@ export default defineConfig([
       '@typescript-eslint/require-await': 'warn',
       '@typescript-eslint/prefer-readonly': 'warn',
       '@typescript-eslint/no-non-null-assertion': 'warn',
+      'prefer-const': 'warn',
       '@typescript-eslint/no-dynamic-delete': 'off',
       '@typescript-eslint/prefer-includes': 'off',
       '@typescript-eslint/prefer-regexp-exec': 'off',
