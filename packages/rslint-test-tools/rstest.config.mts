@@ -20,6 +20,7 @@ export default defineConfig({
     './tests/cli/js-config/files-driven-lint.test.ts',
     './tests/cli/js-config/files-driven-monorepo.test.ts',
     './tests/cli/js-config/gitignore-integration.test.ts',
+    './tests/cli/entry-point.test.ts',
     './tests/cli/type-check/type-check.test.ts',
     './tests/cli/type-check/type-check-snapshot.test.ts',
 
