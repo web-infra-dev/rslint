@@ -21,7 +21,11 @@ func collectCatchBindingNamesAndSymbols(node *ast.Node, ctx rule.RuleContext) ([
 		return nil, nil
 	}
 	if ast.IsIdentifier(node) {
-		return []string{node.Text()}, []*ast.Symbol{ctx.TypeChecker.GetSymbolAtLocation(node)}
+		var sym *ast.Symbol
+		if ctx.TypeChecker != nil {
+			sym = ctx.TypeChecker.GetSymbolAtLocation(node)
+		}
+		return []string{node.Text()}, []*ast.Symbol{sym}
 	}
 	if ast.IsBindingPattern(node) {
 		var names []string
@@ -36,7 +40,11 @@ func collectCatchBindingNamesAndSymbols(node *ast.Node, ctx rule.RuleContext) ([
 			}
 			utils.CollectBindingNames(be.Name(), func(ident *ast.Node, name string) {
 				names = append(names, name)
-				symbols = append(symbols, ctx.TypeChecker.GetSymbolAtLocation(ident))
+				var sym *ast.Symbol
+				if ctx.TypeChecker != nil {
+					sym = ctx.TypeChecker.GetSymbolAtLocation(ident)
+				}
+				symbols = append(symbols, sym)
 			})
 		}
 		return names, symbols
