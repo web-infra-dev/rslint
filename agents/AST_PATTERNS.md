@@ -207,29 +207,56 @@ if node.Kind == ast.KindPropertyAccessExpression {
 
 ## Using TypeChecker
 
-For rules that need type information, access `TypeChecker` via `RuleContext`:
+For rules that need type information, access `TypeChecker` via `RuleContext`.
+
+### RequiresTypeInfo vs nil check
+
+How you handle TypeChecker availability depends on the rule type:
+
+| Rule type                           | Approach                                          | Reason                                                                                                                             |
+| ----------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| **@typescript-eslint** (type-aware) | Set `RequiresTypeInfo: true` in the `Rule` struct | The linter automatically skips the rule on files without a type checker. `ctx.TypeChecker` is guaranteed non-nil inside listeners. |
+| **Core ESLint**                     | Check `ctx.TypeChecker == nil` at the call site   | Core rules must run on JS files (no type checker). They either degrade gracefully or return early. Do NOT set `RequiresTypeInfo`.  |
+
+**Type-aware @typescript-eslint rule** — set `RequiresTypeInfo: true`, no nil check needed:
 
 ```go
-Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
-    return rule.RuleListeners{
-        ast.KindCallExpression: func(node *ast.Node) {
-            if ctx.TypeChecker == nil {
-                return // TypeChecker may not be available
-            }
+var MyTSRule = rule.CreateRule(rule.Rule{
+    Name:             "my-ts-rule",
+    RequiresTypeInfo: true,
+    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+        return rule.RuleListeners{
+            ast.KindCallExpression: func(node *ast.Node) {
+                // ctx.TypeChecker is guaranteed non-nil
+                exprType := ctx.TypeChecker.GetTypeAtLocation(node.AsCallExpression().Expression)
+                // ...
+            },
+        }
+    },
+})
+```
 
-            // Get the type of an expression
-            callExpr := node.AsCallExpression()
-            exprType := ctx.TypeChecker.GetTypeAtLocation(callExpr.Expression)
+**Core ESLint rule** — nil check required, do NOT set `RequiresTypeInfo`:
 
-            // Check if it's a Promise type
-            if exprType != nil {
-                typeStr := ctx.TypeChecker.TypeToString(exprType)
-                // Use type information for analysis
-            }
-        },
-    }
+```go
+var MyCoreRule = rule.Rule{
+    Name: "my-core-rule",
+    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+        return rule.RuleListeners{
+            ast.KindCallExpression: func(node *ast.Node) {
+                if ctx.TypeChecker == nil {
+                    return // TypeChecker not available — degrade gracefully
+                }
+
+                exprType := ctx.TypeChecker.GetTypeAtLocation(node.AsCallExpression().Expression)
+                // ...
+            },
+        }
+    },
 }
 ```
+
+> **Why the distinction?** The linter uses `RequiresTypeInfo` to filter rules via `FilterNonTypeAwareRules` (see `internal/linter/linter.go`). Setting it on a core ESLint rule would prevent it from running on JS files entirely, which breaks `eslint:recommended` behavior.
 
 ### Common TypeChecker Methods
 
