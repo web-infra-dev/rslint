@@ -95,7 +95,7 @@ export class Logger {
       return message;
     }
 
-    const formattedArgs = args.map(arg => {
+    const formattedArgs = args.map((arg) => {
       if (typeof arg === 'string') {
         return arg;
       }

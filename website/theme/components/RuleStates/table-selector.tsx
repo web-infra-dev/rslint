@@ -40,7 +40,7 @@ function SelectWithCancel(props: {
       <SelectContent>
         <SelectGroup>
           <SelectLabel>{props.label}</SelectLabel>
-          {props.items.map(item => (
+          {props.items.map((item) => (
             <SelectItem className="cursor-pointer" key={item} value={item}>
               {item}
             </SelectItem>
@@ -84,7 +84,7 @@ export const TableSelector: React.FC<TableSelectorProps> = ({
         placeholder="Search rules..."
         className="w-full max-w-sm"
         value={searchValue}
-        onChange={e => onSearchChange(e.target.value)}
+        onChange={(e) => onSearchChange(e.target.value)}
       />
 
       <SelectWithCancel
@@ -100,7 +100,7 @@ export const TableSelector: React.FC<TableSelectorProps> = ({
         onValueChange={onStatusChange}
         placeholder="Select a Status"
         label="Status"
-        items={statuses.map(status => status.value)}
+        items={statuses.map((status) => status.value)}
       />
 
       {/* cancel for selectors */}

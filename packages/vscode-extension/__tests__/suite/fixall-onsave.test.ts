@@ -42,7 +42,9 @@ suite('rslint fixAll - on-save', function () {
 
         const diags = await waitForDiagnostics(doc);
         if (
-          !diags.some(d => d.message.includes('no-unnecessary-type-assertion'))
+          !diags.some((d) =>
+            d.message.includes('no-unnecessary-type-assertion'),
+          )
         ) {
           return;
         }
@@ -54,7 +56,7 @@ suite('rslint fixAll - on-save', function () {
           doc.getText().includes('gfVal as string') &&
           Date.now() - startTime < 10000
         ) {
-          await new Promise(r => setTimeout(r, 500));
+          await new Promise((r) => setTimeout(r, 500));
         }
 
         assert.ok(
@@ -85,7 +87,7 @@ suite('rslint fixAll - on-save', function () {
       await replaceAll(editor, fixableContent);
 
       const diags = await waitForDiagnostics(doc);
-      const hasFixable = diags.some(d =>
+      const hasFixable = diags.some((d) =>
         d.message.includes('no-unnecessary-type-assertion'),
       );
       if (!hasFixable) return;
@@ -97,7 +99,7 @@ suite('rslint fixAll - on-save', function () {
         doc.getText().includes('saveVal as string') &&
         Date.now() - startTime < 10000
       ) {
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 500));
       }
 
       assert.ok(
@@ -116,7 +118,7 @@ suite('rslint fixAll - on-save', function () {
       );
       const probeDiags = await waitForDiagnostics(doc);
       if (
-        !probeDiags.some(d =>
+        !probeDiags.some((d) =>
           d.message.includes('no-unnecessary-type-assertion'),
         )
       ) {
@@ -128,7 +130,7 @@ suite('rslint fixAll - on-save', function () {
         doc.getText().includes('probeVal as string') &&
         Date.now() - probeStart < 10000
       ) {
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 500));
       }
       assert.ok(
         !doc.getText().includes('probeVal as string'),
@@ -139,10 +141,10 @@ suite('rslint fixAll - on-save', function () {
       const cleanContent =
         '// no issues\nconst cleanOnSave = 42;\nexport {};\n';
       await replaceAll(editor, cleanContent);
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise((r) => setTimeout(r, 3000));
 
       await doc.save();
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 2000));
 
       assert.strictEqual(
         doc.getText(),
@@ -161,7 +163,7 @@ suite('rslint fixAll - on-save', function () {
       );
       const probeDiags = await waitForDiagnostics(doc);
       if (
-        !probeDiags.some(d =>
+        !probeDiags.some((d) =>
           d.message.includes('no-unnecessary-type-assertion'),
         )
       ) {
@@ -173,7 +175,7 @@ suite('rslint fixAll - on-save', function () {
         doc.getText().includes('probeVal2 as string') &&
         Date.now() - probeStart < 10000
       ) {
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 500));
       }
       assert.ok(
         !doc.getText().includes('probeVal2 as string'),
@@ -188,7 +190,7 @@ suite('rslint fixAll - on-save', function () {
       assert.ok(diags.length > 0, 'Should have non-fixable diagnostics');
 
       await doc.save();
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 2000));
 
       assert.strictEqual(
         doc.getText(),
@@ -222,7 +224,7 @@ suite('rslint fixAll - on-save', function () {
         doc.getText().includes('quickVal as string') &&
         Date.now() - startTime < 10000
       ) {
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 500));
       }
 
       assert.ok(

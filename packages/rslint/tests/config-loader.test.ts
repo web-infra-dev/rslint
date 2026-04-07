@@ -366,7 +366,7 @@ describe('findJSConfigsInDir', () => {
       }
       const result = findJSConfigsInDir(tmp).sort();
       expect(result).toEqual(
-        JS_CONFIG_FILES.map(name => path.join(tmp, name)).sort(),
+        JS_CONFIG_FILES.map((name) => path.join(tmp, name)).sort(),
       );
     } finally {
       cleanup(tmp);

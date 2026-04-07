@@ -3,9 +3,9 @@ import { describe, test, expect } from '@rstest/core';
 import path from 'node:path';
 import { RemoteSourceFile, Node } from '@rslint/api';
 
-describe('lint api', async t => {
+describe('lint api', async (t) => {
   let cwd = path.resolve(import.meta.dirname, '../fixtures');
-  test('virtual file support', async t => {
+  test('virtual file support', async (t) => {
     let config = path.resolve(
       import.meta.dirname,
       '../fixtures/rslint.virtual.json',
@@ -28,7 +28,7 @@ describe('lint api', async t => {
 
     expect(diags).toMatchSnapshot();
   });
-  test('diag snapshot', async t => {
+  test('diag snapshot', async (t) => {
     let config = path.resolve(import.meta.dirname, '../fixtures/rslint.json');
     const diags = await lint({
       config,
@@ -41,10 +41,10 @@ describe('lint api', async t => {
   });
 });
 
-describe('applyFixes api', async t => {
+describe('applyFixes api', async (t) => {
   let cwd = path.resolve(import.meta.dirname, '../fixtures');
 
-  test('apply fixes with real diagnostics', async t => {
+  test('apply fixes with real diagnostics', async (t) => {
     // Since the linter isn't working as expected, let's simulate what real diagnostics would look like
     // This test simulates the scenario where we have diagnostics from a previous lint operation
     let config = path.resolve(
@@ -74,7 +74,7 @@ const y = x as string;`;
 
     // Filter diagnostics that have fixes
     const diagnosticsWithFixes = diags.diagnostics.filter(
-      d => d.fixes && d.fixes.length > 0,
+      (d) => d.fixes && d.fixes.length > 0,
     );
     if (diagnosticsWithFixes.length === 0) {
       console.log('No diagnostics with fixes found, skipping test');
@@ -97,11 +97,11 @@ const y = x as string;`;
   });
 });
 
-describe('encoded source files', async t => {
+describe('encoded source files', async (t) => {
   let cwd = path.resolve(import.meta.dirname, '../fixtures');
   let virtual_entry = path.resolve(cwd, 'src/virtual.ts');
   const fileContent = `let x: string = "hello";const y = x as string;`;
-  test('encoded source files', async t => {
+  test('encoded source files', async (t) => {
     const diags = await lint({
       config: path.resolve(
         import.meta.dirname,
@@ -118,7 +118,7 @@ describe('encoded source files', async t => {
     });
     const content = diags.encodedSourceFiles['src/virtual.ts'];
     // decode content from base64 to uint8array
-    const buffer = Uint8Array.from(atob(content), c => c.charCodeAt(0));
+    const buffer = Uint8Array.from(atob(content), (c) => c.charCodeAt(0));
 
     const sourceFile = new RemoteSourceFile(buffer, new TextDecoder());
 

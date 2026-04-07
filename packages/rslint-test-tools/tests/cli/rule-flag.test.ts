@@ -443,7 +443,7 @@ describe('CLI --rule flag', () => {
       expect(result.stdout).toContain('title=no-var');
       // Both are errors in github format
       const lines = result.stdout.trim().split('\n');
-      expect(lines.filter(l => l.startsWith('::error')).length).toBe(2);
+      expect(lines.filter((l) => l.startsWith('::error')).length).toBe(2);
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -507,7 +507,7 @@ describe('CLI --rule flag', () => {
       expect(result.stdout).toContain('title=no-debugger');
       expect(result.stdout).toContain('title=no-var');
       const lines = result.stdout.trim().split('\n');
-      expect(lines.filter(l => l.startsWith('::error')).length).toBe(2);
+      expect(lines.filter((l) => l.startsWith('::error')).length).toBe(2);
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -573,8 +573,8 @@ describe('CLI --rule flag', () => {
       expect(result.exitCode).not.toBe(0);
       const lines = result.stdout.trim().split('\n');
       // Exactly 1 error (no-debugger) and 1 warning (no-var)
-      const errors = lines.filter(l => l.startsWith('::error'));
-      const warnings = lines.filter(l => l.startsWith('::warning'));
+      const errors = lines.filter((l) => l.startsWith('::error'));
+      const warnings = lines.filter((l) => l.startsWith('::warning'));
       expect(errors.length).toBe(1);
       expect(warnings.length).toBe(1);
       expect(errors[0]).toContain('title=no-debugger');

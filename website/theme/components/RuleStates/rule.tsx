@@ -99,7 +99,7 @@ const RuleImplementationStatus: React.FC = () => {
   const rulesData = manifest.rules as Rule[];
 
   // Filter rule data
-  const filteredRules = rulesData.filter(rule => {
+  const filteredRules = rulesData.filter((rule) => {
     const matchesSearch = rule.name
       .toLowerCase()
       .includes(searchValue.toLowerCase());
@@ -110,7 +110,7 @@ const RuleImplementationStatus: React.FC = () => {
   });
 
   // Get available groups and statuses
-  const availableGroups = [...new Set(rulesData.map(rule => rule.group))];
+  const availableGroups = [...new Set(rulesData.map((rule) => rule.group))];
   const availableStatuses = [
     { value: 'full', label: 'Full' },
     { value: 'partial-impl', label: 'Partial Implemented' },
@@ -121,18 +121,18 @@ const RuleImplementationStatus: React.FC = () => {
   const statusCount: RuleStateDescribe[] = [
     {
       name: 'Fully Implemented',
-      count: filteredRules.filter(item => item.status === 'full').length,
+      count: filteredRules.filter((item) => item.status === 'full').length,
       style: 'full',
     },
     {
       name: 'Partial Implemented',
-      count: filteredRules.filter(item => item.status === 'partial-impl')
+      count: filteredRules.filter((item) => item.status === 'partial-impl')
         .length,
       style: 'partial-impl',
     },
     {
       name: 'Partial Tested',
-      count: filteredRules.filter(item => item.status === 'partial-test')
+      count: filteredRules.filter((item) => item.status === 'partial-test')
         .length,
       style: 'partial-test',
     },
@@ -186,7 +186,7 @@ const RuleImplementationStatus: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRules.map(rule => (
+                {filteredRules.map((rule) => (
                   <TableRow key={rule.name} className="transition-colors">
                     <TableCell className="w-1/2 truncate">
                       <Button

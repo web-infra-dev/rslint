@@ -225,7 +225,7 @@ function ruleEntry(
 }
 
 function dirs(result: { configDirectory: string }[]): string[] {
-  return result.map(r => r.configDirectory);
+  return result.map((r) => r.configDirectory);
 }
 
 describe('filterConfigsByParentIgnores', () => {

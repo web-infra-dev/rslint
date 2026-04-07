@@ -29,7 +29,7 @@ export function ArrayDisplay<T>({
   const handleToggle = () => setExpanded(!expanded);
 
   const toggleItem = (index: number) => {
-    setExpandedItems(prev => {
+    setExpandedItems((prev) => {
       const next = new Set(prev);
       if (next.has(index)) {
         next.delete(index);
@@ -80,7 +80,7 @@ export function ArrayDisplay<T>({
                     className={`text-cyan-600 cursor-pointer hover:underline ${clickHandler ? 'hover:text-cyan-800' : ''}`}
                     onClick={
                       clickHandler
-                        ? e => {
+                        ? (e) => {
                             e.stopPropagation();
                             clickHandler();
                           }

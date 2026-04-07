@@ -13,12 +13,12 @@ export function run(
     ui: 'tdd',
   });
 
-  files.forEach(file => {
+  files.forEach((file) => {
     mocha.addFile(path.join(testPath, file));
   });
 
   try {
-    mocha.run(failures => {
+    mocha.run((failures) => {
       callback(null, failures);
     });
   } catch (error) {

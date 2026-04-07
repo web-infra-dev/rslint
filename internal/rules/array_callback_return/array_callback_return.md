@@ -25,7 +25,7 @@ var bools = [1, 2, 3].filter(function (x) {
 });
 
 // with checkForEach: true
-[1, 2, 3].forEach(x => x * x);
+[1, 2, 3].forEach((x) => x * x);
 ```
 
 Examples of **correct** code for this rule:
@@ -39,12 +39,12 @@ var bools = [1, 2, 3].filter(function (x) {
   return x > 2;
 });
 
-[1, 2, 3].forEach(x => {
+[1, 2, 3].forEach((x) => {
   console.log(x);
 });
 
 // with checkForEach: true and allowVoid: true
-[1, 2, 3].forEach(x => void bar(x));
+[1, 2, 3].forEach((x) => void bar(x));
 ```
 
 ## Original Documentation

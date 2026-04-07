@@ -21,8 +21,8 @@ async function lintJsonline(
   const lines = result.stdout
     .trim()
     .split('\n')
-    .filter(l => l.trim());
-  const diagnostics = lines.map(l => JSON.parse(l) as Diagnostic);
+    .filter((l) => l.trim());
+  const diagnostics = lines.map((l) => JSON.parse(l) as Diagnostic);
   return {
     diagnostics,
     stdout: result.stdout,
@@ -33,7 +33,7 @@ async function lintJsonline(
 
 function diagsAt(diagnostics: Diagnostic[], pathPart: string): Diagnostic[] {
   return diagnostics.filter(
-    d => d.filePath === pathPart || d.filePath.startsWith(pathPart + '/'),
+    (d) => d.filePath === pathPart || d.filePath.startsWith(pathPart + '/'),
   );
 }
 
@@ -535,8 +535,8 @@ describe('Gitignore: CLI invocation variants', () => {
       const diagnostics = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim())
-        .map(l => JSON.parse(l) as Diagnostic);
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l) as Diagnostic);
 
       expect(diagsAt(diagnostics, 'src/index.ts').length).toBeGreaterThan(0);
       // src/dist/ blocked by gitignore
@@ -561,8 +561,8 @@ describe('Gitignore: CLI invocation variants', () => {
       const diagnostics = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim() && !l.includes('warning'))
-        .map(l => {
+        .filter((l) => l.trim() && !l.includes('warning'))
+        .map((l) => {
           try {
             return JSON.parse(l) as Diagnostic;
           } catch {

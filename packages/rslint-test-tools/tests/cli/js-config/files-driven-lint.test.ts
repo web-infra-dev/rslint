@@ -16,19 +16,19 @@ async function lintJsonline(
   const lines = result.stdout
     .trim()
     .split('\n')
-    .filter(l => l.trim());
-  const diagnostics = lines.map(l => JSON.parse(l) as Diagnostic);
+    .filter((l) => l.trim());
+  const diagnostics = lines.map((l) => JSON.parse(l) as Diagnostic);
   return { diagnostics, cleanup: () => cleanupTempDir(tempDir) };
 }
 
 function diagsAt(diagnostics: Diagnostic[], pathPart: string): Diagnostic[] {
   return diagnostics.filter(
-    d => d.filePath === pathPart || d.filePath.startsWith(pathPart + '/'),
+    (d) => d.filePath === pathPart || d.filePath.startsWith(pathPart + '/'),
   );
 }
 
 function rules(diagnostics: Diagnostic[]): string[] {
-  return diagnostics.map(d => d.ruleName);
+  return diagnostics.map((d) => d.ruleName);
 }
 
 /**
@@ -71,8 +71,8 @@ describe('Files-driven lint: gap file auto-degrade', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
-      const diagnostics = lines.map(l => JSON.parse(l));
+        .filter((l) => l.trim());
+      const diagnostics = lines.map((l) => JSON.parse(l));
 
       // src/index.ts should have both ban-ts-comment (syntax) and no-unsafe-member-access (type-aware)
       const srcDiags = diagnostics.filter((d: any) =>
@@ -128,8 +128,8 @@ describe('Files-driven lint: gap file auto-degrade', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
-      const diagnostics = lines.map(l => JSON.parse(l));
+        .filter((l) => l.trim());
+      const diagnostics = lines.map((l) => JSON.parse(l));
 
       // src/index.ts should be linted
       const srcDiags = diagnostics.filter((d: any) =>
@@ -182,8 +182,8 @@ describe('Files-driven lint: gap file auto-degrade', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
-      const diagnostics = lines.map(l => JSON.parse(l));
+        .filter((l) => l.trim());
+      const diagnostics = lines.map((l) => JSON.parse(l));
       const rules = diagnostics.map((d: any) => d.ruleName);
 
       // Should get syntax rules
@@ -226,8 +226,8 @@ describe('Files-driven lint: gap file auto-degrade', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
-      const diagnostics = lines.map(l => JSON.parse(l));
+        .filter((l) => l.trim());
+      const diagnostics = lines.map((l) => JSON.parse(l));
 
       // src/index.ts should be linted (in tsconfig)
       const srcDiags = diagnostics.filter((d: any) =>
@@ -276,7 +276,7 @@ describe('Files-driven lint: gap file auto-degrade', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
+        .filter((l) => l.trim());
 
       // Gap files should NOT get TypeScript semantic diagnostics
       for (const line of lines) {
@@ -329,8 +329,8 @@ describe('Files-driven lint: file type support', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
-      const diagnostics = lines.map(l => JSON.parse(l));
+        .filter((l) => l.trim());
+      const diagnostics = lines.map((l) => JSON.parse(l));
 
       // Gap .tsx file should get syntax rules (JSX parsed correctly)
       const gapDiags = diagnostics.filter((d: any) =>
@@ -378,8 +378,8 @@ describe('Files-driven lint: file type support', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
-      const diagnostics = lines.map(l => JSON.parse(l));
+        .filter((l) => l.trim());
+      const diagnostics = lines.map((l) => JSON.parse(l));
 
       // Gap .js file should get no-empty (syntax rule)
       const jsDiags = diagnostics.filter((d: any) =>
@@ -430,8 +430,8 @@ describe('Files-driven lint: flat config semantics', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
-      const diagnostics = lines.map(l => JSON.parse(l));
+        .filter((l) => l.trim());
+      const diagnostics = lines.map((l) => JSON.parse(l));
 
       const gapDiags = diagnostics.filter((d: any) =>
         d.filePath.includes('scripts/build.ts'),
@@ -477,8 +477,8 @@ describe('Files-driven lint: flat config semantics', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
-      const diagnostics = lines.map(l => JSON.parse(l));
+        .filter((l) => l.trim());
+      const diagnostics = lines.map((l) => JSON.parse(l));
 
       // scripts/build.ts should be globally ignored
       const scriptDiags = diagnostics.filter((d: any) =>
@@ -572,8 +572,8 @@ describe('Files-driven lint: CLI interaction', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
-      const diagnostics = lines.map(l => JSON.parse(l));
+        .filter((l) => l.trim());
+      const diagnostics = lines.map((l) => JSON.parse(l));
 
       // scripts/build.ts should be linted
       const scriptDiags = diagnostics.filter((d: any) =>
@@ -632,8 +632,8 @@ describe('Files-driven lint: multiple tsconfigs', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
-      const diagnostics = lines.map(l => JSON.parse(l));
+        .filter((l) => l.trim());
+      const diagnostics = lines.map((l) => JSON.parse(l));
 
       // src/index.ts → all rules
       const srcRules = diagnostics
@@ -704,8 +704,8 @@ describe('Files-driven lint: recommended + user override cascade', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
-      const diagnostics = lines.map(l => JSON.parse(l));
+        .filter((l) => l.trim());
+      const diagnostics = lines.map((l) => JSON.parse(l));
 
       const gapDiags = diagnostics.filter((d: any) =>
         d.filePath.includes('scripts/build.ts'),
@@ -765,8 +765,8 @@ describe('Files-driven lint: recommended + user override cascade', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
-      const diagnostics = lines.map(l => JSON.parse(l));
+        .filter((l) => l.trim());
+      const diagnostics = lines.map((l) => JSON.parse(l));
 
       const mtsDiags = diagnostics.filter((d: any) =>
         d.filePath.includes('scripts/utils.mts'),
@@ -820,8 +820,8 @@ describe('Files-driven lint: recommended + user override cascade', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
-      const diagnostics = lines.map(l => JSON.parse(l));
+        .filter((l) => l.trim());
+      const diagnostics = lines.map((l) => JSON.parse(l));
 
       const mtsDiags = diagnostics.filter((d: any) =>
         d.filePath.includes('src/utils.mts'),
@@ -882,8 +882,8 @@ describe('Files-driven lint: recommended + user override cascade', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
-      const diagnostics = lines.map(l => JSON.parse(l));
+        .filter((l) => l.trim());
+      const diagnostics = lines.map((l) => JSON.parse(l));
 
       // packages/app/src/index.ts → all rules
       const appRules = diagnostics
@@ -949,8 +949,8 @@ describe('Files-driven lint: recommended + user override cascade', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
-      const diagnostics = lines.map(l => JSON.parse(l));
+        .filter((l) => l.trim());
+      const diagnostics = lines.map((l) => JSON.parse(l));
 
       // src/feature.ts → in tsconfig → all rules
       const srcRules = diagnostics
@@ -1006,8 +1006,8 @@ describe('Files-driven lint: recommended + user override cascade', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
-      const diagnostics = lines.map(l => JSON.parse(l));
+        .filter((l) => l.trim());
+      const diagnostics = lines.map((l) => JSON.parse(l));
 
       const srcDiags = diagnostics.filter((d: any) =>
         d.filePath.includes('src/index.ts'),
@@ -1081,8 +1081,8 @@ describe('Files-driven lint: edge cases', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
-      const diagnostics = lines.map(l => JSON.parse(l));
+        .filter((l) => l.trim());
+      const diagnostics = lines.map((l) => JSON.parse(l));
 
       // index.js should get no-empty
       const indexDiags = diagnostics.filter((d: any) =>

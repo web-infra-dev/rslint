@@ -14,8 +14,8 @@ suite('rslint fixAll - error flows', function () {
 
   test('fixAll on file with syntax errors does not crash', async () => {
     const brokenContent = 'const x: string = \nfunction (\nexport { \n';
-    await withTmpFile(brokenContent, async doc => {
-      await new Promise(r => setTimeout(r, 3000));
+    await withTmpFile(brokenContent, async (doc) => {
+      await new Promise((r) => setTimeout(r, 3000));
 
       const codeActions = await requestFixAll(doc);
       const fixAllAction = findFixAllAction(codeActions);
@@ -31,8 +31,8 @@ suite('rslint fixAll - error flows', function () {
   });
 
   test('fixAll on empty file does not crash', async () => {
-    await withTmpFile('', async doc => {
-      await new Promise(r => setTimeout(r, 2000));
+    await withTmpFile('', async (doc) => {
+      await new Promise((r) => setTimeout(r, 2000));
 
       const codeActions = await requestFixAll(doc);
       const fixAllAction = findFixAllAction(codeActions);
@@ -55,7 +55,7 @@ suite('rslint fixAll - error flows', function () {
       );
       const probeDiags = await waitForDiagnostics(doc);
       if (
-        !probeDiags.some(d =>
+        !probeDiags.some((d) =>
           d.message.includes('no-unnecessary-type-assertion'),
         )
       ) {
@@ -67,14 +67,14 @@ suite('rslint fixAll - error flows', function () {
         doc.getText().includes('pVal as string') &&
         Date.now() - probeStart < 10000
       ) {
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 500));
       }
 
       const brokenContent = 'const x = \nfunction {\nexport {\n';
       await replaceAll(editor, brokenContent);
       await doc.save();
 
-      await new Promise(r => setTimeout(r, 3000));
+      await new Promise((r) => setTimeout(r, 3000));
 
       assert.ok(
         doc.getText().length > 0,
