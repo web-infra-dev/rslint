@@ -15,8 +15,9 @@ type SwitchExhaustivenessCheckOptions struct {
 // SwitchExhaustivenessCheckRule implements the switch-exhaustiveness-check rule
 // Require exhaustive switch statements
 var SwitchExhaustivenessCheckRule = rule.CreateRule(rule.Rule{
-	Name: "switch-exhaustiveness-check",
-	Run:  run,
+	Name:             "switch-exhaustiveness-check",
+	RequiresTypeInfo: true,
+	Run:              run,
 })
 
 func run(ctx rule.RuleContext, options any) rule.RuleListeners {
