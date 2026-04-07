@@ -5,8 +5,10 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/web-infra-dev/rslint/internal/rule"
+	"github.com/web-infra-dev/rslint/internal/utils"
 )
 
 type DirectiveConfig struct {
@@ -92,11 +94,7 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 		"ts-check":        parseDirectiveConfig(opts.TsCheck),
 	}
 
-	// Get the full text of the source file
-	text := ctx.SourceFile.Text()
-
-	// Process the text to find comments
-	processComments(ctx, text, configs, opts.MinimumDescriptionLength)
+	processComments(ctx, ctx.SourceFile.Text(), configs, opts.MinimumDescriptionLength)
 
 	return rule.RuleListeners{}
 }
@@ -125,47 +123,29 @@ func parseDirectiveConfig(value interface{}) *DirectiveConfig {
 	return config
 }
 
-// processComments scans the source text for comments and checks for banned directives
+// processComments scans real comment trivia and checks for banned directives.
+// Using the TS scanner avoids matching comment-like text inside strings/template literals,
+// for example `const c = "// @ts-ignore"` should stay a plain string and must not be linted
+// as if it were an actual comment directive.
 func processComments(ctx rule.RuleContext, text string, configs map[string]*DirectiveConfig, minDescLength int) {
-	pos := 0
-	length := len(text)
-
-	for pos < length {
-		// Skip to next potential comment
-		if pos+1 < length {
-			if text[pos] == '/' && text[pos+1] == '/' {
-				// Single-line comment
-				commentStart := pos
-				pos += 2
-				lineEnd := pos
-				for lineEnd < length && text[lineEnd] != '\n' && text[lineEnd] != '\r' {
-					lineEnd++
-				}
-				commentText := text[commentStart:lineEnd]
-				checkComment(ctx, commentText, commentStart, configs, minDescLength, false)
-				pos = lineEnd
-			} else if text[pos] == '/' && text[pos+1] == '*' {
-				// Multi-line comment
-				commentStart := pos
-				pos += 2
-				commentEnd := pos
-				for commentEnd+1 < length {
-					if text[commentEnd] == '*' && text[commentEnd+1] == '/' {
-						commentEnd += 2
-						break
-					}
-					commentEnd++
-				}
-				commentText := text[commentStart:commentEnd]
-				checkComment(ctx, commentText, commentStart, configs, minDescLength, true)
-				pos = commentEnd
-			} else {
-				pos++
-			}
-		} else {
-			pos++
+	utils.ForEachComment(ctx.SourceFile.AsNode(), func(comment *ast.CommentRange) {
+		if comment == nil {
+			return
 		}
-	}
+		if comment.Pos() < 0 || comment.End() > len(text) || comment.Pos() >= comment.End() {
+			return
+		}
+
+		commentText := text[comment.Pos():comment.End()]
+		checkComment(
+			ctx,
+			commentText,
+			comment.Pos(),
+			configs,
+			minDescLength,
+			comment.Kind == ast.KindMultiLineCommentTrivia,
+		)
+	}, ctx.SourceFile)
 }
 
 // checkComment checks a single comment for banned directives
