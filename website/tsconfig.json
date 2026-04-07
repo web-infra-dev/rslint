@@ -12,7 +12,6 @@
     "moduleResolution": "bundler",
     "useDefineForClassFields": true,
     "allowImportingTsExtensions": true,
-    "baseUrl": ".",
     "paths": {
       "@theme": ["./theme"],
       "@components/*": ["./theme/components/*"],
