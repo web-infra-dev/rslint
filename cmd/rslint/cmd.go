@@ -417,6 +417,12 @@ func printDiagnosticDefault(d rule.RuleDiagnostic, w *bufio.Writer, comparePathO
 	w.WriteString("\n\n")
 }
 
+// repeatedFlag collects multiple values for the same flag (e.g. --rule used multiple times).
+type repeatedFlag []string
+
+func (f *repeatedFlag) String() string   { return strings.Join(*f, ", ") }
+func (f *repeatedFlag) Set(v string) error { *f = append(*f, v); return nil }
+
 const usage = `🚀 Rslint - Rocket Speed Linter
 
 Usage:
@@ -432,6 +438,7 @@ Options:
   --force-color         Force colored output
   --quiet               Report errors only
   --max-warnings Int    Number of warnings to trigger nonzero exit code
+  --rule RULE           Rule override, e.g. 'no-console: error' (repeatable)
   -h, --help            Show help
 `
 
@@ -506,6 +513,7 @@ func runCMD() int {
 		quiet          bool
 		maxWarnings    int
 		startTimeMs    int64
+		ruleFlags      repeatedFlag
 	)
 	flag.StringVar(&format, "format", "default", "output format")
 	flag.StringVar(&config, "config", "", "which rslint config to use")
@@ -524,6 +532,7 @@ func runCMD() int {
 	flag.StringVar(&cpuprofOut, "cpuprof", "", "file to put cpu profiling to")
 	flag.BoolVar(&singleThreaded, "singleThreaded", false, "run in single threaded mode")
 	flag.Int64Var(&startTimeMs, "start-time", 0, "internal: epoch milliseconds from Node.js entry point")
+	flag.Var(&ruleFlags, "rule", "rule override, e.g. 'no-console: error' (repeatable)")
 
 	flag.Parse()
 
@@ -712,6 +721,24 @@ func runCMD() int {
 			return exitCode
 		}
 		programs = append(programs, progs...)
+	}
+
+	// Apply --rule CLI overrides by appending a synthetic ConfigEntry (no files = matches all).
+	if len(ruleFlags) > 0 {
+		cliEntry, err := rslintconfig.BuildCLIRuleEntry(ruleFlags)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			return 1
+		}
+		if cliEntry != nil {
+			if configMap != nil {
+				for dir, cfg := range configMap {
+					configMap[dir] = append(cfg, *cliEntry)
+				}
+			} else {
+				rslintConfig = append(rslintConfig, *cliEntry)
+			}
+		}
 	}
 
 	// Use CWD for display paths (not any config directory).

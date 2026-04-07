@@ -8,18 +8,19 @@ rslint [options] [files/directories...]
 
 ## Options
 
-| Flag                 | Description                                                                 |
-| -------------------- | --------------------------------------------------------------------------- |
-| `--init`             | Generate a default config file, or migrate an existing JSON config to JS/TS |
-| `--config <path>`    | Specify which config file to use                                            |
-| `--fix`              | Automatically fix problems                                                  |
-| `--type-check`       | Enable TypeScript semantic type checking ([details](/guide/type-checking))  |
-| `--format <format>`  | Output format: `default`, `jsonline`, or `github`                           |
-| `--quiet`            | Report errors only, suppress warnings                                       |
-| `--max-warnings <n>` | Exit with error if warning count exceeds this number                        |
-| `--no-color`         | Disable colored output                                                      |
-| `--force-color`      | Force colored output                                                        |
-| `--help`, `-h`       | Show help information                                                       |
+| Flag                 | Description                                                                        |
+| -------------------- | ---------------------------------------------------------------------------------- |
+| `--init`             | Generate a default config file, or migrate an existing JSON config to JS/TS        |
+| `--config <path>`    | Specify which config file to use                                                   |
+| `--fix`              | Automatically fix problems                                                         |
+| `--type-check`       | Enable TypeScript semantic type checking ([details](/guide/type-checking))         |
+| `--format <format>`  | Output format: `default`, `jsonline`, or `github`                                  |
+| `--quiet`            | Report errors only, suppress warnings                                              |
+| `--max-warnings <n>` | Exit with error if warning count exceeds this number                               |
+| `--rule <rule>`      | Override a rule's severity or options (repeatable, see [details](#rule-overrides)) |
+| `--no-color`         | Disable colored output                                                             |
+| `--force-color`      | Force colored output                                                               |
+| `--help`, `-h`       | Show help information                                                              |
 
 ## File and Directory Arguments
 
@@ -122,6 +123,40 @@ rslint --type-check .
 ```
 
 For details on output format, CI migration, and how it works, see the [Type Checking](/guide/type-checking) page.
+
+## Rule Overrides
+
+Use `--rule` to override a rule's severity or options from the command line, without modifying your config file. This is useful for quick debugging, CI one-offs, or temporarily enabling/disabling rules.
+
+```bash
+# Override severity
+rslint --rule 'no-console: off'
+rslint --rule 'no-debugger: error'
+rslint --rule 'no-debugger: warn'
+
+# Override severity with options (JSON array format)
+rslint --rule 'no-console: ["error", {"allow": ["warn", "error"]}]'
+
+# Plugin rules
+rslint --rule '@typescript-eslint/no-explicit-any: off'
+
+# Multiple overrides
+rslint --rule 'no-console: off' --rule 'no-debugger: error'
+```
+
+`--rule` can appear anywhere in the argument list — before or after file paths and other flags:
+
+```bash
+rslint --rule 'no-console: off' src/
+rslint src/ --rule 'no-console: off'
+rslint src/ --rule 'no-console: off' --format github
+```
+
+**Behavior:**
+
+- CLI rules have the **highest precedence** and override all config file entries, including per-file overrides.
+- When the same rule is specified multiple times, the **last one wins**.
+- Rules that don't exist in the registry are silently ignored.
 
 ## Exit Codes
 
