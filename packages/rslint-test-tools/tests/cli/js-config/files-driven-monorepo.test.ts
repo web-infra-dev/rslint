@@ -350,7 +350,7 @@ describe('Monorepo multi-config: global ignores + config discovery', () => {
     });
     try {
       expect(rules(diagsAt(diagnostics, 'src/a.ts'))).toContain('no-console');
-      expect(diagsAt(diagnostics, 'packages/ignored/').length).toBe(0);
+      expect(diagsAt(diagnostics, 'packages/ignored').length).toBe(0);
     } finally {
       await cleanup();
     }
@@ -552,7 +552,7 @@ describe('Monorepo multi-config: real-world scenarios', () => {
       );
 
       // dist ignored
-      expect(diagsAt(diagnostics, 'dist/').length).toBe(0);
+      expect(diagsAt(diagnostics, 'dist').length).toBe(0);
 
       // No duplicates anywhere
       const allFiles = [...new Set(diagnostics.map(d => d.filePath))];
@@ -578,8 +578,8 @@ describe('Monorepo multi-config: real-world scenarios', () => {
     try {
       expect(diagsAt(diagnostics, 'src/index.ts').length).toBeGreaterThan(0);
       // node_modules at any level should be excluded
-      expect(diagsAt(diagnostics, 'node_modules/').length).toBe(0);
-      expect(diagsAt(diagnostics, 'packages/app/node_modules/').length).toBe(0);
+      expect(diagsAt(diagnostics, 'node_modules').length).toBe(0);
+      expect(diagsAt(diagnostics, 'packages/app/node_modules').length).toBe(0);
     } finally {
       await cleanup();
     }
