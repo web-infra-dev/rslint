@@ -56,7 +56,7 @@ export class Extension implements Disposable {
     this.logger.info('Rslint extension deactivating...');
 
     const stopPromises = Array.from(this.rslintInstances.values()).map(
-      instance => instance.stop(),
+      (instance) => instance.stop(),
     );
 
     try {
@@ -116,12 +116,12 @@ export class Extension implements Disposable {
   }
 
   public dispose(): void {
-    this.rslintInstances.forEach(instance => {
+    this.rslintInstances.forEach((instance) => {
       instance.dispose();
     });
     this.rslintInstances.clear();
 
-    this.disposables.forEach(disposable => {
+    this.disposables.forEach((disposable) => {
       disposable.dispose();
     });
     this.disposables = [];
@@ -138,7 +138,7 @@ export class Extension implements Disposable {
   }
 
   private setupStateChangeMonitoring(rslint: Rslint, instanceId: string): void {
-    const stateChangeDisposable = rslint.onDidChangeState(event => {
+    const stateChangeDisposable = rslint.onDidChangeState((event) => {
       this.logger.debug(
         `Rslint client state changed for instance '${instanceId}':`,
         event.oldState,

@@ -162,7 +162,7 @@ export class Rslint implements Disposable {
     }
 
     const results = await Promise.allSettled(
-      configFiles.map(async uri => {
+      configFiles.map(async (uri) => {
         const rawConfig = await this.loadConfigFresh(uri.fsPath);
         const entries = normalizeConfig(rawConfig);
         return {

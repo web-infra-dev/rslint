@@ -16,19 +16,19 @@ async function lintJsonline(
   const lines = result.stdout
     .trim()
     .split('\n')
-    .filter(l => l.trim());
-  const diagnostics = lines.map(l => JSON.parse(l) as Diagnostic);
+    .filter((l) => l.trim());
+  const diagnostics = lines.map((l) => JSON.parse(l) as Diagnostic);
   return { diagnostics, cleanup: () => cleanupTempDir(tempDir) };
 }
 
 function diagsAt(diagnostics: Diagnostic[], pathPart: string): Diagnostic[] {
   return diagnostics.filter(
-    d => d.filePath === pathPart || d.filePath.startsWith(pathPart + '/'),
+    (d) => d.filePath === pathPart || d.filePath.startsWith(pathPart + '/'),
   );
 }
 
 function rules(diagnostics: Diagnostic[]): string[] {
-  return diagnostics.map(d => d.ruleName);
+  return diagnostics.map((d) => d.ruleName);
 }
 
 describe('Monorepo multi-config: ownership dedup', () => {
@@ -52,7 +52,9 @@ describe('Monorepo multi-config: ownership dedup', () => {
       expect(rules(rootDiags)).toContain('no-console');
 
       const appDiags = diagsAt(diagnostics, 'packages/app/src/index.ts');
-      expect(appDiags.filter(d => d.ruleName === 'no-debugger').length).toBe(1);
+      expect(appDiags.filter((d) => d.ruleName === 'no-debugger').length).toBe(
+        1,
+      );
       expect(rules(appDiags)).not.toContain('no-console');
     } finally {
       await cleanup();
@@ -74,7 +76,9 @@ describe('Monorepo multi-config: ownership dedup', () => {
       expect(rules(diagsAt(diagnostics, 'root.ts'))).toContain('no-console');
 
       const appDiags = diagsAt(diagnostics, 'packages/app/src/index.ts');
-      expect(appDiags.filter(d => d.ruleName === 'no-debugger').length).toBe(1);
+      expect(appDiags.filter((d) => d.ruleName === 'no-debugger').length).toBe(
+        1,
+      );
       expect(rules(appDiags)).not.toContain('no-console');
     } finally {
       await cleanup();
@@ -92,7 +96,9 @@ describe('Monorepo multi-config: ownership dedup', () => {
       expect(rules(diagsAt(diagnostics, 'root.ts'))).toContain('no-console');
 
       const appDiags = diagsAt(diagnostics, 'packages/app/src/index.ts');
-      expect(appDiags.filter(d => d.ruleName === 'no-debugger').length).toBe(1);
+      expect(appDiags.filter((d) => d.ruleName === 'no-debugger').length).toBe(
+        1,
+      );
       expect(rules(appDiags)).not.toContain('no-console');
     } finally {
       await cleanup();
@@ -119,12 +125,12 @@ describe('Monorepo multi-config: ownership dedup', () => {
       expect(rules(diagsAt(diagnostics, 'root.ts'))).toContain('no-console');
       expect(
         diagsAt(diagnostics, 'packages/app/src/index.ts').filter(
-          d => d.ruleName === 'no-debugger',
+          (d) => d.ruleName === 'no-debugger',
         ).length,
       ).toBe(1);
       expect(
         diagsAt(diagnostics, 'packages/app/scripts/build.ts').filter(
-          d => d.ruleName === 'no-debugger',
+          (d) => d.ruleName === 'no-debugger',
         ).length,
       ).toBe(1);
     } finally {
@@ -170,11 +176,11 @@ describe('Monorepo multi-config: ownership dedup', () => {
     try {
       const aDiags = diagsAt(diagnostics, 'packages/a/src/index.ts');
       expect(rules(aDiags)).toContain('no-console');
-      expect(aDiags.filter(d => d.ruleName === 'no-console').length).toBe(1);
+      expect(aDiags.filter((d) => d.ruleName === 'no-console').length).toBe(1);
 
       const bDiags = diagsAt(diagnostics, 'packages/b/src/index.ts');
       expect(rules(bDiags)).toContain('no-debugger');
-      expect(bDiags.filter(d => d.ruleName === 'no-debugger').length).toBe(1);
+      expect(bDiags.filter((d) => d.ruleName === 'no-debugger').length).toBe(1);
     } finally {
       await cleanup();
     }
@@ -201,15 +207,15 @@ describe('Monorepo multi-config: CLI invocation variants', () => {
       const diagnostics = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim())
-        .map(l => JSON.parse(l) as Diagnostic);
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l) as Diagnostic);
 
-      expect(diagnostics.filter(d => d.ruleName === 'no-debugger').length).toBe(
-        1,
-      );
-      expect(diagnostics.filter(d => d.ruleName === 'no-console').length).toBe(
-        0,
-      );
+      expect(
+        diagnostics.filter((d) => d.ruleName === 'no-debugger').length,
+      ).toBe(1);
+      expect(
+        diagnostics.filter((d) => d.ruleName === 'no-console').length,
+      ).toBe(0);
       // --start-time should not leak as a spurious "not found" warning
       expect(result.stderr).not.toContain('start-time');
     } finally {
@@ -232,15 +238,15 @@ describe('Monorepo multi-config: CLI invocation variants', () => {
       const diagnostics = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim())
-        .map(l => JSON.parse(l) as Diagnostic);
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l) as Diagnostic);
 
-      expect(diagnostics.filter(d => d.ruleName === 'no-debugger').length).toBe(
-        1,
-      );
-      expect(diagnostics.filter(d => d.ruleName === 'no-console').length).toBe(
-        0,
-      );
+      expect(
+        diagnostics.filter((d) => d.ruleName === 'no-debugger').length,
+      ).toBe(1);
+      expect(
+        diagnostics.filter((d) => d.ruleName === 'no-console').length,
+      ).toBe(0);
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -267,8 +273,8 @@ describe('Monorepo multi-config: CLI invocation variants', () => {
       const diagnostics = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim())
-        .map(l => JSON.parse(l) as Diagnostic);
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l) as Diagnostic);
 
       // Each file uses its nearest config
       const aDiags = diagsAt(diagnostics, 'packages/a/src/index.ts');
@@ -373,15 +379,15 @@ describe('Monorepo multi-config: global ignores + config discovery', () => {
       const diagnostics = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim())
-        .map(l => JSON.parse(l) as Diagnostic);
+        .filter((l) => l.trim())
+        .map((l) => JSON.parse(l) as Diagnostic);
 
-      expect(diagnostics.filter(d => d.ruleName === 'no-debugger').length).toBe(
-        1,
-      );
-      expect(diagnostics.filter(d => d.ruleName === 'no-console').length).toBe(
-        0,
-      );
+      expect(
+        diagnostics.filter((d) => d.ruleName === 'no-debugger').length,
+      ).toBe(1);
+      expect(
+        diagnostics.filter((d) => d.ruleName === 'no-console').length,
+      ).toBe(0);
     } finally {
       await cleanupTempDir(tempDir);
     }
@@ -455,7 +461,9 @@ describe('Monorepo multi-config: type-aware rules + tsconfig', () => {
       expect(rules(appDiags)).not.toContain(
         '@typescript-eslint/ban-ts-comment',
       );
-      expect(appDiags.filter(d => d.ruleName === 'no-debugger').length).toBe(1);
+      expect(appDiags.filter((d) => d.ruleName === 'no-debugger').length).toBe(
+        1,
+      );
     } finally {
       await cleanup();
     }
@@ -497,7 +505,7 @@ describe('Monorepo multi-config: type-aware rules + tsconfig', () => {
       );
       expect(
         appDiags.filter(
-          d => d.ruleName === '@typescript-eslint/no-unsafe-member-access',
+          (d) => d.ruleName === '@typescript-eslint/no-unsafe-member-access',
         ).length,
       ).toBe(1);
     } finally {
@@ -555,11 +563,11 @@ describe('Monorepo multi-config: real-world scenarios', () => {
       expect(diagsAt(diagnostics, 'dist').length).toBe(0);
 
       // No duplicates anywhere
-      const allFiles = [...new Set(diagnostics.map(d => d.filePath))];
+      const allFiles = [...new Set(diagnostics.map((d) => d.filePath))];
       for (const file of allFiles) {
-        const fileDiags = diagnostics.filter(d => d.filePath === file);
+        const fileDiags = diagnostics.filter((d) => d.filePath === file);
         const ruleSet = new Set(
-          fileDiags.map(d => `${d.ruleName}:${d.filePath}`),
+          fileDiags.map((d) => `${d.ruleName}:${d.filePath}`),
         );
         expect(fileDiags.length).toBe(ruleSet.size);
       }

@@ -44,7 +44,7 @@ suite('rslint fixAll - code actions', function () {
     );
     await vscode.window.showTextDocument(doc);
 
-    await new Promise(r => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 2000));
 
     const fixAllAction = findFixAllAction(await requestFixAll(doc));
 
@@ -79,7 +79,7 @@ suite('rslint fixAll - code actions', function () {
 
   test('no action for clean file', async () => {
     const cleanContent = '// no lint errors\nexport {};\n';
-    await withTmpFile(cleanContent, async doc => {
+    await withTmpFile(cleanContent, async (doc) => {
       await waitForDiagnosticsCount(doc, 0);
 
       const fixAllAction = findFixAllAction(await requestFixAll(doc));
@@ -97,11 +97,11 @@ suite('rslint fixAll - code actions', function () {
   test('fixes reduce diagnostics after apply', async () => {
     const fixableContent =
       "const frVal: string = 'hello';\nconst frRes = (frVal as string).toUpperCase();\n";
-    await withTmpFile(fixableContent, async doc => {
+    await withTmpFile(fixableContent, async (doc) => {
       const initialDiags = await waitForDiagnostics(doc);
       assert.ok(initialDiags.length > 0, 'Should have initial diagnostics');
 
-      const fixableDiags = initialDiags.filter(d =>
+      const fixableDiags = initialDiags.filter((d) =>
         d.message.includes('no-unnecessary-type-assertion'),
       );
       if (fixableDiags.length === 0) return;
@@ -133,14 +133,14 @@ suite('rslint fixAll - code actions', function () {
       'mfUnsafe.foo;',
       '',
     ].join('\n');
-    await withTmpFile(mixedContent, async doc => {
+    await withTmpFile(mixedContent, async (doc) => {
       const initialDiags = await waitForDiagnostics(doc);
       assert.ok(initialDiags.length > 0, 'Should have diagnostics');
 
-      const fixableBefore = initialDiags.filter(d =>
+      const fixableBefore = initialDiags.filter((d) =>
         d.message.includes('no-unnecessary-type-assertion'),
       );
-      const nonFixableBefore = initialDiags.filter(d =>
+      const nonFixableBefore = initialDiags.filter((d) =>
         d.message.includes('no-unsafe'),
       );
       if (fixableBefore.length === 0 || nonFixableBefore.length === 0) return;
@@ -155,7 +155,7 @@ suite('rslint fixAll - code actions', function () {
           initialDiags.length,
         );
 
-        const fixableAfter = updatedDiags.filter(d =>
+        const fixableAfter = updatedDiags.filter((d) =>
           d.message.includes('no-unnecessary-type-assertion'),
         );
         assert.ok(
@@ -163,7 +163,7 @@ suite('rslint fixAll - code actions', function () {
           `Fixable diagnostics should decrease. Before: ${fixableBefore.length}, After: ${fixableAfter.length}`,
         );
 
-        const nonFixableAfter = updatedDiags.filter(d =>
+        const nonFixableAfter = updatedDiags.filter((d) =>
           d.message.includes('no-unsafe'),
         );
         assert.ok(
@@ -177,7 +177,7 @@ suite('rslint fixAll - code actions', function () {
   test('works after rapid edit without debounce', async () => {
     const { replaceAll } = await import('./fixall-helpers');
     await withTmpFile('// initial\nexport {};\n', async (doc, editor) => {
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise((r) => setTimeout(r, 2000));
 
       await replaceAll(
         editor,
@@ -200,9 +200,9 @@ suite('rslint fixAll - code actions', function () {
   test('second fixAll after first has fewer fixes', async () => {
     const fixableContent =
       "const sfVal: string = 'x';\nconst sfRes = (sfVal as string).trim();\n";
-    await withTmpFile(fixableContent, async doc => {
+    await withTmpFile(fixableContent, async (doc) => {
       const initialDiags = await waitForDiagnostics(doc);
-      const fixableCount = initialDiags.filter(d =>
+      const fixableCount = initialDiags.filter((d) =>
         d.message.includes('no-unnecessary-type-assertion'),
       ).length;
       if (fixableCount === 0) return;

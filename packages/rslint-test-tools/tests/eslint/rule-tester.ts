@@ -12,7 +12,7 @@ interface TsDiagnostic {
 }
 
 function toCamelCase(name: string): string {
-  return name.replace(/-([a-z])/g, g => g[1].toUpperCase());
+  return name.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
 }
 
 function checkDiagnosticEqual(
@@ -90,8 +90,8 @@ export class RuleTester {
       const config = path.resolve(cwd, './rslint.json');
 
       let hasOnly =
-        cases.valid.some(x => typeof x === 'object' && x.only) ||
-        cases.invalid.some(x => x.only);
+        cases.valid.some((x) => typeof x === 'object' && x.only) ||
+        cases.invalid.some((x) => x.only);
 
       test('valid', async () => {
         for (const validCase of cases.valid) {

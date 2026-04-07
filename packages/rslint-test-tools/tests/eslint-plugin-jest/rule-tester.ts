@@ -56,13 +56,13 @@ export class RuleTester {
 
       // test whether case has only
       let hasOnly =
-        cases.valid.some(x => {
+        cases.valid.some((x) => {
           if (typeof x === 'object' && x.only) {
             return true;
           } else {
             return false;
           }
-        }) || cases.invalid.some(x => x.only);
+        }) || cases.invalid.some((x) => x.only);
 
       test('valid', async () => {
         for (const validCase of cases.valid) {
@@ -103,7 +103,7 @@ export class RuleTester {
           );
         }
       });
-      test('invalid', async t => {
+      test('invalid', async (t) => {
         for (const item of cases.invalid) {
           assert.ok(
             item.errors || item.errors === 0,
@@ -166,7 +166,7 @@ export class RuleTester {
             );
 
             const hasMessageOfThisRule = diags.diagnostics.some(
-              d => d.ruleName === ruleName,
+              (d) => d.ruleName === ruleName,
             );
 
             for (let i = 0, l = item.errors.length; i < l; i++) {

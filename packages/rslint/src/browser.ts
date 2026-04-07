@@ -43,11 +43,11 @@ export class BrowserRslintService implements RslintServiceInterface {
     if (!this.worker) {
       this.worker = new Worker(this.workerUrl, { name: 'rslint-worker.js' });
 
-      this.worker.onmessage = event => {
+      this.worker.onmessage = (event) => {
         this.handlePacket(event.data);
       };
 
-      this.worker.onerror = error => {
+      this.worker.onerror = (error) => {
         console.error('Worker error:', error);
         // Reject all pending messages
         for (const [id, pending] of this.pendingMessages) {

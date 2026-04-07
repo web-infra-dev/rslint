@@ -65,7 +65,7 @@ describe('CLI JS config integration', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
+        .filter((l) => l.trim());
       for (const line of lines) {
         expect(() => JSON.parse(line)).not.toThrow();
       }

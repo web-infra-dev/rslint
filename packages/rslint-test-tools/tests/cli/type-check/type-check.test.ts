@@ -129,8 +129,8 @@ describe('--type-check basic behavior', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(l => l.trim());
-      const tsLines = lines.filter(l => {
+        .filter((l) => l.trim());
+      const tsLines = lines.filter((l) => {
         const parsed = JSON.parse(l);
         return parsed.ruleName?.startsWith('TypeScript(');
       });

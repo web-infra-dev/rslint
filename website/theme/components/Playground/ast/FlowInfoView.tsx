@@ -47,7 +47,7 @@ export const FlowInfoView: React.FC<FlowInfoViewProps> = ({ info }) => {
           label="Antecedent"
           preview={
             info.antecedent.flagNames
-              ?.map(e => e.replace('ast.', ''))
+              ?.map((e) => e.replace('ast.', ''))
               .join(' | ') || `flags: ${info.antecedent.flags}`
           }
           flow={info.antecedent}
@@ -63,7 +63,7 @@ export const FlowInfoView: React.FC<FlowInfoViewProps> = ({ info }) => {
 
 // Helper to get title for top-level display
 export const getFlowTitle = (info: FlowInfo) => {
-  return `FlowNode[${info.flagNames?.map(e => e.replace('ast.', '')).join('|') || ''}]`;
+  return `FlowNode[${info.flagNames?.map((e) => e.replace('ast.', '')).join('|') || ''}]`;
 };
 
 // Helper to get preview for top-level display

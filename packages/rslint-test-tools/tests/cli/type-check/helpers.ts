@@ -15,7 +15,7 @@ export async function runRslint(
   args: string[],
   cwd: string,
 ): Promise<CliTestResult> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const { GITHUB_ACTIONS, FORCE_COLOR, ...cleanEnv } = process.env;
     const child = spawn(RSLINT_BIN, args, {
       cwd,
@@ -34,7 +34,7 @@ export async function runRslint(
       stderr += data.toString();
     });
 
-    child.on('close', code => {
+    child.on('close', (code) => {
       resolve({ exitCode: code || 0, stdout, stderr });
     });
   });

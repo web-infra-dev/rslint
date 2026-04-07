@@ -16,7 +16,7 @@ interface CliTestResult {
  * Helper function to run rslint CLI command
  */
 async function runRslint(args: string[], cwd?: string): Promise<CliTestResult> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const child = spawn(RSLINT_BIN, args, {
       cwd: cwd || process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -33,7 +33,7 @@ async function runRslint(args: string[], cwd?: string): Promise<CliTestResult> {
       stderr += data.toString();
     });
 
-    child.on('close', code => {
+    child.on('close', (code) => {
       resolve({
         exitCode: code || 0,
         stdout,
@@ -204,7 +204,7 @@ describe('CLI Configuration Tests', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(line => line.trim());
+        .filter((line) => line.trim());
       for (const line of lines) {
         // eslint-disable-next-line
         expect(() => JSON.parse(line)).not.toThrow();
@@ -254,7 +254,7 @@ describe('CLI Configuration Tests', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(line => line.trim());
+        .filter((line) => line.trim());
 
       expect(lines.length).toBe(2);
       expect(lines[0]).toBe(

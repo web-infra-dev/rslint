@@ -25,7 +25,7 @@ async function main() {
   process.exit(exitCode);
 }
 
-main().catch(err => {
+main().catch((err) => {
   process.stderr.write(`rslint: ${err}\n`);
   process.exit(1);
 });

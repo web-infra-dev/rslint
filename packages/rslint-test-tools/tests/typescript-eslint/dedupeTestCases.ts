@@ -2,7 +2,7 @@ export const dedupeTestCases = <T>(...caseArrays: (readonly T[])[]): T[] => {
   const cases = caseArrays.flat();
   const dedupedCases = Object.values(
     Object.fromEntries(
-      cases.map(testCase => [JSON.stringify(testCase), testCase]),
+      cases.map((testCase) => [JSON.stringify(testCase), testCase]),
     ),
   );
   if (cases.length === dedupedCases.length) {

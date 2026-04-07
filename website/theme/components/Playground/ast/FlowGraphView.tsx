@@ -128,14 +128,14 @@ export const FlowGraphView: React.FC<FlowGraphViewProps> = ({
     }> = [];
     const edges: Array<{ points: Array<{ x: number; y: number }> }> = [];
 
-    g.nodes().forEach(id => {
+    g.nodes().forEach((id) => {
       const n = g.node(id) as DagreNode | undefined;
       if (n) {
         nodes.push({ x: n.x, y: n.y, width: n.width, node: n.node });
       }
     });
 
-    g.edges().forEach(e => {
+    g.edges().forEach((e) => {
       const edge = g.edge(e);
       if (edge && edge.points) {
         edges.push({ points: edge.points });

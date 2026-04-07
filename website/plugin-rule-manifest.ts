@@ -122,7 +122,7 @@ function writeRuleDocsToDir(rules: RuleEntry[]): void {
     }
   }
 
-  const rulesWithDocs = rules.filter(r => r.docPath);
+  const rulesWithDocs = rules.filter((r) => r.docPath);
 
   // Group rules by slug
   const groups = new Map<string, RuleEntry[]>();
@@ -165,7 +165,7 @@ function writeRuleDocsToDir(rules: RuleEntry[]): void {
 
     const sorted = groupRules.sort((a, b) => a.name.localeCompare(b.name));
 
-    const groupMeta = sorted.map(rule => ({
+    const groupMeta = sorted.map((rule) => ({
       type: 'file',
       name: rule.name,
     }));

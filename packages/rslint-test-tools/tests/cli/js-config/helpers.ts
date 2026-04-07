@@ -15,7 +15,7 @@ export async function runRslint(
   args: string[],
   cwd?: string,
 ): Promise<CliTestResult> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     // Strip GITHUB_ACTIONS/FORCE_COLOR to prevent Go binary from force-enabling
     // ANSI colors, which would embed escape codes in stdout and break assertions.
     const { GITHUB_ACTIONS, FORCE_COLOR, ...cleanEnv } = process.env;
@@ -36,7 +36,7 @@ export async function runRslint(
       stderr += data.toString();
     });
 
-    child.on('close', code => {
+    child.on('close', (code) => {
       resolve({ exitCode: code || 0, stdout, stderr });
     });
   });

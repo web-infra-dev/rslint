@@ -82,7 +82,7 @@ const Playground: React.FC = () => {
 
       // Convert diagnostics to the expected format
       const convertedDiagnostics: Diagnostic[] = result.diagnostics.map(
-        diag => ({
+        (diag) => ({
           ruleName: diag.ruleName,
           message: diag.message,
           range: {
@@ -111,7 +111,7 @@ const Playground: React.FC = () => {
       let sourceTextForTs: string | undefined;
       try {
         const astBuffer = result.encodedSourceFiles!['index.ts'];
-        const buffer = Uint8Array.from(atob(astBuffer), c => c.charCodeAt(0));
+        const buffer = Uint8Array.from(atob(astBuffer), (c) => c.charCodeAt(0));
         const source = new RemoteSourceFile(buffer, new TextDecoder());
         // capture the exact source text from encoded source file
         try {
@@ -307,7 +307,7 @@ const Playground: React.FC = () => {
               ref={editorRef}
               onChange={() => scheduleRunLint()}
               onSelectionChange={(start: number, end: number) =>
-                setSelectedAstRange(prev => {
+                setSelectedAstRange((prev) => {
                   // Preserve kind if position is the same (e.g., from revealRangeByOffset)
                   if (prev && prev.start === start && prev.end === end) {
                     return prev;
