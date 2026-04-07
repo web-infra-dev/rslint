@@ -127,7 +127,7 @@ func DiscoverGapFiles(
 
 	_ = fs.WalkDir(fsAdapter, ".", func(walkPath string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return nil // skip unreadable entries
+			return nil //nolint:nilerr // intentionally skip unreadable entries and continue walking
 		}
 
 		if d.IsDir() {

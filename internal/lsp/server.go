@@ -331,7 +331,12 @@ func (s *Server) readLoop(ctx context.Context) error {
 		if s.initializeParams == nil && msg.Kind == jsonrpc.MessageKindRequest {
 			req := msg.AsRequest()
 			if req.Method == lsproto.MethodInitialize {
-				resp, err := s.handleInitialize(ctx, req.Params.(*lsproto.InitializeParams))
+				initParams, ok := req.Params.(*lsproto.InitializeParams)
+				if !ok {
+					s.sendError(req.ID, lsproto.ErrorCodeInvalidParams)
+					continue
+				}
+				resp, err := s.handleInitialize(ctx, initParams)
 				if err != nil {
 					return err
 				}
@@ -354,7 +359,9 @@ func (s *Server) readLoop(ctx context.Context) error {
 		} else {
 			req := msg.AsRequest()
 			if req.Method == lsproto.MethodCancelRequest {
-				s.cancelRequest(req.Params.(*lsproto.CancelParams).Id)
+				if cancelParams, ok := req.Params.(*lsproto.CancelParams); ok {
+					s.cancelRequest(cancelParams.Id)
+				}
 			} else {
 				s.requestQueue <- req
 			}
@@ -566,7 +573,11 @@ func registerNotificationHandler[Req any](handlers handlerMap, info lsproto.Noti
 		var params Req
 		// Ignore empty params; all generated params are either pointers or any.
 		if req.Params != nil {
-			params = req.Params.(Req)
+			p, ok := req.Params.(Req)
+			if !ok {
+				return fmt.Errorf("unexpected params type %T for %s", req.Params, info.Method)
+			}
+			params = p
 		}
 		if err := fn(s, ctx, params); err != nil {
 			return err
@@ -580,7 +591,11 @@ func registerRequestHandler[Req, Resp any](handlers handlerMap, info lsproto.Req
 		var params Req
 		// Ignore empty params.
 		if req.Params != nil {
-			params = req.Params.(Req)
+			p, ok := req.Params.(Req)
+			if !ok {
+				return fmt.Errorf("unexpected params type %T for %s", req.Params, info.Method)
+			}
+			params = p
 		}
 		resp, err := fn(s, ctx, params)
 		if err != nil {
