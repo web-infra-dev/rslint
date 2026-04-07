@@ -55,6 +55,9 @@ jsonline
 lintedfile
 lsproto
 myfunc
+nilerr
+nilnil
+nilnesserr
 nolint
 nullary
 noregabi

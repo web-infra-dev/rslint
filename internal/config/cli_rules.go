@@ -50,7 +50,7 @@ func ParseCLIRuleFlag(input string) (string, interface{}, error) {
 // ConfigEntry with no Files field (matches all files). Returns nil if flags is empty.
 func BuildCLIRuleEntry(flags []string) (*ConfigEntry, error) {
 	if len(flags) == 0 {
-		return nil, nil
+		return nil, nil //nolint:nilnil // no flags means no entry, not an error
 	}
 
 	rules := make(Rules, len(flags))
