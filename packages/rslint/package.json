@@ -59,8 +59,8 @@
   "devDependencies": {
     "@rslint/api": "workspace:*",
     "@types/node": "24.0.14",
-    "@types/picomatch": "4.0.2",
-    "@typescript/native-preview": "7.0.0-dev.20250904.1",
+    "@types/picomatch": "4.0.3",
+    "@typescript/native-preview": "7.0.0-dev.20260407.1",
     "typescript": "5.9.3"
   },
   "peerDependencies": {

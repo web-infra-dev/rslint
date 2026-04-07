@@ -19,9 +19,9 @@
   "devDependencies": {
     "@typescript/api": "workspace:*",
     "@typescript/ast": "workspace:*",
-    "@rslib/core": "0.20.0",
+    "@rslib/core": "0.20.3",
     "@types/node": "24.3.0",
-    "@typescript/native-preview": "7.0.0-dev.20250904.1"
+    "@typescript/native-preview": "7.0.0-dev.20260407.1"
   },
   "publishConfig": {
     "access": "public"
