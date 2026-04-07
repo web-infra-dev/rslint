@@ -340,6 +340,9 @@ importers:
       '@rslint/api':
         specifier: workspace:*
         version: link:../packages/rslint-api
+      '@rslint/core':
+        specifier: workspace:*
+        version: link:../packages/rslint
       '@rslint/wasm':
         specifier: workspace:*
         version: link:../packages/rslint-wasm
