@@ -88,7 +88,7 @@ func buildCalleeWithTodo(ctx rule.RuleContext, callExpr *ast.CallExpression, jes
 			return ""
 		}
 		headTrim := rslintUtils.TrimNodeTextRange(ctx.SourceFile, head)
-		return fmt.Sprintf("%s.todo", src[headTrim.Pos():headTrim.End()])
+		return src[headTrim.Pos():headTrim.End()] + ".todo"
 	}
 	entry := jestFn.MemberEntries[0]
 	mem := entry.Node
