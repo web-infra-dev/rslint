@@ -26,11 +26,10 @@ runs:
         key: setup-go-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           setup-go-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
+        # Only cache module downloads, not build cache (GOCACHE is too large
+        # and fills up disk on self-hosted runners)
         path: |
           ~/go/pkg/mod
-          ~/.cache/go-build
-          ~/Library/Caches/go-build
-          ~/AppData/Local/go-build
 
     - name: Go cache
       uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
@@ -39,11 +38,18 @@ runs:
         key: setup-go-SH-2-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           setup-go-SH-2-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
+        # Only cache module downloads, not build cache (GOCACHE is too large
+        # and fills up disk on self-hosted runners)
         path: |
           ~/go/pkg/mod
-          ~/.cache/go-build
-          ~/Library/Caches/go-build
-          ~/AppData/Local/go-build
+
+    # Clean GOCACHE on self-hosted runners to prevent disk space issues.
+    # Build cache is not persisted via cache action, so it grows indefinitely
+    # on persistent runners and must be cleaned each run.
+    - name: Clean Go build cache
+      shell: bash
+      if: runner.environment == 'self-hosted'
+      run: go clean -cache
 
     # Clean up after cache restore - remove toolchain to save space
     - name: Clean Go module cache dir (Linux)
