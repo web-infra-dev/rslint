@@ -31,7 +31,7 @@ func isStringNode(node *ast.Node) bool {
 		return false
 	}
 	switch node.Kind {
-	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral:
+	case ast.KindStringLiteral, ast.KindNoSubstitutionTemplateLiteral, ast.KindTemplateExpression:
 		return true
 	default:
 		return false
