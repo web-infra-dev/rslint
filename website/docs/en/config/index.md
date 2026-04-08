@@ -90,20 +90,7 @@ export default defineConfig([
 ]);
 ```
 
-### Available Presets
-
-| Preset                             | Description                                               |
-| ---------------------------------- | --------------------------------------------------------- |
-| `ts.configs.recommended`           | TypeScript recommended rules (includes ESLint core rules) |
-| `js.configs.recommended`           | JavaScript recommended rules                              |
-| `reactPlugin.configs.recommended`  | React rules                                               |
-| `importPlugin.configs.recommended` | Import/export rules                                       |
-
-Import presets from `@rslint/core`:
-
-```ts
-import { defineConfig, ts, js, reactPlugin, importPlugin } from '@rslint/core';
-```
+For available presets, rule severity, and plugin configuration, see [Rules & Presets](/config/rules-and-presets).
 
 ## Configuration Options
 
@@ -128,157 +115,11 @@ Files that match `files` but are not included in any tsconfig automatically rece
 
 ### ignores
 
-- **Type:** `string[]`
-
-Glob patterns for files to exclude. An entry with **only** `ignores` (no other fields) acts as a global ignore — matching files are excluded from all rules.
-
-```ts
-// Global ignore entry
-{
-  ignores: ['**/dist/**', '**/fixtures/**'],
-}
-
-// Entry-level ignore (only applies to this entry)
-{
-  files: ['**/*.ts'],
-  ignores: ['**/*.test.ts'],
-  rules: { /* ... */ },
-}
-```
-
-#### Pattern types in global ignores
-
-Global ignore patterns affect both file matching and directory traversal (including config discovery in monorepos):
-
-| Pattern    | Effect                                               |
-| ---------- | ---------------------------------------------------- |
-| `dir/**`   | Ignores directory and all contents, blocks traversal |
-| `dir/**/*` | Ignores files inside, but allows directory traversal |
-| `dir/*`    | Ignores direct children files only                   |
-
-Use `dir/**` to completely exclude a directory (including any nested configs inside it). Use `dir/**/*` if you only want to ignore files but still allow nested configs to be discovered.
-
-You can use `!` negation patterns to re-include specific files. Patterns are evaluated sequentially — later patterns override earlier ones:
-
-```ts
-// Global ignore: re-include specific file
-{
-  ignores: ['build/**/*', '!build/test.js'],
-}
-
-// Entry-level ignore: re-include a subdirectory
-{
-  files: ['**/*.ts'],
-  ignores: ['vendor/**/*', '!vendor/keep/**/*'],
-  rules: { /* ... */ },
-}
-
-// Across separate global ignore entries
-{ ignores: ['build/**/*'] },
-{ ignores: ['!build/test.js'] },
-```
-
-:::warning
-For directory-level patterns (`dir/**`), `!` negation cannot re-include files because the directory traversal is blocked entirely. Use `dir/**/*` instead if you need negation:
-
-```ts
-// ✅ dir/**/* allows traversal — negation works
-{
-  ignores: ['build/**/*', '!build/test.js'];
-}
-
-// ❌ dir/** blocks traversal — negation has no effect
-{
-  ignores: ['build/**', '!build/test.js'];
-}
-```
-
-:::
-
-:::tip
-`node_modules` and `.git` are automatically excluded by rslint — you don't need to add them to ignores.
-:::
-
-#### .gitignore integration
-
-Rslint automatically reads `.gitignore` files and treats their patterns as additional global ignores. This means files ignored by git (build outputs, coverage reports, etc.) are also ignored by the linter without extra configuration.
-
-- **Nested `.gitignore` files** are supported — each one only affects its own directory subtree
-- **Parent patterns cascade** to child directories (e.g., root `dist/` also ignores `packages/app/dist/`)
-- **Child `.gitignore` can override** parent patterns with `!` negation
-- Config `!` negation can also override `.gitignore` patterns (they are evaluated sequentially in the same global ignores list)
-
-```text
-# .gitignore
-dist/
-coverage/
-*.log
-
-# packages/app/.gitignore
-!dist/          # re-include dist/ under packages/app/
-```
-
-If you need to lint a file that is in `.gitignore`, add a `!` negation pattern in your config's global ignores:
-
-```ts
-export default [
-  {
-    ignores: ['!dist/important.ts'], // override .gitignore for this file
-  },
-  // ...
-];
-```
+For file exclusion patterns, negation, and `.gitignore` integration, see [Ignoring Files](/config/ignoring-files).
 
 ### rules
 
-- **Type:** `Record<string, RuleSeverity | [RuleSeverity, ...options]>`
-
-Configure individual rules with a severity level and optional options.
-
-**Severity levels:**
-
-| Value     | Description                                 |
-| --------- | ------------------------------------------- |
-| `"error"` | Reports as error, causes non-zero exit code |
-| `"warn"`  | Reports as warning                          |
-| `"off"`   | Disables the rule                           |
-
-**String format** (severity only):
-
-```ts
-rules: {
-  '@typescript-eslint/no-explicit-any': 'error',
-  '@typescript-eslint/require-await': 'off',
-}
-```
-
-**Array format** (severity + options):
-
-```ts
-rules: {
-  '@typescript-eslint/array-type': ['warn', { default: 'array-simple' }],
-  '@typescript-eslint/no-unused-vars': ['error', {
-    argsIgnorePattern: '^_',
-    varsIgnorePattern: '^_',
-  }],
-}
-```
-
-### plugins
-
-- **Type:** `string[]`
-
-Plugin names to enable. Available plugins:
-
-| Plugin                 | Rules Prefix           |
-| ---------------------- | ---------------------- |
-| `@typescript-eslint`   | `@typescript-eslint/*` |
-| `eslint-plugin-import` | `import/*`             |
-| `react`                | `react/*`              |
-
-:::tip
-When using JS/TS config with presets (e.g., `ts.configs.recommended`), plugins are declared within the preset — you don't need to specify them separately.
-:::
+For rule severity levels, option format, and plugin configuration, see [Rules & Presets](/config/rules-and-presets).
 
 ### languageOptions
 
