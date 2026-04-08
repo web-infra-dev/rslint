@@ -546,11 +546,16 @@ func runCMD() int {
 				fmt.Fprintf(os.Stderr, "error resolving path %s: %v\n", arg, err)
 				return 1
 			}
-			// Resolve symlinks so paths are consistent with os.Getwd() and
-			// TypeScript's SourceFile.FileName() which both return real paths.
-			if resolved, err := filepath.EvalSymlinks(absPath); err == nil {
-				absPath = resolved
-			}
+			// NOTE: we intentionally do NOT call filepath.EvalSymlinks here.
+			// EvalSymlinks resolves symlinks (macOS /tmp → /private/tmp) and
+			// Windows 8.3 short names to long names, but the rest
+			// of the pipeline (os.Getwd, TypeScript file names, configDir)
+			// uses unresolved CWD-based paths. Resolving only file args would
+			// create a format mismatch causing failures in gap file detection,
+			// config matching, dir scoping, and gitignore checks.
+			// Edge cases (e.g. user passes a symlink-resolved absolute path)
+			// are handled by isFileAllowed's os.SameFile fallback in linter.go
+			// and buildProgramFileSet's Realpath'd keys in programs.go.
 			normalized := tspath.NormalizePath(absPath)
 			info, statErr := os.Stat(absPath)
 			if statErr == nil && info.IsDir() {
