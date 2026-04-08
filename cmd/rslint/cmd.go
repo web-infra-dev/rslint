@@ -602,12 +602,11 @@ func runCMD() int {
 		defer pprof.StopCPUProfile()
 	}
 
-	currentDirectory, err := os.Getwd()
+	currentDirectory, err := utils.ResolveWorkingDirectory()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error getting current directory: %v\n", err)
 		return 1
 	}
-	currentDirectory = tspath.NormalizePath(currentDirectory)
 
 	if init {
 		if err := rslintconfig.InitDefaultConfig(currentDirectory); err != nil {

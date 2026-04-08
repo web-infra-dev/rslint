@@ -54,11 +54,10 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 	}
 
 	// Get current directory
-	currentDirectory, err := os.Getwd()
+	currentDirectory, err := utils.ResolveWorkingDirectory()
 	if err != nil {
 		return nil, fmt.Errorf("error getting current directory: %w", err)
 	}
-	currentDirectory = tspath.NormalizePath(currentDirectory)
 
 	// Create filesystem
 	fs := bundled.WrapFS(cachedvfs.From(osvfs.FS()))

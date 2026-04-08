@@ -26,11 +26,9 @@ runs:
         key: setup-go-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           setup-go-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
+        # Only cache module downloads, not build cache (too large for disk limits)
         path: |
           ~/go/pkg/mod
-          ~/.cache/go-build
-          ~/Library/Caches/go-build
-          ~/AppData/Local/go-build
 
     - name: Go cache
       uses: lynx-infra/cache@5c6160a6a4c7fca80a2f3057bb9dfc9513fcb732
@@ -39,13 +37,21 @@ runs:
         key: setup-go-SH-2-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           setup-go-SH-2-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
+        # Only cache module downloads, not build cache (too large for disk limits)
         path: |
           ~/go/pkg/mod
-          ~/.cache/go-build
-          ~/Library/Caches/go-build
-          ~/AppData/Local/go-build
 
-    # Clean up after cache restore - remove toolchain to save space
+    # Clean up after cache restore to save disk space
+    - name: Clean Go build cache (Windows)
+      shell: pwsh
+      if: runner.os == 'Windows'
+      run: |
+        $gocache = go env GOCACHE
+        if (Test-Path $gocache) {
+          Write-Host "Cleaning GOCACHE at $gocache"
+          Remove-Item -Path $gocache -Recurse -Force -ErrorAction SilentlyContinue
+        }
+
     - name: Clean Go module cache dir (Linux)
       shell: bash
       if: runner.os == 'Linux'

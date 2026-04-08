@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/microsoft/typescript-go/shim/ast"
@@ -14,7 +16,30 @@ import (
 	"github.com/microsoft/typescript-go/shim/tsoptions"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 )
+
+// ResolveWorkingDirectory resolves the current working directory to its
+// canonical form (resolving symlinks on macOS/Linux and 8.3 short names
+// on Windows). If the path changes, the process CWD is also updated via
+// os.Chdir so that filepath.Abs and other os.Getwd-dependent calls use
+// the resolved path consistently.
+func ResolveWorkingDirectory() (string, error) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	normalized := tspath.NormalizePath(cwd)
+	resolved := osvfs.FS().Realpath(normalized)
+	if resolved != normalized {
+		fmt.Fprintf(os.Stderr, "[rslint:debug] CWD resolved: %s → %s\n", normalized, resolved)
+		if err := os.Chdir(filepath.FromSlash(resolved)); err != nil {
+			fmt.Fprintf(os.Stderr, "[rslint:debug] Chdir failed: %v\n", err)
+			return normalized, nil
+		}
+	}
+	return resolved, nil
+}
 
 // SyntacticError carries structured diagnostics for syntax errors.
 // Callers can type-assert to access the raw diagnostics for rich rendering.
