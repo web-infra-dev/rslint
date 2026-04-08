@@ -84,8 +84,10 @@ describe('classifyArgs', () => {
   });
 
   test('non-existent path treated as file', () => {
-    const result = classifyArgs(['/nonexistent/path/file.ts'], '/');
-    expect(result.files).toEqual(['/nonexistent/path/file.ts']);
+    const nonExistent = '/nonexistent/path/file.ts';
+    const cwd = '/';
+    const result = classifyArgs([nonExistent], cwd);
+    expect(result.files).toEqual([path.resolve(cwd, nonExistent)]);
     expect(result.dirs).toEqual([]);
   });
 

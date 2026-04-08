@@ -17,7 +17,7 @@ export async function runRslint(
 ): Promise<CliTestResult> {
   return new Promise((resolve) => {
     const { GITHUB_ACTIONS, FORCE_COLOR, ...cleanEnv } = process.env;
-    const child = spawn(RSLINT_BIN, args, {
+    const child = spawn(process.execPath, [RSLINT_BIN, ...args], {
       cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...cleanEnv, NO_COLOR: '1' },
@@ -81,12 +81,23 @@ export function normalizeOutput(output: string, tempDir: string): string {
     result = result.replaceAll(privateTempDir, '<TEMPDIR>');
   }
   result = result.replaceAll(tempDir, '<TEMPDIR>');
+  // macOS: relative paths through /private/tmp symlink
   result = result.replace(
     /(?:\.\.\/)+private\/tmp\/rslint-typecheck-[^\s/)]+/g,
     '<TEMPDIR>',
   );
   result = result.replace(
     /(?:\.\.\/)+tmp\/rslint-typecheck-[^\s/)]+/g,
+    '<TEMPDIR>',
+  );
+  // Windows: absolute paths with possible 8.3 short names (e.g. RUNNER~1)
+  result = result.replace(
+    /[A-Z]:\/Users\/[^/]+\/AppData\/Local\/Temp\/rslint-typecheck-[^\s/)]+/g,
+    '<TEMPDIR>',
+  );
+  // Windows: relative paths through 8.3 short name directories
+  result = result.replace(
+    /(?:\.\.\/)+[^/]+\/AppData\/Local\/Temp\/rslint-typecheck-[^\s/)]+/g,
     '<TEMPDIR>',
   );
   result = result.replace(
