@@ -22,7 +22,7 @@ function runRslintViaNode(
   args: string[],
   cwd?: string,
 ): Promise<CliTestResult> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const { GITHUB_ACTIONS, FORCE_COLOR, ...cleanEnv } = process.env;
     const child = spawn(process.execPath, [RSLINT_BIN, ...args], {
       cwd: cwd || process.cwd(),
@@ -41,7 +41,7 @@ function runRslintViaNode(
       stderr += data.toString();
     });
 
-    child.on('close', code => {
+    child.on('close', (code) => {
       resolve({ exitCode: code || 0, stdout, stderr });
     });
   });
