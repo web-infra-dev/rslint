@@ -232,7 +232,7 @@ ruleTester.run('no-alias-methods', {} as never, {
     },
     {
       code: 'expect(a).not["toThrowError"]()',
-      output: "expect(a).not['toThrow']()",
+      output: "expect(a).not[\"toThrow\"]()",
       errors: [
         {
           messageId: 'replaceAlias',
