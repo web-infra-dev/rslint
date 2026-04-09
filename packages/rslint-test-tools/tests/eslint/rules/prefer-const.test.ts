@@ -50,6 +50,16 @@ ruleTester.run('prefer-const', {
       code: 'let x; console.log(x); x = 0;',
       options: { ignoreReadBeforeAssign: true },
     },
+    // destructuring: "all" — uninitialized, destructuring write, one has extra reassignment
+    {
+      code: 'let a: any, b: any; ({a, b} = ({} as any)); b = 1;',
+      options: { destructuring: 'all' },
+    },
+    // destructuring: "all" — separate let statements, destructuring write, one reassigned
+    {
+      code: 'function f() { let a: any; let b: any; ({a, b} = ({} as any)); b = 1; void a; }',
+      options: { destructuring: 'all' },
+    },
     // Uninitialized, assigned inside nested block
     'let x: number; if (true) { x = 1; }',
     'let x: number; try { x = 1; } catch { x = 2; }',
@@ -67,8 +77,12 @@ ruleTester.run('prefer-const', {
     'let a = 0; let b: number; a = b = 1;',
     // Mixed member expression in destructuring assignment
     'function f() { let v: any; [({} as any).prop, v] = [1, 2]; return v; }',
-    // Cross-declaration destructuring assignment
+    // Cross-declaration destructuring in different scope — unmergeable
     'function f() { let a: any; { let b: any; ({a, b} = ({} as any)); void b; } return a; }',
+    // Cross-declaration array destructuring in different scope
+    'function f() { let a: any; { let b: any; ([a, b] = ([] as any)); void b; } return a; }',
+    // Cross-declaration with renamed property and member expression
+    'let a: any; const b: any = {}; ({ a, c: (b as any).c } = ({} as any));',
   ],
   invalid: [
     // Simple let
@@ -202,6 +216,32 @@ ruleTester.run('prefer-const', {
       code: 'let x; x = 0;',
       options: { ignoreReadBeforeAssign: false },
       errors: [{ messageId: 'useConst' }],
+    },
+    // Cross-declaration destructuring in same scope — should report both
+    {
+      code: 'function f() { let a: any; let b: any; ({a, b} = ({} as any)); }',
+      errors: [{ messageId: 'useConst' }, { messageId: 'useConst' }],
+    },
+    // Cross-declaration array destructuring in same scope
+    {
+      code: 'function f() { let a: any; let b: any; ([a, b] = ([] as any)); }',
+      errors: [{ messageId: 'useConst' }, { messageId: 'useConst' }],
+    },
+    // Cross-declaration renamed object destructuring in same scope
+    {
+      code: 'function f() { let a: any; let b: any; ({x: a, y: b} = ({} as any)); }',
+      errors: [{ messageId: 'useConst' }, { messageId: 'useConst' }],
+    },
+    // Cross-declaration in class static block
+    {
+      code: 'class C { static { let a: any; let b: any; ({a, b} = ({} as any)); } }',
+      errors: [{ messageId: 'useConst' }, { messageId: 'useConst' }],
+    },
+    // destructuring: "all" — uninitialized, all targets have single write
+    {
+      code: 'let a: any, b: any; ({a, b} = ({} as any));',
+      options: { destructuring: 'all' },
+      errors: [{ messageId: 'useConst' }, { messageId: 'useConst' }],
     },
   ],
 });
