@@ -16,7 +16,7 @@ export async function runRslint(
   cwd?: string,
 ): Promise<CliTestResult> {
   return new Promise((resolve) => {
-    const child = spawn(RSLINT_BIN, args, {
+    const child = spawn(process.execPath, [RSLINT_BIN, ...args], {
       cwd: cwd || process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'],
     });

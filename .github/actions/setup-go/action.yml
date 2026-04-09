@@ -19,20 +19,6 @@ runs:
         go-version: ${{ inputs.go-version }}
         cache: false
 
-    # Clean up before cache restore to free disk space
-    - name: Pre-cache cleanup (Windows)
-      shell: pwsh
-      if: runner.os == 'Windows'
-      run: |
-        Write-Host "Disk space before cleanup:"
-        Get-PSDrive C | Select-Object Used,Free | Format-Table
-
-        # Clean temp directory
-        Get-ChildItem -Path $env:TEMP -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
-
-        Write-Host "Disk space after cleanup:"
-        Get-PSDrive C | Select-Object Used,Free | Format-Table
-
     - name: Go cache
       uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       if: runner.environment == 'github-hosted'
@@ -40,7 +26,8 @@ runs:
         key: setup-go-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           setup-go-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
-        # Only cache dependencies, not build cache (saves disk space on Windows)
+        # Only cache module downloads, not build cache (GOCACHE is too large
+        # and fills up disk on self-hosted runners)
         path: |
           ~/go/pkg/mod
 
@@ -51,9 +38,18 @@ runs:
         key: setup-go-SH-2-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
         restore-keys: |
           setup-go-SH-2-${{ runner.os }}-${{ steps.install-go.outputs.go-version }}-${{ inputs.cache-name }}-${{ hashFiles('**/go.sum') }}
-        # Only cache dependencies, not build cache (saves disk space on Windows)
+        # Only cache module downloads, not build cache (GOCACHE is too large
+        # and fills up disk on self-hosted runners)
         path: |
           ~/go/pkg/mod
+
+    # Clean GOCACHE on self-hosted runners to prevent disk space issues.
+    # Build cache is not persisted via cache action, so it grows indefinitely
+    # on persistent runners and must be cleaned each run.
+    - name: Clean Go build cache
+      shell: bash
+      if: runner.environment == 'self-hosted'
+      run: go clean -cache
 
     # Clean up after cache restore - remove toolchain to save space
     - name: Clean Go module cache dir (Linux)

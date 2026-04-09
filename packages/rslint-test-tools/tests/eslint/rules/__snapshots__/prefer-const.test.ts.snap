@@ -791,3 +791,208 @@ exports[`prefer-const > invalid 27`] = `
   "ruleCount": 1,
 }
 `;
+
+exports[`prefer-const > invalid 28`] = `
+{
+  "code": "function f() { let a: any; let b: any; ({a, b} = ({} as any)); }",
+  "diagnostics": [
+    {
+      "message": "'a' is never reassigned. Use 'const' instead.",
+      "messageId": "useConst",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-const",
+    },
+    {
+      "message": "'b' is never reassigned. Use 'const' instead.",
+      "messageId": "useConst",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-const",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-const > invalid 29`] = `
+{
+  "code": "function f() { let a: any; let b: any; ([a, b] = ([] as any)); }",
+  "diagnostics": [
+    {
+      "message": "'a' is never reassigned. Use 'const' instead.",
+      "messageId": "useConst",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-const",
+    },
+    {
+      "message": "'b' is never reassigned. Use 'const' instead.",
+      "messageId": "useConst",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-const",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-const > invalid 30`] = `
+{
+  "code": "function f() { let a: any; let b: any; ({x: a, y: b} = ({} as any)); }",
+  "diagnostics": [
+    {
+      "message": "'a' is never reassigned. Use 'const' instead.",
+      "messageId": "useConst",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-const",
+    },
+    {
+      "message": "'b' is never reassigned. Use 'const' instead.",
+      "messageId": "useConst",
+      "range": {
+        "end": {
+          "column": 52,
+          "line": 1,
+        },
+        "start": {
+          "column": 51,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-const",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-const > invalid 31`] = `
+{
+  "code": "class C { static { let a: any; let b: any; ({a, b} = ({} as any)); } }",
+  "diagnostics": [
+    {
+      "message": "'a' is never reassigned. Use 'const' instead.",
+      "messageId": "useConst",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-const",
+    },
+    {
+      "message": "'b' is never reassigned. Use 'const' instead.",
+      "messageId": "useConst",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-const",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`prefer-const > invalid 32`] = `
+{
+  "code": "let a: any, b: any; ({a, b} = ({} as any));",
+  "diagnostics": [
+    {
+      "message": "'a' is never reassigned. Use 'const' instead.",
+      "messageId": "useConst",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-const",
+    },
+    {
+      "message": "'b' is never reassigned. Use 'const' instead.",
+      "messageId": "useConst",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "prefer-const",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

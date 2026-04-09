@@ -21,9 +21,6 @@ const GROUP_CONFIG: Record<string, { importName: string; preset: string }> = {
 /**
  * Displays a complete rslint configuration snippet that users can copy
  * for a specific rule. Includes the correct import, preset, and rule override.
- *
- * Imported in each generated rule .mdx file via:
- *   import RuleConfig from '@/theme/components/RuleConfig.tsx';
  */
 export const RuleConfig: React.FC<{ name: string; group: string }> = ({
   name,
@@ -31,8 +28,6 @@ export const RuleConfig: React.FC<{ name: string; group: string }> = ({
 }) => {
   const config = GROUP_CONFIG[group];
 
-  // Known group: show full config with import and preset
-  // Unknown group: show minimal config with just the rule override
   const code = config
     ? `import { defineConfig, ${config.importName} } from '@rslint/core';
 

@@ -907,3 +907,78 @@ func CollectBindingNames(nameNode *ast.Node, callback func(ident *ast.Node, name
 		})
 	}
 }
+
+// IsNullLiteral checks if a node is the null keyword, unwrapping parentheses.
+func IsNullLiteral(node *ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	return ast.SkipParentheses(node).Kind == ast.KindNullKeyword
+}
+
+// FindEnclosingScope finds the nearest function-like, class static block,
+// module block, or source file scope for a node. Uses the tsgo public
+// function IsFunctionLikeOrClassStaticBlockDeclaration.
+// This is commonly needed by rules that walk write references or check
+// variable scoping (e.g. prefer-const, no-var, no-class-assign).
+func FindEnclosingScope(node *ast.Node) *ast.Node {
+	return ast.FindAncestor(node.Parent, func(n *ast.Node) bool {
+		if ast.IsFunctionLikeOrClassStaticBlockDeclaration(n) {
+			return true
+		}
+		switch n.Kind {
+		case ast.KindSourceFile, ast.KindModuleBlock:
+			return true
+		}
+		return false
+	})
+}
+
+// VisitDestructuringIdentifiers calls fn for each identifier target in a
+// destructuring assignment pattern (object/array literal on the left side
+// of an assignment expression). Handles shorthand properties, renamed
+// properties, default values, rest/spread, and arbitrary nesting.
+// This does NOT handle declaration-level destructuring (BindingPattern) —
+// use CollectBindingNames for that.
+func VisitDestructuringIdentifiers(node *ast.Node, fn func(*ast.Node)) {
+	node.ForEachChild(func(child *ast.Node) bool {
+		switch child.Kind {
+		case ast.KindIdentifier:
+			fn(child)
+		case ast.KindShorthandPropertyAssignment:
+			shorthand := child.AsShorthandPropertyAssignment()
+			if shorthand != nil && shorthand.Name() != nil {
+				fn(shorthand.Name())
+			}
+		case ast.KindPropertyAssignment:
+			pa := child.AsPropertyAssignment()
+			if pa != nil && pa.Initializer != nil {
+				if pa.Initializer.Kind == ast.KindIdentifier {
+					fn(pa.Initializer)
+				} else {
+					VisitDestructuringIdentifiers(pa.Initializer, fn)
+				}
+			}
+		case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression, ast.KindSpreadElement:
+			VisitDestructuringIdentifiers(child, fn)
+		case ast.KindSpreadAssignment:
+			child.ForEachChild(func(gc *ast.Node) bool {
+				if gc.Kind == ast.KindIdentifier {
+					fn(gc)
+				}
+				return false
+			})
+		case ast.KindBinaryExpression:
+			// Default value: [x = 5] → visit left side only
+			be := child.AsBinaryExpression()
+			if be != nil && be.Left != nil {
+				if be.Left.Kind == ast.KindIdentifier {
+					fn(be.Left)
+				} else {
+					VisitDestructuringIdentifiers(be.Left, fn)
+				}
+			}
+		}
+		return false
+	})
+}

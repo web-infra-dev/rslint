@@ -9,6 +9,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
+	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -120,9 +121,20 @@ func createFallbackProgram(
 // into a set for fast lookup.
 func buildProgramFileSet(programs []*compiler.Program) map[string]struct{} {
 	fileSet := make(map[string]struct{})
+	realFS := osvfs.FS()
 	for _, prog := range programs {
 		for _, sf := range prog.GetSourceFiles() {
-			fileSet[sf.FileName()] = struct{}{}
+			name := sf.FileName()
+			if _, ok := fileSet[name]; ok {
+				continue
+			}
+			fileSet[name] = struct{}{}
+			// Also store the resolved path so lookups from filepath.EvalSymlinks
+			// match even when os.Getwd() returns 8.3 short names (Windows) or
+			// unresolved symlinks (macOS /tmp → /private/tmp).
+			if resolved := realFS.Realpath(name); resolved != name {
+				fileSet[resolved] = struct{}{}
+			}
 		}
 	}
 	return fileSet

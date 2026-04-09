@@ -1,1 +1,17 @@
-["index"]
+[
+  {
+    "type": "file",
+    "name": "index",
+    "label": "Overview"
+  },
+  {
+    "type": "file",
+    "name": "rules-and-presets",
+    "label": "Rules & Presets"
+  },
+  {
+    "type": "file",
+    "name": "ignoring-files",
+    "label": "Ignoring Files"
+  }
+]
