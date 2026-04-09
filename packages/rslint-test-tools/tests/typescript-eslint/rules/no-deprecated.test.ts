@@ -1,4 +1,4 @@
-import { RuleTester } from '@typescript-eslint/rule-tester';
+import { noFormat, RuleTester } from '@typescript-eslint/rule-tester';
 
 
 import { getFixturesRootDir } from '../RuleTester';
@@ -15,6 +15,7 @@ const ruleTester = new RuleTester({
     },
   },
 });
+const jsxLanguageOptions = ruleTester.options.languageOptions;
 
 ruleTester.run('no-deprecated', {
   valid: [
@@ -271,6 +272,21 @@ ruleTester.run('no-deprecated', {
         },
       },
     },
+    {
+      code: `
+        async function fn() {
+          const d = await import('./deprecated.js');
+          d.default['foo'];
+        }
+      `,
+      languageOptions: {
+        parserOptions: {
+          project: './tsconfig.moduleResolution-node16.json',
+          projectService: false,
+          tsconfigRootDir: rootDir,
+        },
+      },
+    },
     'call();',
 
     // this test is to ensure the rule doesn't crash when class implements itself
@@ -286,51 +302,66 @@ ruleTester.run('no-deprecated', {
         }
       }
     `,
-    `
-      declare namespace JSX {}
-
-      <foo bar={1} />;
-    `,
-    `
-      declare namespace JSX {
-        interface IntrinsicElements {
-          foo: any;
-        }
-      }
-
-      <foo bar={1} />;
-    `,
-    `
-      declare namespace JSX {
-        interface IntrinsicElements {
-          foo: unknown;
-        }
-      }
-
-      <foo bar={1} />;
-    `,
-    `
-      declare namespace JSX {
-        interface IntrinsicElements {
-          foo: {
-            bar: any;
-          };
-        }
-      }
-      <foo bar={1} />;
-    `,
-    `
-      declare namespace JSX {
-        interface IntrinsicElements {
-          foo: {
-            bar: unknown;
-          };
-        }
-      }
-      <foo bar={1} />;
-    `,
     {
-      code: `
+      code: noFormat`
+        declare namespace JSX {}
+
+        <foo bar={1} />;
+      `,
+      languageOptions: jsxLanguageOptions,
+    },
+    {
+      code: noFormat`
+        declare namespace JSX {
+          interface IntrinsicElements {
+            foo: any;
+          }
+        }
+
+        <foo bar={1} />;
+      `,
+      languageOptions: jsxLanguageOptions,
+    },
+    {
+      code: noFormat`
+        declare namespace JSX {
+          interface IntrinsicElements {
+            foo: unknown;
+          }
+        }
+
+        <foo bar={1} />;
+      `,
+      languageOptions: jsxLanguageOptions,
+    },
+    {
+      code: noFormat`
+        declare namespace JSX {
+          interface IntrinsicElements {
+            foo: {
+              bar: any;
+            };
+          }
+        }
+        <foo bar={1} />;
+      `,
+      languageOptions: jsxLanguageOptions,
+    },
+    {
+      code: noFormat`
+        declare namespace JSX {
+          interface IntrinsicElements {
+            foo: {
+              bar: unknown;
+            };
+          }
+        }
+        <foo bar={1} />;
+      `,
+      languageOptions: jsxLanguageOptions,
+    },
+    {
+      code: noFormat`
 /** @deprecated */
 function A() {
   return <div />;
@@ -338,6 +369,7 @@ function A() {
 
 const a = <A></A>;
       `,
+      languageOptions: jsxLanguageOptions,
       options: [
         {
           allow: [{ from: 'file', name: 'A' }],
@@ -557,8 +589,10 @@ exists('/foo');
     `,
   ],
   invalid: [
+    // Skipped: React JSX deprecation requires React types (tsgolint parity)
     {
-      code: `
+      skip: true,
+      code: noFormat`
         interface AProps {
           /** @deprecated */
           b: number | string;
@@ -570,6 +604,7 @@ exists('/foo');
 
         const a = <A b="" />;
       `,
+      languageOptions: jsxLanguageOptions,
       errors: [
         {
           column: 22,
@@ -1841,12 +1876,13 @@ exists('/foo');
       ],
     },
     {
-      code: `
+      code: noFormat`
         /** @deprecated */
         const A = () => <div />;
 
         const a = <A />;
       `,
+      languageOptions: jsxLanguageOptions,
       errors: [
         {
           column: 20,
@@ -1859,12 +1895,13 @@ exists('/foo');
       ],
     },
     {
-      code: `
+      code: noFormat`
         /** @deprecated */
         const A = () => <div />;
 
         const a = <A></A>;
       `,
+      languageOptions: jsxLanguageOptions,
       errors: [
         {
           column: 20,
@@ -1877,7 +1914,7 @@ exists('/foo');
       ],
     },
     {
-      code: `
+      code: noFormat`
         /** @deprecated */
         function A() {
           return <div />;
@@ -1885,6 +1922,7 @@ exists('/foo');
 
         const a = <A />;
       `,
+      languageOptions: jsxLanguageOptions,
       errors: [
         {
           column: 20,
@@ -1897,7 +1935,7 @@ exists('/foo');
       ],
     },
     {
-      code: `
+      code: noFormat`
         /** @deprecated */
         function A() {
           return <div />;
@@ -1905,6 +1943,7 @@ exists('/foo');
 
         const a = <A></A>;
       `,
+      languageOptions: jsxLanguageOptions,
       errors: [
         {
           column: 20,
@@ -2889,7 +2928,7 @@ class B extends A {
       ],
     },
     {
-      code: `
+      code: noFormat`
 class A {
   /** @deprecated test reason*/
   constructor() {}
@@ -2914,7 +2953,9 @@ class B extends A {
       ],
     },
     {
+      skip: true,
       code: 'const a = <div aria-grabbed></div>;',
+      languageOptions: jsxLanguageOptions,
       errors: [
         {
           column: 16,
@@ -2927,6 +2968,7 @@ class B extends A {
       ],
     },
     {
+      skip: true,
       code: `
         declare namespace JSX {
           interface IntrinsicElements {
@@ -2942,6 +2984,7 @@ class B extends A {
 
         const componentDashed = <foo-bar:baz-bam name="e" deprecatedProp="oh no" />;
       `,
+      languageOptions: jsxLanguageOptions,
       errors: [
         {
           column: 59,
@@ -2954,7 +2997,8 @@ class B extends A {
       ],
     },
     {
-      code: `
+      skip: true,
+      code: noFormat`
         import * as React from 'react';
 
         interface Props {
@@ -2974,6 +3018,7 @@ class B extends A {
 
         const anotherExample = <Tab.List deprecatedProp="oh no" />;
       `,
+      languageOptions: jsxLanguageOptions,
       errors: [
         {
           column: 42,

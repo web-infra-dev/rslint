@@ -86,7 +86,7 @@ export class BrowserRslintService implements RslintServiceInterface {
         this.expectedSize = dataView.getUint32(0, true); // true for little-endian
 
         // Remove length bytes from buffer
-        this.chunks = [combined.slice(4)];
+        this.chunks = [combined.subarray(4)];
         this.chunkSize -= 4;
       }
 
@@ -95,7 +95,7 @@ export class BrowserRslintService implements RslintServiceInterface {
 
       // Read the message content
       const combined = this.combineChunks();
-      const messageBytes = combined.slice(0, this.expectedSize);
+      const messageBytes = combined.subarray(0, this.expectedSize);
       const message = new TextDecoder().decode(messageBytes);
 
       // Handle the message
@@ -107,7 +107,7 @@ export class BrowserRslintService implements RslintServiceInterface {
       }
 
       // Reset for next message
-      this.chunks = [combined.slice(this.expectedSize)];
+      this.chunks = [combined.subarray(this.expectedSize)];
       this.chunkSize = this.chunks[0].length;
       this.expectedSize = null;
     }

@@ -126,6 +126,14 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 				})
 			}
 		}
+	} else {
+		// Default to enabling all rules with empty options when none were specified.
+		for _, r := range rslintconfig.GlobalRuleRegistry.GetAllRules() {
+			rulesWithOptions = append(rulesWithOptions, RuleWithOption{
+				rule:   r,
+				option: []interface{}{},
+			})
+		}
 	}
 
 	// Create compiler host
