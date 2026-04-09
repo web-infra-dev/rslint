@@ -243,6 +243,7 @@ export default defineConfig({
     './tests/eslint-plugin-jest/rules/no-disabled-tests.test.ts',
     './tests/eslint-plugin-jest/rules/no-focused-tests.test.ts',
     './tests/eslint-plugin-jest/rules/no-hooks.test.ts',
+    './tests/eslint-plugin-jest/rules/no-test-prefixes.test.ts',
     './tests/eslint-plugin-jest/rules/valid-describe-callback.test.ts',
   ],
 });
