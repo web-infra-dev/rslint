@@ -95,7 +95,7 @@ export const Editor = ({
       const model = editorRef.current?.getModel();
 
       if (model) {
-        const markers = diags.map(diag => {
+        const markers = diags.map((diag) => {
           // Convert character offset to line/column position
           const start = diag.range.start;
           const end = diag.range.end;

@@ -19,8 +19,9 @@ type RestrictTemplateExpressionsOptions struct {
 // RestrictTemplateExpressionsRule implements the restrict-template-expressions rule
 // Enforce template literal expressions to be of string type
 var RestrictTemplateExpressionsRule = rule.CreateRule(rule.Rule{
-	Name: "restrict-template-expressions",
-	Run:  run,
+	Name:             "restrict-template-expressions",
+	RequiresTypeInfo: true,
+	Run:              run,
 })
 
 func run(ctx rule.RuleContext, options any) rule.RuleListeners {

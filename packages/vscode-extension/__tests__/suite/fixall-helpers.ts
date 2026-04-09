@@ -23,8 +23,8 @@ export async function waitForDiagnostics(
     if (diagnostics.length > 0) {
       return diagnostics;
     }
-    await new Promise(resolve => {
-      const disposable = vscode.languages.onDidChangeDiagnostics(e => {
+    await new Promise((resolve) => {
+      const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
         for (const uri of e.uris) {
           if (uri.toString() === doc.uri.toString()) {
             disposable.dispose();
@@ -53,8 +53,8 @@ export async function waitForDiagnosticsToChange(
     if (current.length !== previousCount) {
       return current;
     }
-    await new Promise(resolve => {
-      const disposable = vscode.languages.onDidChangeDiagnostics(e => {
+    await new Promise((resolve) => {
+      const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
         for (const uri of e.uris) {
           if (uri.toString() === doc.uri.toString()) {
             disposable.dispose();
@@ -83,8 +83,8 @@ export async function waitForDiagnosticsCount(
     if (current.length === expectedCount) {
       return current;
     }
-    await new Promise(resolve => {
-      const disposable = vscode.languages.onDidChangeDiagnostics(e => {
+    await new Promise((resolve) => {
+      const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
         for (const uri of e.uris) {
           if (uri.toString() === doc.uri.toString()) {
             disposable.dispose();
@@ -106,7 +106,7 @@ export function findFixAllAction(
   codeActions: vscode.CodeAction[] | undefined,
 ): vscode.CodeAction | undefined {
   return codeActions?.find(
-    action =>
+    (action) =>
       action.kind?.value === 'source.fixAll.rslint' ||
       action.kind?.value === 'source.fixAll',
   );
@@ -161,7 +161,7 @@ export async function replaceAll(
     doc.positionAt(0),
     doc.positionAt(doc.getText().length),
   );
-  const ok = await editor.edit(b => b.replace(fullRange, newContent));
+  const ok = await editor.edit((b) => b.replace(fullRange, newContent));
   assert.ok(ok, 'editor.edit should succeed');
 }
 

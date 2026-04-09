@@ -41,7 +41,7 @@ export const CollapsibleItem: React.FC<CollapsibleItemProps> = ({
     if (onToggle) {
       onToggle();
     }
-    setExpanded(prev => !prev);
+    setExpanded((prev) => !prev);
   }, [onToggle]);
 
   return (

@@ -183,15 +183,24 @@ Before starting, familiarize yourself with these key source locations:
 **Rule Interface**:
 
 ```go
-// For typescript-eslint rules (auto-prefixes with @typescript-eslint/):
+// For typescript-eslint rules that use TypeChecker (auto-prefixes with @typescript-eslint/):
 var MyRuleRule = rule.CreateRule(rule.Rule{
-    Name: "my-rule",
+    Name:             "my-rule",
+    RequiresTypeInfo: true,
     Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
         return rule.RuleListeners{
             ast.KindSomeNode: func(node *ast.Node) {
-                // Check conditions and report
+                // ctx.TypeChecker is guaranteed non-nil when RequiresTypeInfo is true
             },
         }
+    },
+})
+
+// For typescript-eslint rules that do NOT use TypeChecker:
+var MyOtherRule = rule.CreateRule(rule.Rule{
+    Name: "my-other-rule",
+    Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
+        // ...
     },
 })
 
@@ -210,6 +219,7 @@ var MyCoreRule = rule.Rule{
 - Each callback receives a `*ast.Node` and reports diagnostics via `ctx.ReportNode()`
 - Options parsing happens inside the `Run` function before returning listeners
 - Use `rule.CreateRule` **ONLY** for `@typescript-eslint` rules (it adds the prefix)
+- **`RequiresTypeInfo`**: If a `@typescript-eslint` rule uses `ctx.TypeChecker`, you **MUST** set `RequiresTypeInfo: true`. This tells the linter to skip the rule on files without a type checker, preventing nil-pointer panics. Core ESLint rules should NOT set this flag — use `ctx.TypeChecker == nil` guards instead (see [AST_PATTERNS.md — Using TypeChecker](../../AST_PATTERNS.md#using-typechecker)).
 - **MessageId convention**: Use camelCase for `RuleMessage.Id` (e.g., `"unexpectedAny"`, `"missingSuper"`). Match the original ESLint rule's messageId names. The JS rule-tester has a `toCamelCase` compatibility layer, but new rules should use camelCase directly.
 
 **AST Shim API Warning**: In `github.com/microsoft/typescript-go/shim/ast`:

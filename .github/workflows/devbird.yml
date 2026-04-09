@@ -85,7 +85,7 @@ jobs:
       - name: Install JavaScript dependencies
         run: pnpm install
       - name: Run DevBird
-        uses: delinoio/devbird-action@main
+        uses: delinoio/devbird-action@1a00faaf30734c914c4066d64d86527edc6bcd85 # main
         with:
           agent: ${{ inputs.agent }}
           agent_model: ${{ inputs.agent_model }}

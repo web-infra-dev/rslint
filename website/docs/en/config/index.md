@@ -90,20 +90,7 @@ export default defineConfig([
 ]);
 ```
 
-### Available Presets
-
-| Preset                             | Description                                               |
-| ---------------------------------- | --------------------------------------------------------- |
-| `ts.configs.recommended`           | TypeScript recommended rules (includes ESLint core rules) |
-| `js.configs.recommended`           | JavaScript recommended rules                              |
-| `reactPlugin.configs.recommended`  | React rules                                               |
-| `importPlugin.configs.recommended` | Import/export rules                                       |
-
-Import presets from `@rslint/core`:
-
-```ts
-import { defineConfig, ts, js, reactPlugin, importPlugin } from '@rslint/core';
-```
+For available presets, rule severity, and plugin configuration, see [Rules & Presets](/config/rules-and-presets).
 
 ## Configuration Options
 
@@ -113,6 +100,8 @@ import { defineConfig, ts, js, reactPlugin, importPlugin } from '@rslint/core';
 
 Glob patterns specifying which files this config entry applies to. If omitted, the entry applies to all files matched by other entries.
 
+The `files` field determines the **lint scope** — only files matching at least one entry's `files` pattern will be linted. This is independent of tsconfig's `include`: a file in tsconfig but not matching any `files` pattern will not be linted, while a file matching `files` but not in any tsconfig will still be linted with syntax-only rules (type-aware rules require tsconfig coverage).
+
 ```ts
 {
   files: ['**/*.ts', '**/*.tsx'],
@@ -120,129 +109,17 @@ Glob patterns specifying which files this config entry applies to. If omitted, t
 }
 ```
 
+:::tip
+Files that match `files` but are not included in any tsconfig automatically receive a reduced rule set — only rules that don't require type information will run. To enable type-aware rules for these files, add them to your tsconfig's `include`.
+:::
+
 ### ignores
 
-- **Type:** `string[]`
-
-Glob patterns for files to exclude. An entry with **only** `ignores` (no other fields) acts as a global ignore — matching files are excluded from all rules.
-
-```ts
-// Global ignore entry
-{
-  ignores: ['**/dist/**', '**/fixtures/**'],
-}
-
-// Entry-level ignore (only applies to this entry)
-{
-  files: ['**/*.ts'],
-  ignores: ['**/*.test.ts'],
-  rules: { /* ... */ },
-}
-```
-
-#### Pattern types in global ignores
-
-Global ignore patterns affect both file matching and directory traversal (including config discovery in monorepos):
-
-| Pattern    | Effect                                               |
-| ---------- | ---------------------------------------------------- |
-| `dir/**`   | Ignores directory and all contents, blocks traversal |
-| `dir/**/*` | Ignores files inside, but allows directory traversal |
-| `dir/*`    | Ignores direct children files only                   |
-
-Use `dir/**` to completely exclude a directory (including any nested configs inside it). Use `dir/**/*` if you only want to ignore files but still allow nested configs to be discovered.
-
-You can use `!` negation patterns to re-include specific files. Patterns are evaluated sequentially — later patterns override earlier ones:
-
-```ts
-// Global ignore: re-include specific file
-{
-  ignores: ['build/**/*', '!build/test.js'],
-}
-
-// Entry-level ignore: re-include a subdirectory
-{
-  files: ['**/*.ts'],
-  ignores: ['vendor/**/*', '!vendor/keep/**/*'],
-  rules: { /* ... */ },
-}
-
-// Across separate global ignore entries
-{ ignores: ['build/**/*'] },
-{ ignores: ['!build/test.js'] },
-```
-
-:::warning
-For directory-level patterns (`dir/**`), `!` negation cannot re-include files because the directory traversal is blocked entirely. Use `dir/**/*` instead if you need negation:
-
-```ts
-// ✅ dir/**/* allows traversal — negation works
-{
-  ignores: ['build/**/*', '!build/test.js'];
-}
-
-// ❌ dir/** blocks traversal — negation has no effect
-{
-  ignores: ['build/**', '!build/test.js'];
-}
-```
-
-:::
-
-:::tip
-`node_modules` is automatically excluded by rslint — you don't need to add it to ignores.
-:::
+For file exclusion patterns, negation, and `.gitignore` integration, see [Ignoring Files](/config/ignoring-files).
 
 ### rules
 
-- **Type:** `Record<string, RuleSeverity | [RuleSeverity, ...options]>`
-
-Configure individual rules with a severity level and optional options.
-
-**Severity levels:**
-
-| Value     | Description                                 |
-| --------- | ------------------------------------------- |
-| `"error"` | Reports as error, causes non-zero exit code |
-| `"warn"`  | Reports as warning                          |
-| `"off"`   | Disables the rule                           |
-
-**String format** (severity only):
-
-```ts
-rules: {
-  '@typescript-eslint/no-explicit-any': 'error',
-  '@typescript-eslint/require-await': 'off',
-}
-```
-
-**Array format** (severity + options):
-
-```ts
-rules: {
-  '@typescript-eslint/array-type': ['warn', { default: 'array-simple' }],
-  '@typescript-eslint/no-unused-vars': ['error', {
-    argsIgnorePattern: '^_',
-    varsIgnorePattern: '^_',
-  }],
-}
-```
-
-### plugins
-
-- **Type:** `string[]`
-
-Plugin names to enable. Available plugins:
-
-| Plugin                 | Rules Prefix           |
-| ---------------------- | ---------------------- |
-| `@typescript-eslint`   | `@typescript-eslint/*` |
-| `eslint-plugin-import` | `import/*`             |
-| `react`                | `react/*`              |
-
-:::tip
-When using JS/TS config with presets (e.g., `ts.configs.recommended`), plugins are declared within the preset — you don't need to specify them separately.
-:::
+For rule severity levels, option format, and plugin configuration, see [Rules & Presets](/config/rules-and-presets).
 
 ### languageOptions
 
@@ -268,7 +145,7 @@ Enable TypeScript's project service for automatic tsconfig discovery. This is th
 
 - **Type:** `string | string[]`
 
-Explicit tsconfig.json paths. Supports glob patterns for monorepos.
+Explicit tsconfig.json paths. Supports glob patterns for monorepos. Files included by these tsconfigs receive full type information, enabling type-aware rules (e.g. `@typescript-eslint/no-floating-promises`, `@typescript-eslint/await-thenable`). Files outside all tsconfigs are still linted but only with syntax-level rules.
 
 ```ts
 {

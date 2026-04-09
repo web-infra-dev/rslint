@@ -21,19 +21,19 @@ async function lintAndParse(
   const lines = result.stdout
     .trim()
     .split('\n')
-    .filter(l => l.trim());
-  const diagnostics = lines.map(l => JSON.parse(l) as Diagnostic);
+    .filter((l) => l.trim());
+  const diagnostics = lines.map((l) => JSON.parse(l) as Diagnostic);
   return { diagnostics, cleanup: () => cleanupTempDir(tempDir) };
 }
 
 function diagsFor(diagnostics: Diagnostic[], pathPart: string): Diagnostic[] {
   return diagnostics.filter(
-    d => d.filePath === pathPart || d.filePath.startsWith(pathPart + '/'),
+    (d) => d.filePath === pathPart || d.filePath.startsWith(pathPart + '/'),
   );
 }
 
 function ruleNames(diagnostics: Diagnostic[]): string[] {
-  return diagnostics.map(d => d.ruleName);
+  return diagnostics.map((d) => d.ruleName);
 }
 
 describe('Ignore negation: ! re-include patterns', () => {
@@ -124,10 +124,9 @@ describe('Ignore negation: ! re-include patterns', () => {
     }
   });
 
-  test('dir/** with negation: file-level negation still works even with dir pattern', async () => {
-    // Note: dir/** blocks directory traversal in JS-side config discovery,
-    // but at the Go-side file matching level, negation works normally
-    // because files already in tsconfig Programs are matched directly.
+  test('dir/** blocks entirely — ! negation cannot re-include (ESLint v10 aligned)', async () => {
+    // dir/** is directory-level → blocks both gap discovery and tsconfig
+    // file matching. ! negation cannot undo it.
     const { diagnostics, cleanup } = await lintAndParse({
       'tsconfig.json': TS_CONFIG,
       'rslint.config.mjs': `export default [
@@ -142,12 +141,8 @@ describe('Ignore negation: ! re-include patterns', () => {
       'src/index.ts': `debugger;\n`,
     });
     try {
-      // build/keep.ts re-included by negation at file level
-      expect(ruleNames(diagsFor(diagnostics, 'build/keep.ts'))).toContain(
-        'no-debugger',
-      );
-      // build/other.ts still ignored
-      expect(diagsFor(diagnostics, 'build/other.ts').length).toBe(0);
+      // build/** blocks directory → all build/ files ignored
+      expect(diagsFor(diagnostics, 'build').length).toBe(0);
       // src always linted
       expect(diagsFor(diagnostics, 'src/index.ts').length).toBeGreaterThan(0);
     } finally {

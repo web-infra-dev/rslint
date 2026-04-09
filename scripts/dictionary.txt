@@ -50,10 +50,14 @@ hotpink
 hujson
 imul
 instane
+isnan
 jsonline
 lintedfile
 lsproto
 myfunc
+nilerr
+nilnil
+nilnesserr
 nolint
 nullary
 noregabi
@@ -185,3 +189,4 @@ fdescribe
 xdescribe
 xtest
 xitiViewMap
+unrooted

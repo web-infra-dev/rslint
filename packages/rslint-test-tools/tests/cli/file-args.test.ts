@@ -12,11 +12,11 @@ interface CliTestResult {
 }
 
 async function runRslint(args: string[], cwd?: string): Promise<CliTestResult> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     // Strip GITHUB_ACTIONS env to prevent setupColors() from force-enabling colors,
     // which would override --no-color and embed ANSI codes in the output.
     const { GITHUB_ACTIONS, FORCE_COLOR, ...cleanEnv } = process.env;
-    const child = spawn(RSLINT_BIN, ['--no-color', ...args], {
+    const child = spawn(process.execPath, [RSLINT_BIN, '--no-color', ...args], {
       cwd: cwd || process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'],
       env: { ...cleanEnv, NO_COLOR: '1' },
@@ -33,7 +33,7 @@ async function runRslint(args: string[], cwd?: string): Promise<CliTestResult> {
       stderr += data.toString();
     });
 
-    child.on('close', code => {
+    child.on('close', (code) => {
       resolve({
         exitCode: code || 0,
         stdout,
@@ -204,7 +204,7 @@ describe('CLI File Arguments', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(line => line.trim());
+        .filter((line) => line.trim());
       for (const line of lines) {
         expect(() => JSON.parse(line)).not.toThrow();
       }

@@ -413,7 +413,8 @@ func needsParentheses(node *ast.Node) bool {
 }
 
 var PreferStringStartsEndsWithRule = rule.CreateRule(rule.Rule{
-	Name: "prefer-string-starts-ends-with",
+	Name:             "prefer-string-starts-ends-with",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := defaultOpts
 

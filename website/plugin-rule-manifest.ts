@@ -2,6 +2,8 @@ import type { RspressPlugin } from '@rspress/core';
 import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { ts, js, reactPlugin, importPlugin } from '@rslint/core';
+import type { RslintConfigEntry } from '@rslint/core';
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 const MANIFEST_PATH = path.resolve(__dirname, 'generated/rule-manifest.json');
@@ -16,6 +18,8 @@ interface RuleEntry {
   failing_case: { name: string; url: string }[];
   /** Relative path (from repo root) to the rule's .md doc file, or null if absent. */
   docPath: string | null;
+  /** Presets that include this rule, with their configured values. */
+  presets: { name: string; value: unknown }[];
 }
 
 /**
@@ -36,15 +40,94 @@ function getFullRuleName(rule: RuleEntry): string {
   return `${rule.group}/${rule.name}`;
 }
 
+/** Each preset config paired with its full reference name (e.g. "ts.configs.recommended"). */
+const PRESETS: { config: RslintConfigEntry; name: string }[] = [
+  { config: ts.configs.recommended, name: 'ts.configs.recommended' },
+  { config: js.configs.recommended, name: 'js.configs.recommended' },
+  {
+    config: reactPlugin.configs.recommended,
+    name: 'reactPlugin.configs.recommended',
+  },
+  {
+    config: importPlugin.configs.recommended,
+    name: 'importPlugin.configs.recommended',
+  },
+];
+
+/**
+ * Parse a fully-qualified rule key from a config into the (group, name)
+ * pair used by the manifest.
+ */
+function parseRuleKey(ruleKey: string): { group: string; name: string } {
+  if (ruleKey.startsWith('@typescript-eslint/')) {
+    return {
+      group: '@typescript-eslint',
+      name: ruleKey.slice('@typescript-eslint/'.length),
+    };
+  }
+  if (ruleKey.startsWith('react/')) {
+    return { group: 'react', name: ruleKey.slice('react/'.length) };
+  }
+  if (ruleKey.startsWith('import/')) {
+    return {
+      group: 'eslint-plugin-import',
+      name: ruleKey.slice('import/'.length),
+    };
+  }
+  return { group: 'eslint', name: ruleKey };
+}
+
+interface PresetInfo {
+  name: string; // e.g. "ts.configs.recommended"
+  value: unknown; // e.g. "error" or ["error", { varsIgnorePattern: "^_" }]
+}
+
+/**
+ * Walk the actual preset config objects and return a map of
+ * "group:name" → PresetInfo[] for every rule that is actively enabled
+ * (severity !== 'off') in at least one preset.
+ */
+function extractPresetRules(): Map<string, PresetInfo[]> {
+  const result = new Map<string, PresetInfo[]>();
+
+  for (const { config, name: presetName } of PRESETS) {
+    if (!config.rules) continue;
+    for (const [ruleKey, value] of Object.entries(config.rules)) {
+      const severity = Array.isArray(value) ? value[0] : value;
+      if (severity === 'off') continue;
+
+      const { group, name } = parseRuleKey(ruleKey);
+      const manifestKey = `${group}:${name}`;
+      if (!result.has(manifestKey)) result.set(manifestKey, []);
+      result.get(manifestKey)!.push({ name: presetName, value: value! });
+    }
+  }
+  return result;
+}
+
 /**
  * Run the manifest generation script and return the parsed rule entries.
  * The script scans Go source directories for rule implementations and
  * test status, writing the result to website/generated/rule-manifest.json.
+ * After loading, enriches each entry with recommended preset information
+ * and writes the result back so React components can consume it.
  */
 function loadManifest(): RuleEntry[] {
   execSync(`node "${SCRIPT_PATH}"`, { stdio: 'inherit' });
   const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf-8'));
-  return manifest.rules;
+  const rules: RuleEntry[] = manifest.rules;
+
+  // Enrich with preset data (level + configured value)
+  const presetMap = extractPresetRules();
+  for (const rule of rules) {
+    const key = `${rule.group}:${rule.name}`;
+    rule.presets = presetMap.get(key) || [];
+  }
+
+  // Write enriched manifest back for React components
+  fs.writeFileSync(MANIFEST_PATH, JSON.stringify(manifest, null, 2) + '\n');
+
+  return rules;
 }
 
 /**
@@ -63,7 +146,7 @@ function loadManifest(): RuleEntry[] {
  *
  *   ## Configuration
  *
- *   <RuleConfig name="no-console" group="eslint" />
+ *   <RuleConfig name="no-console" group="eslint" presets={["recommended"]} />
  *
  *   ## Rule Details
  *   ...
@@ -75,8 +158,27 @@ function buildRuleDocContent(rule: RuleEntry): string {
   );
   const fullName = getFullRuleName(rule);
   const importLine = `import RuleConfig from '@/theme/components/RuleConfig.tsx';`;
+
+  // Build preset table if the rule is in any preset
+  let presetTable = '';
+  if (rule.presets.length > 0) {
+    const rows = rule.presets.map((p) => {
+      const val =
+        typeof p.value === 'string'
+          ? `\`"${p.value}"\``
+          : `\`${JSON.stringify(p.value)}\``;
+      return `| ✅ ${p.name} | ${val} |`;
+    });
+    presetTable =
+      `| Preset | Configured Value |\n` +
+      `| ------ | ---------------- |\n` +
+      rows.join('\n') +
+      '\n\n';
+  }
+
   const configSection =
     `## Configuration\n\n` +
+    presetTable +
     `<RuleConfig name="${fullName}" group="${rule.group}" />`;
 
   const headingEnd = sourceContent.indexOf('\n');
@@ -122,7 +224,7 @@ function writeRuleDocsToDir(rules: RuleEntry[]): void {
     }
   }
 
-  const rulesWithDocs = rules.filter(r => r.docPath);
+  const rulesWithDocs = rules.filter((r) => r.docPath);
 
   // Group rules by slug
   const groups = new Map<string, RuleEntry[]>();
@@ -165,7 +267,7 @@ function writeRuleDocsToDir(rules: RuleEntry[]): void {
 
     const sorted = groupRules.sort((a, b) => a.name.localeCompare(b.name));
 
-    const groupMeta = sorted.map(rule => ({
+    const groupMeta = sorted.map((rule) => ({
       type: 'file',
       name: rule.name,
     }));

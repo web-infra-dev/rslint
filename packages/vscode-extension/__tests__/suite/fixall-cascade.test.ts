@@ -20,9 +20,9 @@ suite('rslint fixAll - cascade (multi-pass)', function () {
       'export { csA, csB, csC };',
       '',
     ].join('\n');
-    await withTmpFile(cascadeContent, async doc => {
+    await withTmpFile(cascadeContent, async (doc) => {
       const initialDiags = await waitForDiagnostics(doc);
-      const banTypeDiags = initialDiags.filter(d =>
+      const banTypeDiags = initialDiags.filter((d) =>
         d.message.includes('ban-types'),
       );
       if (banTypeDiags.length === 0) return;
@@ -59,7 +59,7 @@ suite('rslint fixAll - cascade (multi-pass)', function () {
       await replaceAll(editor, cascadeContent);
 
       const diags = await waitForDiagnostics(doc);
-      if (!diags.some(d => d.message.includes('ban-types'))) return;
+      if (!diags.some((d) => d.message.includes('ban-types'))) return;
 
       await doc.save();
 
@@ -69,7 +69,7 @@ suite('rslint fixAll - cascade (multi-pass)', function () {
           doc.getText().includes(': string')) &&
         Date.now() - startTime < 15000
       ) {
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise((r) => setTimeout(r, 500));
       }
 
       const content = doc.getText();

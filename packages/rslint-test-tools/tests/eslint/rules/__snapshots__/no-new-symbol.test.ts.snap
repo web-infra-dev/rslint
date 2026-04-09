@@ -1,0 +1,547 @@
+// Rstest Snapshot v1
+
+exports[`no-new-symbol > invalid 1`] = `
+{
+  "code": "var foo = new Symbol('foo');",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 2`] = `
+{
+  "code": "new Symbol()",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 3`] = `
+{
+  "code": "function bar() { return function Symbol() {}; } var baz = new Symbol('baz');",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 69,
+          "line": 1,
+        },
+        "start": {
+          "column": 63,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 4`] = `
+{
+  "code": "{ function Symbol() {} } new Symbol();",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 30,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 5`] = `
+{
+  "code": "{ let Symbol = 1; } new Symbol();",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 6`] = `
+{
+  "code": "{ const Symbol = 1; } new Symbol();",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 7`] = `
+{
+  "code": "if (true) { let Symbol = 1; } new Symbol();",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 35,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 8`] = `
+{
+  "code": "try { let Symbol = 1; } catch(e) {} new Symbol();",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 47,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 9`] = `
+{
+  "code": "function foo() { var Symbol = 1; } new Symbol();",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 40,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 10`] = `
+{
+  "code": "const f = () => { var Symbol = 1; }; new Symbol();",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 11`] = `
+{
+  "code": "function a() { function b() { var Symbol = 1; } } new Symbol();",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 12`] = `
+{
+  "code": "(function(Symbol) {})(1); new Symbol();",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 13`] = `
+{
+  "code": "((Symbol) => {})(1); new Symbol();",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 14`] = `
+{
+  "code": "class C { static { var Symbol = 1; } } new Symbol();",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 15`] = `
+{
+  "code": "function f() { new Symbol(); }",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 16`] = `
+{
+  "code": "const f = () => new Symbol();",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 17`] = `
+{
+  "code": "class C { m() { new Symbol(); } }",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 18`] = `
+{
+  "code": "if (true) { if (true) { new Symbol(); } }",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 19`] = `
+{
+  "code": "class C { static { new Symbol(); } }",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 20`] = `
+{
+  "code": "function f(Symbol) { new Symbol(); } new Symbol();",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 42,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-new-symbol > invalid 21`] = `
+{
+  "code": "{ let Symbol = 1; new Symbol(); } new Symbol();",
+  "diagnostics": [
+    {
+      "message": "\`Symbol\` cannot be called as a constructor.",
+      "messageId": "noNewSymbol",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 39,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-new-symbol",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

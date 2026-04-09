@@ -68,7 +68,7 @@ interface ASTNode {
   children?: ASTNode[];
 }
 
-export const ResultPanel: React.FC<ResultPanelProps> = props => {
+export const ResultPanel: React.FC<ResultPanelProps> = (props) => {
   const {
     diagnostics,
     ast,
@@ -182,7 +182,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
 
   function toggleNode(n: ASTNode) {
     const id = nodeId(n);
-    setExpanded(prev => {
+    setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -219,7 +219,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
           {hasKids && (
             <button
               className={`twisty ${open ? 'open' : ''}`}
-              onClick={e => {
+              onClick={(e) => {
                 e.stopPropagation();
                 toggleNode(n);
               }}
@@ -268,9 +268,9 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
           {hasKids && (
             <button
               className={`twisty ${open ? 'open' : ''}`}
-              onClick={e => {
+              onClick={(e) => {
                 e.stopPropagation();
-                setTsExpanded(prev => {
+                setTsExpanded((prev) => {
                   const next = new Set(prev);
                   if (next.has(id)) next.delete(id);
                   else next.add(id);
@@ -316,7 +316,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
     if (best) {
       const id = nodeId(best.node);
       setSelectedId(id);
-      setExpanded(prev => {
+      setExpanded((prev) => {
         const next = new Set(prev);
         for (const p of best!.path) next.add(nodeId(p));
         return next;
@@ -343,7 +343,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
   useEffect(() => {
     if (astTree) {
       const id = nodeId(astTree);
-      setExpanded(prev => {
+      setExpanded((prev) => {
         if (prev.has(id)) return prev;
         const next = new Set(prev);
         next.add(id);
@@ -352,7 +352,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
     }
     if (tsAstTree) {
       const id = tsNodeId(tsAstTree);
-      setTsExpanded(prev => {
+      setTsExpanded((prev) => {
         if (prev.has(id)) return prev;
         const next = new Set(prev);
         next.add(id);
@@ -378,7 +378,7 @@ export const ResultPanel: React.FC<ResultPanelProps> = props => {
     if (best) {
       const id = tsNodeId(best.node);
       setTsSelectedId(id);
-      setTsExpanded(prev => {
+      setTsExpanded((prev) => {
         const next = new Set(prev);
         for (const p of best!.path) next.add(tsNodeId(p));
         return next;

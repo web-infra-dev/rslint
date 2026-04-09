@@ -25,8 +25,8 @@ function getCoreRuleEntries() {
 
   return fs
     .readdirSync(CORE_RULES_DIR, { withFileTypes: true })
-    .filter(d => d.isDirectory() && !d.name.startsWith('.'))
-    .map(d => ({ rule: d.name, group: 'eslint', pluginDir: null }));
+    .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+    .map((d) => ({ rule: d.name, group: 'eslint', pluginDir: null }));
 }
 
 function getPluginRuleEntries() {
@@ -34,8 +34,8 @@ function getPluginRuleEntries() {
   if (!fs.existsSync(PLUGINS_DIR)) return [];
   const plugins = fs
     .readdirSync(PLUGINS_DIR, { withFileTypes: true })
-    .filter(d => d.isDirectory() && !d.name.startsWith('.'))
-    .map(d => d.name);
+    .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+    .map((d) => d.name);
   const entries = [];
   const pluginNameCache = new Map();
   function getPluginDisplayName(plugin) {
@@ -60,10 +60,10 @@ function getPluginRuleEntries() {
     const ruleDirs = fs
       .readdirSync(rulesDir, { withFileTypes: true })
       .filter(
-        d =>
+        (d) =>
           d.isDirectory() && d.name !== 'fixtures' && !d.name.startsWith('.'),
       )
-      .map(d => d.name);
+      .map((d) => d.name);
     for (const rule of ruleDirs) {
       entries.push({ rule, group: pluginDisplayName, pluginDir: plugin });
     }
@@ -177,7 +177,7 @@ function buildManifest() {
   }
   const rules = Array.from(seen.keys())
     .sort((a, b) => a.localeCompare(b))
-    .map(rule => {
+    .map((rule) => {
       const entry = seen.get(rule);
       let status = 'full';
       let failing_case = [];

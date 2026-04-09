@@ -19,7 +19,8 @@ type RequireArraySortCompareOptions struct {
 }
 
 var RequireArraySortCompareRule = rule.CreateRule(rule.Rule{
-	Name: "require-array-sort-compare",
+	Name:             "require-array-sort-compare",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts, ok := options.(RequireArraySortCompareOptions)
 		if !ok {

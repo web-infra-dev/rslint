@@ -1,0 +1,625 @@
+// Rstest Snapshot v1
+
+exports[`no-invalid-regexp > invalid 1`] = `
+{
+  "code": "RegExp('.', 'z');",
+  "diagnostics": [
+    {
+      "message": "Invalid flags supplied to RegExp constructor 'z'.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 2`] = `
+{
+  "code": "new RegExp('.', 'G');",
+  "diagnostics": [
+    {
+      "message": "Invalid flags supplied to RegExp constructor 'G'.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 3`] = `
+{
+  "code": "new RegExp('.', 'abc');",
+  "diagnostics": [
+    {
+      "message": "Invalid flags supplied to RegExp constructor 'abc'.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 4`] = `
+{
+  "code": "new RegExp('.', 'gz');",
+  "diagnostics": [
+    {
+      "message": "Invalid flags supplied to RegExp constructor 'z'.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 5`] = `
+{
+  "code": "new RegExp('.', 'gg');",
+  "diagnostics": [
+    {
+      "message": "Duplicate flags ('g') supplied to RegExp constructor.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 6`] = `
+{
+  "code": "new RegExp('.', 'dd');",
+  "diagnostics": [
+    {
+      "message": "Duplicate flags ('d') supplied to RegExp constructor.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 7`] = `
+{
+  "code": "new RegExp('.', 'giig');",
+  "diagnostics": [
+    {
+      "message": "Duplicate flags ('ig') supplied to RegExp constructor.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 8`] = `
+{
+  "code": "RegExp('.', 'uv');",
+  "diagnostics": [
+    {
+      "message": "Regex 'u' and 'v' flags cannot be used together.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 9`] = `
+{
+  "code": "new RegExp('.', 'guv');",
+  "diagnostics": [
+    {
+      "message": "Regex 'u' and 'v' flags cannot be used together.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 10`] = `
+{
+  "code": "RegExp('[');",
+  "diagnostics": [
+    {
+      "message": "Invalid regular expression: /[/: unterminated [] set in \`[\`.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 11`] = `
+{
+  "code": "RegExp('(');",
+  "diagnostics": [
+    {
+      "message": "Invalid regular expression: /(/: missing closing ) in \`(\`.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 12`] = `
+{
+  "code": "new RegExp('[', flags);",
+  "diagnostics": [
+    {
+      "message": "Invalid regular expression: /[/: unterminated [] set in \`[\`.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 13`] = `
+{
+  "code": "RegExp(foo, 'z');",
+  "diagnostics": [
+    {
+      "message": "Invalid flags supplied to RegExp constructor 'z'.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 14`] = `
+{
+  "code": "new RegExp(foo, 'gg');",
+  "diagnostics": [
+    {
+      "message": "Duplicate flags ('g') supplied to RegExp constructor.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 15`] = `
+{
+  "code": "RegExp(foo, 'uv');",
+  "diagnostics": [
+    {
+      "message": "Regex 'u' and 'v' flags cannot be used together.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 16`] = `
+{
+  "code": "RegExp(\`test\`, 'z');",
+  "diagnostics": [
+    {
+      "message": "Invalid flags supplied to RegExp constructor 'z'.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 17`] = `
+{
+  "code": "RegExp('a' + 'b', 'z');",
+  "diagnostics": [
+    {
+      "message": "Invalid flags supplied to RegExp constructor 'z'.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 18`] = `
+{
+  "code": "(RegExp)('.', 'z');",
+  "diagnostics": [
+    {
+      "message": "Invalid flags supplied to RegExp constructor 'z'.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 19`] = `
+{
+  "code": "foo(new RegExp('['));",
+  "diagnostics": [
+    {
+      "message": "Invalid regular expression: /[/: unterminated [] set in \`[\`.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 20`] = `
+{
+  "code": "[RegExp('[')];",
+  "diagnostics": [
+    {
+      "message": "Invalid regular expression: /[/: unterminated [] set in \`[\`.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 21`] = `
+{
+  "code": "const fn = () => RegExp('.', 'z');",
+  "diagnostics": [
+    {
+      "message": "Invalid flags supplied to RegExp constructor 'z'.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 22`] = `
+{
+  "code": "class C { m() { new RegExp('['); } }",
+  "diagnostics": [
+    {
+      "message": "Invalid regular expression: /[/: unterminated [] set in \`[\`.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 23`] = `
+{
+  "code": "function f(x = new RegExp('[')) {}",
+  "diagnostics": [
+    {
+      "message": "Invalid regular expression: /[/: unterminated [] set in \`[\`.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-invalid-regexp > invalid 24`] = `
+{
+  "code": "true && new RegExp('.', 'zz');",
+  "diagnostics": [
+    {
+      "message": "Invalid flags supplied to RegExp constructor 'zz'.",
+      "messageId": "regexMessage",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-invalid-regexp",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

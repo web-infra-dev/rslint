@@ -84,8 +84,10 @@ describe('classifyArgs', () => {
   });
 
   test('non-existent path treated as file', () => {
-    const result = classifyArgs(['/nonexistent/path/file.ts'], '/');
-    expect(result.files).toEqual(['/nonexistent/path/file.ts']);
+    const nonExistent = '/nonexistent/path/file.ts';
+    const cwd = '/';
+    const result = classifyArgs([nonExistent], cwd);
+    expect(result.files).toEqual([path.resolve(cwd, nonExistent)]);
     expect(result.dirs).toEqual([]);
   });
 
@@ -239,5 +241,213 @@ describe('parseArgs positionals', () => {
     const result = parseArgs(['--start-time=1234567890', 'src/a.ts']);
     expect(result.rest).not.toContain('--start-time=1234567890');
     expect(result.rest).toContain('src/a.ts');
+  });
+});
+
+describe('parseArgs rest ordering', () => {
+  test('flags are placed before positionals in rest', () => {
+    const result = parseArgs(['src/a.ts', '--format', 'jsonline']);
+    expect(result.rest).toEqual(['--format', 'jsonline', 'src/a.ts']);
+  });
+
+  test('multiple positionals preserve relative order after flags', () => {
+    const result = parseArgs(['src/a.ts', '--format', 'jsonline', 'src/b.ts']);
+    expect(result.rest).toEqual([
+      '--format',
+      'jsonline',
+      'src/a.ts',
+      'src/b.ts',
+    ]);
+  });
+
+  test('multiple flags preserve relative order before positionals', () => {
+    const result = parseArgs(['--quiet', 'src/a.ts', '--format', 'jsonline']);
+    expect(result.rest).toEqual([
+      '--quiet',
+      '--format',
+      'jsonline',
+      'src/a.ts',
+    ]);
+  });
+
+  test('--config and --init are excluded, other flags reordered', () => {
+    const result = parseArgs([
+      'src/a.ts',
+      '--config',
+      'custom.js',
+      '--format',
+      'jsonline',
+    ]);
+    expect(result.rest).toEqual(['--format', 'jsonline', 'src/a.ts']);
+  });
+
+  test('--start-time is excluded from reordered rest', () => {
+    const result = parseArgs(['--start-time', '123', 'src/a.ts', '--quiet']);
+    expect(result.rest).toEqual(['--quiet', 'src/a.ts']);
+  });
+});
+
+describe('parseArgs --rule flag', () => {
+  test('--rule value is not treated as positional', () => {
+    const result = parseArgs(['--rule', 'no-console: error', 'src/a.ts']);
+    expect(result.positionals).toEqual(['src/a.ts']);
+    expect(result.rest).toEqual(['--rule', 'no-console: error', 'src/a.ts']);
+  });
+
+  test('--rule after positional is reordered before it', () => {
+    const result = parseArgs(['src/a.ts', '--rule', 'no-console: error']);
+    expect(result.rest).toEqual(['--rule', 'no-console: error', 'src/a.ts']);
+  });
+
+  test('multiple --rule flags are all in rest', () => {
+    const result = parseArgs([
+      '--rule',
+      'no-console: error',
+      '--rule',
+      'no-debugger: off',
+    ]);
+    expect(result.rest).toEqual([
+      '--rule',
+      'no-console: error',
+      '--rule',
+      'no-debugger: off',
+    ]);
+    expect(result.positionals).toEqual([]);
+  });
+
+  test('multiple --rule interleaved with positionals', () => {
+    const result = parseArgs([
+      '--rule',
+      'no-console: error',
+      'src/a.ts',
+      '--rule',
+      'no-debugger: off',
+      'src/b.ts',
+    ]);
+    expect(result.rest).toEqual([
+      '--rule',
+      'no-console: error',
+      '--rule',
+      'no-debugger: off',
+      'src/a.ts',
+      'src/b.ts',
+    ]);
+    expect(result.positionals).toEqual(['src/a.ts', 'src/b.ts']);
+  });
+
+  test('--rule=value syntax is reordered correctly', () => {
+    // node:util parseArgs splits --rule=value into rawName='--rule' + value
+    const result = parseArgs([
+      'src/a.ts',
+      '--rule=no-console: error',
+      '--format',
+      'github',
+    ]);
+    expect(result.rest).toEqual([
+      '--rule',
+      'no-console: error',
+      '--format',
+      'github',
+      'src/a.ts',
+    ]);
+  });
+
+  test('--rule mixed with other flags and positionals', () => {
+    const result = parseArgs([
+      '--quiet',
+      'src/a.ts',
+      '--rule',
+      'no-console: error',
+      '--format',
+      'github',
+      'src/b.ts',
+    ]);
+    expect(result.rest).toEqual([
+      '--quiet',
+      '--rule',
+      'no-console: error',
+      '--format',
+      'github',
+      'src/a.ts',
+      'src/b.ts',
+    ]);
+  });
+});
+
+describe('parseArgs option-terminator (--)', () => {
+  test('-- is preserved between flags and positionals', () => {
+    const result = parseArgs(['--rule', 'no-console: error', '--', 'src/a.ts']);
+    expect(result.rest).toEqual([
+      '--rule',
+      'no-console: error',
+      '--',
+      'src/a.ts',
+    ]);
+    expect(result.positionals).toEqual(['src/a.ts']);
+  });
+
+  test('flag-like args after -- become positionals, not flags', () => {
+    const result = parseArgs(['--', '--not-a-flag', 'src/a.ts']);
+    expect(result.positionals).toEqual(['--not-a-flag', 'src/a.ts']);
+    // rest should have -- before them, no flags
+    expect(result.rest).toEqual(['--', '--not-a-flag', 'src/a.ts']);
+  });
+
+  test('flags before -- are reordered, positionals after -- follow', () => {
+    const result = parseArgs([
+      'src/a.ts',
+      '--rule',
+      'no-console: error',
+      '--',
+      'src/b.ts',
+    ]);
+    // src/a.ts is positional (before --), src/b.ts is positional (after --)
+    // flags go first, then before-positionals, then --, then after-positionals
+    expect(result.rest).toEqual([
+      '--rule',
+      'no-console: error',
+      'src/a.ts',
+      '--',
+      'src/b.ts',
+    ]);
+    expect(result.positionals).toEqual(['src/a.ts', 'src/b.ts']);
+  });
+
+  test('-- without any positionals after it', () => {
+    const result = parseArgs(['--rule', 'no-console: error', '--']);
+    expect(result.rest).toEqual(['--rule', 'no-console: error', '--']);
+    expect(result.positionals).toEqual([]);
+  });
+
+  test('-- without any flags before it', () => {
+    const result = parseArgs(['--', 'src/a.ts']);
+    expect(result.rest).toEqual(['--', 'src/a.ts']);
+    expect(result.positionals).toEqual(['src/a.ts']);
+  });
+
+  test('no -- means no separator in rest', () => {
+    const result = parseArgs(['--rule', 'no-console: error', 'src/a.ts']);
+    expect(result.rest).not.toContain('--');
+  });
+
+  test('second -- is treated as positional, not a second terminator', () => {
+    const result = parseArgs([
+      '--rule',
+      'no-console: error',
+      '--',
+      'src/a.ts',
+      '--',
+      'src/b.ts',
+    ]);
+    // Only one real --, the second is a positional value
+    expect(result.rest).toEqual([
+      '--rule',
+      'no-console: error',
+      '--',
+      'src/a.ts',
+      '--',
+      'src/b.ts',
+    ]);
+    expect(result.positionals).toEqual(['src/a.ts', '--', 'src/b.ts']);
   });
 });

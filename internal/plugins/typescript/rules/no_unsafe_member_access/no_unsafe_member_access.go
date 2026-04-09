@@ -44,7 +44,8 @@ func createDataType(t *checker.Type) string {
 }
 
 var NoUnsafeMemberAccessRule = rule.CreateRule(rule.Rule{
-	Name: "no-unsafe-member-access",
+	Name:             "no-unsafe-member-access",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		compilerOptions := ctx.Program.Options()
 		// When noImplicitThis is not enabled (considering strict mode), object literal methods

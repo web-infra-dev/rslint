@@ -238,6 +238,8 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 		},
 		false, // no type-check in API mode
 		diagnosticCollector,
+		nil, // no typeInfoFiles distinction in API mode (all files have type info)
+		nil, // no file filters in API mode (single config)
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error running linter: %w", err)

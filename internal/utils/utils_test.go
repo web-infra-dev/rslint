@@ -24,3 +24,34 @@ func TestExtractRegexPatternAndFlags(t *testing.T) {
 		}
 	}
 }
+
+func TestDefaultIgnoreDirGlobs(t *testing.T) {
+	globs := DefaultIgnoreDirGlobs()
+
+	if len(globs) != len(DefaultExcludeDirNames) {
+		t.Fatalf("Expected %d globs, got %d", len(DefaultExcludeDirNames), len(globs))
+	}
+
+	for i, name := range DefaultExcludeDirNames {
+		expected := name + "/**"
+		if globs[i] != expected {
+			t.Errorf("Expected glob %q for dir %q, got %q", expected, name, globs[i])
+		}
+	}
+}
+
+func TestDefaultExcludeDirNames_ContainsExpected(t *testing.T) {
+	expected := map[string]bool{"node_modules": false, ".git": false}
+
+	for _, name := range DefaultExcludeDirNames {
+		if _, ok := expected[name]; ok {
+			expected[name] = true
+		}
+	}
+
+	for name, found := range expected {
+		if !found {
+			t.Errorf("Expected %q in DefaultExcludeDirNames", name)
+		}
+	}
+}

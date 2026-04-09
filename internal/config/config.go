@@ -129,16 +129,22 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_global_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_import_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_inner_declarations"
+	"github.com/web-infra-dev/rslint/internal/rules/no_invalid_regexp"
 	"github.com/web-infra-dev/rslint/internal/rules/no_loss_of_precision"
+	"github.com/web-infra-dev/rslint/internal/rules/no_new_symbol"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_wrappers"
+	"github.com/web-infra-dev/rslint/internal/rules/no_obj_calls"
 	"github.com/web-infra-dev/rslint/internal/rules/no_self_assign"
+	"github.com/web-infra-dev/rslint/internal/rules/no_setter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_sparse_arrays"
 	"github.com/web-infra-dev/rslint/internal/rules/no_template_curly_in_string"
 	"github.com/web-infra-dev/rslint/internal/rules/no_this_before_super"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_negation"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_rest_params"
+	"github.com/web-infra-dev/rslint/internal/rules/use_isnan"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -499,8 +505,19 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-var", no_var.NoVarRule)
 	GlobalRuleRegistry.Register("prefer-rest-params", prefer_rest_params.PreferRestParamsRule)
 	GlobalRuleRegistry.Register("no-empty-character-class", no_empty_character_class.NoEmptyCharacterClassRule)
+	GlobalRuleRegistry.Register("no-invalid-regexp", no_invalid_regexp.NoInvalidRegexpRule)
+	GlobalRuleRegistry.Register("no-setter-return", no_setter_return.NoSetterReturnRule)
+	GlobalRuleRegistry.Register("no-unsafe-negation", no_unsafe_negation.NoUnsafeNegationRule)
+	GlobalRuleRegistry.Register("no-obj-calls", no_obj_calls.NoObjCallsRule)
+	GlobalRuleRegistry.Register("no-new-symbol", no_new_symbol.NoNewSymbolRule)
+	GlobalRuleRegistry.Register("use-isnan", use_isnan.UseIsNaNRule)
 }
 
+// isFileIgnored checks if a file is matched by ignore patterns, evaluated sequentially.
+// Later patterns override earlier ones; a `!` prefix negates (re-includes) a previously
+// ignored file. This aligns with ESLint v10's ignore semantics.
+//
+// For directory-level blocking (dir/** prevents traversal entirely), use isDirPathBlocked.
 func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {
 	if cwd == "" {
 		return isFileIgnoredSimple(filePath, ignorePatterns)
@@ -513,11 +530,6 @@ func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {
 	// Evaluate patterns sequentially. Later patterns override earlier ones.
 	// A `!` prefix negates (re-includes) a previously ignored file.
 	// This aligns with ESLint v10's ignore semantics.
-	matchPattern := func(pattern, path string) bool {
-		m, err := doublestar.Match(pattern, path)
-		return err == nil && m
-	}
-
 	ignored := false
 	for _, pattern := range ignorePatterns {
 		negated := false
@@ -528,12 +540,14 @@ func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {
 
 		normalizedPattern := normalizePattern(pattern)
 
-		matched := matchPattern(normalizedPattern, normalizedPath)
-		if !matched && normalizedPath != filePath {
-			matched = matchPattern(normalizedPattern, filePath)
-		}
+		// Match against the relative path only. Do NOT fall back to the
+		// absolute filePath — patterns with **/ prefix (e.g., **/tmp/**/*)
+		// would incorrectly match system directory names in the absolute path
+		// (e.g., /tmp/ on Linux/macOS).
+		matched := matchGlob(normalizedPattern, normalizedPath)
+		// Windows path separator fallback.
 		if !matched && unixPath != normalizedPath {
-			matched = matchPattern(normalizedPattern, unixPath)
+			matched = matchGlob(normalizedPattern, unixPath)
 		}
 
 		if matched {
@@ -546,8 +560,74 @@ func isFileIgnored(filePath string, ignorePatterns []string, cwd string) bool {
 // normalizePattern cleans up a glob pattern to match paths produced by normalizePath.
 // normalizePath uses tspath.NormalizePath on file paths (strips leading "./", collapses
 // "/./", resolves ".."), so patterns must undergo the same transformation.
+// matchGlob matches a glob pattern against a path using doublestar.
+func matchGlob(pattern, path string) bool {
+	m, err := doublestar.Match(pattern, path)
+	return err == nil && m
+}
+
+// isFileLevelPattern returns true if the pattern only matches files (not directories).
+// File-level patterns end with /**/* or /* (but not /**).
+// These do NOT block directory traversal in ESLint v10's isDirectoryIgnored.
+func isFileLevelPattern(pattern string) bool {
+	return strings.HasSuffix(pattern, "/**/*") ||
+		(strings.HasSuffix(pattern, "/*") && !strings.HasSuffix(pattern, "/**"))
+}
+
 func normalizePattern(pattern string) string {
 	return tspath.NormalizePath(pattern)
+}
+
+// isDirBlockedByIgnores checks if the file's directory is blocked by a
+// directory-level ignore pattern (e.g., `dir/**`). File-level patterns
+// (`dir/**/*`, `dir/*`) and negation patterns are skipped.
+// This aligns with ESLint v10: `dir/**` blocks directory traversal entirely,
+// and `!` negation cannot undo it.
+func isDirBlockedByIgnores(filePath string, ignorePatterns []string, cwd string) bool {
+	var dirPath string
+	if cwd != "" {
+		dirPath = normalizePath(tspath.GetDirectoryPath(filePath), cwd)
+	} else {
+		dirPath = tspath.GetDirectoryPath(filePath)
+	}
+	dirPath = strings.ReplaceAll(dirPath, "\\", "/")
+	dirPath = strings.TrimSuffix(dirPath, "/")
+	if dirPath == "" || dirPath == "." {
+		return false
+	}
+	return isDirPathBlocked(dirPath, ignorePatterns)
+}
+
+// isDirPathBlocked checks if a directory path is blocked by any directory-level ignore
+// pattern. Shared between GetConfigForFile and DiscoverGapFiles.
+//
+// A directory is blocked if a pattern matches the path itself or any parent segment.
+// For example, pattern "dir1/**" blocks "dir1", "dir1/sub", and "dir1/sub/deep".
+// File-level patterns (ending with /**/* or /*) and negation (!) patterns are skipped —
+// directory blocking is absolute and cannot be negated.
+func isDirPathBlocked(dirPath string, ignorePatterns []string) bool {
+	for _, pattern := range ignorePatterns {
+		if pattern == "" || strings.HasPrefix(pattern, "!") {
+			continue
+		}
+		if isFileLevelPattern(pattern) {
+			continue
+		}
+
+		normalizedPattern := normalizePattern(pattern)
+
+		if matchGlob(normalizedPattern, dirPath) || matchGlob(normalizedPattern, dirPath+"/x") {
+			return true
+		}
+		segments := strings.Split(dirPath, "/")
+		for i := 1; i < len(segments); i++ {
+			partial := strings.Join(segments[:i], "/")
+			if matchGlob(normalizedPattern, partial) || matchGlob(normalizedPattern, partial+"/x") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // normalizePath converts file path to be relative to cwd for consistent matching
@@ -585,10 +665,14 @@ type MergedConfig struct {
 
 // GetConfigForFile computes the merged configuration for a file following ESLint flat config semantics.
 // Returns nil if the file is globally ignored or no entry matches (should not be linted).
-// Both JS and JSON configs are processed identically here — any differences in default rule
-// behavior are handled during config loading (see normalizeJSONConfig).
-// cwd is the directory the config lives in; file paths are resolved relative to it
-// for files/ignores glob matching.
+//
+// Global ignore evaluation happens in two phases:
+//  1. Directory-level (isDirBlockedByIgnores): patterns like dir/** block entire directories.
+//     Negation (!) cannot override directory-level blocking.
+//  2. File-level (isFileIgnored): sequential evaluation with ! negation support for re-inclusion.
+//
+// After global ignore check, entries are merged in order if their files match and ignores don't.
+// cwd is the directory the config lives in; file paths are resolved relative to it.
 func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *MergedConfig {
 	merged := &MergedConfig{
 		Rules:   make(map[string]*RuleConfig),
@@ -604,8 +688,17 @@ func (config RslintConfig) GetConfigForFile(filePath string, cwd string) *Merged
 			globalIgnorePatterns = append(globalIgnorePatterns, entry.Ignores...)
 		}
 	}
-	if len(globalIgnorePatterns) > 0 && isFileIgnored(filePath, globalIgnorePatterns, cwd) {
-		return nil
+	if len(globalIgnorePatterns) > 0 {
+		// Phase 1: directory-level check. Patterns like `dir/**` block the
+		// directory entirely — `!` negation cannot undo this. Aligned with
+		// ESLint v10's isDirectoryIgnored behavior.
+		if isDirBlockedByIgnores(filePath, globalIgnorePatterns, cwd) {
+			return nil
+		}
+		// Phase 2: file-level check with sequential `!` negation support.
+		if isFileIgnored(filePath, globalIgnorePatterns, cwd) {
+			return nil
+		}
 	}
 
 	// Track whether any non-global entry matched this file

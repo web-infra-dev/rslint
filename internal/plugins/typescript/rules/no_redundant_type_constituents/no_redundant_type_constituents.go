@@ -92,7 +92,8 @@ func (t *typeFlagsWithNodeOrType) ToString(typeChecker *checker.Checker) string 
 }
 
 var NoRedundantTypeConstituentsRule = rule.CreateRule(rule.Rule{
-	Name: "no-redundant-type-constituents",
+	Name:             "no-redundant-type-constituents",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		var getTypeNodeTypePartFlags func(node *ast.Node) []typeFlagsWithNodeOrType
 		getTypeNodeTypePartFlags = func(node *ast.Node) []typeFlagsWithNodeOrType {

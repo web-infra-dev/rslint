@@ -342,42 +342,50 @@ func TestGetConfigForFile_NegationGlobalAndEntryInteraction(t *testing.T) {
 }
 
 func TestGetConfigForFile_NegationAcrossGlobalIgnoreEntries(t *testing.T) {
-	// Global ignore patterns from separate entries are merged and evaluated
-	// together. This allows negation in one entry to override a pattern in
-	// another, aligned with ESLint v10 behavior.
+	// build/** is directory-level → blocks entirely, ! cannot undo.
+	// To allow negation, use build/**/* (file-level) instead.
 	config := RslintConfig{
 		{Ignores: []string{"build/**"}},
 		{Ignores: []string{"!build/test.js"}},
 		{Files: []string{"**/*.js"}, Rules: Rules{"no-debugger": "error"}},
 	}
 
-	// build/test.js: ignored by entry 1, re-included by entry 2
+	// build/test.js: build/** blocks directory → ! has no effect → ignored
 	merged := config.GetConfigForFile("build/test.js", "")
-	if merged == nil {
-		t.Fatal("Expected build/test.js to be re-included by cross-entry negation")
-	}
-	if _, ok := merged.Rules["no-debugger"]; !ok {
-		t.Error("Expected no-debugger rule for re-included file")
+	if merged != nil {
+		t.Error("Expected build/test.js to be ignored (dir/** blocks, ! cannot undo)")
 	}
 
-	// build/other.js: ignored by entry 1, not re-included by entry 2
+	// build/other.js: also ignored
 	merged2 := config.GetConfigForFile("build/other.js", "")
 	if merged2 != nil {
 		t.Error("Expected build/other.js to remain ignored")
 	}
 
-	// Same behavior as single entry
+	// With file-level pattern build/**/* → negation DOES work
 	config2 := RslintConfig{
-		{Ignores: []string{"build/**", "!build/test.js"}},
+		{Ignores: []string{"build/**/*"}},
+		{Ignores: []string{"!build/test.js"}},
 		{Files: []string{"**/*.js"}, Rules: Rules{"no-debugger": "error"}},
 	}
 	merged3 := config2.GetConfigForFile("build/test.js", "")
 	if merged3 == nil {
-		t.Fatal("Expected build/test.js to be re-included (same-entry negation)")
+		t.Fatal("Expected build/test.js to be re-included with build/**/* (file-level)")
+	}
+
+	// Same-entry with dir/** + ! → dir blocks, ! has no effect
+	config3 := RslintConfig{
+		{Ignores: []string{"build/**", "!build/test.js"}},
+		{Files: []string{"**/*.js"}, Rules: Rules{"no-debugger": "error"}},
+	}
+	merged4 := config3.GetConfigForFile("build/test.js", "")
+	if merged4 != nil {
+		t.Error("Expected build/test.js to be ignored (dir/** blocks even in same entry)")
 	}
 }
 
 func TestGetConfigForFile_NegationSequentialOverride(t *testing.T) {
+	// dist/** is directory-level → blocks entirely, ! cannot undo
 	config := RslintConfig{
 		{
 			Ignores: []string{"dist/**", "!dist/**", "dist/generated/**"},
@@ -388,13 +396,31 @@ func TestGetConfigForFile_NegationSequentialOverride(t *testing.T) {
 		},
 	}
 
+	// dist/** blocks directory → dist/index.js ignored (! cannot undo dir/**)
 	merged := config.GetConfigForFile("dist/index.js", "")
-	if merged == nil {
-		t.Fatal("Expected dist/index.js to be linted (re-included)")
+	if merged != nil {
+		t.Error("Expected dist/index.js to be ignored (dir/** blocks, ! cannot undo)")
 	}
 
-	merged2 := config.GetConfigForFile("dist/generated/a.js", "")
-	if merged2 != nil {
+	// With file-level pattern: sequential override works
+	config2 := RslintConfig{
+		{
+			Ignores: []string{"dist/**/*", "!dist/**/*", "dist/generated/**/*"},
+		},
+		{
+			Files: []string{"**/*.js"},
+			Rules: Rules{"no-debugger": "error"},
+		},
+	}
+
+	// dist/**/* → ignored, !dist/**/* → re-included, dist/generated/**/* → re-ignored
+	merged2 := config2.GetConfigForFile("dist/index.js", "")
+	if merged2 == nil {
+		t.Fatal("Expected dist/index.js to be linted (file-level sequential override)")
+	}
+
+	merged3 := config2.GetConfigForFile("dist/generated/a.js", "")
+	if merged3 != nil {
 		t.Error("Expected dist/generated/a.js to be ignored")
 	}
 }

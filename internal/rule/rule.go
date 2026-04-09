@@ -83,14 +83,16 @@ func ListenerOnNotAllowPattern(kind ast.Kind) ast.Kind {
 type RuleListeners map[ast.Kind](func(node *ast.Node))
 
 type Rule struct {
-	Name string
-	Run  func(ctx RuleContext, options any) RuleListeners
+	Name             string
+	RequiresTypeInfo bool
+	Run              func(ctx RuleContext, options any) RuleListeners
 }
 
 func CreateRule(r Rule) Rule {
 	return Rule{
-		Name: "@typescript-eslint/" + r.Name,
-		Run:  r.Run,
+		Name:             "@typescript-eslint/" + r.Name,
+		RequiresTypeInfo: r.RequiresTypeInfo,
+		Run:              r.Run,
 	}
 }
 
