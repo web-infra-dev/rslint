@@ -2,6 +2,8 @@ package prefer_const
 
 import (
 	"github.com/microsoft/typescript-go/shim/ast"
+	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -62,6 +64,13 @@ var PreferConstRule = rule.Rule{
 
 				isForInOrOf := isInForInOrOf(node)
 
+				// Collect candidates across ALL declarators in the VDL to determine
+				// if the entire VDL can be auto-fixed (let → const).
+				var allConstCandidates []*candidateInfo
+				totalBindings := 0
+				totalConstBindings := 0
+				allHaveInit := true
+
 				for _, decl := range declList.Declarations.Nodes {
 					varDecl := decl.AsVariableDeclaration()
 					if varDecl == nil || varDecl.Name() == nil {
@@ -69,12 +78,17 @@ var PreferConstRule = rule.Rule{
 					}
 
 					hasInit := varDecl.Initializer != nil || isForInOrOf
+					if !hasInit {
+						allHaveInit = false
+					}
 
 					// Collect all candidate binding names from this declaration
 					candidates := collectBindingNames(varDecl.Name(), hasInit)
 					if len(candidates) == 0 {
 						continue
 					}
+
+					totalBindings += len(candidates)
 
 					// Check each candidate
 					var constCandidates []*candidateInfo
@@ -95,17 +109,62 @@ var PreferConstRule = rule.Rule{
 						}
 					}
 
-					// Report the const candidates
-					for _, c := range constCandidates {
-						name := c.nameNode.Text()
-						reportOn := c.nameNode
-						if c.reportNode != nil {
-							reportOn = c.reportNode
+					// For destructuring: "all", also suppress uninitialized candidates
+					// whose write is in a destructuring assignment where not all targets
+					// can be const. ESLint groups by the destructuring write, not just
+					// the declaration pattern.
+					if opts.destructuring == "all" {
+						var filtered []*candidateInfo
+						for _, c := range constCandidates {
+							if c.reportNode != nil && !allDestructuringWriteTargetsConst(c.reportNode, &ctx) {
+								continue
+							}
+							filtered = append(filtered, c)
 						}
-						ctx.ReportNode(reportOn, rule.RuleMessage{
-							Id:          "useConst",
-							Description: "'" + name + "' is never reassigned. Use 'const' instead.",
-						})
+						constCandidates = filtered
+					}
+
+					totalConstBindings += len(constCandidates)
+					allConstCandidates = append(allConstCandidates, constCandidates...)
+				}
+
+				// Determine if auto-fix is possible: ALL bindings in the VDL must be
+				// const-eligible AND all declarators must have initializers.
+				// ESLint only auto-fixes when the entire `let` can become `const`.
+				canFix := allHaveInit && totalBindings > 0 && totalConstBindings == totalBindings
+
+				// Additionally, suppress fix for uninitialized candidates whose write
+				// is in a destructuring with non-let targets (var/const in same scope,
+				// member expressions, or cross-scope identifiers).
+				if canFix {
+					firstDecl := declList.Declarations.Nodes[0]
+					for _, c := range allConstCandidates {
+						if c.reportNode != nil {
+							if isInUnfixableDestructuring(c.reportNode, firstDecl) {
+								canFix = false
+								break
+							}
+						}
+					}
+				}
+
+				// Report the const candidates
+				for _, c := range allConstCandidates {
+					name := c.nameNode.Text()
+					reportOn := c.nameNode
+					if c.reportNode != nil {
+						reportOn = c.reportNode
+					}
+					msg := rule.RuleMessage{
+						Id:          "useConst",
+						Description: "'" + name + "' is never reassigned. Use 'const' instead.",
+					}
+					if canFix {
+						letRange := getLetKeywordRange(node, ctx.SourceFile)
+						ctx.ReportNodeWithFixes(reportOn, msg,
+							rule.RuleFixReplaceRange(letRange, "const"))
+					} else {
+						ctx.ReportNode(reportOn, msg)
 					}
 				}
 			},
@@ -144,43 +203,35 @@ func shouldReport(c *candidateInfo, declNode *ast.Node, ctx *rule.RuleContext, o
 	}
 	// ESLint reports uninitialized variables at the write location when there's no read
 	// between declaration and write. If there IS a read before write, report at the declaration.
-	if !isReadBeforeFirstAssign(sym, c.nameNode.Text(), declNode, ctx) {
+	readBeforeAssign := isReadBeforeFirstAssign(sym, c.nameNode.Text(), declNode, ctx)
+	if !readBeforeAssign {
 		c.reportNode = writeNode
 	}
 
 	// Check ignoreReadBeforeAssign option
-	if opts.ignoreReadBeforeAssign {
-		if isReadBeforeFirstAssign(sym, c.nameNode.Text(), declNode, ctx) {
-			return false
-		}
+	if opts.ignoreReadBeforeAssign && readBeforeAssign {
+		return false
 	}
 	return true
 }
 
-// collectBindingNames collects all identifier nodes from a binding pattern.
+// collectBindingNames collects all identifier nodes from a binding pattern
+// using the public utils.CollectBindingNames utility.
 func collectBindingNames(nameNode *ast.Node, hasInitializer bool) []candidateInfo {
 	var result []candidateInfo
-
-	switch nameNode.Kind {
-	case ast.KindIdentifier:
+	utils.CollectBindingNames(nameNode, func(ident *ast.Node, _ string) {
 		result = append(result, candidateInfo{
-			nameNode:       nameNode,
+			nameNode:       ident,
 			hasInitializer: hasInitializer,
 		})
-
-	case ast.KindObjectBindingPattern, ast.KindArrayBindingPattern:
-		nameNode.ForEachChild(func(child *ast.Node) bool {
-			if child.Kind == ast.KindBindingElement {
-				bindingName := child.Name()
-				if bindingName != nil {
-					result = append(result, collectBindingNames(bindingName, hasInitializer)...)
-				}
-			}
-			return false
-		})
-	}
-
+	})
 	return result
+}
+
+// getLetKeywordRange returns the text range of the `let` keyword in a VariableDeclarationList.
+func getLetKeywordRange(node *ast.Node, sourceFile *ast.SourceFile) core.TextRange {
+	s := scanner.GetScannerForSourceFile(sourceFile, node.Pos())
+	return core.NewTextRange(s.TokenStart(), s.TokenEnd())
 }
 
 // isInForStatement checks if a VariableDeclarationList is the initializer of a regular for statement.
@@ -229,13 +280,20 @@ func countWriteReferences(sym *ast.Symbol, declName string, declNode *ast.Node, 
 		// Also check ShorthandPropertyAssignment - in ({x} = {x: 2}), the TypeChecker
 		// resolves the shorthand name to the property symbol, not the variable symbol.
 		// Use name-based matching combined with scope check for this case.
+		// To avoid false-matching shadowed variables, verify that the shorthand's
+		// value symbol (obtained via the generated identifier) matches the target.
 		if n.Kind == ast.KindShorthandPropertyAssignment && !isPartOfDeclaration(n, declNode) {
 			shorthand := n.AsShorthandPropertyAssignment()
 			if shorthand != nil && shorthand.Name() != nil && utils.IsInDestructuringAssignment(n) {
 				name := shorthand.Name().Text()
 				if name == declName && isInSameScope(n, declNode) {
-					count++
-					return // Skip children to avoid double-counting the name identifier via Path 1
+					// Guard against shadowed variables: if the TypeChecker can resolve
+					// the shorthand's value to a different symbol, skip it.
+					valSym := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(n)
+					if valSym == nil || valSym == sym {
+						count++
+						return // Skip children to avoid double-counting the name identifier via Path 1
+					}
 				}
 			}
 		}
@@ -305,8 +363,11 @@ func isReadBeforeFirstAssign(sym *ast.Symbol, declName string, declNode *ast.Nod
 			shorthand := n.AsShorthandPropertyAssignment()
 			if shorthand != nil && shorthand.Name() != nil && utils.IsInDestructuringAssignment(n) {
 				if shorthand.Name().Text() == declName && isInSameScope(n, declNode) {
-					// Found the first write via shorthand destructuring - stop walking
-					return true
+					valSym := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(n)
+					if valSym == nil || valSym == sym {
+						// Found the first write via shorthand destructuring - stop walking
+						return true
+					}
 				}
 			}
 		}
@@ -325,17 +386,9 @@ func isReadBeforeFirstAssign(sym *ast.Symbol, declName string, declNode *ast.Nod
 	return foundRead
 }
 
-// findEnclosingScope finds the nearest function/module/source file scope.
+// findEnclosingScope delegates to the public utils.FindEnclosingScope.
 func findEnclosingScope(node *ast.Node) *ast.Node {
-	return ast.FindAncestor(node.Parent, func(n *ast.Node) bool {
-		switch n.Kind {
-		case ast.KindSourceFile, ast.KindModuleBlock,
-			ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
-			ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
-			return true
-		}
-		return false
-	})
+	return utils.FindEnclosingScope(node)
 }
 
 // isPartOfDeclaration checks if an identifier node is part of the variable declaration's
@@ -438,8 +491,11 @@ func findWriteInSameBlock(sym *ast.Symbol, declName string, declNode *ast.Node, 
 			if shorthand != nil && shorthand.Name() != nil && utils.IsInDestructuringAssignment(n) {
 				name := shorthand.Name().Text()
 				if name == declName && isInSameScope(n, declNode) {
-					writeNode = shorthand.Name()
-					return
+					valSym := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(n)
+					if valSym == nil || valSym == sym {
+						writeNode = shorthand.Name()
+						return
+					}
 				}
 			}
 		}
@@ -470,22 +526,199 @@ func findWriteInSameBlock(sym *ast.Symbol, declName string, declNode *ast.Node, 
 	}
 
 	// ESLint doesn't report variables in destructuring assignments that contain
-	// non-mergeable targets: member expressions (obj.prop), or variables from
-	// a different declaration than the candidate. The auto-fix can't produce
-	// valid code in these cases.
-	if isInUnmergeableDestructuring(writeNode, declNode) {
+	// member expressions (obj.prop) or identifiers from a different block scope.
+	// Same-scope var/const targets don't suppress reporting (only suppress fix).
+	if hasNonReportableDestructuringTarget(writeNode, declNode, ctx) {
 		return nil
 	}
 
 	return writeNode
 }
 
-// isInUnmergeableDestructuring checks if a write node is inside a destructuring
-// assignment that can't be merged into a const declaration. This includes:
-// 1. Destructuring with member expressions (e.g. [obj.prop, v] = foo())
-// 2. Destructuring with targets from different VariableDeclarations
-func isInUnmergeableDestructuring(writeNode *ast.Node, declNode *ast.Node) bool {
-	// Find the enclosing destructuring assignment using the shim's utility
+// allDestructuringWriteTargetsConst checks whether all identifier targets in the
+// destructuring assignment containing writeNode have at most 1 write reference.
+// Used with destructuring: "all" to suppress reporting when not all variables in
+// the destructuring write group can be const.
+// Uses name-based matching because GetSymbolAtLocation on shorthand property names
+// in destructuring assignments resolves to the property symbol, not the variable.
+func allDestructuringWriteTargetsConst(writeNode *ast.Node, ctx *rule.RuleContext) bool {
+	assignExpr := ast.FindAncestor(writeNode, func(n *ast.Node) bool {
+		return ast.IsDestructuringAssignment(n)
+	})
+	if assignExpr == nil {
+		return true // not in a destructuring, no group constraint
+	}
+
+	scope := findEnclosingScope(writeNode)
+	if scope == nil {
+		scope = ctx.SourceFile.AsNode()
+	}
+
+	left := assignExpr.AsBinaryExpression().Left
+	allConst := true
+	utils.VisitDestructuringIdentifiers(left, func(ident *ast.Node) {
+		if !allConst {
+			return
+		}
+		// Resolve the symbol directly from the identifier node provided by
+		// VisitDestructuringIdentifiers. For shorthand properties, the parent
+		// is a ShorthandPropertyAssignment and GetSymbolAtLocation returns the
+		// property symbol, so use GetShorthandAssignmentValueSymbol instead.
+		var sym *ast.Symbol
+		if ident.Parent != nil && ident.Parent.Kind == ast.KindShorthandPropertyAssignment {
+			sym = ctx.TypeChecker.GetShorthandAssignmentValueSymbol(ident.Parent)
+		} else {
+			sym = ctx.TypeChecker.GetSymbolAtLocation(ident)
+		}
+		if sym == nil {
+			return
+		}
+		if countWritesBySym(sym, ident.Text(), scope, ctx) > 1 {
+			allConst = false
+		}
+	})
+	return allConst
+}
+
+// countWritesBySym counts write references to a specific symbol within a scope.
+// Uses symbol comparison for identifiers and GetShorthandAssignmentValueSymbol
+// for shorthand property assignments.
+func countWritesBySym(sym *ast.Symbol, name string, scope *ast.Node, ctx *rule.RuleContext) int {
+	count := 0
+	var walk func(*ast.Node)
+	walk = func(n *ast.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind == ast.KindIdentifier && n.Text() == name && utils.IsWriteReference(n) {
+			refSym := ctx.TypeChecker.GetSymbolAtLocation(n)
+			if refSym == sym {
+				count++
+			}
+		}
+		if n.Kind == ast.KindShorthandPropertyAssignment {
+			shorthand := n.AsShorthandPropertyAssignment()
+			if shorthand != nil && shorthand.Name() != nil &&
+				shorthand.Name().Text() == name && utils.IsInDestructuringAssignment(n) {
+				valSym := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(n)
+				if valSym == nil || valSym == sym {
+					count++
+					return // avoid double-counting
+				}
+			}
+		}
+		n.ForEachChild(func(child *ast.Node) bool {
+			walk(child)
+			return false
+		})
+	}
+	walk(scope)
+	return count
+}
+
+// hasNonReportableDestructuringTarget checks if a write node is inside a destructuring
+// assignment that should suppress REPORTING. This is limited to:
+// 1. Member expressions (obj.prop, arr[i]) — can never be const declarations
+// 2. Identifiers whose declaration is in a different block scope — can't safely merge
+// Same-scope identifiers (var, const, import, param, etc.) do NOT suppress reporting.
+// Uses TypeChecker symbol resolution instead of name-set collection to correctly
+// handle all declaration types (imports, function/class declarations, parameters, etc.).
+func hasNonReportableDestructuringTarget(writeNode *ast.Node, declNode *ast.Node, ctx *rule.RuleContext) bool {
+	assignExpr := ast.FindAncestor(writeNode, func(n *ast.Node) bool {
+		return ast.IsDestructuringAssignment(n)
+	})
+	if assignExpr == nil {
+		return false
+	}
+
+	left := assignExpr.AsBinaryExpression().Left
+	declBlock := findContainingBlock(declNode)
+	if declBlock == nil {
+		return true
+	}
+	return hasNonReportableTarget(left, declBlock, ctx)
+}
+
+// hasNonReportableTarget checks if a destructuring pattern contains targets that
+// should suppress reporting: member expressions, or identifiers declared in a
+// different block scope. Uses TypeChecker to resolve each identifier's declaration
+// rather than pre-collecting names, so it correctly handles imports, parameters,
+// function declarations, class declarations, etc.
+func hasNonReportableTarget(node *ast.Node, declBlock *ast.Node, ctx *rule.RuleContext) bool {
+	if node.Kind == ast.KindIdentifier {
+		sym := ctx.TypeChecker.GetSymbolAtLocation(node)
+		if sym == nil || len(sym.Declarations) == 0 {
+			// Can't resolve — treat as non-reportable (conservative)
+			return true
+		}
+		targetDeclBlock := findContainingBlock(sym.Declarations[0])
+		return targetDeclBlock != declBlock
+	}
+
+	found := false
+	node.ForEachChild(func(child *ast.Node) bool {
+		if found {
+			return true
+		}
+		switch child.Kind {
+		case ast.KindPropertyAccessExpression, ast.KindElementAccessExpression:
+			found = true
+			return true
+		case ast.KindIdentifier:
+			sym := ctx.TypeChecker.GetSymbolAtLocation(child)
+			if sym == nil || len(sym.Declarations) == 0 {
+				found = true
+				return true
+			}
+			if findContainingBlock(sym.Declarations[0]) != declBlock {
+				found = true
+				return true
+			}
+		case ast.KindShorthandPropertyAssignment:
+			shorthand := child.AsShorthandPropertyAssignment()
+			if shorthand != nil && shorthand.Name() != nil {
+				valSym := ctx.TypeChecker.GetShorthandAssignmentValueSymbol(child)
+				if valSym == nil || len(valSym.Declarations) == 0 {
+					found = true
+					return true
+				}
+				if findContainingBlock(valSym.Declarations[0]) != declBlock {
+					found = true
+					return true
+				}
+			}
+		case ast.KindPropertyAssignment:
+			pa := child.AsPropertyAssignment()
+			if pa != nil && pa.Initializer != nil {
+				if hasNonReportableTarget(pa.Initializer, declBlock, ctx) {
+					found = true
+					return true
+				}
+			}
+		case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression, ast.KindSpreadElement, ast.KindSpreadAssignment:
+			if hasNonReportableTarget(child, declBlock, ctx) {
+				found = true
+				return true
+			}
+		case ast.KindBinaryExpression:
+			be := child.AsBinaryExpression()
+			if be != nil && be.Left != nil {
+				if hasNonReportableTarget(be.Left, declBlock, ctx) {
+					found = true
+					return true
+				}
+			}
+		}
+		return false
+	})
+	return found
+}
+
+// isInUnfixableDestructuring checks if a write node is inside a destructuring
+// assignment that should suppress AUTO-FIX. This is stricter than the reporting
+// check — it also rejects same-scope var/const targets (can't change `let` to
+// `const` if the destructuring also writes to a non-let variable).
+func isInUnfixableDestructuring(writeNode *ast.Node, declNode *ast.Node) bool {
 	assignExpr := ast.FindAncestor(writeNode, func(n *ast.Node) bool {
 		return ast.IsDestructuringAssignment(n)
 	})
@@ -499,20 +732,57 @@ func isInUnmergeableDestructuring(writeNode *ast.Node, declNode *ast.Node) bool 
 
 // hasUnmergeableTarget checks if a destructuring target contains elements that
 // prevent merging into a const declaration: member expressions, or identifiers
-// declared in a different VariableDeclarationList than the candidate.
-// Uses name-based matching (not symbol resolution) for reliability with shorthand properties.
+// declared in a different block scope than the candidate.
+// ESLint reports cross-declaration destructuring when all targets are in the same
+// block scope (with output: null for no auto-fix), but skips when targets span
+// different scopes.
 func hasUnmergeableTarget(lhs *ast.Node, declNode *ast.Node) bool {
-	candidateVDL := findVariableDeclarationList(declNode)
-	if candidateVDL == nil {
+	declBlock := findContainingBlock(declNode)
+	if declBlock == nil {
 		return true
 	}
-	vdlNames := collectDeclaratorNames(candidateVDL)
-	return hasTargetNotInSet(lhs, vdlNames)
+	blockNames := collectBlockLetNames(declBlock)
+	return hasTargetNotInSet(lhs, blockNames)
+}
+
+// collectBlockLetNames collects all variable names from let declarations that are
+// direct children of the given block. Used for the auto-fix check (only let
+// declarations can be converted to const).
+func collectBlockLetNames(block *ast.Node) map[string]bool {
+	names := make(map[string]bool)
+	block.ForEachChild(func(child *ast.Node) bool {
+		if child.Kind == ast.KindVariableStatement {
+			child.ForEachChild(func(grandchild *ast.Node) bool {
+				if grandchild.Kind == ast.KindVariableDeclarationList && grandchild.Flags&ast.NodeFlagsLet != 0 {
+					declList := grandchild.AsVariableDeclarationList()
+					if declList != nil && declList.Declarations != nil {
+						for _, decl := range declList.Declarations.Nodes {
+							varDecl := decl.AsVariableDeclaration()
+							if varDecl != nil && varDecl.Name() != nil {
+								utils.CollectBindingNames(varDecl.Name(), func(_ *ast.Node, name string) {
+									names[name] = true
+								})
+							}
+						}
+					}
+				}
+				return false
+			})
+		}
+		return false
+	})
+	return names
 }
 
 // hasTargetNotInSet recursively checks if any target in a destructuring pattern
 // is a member expression or an identifier NOT in the given name set.
 func hasTargetNotInSet(node *ast.Node, names map[string]bool) bool {
+	// Handle leaf Identifier nodes directly (reached via PropertyAssignment or
+	// BinaryExpression default-value recursion).
+	if node.Kind == ast.KindIdentifier {
+		return !names[node.Text()]
+	}
+
 	found := false
 	node.ForEachChild(func(child *ast.Node) bool {
 		if found {
@@ -544,7 +814,7 @@ func hasTargetNotInSet(node *ast.Node, names map[string]bool) bool {
 					return true
 				}
 			}
-		case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression, ast.KindSpreadElement:
+		case ast.KindArrayLiteralExpression, ast.KindObjectLiteralExpression, ast.KindSpreadElement, ast.KindSpreadAssignment:
 			if hasTargetNotInSet(child, names) {
 				found = true
 				return true
@@ -564,30 +834,6 @@ func hasTargetNotInSet(node *ast.Node, names map[string]bool) bool {
 	return found
 }
 
-// findVariableDeclarationList finds the VariableDeclarationList ancestor of a declaration node.
-func findVariableDeclarationList(declNode *ast.Node) *ast.Node {
-	return ast.FindAncestor(declNode, func(n *ast.Node) bool {
-		return n.Kind == ast.KindVariableDeclarationList
-	})
-}
-
-// collectDeclaratorNames collects all variable names from a VariableDeclarationList.
-func collectDeclaratorNames(vdl *ast.Node) map[string]bool {
-	names := make(map[string]bool)
-	declList := vdl.AsVariableDeclarationList()
-	if declList == nil || declList.Declarations == nil {
-		return names
-	}
-	for _, decl := range declList.Declarations.Nodes {
-		varDecl := decl.AsVariableDeclaration()
-		if varDecl != nil && varDecl.Name() != nil {
-			utils.CollectBindingNames(varDecl.Name(), func(_ *ast.Node, name string) {
-				names[name] = true
-			})
-		}
-	}
-	return names
-}
 
 // isStandaloneAssignment checks if a write reference identifier is part of an
 // assignment expression that is directly inside an ExpressionStatement.

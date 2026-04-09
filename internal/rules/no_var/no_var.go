@@ -371,17 +371,9 @@ func isLoopAssignee(node *ast.Node) bool {
 	return node.Parent.Kind == ast.KindForInStatement || node.Parent.Kind == ast.KindForOfStatement
 }
 
-// findEnclosingScope finds the nearest function/module/source file scope.
+// findEnclosingScope delegates to the public utils.FindEnclosingScope.
 func findEnclosingScope(node *ast.Node) *ast.Node {
-	return ast.FindAncestor(node.Parent, func(n *ast.Node) bool {
-		switch n.Kind {
-		case ast.KindSourceFile, ast.KindModuleBlock,
-			ast.KindFunctionDeclaration, ast.KindFunctionExpression, ast.KindArrowFunction,
-			ast.KindMethodDeclaration, ast.KindConstructor, ast.KindGetAccessor, ast.KindSetAccessor:
-			return true
-		}
-		return false
-	})
+	return utils.FindEnclosingScope(node)
 }
 
 // findBlockScope finds the nearest block-level scope that contains the declaration.
