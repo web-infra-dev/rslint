@@ -1086,6 +1086,9 @@ func isReExportedSymbol(ctx rule.RuleContext, sym *ast.Symbol, sourceFile *ast.N
 		if exportDecl == nil || exportDecl.ExportClause == nil {
 			return false
 		}
+		if !ast.IsNamedExports(exportDecl.ExportClause) {
+			return false
+		}
 		namedExports := exportDecl.ExportClause.AsNamedExports()
 		if namedExports == nil || namedExports.Elements == nil {
 			return false
