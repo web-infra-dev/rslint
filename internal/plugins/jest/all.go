@@ -5,6 +5,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_focused_tests"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_hooks"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/no_test_prefixes"
+	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/prefer_strict_equal"
 	"github.com/web-infra-dev/rslint/internal/plugins/jest/rules/valid_describe_callback"
 	"github.com/web-infra-dev/rslint/internal/rule"
 )
@@ -15,6 +16,7 @@ func GetAllRules() []rule.Rule {
 		no_focused_tests.NoFocusedTestsRule,
 		no_hooks.NoHooksRule,
 		no_test_prefixes.NoTestPrefixesRule,
+		prefer_strict_equal.PreferStrictEqualRule,
 		valid_describe_callback.ValidDescribeCallbackRule,
 	}
 }
