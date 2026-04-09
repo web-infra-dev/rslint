@@ -1,0 +1,868 @@
+// Rstest Snapshot v1
+
+exports[`no-fallthrough > invalid 1`] = `
+{
+  "code": "switch(foo) { case 0: a(); case 1: b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 2`] = `
+{
+  "code": "switch(foo) { case 0: a(); default: b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'default'.",
+      "messageId": "default",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 3`] = `
+{
+  "code": "switch(foo) { case 0:
+  a();
+case 1:
+  b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 4`] = `
+{
+  "code": "switch(foo) { case 0: switch(bar) { case 1: break; } case 2: b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 66,
+          "line": 1,
+        },
+        "start": {
+          "column": 54,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 5`] = `
+{
+  "code": "switch(foo) { case 0: if (a) { break; } case 1: b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 6`] = `
+{
+  "code": "switch(foo) { case 0: if (a) { break; } else { c(); } case 1: b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 7`] = `
+{
+  "code": "switch(foo) { case 0: { } case 1: b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 8`] = `
+{
+  "code": "switch(foo) { case 0: break; default: a(); case 1: b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 56,
+          "line": 1,
+        },
+        "start": {
+          "column": 44,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 9`] = `
+{
+  "code": "switch(foo) { case 0: a();
+/* intentional */
+case 1: b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 10`] = `
+{
+  "code": "switch(foo) { case 0: if(a) { break; } else if(b) { break; } case 1: c(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 74,
+          "line": 1,
+        },
+        "start": {
+          "column": 62,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 11`] = `
+{
+  "code": "switch(foo) { case 0: label1: a(); case 1: b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 36,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 12`] = `
+{
+  "code": "switch(foo) { case 0: for(var x in obj) { break; } case 1: b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 13`] = `
+{
+  "code": "switch(foo) { case 0: for(var x of arr) { break; } case 1: b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 14`] = `
+{
+  "code": "switch(foo) { case 0: while(a) { break; } case 1: b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 43,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 15`] = `
+{
+  "code": "switch(foo) { case 0: try { foo(); break; } catch(e) { a(); } case 1: b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 75,
+          "line": 1,
+        },
+        "start": {
+          "column": 63,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 16`] = `
+{
+  "code": "function f3() { switch(foo) { case 0: try { return foo(); } catch(e) { a(); } case 1: b(); } }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 91,
+          "line": 1,
+        },
+        "start": {
+          "column": 79,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 17`] = `
+{
+  "code": "switch(foo) { case 0: try { a(); } finally { b(); } case 1: c(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 65,
+          "line": 1,
+        },
+        "start": {
+          "column": 53,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 18`] = `
+{
+  "code": "switch(foo) { case 0: while(true) { if(x) break; } case 1: b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 52,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 19`] = `
+{
+  "code": "switch(foo) { case 0: inner1: { break inner1; } case 1: b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 20`] = `
+{
+  "code": "switch(foo) { case 0: if(a) { if(b) { break; } } else { break; } case 1: b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 78,
+          "line": 1,
+        },
+        "start": {
+          "column": 66,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 21`] = `
+{
+  "code": "switch(foo) { case 0: var y = 1; case 1: x(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 1,
+        },
+        "start": {
+          "column": 34,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 22`] = `
+{
+  "code": "switch(foo) { case 0: a(); case 1: b(); case 2: c(); break; }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 41,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 23`] = `
+{
+  "code": "switch(a) { case 0: outer: inner: while(true) { break outer; } case 1: x(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 76,
+          "line": 1,
+        },
+        "start": {
+          "column": 64,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 24`] = `
+{
+  "code": "function t1() { switch(a) { case 0: label: while(true) { break label; } case 1: x(); } }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 85,
+          "line": 1,
+        },
+        "start": {
+          "column": 73,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 25`] = `
+{
+  "code": "switch(foo) { case 0: while(0x00) {} case 1: b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 50,
+          "line": 1,
+        },
+        "start": {
+          "column": 38,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 26`] = `
+{
+  "code": "function f5() { switch(a) { case 0: switch(b) { case 1: return; default: } case 1: x(); } }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 88,
+          "line": 1,
+        },
+        "start": {
+          "column": 76,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 27`] = `
+{
+  "code": "switch(a) { case 0: switch(b) { case 1: break; default: break; } case 1: x(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 78,
+          "line": 1,
+        },
+        "start": {
+          "column": 66,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 28`] = `
+{
+  "code": "function f4() { switch(a) { case 0: switch(b) { case 1: return; case 2: return; } case 1: x(); } }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 95,
+          "line": 1,
+        },
+        "start": {
+          "column": 83,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 29`] = `
+{
+  "code": "switch(a) { case 0: switch(b) { case 1: x(); default: break; } case 1: x(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'default'.",
+      "messageId": "default",
+      "range": {
+        "end": {
+          "column": 61,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 76,
+          "line": 1,
+        },
+        "start": {
+          "column": 64,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 30`] = `
+{
+  "code": "switch(foo) { default: a(); case 0: b(); break; }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 31`] = `
+{
+  "code": "switch(foo) { case 0: a(); /* falls through */ case 1: b(); }",
+  "diagnostics": [
+    {
+      "message": "Expected a 'break' statement before 'case'.",
+      "messageId": "case",
+      "range": {
+        "end": {
+          "column": 60,
+          "line": 1,
+        },
+        "start": {
+          "column": 48,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-fallthrough > invalid 32`] = `
+{
+  "code": "switch(foo) { case 0: a(); break; /* falls through */ case 1: b(); }",
+  "diagnostics": [
+    {
+      "message": "Found a comment that would permit fallthrough, but case cannot fall through.",
+      "messageId": "unusedFallthroughComment",
+      "range": {
+        "end": {
+          "column": 67,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-fallthrough",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
