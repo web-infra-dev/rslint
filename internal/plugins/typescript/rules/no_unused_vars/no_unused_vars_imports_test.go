@@ -100,6 +100,17 @@ func TestNoUnusedVarsImports(t *testing.T) {
 				}},
 			}},
 		},
+		// unrelated namespace re-export in the same file should not panic while checking unused imports
+		{
+			Code: `import { join } from "path"; export * as pathNs from "path";`,
+			Errors: []rule_tester.InvalidTestCaseError{{
+				MessageId: "unusedVar", Line: 1, Column: 10,
+				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
+					MessageId: "removeUnusedImportDeclaration",
+					Output:    ` export * as pathNs from "path";`,
+				}},
+			}},
+		},
 
 		// --- enableAutofixRemoval.imports = true: fix applied as autofix ---
 		{
