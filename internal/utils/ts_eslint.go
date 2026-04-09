@@ -655,6 +655,21 @@ func IsInObjectLiteralMethod(functionNode *ast.Node) bool {
 	return false
 }
 
+// IsSymbolDeclaredInFile reports whether the given symbol has at least one
+// declaration in the specified source file. Use this to distinguish locally
+// declared symbols (shadowed) from globals provided by lib.d.ts.
+func IsSymbolDeclaredInFile(symbol *ast.Symbol, sf *ast.SourceFile) bool {
+	if symbol == nil {
+		return false
+	}
+	for _, decl := range symbol.Declarations {
+		if ast.GetSourceFileOfNode(decl) == sf {
+			return true
+		}
+	}
+	return false
+}
+
 // GetStaticPropertyName extracts the static name from a property name node.
 // It handles Identifier, StringLiteral, NumericLiteral, and ComputedPropertyName
 // (with static string, numeric, BigInt, or template literal expressions).
@@ -791,11 +806,11 @@ func IsSameReference(left, right *ast.Node) bool {
 	// Member expression comparison.
 	if ast.IsAccessExpression(left) && ast.IsAccessExpression(right) {
 		// Try static property name comparison first (handles cross-type: a.b vs a['b']).
-		leftName, leftOK := accessExpressionStaticName(left)
+		leftName, leftOK := AccessExpressionStaticName(left)
 		if leftOK {
-			rightName, rightOK := accessExpressionStaticName(right)
+			rightName, rightOK := AccessExpressionStaticName(right)
 			if rightOK && leftName == rightName {
-				return IsSameReference(accessExpressionObject(left), accessExpressionObject(right))
+				return IsSameReference(AccessExpressionObject(left), AccessExpressionObject(right))
 			}
 			return false
 		}
@@ -813,9 +828,9 @@ func IsSameReference(left, right *ast.Node) bool {
 	return false
 }
 
-// accessExpressionStaticName returns the static property name of an access expression
+// AccessExpressionStaticName returns the static property name of an access expression
 // (PropertyAccessExpression or ElementAccessExpression), or ("", false) if not static.
-func accessExpressionStaticName(node *ast.Node) (string, bool) {
+func AccessExpressionStaticName(node *ast.Node) (string, bool) {
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
 		name := node.AsPropertyAccessExpression().Name()
@@ -828,8 +843,8 @@ func accessExpressionStaticName(node *ast.Node) (string, bool) {
 	return "", false
 }
 
-// accessExpressionObject returns the object expression of an access expression.
-func accessExpressionObject(node *ast.Node) *ast.Node {
+// AccessExpressionObject returns the object expression of an access expression.
+func AccessExpressionObject(node *ast.Node) *ast.Node {
 	switch node.Kind {
 	case ast.KindPropertyAccessExpression:
 		return node.AsPropertyAccessExpression().Expression

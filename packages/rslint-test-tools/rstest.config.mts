@@ -17,6 +17,10 @@ export default defineConfig({
     './tests/cli/js-config/dir-args.test.ts',
     './tests/cli/js-config/config-ignores-filter.test.ts',
     './tests/cli/js-config/ignore-negation.test.ts',
+    './tests/cli/js-config/files-driven-lint.test.ts',
+    './tests/cli/js-config/files-driven-monorepo.test.ts',
+    './tests/cli/js-config/gitignore-integration.test.ts',
+    './tests/cli/entry-point.test.ts',
     './tests/cli/type-check/type-check.test.ts',
     './tests/cli/type-check/type-check-snapshot.test.ts',
 
@@ -228,12 +232,19 @@ export default defineConfig({
     // './tests/typescript-eslint/rules/unified-signatures.test.ts',
     // './tests/typescript-eslint/rules/use-unknown-in-catch-callback-variable.test.ts',
     './tests/eslint/rules/no-empty-character-class.test.ts',
+    './tests/eslint/rules/no-invalid-regexp.test.ts',
+    './tests/eslint/rules/no-new-symbol.test.ts',
+    './tests/eslint/rules/no-obj-calls.test.ts',
+    './tests/eslint/rules/no-setter-return.test.ts',
+    './tests/eslint/rules/no-unsafe-negation.test.ts',
+    './tests/eslint/rules/use-isnan.test.ts',
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/no-alias-methods.test.ts',
     './tests/eslint-plugin-jest/rules/no-disabled-tests.test.ts',
     './tests/eslint-plugin-jest/rules/no-focused-tests.test.ts',
     './tests/eslint-plugin-jest/rules/no-hooks.test.ts',
+    './tests/eslint-plugin-jest/rules/no-test-prefixes.test.ts',
     './tests/eslint-plugin-jest/rules/valid-describe-callback.test.ts',
   ],
 });

@@ -38,7 +38,7 @@ export class NodeRslintService implements RslintServiceInterface {
     });
 
     // Set up binary message reading
-    this.process.stdout!.on('data', data => {
+    this.process.stdout!.on('data', (data) => {
       this.handleChunk(data);
     });
     this.chunks = [];

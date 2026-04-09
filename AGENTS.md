@@ -4,6 +4,7 @@ This document summarizes how to work on rslint effectively and consistently.
 
 ## Project Structure & Module Organization
 
+- `architecture.md`: Current high-level architecture, major runtime flows, and subsystem relationships.
 - `cmd/rslint/`: CLI entry (default), IPC API (`--api`), LSP (`--lsp`).
 - `internal/config/`: Config types/loader, rule registry and registration.
 - `internal/linter/`: Linter engine, traversal, and fix application.
@@ -50,6 +51,8 @@ This document summarizes how to work on rslint effectively and consistently.
 
 ## Architecture & Configuration Tips
 
+- Read `architecture.md` before making broad changes that touch module boundaries, entrypoints, or cross-package flows.
+- If a change affects the high-level architecture, runtime data flow, or major integration paths, update `architecture.md` in the same change.
 - rslint loads `rslint.json`/`rslint.jsonc`; rules accept ESLint-style levels/options.
 - The linter walks each file once and dispatches to registered listeners; `--singleThreaded` disables parallelism.
 - Use `--format github` in CI to emit GitHub workflow annotations.

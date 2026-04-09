@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardContent as CardBody } from '@components/ui/card';
 import {
   Table,
@@ -9,7 +9,7 @@ import {
   TableRow,
 } from '@components/ui/table';
 import { CancelSymbol, TableSelector } from './table-selector';
-import { Badge, Heading, Text } from './ui-utils';
+import { Badge, Heading, PresetBadge, Text } from './ui-utils';
 import { Button } from '@components/ui/button';
 import manifest from '@/generated/rule-manifest.json';
 
@@ -25,6 +25,7 @@ type Rule = {
   status: string;
   failing_case: FailingCase[];
   docPath: string | null;
+  presets: { name: string; value: unknown }[];
 };
 
 type RuleStateDescribe = {
@@ -53,6 +54,27 @@ function getRuleUrl(rule: Rule): { url: string; isInternal: boolean } {
     url: `https://github.com/import-js/eslint-plugin-import/blob/main/docs/rules/${rule.name}.md`,
     isInternal: false,
   };
+}
+
+// --- URL params helpers ---
+
+function getInitialParam(key: string): string {
+  if (typeof window === 'undefined') return '';
+  const params = new URLSearchParams(window.location.search);
+  return params.get(key) || '';
+}
+
+function syncFiltersToUrl(filters: Record<string, string>): void {
+  if (typeof window === 'undefined') return;
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) params.set(key, value);
+  }
+  const search = params.toString();
+  const newUrl = search
+    ? `${window.location.pathname}?${search}`
+    : window.location.pathname;
+  window.history.replaceState(null, '', newUrl);
 }
 
 // Statistics card component
@@ -92,47 +114,74 @@ function hooksFilter(setValue: (value: string) => void) {
 
 // Main component
 const RuleImplementationStatus: React.FC = () => {
-  const [searchValue, setSearchValue] = useState('');
-  const [groupValue, setGroupValue] = useState('');
-  const [statusValue, setStatusValue] = useState('');
+  const [searchValue, setSearchValue] = useState(() =>
+    getInitialParam('search'),
+  );
+  const [groupValue, setGroupValue] = useState(() => getInitialParam('group'));
+  const [statusValue, setStatusValue] = useState(() =>
+    getInitialParam('status'),
+  );
+  const [presetValue, setPresetValue] = useState(() =>
+    getInitialParam('preset'),
+  );
+
+  // Sync filters to URL whenever they change
+  useEffect(() => {
+    syncFiltersToUrl({
+      search: searchValue,
+      group: groupValue,
+      status: statusValue,
+      preset: presetValue,
+    });
+  }, [searchValue, groupValue, statusValue, presetValue]);
 
   const rulesData = manifest.rules as Rule[];
 
   // Filter rule data
-  const filteredRules = rulesData.filter(rule => {
+  const filteredRules = rulesData.filter((rule) => {
     const matchesSearch = rule.name
       .toLowerCase()
       .includes(searchValue.toLowerCase());
     const matchesGroup = !groupValue || rule.group === groupValue;
     const matchesStatus = !statusValue || rule.status === statusValue;
+    const matchesPreset =
+      !presetValue ||
+      (rule.presets && rule.presets.some((p) => p.name === presetValue));
 
-    return matchesSearch && matchesGroup && matchesStatus;
+    return matchesSearch && matchesGroup && matchesStatus && matchesPreset;
   });
 
   // Get available groups and statuses
-  const availableGroups = [...new Set(rulesData.map(rule => rule.group))];
+  const availableGroups = [...new Set(rulesData.map((rule) => rule.group))];
   const availableStatuses = [
     { value: 'full', label: 'Full' },
     { value: 'partial-impl', label: 'Partial Implemented' },
     { value: 'partial-test', label: 'Partial Tested' },
   ];
 
+  // Build preset filter options from levels that have at least one rule
+  const availablePresets = [
+    ...new Set(rulesData.flatMap((r) => (r.presets || []).map((p) => p.name))),
+  ]
+    .sort()
+    .map((level) => ({ value: level, label: level }));
+
   // Calculate status statistics
   const statusCount: RuleStateDescribe[] = [
     {
       name: 'Fully Implemented',
-      count: filteredRules.filter(item => item.status === 'full').length,
+      count: filteredRules.filter((item) => item.status === 'full').length,
       style: 'full',
     },
     {
       name: 'Partial Implemented',
-      count: filteredRules.filter(item => item.status === 'partial-impl')
+      count: filteredRules.filter((item) => item.status === 'partial-impl')
         .length,
       style: 'partial-impl',
     },
     {
       name: 'Partial Tested',
-      count: filteredRules.filter(item => item.status === 'partial-test')
+      count: filteredRules.filter((item) => item.status === 'partial-test')
         .length,
       style: 'partial-test',
     },
@@ -167,11 +216,14 @@ const RuleImplementationStatus: React.FC = () => {
             searchValue={searchValue}
             groupValue={groupValue}
             statusValue={statusValue}
+            presetValue={presetValue}
             onSearchChange={setSearchValue}
             onGroupChange={hooksFilter(setGroupValue)}
             onStatusChange={hooksFilter(setStatusValue)}
+            onPresetChange={hooksFilter(setPresetValue)}
             groups={availableGroups}
             statuses={availableStatuses}
+            presetOptions={availablePresets}
           />
         </CardHeader>
         <CardBody>
@@ -179,16 +231,17 @@ const RuleImplementationStatus: React.FC = () => {
             <Table className="w-full">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-1/2">Rule Name</TableHead>
-                  <TableHead className="w-1/8">Group</TableHead>
-                  <TableHead className="w-1/8">Status</TableHead>
-                  <TableHead className="w-1/4">Failing Cases</TableHead>
+                  <TableHead className="w-2/6">Rule Name</TableHead>
+                  <TableHead className="w-1/6">Group</TableHead>
+                  <TableHead className="w-1/6">Preset</TableHead>
+                  <TableHead className="w-1/12">Status</TableHead>
+                  <TableHead className="w-1/6">Failing Cases</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRules.map(rule => (
+                {filteredRules.map((rule) => (
                   <TableRow key={rule.name} className="transition-colors">
-                    <TableCell className="w-1/2 truncate">
+                    <TableCell className="truncate">
                       <Button
                         variant="link"
                         onClick={() => {
@@ -206,13 +259,22 @@ const RuleImplementationStatus: React.FC = () => {
                         </span>
                       </Button>
                     </TableCell>
-                    <TableCell className="w-1/8">
+                    <TableCell>
                       <Badge>{rule.group}</Badge>
                     </TableCell>
-                    <TableCell className="w-1/8">
+                    <TableCell>
+                      {rule.presets?.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {rule.presets.map((p) => (
+                            <PresetBadge key={p.name} preset={p.name} />
+                          ))}
+                        </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
                       <Badge>{rule.status}</Badge>
                     </TableCell>
-                    <TableCell className="w-1/4">
+                    <TableCell>
                       {rule.failing_case.length > 0 ? (
                         <div className="flex flex-col gap-1">
                           {rule.failing_case.map((caseItem, index) => (

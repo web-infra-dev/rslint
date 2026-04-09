@@ -6,8 +6,8 @@
   },
   {
     "type": "file",
-    "name": "cli",
-    "label": "CLI Reference"
+    "name": "vscode-extension",
+    "label": "VSCode Extension"
   },
   {
     "type": "file",
@@ -18,5 +18,25 @@
     "type": "file",
     "name": "inline-directives",
     "label": "Inline Directives"
+  },
+  {
+    "type": "file",
+    "name": "cli",
+    "label": "CLI Reference"
+  },
+  {
+    "type": "file",
+    "name": "output-formats",
+    "label": "Output Formats"
+  },
+  {
+    "type": "file",
+    "name": "ci-integration",
+    "label": "CI Integration"
+  },
+  {
+    "type": "file",
+    "name": "environment-variables",
+    "label": "Environment Variables"
   }
 ]

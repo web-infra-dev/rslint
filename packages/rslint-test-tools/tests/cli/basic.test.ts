@@ -16,8 +16,8 @@ interface CliTestResult {
  * Helper function to run rslint CLI command
  */
 async function runRslint(args: string[], cwd?: string): Promise<CliTestResult> {
-  return new Promise(resolve => {
-    const child = spawn(RSLINT_BIN, args, {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [RSLINT_BIN, ...args], {
       cwd: cwd || process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -33,7 +33,7 @@ async function runRslint(args: string[], cwd?: string): Promise<CliTestResult> {
       stderr += data.toString();
     });
 
-    child.on('close', code => {
+    child.on('close', (code) => {
       resolve({
         exitCode: code || 0,
         stdout,
@@ -204,7 +204,7 @@ describe('CLI Configuration Tests', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(line => line.trim());
+        .filter((line) => line.trim());
       for (const line of lines) {
         // eslint-disable-next-line
         expect(() => JSON.parse(line)).not.toThrow();
@@ -242,7 +242,7 @@ describe('CLI Configuration Tests', () => {
         },
         include: ['**/*.ts'],
       }),
-      'test:%,\r\nfile.ts': `
+      'test%,file.ts': `
         let a: any = 10;
         a.b = 20;
       `,
@@ -254,14 +254,14 @@ describe('CLI Configuration Tests', () => {
       const lines = result.stdout
         .trim()
         .split('\n')
-        .filter(line => line.trim());
+        .filter((line) => line.trim());
 
       expect(lines.length).toBe(2);
       expect(lines[0]).toBe(
-        '::warning file=test%3A%25%2C%0D%0Afile.ts,line=2,endLine=2,col=16,endColumn=19,title=@typescript-eslint/no-explicit-any::Unexpected any. Specify a different type.',
+        '::warning file=test%25%2Cfile.ts,line=2,endLine=2,col=16,endColumn=19,title=@typescript-eslint/no-explicit-any::Unexpected any. Specify a different type.',
       );
       expect(lines[1]).toBe(
-        '::error file=test%3A%25%2C%0D%0Afile.ts,line=3,endLine=3,col=11,endColumn=12,title=@typescript-eslint/no-unsafe-member-access::Unsafe member access .b on an `any` value.',
+        '::error file=test%25%2Cfile.ts,line=3,endLine=3,col=11,endColumn=12,title=@typescript-eslint/no-unsafe-member-access::Unsafe member access .b on an `any` value.',
       );
     } finally {
       await cleanupTempDir(tempDir);

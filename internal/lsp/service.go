@@ -623,7 +623,7 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules, _ := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), cwd, enforcePlugins)
 			return activeRules
-		}, false, diagnosticCollector)
+		}, false, diagnosticCollector, nil, nil)
 
 	if diagnostics == nil {
 		diagnostics = []rule.RuleDiagnostic{}

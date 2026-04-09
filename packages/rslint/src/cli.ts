@@ -130,9 +130,10 @@ export async function run(
     }
   }
 
-  // Build Go args: rest (user flags, stripped of --config/--init/--start-time
-  // by parseArgs) + the real start time from the Node.js entry point.
-  const goArgs = [...args.rest, `--start-time=${startTime}`];
+  // Build Go args: start-time flag BEFORE positional args, because Go's
+  // flag.Parse stops at the first positional argument. If --start-time comes
+  // after positionals, it gets treated as a file path.
+  const goArgs = [`--start-time=${startTime}`, ...args.rest];
 
   // Classify positional arguments into files and directories
   const { files, dirs } = classifyArgs(args.positionals, cwd);

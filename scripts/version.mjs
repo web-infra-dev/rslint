@@ -143,9 +143,9 @@ async function main() {
 
     const allPackagePaths = [
       rootPackagePath,
-      ...workspacePackagePaths.map(p => path.join(process.cwd(), p)),
-      ...npmRslintPackagePaths.map(p => path.join(process.cwd(), p)),
-      ...npmTsgoPackagePaths.map(p => path.join(process.cwd(), p)),
+      ...workspacePackagePaths.map((p) => path.join(process.cwd(), p)),
+      ...npmRslintPackagePaths.map((p) => path.join(process.cwd(), p)),
+      ...npmTsgoPackagePaths.map((p) => path.join(process.cwd(), p)),
     ];
 
     console.log(
@@ -171,7 +171,7 @@ async function main() {
 
     // Find the highest current version
     const highestVersion = currentVersions
-      .map(v => {
+      .map((v) => {
         // Extract base version (remove prerelease identifiers)
         const baseVersion = v.split('-')[0];
         return baseVersion.split('.').map(Number);

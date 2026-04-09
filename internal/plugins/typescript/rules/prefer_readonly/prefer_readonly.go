@@ -400,7 +400,8 @@ func isDestructuringAssignment(node *ast.Node) bool {
 }
 
 var PreferReadonlyRule = rule.CreateRule(rule.Rule{
-	Name: "prefer-readonly",
+	Name:             "prefer-readonly",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, rawOpts any) rule.RuleListeners {
 		if ctx.TypeChecker == nil {
 			return rule.RuleListeners{}

@@ -18,6 +18,7 @@ export function parseArgs(argv: string[]) {
       // mistaken for positional file/dir arguments.
       format: { type: 'string' },
       'max-warnings': { type: 'string' },
+      rule: { type: 'string', multiple: true },
       trace: { type: 'string' },
       cpuprof: { type: 'string' },
       // Consumed by the JS entry point; must not reach Go from user input.
@@ -27,8 +28,17 @@ export function parseArgs(argv: string[]) {
 
   // Collect args that are not --config or --init for pass-through to Go.
   // positionals collects only true file/dir arguments.
-  const rest: string[] = [];
-  const positionals: string[] = [];
+  // Flags are emitted before positional args because Go's flag.Parse stops
+  // at the first positional argument. Without reordering, a flag like
+  // `--rule 'no-console: off'` placed after a file path would be silently
+  // ignored by Go.
+  //
+  // When "--" is present, positionals before it and after it are tracked
+  // separately so the rebuilt rest preserves their relative position to "--".
+  const flags: string[] = [];
+  const positionalsBefore: string[] = [];
+  const positionalsAfter: string[] = [];
+  let seenTerminator = false;
   for (const token of tokens) {
     if (token.kind === 'option') {
       if (
@@ -37,15 +47,25 @@ export function parseArgs(argv: string[]) {
         token.name === 'start-time'
       )
         continue;
-      rest.push(token.rawName);
-      if (token.value != null) rest.push(token.value);
+      flags.push(token.rawName);
+      if (token.value != null) flags.push(token.value);
     } else if (token.kind === 'option-terminator') {
-      rest.push('--');
+      seenTerminator = true;
     } else if (token.kind === 'positional') {
-      rest.push(token.value);
-      positionals.push(token.value);
+      if (seenTerminator) {
+        positionalsAfter.push(token.value);
+      } else {
+        positionalsBefore.push(token.value);
+      }
     }
   }
+
+  // Rebuild rest: flags first, then positionals that appeared before "--",
+  // then "--" (if present), then positionals that appeared after "--".
+  const positionals = [...positionalsBefore, ...positionalsAfter];
+  const rest = seenTerminator
+    ? [...flags, ...positionalsBefore, '--', ...positionalsAfter]
+    : [...flags, ...positionalsBefore];
 
   return {
     config: (values.config as string) ?? null,

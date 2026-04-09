@@ -26,7 +26,7 @@ Examples of **correct** code for this rule:
 
 ```javascript
 async function foo(things) {
-  await Promise.all(things.map(thing => bar(thing)));
+  await Promise.all(things.map((thing) => bar(thing)));
 }
 
 async function foo(things) {

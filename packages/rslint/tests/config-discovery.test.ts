@@ -208,6 +208,16 @@ describe('discoverConfigs', () => {
 
 // --- filterConfigsByParentIgnores ---
 
+/**
+ * Build a platform-appropriate absolute path for filter tests.
+ * Uses a non-existent root so that realpathSync consistently fails for all
+ * paths (avoiding symlink resolution mismatches, e.g. /tmp → /private/tmp
+ * on macOS). path.resolve ensures the correct format per platform
+ * (forward slashes on Unix, drive-letter + backslashes on Windows).
+ */
+const ROOT = path.resolve('/rslint-test-nonexistent');
+const P = (...segments: string[]) => path.join(ROOT, ...segments);
+
 /** Shorthand config entry builder. */
 function cfg(dir: string, ...entries: Record<string, unknown>[]) {
   return { configDirectory: dir, entries: entries as unknown[] };
@@ -225,13 +235,13 @@ function ruleEntry(
 }
 
 function dirs(result: { configDirectory: string }[]): string[] {
-  return result.map(r => r.configDirectory);
+  return result.map((r) => r.configDirectory);
 }
 
 describe('filterConfigsByParentIgnores', () => {
   test('single config is not affected', () => {
     const result = filterConfigsByParentIgnores([
-      cfg('/project', globalIgnore('dist/**'), ruleEntry(['**/*.ts'], {})),
+      cfg(P(), globalIgnore('dist/**'), ruleEntry(['**/*.ts'], {})),
     ]);
     expect(result).toHaveLength(1);
   });
@@ -242,25 +252,21 @@ describe('filterConfigsByParentIgnores', () => {
 
   test('filters nested config in globally ignored directory', () => {
     const result = filterConfigsByParentIgnores([
-      cfg('/project', globalIgnore('__tests__/**'), ruleEntry(['**/*.ts'], {})),
+      cfg(P(), globalIgnore('__tests__/**'), ruleEntry(['**/*.ts'], {})),
       cfg(
-        '/project/__tests__/fixtures',
+        P('__tests__', 'fixtures'),
         ruleEntry(['**/*.ts'], { 'no-console': 'error' }),
       ),
     ]);
     expect(result).toHaveLength(1);
-    expect(dirs(result)).toEqual(['/project']);
+    expect(dirs(result)).toEqual([P()]);
   });
 
   test('filters with **/prefix/** pattern', () => {
     const result = filterConfigsByParentIgnores([
+      cfg(P(), globalIgnore('**/fixtures/**'), ruleEntry(['**/*.ts'], {})),
       cfg(
-        '/project',
-        globalIgnore('**/fixtures/**'),
-        ruleEntry(['**/*.ts'], {}),
-      ),
-      cfg(
-        '/project/packages/ext/__tests__/fixtures',
+        P('packages', 'ext', '__tests__', 'fixtures'),
         ruleEntry(['**/*.ts'], {}),
       ),
     ]);
@@ -269,16 +275,19 @@ describe('filterConfigsByParentIgnores', () => {
 
   test('filters with **/dist/** pattern', () => {
     const result = filterConfigsByParentIgnores([
-      cfg('/project', globalIgnore('**/dist/**'), ruleEntry(['**/*.ts'], {})),
-      cfg('/project/packages/app/dist/generated', ruleEntry(['**/*.ts'], {})),
+      cfg(P(), globalIgnore('**/dist/**'), ruleEntry(['**/*.ts'], {})),
+      cfg(
+        P('packages', 'app', 'dist', 'generated'),
+        ruleEntry(['**/*.ts'], {}),
+      ),
     ]);
     expect(result).toHaveLength(1);
   });
 
   test('filters with trailing slash', () => {
     const result = filterConfigsByParentIgnores([
-      cfg('/project', globalIgnore('__tests__/')),
-      cfg('/project/__tests__/fixtures', ruleEntry(['**/*.ts'], {})),
+      cfg(P() + '/', globalIgnore('__tests__/')),
+      cfg(P('__tests__', 'fixtures'), ruleEntry(['**/*.ts'], {})),
     ]);
     expect(result).toHaveLength(1);
   });
@@ -286,97 +295,100 @@ describe('filterConfigsByParentIgnores', () => {
   test('filters with multiple patterns in one entry', () => {
     const result = filterConfigsByParentIgnores([
       cfg(
-        '/project',
+        P(),
         globalIgnore('__tests__/**', 'e2e/**', 'examples/**'),
         ruleEntry(['**/*.ts'], {}),
       ),
-      cfg('/project/__tests__/fixtures', ruleEntry(['**/*.ts'], {})),
-      cfg('/project/e2e/setup', ruleEntry(['**/*.ts'], {})),
-      cfg('/project/packages/app', ruleEntry(['**/*.ts'], {})),
+      cfg(P('__tests__', 'fixtures'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('e2e', 'setup'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('packages', 'app'), ruleEntry(['**/*.ts'], {})),
     ]);
     expect(result).toHaveLength(2);
-    expect(dirs(result)).toContain('/project');
-    expect(dirs(result)).toContain('/project/packages/app');
+    expect(dirs(result)).toContain(P());
+    expect(dirs(result)).toContain(P('packages', 'app'));
   });
 
   test('filters with multiple global ignore entries', () => {
     const result = filterConfigsByParentIgnores([
       cfg(
-        '/project',
+        P(),
         globalIgnore('__tests__/**'),
         globalIgnore('e2e/**'),
         ruleEntry(['**/*.ts'], {}),
       ),
-      cfg('/project/__tests__/fixtures', ruleEntry(['**/*.ts'], {})),
-      cfg('/project/e2e/setup', ruleEntry(['**/*.ts'], {})),
+      cfg(P('__tests__', 'fixtures'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('e2e', 'setup'), ruleEntry(['**/*.ts'], {})),
     ]);
     expect(result).toHaveLength(1);
   });
 
   test('entry-level ignores do not filter nested configs', () => {
     const result = filterConfigsByParentIgnores([
-      cfg('/project', {
+      cfg(P(), {
         files: ['**/*.ts'],
         ignores: ['__tests__/**'],
         rules: { r: 'error' },
       }),
-      cfg('/project/__tests__/fixtures', ruleEntry(['**/*.ts'], {})),
+      cfg(P('__tests__', 'fixtures'), ruleEntry(['**/*.ts'], {})),
     ]);
     expect(result).toHaveLength(2);
   });
 
   test('sibling configs do not affect each other', () => {
     const result = filterConfigsByParentIgnores([
-      cfg('/project/packages/app', ruleEntry(['**/*.ts'], { a: 'error' })),
-      cfg('/project/packages/lib', ruleEntry(['**/*.ts'], { b: 'error' })),
+      cfg(P('packages', 'app'), ruleEntry(['**/*.ts'], { a: 'error' })),
+      cfg(P('packages', 'lib'), ruleEntry(['**/*.ts'], { b: 'error' })),
     ]);
     expect(result).toHaveLength(2);
   });
 
   test('parent without global ignores does not filter children', () => {
     const result = filterConfigsByParentIgnores([
-      cfg('/project', ruleEntry(['**/*.ts'], { a: 'error' })),
-      cfg('/project/packages/app', ruleEntry(['**/*.ts'], { b: 'error' })),
+      cfg(P(), ruleEntry(['**/*.ts'], { a: 'error' })),
+      cfg(P('packages', 'app'), ruleEntry(['**/*.ts'], { b: 'error' })),
     ]);
     expect(result).toHaveLength(2);
   });
 
   test('grandparent global ignores filter grandchild', () => {
     const result = filterConfigsByParentIgnores([
-      cfg('/project', globalIgnore('vendor/**'), ruleEntry(['**/*.ts'], {})),
-      cfg('/project/packages/app', ruleEntry(['**/*.ts'], {})),
-      cfg('/project/vendor/lib', ruleEntry(['**/*.ts'], {})),
+      cfg(P(), globalIgnore('vendor/**'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('packages', 'app'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('vendor', 'lib'), ruleEntry(['**/*.ts'], {})),
     ]);
     expect(result).toHaveLength(2);
-    expect(dirs(result)).not.toContain('/project/vendor/lib');
+    expect(dirs(result)).not.toContain(P('vendor', 'lib'));
   });
 
   test('intermediate config ignores only affect its children', () => {
     const result = filterConfigsByParentIgnores([
-      cfg('/project', ruleEntry(['**/*.ts'], {})),
+      cfg(P(), ruleEntry(['**/*.ts'], {})),
       cfg(
-        '/project/packages/app',
+        P('packages', 'app'),
         globalIgnore('generated/**'),
         ruleEntry(['**/*.ts'], {}),
       ),
-      cfg('/project/packages/app/generated/config', ruleEntry(['**/*.ts'], {})),
-      cfg('/project/packages/lib', ruleEntry(['**/*.ts'], {})),
+      cfg(
+        P('packages', 'app', 'generated', 'config'),
+        ruleEntry(['**/*.ts'], {}),
+      ),
+      cfg(P('packages', 'lib'), ruleEntry(['**/*.ts'], {})),
     ]);
     expect(result).toHaveLength(3);
     expect(dirs(result)).not.toContain(
-      '/project/packages/app/generated/config',
+      P('packages', 'app', 'generated', 'config'),
     );
-    expect(dirs(result)).toContain('/project/packages/lib');
+    expect(dirs(result)).toContain(P('packages', 'lib'));
   });
 
   test('global ignore entry with name field is still recognized', () => {
     const result = filterConfigsByParentIgnores([
       cfg(
-        '/project',
+        P(),
         { name: 'global-ignores', ignores: ['vendor/**'] },
         ruleEntry(['**/*.ts'], {}),
       ),
-      cfg('/project/vendor/lib', ruleEntry(['**/*.ts'], {})),
+      cfg(P('vendor', 'lib'), ruleEntry(['**/*.ts'], {})),
     ]);
     expect(result).toHaveLength(1);
   });
@@ -384,76 +396,68 @@ describe('filterConfigsByParentIgnores', () => {
   test('real-world monorepo pattern', () => {
     const result = filterConfigsByParentIgnores([
       cfg(
-        '/project',
+        P(),
         globalIgnore('**/fixtures/**', '**/dist/**', 'e2e/**'),
         ruleEntry(['**/*.ts'], {}),
       ),
-      cfg('/project/packages/app', ruleEntry(['**/*.ts'], { a: 'error' })),
-      cfg('/project/packages/lib', ruleEntry(['**/*.ts'], { b: 'error' })),
+      cfg(P('packages', 'app'), ruleEntry(['**/*.ts'], { a: 'error' })),
+      cfg(P('packages', 'lib'), ruleEntry(['**/*.ts'], { b: 'error' })),
       cfg(
-        '/project/packages/vscode-ext/__tests__/fixtures',
+        P('packages', 'vscode-ext', '__tests__', 'fixtures'),
         ruleEntry(['**/*.ts'], {}),
       ),
-      cfg('/project/e2e/helpers', ruleEntry(['**/*.ts'], {})),
-      cfg('/project/packages/app/dist/gen', ruleEntry(['**/*.ts'], {})),
+      cfg(P('e2e', 'helpers'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('packages', 'app', 'dist', 'gen'), ruleEntry(['**/*.ts'], {})),
     ]);
     expect(result).toHaveLength(3);
-    expect(dirs(result)).toContain('/project');
-    expect(dirs(result)).toContain('/project/packages/app');
-    expect(dirs(result)).toContain('/project/packages/lib');
+    expect(dirs(result)).toContain(P());
+    expect(dirs(result)).toContain(P('packages', 'app'));
+    expect(dirs(result)).toContain(P('packages', 'lib'));
   });
 
   // --- Glob pattern coverage (picomatch) ---
 
   test('wildcard in middle: packages/*/dist/**', () => {
     const result = filterConfigsByParentIgnores([
-      cfg(
-        '/project',
-        globalIgnore('packages/*/dist/**'),
-        ruleEntry(['**/*.ts'], {}),
-      ),
-      cfg('/project/packages/app/dist/gen', ruleEntry(['**/*.ts'], {})),
-      cfg('/project/packages/app/src', ruleEntry(['**/*.ts'], {})),
+      cfg(P(), globalIgnore('packages/*/dist/**'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('packages', 'app', 'dist', 'gen'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('packages', 'app', 'src'), ruleEntry(['**/*.ts'], {})),
     ]);
     expect(result).toHaveLength(2);
-    expect(dirs(result)).not.toContain('/project/packages/app/dist/gen');
-    expect(dirs(result)).toContain('/project/packages/app/src');
+    expect(dirs(result)).not.toContain(P('packages', 'app', 'dist', 'gen'));
+    expect(dirs(result)).toContain(P('packages', 'app', 'src'));
   });
 
   test('brace expansion: {__tests__,e2e}/**', () => {
     const result = filterConfigsByParentIgnores([
-      cfg(
-        '/project',
-        globalIgnore('{__tests__,e2e}/**'),
-        ruleEntry(['**/*.ts'], {}),
-      ),
-      cfg('/project/__tests__/fixtures', ruleEntry(['**/*.ts'], {})),
-      cfg('/project/e2e/setup', ruleEntry(['**/*.ts'], {})),
-      cfg('/project/packages/app', ruleEntry(['**/*.ts'], {})),
+      cfg(P(), globalIgnore('{__tests__,e2e}/**'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('__tests__', 'fixtures'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('e2e', 'setup'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('packages', 'app'), ruleEntry(['**/*.ts'], {})),
     ]);
     expect(result).toHaveLength(2);
-    expect(dirs(result)).toContain('/project');
-    expect(dirs(result)).toContain('/project/packages/app');
+    expect(dirs(result)).toContain(P());
+    expect(dirs(result)).toContain(P('packages', 'app'));
   });
 
   test('bare directory name without glob: dist', () => {
     const result = filterConfigsByParentIgnores([
-      cfg('/project', globalIgnore('dist'), ruleEntry(['**/*.ts'], {})),
-      cfg('/project/dist', ruleEntry(['**/*.ts'], {})),
-      cfg('/project/dist/sub', ruleEntry(['**/*.ts'], {})),
+      cfg(P(), globalIgnore('dist'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('dist'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('dist', 'sub'), ruleEntry(['**/*.ts'], {})),
     ]);
     // 'dist' matches the dir exactly, and dist/sub is nested under it
-    expect(dirs(result)).not.toContain('/project/dist');
-    expect(dirs(result)).not.toContain('/project/dist/sub');
+    expect(dirs(result)).not.toContain(P('dist'));
+    expect(dirs(result)).not.toContain(P('dist', 'sub'));
   });
 
   test('dot-prefixed directories: .cache/**', () => {
     const result = filterConfigsByParentIgnores([
-      cfg('/project', globalIgnore('.cache/**'), ruleEntry(['**/*.ts'], {})),
-      cfg('/project/.cache/generated', ruleEntry(['**/*.ts'], {})),
+      cfg(P(), globalIgnore('.cache/**'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('.cache', 'generated'), ruleEntry(['**/*.ts'], {})),
     ]);
     expect(result).toHaveLength(1);
-    expect(dirs(result)).toEqual(['/project']);
+    expect(dirs(result)).toEqual([P()]);
   });
 
   test('negation pattern is skipped — does not re-include or accidentally filter', () => {
@@ -461,29 +465,29 @@ describe('filterConfigsByParentIgnores', () => {
     // `vendor/**` filters vendor dirs, `!vendor/keep/**` is ignored.
     const result = filterConfigsByParentIgnores([
       cfg(
-        '/project',
+        P(),
         globalIgnore('vendor/**', '!vendor/keep/**'),
         ruleEntry(['**/*.ts'], {}),
       ),
-      cfg('/project/vendor/lib', ruleEntry(['**/*.ts'], {})),
-      cfg('/project/vendor/keep', ruleEntry(['**/*.ts'], {})),
+      cfg(P('vendor', 'lib'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('vendor', 'keep'), ruleEntry(['**/*.ts'], {})),
       // Unrelated dirs should NOT be affected by the negation pattern
-      cfg('/project/packages/app', ruleEntry(['**/*.ts'], {})),
+      cfg(P('packages', 'app'), ruleEntry(['**/*.ts'], {})),
     ]);
     // vendor/* filtered by positive pattern
-    expect(dirs(result)).not.toContain('/project/vendor/lib');
-    expect(dirs(result)).not.toContain('/project/vendor/keep');
+    expect(dirs(result)).not.toContain(P('vendor', 'lib'));
+    expect(dirs(result)).not.toContain(P('vendor', 'keep'));
     // Unrelated dirs must NOT be filtered (negation pattern skipped safely)
-    expect(dirs(result)).toContain('/project/packages/app');
-    expect(dirs(result)).toContain('/project');
+    expect(dirs(result)).toContain(P('packages', 'app'));
+    expect(dirs(result)).toContain(P());
   });
 
   test('only-negation global ignore does not filter anything', () => {
     // If global ignore only has negation patterns, nothing should be filtered
     const result = filterConfigsByParentIgnores([
-      cfg('/project', globalIgnore('!vendor/**'), ruleEntry(['**/*.ts'], {})),
-      cfg('/project/vendor/lib', ruleEntry(['**/*.ts'], {})),
-      cfg('/project/packages/app', ruleEntry(['**/*.ts'], {})),
+      cfg(P(), globalIgnore('!vendor/**'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('vendor', 'lib'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('packages', 'app'), ruleEntry(['**/*.ts'], {})),
     ]);
     expect(result).toHaveLength(3);
   });
@@ -494,26 +498,26 @@ describe('filterConfigsByParentIgnores', () => {
     // vendor/** = directory-level → filters nested configs
     // vendor/**/* = file-level → does NOT filter (allows traversal)
     const withDirPattern = filterConfigsByParentIgnores([
-      cfg('/project', globalIgnore('vendor/**'), ruleEntry(['**/*.ts'], {})),
-      cfg('/project/vendor/keep', ruleEntry(['**/*.ts'], {})),
+      cfg(P(), globalIgnore('vendor/**'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('vendor', 'keep'), ruleEntry(['**/*.ts'], {})),
     ]);
     expect(withDirPattern).toHaveLength(1); // vendor/keep filtered
 
     const withFilePattern = filterConfigsByParentIgnores([
-      cfg('/project', globalIgnore('vendor/**/*'), ruleEntry(['**/*.ts'], {})),
-      cfg('/project/vendor/keep', ruleEntry(['**/*.ts'], {})),
+      cfg(P(), globalIgnore('vendor/**/*'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('vendor', 'keep'), ruleEntry(['**/*.ts'], {})),
     ]);
     expect(withFilePattern).toHaveLength(2); // vendor/keep NOT filtered
-    expect(dirs(withFilePattern)).toContain('/project/vendor/keep');
+    expect(dirs(withFilePattern)).toContain(P('vendor', 'keep'));
   });
 
   test('dir/* (single-level file glob) does not block traversal', () => {
     const result = filterConfigsByParentIgnores([
-      cfg('/project', globalIgnore('vendor/*'), ruleEntry(['**/*.ts'], {})),
-      cfg('/project/vendor/keep', ruleEntry(['**/*.ts'], {})),
+      cfg(P(), globalIgnore('vendor/*'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('vendor', 'keep'), ruleEntry(['**/*.ts'], {})),
     ]);
     expect(result).toHaveLength(2);
-    expect(dirs(result)).toContain('/project/vendor/keep');
+    expect(dirs(result)).toContain(P('vendor', 'keep'));
   });
 
   // --- Mixed global + entry-level ignores in same config ---
@@ -521,43 +525,39 @@ describe('filterConfigsByParentIgnores', () => {
   test('config with both global and entry-level ignores: only global filters nested configs', () => {
     const result = filterConfigsByParentIgnores([
       cfg(
-        '/project',
+        P(),
         // Global ignore → should filter nested configs in dist/
         globalIgnore('dist/**'),
         // Entry-level ignore → should NOT filter nested configs in test/
         { files: ['**/*.ts'], ignores: ['test/**'], rules: { r: 'error' } },
       ),
       // In dist/ → should be filtered (global ignore)
-      cfg('/project/dist/generated', ruleEntry(['**/*.ts'], {})),
+      cfg(P('dist', 'generated'), ruleEntry(['**/*.ts'], {})),
       // In test/ → should NOT be filtered (entry-level ignore)
-      cfg('/project/test/fixtures', ruleEntry(['**/*.ts'], {})),
+      cfg(P('test', 'fixtures'), ruleEntry(['**/*.ts'], {})),
       // Normal child → should NOT be filtered
-      cfg('/project/packages/app', ruleEntry(['**/*.ts'], {})),
+      cfg(P('packages', 'app'), ruleEntry(['**/*.ts'], {})),
     ]);
     expect(result).toHaveLength(3);
-    expect(dirs(result)).not.toContain('/project/dist/generated');
-    expect(dirs(result)).toContain('/project/test/fixtures');
-    expect(dirs(result)).toContain('/project/packages/app');
+    expect(dirs(result)).not.toContain(P('dist', 'generated'));
+    expect(dirs(result)).toContain(P('test', 'fixtures'));
+    expect(dirs(result)).toContain(P('packages', 'app'));
   });
 
   // --- Path edge cases ---
 
   test('trailing slash in configDirectory is handled', () => {
     const result = filterConfigsByParentIgnores([
-      cfg(
-        '/project/',
-        globalIgnore('__tests__/**'),
-        ruleEntry(['**/*.ts'], {}),
-      ),
-      cfg('/project/__tests__/fixtures', ruleEntry(['**/*.ts'], {})),
+      cfg(P() + '/', globalIgnore('__tests__/**'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('__tests__', 'fixtures'), ruleEntry(['**/*.ts'], {})),
     ]);
     expect(result).toHaveLength(1);
   });
 
   test('trailing slash on both parent and child', () => {
     const result = filterConfigsByParentIgnores([
-      cfg('/project/', globalIgnore('vendor/**'), ruleEntry(['**/*.ts'], {})),
-      cfg('/project/vendor/lib/', ruleEntry(['**/*.ts'], {})),
+      cfg(P() + '/', globalIgnore('vendor/**'), ruleEntry(['**/*.ts'], {})),
+      cfg(P('vendor', 'lib') + '/', ruleEntry(['**/*.ts'], {})),
     ]);
     expect(result).toHaveLength(1);
   });
@@ -566,66 +566,72 @@ describe('filterConfigsByParentIgnores', () => {
 
   test('child global ignore does NOT bubble up to filter parent', () => {
     const result = filterConfigsByParentIgnores([
-      cfg('/project', ruleEntry(['**/*.ts'], {})),
+      cfg(P(), ruleEntry(['**/*.ts'], {})),
       cfg(
-        '/project/packages/app',
+        P('packages', 'app'),
         globalIgnore('generated/**'),
         ruleEntry(['**/*.ts'], {}),
       ),
     ]);
     // Parent should never be filtered by child's ignores
     expect(result).toHaveLength(2);
-    expect(dirs(result)).toContain('/project');
-    expect(dirs(result)).toContain('/project/packages/app');
+    expect(dirs(result)).toContain(P());
+    expect(dirs(result)).toContain(P('packages', 'app'));
   });
 
   test('sibling A global ignore does NOT filter sibling B nested config', () => {
     // app ignores generated/, lib also has a generated/ subdir with a config.
     // lib's generated/ should NOT be filtered by app's ignore.
     const result = filterConfigsByParentIgnores([
-      cfg('/project', ruleEntry(['**/*.ts'], {})),
+      cfg(P(), ruleEntry(['**/*.ts'], {})),
       cfg(
-        '/project/packages/app',
+        P('packages', 'app'),
         globalIgnore('generated/**'),
         ruleEntry(['**/*.ts'], {}),
       ),
-      cfg('/project/packages/app/generated/output', ruleEntry(['**/*.ts'], {})),
-      cfg('/project/packages/lib', ruleEntry(['**/*.ts'], {})),
-      cfg('/project/packages/lib/generated/output', ruleEntry(['**/*.ts'], {})),
+      cfg(
+        P('packages', 'app', 'generated', 'output'),
+        ruleEntry(['**/*.ts'], {}),
+      ),
+      cfg(P('packages', 'lib'), ruleEntry(['**/*.ts'], {})),
+      cfg(
+        P('packages', 'lib', 'generated', 'output'),
+        ruleEntry(['**/*.ts'], {}),
+      ),
     ]);
     // app/generated should be filtered (by app's ignore)
     expect(dirs(result)).not.toContain(
-      '/project/packages/app/generated/output',
+      P('packages', 'app', 'generated', 'output'),
     );
     // lib/generated should NOT be filtered (app's ignore doesn't affect lib)
-    expect(dirs(result)).toContain('/project/packages/lib/generated/output');
+    expect(dirs(result)).toContain(P('packages', 'lib', 'generated', 'output'));
     expect(result).toHaveLength(4);
   });
 
   test('both siblings have same-name ignored dir, only own children filtered', () => {
     const result = filterConfigsByParentIgnores([
-      cfg('/project', ruleEntry(['**/*.ts'], {})),
+      cfg(P(), ruleEntry(['**/*.ts'], {})),
       cfg(
-        '/project/packages/app',
+        P('packages', 'app'),
         globalIgnore('dist/**'),
         ruleEntry(['**/*.ts'], {}),
       ),
-      cfg('/project/packages/app/dist/gen', ruleEntry(['**/*.ts'], {})),
+      cfg(P('packages', 'app', 'dist', 'gen'), ruleEntry(['**/*.ts'], {})),
       cfg(
-        '/project/packages/lib',
+        P('packages', 'lib'),
         globalIgnore('dist/**'),
         ruleEntry(['**/*.ts'], {}),
       ),
-      cfg('/project/packages/lib/dist/gen', ruleEntry(['**/*.ts'], {})),
+      cfg(P('packages', 'lib', 'dist', 'gen'), ruleEntry(['**/*.ts'], {})),
     ]);
     // Both dist/gen configs filtered by their respective parent
-    expect(dirs(result)).not.toContain('/project/packages/app/dist/gen');
-    expect(dirs(result)).not.toContain('/project/packages/lib/dist/gen');
+    expect(dirs(result)).not.toContain(P('packages', 'app', 'dist', 'gen'));
+    expect(dirs(result)).not.toContain(P('packages', 'lib', 'dist', 'gen'));
     // Root + both packages survive
     expect(result).toHaveLength(3);
-    expect(dirs(result)).toContain('/project');
-    expect(dirs(result)).toContain('/project/packages/app');
-    expect(dirs(result)).toContain('/project/packages/lib');
+    expect(dirs(result)).toContain(P());
+    expect(dirs(result)).toContain(P('packages', 'app'));
+    expect(dirs(result)).toContain(P('packages', 'lib'));
   });
 
   test('uses real filesystem paths for symlink resolution', () => {

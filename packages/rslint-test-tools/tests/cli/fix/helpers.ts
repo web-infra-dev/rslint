@@ -15,8 +15,8 @@ export async function runRslint(
   args: string[],
   cwd?: string,
 ): Promise<CliTestResult> {
-  return new Promise(resolve => {
-    const child = spawn(RSLINT_BIN, args, {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, [RSLINT_BIN, ...args], {
       cwd: cwd || process.cwd(),
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -32,7 +32,7 @@ export async function runRslint(
       stderr += data.toString();
     });
 
-    child.on('close', code => {
+    child.on('close', (code) => {
       resolve({ exitCode: code || 0, stdout, stderr });
     });
   });

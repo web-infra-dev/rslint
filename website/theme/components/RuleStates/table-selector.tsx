@@ -10,17 +10,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@components/ui/select';
-import { ChevronDown, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 
 export interface TableSelectorProps {
   onSearchChange: (value: string) => void;
   onGroupChange: (value: string) => void;
   onStatusChange: (value: string) => void;
+  onPresetChange: (value: string) => void;
   searchValue?: string;
   groupValue?: string;
   statusValue?: string;
+  presetValue?: string;
   groups?: string[];
   statuses?: Array<{ value: string; label: string }>;
+  presetOptions?: Array<{ value: string; label: string }>;
 }
 
 export const CancelSymbol = 'cancel';
@@ -30,7 +33,7 @@ function SelectWithCancel(props: {
   onValueChange: (value: string) => void;
   placeholder: string;
   label: string;
-  items: string[];
+  items: Array<{ value: string; label: string }>;
 }) {
   return (
     <Select value={props.value} onValueChange={props.onValueChange}>
@@ -40,9 +43,13 @@ function SelectWithCancel(props: {
       <SelectContent>
         <SelectGroup>
           <SelectLabel>{props.label}</SelectLabel>
-          {props.items.map(item => (
-            <SelectItem className="cursor-pointer" key={item} value={item}>
-              {item}
+          {props.items.map((item) => (
+            <SelectItem
+              className="cursor-pointer"
+              key={item.value}
+              value={item.value}
+            >
+              {item.label}
             </SelectItem>
           ))}
           <SelectSeparator />
@@ -59,9 +66,11 @@ export const TableSelector: React.FC<TableSelectorProps> = ({
   onSearchChange,
   onGroupChange,
   onStatusChange,
+  onPresetChange,
   searchValue = '',
   groupValue = '',
   statusValue = '',
+  presetValue = '',
   groups = ['typescript-eslint'],
   statuses = [
     { value: 'full', label: 'Full' },
@@ -69,12 +78,14 @@ export const TableSelector: React.FC<TableSelectorProps> = ({
     { value: 'partial-test', label: 'Partial Tested' },
     { value: 'total', label: 'Total' },
   ],
+  presetOptions = [],
 }) => {
   // Clear all selectors
   const handleClearAll = () => {
     onSearchChange('');
     onGroupChange('');
     onStatusChange('');
+    onPresetChange('');
   };
 
   return (
@@ -84,7 +95,7 @@ export const TableSelector: React.FC<TableSelectorProps> = ({
         placeholder="Search rules..."
         className="w-full max-w-sm"
         value={searchValue}
-        onChange={e => onSearchChange(e.target.value)}
+        onChange={(e) => onSearchChange(e.target.value)}
       />
 
       <SelectWithCancel
@@ -92,7 +103,7 @@ export const TableSelector: React.FC<TableSelectorProps> = ({
         onValueChange={onGroupChange}
         placeholder="Select a Group"
         label="Groups"
-        items={groups}
+        items={groups.map((g) => ({ value: g, label: g }))}
       />
 
       <SelectWithCancel
@@ -100,8 +111,18 @@ export const TableSelector: React.FC<TableSelectorProps> = ({
         onValueChange={onStatusChange}
         placeholder="Select a Status"
         label="Status"
-        items={statuses.map(status => status.value)}
+        items={statuses}
       />
+
+      {presetOptions.length > 0 && (
+        <SelectWithCancel
+          value={presetValue}
+          onValueChange={onPresetChange}
+          placeholder="Preset"
+          label="Preset"
+          items={presetOptions}
+        />
+      )}
 
       {/* cancel for selectors */}
       <div

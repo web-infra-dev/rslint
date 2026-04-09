@@ -17,8 +17,8 @@ suite('rslint extension', function () {
       }
 
       // Wait for diagnostics change event or timeout
-      await new Promise(resolve => {
-        const disposable = vscode.languages.onDidChangeDiagnostics(e => {
+      await new Promise((resolve) => {
+        const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
           // Check if this event is for our document
           for (const uri of e.uris) {
             if (uri.toString() === doc.uri.toString()) {
@@ -54,8 +54,8 @@ suite('rslint extension', function () {
       }
 
       // Wait for diagnostics change event or short timeout
-      await new Promise(resolve => {
-        const disposable = vscode.languages.onDidChangeDiagnostics(e => {
+      await new Promise((resolve) => {
+        const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
           for (const uri of e.uris) {
             if (uri.toString() === doc.uri.toString()) {
               disposable.dispose();
@@ -88,8 +88,8 @@ suite('rslint extension', function () {
         return current;
       }
 
-      await new Promise(resolve => {
-        const disposable = vscode.languages.onDidChangeDiagnostics(e => {
+      await new Promise((resolve) => {
+        const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
           for (const uri of e.uris) {
             if (uri.toString() === doc.uri.toString()) {
               disposable.dispose();
@@ -118,13 +118,13 @@ suite('rslint extension', function () {
 
     while (Date.now() - startTime < timeoutMs) {
       const current = vscode.languages.getDiagnostics(doc.uri);
-      if (current.some(d => d.message.includes(messageSubstring))) {
+      if (current.some((d) => d.message.includes(messageSubstring))) {
         return current;
       }
 
       // Wait for diagnostics change event or short timeout
-      await new Promise(resolve => {
-        const disposable = vscode.languages.onDidChangeDiagnostics(e => {
+      await new Promise((resolve) => {
+        const disposable = vscode.languages.onDidChangeDiagnostics((e) => {
           for (const uri of e.uris) {
             if (uri.toString() === doc.uri.toString()) {
               disposable.dispose();
@@ -175,7 +175,7 @@ suite('rslint extension', function () {
 
     // Find the no-unnecessary-type-assertion diagnostic
     const typeAssertionDiag = diagnostics.find(
-      d =>
+      (d) =>
         d.message.includes('no-unnecessary-type-assertion') ||
         (d.source === 'rslint' && d.message.includes('assertion')),
     );
@@ -193,7 +193,7 @@ suite('rslint extension', function () {
 
       // Look for auto fix action
       const autoFixAction = codeActions.find(
-        action =>
+        (action) =>
           action.title.toLowerCase().includes('fix') &&
           action.kind?.value === vscode.CodeActionKind.QuickFix.value,
       );
@@ -218,7 +218,7 @@ suite('rslint extension', function () {
 
     // Find an unsafe diagnostic (these typically don't have auto fixes)
     const unsafeDiag = diagnostics.find(
-      d => d.message.includes('unsafe') || d.message.includes('Unsafe'),
+      (d) => d.message.includes('unsafe') || d.message.includes('Unsafe'),
     );
 
     if (unsafeDiag) {
@@ -234,7 +234,7 @@ suite('rslint extension', function () {
 
       // Look for disable rule for line action
       const disableLineAction = codeActions.find(
-        action =>
+        (action) =>
           action.title.toLowerCase().includes('disable') &&
           action.title.toLowerCase().includes('line'),
       );
@@ -270,7 +270,7 @@ suite('rslint extension', function () {
 
     // Find an unsafe diagnostic
     const unsafeDiag = diagnostics.find(
-      d => d.message.includes('unsafe') || d.message.includes('Unsafe'),
+      (d) => d.message.includes('unsafe') || d.message.includes('Unsafe'),
     );
 
     if (unsafeDiag) {
@@ -286,7 +286,7 @@ suite('rslint extension', function () {
 
       // Look for disable rule for file action
       const disableFileAction = codeActions.find(
-        action =>
+        (action) =>
           action.title.toLowerCase().includes('disable') &&
           action.title.toLowerCase().includes('file'),
       );
@@ -332,7 +332,7 @@ suite('rslint extension', function () {
     // Should either be empty or only contain general actions (not diagnostic-specific)
     if (codeActionsEmptyRange) {
       const diagnosticSpecificActions = codeActionsEmptyRange.filter(
-        action =>
+        (action) =>
           action.title.toLowerCase().includes('fix') ||
           action.title.toLowerCase().includes('disable'),
       );
@@ -361,7 +361,7 @@ suite('rslint extension', function () {
       doc.positionAt(0),
       doc.positionAt(doc.getText().length),
     );
-    await editor.edit(editBuilder => {
+    await editor.edit((editBuilder) => {
       editBuilder.replace(fullRange, '// no lint errors\nexport {};\n');
     });
 
@@ -384,7 +384,7 @@ suite('rslint extension', function () {
 
     // 2. Append code that introduces additional lint errors
     const endPos = doc.positionAt(doc.getText().length);
-    await editor.edit(editBuilder => {
+    await editor.edit((editBuilder) => {
       editBuilder.insert(
         endPos,
         '\nconst anyVal: any = 123;\nanyVal.foo = 1;\n',
@@ -416,18 +416,18 @@ suite('rslint extension', function () {
       new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length));
 
     // Edit 1: still has errors
-    await editor.edit(b =>
+    await editor.edit((b) =>
       b.replace(fullRange(), 'const x: any = 1;\nexport {};\n'),
     );
     // Edit 2: still has errors
-    await editor.edit(b =>
+    await editor.edit((b) =>
       b.replace(
         fullRange(),
         'const y: any = 2;\nconst z: any = 3;\nexport {};\n',
       ),
     );
     // Edit 3: error-free — the final state that matters
-    await editor.edit(b =>
+    await editor.edit((b) =>
       b.replace(fullRange(), '// all clean\nexport {};\n'),
     );
 
@@ -453,7 +453,7 @@ suite('rslint extension', function () {
       doc.positionAt(0),
       doc.positionAt(doc.getText().length),
     );
-    await editor.edit(b => {
+    await editor.edit((b) => {
       b.replace(fullRange, '// empty file\nexport {};\n');
     });
 
@@ -476,14 +476,14 @@ suite('rslint extension', function () {
       new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length));
 
     // Step 1: start from clean state to establish baseline
-    await editor.edit(b =>
+    await editor.edit((b) =>
       b.replace(fullRange(), '// no errors\nexport {};\n'),
     );
     await waitForDiagnosticsCount(doc, 0, 10000);
     const cleanCount = vscode.languages.getDiagnostics(doc.uri).length;
 
     // Step 2: introduce errors
-    await editor.edit(b =>
+    await editor.edit((b) =>
       b.replace(
         fullRange(),
         'const x: any = 1;\nconst y: any = 2;\nx.foo;\ny.bar;\nexport {};\n',
@@ -498,7 +498,7 @@ suite('rslint extension', function () {
 
     // Step 3: clear errors again — use waitForDiagnosticsCount to avoid
     // catching intermediate states from debounce on CI
-    await editor.edit(b =>
+    await editor.edit((b) =>
       b.replace(fullRange(), '// clean again\nexport {};\n'),
     );
     const diags3 = await waitForDiagnosticsCount(doc, 0);
@@ -516,13 +516,13 @@ suite('rslint extension', function () {
       new vscode.Range(doc.positionAt(0), doc.positionAt(doc.getText().length));
 
     // Step 1: Start with clean code — should have zero diagnostics
-    await editor.edit(b =>
+    await editor.edit((b) =>
       b.replace(fullRange(), '// no errors\nexport {};\n'),
     );
     // -1 as previousCount ensures the condition (current.length !== -1) is always
     // true on the first check, effectively meaning "wait for any diagnostics event".
     await waitForDiagnosticsToChange(doc, -1, 5000);
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise((r) => setTimeout(r, 1000));
     const cleanDiags = vscode.languages.getDiagnostics(doc.uri);
     assert.strictEqual(
       cleanDiags.length,
@@ -531,7 +531,7 @@ suite('rslint extension', function () {
     );
 
     // Step 2: Introduce error A — no-unsafe-member-access
-    await editor.edit(b =>
+    await editor.edit((b) =>
       b.replace(
         fullRange(),
         'const obj: any = {};\nobj.foo.bar;\nexport {};\n',
@@ -546,12 +546,12 @@ suite('rslint extension', function () {
       `Step 2 (error A): expected diagnostics, got ${errorADiags.length}`,
     );
     assert.ok(
-      errorADiags.some(d => d.message.includes('no-unsafe-member-access')),
-      `Step 2 (error A): expected no-unsafe-member-access diagnostic, got: ${errorADiags.map(d => d.message).join(', ')}`,
+      errorADiags.some((d) => d.message.includes('no-unsafe-member-access')),
+      `Step 2 (error A): expected no-unsafe-member-access diagnostic, got: ${errorADiags.map((d) => d.message).join(', ')}`,
     );
 
     // Step 3: Change to error B — no-unnecessary-type-assertion (different rule)
-    await editor.edit(b =>
+    await editor.edit((b) =>
       b.replace(
         fullRange(),
         "const someValue: string = 'hello';\nconst result = someValue as string;\nexport {};\n",
@@ -566,21 +566,21 @@ suite('rslint extension', function () {
       `Step 3 (error B): expected diagnostics, got ${errorBDiags.length}`,
     );
     assert.ok(
-      errorBDiags.some(d =>
+      errorBDiags.some((d) =>
         d.message.includes('no-unnecessary-type-assertion'),
       ),
-      `Step 3 (error B): expected no-unnecessary-type-assertion diagnostic, got: ${errorBDiags.map(d => d.message).join(', ')}`,
+      `Step 3 (error B): expected no-unnecessary-type-assertion diagnostic, got: ${errorBDiags.map((d) => d.message).join(', ')}`,
     );
     // Verify error A is gone
     assert.ok(
-      !errorBDiags.some(d => d.message.includes('no-unsafe-member-access')),
+      !errorBDiags.some((d) => d.message.includes('no-unsafe-member-access')),
       `Step 3 (error B): no-unsafe-member-access should be gone`,
     );
 
     // Step 4: Back to clean code — should have zero diagnostics.
     // Use waitForDiagnosticsCount instead of waitForDiagnosticsToChange
     // because debounce can cause intermediate diagnostic states on CI.
-    await editor.edit(b =>
+    await editor.edit((b) =>
       b.replace(fullRange(), '// all clean again\nexport {};\n'),
     );
     const finalDiags = await waitForDiagnosticsCount(doc, 0);
@@ -606,28 +606,28 @@ suite('rslint extension', function () {
           diagnostic.range,
         )
       ).filter(
-        action => action.kind?.value === vscode.CodeActionKind.QuickFix.value,
+        (action) => action.kind?.value === vscode.CodeActionKind.QuickFix.value,
       );
 
       // Check that if there are auto fixes, they are marked as preferred
       const autoFixActions = codeActions.filter(
-        action =>
+        (action) =>
           action.title.toLowerCase().includes('fix') &&
           !action.title.toLowerCase().includes('disable'),
       );
 
-      const disableActions = codeActions.filter(action =>
+      const disableActions = codeActions.filter((action) =>
         action.title.toLowerCase().includes('disable'),
       );
 
       // If both auto fix and disable actions exist, auto fix should be preferred
       if (autoFixActions.length > 0 && disableActions.length > 0) {
         assert.ok(
-          autoFixActions.some(action => action.isPreferred),
+          autoFixActions.some((action) => action.isPreferred),
           'Auto fix actions should be marked as preferred',
         );
         assert.ok(
-          !disableActions.some(action => action.isPreferred),
+          !disableActions.some((action) => action.isPreferred),
           'Disable actions should not be marked as preferred when auto fixes exist',
         );
       }
@@ -655,7 +655,7 @@ suite('rslint extension', function () {
       doc.positionAt(0),
       doc.positionAt(doc.getText().length),
     );
-    await editor.edit(b => b.replace(fullRange, '// clean\nexport {};\n'));
+    await editor.edit((b) => b.replace(fullRange, '// clean\nexport {};\n'));
     const cleanDiags = await waitForDiagnosticsToChange(doc, initialCount);
     assert.strictEqual(
       cleanDiags.length,
@@ -673,7 +673,7 @@ suite('rslint extension', function () {
       doc2.positionAt(0),
       doc2.positionAt(doc2.getText().length),
     );
-    await editor2.edit(b =>
+    await editor2.edit((b) =>
       b.replace(fullRange2, 'const unsafeVal: any = 42;\nunsafeVal.prop;\n'),
     );
 
@@ -697,7 +697,7 @@ suite('rslint extension', function () {
     await vscode.window.showTextDocument(doc);
 
     // Wait a reasonable amount of time — diagnostics should NOT appear
-    await new Promise(r => setTimeout(r, 3000));
+    await new Promise((r) => setTimeout(r, 3000));
 
     const diagnostics = vscode.languages.getDiagnostics(doc.uri);
     assert.strictEqual(

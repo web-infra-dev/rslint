@@ -24,8 +24,8 @@ async function lintAndParse(
   const lines = result.stdout
     .trim()
     .split('\n')
-    .filter(l => l.trim());
-  const diagnostics = lines.map(l => JSON.parse(l) as Diagnostic);
+    .filter((l) => l.trim());
+  const diagnostics = lines.map((l) => JSON.parse(l) as Diagnostic);
   return {
     diagnostics,
     cleanup: () => cleanupTempDir(tempDir),
@@ -43,13 +43,13 @@ async function lintAndParse(
  */
 function diagsFor(diagnostics: Diagnostic[], pathPart: string): Diagnostic[] {
   return diagnostics.filter(
-    d => d.filePath === pathPart || d.filePath.startsWith(pathPart + '/'),
+    (d) => d.filePath === pathPart || d.filePath.startsWith(pathPart + '/'),
   );
 }
 
 /** Extract rule names from diagnostics. */
 function ruleNames(diagnostics: Diagnostic[]): string[] {
-  return diagnostics.map(d => d.ruleName);
+  return diagnostics.map((d) => d.ruleName);
 }
 
 /** Common root config with global ignores + TS rules. */

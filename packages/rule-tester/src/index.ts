@@ -17,7 +17,7 @@ interface TsDiagnostic {
   output?: string;
 }
 function toCamelCase(name: string): string {
-  return name.replace(/-([a-z])/g, g => g[1].toUpperCase());
+  return name.replace(/-([a-z])/g, (g) => g[1].toUpperCase());
 }
 // check whether rslint diagnostics and typescript-eslint diagnostics are semantic equal
 function checkDiagnosticEqual(
@@ -159,13 +159,13 @@ export class RuleTester {
 
       // test whether case has only
       let hasOnly =
-        cases.valid.some(x => {
+        cases.valid.some((x) => {
           if (typeof x === 'object' && x.only) {
             return true;
           } else {
             return false;
           }
-        }) || cases.invalid.some(x => x.only);
+        }) || cases.invalid.some((x) => x.only);
       test('valid', async () => {
         for (const validCase of cases.valid) {
           if (typeof validCase === 'object' && validCase.skip) {
@@ -226,7 +226,7 @@ export class RuleTester {
           );
         }
       });
-      test('invalid', async t => {
+      test('invalid', async (t) => {
         for (const item of cases.invalid) {
           const {
             code,

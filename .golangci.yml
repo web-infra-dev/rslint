@@ -25,6 +25,7 @@ linters:
     - errname
     - errorlint
     - fatcontext
+    - forcetypeassert
     - gocheckcompilerdirectives
     - goprintffuncname
     - govet
@@ -37,6 +38,9 @@ linters:
     - misspell
     - musttag
     - nakedret
+    - nilerr
+    - nilnesserr
+    - nilnil
     # - nolintlint
     - paralleltest
     - perfsprint
@@ -62,6 +66,9 @@ linters:
     - unused
 
   settings:
+    govet:
+      enable:
+        - nilness
     depguard:
       rules:
         main:
@@ -74,6 +81,9 @@ linters:
       - path: internal/fourslash/tests/gen/
         linters:
           - misspell
+      - path: '_test\.go$'
+        linters:
+          - forcetypeassert
 
     presets:
       - comments

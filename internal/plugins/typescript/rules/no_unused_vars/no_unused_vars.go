@@ -1086,6 +1086,9 @@ func isReExportedSymbol(ctx rule.RuleContext, sym *ast.Symbol, sourceFile *ast.N
 		if exportDecl == nil || exportDecl.ExportClause == nil {
 			return false
 		}
+		if !ast.IsNamedExports(exportDecl.ExportClause) {
+			return false
+		}
 		namedExports := exportDecl.ExportClause.AsNamedExports()
 		if namedExports == nil || namedExports.Elements == nil {
 			return false
@@ -1741,7 +1744,8 @@ func processVariable(ctx rule.RuleContext, nameNode *ast.Node, name string, defi
 }
 
 var NoUnusedVarsRule = rule.CreateRule(rule.Rule{
-	Name: "no-unused-vars",
+	Name:             "no-unused-vars",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := parseOptions(options)
 

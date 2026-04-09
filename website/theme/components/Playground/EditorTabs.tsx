@@ -184,7 +184,7 @@ export const EditorTabs = ({
     attachDiag: (diags: Diagnostic[]) => {
       const model = codeEditorRef.current?.getModel();
       if (model) {
-        const markers = diags.map(diag => {
+        const markers = diags.map((diag) => {
           const start = diag.range.start;
           const end = diag.range.end;
           return {
@@ -432,7 +432,7 @@ export const EditorTabs = ({
   return (
     <div className="flex flex-col h-full w-full">
       <div className="flex items-center gap-2 bg-gray-50 p-2 flex-shrink-0">
-        {tabs.map(tab => (
+        {tabs.map((tab) => (
           <Button
             key={tab.key}
             type="button"

@@ -153,7 +153,8 @@ func checkParameter(ctx rule.RuleContext, param *ast.Node, opts PreferReadonlyPa
 }
 
 var PreferReadonlyParameterTypesRule = rule.CreateRule(rule.Rule{
-	Name: "prefer-readonly-parameter-types",
+	Name:             "prefer-readonly-parameter-types",
+	RequiresTypeInfo: true,
 	Run: func(ctx rule.RuleContext, options any) rule.RuleListeners {
 		opts := parseOptions(options)
 
