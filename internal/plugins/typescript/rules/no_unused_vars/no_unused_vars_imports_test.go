@@ -107,7 +107,7 @@ func TestNoUnusedVarsImports(t *testing.T) {
 				MessageId: "unusedVar", Line: 1, Column: 10,
 				Suggestions: []rule_tester.InvalidTestCaseSuggestion{{
 					MessageId: "removeUnusedImportDeclaration",
-					Output:    `export * as pathNs from "path";`,
+					Output:    ` export * as pathNs from "path";`,
 				}},
 			}},
 		},
