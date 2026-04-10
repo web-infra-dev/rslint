@@ -238,6 +238,7 @@ export default defineConfig({
     './tests/eslint/rules/no-obj-calls.test.ts',
     './tests/eslint/rules/no-setter-return.test.ts',
     './tests/eslint/rules/no-unsafe-negation.test.ts',
+    './tests/eslint/rules/no-unsafe-optional-chaining.test.ts',
     './tests/eslint/rules/use-isnan.test.ts',
     './tests/eslint/rules/eqeqeq.test.ts',
     './tests/eslint/rules/valid-typeof.test.ts',
