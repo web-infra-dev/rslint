@@ -2,7 +2,7 @@
 
 ## Rule Details
 
-Prefer `toStrictEqual()` over `toEqual()` on `expect()`. It is common to expect objects to not only have identical values but also to have identical keys. A stricter equality will catch cases where two objects do not have identical keys.
+Prefer `toStrictEqual()` over `toEqual()`. While `toEqual` recursively checks every field of an object or array, it ignores `undefined` properties. This can lead to unexpected test passes and hide bugs. `toStrictEqual()` provides a stricter equality check that does not ignore `undefined` properties, making your tests more robust.
 
 Examples of **incorrect** code for this rule:
 
