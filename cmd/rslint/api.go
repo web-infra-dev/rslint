@@ -156,7 +156,6 @@ func (h *IPCHandler) HandleLint(req api.LintRequest) (*api.LintResponse, error) 
 
 	// Create collector function
 	diagnosticCollector := func(d rule.RuleDiagnostic) {
-
 		diagnosticsLock.Lock()
 		defer diagnosticsLock.Unlock()
 
