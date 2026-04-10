@@ -54,7 +54,15 @@ var PreferStrictEqualRule = rule.Rule{
 						rule.RuleSuggestion{
 							Message: buildSuggestReplaceWithStrictEqualErrorMessage(),
 							FixesArr: []rule.RuleFix{
-								{Range: core.NewTextRange(memberEntry.Node.Pos(), memberEntry.Node.End()), Text: "toStrictEqual"},
+								{
+									Range: core.NewTextRange(memberEntry.Node.Pos(), memberEntry.Node.End()),
+									Text: func() string {
+										if memberEntry.Node.Kind != ast.KindIdentifier {
+											return "'toStrictEqual'"
+										}
+										return "toStrictEqual"
+									}(),
+								},
 							},
 						},
 					)
