@@ -245,6 +245,7 @@ export default defineConfig({
     './tests/eslint/rules/eqeqeq.test.ts',
     './tests/eslint/rules/valid-typeof.test.ts',
     './tests/eslint/rules/no-unmodified-loop-condition.test.ts',
+    './tests/eslint/rules/no-alert.test.ts',
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/no-alias-methods.test.ts',
