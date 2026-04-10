@@ -96,7 +96,8 @@ func buildCalleeWithTodo(ctx rule.RuleContext, callExpr *ast.CallExpression, jes
 		return ""
 	}
 
-	prefix := src[callee.Pos():mem.Pos()]
+	calleeTrim := rslintUtils.TrimNodeTextRange(ctx.SourceFile, callee)
+	prefix := src[calleeTrim.Pos():mem.Pos()]
 	var mid string
 	if mem.Kind == ast.KindIdentifier {
 		mid = "todo"

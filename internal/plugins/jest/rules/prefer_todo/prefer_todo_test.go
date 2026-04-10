@@ -94,6 +94,17 @@ func TestPreferTodoRule(t *testing.T) {
 					{MessageId: "emptyTest", Line: 1, Column: 1},
 				},
 			},
+			{
+				Code: `if (true) {
+    test.skip("i need to write this test", () => {});
+}`,
+				Output: []string{`if (true) {
+    test.todo("i need to write this test");
+}`},
+				Errors: []rule_tester.InvalidTestCaseError{
+					{MessageId: "emptyTest", Line: 2, Column: 5},
+				},
+			},
 		},
 	)
 }
