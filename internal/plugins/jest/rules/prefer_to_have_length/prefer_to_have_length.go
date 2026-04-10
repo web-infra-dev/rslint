@@ -149,7 +149,8 @@ var PreferToHaveLengthRule = rule.Rule{
 				middleText := fileText[expectCall.End():beforeMatcher.End()]
 
 				newText := fmt.Sprintf("expect(%s)%s.toHaveLength(%s)", innerText, middleText, expectedText)
-				fixRange := core.NewTextRange(expectCall.Pos(), node.End())
+				trimmedExpectCall := rslintUtils.TrimNodeTextRange(sourceFile, expectCall)
+				fixRange := core.NewTextRange(trimmedExpectCall.Pos(), node.End())
 				reportNode := node
 
 				if n := len(jestFnCall.MemberEntries); n > 0 {
