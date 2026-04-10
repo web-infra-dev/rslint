@@ -243,6 +243,7 @@ export default defineConfig({
     './tests/eslint/rules/use-isnan.test.ts',
     './tests/eslint/rules/eqeqeq.test.ts',
     './tests/eslint/rules/valid-typeof.test.ts',
+    './tests/eslint/rules/no-unmodified-loop-condition.test.ts',
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/no-alias-methods.test.ts',
