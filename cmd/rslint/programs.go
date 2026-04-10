@@ -9,7 +9,6 @@ import (
 	"github.com/microsoft/typescript-go/shim/core"
 	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
-	"github.com/microsoft/typescript-go/shim/vfs/osvfs"
 	rslintconfig "github.com/web-infra-dev/rslint/internal/config"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -25,19 +24,10 @@ func createProgramsForConfig(
 	fsys vfs.FS,
 	seenTsConfigs map[string]struct{},
 ) ([]*compiler.Program, int) {
-	loader := rslintconfig.NewConfigLoader(fsys, configDir)
-	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(entries, configDir)
+	tsConfigs, err := rslintconfig.ResolveTsConfigPaths(entries, configDir, fsys)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return nil, 1
-	}
-
-	// Auto-detect tsconfig.json if none specified in config
-	if len(tsConfigs) == 0 {
-		defaultTsConfig := tspath.ResolvePath(configDir, "tsconfig.json")
-		if fsys.FileExists(defaultTsConfig) {
-			tsConfigs = []string{defaultTsConfig}
-		}
 	}
 
 	var programs []*compiler.Program
@@ -115,29 +105,6 @@ func createFallbackProgram(
 		return nil, 0
 	}
 	return program, 0
-}
-
-// buildProgramFileSet collects all source file paths from the given programs
-// into a set for fast lookup.
-func buildProgramFileSet(programs []*compiler.Program) map[string]struct{} {
-	fileSet := make(map[string]struct{})
-	realFS := osvfs.FS()
-	for _, prog := range programs {
-		for _, sf := range prog.GetSourceFiles() {
-			name := sf.FileName()
-			if _, ok := fileSet[name]; ok {
-				continue
-			}
-			fileSet[name] = struct{}{}
-			// Also store the resolved path so lookups from filepath.EvalSymlinks
-			// match even when os.Getwd() returns 8.3 short names (Windows) or
-			// unresolved symlinks (macOS /tmp → /private/tmp).
-			if resolved := realFS.Realpath(name); resolved != name {
-				fileSet[resolved] = struct{}{}
-			}
-		}
-	}
-	return fileSet
 }
 
 // buildFileOwnerMap determines which config directory "owns" each file across

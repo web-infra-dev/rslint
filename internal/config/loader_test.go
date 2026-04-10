@@ -382,3 +382,72 @@ func createTestFile(t *testing.T, path string) {
 	assert.NilError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 	assert.NilError(t, os.WriteFile(path, []byte(`{}`), 0o644))
 }
+
+func TestResolveTsConfigPaths_ReturnsConfiguredPaths(t *testing.T) {
+	tmpDir := t.TempDir()
+	createTestFile(t, filepath.Join(tmpDir, "packages/foo/tsconfig.json"))
+
+	cfg := RslintConfig{
+		{
+			LanguageOptions: &LanguageOptions{
+				ParserOptions: &ParserOptions{
+					Project: []string{"./packages/foo/tsconfig.json"},
+				},
+			},
+		},
+	}
+
+	paths, err := ResolveTsConfigPaths(cfg, tmpDir, osvfs.FS())
+	assert.NilError(t, err)
+	if len(paths) != 1 {
+		t.Fatalf("expected 1 path, got %d", len(paths))
+	}
+	expected := filepath.ToSlash(filepath.Join(tmpDir, "packages/foo/tsconfig.json"))
+	if paths[0] != expected {
+		t.Errorf("expected path %q, got %q", expected, paths[0])
+	}
+}
+
+func TestResolveTsConfigPaths_FallbackToDefaultTsConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	createTestFile(t, filepath.Join(tmpDir, "tsconfig.json"))
+
+	// No parserOptions.project → auto-detect tsconfig.json
+	cfg := RslintConfig{{}}
+
+	paths, err := ResolveTsConfigPaths(cfg, tmpDir, osvfs.FS())
+	assert.NilError(t, err)
+	if len(paths) != 1 {
+		t.Fatalf("expected 1 path (auto-detected), got %d", len(paths))
+	}
+	expected := filepath.ToSlash(filepath.Join(tmpDir, "tsconfig.json"))
+	if paths[0] != expected {
+		t.Errorf("expected auto-detected path %q, got %q", expected, paths[0])
+	}
+}
+
+func TestResolveTsConfigPaths_NilFS(t *testing.T) {
+	paths, err := ResolveTsConfigPaths(RslintConfig{{}}, "/any", nil)
+	assert.NilError(t, err)
+	if paths != nil {
+		t.Errorf("expected nil paths for nil FS, got %v", paths)
+	}
+}
+
+func TestResolveTsConfigPaths_ErrorOnNonExistentTsConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := RslintConfig{
+		{
+			LanguageOptions: &LanguageOptions{
+				ParserOptions: &ParserOptions{
+					Project: []string{"./nonexistent/tsconfig.json"},
+				},
+			},
+		},
+	}
+
+	_, err := ResolveTsConfigPaths(cfg, tmpDir, osvfs.FS())
+	if err == nil {
+		t.Error("expected error for non-existent tsconfig")
+	}
+}

@@ -73,7 +73,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/adjacent-overload-signatures.test.ts',
     './tests/typescript-eslint/rules/array-type.test.ts',
     './tests/typescript-eslint/rules/await-thenable.test.ts',
-    // './tests/typescript-eslint/rules/ban-ts-comment.test.ts',
+    './tests/typescript-eslint/rules/ban-ts-comment.test.ts',
     './tests/typescript-eslint/rules/ban-tslint-comment.test.ts',
     './tests/typescript-eslint/rules/class-literal-property-style.test.ts',
     // './tests/typescript-eslint/rules/class-methods-use-this/class-methods-use-this-core.test.ts',
@@ -237,9 +237,13 @@ export default defineConfig({
     './tests/eslint/rules/no-new-symbol.test.ts',
     './tests/eslint/rules/no-obj-calls.test.ts',
     './tests/eslint/rules/no-setter-return.test.ts',
+    './tests/eslint/rules/no-unsafe-finally.test.ts',
     './tests/eslint/rules/no-unsafe-negation.test.ts',
+    './tests/eslint/rules/no-unsafe-optional-chaining.test.ts',
     './tests/eslint/rules/use-isnan.test.ts',
     './tests/eslint/rules/eqeqeq.test.ts',
+    './tests/eslint/rules/valid-typeof.test.ts',
+    './tests/eslint/rules/no-unmodified-loop-condition.test.ts',
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/no-alias-methods.test.ts',

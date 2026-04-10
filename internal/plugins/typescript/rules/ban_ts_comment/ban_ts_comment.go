@@ -3,10 +3,11 @@ package ban_ts_comment
 import (
 	"regexp"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/microsoft/typescript-go/shim/ast"
 	"github.com/microsoft/typescript-go/shim/core"
+	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/rivo/uniseg"
 	"github.com/web-infra-dev/rslint/internal/rule"
 	"github.com/web-infra-dev/rslint/internal/utils"
 )
@@ -25,15 +26,19 @@ type BanTsCommentOptions struct {
 	MinimumDescriptionLength int         `json:"minimumDescriptionLength"`
 }
 
-// Regular expressions for matching TypeScript directives
+// Regexes for single-line comments.
+// ts-expect-error and ts-ignore: match any number of leading slashes (original: /^\/*\s*@ts-.../)
+// ts-check and ts-nocheck: only match 2 or 3 slashes (pragma comments: /^\/\/\/?\s*@ts-.../)
 var (
-	// Matches single-line comments: // @ts-<directive>
-	singleLineDirectiveRegex = regexp.MustCompile(`^\/\/\/?\s*@ts-(expect-error|ignore|nocheck|check)\b`)
+	// For ts-expect-error / ts-ignore in single-line comments: any number of leading slashes
+	singleLineDirectiveRegex = regexp.MustCompile(`^/{2,}\s*@ts-(expect-error|ignore)\b`)
 
-	// Matches multi-line comments: /* @ts-<directive> */
-	// Matches if the directive appears anywhere in the comment (including after newlines)
-	// Uses [\s*]* to match whitespace (including newlines) and asterisks
-	multiLineDirectiveRegex = regexp.MustCompile(`^\/\*[\s*]*@ts-(expect-error|ignore|nocheck|check)\b`)
+	// For ts-check / ts-nocheck in single-line comments: exactly 2 or 3 slashes (pragma style)
+	singleLinePragmaRegex = regexp.MustCompile(`^///?\s*@ts-(check|nocheck)\b`)
+
+	// For ts-expect-error / ts-ignore on the last line of a block comment
+	// Matches optional whitespace, optional leading * or /, then the directive
+	multiLineLastLineRegex = regexp.MustCompile(`^\s*(?:[/*])*\s*@ts-(expect-error|ignore)\b`)
 )
 
 // BanTsCommentRule implements the ban-ts-comment rule
@@ -45,7 +50,7 @@ var BanTsCommentRule = rule.CreateRule(rule.Rule{
 
 func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 	opts := BanTsCommentOptions{
-		TsExpectError:            true,
+		TsExpectError:            "allow-with-description",
 		TsIgnore:                 true,
 		TsNocheck:                true,
 		TsCheck:                  false,
@@ -94,7 +99,14 @@ func run(ctx rule.RuleContext, options any) rule.RuleListeners {
 		"ts-check":        parseDirectiveConfig(opts.TsCheck),
 	}
 
-	processComments(ctx, ctx.SourceFile.Text(), configs, opts.MinimumDescriptionLength)
+	// Determine token position of the first statement (excluding leading trivia)
+	// for ts-nocheck pragma check: only report if comment is before first real code
+	firstStatementPos := -1
+	if ctx.SourceFile.Statements != nil && len(ctx.SourceFile.Statements.Nodes) > 0 {
+		firstStatementPos = scanner.GetTokenPosOfNode(ctx.SourceFile.Statements.Nodes[0], ctx.SourceFile, false)
+	}
+
+	processComments(ctx, ctx.SourceFile.Text(), configs, opts.MinimumDescriptionLength, firstStatementPos)
 
 	return rule.RuleListeners{}
 }
@@ -124,10 +136,7 @@ func parseDirectiveConfig(value interface{}) *DirectiveConfig {
 }
 
 // processComments scans real comment trivia and checks for banned directives.
-// Using the TS scanner avoids matching comment-like text inside strings/template literals,
-// for example `const c = "// @ts-ignore"` should stay a plain string and must not be linted
-// as if it were an actual comment directive.
-func processComments(ctx rule.RuleContext, text string, configs map[string]*DirectiveConfig, minDescLength int) {
+func processComments(ctx rule.RuleContext, text string, configs map[string]*DirectiveConfig, minDescLength int, firstStatementPos int) {
 	utils.ForEachComment(ctx.SourceFile.AsNode(), func(comment *ast.CommentRange) {
 		if comment == nil {
 			return
@@ -137,106 +146,136 @@ func processComments(ctx rule.RuleContext, text string, configs map[string]*Dire
 		}
 
 		commentText := text[comment.Pos():comment.End()]
-		checkComment(
-			ctx,
-			commentText,
-			comment.Pos(),
-			configs,
-			minDescLength,
-			comment.Kind == ast.KindMultiLineCommentTrivia,
-		)
+
+		switch comment.Kind {
+		case ast.KindSingleLineCommentTrivia:
+			checkSingleLineComment(ctx, commentText, comment.Pos(), configs, minDescLength, firstStatementPos)
+		case ast.KindMultiLineCommentTrivia:
+			checkMultiLineComment(ctx, commentText, comment.Pos(), configs, minDescLength)
+		}
 	}, ctx.SourceFile)
 }
 
-// checkComment checks a single comment for banned directives
-func checkComment(ctx rule.RuleContext, commentText string, commentStart int, configs map[string]*DirectiveConfig, minDescLength int, isMultiLine bool) {
-	var matches []string
-	var directiveType string
+// checkSingleLineComment handles single-line comments (// or /// style).
+func checkSingleLineComment(ctx rule.RuleContext, commentText string, commentStart int, configs map[string]*DirectiveConfig, minDescLength int, firstStatementPos int) {
+	// Try matching ts-expect-error / ts-ignore (any number of leading slashes)
+	if match := singleLineDirectiveRegex.FindStringSubmatch(commentText); match != nil {
+		directiveType := match[1] // "expect-error" or "ignore"
+		directiveName := "ts-" + directiveType
+		description := extractSingleLineDescription(commentText, "@ts-"+directiveType)
+		reportDirective(ctx, commentText, commentStart, configs, directiveName, directiveType, description, minDescLength)
+		return
+	}
 
-	if isMultiLine {
-		match := multiLineDirectiveRegex.FindStringSubmatch(commentText)
-		if match != nil {
-			matches = match
-			directiveType = match[1]
+	// Try matching ts-check / ts-nocheck (only 2 or 3 slashes, pragma style)
+	if match := singleLinePragmaRegex.FindStringSubmatch(commentText); match != nil {
+		directiveType := match[1] // "check" or "nocheck"
+		directiveName := "ts-" + directiveType
+
+		// ts-nocheck after the first statement is not effective and should not be reported
+		if directiveType == "nocheck" && firstStatementPos >= 0 && commentStart >= firstStatementPos {
+			return
 		}
+
+		description := extractSingleLineDescription(commentText, "@ts-"+directiveType)
+		reportDirective(ctx, commentText, commentStart, configs, directiveName, directiveType, description, minDescLength)
+	}
+}
+
+// checkMultiLineComment handles block comments (/* */ style).
+// Only ts-expect-error and ts-ignore are checked in block comments.
+// ts-check and ts-nocheck are pragma-only (single-line).
+// The directive must appear on the LAST line of the comment to be recognized.
+func checkMultiLineComment(ctx rule.RuleContext, commentText string, commentStart int, configs map[string]*DirectiveConfig, minDescLength int) {
+	// Extract content between /* and */
+	if len(commentText) < 4 {
+		return
+	}
+	content := commentText[2 : len(commentText)-2]
+
+	// Get the last line of the comment content
+	lastLineStart := strings.LastIndexByte(content, '\n')
+	var lastLine string
+	if lastLineStart == -1 {
+		lastLine = content
 	} else {
-		match := singleLineDirectiveRegex.FindStringSubmatch(commentText)
-		if match != nil {
-			matches = match
-			directiveType = match[1]
-		}
+		lastLine = content[lastLineStart+1:]
 	}
 
-	if matches == nil {
+	// Check if the last line contains a directive (ts-expect-error or ts-ignore only)
+	match := multiLineLastLineRegex.FindStringSubmatch(lastLine)
+	if match == nil {
 		return
 	}
 
-	// Get the directive config
+	directiveType := match[1] // "expect-error" or "ignore"
 	directiveName := "ts-" + directiveType
-	config := configs[directiveName]
 
-	// If directive is disabled, don't report
-	if !config.Enabled {
-		return
-	}
-
-	// Extract the part after the directive
-	directivePattern := `@ts-` + directiveType
-	idx := strings.Index(commentText, directivePattern)
+	// Extract raw description from the last line after the directive
+	directivePattern := "@ts-" + directiveType
+	idx := strings.Index(lastLine, directivePattern)
 	if idx == -1 {
 		return
 	}
+	rawDescription := lastLine[idx+len(directivePattern):]
 
-	afterDirective := commentText[idx+len(directivePattern):]
+	reportDirective(ctx, commentText, commentStart, configs, directiveName, directiveType, rawDescription, minDescLength)
+}
 
-	// For multi-line comments, check if there's meaningful content after the directive on subsequent lines
-	// If there is, this is not a directive comment (it's just a comment that mentions the directive)
-	if isMultiLine {
-		// Remove the trailing */
-		withoutClosing := strings.TrimSuffix(afterDirective, "*/")
+// extractSingleLineDescription extracts the raw description from a single-line comment after the directive.
+// The returned string is NOT trimmed — callers decide how to use it (raw for format check, trimmed for length).
+func extractSingleLineDescription(commentText string, directive string) string {
+	idx := strings.Index(commentText, directive)
+	if idx == -1 {
+		return ""
+	}
+	return commentText[idx+len(directive):]
+}
 
-		// Find the first newline after the directive
-		firstNewline := strings.Index(withoutClosing, "\n")
-		if firstNewline != -1 {
-			// Get content after the first newline
-			afterFirstLine := withoutClosing[firstNewline+1:]
-
-			// Check if there's any meaningful content after the directive line
-			// (excluding whitespace, asterisks, and description separators)
-			lines := strings.Split(afterFirstLine, "\n")
-			for _, line := range lines {
-				trimmed := strings.TrimLeft(line, " \t*")
-				trimmed = strings.TrimSpace(trimmed)
-				// If this line has content that's not just separators, it's not a directive comment
-				if len(trimmed) > 0 && !isOnlyDescriptionSeparator(trimmed) {
-					return
-				}
-			}
-		}
-
-		afterDirective = withoutClosing
+// reportDirective reports a directive violation if applicable.
+// rawDescription is the text after the directive keyword (untrimmed), used for format matching.
+func reportDirective(ctx rule.RuleContext, commentText string, commentStart int, configs map[string]*DirectiveConfig, directiveName string, directiveType string, rawDescription string, minDescLength int) {
+	config := configs[directiveName]
+	if config == nil || !config.Enabled {
+		return
 	}
 
-	// Description is everything after the directive, trimmed of whitespace only.
-	// Separators like ':' and '--' are part of the description (included in length).
-	description := strings.TrimSpace(afterDirective)
+	commentRange := core.NewTextRange(commentStart, commentStart+len(commentText))
 
 	// Special case: for ts-ignore with no description allowed, suggest ts-expect-error
-	if directiveType == "ignore" && !config.AllowWithDescription {
-		ctx.ReportRange(
-			core.NewTextRange(commentStart, commentStart+len(commentText)),
-			rule.RuleMessage{
-				Id:          "tsIgnoreInsteadOfExpectError",
-				Description: "Prefer '@ts-expect-error' over '@ts-ignore' as it requires error to be present in next line.",
-			},
-		)
+	// BUT only if ts-expect-error is not also completely banned — otherwise it's contradictory
+	// to suggest something that's also forbidden.
+	expectErrorConfig := configs["ts-expect-error"]
+	expectErrorAlsoBanned := expectErrorConfig != nil && expectErrorConfig.Enabled && !expectErrorConfig.AllowWithDescription
+	if directiveType == "ignore" && !config.AllowWithDescription && !expectErrorAlsoBanned {
+		msg := rule.RuleMessage{
+			Id:          "tsIgnoreInsteadOfExpectError",
+			Description: "Prefer '@ts-expect-error' over '@ts-ignore' as it requires error to be present in next line.",
+		}
+		// Provide a suggestion (not autofix): replace @ts-ignore with @ts-expect-error.
+		// This is intentionally a suggestion rather than an autofix because @ts-expect-error
+		// requires the next line to actually have a type error — auto-replacing could break code.
+		idx := strings.LastIndex(commentText, "@ts-ignore")
+		if idx >= 0 {
+			fixRange := core.NewTextRange(commentStart+idx, commentStart+idx+len("@ts-ignore"))
+			fix := rule.RuleFixReplaceRange(fixRange, "@ts-expect-error")
+			ctx.ReportRangeWithSuggestions(commentRange, msg, rule.RuleSuggestion{
+				Message: rule.RuleMessage{
+					Id:          "replaceTsIgnoreWithTsExpectError",
+					Description: "Replace '@ts-ignore' with '@ts-expect-error'.",
+				},
+				FixesArr: []rule.RuleFix{fix},
+			})
+		} else {
+			ctx.ReportRange(commentRange, msg)
+		}
 		return
 	}
 
 	// If the directive is completely banned (no description allowed)
 	if !config.AllowWithDescription {
 		ctx.ReportRange(
-			core.NewTextRange(commentStart, commentStart+len(commentText)),
+			commentRange,
 			rule.RuleMessage{
 				Id:          "tsDirectiveComment",
 				Description: "Do not use '@" + directiveName + "' because it alters compilation errors.",
@@ -245,63 +284,43 @@ func checkComment(ctx rule.RuleContext, commentText string, commentStart int, co
 		return
 	}
 
-	// If description is required, check minimum length (handles both empty and too-short)
-	if config.AllowWithDescription {
-		descLength := graphemeLength(description)
-		if descLength < minDescLength {
-			ctx.ReportRange(
-				core.NewTextRange(commentStart, commentStart+len(commentText)),
-				rule.RuleMessage{
-					Id:          "tsDirectiveCommentRequiresDescription",
-					Description: "Include a description after the '@" + directiveName + "' directive to explain why the '@" + directiveName + "' is necessary. The description must be " + formatMinimumDescLength(minDescLength) + " characters long.",
-				},
-			)
-			return
-		}
+	// Trimmed description for length check; raw description for format check
+	trimmedDescription := strings.TrimSpace(rawDescription)
 
-		// Check description format if specified
-		if config.DescriptionFormat != "" {
-			formatRegex, err := regexp.Compile(config.DescriptionFormat)
-			if err == nil {
-				if !formatRegex.MatchString(description) {
-					ctx.ReportRange(
-						core.NewTextRange(commentStart, commentStart+len(commentText)),
-						rule.RuleMessage{
-							Id:          "tsDirectiveCommentDescriptionNotMatchPattern",
-							Description: "The description for the '@" + directiveName + "' directive must match the format '" + config.DescriptionFormat + "'.",
-						},
-					)
-					return
-				}
+	// Check minimum length using grapheme cluster count on the trimmed description
+	descLength := graphemeLength(trimmedDescription)
+	if descLength < minDescLength {
+		ctx.ReportRange(
+			commentRange,
+			rule.RuleMessage{
+				Id:          "tsDirectiveCommentRequiresDescription",
+				Description: "Include a description after the '@" + directiveName + "' directive to explain why the '@" + directiveName + "' is necessary. The description must be " + formatInt(minDescLength) + " characters or longer.",
+			},
+		)
+		return
+	}
+
+	// Check description format against raw (untrimmed) description
+	if config.DescriptionFormat != "" {
+		formatRegex, err := regexp.Compile(config.DescriptionFormat)
+		if err == nil {
+			if !formatRegex.MatchString(rawDescription) {
+				ctx.ReportRange(
+					commentRange,
+					rule.RuleMessage{
+						Id:          "tsDirectiveCommentDescriptionNotMatchPattern",
+						Description: "The description for the '@" + directiveName + "' directive must match the format '" + config.DescriptionFormat + "'.",
+					},
+				)
 			}
 		}
 	}
 }
 
-// isOnlyDescriptionSeparator checks if a string contains only description separator characters
-func isOnlyDescriptionSeparator(s string) bool {
-	for _, ch := range s {
-		if ch != ':' && ch != ' ' && ch != '\t' && ch != '-' {
-			return false
-		}
-	}
-	return len(s) > 0
-}
-
-// graphemeLength returns the number of grapheme clusters in a string
-// This properly handles Unicode characters including emojis
+// graphemeLength returns the number of grapheme clusters in a string.
+// Uses proper Unicode grapheme cluster segmentation (UAX#29) via rivo/uniseg.
 func graphemeLength(s string) int {
-	// For simplicity, we'll count runes, which is close enough for most cases
-	// A more accurate implementation would use a grapheme cluster library
-	return utf8.RuneCountInString(s)
-}
-
-// formatMinimumDescLength formats the minimum description length message
-func formatMinimumDescLength(length int) string {
-	if length == 1 {
-		return "at least 1 character"
-	}
-	return "at least " + formatInt(length) + " characters"
+	return uniseg.GraphemeClusterCount(s)
 }
 
 // formatInt converts an integer to a string

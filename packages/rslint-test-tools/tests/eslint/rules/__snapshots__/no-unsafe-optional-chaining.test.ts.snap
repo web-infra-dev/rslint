@@ -1,0 +1,607 @@
+// Rstest Snapshot v1
+
+exports[`no-unsafe-optional-chaining > invalid 1`] = `
+{
+  "code": "(obj?.foo)();",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 2`] = `
+{
+  "code": "(obj?.foo).bar;",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 3`] = `
+{
+  "code": "new (obj?.foo)();",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 4`] = `
+{
+  "code": "(obj?.foo)\`text\`;",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 5`] = `
+{
+  "code": "[...obj?.foo];",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 6`] = `
+{
+  "code": "foo(...obj?.foo);",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 7`] = `
+{
+  "code": "const {foo} = obj?.bar;",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 8`] = `
+{
+  "code": "({foo} = obj?.bar);",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 9`] = `
+{
+  "code": "const {x: {y} = obj?.foo} = obj;",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 10`] = `
+{
+  "code": "function f({x: {y} = obj?.foo}: any) {}",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 11`] = `
+{
+  "code": "const [, [a] = obj?.foo] = arr;",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 12`] = `
+{
+  "code": "class Foo extends obj?.bar {}",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 13`] = `
+{
+  "code": "const C = class extends obj?.bar {};",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 25,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 14`] = `
+{
+  "code": "(cond ? obj?.foo : obj?.bar)();",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 15`] = `
+{
+  "code": "(obj?.foo && obj?.bar)();",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 16`] = `
+{
+  "code": "(obj?.foo && bar)();",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 1,
+        },
+        "start": {
+          "column": 2,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 17`] = `
+{
+  "code": "(a, b, obj?.foo)();",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 18`] = `
+{
+  "code": "((((obj?.foo))))();",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 19`] = `
+{
+  "code": "async function h() { (await obj?.foo)(); }",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 29,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 20`] = `
+{
+  "code": ""key" in (cond ? obj?.a : obj?.b);",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unsafe-optional-chaining > invalid 21`] = `
+{
+  "code": "[...(cond ? obj?.a : obj?.b)];",
+  "diagnostics": [
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+    {
+      "message": "Unsafe usage of optional chaining. If it short-circuits with 'undefined' the evaluation will throw TypeError.",
+      "messageId": "unsafeOptionalChain",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unsafe-optional-chaining",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
