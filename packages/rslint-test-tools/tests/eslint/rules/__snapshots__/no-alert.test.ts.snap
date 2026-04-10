@@ -1,0 +1,1363 @@
+// Rstest Snapshot v1
+
+exports[`no-alert > invalid 1`] = `
+{
+  "code": "alert(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 2`] = `
+{
+  "code": "confirm(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected confirm.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 3`] = `
+{
+  "code": "prompt(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected prompt.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 4`] = `
+{
+  "code": "window.alert(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 5`] = `
+{
+  "code": "window.confirm(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected confirm.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 6`] = `
+{
+  "code": "window.prompt(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected prompt.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 7`] = `
+{
+  "code": "window['alert'](foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 8`] = `
+{
+  "code": "window['confirm'](foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected confirm.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 9`] = `
+{
+  "code": "window['prompt'](foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected prompt.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 10`] = `
+{
+  "code": "window[\`alert\`](foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 11`] = `
+{
+  "code": "function alert() {} window.alert(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 12`] = `
+{
+  "code": "var alert = function() {};
+window.alert(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 13`] = `
+{
+  "code": "function foo(alert) { window.alert(); }",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 14`] = `
+{
+  "code": "function foo() { alert(); }",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 15`] = `
+{
+  "code": "const foo = () => alert()",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 16`] = `
+{
+  "code": "const foo = () => { alert(); }",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 17`] = `
+{
+  "code": "class A { foo() { alert(); } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 18`] = `
+{
+  "code": "class A { constructor() { alert(); } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 19`] = `
+{
+  "code": "function a() { function b() { function c() { alert(); } } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 1,
+        },
+        "start": {
+          "column": 46,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 20`] = `
+{
+  "code": "const a = () => { const b = () => { const c = () => { alert(); }; }; }",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 62,
+          "line": 1,
+        },
+        "start": {
+          "column": 55,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 21`] = `
+{
+  "code": "function foo() { var alert = function() {}; }
+alert();",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 22`] = `
+{
+  "code": "this.alert(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 23`] = `
+{
+  "code": "this['alert'](foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 24`] = `
+{
+  "code": "function foo() { var window = bar; window.alert(); }
+window.alert();",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 25`] = `
+{
+  "code": "globalThis['alert'](foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 26`] = `
+{
+  "code": "globalThis.alert();",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 27`] = `
+{
+  "code": "function foo() { var globalThis = bar; globalThis.alert(); }
+globalThis.alert();",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 28`] = `
+{
+  "code": "window?.alert(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 29`] = `
+{
+  "code": "(window?.alert)(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 30`] = `
+{
+  "code": "(alert)(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 31`] = `
+{
+  "code": "((alert))(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 32`] = `
+{
+  "code": "function foo() { window.alert(); }",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 33`] = `
+{
+  "code": "const foo = () => window.confirm()",
+  "diagnostics": [
+    {
+      "message": "Unexpected confirm.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 34`] = `
+{
+  "code": "class A { foo() { window.prompt(); } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected prompt.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 35`] = `
+{
+  "code": "alert();
+confirm();
+prompt();",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+    {
+      "message": "Unexpected confirm.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+    {
+      "message": "Unexpected prompt.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 36`] = `
+{
+  "code": "(function() { alert(); })()",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 37`] = `
+{
+  "code": "(window).alert(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 38`] = `
+{
+  "code": "(globalThis).alert(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 39`] = `
+{
+  "code": "(this).alert(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 40`] = `
+{
+  "code": "window!.alert(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 41`] = `
+{
+  "code": "(window as any).alert(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 42`] = `
+{
+  "code": "this?.alert(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 43`] = `
+{
+  "code": "globalThis?.confirm()",
+  "diagnostics": [
+    {
+      "message": "Unexpected confirm.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 44`] = `
+{
+  "code": "class A { x = alert(); }",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 45`] = `
+{
+  "code": "class A { static { alert(); } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 46`] = `
+{
+  "code": "class A { x = window.alert(); }",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 47`] = `
+{
+  "code": "class A { static { window.alert(); } }",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 48`] = `
+{
+  "code": "alert!(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 49`] = `
+{
+  "code": "(alert as Function)(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 50`] = `
+{
+  "code": "(window.alert!)(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-alert > invalid 51`] = `
+{
+  "code": "(window.alert as Function)(foo)",
+  "diagnostics": [
+    {
+      "message": "Unexpected alert.",
+      "messageId": "unexpected",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-alert",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
