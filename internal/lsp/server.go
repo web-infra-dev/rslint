@@ -163,6 +163,7 @@ type Server struct {
 	jsConfigs        map[string]config.RslintConfig                // configDirectory -> config entries (from JS/TS configs)
 	jsonConfig       config.RslintConfig                           // fallback JSON config (rslint.json/rslint.jsonc)
 	rslintConfigPath string                                        // path to rslint.json/rslint.jsonc, empty if not found
+	tsConfigPaths    []string                                       // resolved parserOptions.project tsconfig paths
 	documents        map[lsproto.DocumentUri]string                // URI -> content
 	diagnostics      map[lsproto.DocumentUri][]rule.RuleDiagnostic // URI -> diagnostics
 

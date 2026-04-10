@@ -118,3 +118,24 @@ func createProgramFromConfig(singleThreaded bool, config *tsoptions.ParsedComman
 
 	return program, nil
 }
+
+// CollectProgramFiles collects all source file paths from the given programs
+// into a set for fast lookup. Also stores symlink-resolved paths to handle
+// platform differences (e.g. macOS /tmp → /private/tmp).
+func CollectProgramFiles(programs []*compiler.Program, fs vfs.FS) map[string]struct{} {
+	fileSet := make(map[string]struct{})
+	for _, prog := range programs {
+		for _, sf := range prog.GetSourceFiles() {
+			name := sf.FileName()
+			if _, ok := fileSet[name]; ok {
+				continue
+			}
+			fileSet[name] = struct{}{}
+			if resolved := fs.Realpath(name); resolved != name {
+				fileSet[resolved] = struct{}{}
+			}
+		}
+	}
+	return fileSet
+}
+

@@ -39,6 +39,12 @@ var JEST_METHOD_NAMES = map[string]bool{
 	"xtest":      true,
 }
 
+var EQUALITY_METHOD_NAMES = map[string]bool{
+	"toBe":          true,
+	"toEqual":       true,
+	"toStrictEqual": true,
+}
+
 var EXPECT_MODIFIER_NAMES = map[string]bool{
 	"not":      true,
 	"rejects":  true,
