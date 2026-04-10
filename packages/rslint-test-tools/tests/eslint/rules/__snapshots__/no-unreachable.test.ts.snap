@@ -1,0 +1,443 @@
+// Rstest Snapshot v1
+
+exports[`no-unreachable > invalid 1`] = `
+{
+  "code": "function foo() { return; x = 1; }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable > invalid 2`] = `
+{
+  "code": "function foo() { throw error; x = 1; }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable > invalid 3`] = `
+{
+  "code": "while (true) { break; x = 1; }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable > invalid 4`] = `
+{
+  "code": "while (true) { continue; x = 1; }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable > invalid 5`] = `
+{
+  "code": "function foo() { return; var x = 1; }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable > invalid 6`] = `
+{
+  "code": "function foo() { return; x = 1; y = 2; }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable > invalid 7`] = `
+{
+  "code": "function foo() { return; let x = 1; }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable > invalid 8`] = `
+{
+  "code": "function foo() { return; const x = 1; }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable > invalid 9`] = `
+{
+  "code": "function foo() { return; class Bar {} }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable > invalid 10`] = `
+{
+  "code": "function foo() { if (x) { return 1; } else { return 2; } bar(); }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 64,
+          "line": 1,
+        },
+        "start": {
+          "column": 58,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable > invalid 11`] = `
+{
+  "code": "function foo() { try { return 1; } catch(e) { return 2; } bar(); }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 65,
+          "line": 1,
+        },
+        "start": {
+          "column": 59,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable > invalid 12`] = `
+{
+  "code": "function foo() { while(true) { doSomething(); } bar(); }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 55,
+          "line": 1,
+        },
+        "start": {
+          "column": 49,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable > invalid 13`] = `
+{
+  "code": "function foo() { for(;;) { doSomething(); } bar(); }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 51,
+          "line": 1,
+        },
+        "start": {
+          "column": 45,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable > invalid 14`] = `
+{
+  "code": "function foo() { try { console.log('x'); } finally { return 1; } bar(); }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 72,
+          "line": 1,
+        },
+        "start": {
+          "column": 66,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable > invalid 15`] = `
+{
+  "code": "outer: while(true) { while(true) { break outer; } bar(); }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 57,
+          "line": 1,
+        },
+        "start": {
+          "column": 51,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable > invalid 16`] = `
+{
+  "code": "function foo() { switch(x) { case 1: return 1; default: return 2; } bar(); }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 75,
+          "line": 1,
+        },
+        "start": {
+          "column": 69,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-unreachable > invalid 17`] = `
+{
+  "code": "function foo() { if (a) { if (b) { return; } else { return; } } else { return; } bar(); }",
+  "diagnostics": [
+    {
+      "message": "Unreachable code.",
+      "messageId": "unreachableCode",
+      "range": {
+        "end": {
+          "column": 88,
+          "line": 1,
+        },
+        "start": {
+          "column": 82,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-unreachable",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

@@ -410,10 +410,27 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []s
 
 	var lintedFileCount atomic.Int32
 	for i, program := range programs {
-		var filter func(string) bool
+		var baseFilter func(string) bool
 		if i < len(fileFilters) {
-			filter = fileFilters[i]
+			baseFilter = fileFilters[i]
 		}
+
+		// Each program only lints its own root files (from tsconfig include/files
+		// patterns or gap file list). Files pulled in through import resolution or
+		// project references belong to other programs — linting them here would
+		// cause duplicate diagnostics.
+		ownedFiles := buildOwnedFileSet(program)
+		filter := func(fileName string) bool {
+			if baseFilter != nil && !baseFilter(fileName) {
+				return false
+			}
+			if ownedFiles != nil {
+				_, isOwned := ownedFiles[fileName]
+				return isOwned
+			}
+			return true
+		}
+
 		wg.Queue(func() {
 			fileCount := RunLinterInProgram(program, allowFiles, allowDirs, excludedPaths, getRulesForFile, typeCheck, onDiagnostic, typeInfoFiles, filter)
 			lintedFileCount.Add(fileCount)
@@ -421,4 +438,21 @@ func RunLinter(programs []*compiler.Program, singleThreaded bool, allowFiles []s
 	}
 	wg.RunAndWait()
 	return lintedFileCount.Load(), nil
+}
+
+// buildOwnedFileSet returns a set of file names that this program directly owns
+// (listed in its tsconfig include/files patterns, or as gap file root files).
+// Files in GetSourceFiles() but NOT in this set were pulled in through import
+// resolution or project references — they belong to other programs.
+// Returns nil for programs with no root files (should not happen in practice).
+func buildOwnedFileSet(program *compiler.Program) map[string]struct{} {
+	fileNames := program.CommandLine().FileNames()
+	if len(fileNames) == 0 {
+		return nil
+	}
+	owned := make(map[string]struct{}, len(fileNames))
+	for _, fn := range fileNames {
+		owned[fn] = struct{}{}
+	}
+	return owned
 }

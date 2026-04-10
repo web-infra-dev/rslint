@@ -166,23 +166,20 @@ describe('CLI Configuration Tests', () => {
 
   test('should output in jsonline format when --format jsonline is used', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': JSON.stringify([
-        {
-          language: 'javascript',
-          files: ['**/*.ts'],
-          languageOptions: {
-            parserOptions: {
-              projectService: false,
-              project: ['./tsconfig.json'],
-            },
+      'rslint.config.mjs': `export default [${JSON.stringify({
+        files: ['**/*.ts'],
+        languageOptions: {
+          parserOptions: {
+            projectService: false,
+            project: ['./tsconfig.json'],
           },
-          rules: {
-            'prefer-const': 'off',
-            '@typescript-eslint/no-unsafe-member-access': 'error',
-          },
-          plugins: ['@typescript-eslint'],
         },
-      ]),
+        rules: {
+          'prefer-const': 'off',
+          '@typescript-eslint/no-unsafe-member-access': 'error',
+        },
+        plugins: ['@typescript-eslint'],
+      })}];`,
       'tsconfig.json': JSON.stringify({
         compilerOptions: {
           target: 'ES2020',
@@ -216,24 +213,21 @@ describe('CLI Configuration Tests', () => {
 
   test('should output in github workflow format when --format github is used', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': JSON.stringify([
-        {
-          language: 'javascript',
-          files: ['**/*.ts'],
-          languageOptions: {
-            parserOptions: {
-              projectService: false,
-              project: ['./tsconfig.json'],
-            },
+      'rslint.config.mjs': `export default [${JSON.stringify({
+        files: ['**/*.ts'],
+        languageOptions: {
+          parserOptions: {
+            projectService: false,
+            project: ['./tsconfig.json'],
           },
-          rules: {
-            'prefer-const': 'off',
-            '@typescript-eslint/no-explicit-any': 'warn',
-            '@typescript-eslint/no-unsafe-member-access': 'error',
-          },
-          plugins: ['@typescript-eslint'],
         },
-      ]),
+        rules: {
+          'prefer-const': 'off',
+          '@typescript-eslint/no-explicit-any': 'warn',
+          '@typescript-eslint/no-unsafe-member-access': 'error',
+        },
+        plugins: ['@typescript-eslint'],
+      })}];`,
       'tsconfig.json': JSON.stringify({
         compilerOptions: {
           target: 'ES2020',
@@ -270,24 +264,21 @@ describe('CLI Configuration Tests', () => {
 
   test('should only report errors when --quiet flag is used', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': JSON.stringify([
-        {
-          language: 'javascript',
-          files: ['**/*.ts'],
-          languageOptions: {
-            parserOptions: {
-              projectService: false,
-              project: ['./tsconfig.json'],
-            },
+      'rslint.config.mjs': `export default [${JSON.stringify({
+        files: ['**/*.ts'],
+        languageOptions: {
+          parserOptions: {
+            projectService: false,
+            project: ['./tsconfig.json'],
           },
-          rules: {
-            'prefer-const': 'off',
-            '@typescript-eslint/no-unsafe-member-access': 'error',
-            '@typescript-eslint/return-await': 'warn',
-          },
-          plugins: ['@typescript-eslint'],
         },
-      ]),
+        rules: {
+          'prefer-const': 'off',
+          '@typescript-eslint/no-unsafe-member-access': 'error',
+          '@typescript-eslint/return-await': 'warn',
+        },
+        plugins: ['@typescript-eslint'],
+      })}];`,
       'tsconfig.json': JSON.stringify({
         compilerOptions: {
           target: 'ES2020',
@@ -359,22 +350,19 @@ describe('CLI Configuration Tests', () => {
 
   test('should handle directory with no matching files', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': JSON.stringify([
-        {
-          language: 'javascript',
-          files: ['**/*.ts'],
-          languageOptions: {
-            parserOptions: {
-              projectService: false,
-              project: ['./tsconfig.json'],
-            },
+      'rslint.config.mjs': `export default [${JSON.stringify({
+        files: ['**/*.ts'],
+        languageOptions: {
+          parserOptions: {
+            projectService: false,
+            project: ['./tsconfig.json'],
           },
-          rules: {
-            'prefer-const': 'off',
-          },
-          plugins: ['@typescript-eslint'],
         },
-      ]),
+        rules: {
+          'prefer-const': 'off',
+        },
+        plugins: ['@typescript-eslint'],
+      })}];`,
       'tsconfig.json': JSON.stringify({
         compilerOptions: {
           target: 'ES2020',
@@ -398,23 +386,20 @@ describe('CLI Configuration Tests', () => {
 
   test('should exit with non-zero code when linting errors are found', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': JSON.stringify([
-        {
-          language: 'javascript',
-          files: ['**/*.ts'],
-          languageOptions: {
-            parserOptions: {
-              projectService: false,
-              project: ['./tsconfig.json'],
-            },
+      'rslint.config.mjs': `export default [${JSON.stringify({
+        files: ['**/*.ts'],
+        languageOptions: {
+          parserOptions: {
+            projectService: false,
+            project: ['./tsconfig.json'],
           },
-          rules: {
-            'prefer-const': 'off',
-            'no-unsafe-member-access': 'error',
-          },
-          plugins: ['@typescript-eslint'],
         },
-      ]),
+        rules: {
+          'prefer-const': 'off',
+          '@typescript-eslint/no-unsafe-member-access': 'error',
+        },
+        plugins: ['@typescript-eslint'],
+      })}];`,
       'tsconfig.json': JSON.stringify({
         compilerOptions: {
           target: 'ES2020',
@@ -441,24 +426,21 @@ describe('CLI Configuration Tests', () => {
 
   test('should exit with zero code when no linting errors are found', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': JSON.stringify([
-        {
-          language: 'javascript',
-          files: ['**/*.ts'],
-          languageOptions: {
-            parserOptions: {
-              projectService: false,
-              project: ['./tsconfig.json'],
-            },
+      'rslint.config.mjs': `export default [${JSON.stringify({
+        files: ['**/*.ts'],
+        languageOptions: {
+          parserOptions: {
+            projectService: false,
+            project: ['./tsconfig.json'],
           },
-          rules: {
-            'prefer-const': 'off',
-            'no-unsafe-member-access': 'error',
-            'no-console': 'off',
-          },
-          plugins: ['@typescript-eslint'],
         },
-      ]),
+        rules: {
+          'prefer-const': 'off',
+          '@typescript-eslint/no-unsafe-member-access': 'error',
+          'no-console': 'off',
+        },
+        plugins: ['@typescript-eslint'],
+      })}];`,
       'tsconfig.json': JSON.stringify({
         compilerOptions: {
           target: 'ES2020',

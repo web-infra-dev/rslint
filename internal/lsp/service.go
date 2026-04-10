@@ -21,6 +21,7 @@ import (
 	"github.com/microsoft/typescript-go/shim/project"
 	"github.com/microsoft/typescript-go/shim/project/logging"
 	"github.com/microsoft/typescript-go/shim/scanner"
+	"github.com/microsoft/typescript-go/shim/tspath"
 	"github.com/microsoft/typescript-go/shim/vfs"
 
 	"github.com/web-infra-dev/rslint/internal/config"
@@ -139,8 +140,10 @@ func (s *Server) handleInitialized(ctx context.Context, params *lsproto.Initiali
 }
 
 // reloadConfig loads (or reloads) the rslint JSON configuration from s.rslintConfigPath.
-// Unlike the CLI, the LSP does not need tsConfigs here — the session discovers
-// tsconfig files on its own via projectService.
+// The LSP session discovers tsconfig files on its own via projectService for
+// providing type information. However, we still need to know which files are
+// covered by parserOptions.project so that type-aware rules (e.g. require-await)
+// are only enabled for files in the configured tsconfigs — matching CLI behavior.
 func (s *Server) reloadConfig() error {
 	loader := config.NewConfigLoader(s.fs, s.cwd)
 	rslintConfig, _, err := loader.LoadRslintConfig(s.rslintConfigPath)
@@ -148,6 +151,7 @@ func (s *Server) reloadConfig() error {
 		return fmt.Errorf("could not load rslint config: %w", err)
 	}
 	s.jsonConfig = rslintConfig
+	s.rebuildTsConfigPaths()
 	return nil
 }
 
@@ -188,6 +192,8 @@ func (s *Server) handleConfigUpdate(ctx context.Context, params any) error {
 	s.rslintConfigPath = ""
 	log.Printf("[rslint] Config updated from JS/TS configs (%d config files)", len(payload.Configs))
 
+	s.rebuildTsConfigPaths()
+
 	// Ask the client to re-pull diagnostics with the updated config.
 	if err := s.RefreshDiagnostics(ctx); err != nil {
 		log.Printf("[rslint] Failed to refresh diagnostics after config update: %v", err)
@@ -209,13 +215,24 @@ func (s *Server) handleDidChangeWatchedFiles(ctx context.Context, params *lsprot
 		s.session.DidChangeWatchedFiles(ctx, params.Changes)
 	}
 
-	// Check for rslint config changes — these need immediate handling
-	// because Session doesn't know about rslint.json.
+	// Check for config file changes that affect rslint.
+	needsTypeInfoRebuild := false
 	for _, change := range params.Changes {
-		if isRslintConfigURI(string(change.Uri)) {
+		uri := string(change.Uri)
+		if isRslintConfigURI(uri) {
+			// rslint config changed — reload config + typeInfoFiles + relint all.
 			s.reloadConfigAndRelint()
 			return nil
 		}
+		if isTsConfigURI(uri) {
+			needsTypeInfoRebuild = true
+		}
+	}
+	if needsTypeInfoRebuild {
+		// tsconfig changed — rebuild tsConfigPaths so type-aware rule filtering
+		// stays in sync. Session already handles the project state update and
+		// triggers RefreshDiagnostics for relinting.
+		s.rebuildTsConfigPaths()
 	}
 
 	return nil
@@ -226,9 +243,68 @@ func isRslintConfigURI(uri string) bool {
 	return strings.HasSuffix(uri, "/rslint.json") || strings.HasSuffix(uri, "/rslint.jsonc")
 }
 
-// reloadConfigAndRelint re-discovers and reloads the rslint config, then
-// re-lints all open documents.
+// isTsConfigURI returns true if the URI points to a tsconfig/jsconfig file,
+// including variants like tsconfig.build.json, tsconfig.app.json, etc.
+func isTsConfigURI(uri string) bool {
+	idx := strings.LastIndex(uri, "/")
+	if idx < 0 {
+		return false
+	}
+	name := uri[idx+1:]
+	return (strings.HasPrefix(name, "tsconfig") || strings.HasPrefix(name, "jsconfig")) &&
+		strings.HasSuffix(name, ".json")
+}
+
+// resolveTsConfigPaths resolves parserOptions.project from a config and
+// normalizes paths with realpath for cross-platform consistency.
+func (s *Server) resolveTsConfigPaths(cfg config.RslintConfig, cwd string) []string {
+	paths, _ := config.ResolveTsConfigPaths(cfg, cwd, s.fs)
+	for i, p := range paths {
+		paths[i] = tspath.NormalizePath(s.fs.Realpath(p))
+	}
+	return paths
+}
+
+// rebuildTsConfigPaths resolves parserOptions.project from the current config.
+// Called when a tsconfig or rslint config changes so that type-aware rule
+// filtering stays in sync.
+func (s *Server) rebuildTsConfigPaths() {
+	if len(s.jsConfigs) > 0 {
+		var merged []string
+		seen := make(map[string]struct{})
+		for dir, entries := range s.jsConfigs {
+			configDir := uriToPath(lsproto.DocumentUri(dir))
+			paths := s.resolveTsConfigPaths(entries, configDir)
+			if paths == nil {
+				// At least one config has no parserOptions.project and no
+				// auto-detected tsconfig. Cannot determine which files should
+				// have type-aware rules without per-file config resolution.
+				// Disable filtering entirely (conservative: allow all).
+				s.tsConfigPaths = nil
+				return
+			}
+			for _, p := range paths {
+				if _, ok := seen[p]; !ok {
+					seen[p] = struct{}{}
+					merged = append(merged, p)
+				}
+			}
+		}
+		s.tsConfigPaths = merged
+	} else if s.rslintConfigPath != "" {
+		s.tsConfigPaths = s.resolveTsConfigPaths(s.jsonConfig, s.cwd)
+	} else {
+		s.tsConfigPaths = nil
+	}
+}
+
+// reloadConfigAndRelint re-discovers and reloads the rslint JSON config, then
+// re-lints all open documents. Skips when JS/TS configs are active — those
+// take priority and are managed by handleConfigUpdate.
 func (s *Server) reloadConfigAndRelint() {
+	if len(s.jsConfigs) > 0 {
+		return
+	}
 	log.Printf("Reloading rslint config...")
 
 	configPath, found := findRslintConfig(s.fs, s.cwd)
@@ -236,6 +312,7 @@ func (s *Server) reloadConfigAndRelint() {
 		log.Printf("rslint config file no longer exists, clearing config")
 		s.jsonConfig = config.RslintConfig{}
 		s.rslintConfigPath = ""
+		s.tsConfigPaths = nil
 	} else {
 		s.rslintConfigPath = configPath
 		if err := s.reloadConfig(); err != nil {
@@ -459,7 +536,7 @@ func (s *Server) handleFixAllCodeAction(ctx context.Context, uri lsproto.Documen
 			})
 		}
 
-		ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig)
+		ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig, s.tsConfigPaths, s.fs)
 		if err != nil {
 			log.Printf("Error running lint for fixAll pass %d: %v", pass, err)
 			break
@@ -598,7 +675,7 @@ type LintResponse struct {
 	RuleCount   int                  `json:"ruleCount"`
 }
 
-func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool) ([]rule.RuleDiagnostic, error) {
+func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx context.Context, rslintConfig config.RslintConfig, cwd string, enforcePlugins bool, tsConfigPaths []string, fs vfs.FS) ([]rule.RuleDiagnostic, error) {
 	filename := uriToPath(uri)
 
 	// GetLanguageService flushes any pending changes (from DidChangeFile) and
@@ -608,6 +685,27 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 		return nil, fmt.Errorf("failed to get language service: %w", err)
 	}
 	program := languageService.GetProgram()
+
+	// Determine if this file has type information from the configured tsconfigs.
+	// The session's program has a ConfigFilePath (the tsconfig it was created from).
+	// If that tsconfig is NOT in parserOptions.project, type-aware rules should
+	// be filtered out — matching CLI behavior.
+	hasTypeInfo := true
+	if tsConfigPaths != nil {
+		configFilePath := program.Options().ConfigFilePath
+		if configFilePath != "" {
+			configFilePath = fs.Realpath(configFilePath)
+		}
+		programConfig := tspath.NormalizePath(configFilePath)
+		hasTypeInfo = false
+		for _, tc := range tsConfigPaths {
+			if tc == programConfig {
+				hasTypeInfo = true
+				break
+			}
+		}
+	}
+
 	// Collect diagnostics
 	var diagnostics []rule.RuleDiagnostic
 	var diagnosticsLock sync.Mutex
@@ -622,6 +720,9 @@ func runLintWithSession(uri lsproto.DocumentUri, session *project.Session, ctx c
 	linter.RunLinterInProgram(program, []string{filename}, nil, util.ExcludePaths,
 		func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 			activeRules, _ := config.GlobalRuleRegistry.GetEnabledRules(rslintConfig, sourceFile.FileName(), cwd, enforcePlugins)
+			if !hasTypeInfo {
+				activeRules = linter.FilterNonTypeAwareRules(activeRules)
+			}
 			return activeRules
 		}, false, diagnosticCollector, nil, nil)
 
@@ -849,7 +950,7 @@ func (s *Server) pushDiagnostics(uri lsproto.DocumentUri) {
 	}
 
 	rslintConfig, configCwd, isJSConfig := s.getConfigForURI(uri)
-	ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig)
+	ruleDiags, err := runLintWithSession(uri, s.session, ctx, rslintConfig, configCwd, isJSConfig, s.tsConfigPaths, s.fs)
 	if err != nil {
 		log.Printf("Error running lint for push diagnostics: %v", err)
 		return

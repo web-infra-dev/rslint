@@ -1,0 +1,1592 @@
+// Rstest Snapshot v1
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 1`] = `
+{
+  "code": "// @ts-expect-error",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-expect-error' directive to explain why the '@ts-expect-error' is necessary. The description must be 3 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 2`] = `
+{
+  "code": "// @ts-expect-error",
+  "diagnostics": [
+    {
+      "message": "Do not use '@ts-expect-error' because it alters compilation errors.",
+      "messageId": "tsDirectiveComment",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 3`] = `
+{
+  "code": "/* @ts-expect-error */",
+  "diagnostics": [
+    {
+      "message": "Do not use '@ts-expect-error' because it alters compilation errors.",
+      "messageId": "tsDirectiveComment",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 4`] = `
+{
+  "code": "
+/*
+@ts-expect-error */
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not use '@ts-expect-error' because it alters compilation errors.",
+      "messageId": "tsDirectiveComment",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 5`] = `
+{
+  "code": "
+/** on the last line
+  @ts-expect-error */
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not use '@ts-expect-error' because it alters compilation errors.",
+      "messageId": "tsDirectiveComment",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 6`] = `
+{
+  "code": "
+/** on the last line
+ * @ts-expect-error */
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not use '@ts-expect-error' because it alters compilation errors.",
+      "messageId": "tsDirectiveComment",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 7`] = `
+{
+  "code": "
+/**
+ * @ts-expect-error: TODO */
+      ",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-expect-error' directive to explain why the '@ts-expect-error' is necessary. The description must be 10 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 8`] = `
+{
+  "code": "
+/**
+ * @ts-expect-error: TS1234 because xyz */
+      ",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-expect-error' directive to explain why the '@ts-expect-error' is necessary. The description must be 25 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 9`] = `
+{
+  "code": "
+/**
+ * @ts-expect-error: TS1234 */
+      ",
+  "diagnostics": [
+    {
+      "message": "The description for the '@ts-expect-error' directive must match the format '^: TS\\d+ because .+$'.",
+      "messageId": "tsDirectiveCommentDescriptionNotMatchPattern",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 10`] = `
+{
+  "code": "
+/**
+ * @ts-expect-error    : TS1234 */
+      ",
+  "diagnostics": [
+    {
+      "message": "The description for the '@ts-expect-error' directive must match the format '^: TS\\d+ because .+$'.",
+      "messageId": "tsDirectiveCommentDescriptionNotMatchPattern",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 11`] = `
+{
+  "code": "
+/**
+ * @ts-expect-error 👨‍👩‍👧‍👦 */
+      ",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-expect-error' directive to explain why the '@ts-expect-error' is necessary. The description must be 3 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 12`] = `
+{
+  "code": "/** @ts-expect-error */",
+  "diagnostics": [
+    {
+      "message": "Do not use '@ts-expect-error' because it alters compilation errors.",
+      "messageId": "tsDirectiveComment",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 13`] = `
+{
+  "code": "// @ts-expect-error: Suppress next line",
+  "diagnostics": [
+    {
+      "message": "Do not use '@ts-expect-error' because it alters compilation errors.",
+      "messageId": "tsDirectiveComment",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 14`] = `
+{
+  "code": "/////@ts-expect-error: Suppress next line",
+  "diagnostics": [
+    {
+      "message": "Do not use '@ts-expect-error' because it alters compilation errors.",
+      "messageId": "tsDirectiveComment",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 15`] = `
+{
+  "code": "
+if (false) {
+  // @ts-expect-error: Unreachable code error
+  console.log('hello');
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not use '@ts-expect-error' because it alters compilation errors.",
+      "messageId": "tsDirectiveComment",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 16`] = `
+{
+  "code": "// @ts-expect-error",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-expect-error' directive to explain why the '@ts-expect-error' is necessary. The description must be 3 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 17`] = `
+{
+  "code": "// @ts-expect-error: TODO",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-expect-error' directive to explain why the '@ts-expect-error' is necessary. The description must be 10 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 18`] = `
+{
+  "code": "// @ts-expect-error: TS1234 because xyz",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-expect-error' directive to explain why the '@ts-expect-error' is necessary. The description must be 25 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 19`] = `
+{
+  "code": "// @ts-expect-error: TS1234",
+  "diagnostics": [
+    {
+      "message": "The description for the '@ts-expect-error' directive must match the format '^: TS\\d+ because .+$'.",
+      "messageId": "tsDirectiveCommentDescriptionNotMatchPattern",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 20`] = `
+{
+  "code": "// @ts-expect-error    : TS1234 because xyz",
+  "diagnostics": [
+    {
+      "message": "The description for the '@ts-expect-error' directive must match the format '^: TS\\d+ because .+$'.",
+      "messageId": "tsDirectiveCommentDescriptionNotMatchPattern",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 21`] = `
+{
+  "code": "// @ts-expect-error 👨‍👩‍👧‍👦",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-expect-error' directive to explain why the '@ts-expect-error' is necessary. The description must be 3 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 22`] = `
+{
+  "code": "// @ts-ignore",
+  "diagnostics": [
+    {
+      "message": "Do not use '@ts-ignore' because it alters compilation errors.",
+      "messageId": "tsDirectiveComment",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 23`] = `
+{
+  "code": "// @ts-ignore",
+  "diagnostics": [
+    {
+      "message": "Prefer '@ts-expect-error' over '@ts-ignore' as it requires error to be present in next line.",
+      "messageId": "tsIgnoreInsteadOfExpectError",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 24`] = `
+{
+  "code": "// @ts-ignore",
+  "diagnostics": [
+    {
+      "message": "Prefer '@ts-expect-error' over '@ts-ignore' as it requires error to be present in next line.",
+      "messageId": "tsIgnoreInsteadOfExpectError",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 25`] = `
+{
+  "code": "// @ts-ignore",
+  "diagnostics": [
+    {
+      "message": "Prefer '@ts-expect-error' over '@ts-ignore' as it requires error to be present in next line.",
+      "messageId": "tsIgnoreInsteadOfExpectError",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 26`] = `
+{
+  "code": "/* @ts-ignore */",
+  "diagnostics": [
+    {
+      "message": "Prefer '@ts-expect-error' over '@ts-ignore' as it requires error to be present in next line.",
+      "messageId": "tsIgnoreInsteadOfExpectError",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 27`] = `
+{
+  "code": "
+/*
+ @ts-ignore */
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer '@ts-expect-error' over '@ts-ignore' as it requires error to be present in next line.",
+      "messageId": "tsIgnoreInsteadOfExpectError",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 28`] = `
+{
+  "code": "
+/** on the last line
+  @ts-ignore */
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer '@ts-expect-error' over '@ts-ignore' as it requires error to be present in next line.",
+      "messageId": "tsIgnoreInsteadOfExpectError",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 29`] = `
+{
+  "code": "
+/** on the last line
+ * @ts-ignore */
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer '@ts-expect-error' over '@ts-ignore' as it requires error to be present in next line.",
+      "messageId": "tsIgnoreInsteadOfExpectError",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 30`] = `
+{
+  "code": "/** @ts-ignore */",
+  "diagnostics": [
+    {
+      "message": "Prefer '@ts-expect-error' over '@ts-ignore' as it requires error to be present in next line.",
+      "messageId": "tsIgnoreInsteadOfExpectError",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 31`] = `
+{
+  "code": "
+/**
+ * @ts-ignore: TODO */
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer '@ts-expect-error' over '@ts-ignore' as it requires error to be present in next line.",
+      "messageId": "tsIgnoreInsteadOfExpectError",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 32`] = `
+{
+  "code": "
+/**
+ * @ts-ignore: TS1234 because xyz */
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer '@ts-expect-error' over '@ts-ignore' as it requires error to be present in next line.",
+      "messageId": "tsIgnoreInsteadOfExpectError",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 33`] = `
+{
+  "code": "// @ts-ignore: Suppress next line",
+  "diagnostics": [
+    {
+      "message": "Prefer '@ts-expect-error' over '@ts-ignore' as it requires error to be present in next line.",
+      "messageId": "tsIgnoreInsteadOfExpectError",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 34`] = `
+{
+  "code": "/////@ts-ignore: Suppress next line",
+  "diagnostics": [
+    {
+      "message": "Prefer '@ts-expect-error' over '@ts-ignore' as it requires error to be present in next line.",
+      "messageId": "tsIgnoreInsteadOfExpectError",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 35`] = `
+{
+  "code": "
+if (false) {
+  // @ts-ignore: Unreachable code error
+  console.log('hello');
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Prefer '@ts-expect-error' over '@ts-ignore' as it requires error to be present in next line.",
+      "messageId": "tsIgnoreInsteadOfExpectError",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 36`] = `
+{
+  "code": "// @ts-ignore",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-ignore' directive to explain why the '@ts-ignore' is necessary. The description must be 3 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 37`] = `
+{
+  "code": "// @ts-ignore         ",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-ignore' directive to explain why the '@ts-ignore' is necessary. The description must be 3 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 38`] = `
+{
+  "code": "// @ts-ignore    .",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-ignore' directive to explain why the '@ts-ignore' is necessary. The description must be 3 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 39`] = `
+{
+  "code": "// @ts-ignore: TS1234 because xyz",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-ignore' directive to explain why the '@ts-ignore' is necessary. The description must be 25 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 40`] = `
+{
+  "code": "// @ts-ignore: TS1234",
+  "diagnostics": [
+    {
+      "message": "The description for the '@ts-ignore' directive must match the format '^: TS\\d+ because .+$'.",
+      "messageId": "tsDirectiveCommentDescriptionNotMatchPattern",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 41`] = `
+{
+  "code": "// @ts-ignore    : TS1234 because xyz",
+  "diagnostics": [
+    {
+      "message": "The description for the '@ts-ignore' directive must match the format '^: TS\\d+ because .+$'.",
+      "messageId": "tsDirectiveCommentDescriptionNotMatchPattern",
+      "range": {
+        "end": {
+          "column": 38,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 42`] = `
+{
+  "code": "// @ts-ignore 👨‍👩‍👧‍👦",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-ignore' directive to explain why the '@ts-ignore' is necessary. The description must be 3 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 43`] = `
+{
+  "code": "// @ts-nocheck",
+  "diagnostics": [
+    {
+      "message": "Do not use '@ts-nocheck' because it alters compilation errors.",
+      "messageId": "tsDirectiveComment",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 44`] = `
+{
+  "code": "// @ts-nocheck",
+  "diagnostics": [
+    {
+      "message": "Do not use '@ts-nocheck' because it alters compilation errors.",
+      "messageId": "tsDirectiveComment",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 45`] = `
+{
+  "code": "// @ts-nocheck: Suppress next line",
+  "diagnostics": [
+    {
+      "message": "Do not use '@ts-nocheck' because it alters compilation errors.",
+      "messageId": "tsDirectiveComment",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 46`] = `
+{
+  "code": "// @ts-nocheck",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-nocheck' directive to explain why the '@ts-nocheck' is necessary. The description must be 3 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 47`] = `
+{
+  "code": "// @ts-nocheck: TS1234 because xyz",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-nocheck' directive to explain why the '@ts-nocheck' is necessary. The description must be 25 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 48`] = `
+{
+  "code": "// @ts-nocheck: TS1234",
+  "diagnostics": [
+    {
+      "message": "The description for the '@ts-nocheck' directive must match the format '^: TS\\d+ because .+$'.",
+      "messageId": "tsDirectiveCommentDescriptionNotMatchPattern",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 49`] = `
+{
+  "code": "// @ts-nocheck    : TS1234 because xyz",
+  "diagnostics": [
+    {
+      "message": "The description for the '@ts-nocheck' directive must match the format '^: TS\\d+ because .+$'.",
+      "messageId": "tsDirectiveCommentDescriptionNotMatchPattern",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 50`] = `
+{
+  "code": "// @ts-nocheck 👨‍👩‍👧‍👦",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-nocheck' directive to explain why the '@ts-nocheck' is necessary. The description must be 3 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 51`] = `
+{
+  "code": "
+ // @ts-nocheck
+const a: true = false;
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not use '@ts-nocheck' because it alters compilation errors.",
+      "messageId": "tsDirectiveComment",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 2,
+        },
+        "start": {
+          "column": 2,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 52`] = `
+{
+  "code": "// @ts-check",
+  "diagnostics": [
+    {
+      "message": "Do not use '@ts-check' because it alters compilation errors.",
+      "messageId": "tsDirectiveComment",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 53`] = `
+{
+  "code": "// @ts-check: Suppress next line",
+  "diagnostics": [
+    {
+      "message": "Do not use '@ts-check' because it alters compilation errors.",
+      "messageId": "tsDirectiveComment",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 54`] = `
+{
+  "code": "
+if (false) {
+  // @ts-check: Unreachable code error
+  console.log('hello');
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Do not use '@ts-check' because it alters compilation errors.",
+      "messageId": "tsDirectiveComment",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 55`] = `
+{
+  "code": "// @ts-check",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-check' directive to explain why the '@ts-check' is necessary. The description must be 3 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 13,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 56`] = `
+{
+  "code": "// @ts-check: TS1234 because xyz",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-check' directive to explain why the '@ts-check' is necessary. The description must be 25 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 57`] = `
+{
+  "code": "// @ts-check: TS1234",
+  "diagnostics": [
+    {
+      "message": "The description for the '@ts-check' directive must match the format '^: TS\\d+ because .+$'.",
+      "messageId": "tsDirectiveCommentDescriptionNotMatchPattern",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 58`] = `
+{
+  "code": "// @ts-check    : TS1234 because xyz",
+  "diagnostics": [
+    {
+      "message": "The description for the '@ts-check' directive must match the format '^: TS\\d+ because .+$'.",
+      "messageId": "tsDirectiveCommentDescriptionNotMatchPattern",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`ban-ts-comment - ban-ts-comment > invalid 59`] = `
+{
+  "code": "// @ts-check 👨‍👩‍👧‍👦",
+  "diagnostics": [
+    {
+      "message": "Include a description after the '@ts-check' directive to explain why the '@ts-check' is necessary. The description must be 3 characters or longer.",
+      "messageId": "tsDirectiveCommentRequiresDescription",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/ban-ts-comment",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;

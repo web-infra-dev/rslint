@@ -59,7 +59,21 @@ async function cleanupTempDir(tempDir: string): Promise<void> {
   await fs.rm(tempDir, { recursive: true, force: true });
 }
 
-const baseConfig = JSON.stringify([
+const baseConfig = `export default [${JSON.stringify({
+  files: ['**/*.ts'],
+  languageOptions: {
+    parserOptions: {
+      projectService: false,
+      project: ['./tsconfig.json'],
+    },
+  },
+  rules: {
+    '@typescript-eslint/no-unsafe-member-access': 'error',
+  },
+  plugins: ['@typescript-eslint'],
+})}];`;
+
+const baseJsonConfig = JSON.stringify([
   {
     language: 'javascript',
     files: ['**/*.ts'],
@@ -88,7 +102,7 @@ const baseTsConfig = JSON.stringify({
 describe('CLI File Arguments', () => {
   test('should only lint specified file', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': baseConfig,
+      'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
       'error.ts': 'let a: any = 10;\na.b = 20;\n',
       'clean.ts': 'export const x = 1;\n',
@@ -106,7 +120,7 @@ describe('CLI File Arguments', () => {
 
   test('should only lint the clean file and find no errors', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': baseConfig,
+      'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
       'error.ts': 'let a: any = 10;\na.b = 20;\n',
       'clean.ts': 'export const x = 1;\n',
@@ -125,7 +139,7 @@ describe('CLI File Arguments', () => {
 
   test('should lint multiple specified files', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': baseConfig,
+      'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
       'a.ts': 'let a: any = 10;\na.b = 20;\n',
       'b.ts': 'let b: any = 20;\nb.c = 30;\n',
@@ -145,22 +159,19 @@ describe('CLI File Arguments', () => {
 
   test('should work with --fix and file arguments', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': JSON.stringify([
-        {
-          language: 'javascript',
-          files: ['**/*.ts'],
-          languageOptions: {
-            parserOptions: {
-              projectService: false,
-              project: ['./tsconfig.json'],
-            },
+      'rslint.config.mjs': `export default [${JSON.stringify({
+        files: ['**/*.ts'],
+        languageOptions: {
+          parserOptions: {
+            projectService: false,
+            project: ['./tsconfig.json'],
           },
-          rules: {
-            '@typescript-eslint/no-inferrable-types': 'error',
-          },
-          plugins: ['@typescript-eslint'],
         },
-      ]),
+        rules: {
+          '@typescript-eslint/no-inferrable-types': 'error',
+        },
+        plugins: ['@typescript-eslint'],
+      })}];`,
       'tsconfig.json': baseTsConfig,
       'fixable.ts': 'const x: number = 42;\n',
       'other.ts': 'const y: string = "hello";\n',
@@ -190,7 +201,7 @@ describe('CLI File Arguments', () => {
 
   test('should work with --format jsonline and file arguments', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': baseConfig,
+      'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
       'error.ts': 'let a: any = 10;\na.b = 20;\n',
     });
@@ -215,7 +226,7 @@ describe('CLI File Arguments', () => {
 
   test('should warn per-file when specified file is not in the project', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': baseConfig,
+      'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
       'existing.ts': 'export const x = 1;\n',
     });
@@ -233,7 +244,7 @@ describe('CLI File Arguments', () => {
 
   test('should warn per-file when multiple specified files are all not in the project', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': baseConfig,
+      'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
       'existing.ts': 'export const x = 1;\n',
     });
@@ -254,7 +265,7 @@ describe('CLI File Arguments', () => {
 
   test('should warn for non-project file while linting project files', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': baseConfig,
+      'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
       'clean.ts': 'export const x = 1;\n',
     });
@@ -273,7 +284,7 @@ describe('CLI File Arguments', () => {
 
   test('should exit 0 with --max-warnings 0 when files are not in project', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': baseConfig,
+      'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
       'existing.ts': 'export const x = 1;\n',
     });
@@ -294,7 +305,7 @@ describe('CLI File Arguments', () => {
 
   test('should lint all files when no file arguments provided', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': baseConfig,
+      'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
       'a.ts': 'let a: any = 10;\na.x = 1;\n',
       'b.ts': 'let b: any = 20;\nb.y = 2;\n',
@@ -348,13 +359,16 @@ describe('CLI File Arguments', () => {
 
   test('should accept absolute file paths', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': baseConfig,
+      'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
       'error.ts': 'let a: any = 10;\na.b = 20;\n',
     });
 
     try {
-      const absPath = path.join(tempDir, 'error.ts');
+      // Use realpath to normalize symlinks (e.g. /var → /private/var on macOS)
+      // so the file arg matches the config-discovered path for dedup.
+      const realTempDir = await fs.realpath(tempDir);
+      const absPath = path.join(realTempDir, 'error.ts');
       const result = await runRslint([absPath], tempDir);
       expect(result.exitCode).not.toBe(0);
       expect(result.stdout).toContain('no-unsafe-member-access');
@@ -366,7 +380,7 @@ describe('CLI File Arguments', () => {
 
   test('should accept subdirectory file paths', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': baseConfig,
+      'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
       'src/error.ts': 'let a: any = 10;\na.b = 20;\n',
       'src/clean.ts': 'export const x = 1;\n',
@@ -384,7 +398,7 @@ describe('CLI File Arguments', () => {
 
   test('should handle symlink-resolved absolute paths', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': baseConfig,
+      'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
       'error.ts': 'let a: any = 10;\na.b = 20;\n',
     });
@@ -405,7 +419,7 @@ describe('CLI File Arguments', () => {
 
   test('should handle mix of existing and nonexistent file args', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': baseConfig,
+      'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
       'error.ts': 'let a: any = 10;\na.b = 20;\n',
     });
@@ -426,7 +440,7 @@ describe('CLI File Arguments', () => {
 
   test('should deduplicate when same file is passed twice', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': baseConfig,
+      'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
       'error.ts': 'let a: any = 10;\na.b = 20;\n',
     });
@@ -443,7 +457,7 @@ describe('CLI File Arguments', () => {
 
   test('should resolve ../ in relative paths', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': baseConfig,
+      'rslint.config.mjs': baseConfig,
       'tsconfig.json': baseTsConfig,
       'src/error.ts': 'let a: any = 10;\na.b = 20;\n',
     });
@@ -461,7 +475,7 @@ describe('CLI File Arguments', () => {
 
   test('should work with --config and file arguments', async () => {
     const tempDir = await createTempDir({
-      'custom.json': baseConfig,
+      'custom.json': baseJsonConfig,
       'tsconfig.json': baseTsConfig,
       'error.ts': 'let a: any = 10;\na.b = 20;\n',
       'clean.ts': 'export const x = 1;\n',
@@ -482,23 +496,20 @@ describe('CLI File Arguments', () => {
 
   test('should work with --quiet and file arguments', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': JSON.stringify([
-        {
-          language: 'javascript',
-          files: ['**/*.ts'],
-          languageOptions: {
-            parserOptions: {
-              projectService: false,
-              project: ['./tsconfig.json'],
-            },
+      'rslint.config.mjs': `export default [${JSON.stringify({
+        files: ['**/*.ts'],
+        languageOptions: {
+          parserOptions: {
+            projectService: false,
+            project: ['./tsconfig.json'],
           },
-          rules: {
-            '@typescript-eslint/no-unsafe-member-access': 'error',
-            '@typescript-eslint/no-explicit-any': 'warn',
-          },
-          plugins: ['@typescript-eslint'],
         },
-      ]),
+        rules: {
+          '@typescript-eslint/no-unsafe-member-access': 'error',
+          '@typescript-eslint/no-explicit-any': 'warn',
+        },
+        plugins: ['@typescript-eslint'],
+      })}];`,
       'tsconfig.json': baseTsConfig,
       'error.ts': 'let a: any = 10;\na.b = 20;\n',
     });
@@ -515,22 +526,19 @@ describe('CLI File Arguments', () => {
 
   test('should respect --max-warnings with file arguments', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': JSON.stringify([
-        {
-          language: 'javascript',
-          files: ['**/*.ts'],
-          languageOptions: {
-            parserOptions: {
-              projectService: false,
-              project: ['./tsconfig.json'],
-            },
+      'rslint.config.mjs': `export default [${JSON.stringify({
+        files: ['**/*.ts'],
+        languageOptions: {
+          parserOptions: {
+            projectService: false,
+            project: ['./tsconfig.json'],
           },
-          rules: {
-            '@typescript-eslint/no-explicit-any': 'warn',
-          },
-          plugins: ['@typescript-eslint'],
         },
-      ]),
+        rules: {
+          '@typescript-eslint/no-explicit-any': 'warn',
+        },
+        plugins: ['@typescript-eslint'],
+      })}];`,
       'tsconfig.json': baseTsConfig,
       'warn.ts': 'let a: any = 10;\nlet b: any = 20;\n',
     });
@@ -549,15 +557,12 @@ describe('CLI File Arguments', () => {
 
   test('should work without tsconfig (pure JS project)', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': JSON.stringify([
-        {
-          language: 'javascript',
-          files: ['**/*.js'],
-          rules: {
-            'no-empty': 'error',
-          },
+      'rslint.config.mjs': `export default [${JSON.stringify({
+        files: ['**/*.js'],
+        rules: {
+          'no-empty': 'error',
         },
-      ]),
+      })}];`,
       'error.js': 'if (true) {}\n',
       'clean.js': 'const x = 1;\n',
     });

@@ -125,6 +125,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_empty_pattern"
 	"github.com/web-infra-dev/rslint/internal/rules/no_ex_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_extra_bind"
+	"github.com/web-infra-dev/rslint/internal/rules/no_fallthrough"
 	"github.com/web-infra-dev/rslint/internal/rules/no_func_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_global_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_import_assign"
@@ -141,11 +142,16 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/eqeqeq"
 	"github.com/web-infra-dev/rslint/internal/rules/no_this_before_super"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unmodified_loop_condition"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unreachable"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_finally"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_negation"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_optional_chaining"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_const"
 	"github.com/web-infra-dev/rslint/internal/rules/prefer_rest_params"
 	"github.com/web-infra-dev/rslint/internal/rules/use_isnan"
+	"github.com/web-infra-dev/rslint/internal/rules/valid_typeof"
 )
 
 // RslintConfig represents the top-level configuration array
@@ -513,6 +519,12 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-new-symbol", no_new_symbol.NoNewSymbolRule)
 	GlobalRuleRegistry.Register("use-isnan", use_isnan.UseIsNaNRule)
 	GlobalRuleRegistry.Register("eqeqeq", eqeqeq.EqeqeqRule)
+	GlobalRuleRegistry.Register("no-fallthrough", no_fallthrough.NoFallthroughRule)
+	GlobalRuleRegistry.Register("valid-typeof", valid_typeof.ValidTypeofRule)
+	GlobalRuleRegistry.Register("no-unsafe-optional-chaining", no_unsafe_optional_chaining.NoUnsafeOptionalChainingRule)
+	GlobalRuleRegistry.Register("no-unsafe-finally", no_unsafe_finally.NoUnsafeFinallyRule)
+	GlobalRuleRegistry.Register("no-unmodified-loop-condition", no_unmodified_loop_condition.NoUnmodifiedLoopConditionRule)
+	GlobalRuleRegistry.Register("no-unreachable", no_unreachable.NoUnreachableRule)
 }
 
 // isFileIgnored checks if a file is matched by ignore patterns, evaluated sequentially.

@@ -53,20 +53,17 @@ async function cleanupTempDir(tempDir: string): Promise<void> {
 }
 
 function makeConfig(rules: Record<string, unknown>) {
-  return JSON.stringify([
-    {
-      language: 'javascript',
-      files: ['**/*.ts'],
-      languageOptions: {
-        parserOptions: {
-          projectService: false,
-          project: ['./tsconfig.json'],
-        },
+  return `export default [${JSON.stringify({
+    files: ['**/*.ts'],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: ['./tsconfig.json'],
       },
-      rules,
-      plugins: ['@typescript-eslint'],
     },
-  ]);
+    rules,
+    plugins: ['@typescript-eslint'],
+  })}];`;
 }
 
 const TSCONFIG = JSON.stringify({
@@ -87,7 +84,7 @@ describe('rslint-disable comment directives', () => {
 
   test('rslint-disable-next-line suppresses diagnostic on next line', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '// rslint-disable-next-line @typescript-eslint/no-explicit-any',
@@ -111,7 +108,7 @@ describe('rslint-disable comment directives', () => {
 
   test('rslint-disable-line suppresses diagnostic on same line', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         'const x: any = 1; // rslint-disable-line @typescript-eslint/no-explicit-any',
@@ -134,7 +131,7 @@ describe('rslint-disable comment directives', () => {
 
   test('rslint-disable + rslint-enable suppresses diagnostics inside range', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '/* rslint-disable @typescript-eslint/no-explicit-any */',
@@ -160,7 +157,7 @@ describe('rslint-disable comment directives', () => {
 
   test('rslint-disable without enable suppresses rest of file', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '/* rslint-disable @typescript-eslint/no-explicit-any */',
@@ -185,7 +182,7 @@ describe('rslint-disable comment directives', () => {
 
   test('rslint-disable without rule name suppresses all rules', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '/* rslint-disable */',
@@ -209,7 +206,7 @@ describe('rslint-disable comment directives', () => {
 
   test('rslint-disable + eslint-enable mixed prefixes work', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '/* rslint-disable @typescript-eslint/no-explicit-any */',
@@ -230,7 +227,7 @@ describe('rslint-disable comment directives', () => {
 
   test('eslint-disable + rslint-enable mixed prefixes work', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '/* eslint-disable @typescript-eslint/no-explicit-any */',
@@ -255,7 +252,7 @@ describe('rslint-disable comment directives', () => {
 
   test('rslint-disable-next-line does not suppress other lines', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '// rslint-disable-next-line @typescript-eslint/no-explicit-any',
@@ -275,7 +272,7 @@ describe('rslint-disable comment directives', () => {
 
   test('rslint-disable + rslint-enable does NOT suppress diagnostics outside range', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '/* rslint-disable @typescript-eslint/no-explicit-any */',
@@ -300,7 +297,7 @@ describe('rslint-disable comment directives', () => {
 
   test('block comment style works for rslint-disable-next-line', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '/* rslint-disable-next-line @typescript-eslint/no-explicit-any */',
@@ -324,7 +321,7 @@ describe('rslint-disable comment directives', () => {
 
   test('rslint-disable-next-line with -- description suppresses diagnostic', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '// rslint-disable-next-line @typescript-eslint/no-explicit-any -- needed for legacy API',
@@ -350,7 +347,7 @@ describe('eslint-disable comment directives', () => {
 
   test('eslint-disable-next-line suppresses diagnostic on next line', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '// eslint-disable-next-line @typescript-eslint/no-explicit-any',
@@ -370,7 +367,7 @@ describe('eslint-disable comment directives', () => {
 
   test('eslint-disable-next-line does not suppress other lines', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '// eslint-disable-next-line @typescript-eslint/no-explicit-any',
@@ -394,7 +391,7 @@ describe('eslint-disable comment directives', () => {
 
   test('eslint-disable-line suppresses diagnostic on same line', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         'const x: any = 1; // eslint-disable-line @typescript-eslint/no-explicit-any',
@@ -417,7 +414,7 @@ describe('eslint-disable comment directives', () => {
 
   test('eslint-disable + eslint-enable suppresses diagnostics inside range', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '/* eslint-disable @typescript-eslint/no-explicit-any */',
@@ -439,7 +436,7 @@ describe('eslint-disable comment directives', () => {
 
   test('eslint-disable + eslint-enable does NOT suppress diagnostics outside range', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '/* eslint-disable @typescript-eslint/no-explicit-any */',
@@ -464,7 +461,7 @@ describe('eslint-disable comment directives', () => {
 
   test('eslint-disable without enable suppresses rest of file', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '/* eslint-disable @typescript-eslint/no-explicit-any */',
@@ -490,7 +487,7 @@ describe('eslint-disable comment directives', () => {
 
   test('eslint-disable without rule name suppresses all rules', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '/* eslint-disable */',
@@ -510,7 +507,7 @@ describe('eslint-disable comment directives', () => {
 
   test('wildcard eslint-disable-next-line suppresses all rules on next line', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': ['// eslint-disable-next-line', 'const x: any = 1;'].join(
         '\n',
@@ -532,7 +529,7 @@ describe('eslint-disable comment directives', () => {
 
   test('block comment style works for disable-next-line', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '/* eslint-disable-next-line @typescript-eslint/no-explicit-any */',
@@ -560,7 +557,7 @@ describe('eslint-disable comment directives', () => {
 
   test('eslint-disable-next-line with -- description suppresses diagnostic', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '// eslint-disable-next-line @typescript-eslint/no-explicit-any -- needed for legacy API',
@@ -585,7 +582,7 @@ describe('eslint-disable comment directives', () => {
   test('eslint-disable-next-line works inside function call arguments', async () => {
     const ASSERTION_RULE = '@typescript-eslint/consistent-type-assertions';
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({
+      'rslint.config.mjs': makeConfig({
         [ASSERTION_RULE]: ['error', { assertionStyle: 'never' }],
       }),
       'tsconfig.json': TSCONFIG,
@@ -614,7 +611,7 @@ describe('eslint-disable comment directives', () => {
   test('eslint-disable-next-line works inside array literals', async () => {
     const ASSERTION_RULE = '@typescript-eslint/consistent-type-assertions';
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({
+      'rslint.config.mjs': makeConfig({
         [ASSERTION_RULE]: ['error', { assertionStyle: 'never' }],
       }),
       'tsconfig.json': TSCONFIG,
@@ -643,7 +640,7 @@ describe('eslint-disable comment directives', () => {
 
   test('multiple disable/enable ranges work independently', async () => {
     const tempDir = await createTempDir({
-      'rslint.json': makeConfig({ [RULE]: 'error' }),
+      'rslint.config.mjs': makeConfig({ [RULE]: 'error' }),
       'tsconfig.json': TSCONFIG,
       'test.ts': [
         '/* eslint-disable @typescript-eslint/no-explicit-any */',
