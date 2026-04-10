@@ -611,6 +611,111 @@ describe('Monorepo multi-config: real-world scenarios', () => {
     }
   });
 
+  // Reproduces the rsbuild issue: single config with parserOptions.project
+  // pointing to multiple tsconfigs that have project references between them.
+  // Files from referenced projects should not be linted twice.
+  test('multi-tsconfig with project references — no duplicate diagnostics', async () => {
+    const { diagnostics, cleanup } = await lintJsonline({
+      'rslint.config.mjs': `export default [
+        {
+          files: ["**/*.ts"],
+          languageOptions: {
+            parserOptions: {
+              projectService: false,
+              project: ["./packages/*/tsconfig.json"],
+            },
+          },
+          rules: { "prefer-const": "error" },
+        }
+      ];`,
+      'packages/core/tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          target: 'ES2020',
+          module: 'ESNext',
+          strict: true,
+          composite: true,
+          outDir: './dist',
+          rootDir: 'src',
+        },
+        include: ['src'],
+      }),
+      'packages/core/src/lib.ts': `let x = 1;\nexport { x };\n`,
+      'packages/plugin/tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          target: 'ES2020',
+          module: 'ESNext',
+          strict: true,
+          outDir: './dist',
+          rootDir: 'src',
+        },
+        include: ['src'],
+        references: [{ path: '../core' }],
+      }),
+      'packages/plugin/src/index.ts': `import { x } from '../../core/src/lib';\nlet y = x;\nexport { y };\n`,
+    });
+    try {
+      // core/src/lib.ts should have exactly 1 prefer-const error (not duplicated)
+      const coreDiags = diagsAt(diagnostics, 'packages/core/src/lib.ts');
+      expect(
+        coreDiags.filter((d) => d.ruleName === 'prefer-const').length,
+      ).toBe(1);
+
+      // plugin/src/index.ts should have exactly 1 prefer-const error
+      const pluginDiags = diagsAt(diagnostics, 'packages/plugin/src/index.ts');
+      expect(
+        pluginDiags.filter((d) => d.ruleName === 'prefer-const').length,
+      ).toBe(1);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  // Single config with multiple tsconfigs + gap files.
+  // The gap file should be linted, but files already covered by tsconfig programs
+  // should not be re-linted by the gap program.
+  test('multi-tsconfig with gap files — no duplicates', async () => {
+    const { diagnostics, cleanup } = await lintJsonline({
+      'rslint.config.mjs': `export default [
+        {
+          files: ["**/*.ts"],
+          languageOptions: {
+            parserOptions: {
+              projectService: false,
+              project: ["./packages/core/tsconfig.json"],
+            },
+          },
+          rules: { "no-console": "error" },
+        }
+      ];`,
+      'packages/core/tsconfig.json': JSON.stringify({
+        compilerOptions: {
+          target: 'ES2020',
+          module: 'ESNext',
+          strict: true,
+        },
+        include: ['src'],
+      }),
+      'packages/core/src/lib.ts': `console.log("core");\n`,
+      // gap file: not in any tsconfig
+      'scripts/build.ts': `console.log("gap");\n`,
+    });
+    try {
+      // core/src/lib.ts: exactly 1 no-console error
+      const coreDiags = diagsAt(diagnostics, 'packages/core/src/lib.ts');
+      expect(coreDiags.filter((d) => d.ruleName === 'no-console').length).toBe(
+        1,
+      );
+
+      // scripts/build.ts (gap file): exactly 1 no-console error
+      const scriptDiags = diagsAt(diagnostics, 'scripts/build.ts');
+      expect(
+        scriptDiags.filter((d) => d.ruleName === 'no-console').length,
+      ).toBe(1);
+    } finally {
+      await cleanup();
+    }
+  });
+
   test('specify nonexistent file — warns without crashing', async () => {
     const tempDir = await createTempDir({
       'rslint.config.mjs': `export default [{ files: ["**/*.ts"], rules: { "no-console": "error" } }];`,
