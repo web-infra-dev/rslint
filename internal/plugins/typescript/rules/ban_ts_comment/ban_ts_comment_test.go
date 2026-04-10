@@ -286,6 +286,12 @@ func TestBanTsCommentRule(t *testing.T) {
 			Options: map[string]interface{}{"ts-ignore": true},
 			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "tsIgnoreInsteadOfExpectError", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceTsIgnoreWithTsExpectError", Output: "/*\n @ts-expect-error */"}}}},
 		},
+		// Block comment: duplicate @ts-ignore — suggestion must target the LAST one (on last line)
+		{
+			Code:    "/* @ts-ignore\n * @ts-ignore */",
+			Options: map[string]interface{}{"ts-ignore": true},
+			Errors:  []rule_tester.InvalidTestCaseError{{MessageId: "tsIgnoreInsteadOfExpectError", Suggestions: []rule_tester.InvalidTestCaseSuggestion{{MessageId: "replaceTsIgnoreWithTsExpectError", Output: "/* @ts-ignore\n * @ts-expect-error */"}}}},
+		},
 		{
 			Code:    "/** on the last line\n  @ts-ignore */",
 			Options: map[string]interface{}{"ts-ignore": true},

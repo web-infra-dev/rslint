@@ -255,7 +255,7 @@ func reportDirective(ctx rule.RuleContext, commentText string, commentStart int,
 		// Provide a suggestion (not autofix): replace @ts-ignore with @ts-expect-error.
 		// This is intentionally a suggestion rather than an autofix because @ts-expect-error
 		// requires the next line to actually have a type error — auto-replacing could break code.
-		idx := strings.Index(commentText, "@ts-ignore")
+		idx := strings.LastIndex(commentText, "@ts-ignore")
 		if idx >= 0 {
 			fixRange := core.NewTextRange(commentStart+idx, commentStart+idx+len("@ts-ignore"))
 			fix := rule.RuleFixReplaceRange(fixRange, "@ts-expect-error")
