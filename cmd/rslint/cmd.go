@@ -555,7 +555,7 @@ func runCMD() int {
 			// config matching, dir scoping, and gitignore checks.
 			// Edge cases (e.g. user passes a symlink-resolved absolute path)
 			// are handled by isFileAllowed's os.SameFile fallback in linter.go
-			// and buildProgramFileSet's Realpath'd keys in programs.go.
+			// and CollectProgramFiles's Realpath'd keys in create_program.go.
 			normalized := tspath.NormalizePath(absPath)
 			info, statErr := os.Stat(absPath)
 			if statErr == nil && info.IsDir() {
@@ -772,7 +772,7 @@ func runCMD() int {
 	var capturedGapFiles []string // retained for --fix rebuild
 
 	{
-		programFiles := buildProgramFileSet(programs)
+		programFiles := utils.CollectProgramFiles(programs, fs)
 
 		var gapFiles []string
 		if configMap != nil {
@@ -816,7 +816,7 @@ func runCMD() int {
 		if gapFiles != nil {
 			// Build type-info set from existing (tsconfig) Programs BEFORE
 			// appending the fallback, so fallback files are NOT in this set.
-			typeInfoFiles = buildProgramFileSet(programs)
+			typeInfoFiles = utils.CollectProgramFiles(programs, fs)
 			capturedGapFiles = gapFiles
 
 			if len(gapFiles) > 0 {
@@ -879,25 +879,14 @@ func runCMD() int {
 	enforcePlugins := configStdin // JS/TS configs loaded via stdin require plugin declarations
 	getRulesForFile := func(sourceFile *ast.SourceFile) []linter.ConfiguredRule {
 		filePath := sourceFile.FileName()
-		var activeRules []linter.ConfiguredRule
 		if configMap != nil {
 			cfgDir, cfg := rslintconfig.FindNearestConfig(filePath, configMap)
 			if cfg == nil {
 				return nil
 			}
-			activeRules, _ = rslintconfig.GlobalRuleRegistry.GetEnabledRules(cfg, filePath, cfgDir, enforcePlugins)
-		} else {
-			activeRules, _ = rslintconfig.GlobalRuleRegistry.GetEnabledRules(rslintConfig, filePath, currentDirectory, enforcePlugins)
+			return rslintconfig.GlobalRuleRegistry.GetActiveRulesForFile(cfg, filePath, cfgDir, enforcePlugins, typeInfoFiles)
 		}
-
-		// For gap files (not in typeInfoFiles), filter out type-aware rules.
-		if typeInfoFiles != nil {
-			if _, hasTypeInfo := typeInfoFiles[filePath]; !hasTypeInfo {
-				activeRules = linter.FilterNonTypeAwareRules(activeRules)
-			}
-		}
-
-		return activeRules
+		return rslintconfig.GlobalRuleRegistry.GetActiveRulesForFile(rslintConfig, filePath, currentDirectory, enforcePlugins, typeInfoFiles)
 	}
 
 	// Build per-program file ownership filters for multi-config deduplication.

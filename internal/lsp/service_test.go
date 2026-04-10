@@ -1293,3 +1293,148 @@ func TestCloseAndReopen(t *testing.T) {
 	}
 }
 
+
+// ======== tsConfigPaths lifecycle tests ========
+
+func TestHandleConfigUpdate_RebuildsTsConfigPaths(t *testing.T) {
+	s := newTestServer()
+	s.fs = &mockFS{files: map[string]bool{}}
+	ctx := context.Background()
+
+	// Set stale tsConfigPaths
+	s.tsConfigPaths = []string{"/old/tsconfig.json"}
+
+	// Config update with no parserOptions.project and no tsconfig.json (mockFS has no files)
+	// → ResolveTsConfigPaths returns nil → rebuildTsConfigPaths clears tsConfigPaths
+	err := s.handleConfigUpdate(ctx, map[string]any{
+		"configs": []any{
+			map[string]any{
+				"configDirectory": "file:///project",
+				"entries": []any{
+					map[string]any{
+						"rules": map[string]any{"no-console": "error"},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("handleConfigUpdate failed: %v", err)
+	}
+
+	// tsConfigPaths should be nil (mockFS has no tsconfig.json to auto-detect)
+	if s.tsConfigPaths != nil {
+		t.Errorf("expected tsConfigPaths nil after config update with no project, got %v", s.tsConfigPaths)
+	}
+}
+
+func TestHandleConfigUpdate_EmptyConfigs_ClearsTsConfigPaths(t *testing.T) {
+	s := newTestServer()
+	s.fs = &mockFS{files: map[string]bool{}}
+	ctx := context.Background()
+
+	s.tsConfigPaths = []string{"/project/tsconfig.json"}
+
+	err := s.handleConfigUpdate(ctx, map[string]any{
+		"configs": []any{},
+	})
+	if err != nil {
+		t.Fatalf("handleConfigUpdate failed: %v", err)
+	}
+
+	if s.tsConfigPaths != nil {
+		t.Errorf("expected tsConfigPaths nil after empty config update, got %v", s.tsConfigPaths)
+	}
+}
+
+func TestRebuildTsConfigPaths_MixedConfigsWithAndWithoutProject(t *testing.T) {
+	s := newTestServer()
+	s.fs = &mockFS{files: map[string]bool{}}
+
+	// Config A has project, Config B doesn't (and no tsconfig.json to auto-detect)
+	// → ResolveTsConfigPaths returns nil for B → rebuildTsConfigPaths should set nil (allow all)
+	s.jsConfigs = map[string]config.RslintConfig{
+		"file:///project-a": {
+			{
+				LanguageOptions: &config.LanguageOptions{
+					ParserOptions: &config.ParserOptions{
+						Project: []string{"./tsconfig.json"},
+					},
+				},
+			},
+		},
+		"file:///project-b": {
+			{
+				Rules: config.Rules{"no-console": "error"},
+			},
+		},
+	}
+
+	s.rebuildTsConfigPaths()
+
+	// Should be nil because config B has no project and no auto-detected tsconfig
+	if s.tsConfigPaths != nil {
+		t.Errorf("expected tsConfigPaths nil for mixed configs (some without project), got %v", s.tsConfigPaths)
+	}
+}
+
+func TestRebuildTsConfigPaths_AllConfigsHaveProject(t *testing.T) {
+	s := newTestServer()
+	s.fs = &mockFS{files: map[string]bool{
+		"/project-a/tsconfig.json": true,
+		"/project-b/tsconfig.json": true,
+	}}
+
+	s.jsConfigs = map[string]config.RslintConfig{
+		"file:///project-a": {
+			{
+				LanguageOptions: &config.LanguageOptions{
+					ParserOptions: &config.ParserOptions{
+						Project: []string{"./tsconfig.json"},
+					},
+				},
+			},
+		},
+		"file:///project-b": {
+			{
+				LanguageOptions: &config.LanguageOptions{
+					ParserOptions: &config.ParserOptions{
+						Project: []string{"./tsconfig.json"},
+					},
+				},
+			},
+		},
+	}
+
+	s.rebuildTsConfigPaths()
+
+	if s.tsConfigPaths == nil {
+		t.Fatal("expected tsConfigPaths non-nil when all configs have project")
+	}
+	if len(s.tsConfigPaths) != 2 {
+		t.Fatalf("expected 2 tsconfig paths, got %d: %v", len(s.tsConfigPaths), s.tsConfigPaths)
+	}
+	// Verify actual paths contain the expected tsconfig locations
+	pathSet := make(map[string]bool)
+	for _, p := range s.tsConfigPaths {
+		pathSet[p] = true
+	}
+	if !pathSet["/project-a/tsconfig.json"] {
+		t.Errorf("expected /project-a/tsconfig.json in paths, got %v", s.tsConfigPaths)
+	}
+	if !pathSet["/project-b/tsconfig.json"] {
+		t.Errorf("expected /project-b/tsconfig.json in paths, got %v", s.tsConfigPaths)
+	}
+}
+
+func TestRebuildTsConfigPaths_NoConfig(t *testing.T) {
+	s := newTestServer()
+	s.fs = &mockFS{files: map[string]bool{}}
+
+	// No jsConfigs, no rslintConfigPath
+	s.rebuildTsConfigPaths()
+
+	if s.tsConfigPaths != nil {
+		t.Errorf("expected tsConfigPaths nil when no config, got %v", s.tsConfigPaths)
+	}
+}

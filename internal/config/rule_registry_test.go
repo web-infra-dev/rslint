@@ -560,3 +560,82 @@ func TestGetEnabledRules_EnforcePlugins_OffRuleNotBlocked(t *testing.T) {
 		}
 	}
 }
+
+func TestGetActiveRulesForFile_FiltersTypeAwareWhenNotInTypeInfoFiles(t *testing.T) {
+	RegisterAllRules()
+
+	cfg := RslintConfig{
+		{
+			Rules: Rules{
+				"@typescript-eslint/require-await": "error", // type-aware
+				"no-console":                       "error", // not type-aware
+			},
+		},
+	}
+
+	typeInfoFiles := map[string]struct{}{
+		"src/covered.ts": {},
+	}
+
+	// File IN typeInfoFiles — both rules returned
+	covered := GlobalRuleRegistry.GetActiveRulesForFile(cfg, "src/covered.ts", "", false, typeInfoFiles)
+	if len(covered) != 2 {
+		t.Fatalf("Expected 2 rules for covered file, got %d: %v", len(covered), ruleNames(covered))
+	}
+	coveredNames := ruleNameSet(covered)
+	if !coveredNames["@typescript-eslint/require-await"] {
+		t.Error("Expected require-await for covered file")
+	}
+	if !coveredNames["no-console"] {
+		t.Error("Expected no-console for covered file")
+	}
+
+	// File NOT in typeInfoFiles — type-aware filtered, only non-type-aware remains
+	uncovered := GlobalRuleRegistry.GetActiveRulesForFile(cfg, "src/uncovered.ts", "", false, typeInfoFiles)
+	if len(uncovered) != 1 {
+		t.Fatalf("Expected 1 rule for uncovered file (only non-type-aware), got %d: %v", len(uncovered), ruleNames(uncovered))
+	}
+	if uncovered[0].Name != "no-console" {
+		t.Errorf("Expected only no-console for uncovered file, got %q", uncovered[0].Name)
+	}
+}
+
+func TestGetActiveRulesForFile_NilTypeInfoFilesNoFiltering(t *testing.T) {
+	RegisterAllRules()
+
+	cfg := RslintConfig{
+		{
+			Rules: Rules{
+				"@typescript-eslint/require-await": "error",
+			},
+		},
+	}
+
+	// nil typeInfoFiles → no filtering, all rules enabled
+	rules := GlobalRuleRegistry.GetActiveRulesForFile(cfg, "src/any.ts", "", false, nil)
+	found := false
+	for _, r := range rules {
+		if r.Name == "@typescript-eslint/require-await" {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("Expected require-await when typeInfoFiles is nil (no filtering)")
+	}
+}
+
+func ruleNames(rules []linter.ConfiguredRule) []string {
+	names := make([]string, len(rules))
+	for i, r := range rules {
+		names[i] = r.Name
+	}
+	return names
+}
+
+func ruleNameSet(rules []linter.ConfiguredRule) map[string]bool {
+	set := make(map[string]bool, len(rules))
+	for _, r := range rules {
+		set[r.Name] = true
+	}
+	return set
+}

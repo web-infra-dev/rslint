@@ -77,6 +77,26 @@ func (r *RuleRegistry) GetEnabledRules(config RslintConfig, filePath string, cwd
 	return enabledRules, mergedConfig
 }
 
+// GetActiveRulesForFile returns the lint rules that should run on a file.
+// It resolves the config, gets enabled rules, and filters out type-aware rules
+// for files not covered by parserOptions.project tsconfigs. This encapsulates
+// the rule selection logic shared by both CLI and LSP.
+func (r *RuleRegistry) GetActiveRulesForFile(
+	rslintConfig RslintConfig,
+	filePath string,
+	cwd string,
+	enforcePlugins bool,
+	typeInfoFiles map[string]struct{},
+) []linter.ConfiguredRule {
+	activeRules, _ := r.GetEnabledRules(rslintConfig, filePath, cwd, enforcePlugins)
+	if typeInfoFiles != nil {
+		if _, hasTypeInfo := typeInfoFiles[filePath]; !hasTypeInfo {
+			activeRules = linter.FilterNonTypeAwareRules(activeRules)
+		}
+	}
+	return activeRules
+}
+
 func CloneSettings(settings map[string]interface{}) map[string]interface{} {
 	if len(settings) == 0 {
 		return nil

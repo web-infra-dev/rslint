@@ -155,6 +155,29 @@ func (loader *ConfigLoader) LoadTsConfigsFromRslintConfig(rslintConfig RslintCon
 	return tsConfigs, nil
 }
 
+// ResolveTsConfigPaths extracts tsconfig paths from a rslint config's parserOptions.project,
+// with an auto-detection fallback to tsconfig.json in the config directory.
+// Returns (nil, nil) when no tsconfigs are found. Returns (nil, err) when
+// config validation fails (e.g. glob matched no files, tsconfig doesn't exist).
+func ResolveTsConfigPaths(rslintConfig RslintConfig, cwd string, fs vfs.FS) ([]string, error) {
+	if fs == nil {
+		return nil, nil
+	}
+	loader := NewConfigLoader(fs, cwd)
+	tsConfigs, err := loader.LoadTsConfigsFromRslintConfig(rslintConfig, cwd)
+	if err != nil {
+		return nil, err
+	}
+	if len(tsConfigs) == 0 {
+		defaultTsConfig := tspath.ResolvePath(cwd, "tsconfig.json")
+		if fs.FileExists(defaultTsConfig) {
+			return []string{defaultTsConfig}, nil
+		}
+		return nil, nil
+	}
+	return tsConfigs, nil
+}
+
 func appendUniqueConfigPath(paths []string, seenPaths map[string]struct{}, configPath string) []string {
 	normalizedPath := tspath.NormalizePath(configPath)
 	if _, exists := seenPaths[normalizedPath]; exists {
