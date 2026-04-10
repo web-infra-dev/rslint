@@ -85,7 +85,7 @@ func TestRequiresTypeInfo_Propagation(t *testing.T) {
 	}
 }
 
-// createTestProgram creates a Program from temp files for testing buildProgramFileSet.
+// createTestProgram creates a Program from temp files for testing utils.CollectProgramFiles.
 func createTestProgram(t *testing.T, files map[string]string) *compiler.Program {
 	t.Helper()
 	tmpDir := t.TempDir()
@@ -119,7 +119,7 @@ func TestBuildProgramFileSet_ContainsSourceFiles(t *testing.T) {
 		"b.ts": "const b = 2;",
 	})
 
-	fileSet := buildProgramFileSet([]*compiler.Program{program})
+	fileSet := utils.CollectProgramFiles([]*compiler.Program{program}, bundled.WrapFS(cachedvfs.From(osvfs.FS())))
 
 	// Should contain user source files
 	found := 0
@@ -135,7 +135,7 @@ func TestBuildProgramFileSet_ContainsSourceFiles(t *testing.T) {
 
 func TestBuildProgramFileSet_RealpathKeyForSymlinks(t *testing.T) {
 	// On macOS, /tmp is a symlink to /private/tmp.
-	// Verify that buildProgramFileSet adds the resolved path as an alternate key.
+	// Verify that utils.CollectProgramFiles adds the resolved path as an alternate key.
 	tmpDir := t.TempDir()
 	realTmpDir, err := filepath.EvalSymlinks(tmpDir)
 	if err != nil {
@@ -156,7 +156,7 @@ func TestBuildProgramFileSet_RealpathKeyForSymlinks(t *testing.T) {
 		t.Fatalf("Failed to create program: %v", err)
 	}
 
-	fileSet := buildProgramFileSet([]*compiler.Program{program})
+	fileSet := utils.CollectProgramFiles([]*compiler.Program{program}, bundled.WrapFS(cachedvfs.From(osvfs.FS())))
 
 	// The file should be findable via BOTH the original and resolved paths
 	resolvedFilePath := tspath.NormalizePath(filepath.Join(realTmpDir, "test.ts"))

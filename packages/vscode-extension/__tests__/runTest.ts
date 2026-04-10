@@ -87,6 +87,28 @@ async function main() {
     failed = true;
   }
 
+  // --- Type-aware rule scope tests ---
+  const typeAwareScopeWorkspace = path.resolve(
+    testsSourceDir,
+    'fixtures-type-aware-scope',
+  );
+  const typeAwareScopeTestsPath = path.resolve(
+    __dirname,
+    './suite-type-aware-scope',
+  );
+
+  try {
+    await runTests({
+      extensionDevelopmentPath,
+      extensionTestsPath: typeAwareScopeTestsPath,
+      launchArgs: ['--disable-extensions', typeAwareScopeWorkspace],
+      version: 'stable',
+    });
+  } catch (err) {
+    console.error('Type-aware scope tests failed:', err);
+    failed = true;
+  }
+
   if (failed) {
     console.error('Some test suites failed');
     process.exit(1);
