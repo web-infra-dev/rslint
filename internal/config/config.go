@@ -142,6 +142,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/eqeqeq"
 	"github.com/web-infra-dev/rslint/internal/rules/no_this_before_super"
 	"github.com/web-infra-dev/rslint/internal/rules/no_undef"
+	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_finally"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_negation"
 	"github.com/web-infra-dev/rslint/internal/rules/no_unsafe_optional_chaining"
 	"github.com/web-infra-dev/rslint/internal/rules/no_var"
@@ -519,6 +520,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-fallthrough", no_fallthrough.NoFallthroughRule)
 	GlobalRuleRegistry.Register("valid-typeof", valid_typeof.ValidTypeofRule)
 	GlobalRuleRegistry.Register("no-unsafe-optional-chaining", no_unsafe_optional_chaining.NoUnsafeOptionalChainingRule)
+	GlobalRuleRegistry.Register("no-unsafe-finally", no_unsafe_finally.NoUnsafeFinallyRule)
 }
 
 // isFileIgnored checks if a file is matched by ignore patterns, evaluated sequentially.
