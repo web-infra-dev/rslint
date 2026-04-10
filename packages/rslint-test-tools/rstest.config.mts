@@ -73,7 +73,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/adjacent-overload-signatures.test.ts',
     './tests/typescript-eslint/rules/array-type.test.ts',
     './tests/typescript-eslint/rules/await-thenable.test.ts',
-    // './tests/typescript-eslint/rules/ban-ts-comment.test.ts',
+    './tests/typescript-eslint/rules/ban-ts-comment.test.ts',
     './tests/typescript-eslint/rules/ban-tslint-comment.test.ts',
     './tests/typescript-eslint/rules/class-literal-property-style.test.ts',
     // './tests/typescript-eslint/rules/class-methods-use-this/class-methods-use-this-core.test.ts',
