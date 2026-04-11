@@ -18,23 +18,23 @@ type EnableAutofixRemoval struct {
 }
 
 type Config struct {
-	Vars                              string `json:"vars"`
-	VarsIgnorePattern                 string `json:"varsIgnorePattern"`
-	Args                              string `json:"args"`
-	ArgsIgnorePattern                 string `json:"argsIgnorePattern"`
-	CaughtErrors                      string `json:"caughtErrors"`
-	CaughtErrorsIgnorePattern         string `json:"caughtErrorsIgnorePattern"`
-	DestructuredArrayIgnorePattern    string `json:"destructuredArrayIgnorePattern"`
-	IgnoreRestSiblings                bool   `json:"ignoreRestSiblings"`
-	IgnoreClassWithStaticInitBlock    bool   `json:"ignoreClassWithStaticInitBlock"`
-	IgnoreUsingDeclarations           bool   `json:"ignoreUsingDeclarations"`
-	ReportUsedIgnorePattern           bool   `json:"reportUsedIgnorePattern"`
-	EnableAutofixRemoval              EnableAutofixRemoval `json:"enableAutofixRemoval"`
+	Vars                           string               `json:"vars"`
+	VarsIgnorePattern              string               `json:"varsIgnorePattern"`
+	Args                           string               `json:"args"`
+	ArgsIgnorePattern              string               `json:"argsIgnorePattern"`
+	CaughtErrors                   string               `json:"caughtErrors"`
+	CaughtErrorsIgnorePattern      string               `json:"caughtErrorsIgnorePattern"`
+	DestructuredArrayIgnorePattern string               `json:"destructuredArrayIgnorePattern"`
+	IgnoreRestSiblings             bool                 `json:"ignoreRestSiblings"`
+	IgnoreClassWithStaticInitBlock bool                 `json:"ignoreClassWithStaticInitBlock"`
+	IgnoreUsingDeclarations        bool                 `json:"ignoreUsingDeclarations"`
+	ReportUsedIgnorePattern        bool                 `json:"reportUsedIgnorePattern"`
+	EnableAutofixRemoval           EnableAutofixRemoval `json:"enableAutofixRemoval"`
 
-	varsIgnoreRe                *regexp.Regexp
-	argsIgnoreRe                *regexp.Regexp
-	caughtErrorsIgnoreRe        *regexp.Regexp
-	destructuredArrayIgnoreRe   *regexp.Regexp
+	varsIgnoreRe              *regexp.Regexp
+	argsIgnoreRe              *regexp.Regexp
+	caughtErrorsIgnoreRe      *regexp.Regexp
+	destructuredArrayIgnoreRe *regexp.Regexp
 }
 
 type analysisContext struct {
@@ -144,57 +144,20 @@ func isInTypeContext(node *ast.Node) bool {
 			ast.KindTypeLiteral,
 			ast.KindMappedType:
 			return true
-		// Note: KindAsExpression, KindTypeAssertionExpression, KindSatisfiesExpression
-		// are NOT included here. Their expression operand is a value context;
-		// only the type annotation part is a type context. Since we walk up
-		// from the identifier, a value operand will pass through these nodes
-		// and continue upward without being misclassified as type-only.
+			// Note: KindAsExpression, KindTypeAssertionExpression, KindSatisfiesExpression
+			// are NOT included here. Their expression operand is a value context;
+			// only the type annotation part is a type context. Since we walk up
+			// from the identifier, a value operand will pass through these nodes
+			// and continue upward without being misclassified as type-only.
 		}
 		parent = parent.Parent
 	}
 	return false
 }
 
-// isDeclarationName checks if the node is the name of a declaration.
-// NOTE: We do NOT use ast.IsDeclarationName() here because it also returns true
-// for ShorthandPropertyAssignment names, which are both declaration names AND
-// value references. We need them to be counted as usages in collectSymbolUsages.
+// isDeclarationName delegates to utils.IsDeclarationIdentifier.
 func isDeclarationName(node *ast.Node) bool {
-	if node == nil || node.Parent == nil {
-		return false
-	}
-	parent := node.Parent
-	switch parent.Kind {
-	case ast.KindVariableDeclaration:
-		return parent.AsVariableDeclaration().Name() == node
-	case ast.KindFunctionDeclaration:
-		return parent.AsFunctionDeclaration().Name() == node
-	case ast.KindParameter:
-		return parent.AsParameterDeclaration().Name() == node
-	case ast.KindClassDeclaration:
-		return parent.AsClassDeclaration().Name() == node
-	case ast.KindInterfaceDeclaration:
-		return parent.AsInterfaceDeclaration().Name() == node
-	case ast.KindTypeAliasDeclaration:
-		return parent.AsTypeAliasDeclaration().Name() == node
-	case ast.KindEnumDeclaration:
-		return parent.AsEnumDeclaration().Name() == node
-	case ast.KindModuleDeclaration:
-		return parent.AsModuleDeclaration().Name() == node
-	case ast.KindCatchClause:
-		return parent.AsCatchClause().VariableDeclaration == node
-	case ast.KindImportSpecifier:
-		return parent.AsImportSpecifier().Name() == node
-	case ast.KindImportClause:
-		return parent.AsImportClause().Name() == node
-	case ast.KindBindingElement:
-		return parent.AsBindingElement().Name() == node
-	case ast.KindNamespaceImport:
-		return parent.AsNamespaceImport().Name() == node
-	case ast.KindImportEqualsDeclaration:
-		return parent.AsImportEqualsDeclaration().Name() == node
-	}
-	return false
+	return utils.IsDeclarationIdentifier(node)
 }
 
 // isPartOfAssignment checks if an identifier is a write-only target in an
@@ -530,8 +493,9 @@ func isMethodCallOnSameSymbol(callee *ast.Node, sym *ast.Symbol, checker *checke
 // isInsideFunctionAssignedToSelf checks if the identifier is inside a function expression
 // whose result (directly or via IIFE) is assigned to the same variable.
 // Covers: `cb = (function(a) { return cb(1+a); })()` (IIFE)
-//         `cb = (0, function(a) { cb(1+a); })` (non-IIFE, assigned directly)
-//         `cb = (function(a) { cb(1+a); }, cb)` (discarded in comma left operand)
+//
+//	`cb = (0, function(a) { cb(1+a); })` (non-IIFE, assigned directly)
+//	`cb = (function(a) { cb(1+a); }, cb)` (discarded in comma left operand)
 func isInsideFunctionAssignedToSelf(node *ast.Node, sym *ast.Symbol, checker *checker.Checker) bool {
 	current := node
 	for current != nil {

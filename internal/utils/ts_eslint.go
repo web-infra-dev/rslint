@@ -934,6 +934,91 @@ func FindEnclosingScope(node *ast.Node) *ast.Node {
 	})
 }
 
+// IsDeclarationIdentifier checks if the node is the name (identifier) of a declaration.
+// Unlike ast.IsDeclarationName(), this returns false for ShorthandPropertyAssignment
+// names since they are both declaration names AND value references.
+func IsDeclarationIdentifier(node *ast.Node) bool {
+	if node == nil || node.Parent == nil {
+		return false
+	}
+	parent := node.Parent
+	switch parent.Kind {
+	case ast.KindVariableDeclaration:
+		return parent.AsVariableDeclaration().Name() == node
+	case ast.KindFunctionDeclaration:
+		return parent.AsFunctionDeclaration().Name() == node
+	case ast.KindParameter:
+		return parent.AsParameterDeclaration().Name() == node
+	case ast.KindClassDeclaration:
+		return parent.AsClassDeclaration().Name() == node
+	case ast.KindClassExpression:
+		return parent.AsClassExpression().Name() == node
+	case ast.KindFunctionExpression:
+		return parent.AsFunctionExpression().Name() == node
+	case ast.KindInterfaceDeclaration:
+		return parent.AsInterfaceDeclaration().Name() == node
+	case ast.KindTypeAliasDeclaration:
+		return parent.AsTypeAliasDeclaration().Name() == node
+	case ast.KindEnumDeclaration:
+		return parent.AsEnumDeclaration().Name() == node
+	case ast.KindModuleDeclaration:
+		return parent.AsModuleDeclaration().Name() == node
+	case ast.KindCatchClause:
+		return parent.AsCatchClause().VariableDeclaration == node
+	case ast.KindImportSpecifier:
+		return parent.AsImportSpecifier().Name() == node
+	case ast.KindImportClause:
+		return parent.AsImportClause().Name() == node
+	case ast.KindBindingElement:
+		return parent.AsBindingElement().Name() == node
+	case ast.KindNamespaceImport:
+		return parent.AsNamespaceImport().Name() == node
+	case ast.KindImportEqualsDeclaration:
+		return parent.AsImportEqualsDeclaration().Name() == node
+	case ast.KindEnumMember:
+		return parent.AsEnumMember().Name() == node
+	}
+	return false
+}
+
+// GetDeclarationIdentifier returns the name node of a declaration.
+func GetDeclarationIdentifier(decl *ast.Node) *ast.Node {
+	if decl == nil {
+		return nil
+	}
+	switch decl.Kind {
+	case ast.KindVariableDeclaration:
+		return decl.AsVariableDeclaration().Name()
+	case ast.KindFunctionDeclaration:
+		return decl.AsFunctionDeclaration().Name()
+	case ast.KindClassDeclaration:
+		return decl.AsClassDeclaration().Name()
+	case ast.KindClassExpression:
+		return decl.AsClassExpression().Name()
+	case ast.KindInterfaceDeclaration:
+		return decl.AsInterfaceDeclaration().Name()
+	case ast.KindTypeAliasDeclaration:
+		return decl.AsTypeAliasDeclaration().Name()
+	case ast.KindEnumDeclaration:
+		return decl.AsEnumDeclaration().Name()
+	case ast.KindModuleDeclaration:
+		return decl.AsModuleDeclaration().Name()
+	case ast.KindImportSpecifier:
+		return decl.AsImportSpecifier().Name()
+	case ast.KindImportClause:
+		return decl.AsImportClause().Name()
+	case ast.KindNamespaceImport:
+		return decl.AsNamespaceImport().Name()
+	case ast.KindImportEqualsDeclaration:
+		return decl.AsImportEqualsDeclaration().Name()
+	case ast.KindParameter:
+		return decl.AsParameterDeclaration().Name()
+	case ast.KindBindingElement:
+		return decl.AsBindingElement().Name()
+	}
+	return nil
+}
+
 // VisitDestructuringIdentifiers calls fn for each identifier target in a
 // destructuring assignment pattern (object/array literal on the left side
 // of an assignment expression). Handles shorthand properties, renamed
