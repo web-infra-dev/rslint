@@ -145,6 +145,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_symbol"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_wrappers"
 	"github.com/web-infra-dev/rslint/internal/rules/no_obj_calls"
+	"github.com/web-infra-dev/rslint/internal/rules/no_octal_escape"
 	"github.com/web-infra-dev/rslint/internal/rules/no_proto"
 	"github.com/web-infra-dev/rslint/internal/rules/no_script_url"
 	"github.com/web-infra-dev/rslint/internal/rules/no_self_assign"
@@ -525,6 +526,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-loss-of-precision", no_loss_of_precision.NoLossOfPrecisionRule)
 	GlobalRuleRegistry.Register("no-new-wrappers", no_new_wrappers.NoNewWrappersRule)
 	GlobalRuleRegistry.Register("no-multi-str", no_multi_str.NoMultiStrRule)
+	GlobalRuleRegistry.Register("no-octal-escape", no_octal_escape.NoOctalEscapeRule)
 	GlobalRuleRegistry.Register("no-proto", no_proto.NoProtoRule)
 	GlobalRuleRegistry.Register("no-script-url", no_script_url.NoScriptUrlRule)
 	GlobalRuleRegistry.Register("no-self-assign", no_self_assign.NoSelfAssignRule)
