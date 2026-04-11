@@ -247,6 +247,24 @@ class ChildClass extends BaseClass {
 			`,
 			Options: []interface{}{"getters"},
 		},
+		// Object literal getters should not trigger the rule (regression: panic on ObjectLiteralExpression)
+		{Code: `
+const obj = {
+  get foo() {
+    return 'bar';
+  }
+};
+		`},
+		{
+			Code: `
+const obj = {
+  get foo() {
+    return 'bar';
+  }
+};
+			`,
+			Options: []interface{}{"getters"},
+		},
 	}, []rule_tester.InvalidTestCase{
 		{
 			Code: `
