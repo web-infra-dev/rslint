@@ -1,0 +1,1453 @@
+// Rstest Snapshot v1
+
+exports[`no-iterator > invalid 1`] = `
+{
+  "code": "var a = test.__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 2`] = `
+{
+  "code": "var a = test['__iterator__'];",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 3`] = `
+{
+  "code": "var a = test["__iterator__"];",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 4`] = `
+{
+  "code": "var a = test[\`__iterator__\`];",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 1,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 5`] = `
+{
+  "code": "Foo.prototype.__iterator__ = function() {};",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 6`] = `
+{
+  "code": "test[\`__iterator__\`] = function () {};",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 7`] = `
+{
+  "code": "obj.__iterator__ = 42;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 8`] = `
+{
+  "code": "a.b.__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 9`] = `
+{
+  "code": "a.b.c.__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 10`] = `
+{
+  "code": "a.__iterator__.__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 11`] = `
+{
+  "code": "obj?.__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 12`] = `
+{
+  "code": "obj?.['__iterator__'];",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 13`] = `
+{
+  "code": "a?.b?.__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 14`] = `
+{
+  "code": "(obj).__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 15`] = `
+{
+  "code": "((obj)).__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 16`] = `
+{
+  "code": "obj!.__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 17`] = `
+{
+  "code": "(obj as any).__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 18`] = `
+{
+  "code": "(<any>obj).__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 19`] = `
+{
+  "code": "this.__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 20`] = `
+{
+  "code": "class A { m() { this.__iterator__; } }",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 21`] = `
+{
+  "code": "class A { x = this.__iterator__; }",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 22`] = `
+{
+  "code": "class A { static { this.__iterator__; } }",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 20,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 23`] = `
+{
+  "code": "function foo() { obj.__iterator__; }",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 24`] = `
+{
+  "code": "const f = () => obj.__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 25`] = `
+{
+  "code": "const f = () => { return obj.__iterator__; };",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 42,
+          "line": 1,
+        },
+        "start": {
+          "column": 26,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 26`] = `
+{
+  "code": "var x = cond ? obj.__iterator__ : null;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 27`] = `
+{
+  "code": "foo(obj.__iterator__);",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 28`] = `
+{
+  "code": "var x = \`\${obj.__iterator__}\`;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 1,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 29`] = `
+{
+  "code": "a.__iterator__;
+b['__iterator__'];",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 30`] = `
+{
+  "code": "for (var x in obj.__iterator__) {}",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 31,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 31`] = `
+{
+  "code": "while (obj.__iterator__) {}",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 32`] = `
+{
+  "code": "delete obj.__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 33`] = `
+{
+  "code": "typeof obj.__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 8,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 34`] = `
+{
+  "code": "void obj.__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 35`] = `
+{
+  "code": "obj.__iterator__();",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 36`] = `
+{
+  "code": "new obj.__iterator__();",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 37`] = `
+{
+  "code": "class A extends B { m() { super.__iterator__; } }",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 45,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 38`] = `
+{
+  "code": "class A extends B { m() { super['__iterator__']; } }",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 48,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 39`] = `
+{
+  "code": "var a = [obj.__iterator__];",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 40`] = `
+{
+  "code": "var a = { x: obj.__iterator__ };",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 41`] = `
+{
+  "code": "var a = { ...obj.__iterator__ };",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 30,
+          "line": 1,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 42`] = `
+{
+  "code": "obj.__iterator__ || fallback;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 43`] = `
+{
+  "code": "obj.__iterator__ ?? fallback;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 44`] = `
+{
+  "code": "obj.__iterator__ ??= fallback;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 45`] = `
+{
+  "code": "async function f() { await obj.__iterator__; }",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 1,
+        },
+        "start": {
+          "column": 28,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 46`] = `
+{
+  "code": "function* g() { yield obj.__iterator__; }",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 39,
+          "line": 1,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 47`] = `
+{
+  "code": "obj['__iterator__'].__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 48`] = `
+{
+  "code": "obj['\\x5F\\x5Fiterator\\x5F\\x5F'];",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 49`] = `
+{
+  "code": "obj['\\u005F\\u005Fiterator\\u005F\\u005F'];",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 40,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 50`] = `
+{
+  "code": "obj[\`\\x5F\\x5Fiterator\\x5F\\x5F\`];",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 51`] = `
+{
+  "code": "obj.\\u005F\\u005Fiterator\\u005F\\u005F;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 52`] = `
+{
+  "code": "(obj satisfies any).__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 53`] = `
+{
+  "code": "obj
+  .__iterator__;",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-iterator > invalid 54`] = `
+{
+  "code": "obj
+  ['__iterator__'];",
+  "diagnostics": [
+    {
+      "message": "Reserved name '__iterator__'.",
+      "messageId": "noIterator",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-iterator",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
