@@ -2,11 +2,12 @@ import { RuleTester } from '../rule-tester';
 
 const ruleTester = new RuleTester();
 
+// NOTE: JS diagnostics are sorted by position (line, column ascending),
+// which differs from Go tests where errors follow AST traversal order.
+
 ruleTester.run('no-labels', {
   valid: [
-    // ================================================================
-    // Non-label contexts — should never trigger
-    // ================================================================
+    // Non-label contexts
     'var f = { label: foo() }',
     'while (true) {}',
     'while (true) { break; }',
@@ -15,9 +16,7 @@ ruleTester.run('no-labels', {
     'do { break; } while (true)',
     'switch (a) { case 0: break; }',
 
-    // ================================================================
-    // allowLoop: all iteration statement types
-    // ================================================================
+    // allowLoop: all iteration types
     {
       code: 'A: while (a) { break A; }',
       options: { allowLoop: true },
@@ -47,17 +46,13 @@ ruleTester.run('no-labels', {
       options: { allowLoop: true },
     },
 
-    // ================================================================
     // allowSwitch
-    // ================================================================
     {
       code: 'A: switch (a) { case 0: break A; }',
       options: { allowSwitch: true },
     },
 
-    // ================================================================
     // Both options true
-    // ================================================================
     {
       code: 'A: while (a) { break A; }',
       options: { allowLoop: true, allowSwitch: true },
@@ -74,7 +69,6 @@ ruleTester.run('no-labels', {
       code: 'A: for (;;) { B: while (a) { break A; continue A; break B; continue B; } }',
       options: { allowLoop: true, allowSwitch: true },
     },
-    // allowLoop: multiple break/continue targeting different labels — all loops
     {
       code: 'A: while (true) { B: while (true) { break A; break B; continue A; continue B; } }',
       options: { allowLoop: true },
@@ -126,98 +120,98 @@ ruleTester.run('no-labels', {
     },
 
     // ================================================================
-    // Dimension 2: Label + break/continue — error ordering
+    // Dimension 2: Label + break/continue — position-sorted order
     // ================================================================
     {
       code: 'label: while (true) { break label; }',
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
       code: 'label: while (true) { continue label; }',
       errors: [
-        { messageId: 'unexpectedLabelInContinue' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInContinue' },
       ],
     },
     {
       code: 'A: while (true) { break A; continue A; }',
       errors: [
+        { messageId: 'unexpectedLabel' },
         { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabelInContinue' },
-        { messageId: 'unexpectedLabel' },
       ],
     },
     {
       code: 'A: break A;',
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
 
     // ================================================================
-    // Dimension 3: Nested labels — scope chain correctness
+    // Dimension 3: Nested labels
     // ================================================================
     {
       code: 'A: { if (foo()) { break A; } bar(); };',
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
       code: 'A: if (a) { if (foo()) { break A; } bar(); };',
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
       code: 'A: switch (a) { case 0: break A; default: break; };',
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
       code: 'A: switch (a) { case 0: B: { break A; } default: break; };',
       errors: [
+        { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabel' },
         { messageId: 'unexpectedLabelInBreak' },
-        { messageId: 'unexpectedLabel' },
-        { messageId: 'unexpectedLabel' },
       ],
     },
     {
       code: 'A: while (true) { B: for (;;) { break A; } }',
       errors: [
+        { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabel' },
         { messageId: 'unexpectedLabelInBreak' },
-        { messageId: 'unexpectedLabel' },
-        { messageId: 'unexpectedLabel' },
       ],
     },
     {
       code: 'A: while (true) { B: { continue A; } }',
       errors: [
+        { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabel' },
         { messageId: 'unexpectedLabelInContinue' },
-        { messageId: 'unexpectedLabel' },
-        { messageId: 'unexpectedLabel' },
       ],
     },
     {
       code: 'A: { B: { C: while (true) { break A; } } }',
       errors: [
+        { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabel' },
         { messageId: 'unexpectedLabelInBreak' },
-        { messageId: 'unexpectedLabel' },
-        { messageId: 'unexpectedLabel' },
-        { messageId: 'unexpectedLabel' },
       ],
     },
 
     // ================================================================
-    // Dimension 4: Chained labels — getBodyKind on LabeledStatement body
+    // Dimension 4: Chained labels
     // ================================================================
     {
       code: 'A: B: while (true) {}',
@@ -229,10 +223,10 @@ ruleTester.run('no-labels', {
     {
       code: 'A: B: while (true) { break A; break B; }',
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
@@ -244,8 +238,8 @@ ruleTester.run('no-labels', {
       code: 'A: B: while (true) { break A; }',
       options: { allowLoop: true },
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
@@ -268,9 +262,9 @@ ruleTester.run('no-labels', {
     {
       code: 'A: { A: while (true) { break A; } }',
       errors: [
+        { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabel' },
         { messageId: 'unexpectedLabelInBreak' },
-        { messageId: 'unexpectedLabel' },
-        { messageId: 'unexpectedLabel' },
       ],
     },
     {
@@ -291,32 +285,32 @@ ruleTester.run('no-labels', {
       code: 'A: break A;',
       options: { allowLoop: true },
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
       code: 'A: { if (foo()) { break A; } bar(); };',
       options: { allowLoop: true },
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
       code: 'A: if (a) { if (foo()) { break A; } bar(); };',
       options: { allowLoop: true },
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
       code: 'A: switch (a) { case 0: break A; default: break; };',
       options: { allowLoop: true },
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
@@ -328,48 +322,48 @@ ruleTester.run('no-labels', {
       code: 'A: break A;',
       options: { allowSwitch: true },
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
       code: 'A: { if (foo()) { break A; } bar(); };',
       options: { allowSwitch: true },
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
       code: 'A: if (a) { if (foo()) { break A; } bar(); };',
       options: { allowSwitch: true },
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
       code: 'A: while (a) { break A; }',
       options: { allowSwitch: true },
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
       code: 'A: do { if (b) { break A; } } while (a);',
       options: { allowSwitch: true },
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
       code: 'A: for (var a in obj) { for (;;) { switch (a) { case 0: break A; } } }',
       options: { allowSwitch: true },
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     // Both options true: block/if/var are "other" — never allowed
@@ -377,16 +371,16 @@ ruleTester.run('no-labels', {
       code: 'A: { break A; }',
       options: { allowLoop: true, allowSwitch: true },
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
       code: 'A: if (true) { break A; }',
       options: { allowLoop: true, allowSwitch: true },
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
@@ -420,8 +414,8 @@ ruleTester.run('no-labels', {
     {
       code: 'A:\n  while (true) {\n    break A;\n  }',
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
 
@@ -438,8 +432,8 @@ ruleTester.run('no-labels', {
     {
       code: 'A: { break A; } B: while (true) {}',
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
       ],
     },
@@ -447,8 +441,8 @@ ruleTester.run('no-labels', {
       code: 'A: { break A; } B: while (true) { break B; }',
       options: { allowLoop: true },
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
 
@@ -458,12 +452,12 @@ ruleTester.run('no-labels', {
     {
       code: 'A: while (true) { B: while (true) { break A; break B; continue A; continue B; } }',
       errors: [
+        { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabel' },
         { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabelInContinue' },
         { messageId: 'unexpectedLabelInContinue' },
-        { messageId: 'unexpectedLabel' },
-        { messageId: 'unexpectedLabel' },
       ],
     },
 
@@ -473,22 +467,22 @@ ruleTester.run('no-labels', {
     {
       code: 'function f() { A: while (true) { break A; } }',
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
       code: 'var f = () => { A: while (true) { break A; } }',
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
     {
       code: 'class C { method() { A: while (true) { break A; } } }',
       errors: [
-        { messageId: 'unexpectedLabelInBreak' },
         { messageId: 'unexpectedLabel' },
+        { messageId: 'unexpectedLabelInBreak' },
       ],
     },
 
