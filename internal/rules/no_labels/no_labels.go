@@ -17,13 +17,14 @@ type labelScope struct {
 
 // getBodyKind categorizes a labeled statement's body for option matching.
 func getBodyKind(node *ast.Node) string {
-	if ast.IsIterationStatement(node, false) {
+	switch {
+	case ast.IsIterationStatement(node, false):
 		return "loop"
-	}
-	if node.Kind == ast.KindSwitchStatement {
+	case node.Kind == ast.KindSwitchStatement:
 		return "switch"
+	default:
+		return "other"
 	}
-	return "other"
 }
 
 // https://eslint.org/docs/latest/rules/no-labels
