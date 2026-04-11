@@ -181,7 +181,7 @@ export default defineConfig({
     './tests/typescript-eslint/rules/no-unsafe-return.test.ts',
     './tests/typescript-eslint/rules/no-unsafe-type-assertion.test.ts',
     './tests/typescript-eslint/rules/no-unsafe-unary-minus.test.ts',
-    // './tests/typescript-eslint/rules/no-unused-expressions.test.ts',
+    './tests/typescript-eslint/rules/no-unused-expressions.test.ts',
     './tests/typescript-eslint/rules/no-unused-vars/no-unused-vars-eslint-basic.test.ts',
     './tests/typescript-eslint/rules/no-unused-vars/no-unused-vars-eslint-patterns.test.ts',
     './tests/typescript-eslint/rules/no-unused-vars/no-unused-vars-eslint-catch-loops.test.ts',
