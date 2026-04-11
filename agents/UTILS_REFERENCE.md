@@ -80,6 +80,14 @@ if optsMap != nil {
 }
 ```
 
+### String Comparison
+
+```go
+// Natural sort comparison: embedded numbers compared numerically (e.g., "a2" < "a10")
+// Returns -1, 0, or 1
+result := utils.NaturalCompare("item2", "item10") // -1
+```
+
 ### Other Utilities
 
 ```go
