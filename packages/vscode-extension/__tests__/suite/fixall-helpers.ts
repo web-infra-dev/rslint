@@ -146,6 +146,11 @@ export async function withTmpFile(
     const editor = await vscode.window.showTextDocument(doc);
     await testFn(doc, editor);
   } finally {
+    // Close the editor tab so VSCode sends a synchronous didClose to the LSP,
+    // which cleans up the session overlay. Without this, the file deletion
+    // triggers an async didClose via the file watcher, which can race with
+    // the next test's LSP requests (all blocking methods are serialized).
+    await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
     if (fs.existsSync(tmpFile)) {
       fs.unlinkSync(tmpFile);
     }
@@ -200,6 +205,11 @@ export async function withOnSaveFixAll(
       );
     }
   } finally {
+    // Close the editor tab so VSCode sends a synchronous didClose to the LSP,
+    // which cleans up the session overlay. Without this, the file deletion
+    // triggers an async didClose via the file watcher, which can race with
+    // the next test's LSP requests (all blocking methods are serialized).
+    await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
     if (fs.existsSync(tmpFile)) {
       fs.unlinkSync(tmpFile);
     }
