@@ -253,6 +253,7 @@ export default defineConfig({
     './tests/eslint/rules/no-labels.test.ts',
     './tests/eslint/rules/no-script-url.test.ts',
     './tests/eslint/rules/no-with.test.ts',
+    './tests/eslint/rules/no-proto.test.ts',
 
     // eslint-plugin-jest
     './tests/eslint-plugin-jest/rules/no-alias-methods.test.ts',
