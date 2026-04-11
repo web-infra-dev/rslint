@@ -1,0 +1,1177 @@
+// Rstest Snapshot v1
+
+exports[`parameter-properties > invalid 1`] = `
+{
+  "code": "
+class Foo {
+  constructor(readonly name: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 2`] = `
+{
+  "code": "
+class Foo {
+  constructor(private name: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 3`] = `
+{
+  "code": "
+class Foo {
+  constructor(protected name: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 4`] = `
+{
+  "code": "
+class Foo {
+  constructor(public name: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 5`] = `
+{
+  "code": "
+class Foo {
+  constructor(private readonly name: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 6`] = `
+{
+  "code": "
+class Foo {
+  constructor(protected readonly name: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 7`] = `
+{
+  "code": "
+class Foo {
+  constructor(public readonly name: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 43,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 8`] = `
+{
+  "code": "
+class Foo {
+  constructor(
+    public name: string,
+    age: number,
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 9`] = `
+{
+  "code": "
+class Foo {
+  constructor(
+    private name: string,
+    private age: number,
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+    {
+      "message": "Property age should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 10`] = `
+{
+  "code": "
+class Foo {
+  constructor(
+    protected name: string,
+    protected age: number,
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+    {
+      "message": "Property age should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 11`] = `
+{
+  "code": "
+class Foo {
+  constructor(
+    public name: string,
+    public age: number,
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 4,
+        },
+        "start": {
+          "column": 5,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+    {
+      "message": "Property age should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 12`] = `
+{
+  "code": "
+class Foo {
+  constructor(name: string) {}
+  constructor(
+    private name: string,
+    age?: number,
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 13`] = `
+{
+  "code": "
+class Foo {
+  constructor(private name: string) {}
+  constructor(
+    private name: string,
+    age?: number,
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 14`] = `
+{
+  "code": "
+class Foo {
+  constructor(private name: string) {}
+  constructor(
+    private name: string,
+    private age?: number,
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+    {
+      "message": "Property age should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 15`] = `
+{
+  "code": "
+class Foo {
+  constructor(name: string) {}
+  constructor(
+    protected name: string,
+    age?: number,
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 16`] = `
+{
+  "code": "
+class Foo {
+  constructor(protected name: string) {}
+  constructor(
+    protected name: string,
+    age?: number,
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 17`] = `
+{
+  "code": "
+class Foo {
+  constructor(protected name: string) {}
+  constructor(
+    protected name: string,
+    protected age?: number,
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+    {
+      "message": "Property age should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 18`] = `
+{
+  "code": "
+class Foo {
+  constructor(name: string) {}
+  constructor(
+    public name: string,
+    age?: number,
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 19`] = `
+{
+  "code": "
+class Foo {
+  constructor(public name: string) {}
+  constructor(
+    public name: string,
+    age?: number,
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 20`] = `
+{
+  "code": "
+class Foo {
+  constructor(public name: string) {}
+  constructor(
+    public name: string,
+    public age?: number,
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 5,
+        },
+        "start": {
+          "column": 5,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+    {
+      "message": "Property age should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 21`] = `
+{
+  "code": "
+class Foo {
+  constructor(readonly name: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 22`] = `
+{
+  "code": "
+class Foo {
+  constructor(private name: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 23`] = `
+{
+  "code": "
+class Foo {
+  constructor(protected name: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 37,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 24`] = `
+{
+  "code": "
+class Foo {
+  constructor(public name: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 25`] = `
+{
+  "code": "
+class Foo {
+  constructor(private readonly name: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 44,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 26`] = `
+{
+  "code": "
+class Foo {
+  constructor(protected readonly name: string) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property name should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 46,
+          "line": 3,
+        },
+        "start": {
+          "column": 15,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 27`] = `
+{
+  "code": "
+class Foo {
+  constructor(private name: string) {}
+  constructor(
+    private name: string,
+    protected age?: number,
+  ) {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property age should be declared as a class property.",
+      "messageId": "preferClassProperty",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 6,
+        },
+        "start": {
+          "column": 5,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 28`] = `
+{
+  "code": "
+class Foo {
+  member: string;
+
+  constructor(member: string) {
+    this.member = member;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property member should be declared as a parameter property.",
+      "messageId": "preferParameterProperty",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 29`] = `
+{
+  "code": "
+class Foo {
+  constructor(member: string) {
+    this.member = member;
+  }
+
+  member: string;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property member should be declared as a parameter property.",
+      "messageId": "preferParameterProperty",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 30`] = `
+{
+  "code": "
+class Foo {
+  member;
+  constructor(member) {
+    this.member = member;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property member should be declared as a parameter property.",
+      "messageId": "preferParameterProperty",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`parameter-properties > invalid 31`] = `
+{
+  "code": "
+class Foo {
+  public member: string;
+  constructor(member: string) {
+    this.member = member;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Property member should be declared as a parameter property.",
+      "messageId": "preferParameterProperty",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/parameter-properties",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
