@@ -10,9 +10,10 @@ import (
 	"github.com/microsoft/typescript-go/shim/vfs"
 )
 
-// vfsAdapter adapts a vfs.FS to a standard fs.FS rooted at a given directory.
-// This allows standard library and third-party tools (like doublestar.GlobWalk)
-// to operate on the custom vfs.FS interface.
+// vfsAdapter adapts a vfs.FS to a standard fs.FS rooted at a given directory,
+// specifically for use with fs.WalkDir in DiscoverGapFiles. It is NOT a
+// general-purpose fs.FS implementation — Open() always returns a directory
+// handle (vfsDirFile) because fs.WalkDir only opens directories.
 //
 // It tracks visited symlink targets to prevent infinite recursion caused by
 // symlink cycles, since the underlying VFS follows symlinks transparently
@@ -25,22 +26,19 @@ type vfsAdapter struct {
 
 var _ fs.FS = (*vfsAdapter)(nil)
 
+// Open implements fs.FS. This adapter is ONLY used by fs.WalkDir in
+// DiscoverGapFiles, where Open() is only called on directories (via the
+// internal readDir function). Therefore we always return a vfsDirFile
+// without calling DirectoryExists — the parent's ReadDir already confirmed
+// the entry is a directory, so the stat would be redundant.
 func (a *vfsAdapter) Open(name string) (fs.File, error) {
 	fullPath := a.fullPath(name)
 
-	if a.vfs.DirectoryExists(fullPath) {
-		return &vfsDirFile{
-			adapter: a,
-			path:    fullPath,
-			name:    name,
-		}, nil
-	}
-
-	if a.vfs.FileExists(fullPath) {
-		return &vfsRegFile{name: name}, nil
-	}
-
-	return nil, &fs.PathError{Op: "open", Path: name, Err: fs.ErrNotExist}
+	return &vfsDirFile{
+		adapter: a,
+		path:    fullPath,
+		name:    name,
+	}, nil
 }
 
 func (a *vfsAdapter) fullPath(name string) string {
@@ -131,19 +129,6 @@ func (f *vfsDirFile) ReadDir(n int) ([]fs.DirEntry, error) {
 	}
 	return result, nil
 }
-
-// vfsRegFile is a minimal fs.File for regular files.
-// GlobWalk only needs directory traversal; file Open is provided for completeness.
-type vfsRegFile struct {
-	name string
-}
-
-func (f *vfsRegFile) Stat() (fs.FileInfo, error) {
-	return &vfsFileInfo{name: f.name, isDir: false}, nil
-}
-
-func (f *vfsRegFile) Read([]byte) (int, error) { return 0, io.EOF }
-func (f *vfsRegFile) Close() error             { return nil }
 
 // vfsDirEntry implements fs.DirEntry.
 type vfsDirEntry struct {

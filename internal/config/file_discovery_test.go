@@ -682,3 +682,393 @@ func TestDiscoverGapFiles_EntersNonExcludedDirs(t *testing.T) {
 	assert.Equal(t, len(gapFiles), 3)
 	_ = paths
 }
+
+// =============================================================================
+// End-to-end cross-matrix tests: config ignores × .gitignore × gap files × linter
+//
+// These tests simulate the full flow:
+//   1. ReadGitignoreAsGlobs (with configIgnores for pruning)
+//   2. Inject gitignore globs into config
+//   3. DiscoverGapFiles
+//   4. Verify GetConfigForFile (linter's per-file decision) is consistent
+//
+// The structural guarantee being tested: if isDirPathBlocked(dir, configIgnores)
+// returns true in collectGitignoreGlobs (causing .gitignore skip), then
+// GetConfigForFile also returns nil for any file in that dir.
+// =============================================================================
+
+// e2eSetup creates a fixture, runs ReadGitignoreAsGlobs + config injection + DiscoverGapFiles,
+// and returns gap files + the final config (for GetConfigForFile verification).
+func e2eSetup(t *testing.T, files map[string]string, config RslintConfig, programFiles map[string]struct{}) (string, []string, RslintConfig) {
+	t.Helper()
+	dir := setupGitignoreFixture(t, files)
+
+	configIgnores := ExtractConfigIgnores(config)
+	gitGlobs := ReadGitignoreAsGlobs(dir, osvfs.FS(), configIgnores)
+	if len(gitGlobs) > 0 {
+		config = append(RslintConfig{{Ignores: gitGlobs}}, config...)
+	}
+
+	if programFiles == nil {
+		programFiles = map[string]struct{}{}
+	}
+
+	gapFiles := DiscoverGapFiles(config, dir, osvfs.FS(), programFiles, nil, nil)
+	return dir, gapFiles, config
+}
+
+// E2E case 1: Standard rspack-like scenario.
+// config ignores tests/, .gitignore ignores target/.
+// Files in src/ should be gap files. Files in tests/ and target/ should not.
+func TestE2E_StandardMonorepo(t *testing.T) {
+	files := map[string]string{
+		".gitignore":               "target/\n",
+		"src/index.ts":             "x",
+		"src/utils.ts":             "x",
+		"tests/unit/a.test.ts":     "x",
+		"tests/.gitignore":         "snapshots/\n",
+		"target/build/output.ts":   "x",
+		"packages/foo/src/main.ts": "x",
+	}
+	config := RslintConfig{
+		{Ignores: []string{"**/tests/**"}},
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+
+	dir, gapFiles, finalConfig := e2eSetup(t, files, config, nil)
+
+	// Exactly 3 gap files: src/index.ts, src/utils.ts, packages/foo/src/main.ts.
+	// tests/ excluded by config ignore, target/ excluded by gitignore.
+	assert.Equal(t, len(gapFiles), 3, "should have exactly 3 gap files, got %d: %v", len(gapFiles), gapFiles)
+
+	gapSet := toSet(gapFiles)
+	assert.Assert(t, gapSet[tspath.NormalizePath(dir+"/src/index.ts")])
+	assert.Assert(t, gapSet[tspath.NormalizePath(dir+"/src/utils.ts")])
+	assert.Assert(t, gapSet[tspath.NormalizePath(dir+"/packages/foo/src/main.ts")])
+
+	// Linter consistency: excluded files return nil from GetConfigForFile.
+	for _, excluded := range []string{"/tests/unit/a.test.ts", "/target/build/output.ts"} {
+		mc := finalConfig.GetConfigForFile(tspath.NormalizePath(dir+excluded), dir)
+		assert.Assert(t, mc == nil, "GetConfigForFile(%s) should be nil", excluded)
+	}
+
+	// Linter consistency: included files return non-nil.
+	for _, included := range []string{"/src/index.ts", "/packages/foo/src/main.ts"} {
+		mc := finalConfig.GetConfigForFile(tspath.NormalizePath(dir+included), dir)
+		assert.Assert(t, mc != nil, "GetConfigForFile(%s) should be non-nil", included)
+	}
+}
+
+// E2E case 2: Nested .gitignore in non-ignored dir affects TS Program files.
+// packages/foo/.gitignore ignores generated/. A file there is in programFiles
+// (simulating tsconfig inclusion). GetConfigForFile should return nil for it.
+func TestE2E_NestedGitignoreAffectsProgramFiles(t *testing.T) {
+	files := map[string]string{
+		".gitignore":                        "dist/\n",
+		"packages/foo/.gitignore":           "generated/\n",
+		"packages/foo/src/index.ts":         "x",
+		"packages/foo/src/generated/api.ts": "x",
+	}
+	config := RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+
+	// Build programFiles with both files (simulating tsconfig include: ["src"])
+	dir := setupGitignoreFixture(t, files)
+	indexPath := tspath.NormalizePath(dir + "/packages/foo/src/index.ts")
+	genPathFull := tspath.NormalizePath(dir + "/packages/foo/src/generated/api.ts")
+
+	configIgnores := ExtractConfigIgnores(config)
+	gitGlobs := ReadGitignoreAsGlobs(dir, osvfs.FS(), configIgnores)
+	if len(gitGlobs) > 0 {
+		config = append(RslintConfig{{Ignores: gitGlobs}}, config...)
+	}
+
+	// generated/api.ts is in programFiles but gitignored.
+	// GetConfigForFile should return nil because gitignore patterns are in config.
+	mc := config.GetConfigForFile(genPathFull, dir)
+	assert.Assert(t, mc == nil, "GetConfigForFile should return nil for gitignored generated/ file (nested .gitignore collected)")
+
+	// index.ts is in programFiles and NOT gitignored → should get rules.
+	mc = config.GetConfigForFile(indexPath, dir)
+	assert.Assert(t, mc != nil, "GetConfigForFile should return config for non-ignored file")
+}
+
+// E2E case 3: Config ignores with file-level pattern (**/tests/**/*).
+// The negation !tests/e2e/**/* re-includes tests/e2e/ at file level.
+// tests/e2e/ files should be discoverable as gap files.
+func TestE2E_FileLevelIgnoreWithNegation(t *testing.T) {
+	files := map[string]string{
+		"src/index.ts":        "x",
+		"tests/unit/a.ts":     "x",
+		"tests/e2e/smoke.ts":  "x",
+		"tests/.gitignore":    "tmp/\n",
+		"tests/e2e/.gitignore": "screenshots/\n",
+	}
+	config := RslintConfig{
+		{Ignores: []string{"**/tests/**/*", "!tests/e2e/**/*"}},
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+
+	dir, gapFiles, finalConfig := e2eSetup(t, files, config, nil)
+
+	gapSet := toSet(gapFiles)
+
+	// src/index.ts → discovered
+	assert.Assert(t, gapSet[tspath.NormalizePath(dir+"/src/index.ts")], "src/index.ts should be gap file")
+
+	// tests/unit/a.ts → file-level ignored, not negated → NOT discovered
+	assert.Assert(t, !gapSet[tspath.NormalizePath(dir+"/tests/unit/a.ts")], "tests/unit/ should be excluded")
+
+	// tests/e2e/smoke.ts → file-level ignored BUT negated → discovered!
+	assert.Assert(t, gapSet[tspath.NormalizePath(dir+"/tests/e2e/smoke.ts")], "tests/e2e/ should be re-included by negation")
+
+	// Verify linter: tests/e2e/smoke.ts gets rules
+	mc := finalConfig.GetConfigForFile(tspath.NormalizePath(dir+"/tests/e2e/smoke.ts"), dir)
+	assert.Assert(t, mc != nil, "GetConfigForFile should return config for negation-included tests/e2e/ file")
+
+	// Verify linter: tests/unit/a.ts does NOT get rules
+	mc = finalConfig.GetConfigForFile(tspath.NormalizePath(dir+"/tests/unit/a.ts"), dir)
+	assert.Assert(t, mc == nil, "GetConfigForFile should return nil for ignored tests/unit/ file")
+}
+
+// E2E case 4: .gitignore + config ignores target different dirs.
+// .gitignore ignores dist/, config ignores vendor/. Both should be excluded.
+func TestE2E_GitignoreAndConfigIgnoreIndependent(t *testing.T) {
+	files := map[string]string{
+		".gitignore":         "dist/\n",
+		"src/index.ts":       "x",
+		"dist/bundle.ts":     "x",
+		"vendor/lib/util.ts": "x",
+	}
+	config := RslintConfig{
+		{Ignores: []string{"**/vendor/**"}},
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+
+	dir, gapFiles, finalConfig := e2eSetup(t, files, config, nil)
+
+	gapSet := toSet(gapFiles)
+
+	// src/ → discovered
+	assert.Assert(t, gapSet[tspath.NormalizePath(dir+"/src/index.ts")], "src/index.ts should be gap file")
+	// dist/ → excluded by gitignore
+	assert.Assert(t, !gapSet[tspath.NormalizePath(dir+"/dist/bundle.ts")], "dist/ should be excluded by gitignore")
+	// vendor/ → excluded by config ignore
+	assert.Assert(t, !gapSet[tspath.NormalizePath(dir+"/vendor/lib/util.ts")], "vendor/ should be excluded by config ignore")
+
+	// Verify linter
+	mc := finalConfig.GetConfigForFile(tspath.NormalizePath(dir+"/dist/bundle.ts"), dir)
+	assert.Assert(t, mc == nil, "dist/ file should be nil in linter (gitignored)")
+	mc = finalConfig.GetConfigForFile(tspath.NormalizePath(dir+"/vendor/lib/util.ts"), dir)
+	assert.Assert(t, mc == nil, "vendor/ file should be nil in linter (config-ignored)")
+}
+
+// E2E case 5: No .gitignore at all + config ignores.
+// Only config ignores are active.
+func TestE2E_NoGitignoreOnlyConfigIgnores(t *testing.T) {
+	files := map[string]string{
+		"src/index.ts":         "x",
+		"tests/unit/a.test.ts": "x",
+	}
+	config := RslintConfig{
+		{Ignores: []string{"**/tests/**"}},
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+
+	dir, gapFiles, _ := e2eSetup(t, files, config, nil)
+
+	gapSet := toSet(gapFiles)
+
+	assert.Assert(t, gapSet[tspath.NormalizePath(dir+"/src/index.ts")], "src/index.ts should be gap file")
+	assert.Assert(t, !gapSet[tspath.NormalizePath(dir+"/tests/unit/a.test.ts")], "tests/ should be excluded")
+}
+
+// E2E case 6: programFiles interaction — file in program is not a gap file.
+func TestE2E_ProgramFilesExcluded(t *testing.T) {
+	files := map[string]string{
+		".gitignore":   "dist/\n",
+		"src/index.ts": "x",
+		"src/utils.ts": "x",
+	}
+	config := RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+
+	// Create fixture once and use the same dir for programFiles and e2e flow.
+	dir := setupGitignoreFixture(t, files)
+	indexPath := tspath.NormalizePath(dir + "/src/index.ts")
+	utilsPath := tspath.NormalizePath(dir + "/src/utils.ts")
+
+	programFiles := map[string]struct{}{
+		indexPath: {},
+	}
+
+	configIgnores := ExtractConfigIgnores(config)
+	gitGlobs := ReadGitignoreAsGlobs(dir, osvfs.FS(), configIgnores)
+	if len(gitGlobs) > 0 {
+		config = append(RslintConfig{{Ignores: gitGlobs}}, config...)
+	}
+
+	gapFiles := DiscoverGapFiles(config, dir, osvfs.FS(), programFiles, nil, nil)
+	gapSet := toSet(gapFiles)
+
+	// index.ts in program → NOT a gap file
+	assert.Assert(t, !gapSet[indexPath], "file in program should not be gap file")
+	// utils.ts not in program → IS a gap file
+	assert.Assert(t, gapSet[utilsPath], "file not in program should be gap file")
+}
+
+// E2E case 7: Multiple config ignore entries + gitignore — verify all patterns combine correctly.
+func TestE2E_MultipleIgnoreEntries(t *testing.T) {
+	files := map[string]string{
+		".gitignore":            "target/\n",
+		"src/index.ts":          "x",
+		"tests/a.test.ts":       "x",
+		"scripts/build.ts":      "x",
+		"target/output.ts":      "x",
+		"packages/foo/index.ts": "x",
+	}
+	config := RslintConfig{
+		{Ignores: []string{"**/tests/**"}},
+		{Ignores: []string{"scripts/**"}},
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+
+	dir, gapFiles, finalConfig := e2eSetup(t, files, config, nil)
+	gapSet := toSet(gapFiles)
+
+	assert.Assert(t, gapSet[tspath.NormalizePath(dir+"/src/index.ts")], "src/ → discovered")
+	assert.Assert(t, gapSet[tspath.NormalizePath(dir+"/packages/foo/index.ts")], "packages/ → discovered")
+	assert.Assert(t, !gapSet[tspath.NormalizePath(dir+"/tests/a.test.ts")], "tests/ → config-ignored")
+	assert.Assert(t, !gapSet[tspath.NormalizePath(dir+"/scripts/build.ts")], "scripts/ → config-ignored")
+	assert.Assert(t, !gapSet[tspath.NormalizePath(dir+"/target/output.ts")], "target/ → gitignored")
+
+	// Verify linter consistency for all excluded paths
+	for _, excluded := range []string{"/tests/a.test.ts", "/scripts/build.ts", "/target/output.ts"} {
+		mc := finalConfig.GetConfigForFile(tspath.NormalizePath(dir+excluded), dir)
+		assert.Assert(t, mc == nil, "GetConfigForFile(%s) should return nil", excluded)
+	}
+}
+
+// E2E case 8: config-ignored directory's file is in TS Program → GetConfigForFile returns nil.
+// This verifies that even if tsconfig pulls in files from a config-ignored directory,
+// the linter correctly skips them (isDirBlockedByIgnores blocks the directory).
+func TestE2E_ConfigIgnoredDirInProgram(t *testing.T) {
+	files := map[string]string{
+		"src/index.ts":             "x",
+		"tests/helpers/setup.ts":   "x",
+	}
+	config := RslintConfig{
+		{Ignores: []string{"**/tests/**"}},
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+
+	dir := setupGitignoreFixture(t, files)
+	testFile := tspath.NormalizePath(dir + "/tests/helpers/setup.ts")
+
+	configIgnores := ExtractConfigIgnores(config)
+	gitGlobs := ReadGitignoreAsGlobs(dir, osvfs.FS(), configIgnores)
+	if len(gitGlobs) > 0 {
+		config = append(RslintConfig{{Ignores: gitGlobs}}, config...)
+	}
+
+	// Even though setup.ts is in programFiles, GetConfigForFile should return nil
+	// because tests/ is directory-blocked by config ignores.
+	mc := config.GetConfigForFile(testFile, dir)
+	assert.Assert(t, mc == nil, "GetConfigForFile should return nil for file in config-ignored dir, even if in TS Program")
+}
+
+// E2E case 9: gitignore and config ignore both target the same directory (dist/).
+// Both mechanisms should work — the file should be excluded regardless of which one catches it.
+func TestE2E_OverlappingGitignoreAndConfigIgnore(t *testing.T) {
+	files := map[string]string{
+		".gitignore":       "dist/\n",
+		"src/index.ts":     "x",
+		"dist/bundle.ts":   "x",
+	}
+	config := RslintConfig{
+		{Ignores: []string{"**/dist/**"}},
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+
+	dir, gapFiles, finalConfig := e2eSetup(t, files, config, nil)
+	gapSet := toSet(gapFiles)
+
+	distFile := tspath.NormalizePath(dir + "/dist/bundle.ts")
+	assert.Assert(t, !gapSet[distFile], "dist/ should be excluded (both gitignore and config ignore)")
+
+	mc := finalConfig.GetConfigForFile(distFile, dir)
+	assert.Assert(t, mc == nil, "GetConfigForFile should return nil for doubly-ignored dist/ file")
+}
+
+// E2E case 10: allowDirs scope combined with config ignores.
+// Only files in the allowed directory should be discovered, config ignores still apply.
+func TestE2E_AllowDirsWithConfigIgnores(t *testing.T) {
+	files := map[string]string{
+		".gitignore":              "dist/\n",
+		"packages/foo/src/a.ts":  "x",
+		"packages/foo/dist/b.ts": "x",
+		"packages/bar/src/c.ts":  "x",
+		"tests/unit/d.ts":        "x",
+	}
+	config := RslintConfig{
+		{Ignores: []string{"**/tests/**"}},
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+
+	dir := setupGitignoreFixture(t, files)
+	configIgnores := ExtractConfigIgnores(config)
+	gitGlobs := ReadGitignoreAsGlobs(dir, osvfs.FS(), configIgnores)
+	if len(gitGlobs) > 0 {
+		config = append(RslintConfig{{Ignores: gitGlobs}}, config...)
+	}
+
+	// Only allow packages/foo/
+	fooDir := tspath.NormalizePath(dir + "/packages/foo")
+	gapFiles := DiscoverGapFiles(config, dir, osvfs.FS(), map[string]struct{}{}, nil, []string{fooDir})
+	gapSet := toSet(gapFiles)
+
+	assert.Assert(t, gapSet[tspath.NormalizePath(dir+"/packages/foo/src/a.ts")], "packages/foo/src/a.ts should be discovered (in allowDirs)")
+	assert.Assert(t, !gapSet[tspath.NormalizePath(dir+"/packages/foo/dist/b.ts")], "packages/foo/dist/b.ts should be excluded (gitignored)")
+	assert.Assert(t, !gapSet[tspath.NormalizePath(dir+"/packages/bar/src/c.ts")], "packages/bar/ should be excluded (not in allowDirs)")
+	assert.Assert(t, !gapSet[tspath.NormalizePath(dir+"/tests/unit/d.ts")], "tests/ should be excluded (config-ignored)")
+}
+
+// E2E case 11: allowFiles (lint-staged fast path) combined with gitignore injection.
+// Files passed explicitly should still be filtered by gitignore patterns.
+func TestE2E_AllowFilesWithGitignore(t *testing.T) {
+	files := map[string]string{
+		".gitignore":     "dist/\n",
+		"src/index.ts":   "x",
+		"dist/bundle.ts": "x",
+	}
+	config := RslintConfig{
+		{Files: []string{"**/*.ts"}, Rules: Rules{"test-rule": "error"}},
+	}
+
+	dir := setupGitignoreFixture(t, files)
+	configIgnores := ExtractConfigIgnores(config)
+	gitGlobs := ReadGitignoreAsGlobs(dir, osvfs.FS(), configIgnores)
+	if len(gitGlobs) > 0 {
+		config = append(RslintConfig{{Ignores: gitGlobs}}, config...)
+	}
+
+	srcFile := tspath.NormalizePath(dir + "/src/index.ts")
+	distFile := tspath.NormalizePath(dir + "/dist/bundle.ts")
+
+	// Simulate lint-staged passing both files explicitly.
+	gapFiles := DiscoverGapFiles(config, dir, osvfs.FS(), map[string]struct{}{}, []string{srcFile, distFile}, nil)
+	gapSet := toSet(gapFiles)
+
+	assert.Assert(t, gapSet[srcFile], "src/index.ts should be discovered (explicit allowFile)")
+	assert.Assert(t, !gapSet[distFile], "dist/bundle.ts should be excluded (gitignored even when explicitly passed)")
+}
+
+func toSet(items []string) map[string]bool {
+	m := make(map[string]bool, len(items))
+	for _, item := range items {
+		m[item] = true
+	}
+	return m
+}
