@@ -26,6 +26,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/consistent_type_imports"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/default_param_last"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/dot_notation"
+	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/explicit_function_return_type"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/naming_convention"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_array_constructor"
 	"github.com/web-infra-dev/rslint/internal/plugins/typescript/rules/no_array_delete"
@@ -401,6 +402,7 @@ func registerAllTypeScriptEslintPluginRules() {
 	GlobalRuleRegistry.Register("@typescript-eslint/consistent-type-imports", consistent_type_imports.ConsistentTypeImportsRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/default-param-last", default_param_last.DefaultParamLastRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/dot-notation", dot_notation.DotNotationRule)
+	GlobalRuleRegistry.Register("@typescript-eslint/explicit-function-return-type", explicit_function_return_type.ExplicitFunctionReturnTypeRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/naming-convention", naming_convention.NamingConventionRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-array-constructor", no_array_constructor.NoArrayConstructorRule)
 	GlobalRuleRegistry.Register("@typescript-eslint/no-array-delete", no_array_delete.NoArrayDeleteRule)

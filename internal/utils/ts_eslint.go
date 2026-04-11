@@ -175,6 +175,116 @@ func GetForStatementHeadLoc(
 	return TrimNodeTextRange(sourceFile, node).WithEnd(statement.Pos())
 }
 
+/**
+ * Gets the location of a function node's "head" for reporting.
+ * Matches the behavior of typescript-eslint's getFunctionHeadLoc:
+ *
+ * - `function foo() {}`         → `function foo`
+ * - `(function() {})`           → `function`
+ * - `() => {}`                  → `=>`
+ * - `class A { method() {} }`   → `method`
+ * - `class A { get foo() {} }`  → `get foo`
+ * - `class A { static async foo() {} }` → `static async foo`
+ * - `class A { foo = () => {} }` → `foo = `
+ * - `{ foo: function() {} }`    → `foo: function`
+ * - `export default function() {}` → `function`
+ */
+func GetFunctionHeadLoc(sourceFile *ast.SourceFile, node *ast.Node) core.TextRange {
+	parent := node.Parent
+
+	switch node.Kind {
+	case ast.KindMethodDeclaration, ast.KindGetAccessor, ast.KindSetAccessor, ast.KindConstructor:
+		start := TrimNodeTextRange(sourceFile, node)
+		if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
+			return start.WithEnd(parenPos)
+		}
+		if node.Body() != nil {
+			return start.WithEnd(node.Body().Pos())
+		}
+		return start
+
+	case ast.KindArrowFunction:
+		if parent != nil && (parent.Kind == ast.KindPropertyDeclaration || parent.Kind == ast.KindPropertyAssignment) {
+			start := TrimNodeTextRange(sourceFile, parent)
+			if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
+				return start.WithEnd(parenPos)
+			}
+			af := node.AsArrowFunction()
+			if af.Parameters != nil && len(af.Parameters.Nodes) > 0 {
+				paramStart := scanner.GetRangeOfTokenAtPosition(sourceFile, af.Parameters.Nodes[0].Pos())
+				return start.WithEnd(paramStart.Pos())
+			}
+			return start.WithEnd(af.EqualsGreaterThanToken.Pos())
+		}
+		af := node.AsArrowFunction()
+		arrowRange := scanner.GetRangeOfTokenAtPosition(sourceFile, af.EqualsGreaterThanToken.Pos())
+		return core.NewTextRange(arrowRange.Pos(), arrowRange.End())
+
+	case ast.KindFunctionExpression:
+		if parent != nil && (parent.Kind == ast.KindPropertyAssignment || parent.Kind == ast.KindPropertyDeclaration) {
+			start := TrimNodeTextRange(sourceFile, parent)
+			if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
+				return start.WithEnd(parenPos)
+			}
+			if node.Body() != nil {
+				return start.WithEnd(node.Body().Pos())
+			}
+			return start
+		}
+		start := TrimNodeTextRange(sourceFile, node)
+		if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
+			return start.WithEnd(parenPos)
+		}
+		if node.Body() != nil {
+			return start.WithEnd(node.Body().Pos())
+		}
+		return start
+
+	case ast.KindFunctionDeclaration:
+		start := findFunctionKeywordPos(sourceFile, node)
+		if parenPos := findOpenParenPos(sourceFile, node); parenPos >= 0 {
+			return core.NewTextRange(start, parenPos)
+		}
+		if node.Body() != nil {
+			return core.NewTextRange(start, node.Body().Pos())
+		}
+		return TrimNodeTextRange(sourceFile, node)
+	}
+
+	return TrimNodeTextRange(sourceFile, node)
+}
+
+// findOpenParenPos finds the position of the first '(' token in a function node.
+func findOpenParenPos(sourceFile *ast.SourceFile, node *ast.Node) int {
+	s := scanner.GetScannerForSourceFile(sourceFile, node.Pos())
+	end := node.End()
+	for s.TokenStart() < end {
+		if s.Token() == ast.KindOpenParenToken {
+			return s.TokenStart()
+		}
+		s.Scan()
+	}
+	return -1
+}
+
+// findFunctionKeywordPos returns the start position of the function head,
+// skipping only `export` and `default` keywords. Other modifiers like `async`
+// and `declare` are kept because they are part of the function signature
+// (matching ESLint's behavior where FunctionDeclaration.loc excludes export/default).
+func findFunctionKeywordPos(sourceFile *ast.SourceFile, node *ast.Node) int {
+	s := scanner.GetScannerForSourceFile(sourceFile, node.Pos())
+	end := node.End()
+	for s.TokenStart() < end {
+		tok := s.Token()
+		if tok == ast.KindExportKeyword || tok == ast.KindDefaultKeyword {
+			s.Scan()
+			continue
+		}
+		return s.TokenStart()
+	}
+	return TrimNodeTextRange(sourceFile, node).Pos()
+}
+
 var arrayPredicateFunctions = []string{"every", "filter", "find", "findIndex", "findLast", "findLastIndex", "some"}
 
 func IsArrayMethodCallWithPredicate(

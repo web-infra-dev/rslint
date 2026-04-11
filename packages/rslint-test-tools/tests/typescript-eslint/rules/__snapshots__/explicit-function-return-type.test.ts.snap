@@ -1,0 +1,2106 @@
+// Rstest Snapshot v1
+
+exports[`explicit-function-return-type > invalid 1`] = `
+{
+  "code": "
+function test(a: number, b: number) {
+  return;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 2`] = `
+{
+  "code": "
+function test() {
+  return;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 3`] = `
+{
+  "code": "
+var fn = function () {
+  return 1;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 2,
+        },
+        "start": {
+          "column": 10,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 4`] = `
+{
+  "code": "
+var arrowFn = () => 'test';
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 2,
+        },
+        "start": {
+          "column": 18,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 5`] = `
+{
+  "code": "
+class Test {
+  constructor() {}
+  get prop() {
+    return 1;
+  }
+  set prop() {}
+  method() {
+    return;
+  }
+  arrow = () => 'arrow';
+  private method() {
+    return;
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 11,
+          "line": 11,
+        },
+        "start": {
+          "column": 3,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 12,
+        },
+        "start": {
+          "column": 3,
+          "line": 12,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 4,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 6`] = `
+{
+  "code": "
+function test() {
+  return;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 7`] = `
+{
+  "code": "const foo = () => {};",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 8`] = `
+{
+  "code": "const foo = function () {};",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 1,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 9`] = `
+{
+  "code": "export default () => {};",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 1,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 10`] = `
+{
+  "code": "export default function () {}",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 11`] = `
+{
+  "code": "
+class Foo {
+  public a = () => {};
+  public b = function () {};
+  public c = function test() {};
+
+  static d = () => {};
+  static e = function () {};
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 3,
+        },
+        "start": {
+          "column": 3,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 27,
+          "line": 5,
+        },
+        "start": {
+          "column": 3,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 7,
+        },
+        "start": {
+          "column": 3,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 8,
+        },
+        "start": {
+          "column": 3,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 5,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 12`] = `
+{
+  "code": "var arrowFn = () => 'test';",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 1,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 13`] = `
+{
+  "code": "
+function foo(): any {
+  const bar = () => () => console.log('aa');
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 3,
+        },
+        "start": {
+          "column": 24,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 14`] = `
+{
+  "code": "
+let anyValue: any;
+function foo(): any {
+  anyValue = () => () => console.log('aa');
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 4,
+        },
+        "start": {
+          "column": 23,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 15`] = `
+{
+  "code": "
+class Foo {
+  foo(): any {
+    const bar = () => () => {
+      return console.log('foo');
+    };
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 28,
+          "line": 4,
+        },
+        "start": {
+          "column": 26,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 16`] = `
+{
+  "code": "
+var funcExpr = function () {
+  return 'test';
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 16,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 17`] = `
+{
+  "code": "const x = (() => {}) as Foo;",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 17,
+          "line": 1,
+        },
+        "start": {
+          "column": 15,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 18`] = `
+{
+  "code": "
+interface Foo {}
+const x = {
+  foo: () => {},
+} as Foo;
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 19`] = `
+{
+  "code": "
+interface Foo {}
+const x: Foo = {
+  foo: () => {},
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 8,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 20`] = `
+{
+  "code": "const foo = <button onClick={() => {}} />;",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 1,
+        },
+        "start": {
+          "column": 33,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 21`] = `
+{
+  "code": "const foo = <button on={{ click: () => {} }} />;",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 34,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 22`] = `
+{
+  "code": "const foo = <Bar>{() => {}}</Bar>;",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 24,
+          "line": 1,
+        },
+        "start": {
+          "column": 22,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 23`] = `
+{
+  "code": "const foo = <Bar>{{ on: () => {} }}</Bar>;",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 1,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 24`] = `
+{
+  "code": "const foo = <button {...{ onClick: () => {} }} />;",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 1,
+        },
+        "start": {
+          "column": 27,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 25`] = `
+{
+  "code": "
+function foo(): any {
+  class Foo {
+    foo = () => () => {
+      return console.log('foo');
+    };
+  }
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 4,
+        },
+        "start": {
+          "column": 20,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 26`] = `
+{
+  "code": "() => () => {};",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 1,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 27`] = `
+{
+  "code": "() => function () {};",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 1,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 28`] = `
+{
+  "code": "
+() => {
+  return () => {};
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 29`] = `
+{
+  "code": "
+() => {
+  return function () {};
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 30`] = `
+{
+  "code": "
+function fn() {
+  return () => {};
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 31`] = `
+{
+  "code": "
+function fn() {
+  return function () {};
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 19,
+          "line": 3,
+        },
+        "start": {
+          "column": 10,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 32`] = `
+{
+  "code": "
+function fn() {
+  const bar = () => (): number => 1;
+  const baz = () => () => 'baz';
+  return function (): void {};
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 4,
+        },
+        "start": {
+          "column": 24,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 33`] = `
+{
+  "code": "
+function fn(arg: boolean) {
+  if (arg) return 'string';
+  return function (): void {};
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 34`] = `
+{
+  "code": "
+function FunctionDeclaration() {
+  return function FunctionExpression_Within_FunctionDeclaration() {
+    return function FunctionExpression_Within_FunctionExpression() {
+      return () => {
+        // ArrowFunctionExpression_Within_FunctionExpression
+        return () =>
+          // ArrowFunctionExpression_Within_ArrowFunctionExpression
+          () =>
+            1; // ArrowFunctionExpression_Within_ArrowFunctionExpression_WithNoBody
+      };
+    };
+  };
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 9,
+        },
+        "start": {
+          "column": 14,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 35`] = `
+{
+  "code": "
+() => () => {
+  return () => {
+    return;
+  };
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 36`] = `
+{
+  "code": "
+declare function foo(arg: () => void): void;
+foo(() => 1);
+foo(() => {});
+foo(() => null);
+foo(() => true);
+foo(() => '');
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 3,
+        },
+        "start": {
+          "column": 8,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 4,
+        },
+        "start": {
+          "column": 8,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 5,
+        },
+        "start": {
+          "column": 8,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 6,
+        },
+        "start": {
+          "column": 8,
+          "line": 6,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 10,
+          "line": 7,
+        },
+        "start": {
+          "column": 8,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 5,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 37`] = `
+{
+  "code": "
+class Accumulator {
+  private count: number = 0;
+
+  public accumulate(fn: () => number): void {
+    this.count += fn();
+  }
+}
+
+new Accumulator().accumulate(() => 1);
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 35,
+          "line": 10,
+        },
+        "start": {
+          "column": 33,
+          "line": 10,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 38`] = `
+{
+  "code": "(() => true)();",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 1,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 39`] = `
+{
+  "code": "
+declare function foo(arg: { meth: () => number }): void;
+foo({
+  meth() {
+    return 1;
+  },
+});
+foo({
+  meth: function () {
+    return 1;
+  },
+});
+foo({
+  meth: () => {
+    return 1;
+  },
+});
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 9,
+        },
+        "start": {
+          "column": 3,
+          "line": 9,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 14,
+        },
+        "start": {
+          "column": 3,
+          "line": 14,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 40`] = `
+{
+  "code": "
+type HigherOrderType = () => (arg1: string) => (arg2: number) => string;
+const x: HigherOrderType = () => arg1 => arg2 => 'foo';
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 3,
+        },
+        "start": {
+          "column": 47,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 41`] = `
+{
+  "code": "
+type HigherOrderType = () => (arg1: string) => (arg2: number) => string;
+const x: HigherOrderType = () => arg1 => arg2 => 'foo';
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 3,
+        },
+        "start": {
+          "column": 31,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 3,
+        },
+        "start": {
+          "column": 39,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 49,
+          "line": 3,
+        },
+        "start": {
+          "column": 47,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 3,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 42`] = `
+{
+  "code": "
+const func = (value: number) => ({ type: 'X', value }) as any;
+const func = (value: number) => ({ type: 'X', value }) as Action;
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 2,
+        },
+        "start": {
+          "column": 30,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 3,
+        },
+        "start": {
+          "column": 30,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 43`] = `
+{
+  "code": "
+const func = (value: number) => ({ type: 'X', value }) as const;
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 2,
+        },
+        "start": {
+          "column": 30,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 44`] = `
+{
+  "code": "
+interface R {
+  type: string;
+  value: number;
+}
+
+const func = (value: number) => ({ type: 'X', value }) as const satisfies R;
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 32,
+          "line": 7,
+        },
+        "start": {
+          "column": 30,
+          "line": 7,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 45`] = `
+{
+  "code": "const log = (message: string) => void console.log(message);",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 33,
+          "line": 1,
+        },
+        "start": {
+          "column": 31,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 46`] = `
+{
+  "code": "
+        const log = (message: string) => {
+          void console.log(message);
+        };
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 41,
+          "line": 2,
+        },
+        "start": {
+          "column": 39,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 47`] = `
+{
+  "code": "const log = <A,>(a: A) => a;",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 26,
+          "line": 1,
+        },
+        "start": {
+          "column": 24,
+          "line": 1,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 48`] = `
+{
+  "code": "
+function log<A>(a: A) {
+  return a;
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 49`] = `
+{
+  "code": "
+const log = function <A>(a: A) {
+  return a;
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 25,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 50`] = `
+{
+  "code": "
+function hoge() {
+  return;
+}
+const foo = () => {
+  return;
+};
+const baz = function () {
+  return;
+};
+let [test, test] = function () {
+  return;
+};
+class X {
+  [test] = function () {
+    return;
+  };
+}
+const x = {
+  1: function () {
+    reutrn;
+  },
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 14,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 18,
+          "line": 5,
+        },
+        "start": {
+          "column": 16,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 22,
+          "line": 8,
+        },
+        "start": {
+          "column": 13,
+          "line": 8,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 29,
+          "line": 11,
+        },
+        "start": {
+          "column": 20,
+          "line": 11,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 21,
+          "line": 15,
+        },
+        "start": {
+          "column": 3,
+          "line": 15,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 20,
+        },
+        "start": {
+          "column": 3,
+          "line": 20,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 6,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 51`] = `
+{
+  "code": "
+const ignoredName = 'notIgnoredName';
+class Foo {
+  [ignoredName]() {}
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 16,
+          "line": 4,
+        },
+        "start": {
+          "column": 3,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 52`] = `
+{
+  "code": "
+class Bar {
+  bar = [
+    {
+      foo: x => x + 1,
+    },
+  ];
+}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 12,
+          "line": 5,
+        },
+        "start": {
+          "column": 7,
+          "line": 5,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 53`] = `
+{
+  "code": "
+const foo = (function () {
+  return 'foo';
+})();
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 2,
+        },
+        "start": {
+          "column": 14,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 54`] = `
+{
+  "code": "
+const foo = (function () {
+  return () => {
+    return 1;
+  };
+})();
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 15,
+          "line": 3,
+        },
+        "start": {
+          "column": 13,
+          "line": 3,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 55`] = `
+{
+  "code": "
+let foo = function () {
+  return 'foo';
+};
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 20,
+          "line": 2,
+        },
+        "start": {
+          "column": 11,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 56`] = `
+{
+  "code": "
+let foo = (() => () => {})()();
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 23,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 2,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 57`] = `
+{
+  "code": "
+type CallBack = () => void;
+
+function f(gotcha: CallBack = () => {}): void {}
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 4,
+        },
+        "start": {
+          "column": 34,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 58`] = `
+{
+  "code": "
+type CallBack = () => void;
+
+const f = (gotcha: CallBack = () => {}): void => {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 36,
+          "line": 4,
+        },
+        "start": {
+          "column": 34,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`explicit-function-return-type > invalid 59`] = `
+{
+  "code": "
+type ObjectWithCallback = { callback: () => void };
+
+const f = (gotcha: ObjectWithCallback = { callback: () => {} }): void => {};
+      ",
+  "diagnostics": [
+    {
+      "message": "Missing return type on function.",
+      "messageId": "missingReturnType",
+      "range": {
+        "end": {
+          "column": 53,
+          "line": 4,
+        },
+        "start": {
+          "column": 43,
+          "line": 4,
+        },
+      },
+      "ruleName": "@typescript-eslint/explicit-function-return-type",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
