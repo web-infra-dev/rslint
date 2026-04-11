@@ -1,0 +1,952 @@
+// Rstest Snapshot v1
+
+exports[`no-multi-str > invalid 1`] = `
+{
+  "code": "var x = 'Line 1 \\
+ Line 2'",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 2,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 2`] = `
+{
+  "code": "'foo\\
+bar';",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 3`] = `
+{
+  "code": "'foo\\
+bar';",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 4`] = `
+{
+  "code": "'foo\\ bar';",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 5`] = `
+{
+  "code": "'foo\\ ar';",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 4,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 6`] = `
+{
+  "code": "'foo\\
+bar';",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 7`] = `
+{
+  "code": ""foo\\
+bar";",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 8`] = `
+{
+  "code": "test('Line 1 \\
+ Line 2');",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 9,
+          "line": 2,
+        },
+        "start": {
+          "column": 6,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 9`] = `
+{
+  "code": "var obj = { key: 'foo\\
+bar' };",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 10`] = `
+{
+  "code": "var obj = { ['foo\\
+bar']: 1 };",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 11`] = `
+{
+  "code": "var arr = ['foo\\
+bar'];",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 12`] = `
+{
+  "code": "function f() { return 'foo\\
+bar'; }",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 23,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 13`] = `
+{
+  "code": "var a = x ? 'foo\\
+bar' : 'safe';",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 14`] = `
+{
+  "code": "function f(x = 'foo\\
+bar') {}",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 16,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 15`] = `
+{
+  "code": "class A { prop = 'foo\\
+bar' }",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 18,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 16`] = `
+{
+  "code": "const f = () => 'foo\\
+bar';",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 17,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 17`] = `
+{
+  "code": "var a = 'foo\\
+bar' + x;",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 18`] = `
+{
+  "code": "var a = x || 'foo\\
+bar';",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 19`] = `
+{
+  "code": "var a = x ?? 'foo\\
+bar';",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 20`] = `
+{
+  "code": "x = 'foo\\
+bar';",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 5,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 21`] = `
+{
+  "code": "throw 'foo\\
+bar';",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 7,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 22`] = `
+{
+  "code": "switch (x) { case 'foo\\
+bar': break; }",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 19,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 23`] = `
+{
+  "code": "var a = obj['foo\\
+bar'];",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 13,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 24`] = `
+{
+  "code": "var a = ('foo\\
+bar');",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 25`] = `
+{
+  "code": "fn1(fn2('foo\\
+bar'));",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 9,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 26`] = `
+{
+  "code": "var obj = { a: { b: 'foo\\
+bar' } };",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 21,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 27`] = `
+{
+  "code": "var a = \`\${'foo\\
+bar'}\`;",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 12,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 28`] = `
+{
+  "code": "enum E { A = 'foo\\
+bar' }",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 14,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 29`] = `
+{
+  "code": "type T = 'foo\\
+bar';",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 10,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 30`] = `
+{
+  "code": "'line1\\
+line2\\
+line3';",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 7,
+          "line": 3,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 31`] = `
+{
+  "code": "'\\
+';",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 2,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 32`] = `
+{
+  "code": "var x;
+var y = 'foo\\
+bar';",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 3,
+        },
+        "start": {
+          "column": 9,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 1,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 33`] = `
+{
+  "code": "'foo\\
+bar';
+'baz\\
+qux';",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 1,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 4,
+        },
+        "start": {
+          "column": 1,
+          "line": 3,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
+
+exports[`no-multi-str > invalid 34`] = `
+{
+  "code": "fn('one\\
+two', 'three\\
+four');",
+  "diagnostics": [
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 5,
+          "line": 2,
+        },
+        "start": {
+          "column": 4,
+          "line": 1,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+    {
+      "message": "Multiline support is limited to browsers supporting ES5 only.",
+      "messageId": "multilineString",
+      "range": {
+        "end": {
+          "column": 6,
+          "line": 3,
+        },
+        "start": {
+          "column": 7,
+          "line": 2,
+        },
+      },
+      "ruleName": "no-multi-str",
+    },
+  ],
+  "errorCount": 2,
+  "fileCount": 1,
+  "ruleCount": 1,
+}
+`;
