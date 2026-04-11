@@ -12,6 +12,7 @@ bigints
 binaryexpression
 bleh
 bmatcuk
+bodyless
 cachedvfs
 catchable
 clazz
@@ -53,7 +54,6 @@ funcw
 gcflags
 getsp
 github
-GitHub
 gnored
 GOARCH
 GOEXE
@@ -168,6 +168,7 @@ tsgolint
 tsoptions
 tspath
 tsutils
+typeparam
 unbnound
 uncast
 undefinded
@@ -189,7 +190,6 @@ visitchildren
 walltime
 wasmer
 wasmfs
-typeparam
 xdescribe
 xjavascript
 aavascript
