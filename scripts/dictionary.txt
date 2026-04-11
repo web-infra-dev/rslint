@@ -191,5 +191,7 @@ wasmer
 wasmfs
 typeparam
 xdescribe
+xjavascript
+aavascript
 xitiViewMap
 xtest

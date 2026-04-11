@@ -250,6 +250,7 @@ export default defineConfig({
     './tests/eslint/rules/no-unmodified-loop-condition.test.ts',
     './tests/eslint/rules/no-alert.test.ts',
     './tests/eslint/rules/no-labels.test.ts',
+    './tests/eslint/rules/no-script-url.test.ts',
     './tests/eslint/rules/no-with.test.ts',
 
     // eslint-plugin-jest

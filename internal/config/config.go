@@ -143,6 +143,7 @@ import (
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_symbol"
 	"github.com/web-infra-dev/rslint/internal/rules/no_new_wrappers"
 	"github.com/web-infra-dev/rslint/internal/rules/no_obj_calls"
+	"github.com/web-infra-dev/rslint/internal/rules/no_script_url"
 	"github.com/web-infra-dev/rslint/internal/rules/no_self_assign"
 	"github.com/web-infra-dev/rslint/internal/rules/no_setter_return"
 	"github.com/web-infra-dev/rslint/internal/rules/no_sparse_arrays"
@@ -520,6 +521,7 @@ func registerAllCoreEslintRules() {
 	GlobalRuleRegistry.Register("no-inner-declarations", no_inner_declarations.NoInnerDeclarationsRule)
 	GlobalRuleRegistry.Register("no-loss-of-precision", no_loss_of_precision.NoLossOfPrecisionRule)
 	GlobalRuleRegistry.Register("no-new-wrappers", no_new_wrappers.NoNewWrappersRule)
+	GlobalRuleRegistry.Register("no-script-url", no_script_url.NoScriptUrlRule)
 	GlobalRuleRegistry.Register("no-self-assign", no_self_assign.NoSelfAssignRule)
 	GlobalRuleRegistry.Register("no-template-curly-in-string", no_template_curly_in_string.NoTemplateCurlyInString)
 	GlobalRuleRegistry.Register("no-sparse-arrays", no_sparse_arrays.NoSparseArraysRule)
