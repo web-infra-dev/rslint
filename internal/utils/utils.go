@@ -247,3 +247,68 @@ func GetOptionsMap(opts any) map[string]interface{} {
 
 	return optsMap
 }
+
+// NaturalCompare compares two strings using natural sort order,
+// where embedded numeric segments are compared by their numeric value
+// (e.g., "a2" < "a10" instead of "a10" < "a2").
+// Returns -1 if a < b, 0 if a == b, 1 if a > b.
+func NaturalCompare(a, b string) int {
+	ra := []rune(a)
+	rb := []rune(b)
+	ai, bi := 0, 0
+	for ai < len(ra) && bi < len(rb) {
+		ca, cb := ra[ai], rb[bi]
+
+		if unicode.IsDigit(ca) && unicode.IsDigit(cb) {
+			na, nextA := extractRuneDigits(ra, ai)
+			nb, nextB := extractRuneDigits(rb, bi)
+			naTrimmed := strings.TrimLeft(na, "0")
+			nbTrimmed := strings.TrimLeft(nb, "0")
+			if naTrimmed == "" {
+				naTrimmed = "0"
+			}
+			if nbTrimmed == "" {
+				nbTrimmed = "0"
+			}
+			if len(naTrimmed) != len(nbTrimmed) {
+				if len(naTrimmed) < len(nbTrimmed) {
+					return -1
+				}
+				return 1
+			}
+			if naTrimmed < nbTrimmed {
+				return -1
+			}
+			if naTrimmed > nbTrimmed {
+				return 1
+			}
+			ai = nextA
+			bi = nextB
+		} else {
+			if ca < cb {
+				return -1
+			}
+			if ca > cb {
+				return 1
+			}
+			ai++
+			bi++
+		}
+	}
+
+	if ai < len(ra) {
+		return 1
+	}
+	if bi < len(rb) {
+		return -1
+	}
+	return 0
+}
+
+func extractRuneDigits(runes []rune, start int) (string, int) {
+	end := start
+	for end < len(runes) && unicode.IsDigit(runes[end]) {
+		end++
+	}
+	return string(runes[start:end]), end
+}
