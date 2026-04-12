@@ -51,11 +51,13 @@ type staticValue struct {
 }
 
 func toStaticValue(t *checker.Type) staticValue {
-	flags := checker.Type_flags(t)
-	// Handle both TypeFlagsBooleanLiteral and TypeFlagsBoolean (const narrowing)
-	if flags&checker.TypeFlagsBooleanLike != 0 && (utils.IsTrueLiteralType(t) || utils.IsFalseLiteralType(t)) {
-		return staticValue{value: utils.IsTrueLiteralType(t), ok: true}
+	if utils.IsTrueLiteralType(t) {
+		return staticValue{value: true, ok: true}
 	}
+	if utils.IsFalseLiteralType(t) {
+		return staticValue{value: false, ok: true}
+	}
+	flags := checker.Type_flags(t)
 	if flags == checker.TypeFlagsUndefined {
 		return staticValue{value: jsUndefined, ok: true}
 	}
@@ -135,6 +137,10 @@ func strictEqual(a, b interface{}) bool {
 		return true
 	}
 	if aNull || bNull || aUndef || bUndef {
+		return false
+	}
+	// JS strict equality requires same type — different Go types means different JS types
+	if fmt.Sprintf("%T", a) != fmt.Sprintf("%T", b) {
 		return false
 	}
 	return valueString(a) == valueString(b)
