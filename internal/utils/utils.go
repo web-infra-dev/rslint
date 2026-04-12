@@ -248,6 +248,23 @@ func GetOptionsMap(opts any) map[string]interface{} {
 	return optsMap
 }
 
+// GetOptionsString extracts a string option from the weakly-typed options parameter.
+// It handles both direct string format ("value") and array format (["value"]).
+func GetOptionsString(opts any) string {
+	if opts == nil {
+		return ""
+	}
+	if s, ok := opts.(string); ok {
+		return s
+	}
+	if arr, ok := opts.([]interface{}); ok && len(arr) > 0 {
+		if s, ok := arr[0].(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
 // NaturalCompare compares two strings using natural sort order,
 // where embedded numeric segments are compared by their numeric value
 // (e.g., "a2" < "a10" instead of "a10" < "a2").
