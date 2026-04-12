@@ -45,19 +45,23 @@ var NoMutableExportsRule = rule.Rule{
 			if resolved == nil || len(resolved.Declarations) == 0 {
 				return nil
 			}
-			decl := resolved.Declarations[0]
-			if !ast.IsVariableDeclaration(decl) {
-				return nil
-			}
-			declList := decl.Parent
-			if declList != nil && ast.IsVariableDeclarationList(declList) {
-				return declList
+			// Iterate all declarations to handle declaration merging
+			// (e.g., var Foo + namespace Foo — Declarations[0] may not be the var).
+			for _, decl := range resolved.Declarations {
+				if ast.IsVariableDeclaration(decl) {
+					declList := decl.Parent
+					if declList != nil && ast.IsVariableDeclarationList(declList) {
+						return declList
+					}
+				}
 			}
 			return nil
 		}
 
 		// findVarDeclListByWalk is the fallback when TypeChecker is unavailable.
 		// It walks top-level VariableStatements to find a declaration by name.
+		// Note: does not recurse into blocks for hoisted var — that is covered
+		// by resolveVarDeclListBySymbol when TypeChecker is available.
 		findVarDeclListByWalk := func(name string) *ast.Node {
 			if ctx.SourceFile == nil || ctx.SourceFile.Statements == nil {
 				return nil
