@@ -48,6 +48,7 @@ export default defineConfig({
     './tests/eslint/rules/no-global-assign.test.ts',
     './tests/eslint/rules/no-import-assign.test.ts',
     './tests/eslint/rules/no-inner-declarations.test.ts',
+    './tests/eslint/rules/no-new-func.test.ts',
     './tests/eslint/rules/no-new-wrappers.test.ts',
     './tests/eslint/rules/no-self-assign.test.ts',
     './tests/eslint/rules/no-undef.test.ts',
