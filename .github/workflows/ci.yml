@@ -72,11 +72,9 @@ jobs:
           go-version: ${{ matrix.go-version }}
           cache-name: ci-go-windows
       - name: Build CLI binary
-        shell: pwsh
-        run: |
-          $env:GOCACHE = "$env:RUNNER_TEMP\gocache"
-          go build -o rslint-windows.exe ./cmd/rslint
-          Remove-Item $env:GOCACHE -Recurse -Force -ErrorAction SilentlyContinue
+        run: go build -o rslint-windows.exe ./cmd/rslint
+        env:
+          GOMAXPROCS: 4
       - name: Upload CLI binary
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
