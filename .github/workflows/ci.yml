@@ -51,40 +51,8 @@ jobs:
       - name: Unit Test
         run: go test -parallel 8 ./internal/...
 
-  # Windows pipeline: build-go-windows produces the CLI binary and warms the
-  # Go build cache. test-go-windows and test-node-windows both depend on it
-  # so they can reuse the cached build artifacts.
-  build-go-windows:
-    name: Build Go (rspack-windows-2022-large)
-    runs-on: rspack-windows-2022-large
-    strategy:
-      matrix:
-        go-version: ['1.26.0']
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          submodules: true
-          fetch-depth: 1
-      - name: Setup Go
-        uses: ./.github/actions/setup-go
-        with:
-          go-version: ${{ matrix.go-version }}
-          cache-name: ci-go-windows
-      - name: Build CLI binary
-        run: go build -o rslint-windows.exe ./cmd/rslint
-        env:
-          GOMAXPROCS: 4
-      - name: Upload CLI binary
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: ci-rslint-windows-binary
-          path: rslint-windows.exe
-          retention-days: 1
-
   test-go-windows:
     name: Test Go (rspack-windows-2022-large)
-    needs: build-go-windows
     runs-on: rspack-windows-2022-large
     strategy:
       matrix:
@@ -142,7 +110,6 @@ jobs:
 
   test-node-windows:
     name: Test npm packages (windows-latest)
-    needs: build-go-windows
     runs-on: windows-latest
     steps:
       - name: Checkout code
@@ -150,18 +117,17 @@ jobs:
         with:
           submodules: true
 
+      - name: Setup Go
+        uses: ./.github/actions/setup-go
+        with:
+          go-version: 1.26.0
+          cache-name: ci-go-windows-node
+
       - name: Setup Node.js
         uses: ./.github/actions/setup-node
 
-      - name: Download Go binary
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: ci-rslint-windows-binary
-          path: packages/rslint/bin
-
-      - name: Rename binary
-        shell: bash
-        run: mv packages/rslint/bin/rslint-windows.exe packages/rslint/bin/rslint.exe
+      - name: Build Go binary
+        run: go build -o packages/rslint/bin/rslint.exe ./cmd/rslint
 
       - name: Build JS packages
         shell: bash
@@ -342,7 +308,6 @@ jobs:
   done:
     needs:
       - test-go
-      - build-go-windows
       - test-go-windows
       - test-node
       - test-node-windows
