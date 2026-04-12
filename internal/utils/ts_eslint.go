@@ -1129,6 +1129,53 @@ func GetDeclarationIdentifier(decl *ast.Node) *ast.Node {
 	return nil
 }
 
+// GetImportBindingNodes returns the local binding identifier nodes declared by
+// an import statement. Returns nil for side-effect imports (e.g. `import 'foo'`).
+// Handles ImportDeclaration (default, named, namespace) and ImportEqualsDeclaration.
+func GetImportBindingNodes(node *ast.Node) []*ast.Node {
+	var nodes []*ast.Node
+	switch node.Kind {
+	case ast.KindImportDeclaration:
+		importDecl := node.AsImportDeclaration()
+		if importDecl.ImportClause == nil {
+			return nil
+		}
+		clause := importDecl.ImportClause.AsImportClause()
+		if clause == nil {
+			return nil
+		}
+		if clause.Name() != nil {
+			nodes = append(nodes, clause.Name())
+		}
+		if clause.NamedBindings != nil {
+			nb := clause.NamedBindings
+			switch nb.Kind {
+			case ast.KindNamespaceImport:
+				nsImport := nb.AsNamespaceImport()
+				if nsImport != nil && nsImport.Name() != nil {
+					nodes = append(nodes, nsImport.Name())
+				}
+			case ast.KindNamedImports:
+				namedImports := nb.AsNamedImports()
+				if namedImports != nil && namedImports.Elements != nil {
+					for _, elem := range namedImports.Elements.Nodes {
+						importSpec := elem.AsImportSpecifier()
+						if importSpec != nil && importSpec.Name() != nil {
+							nodes = append(nodes, importSpec.Name())
+						}
+					}
+				}
+			}
+		}
+	case ast.KindImportEqualsDeclaration:
+		importEquals := node.AsImportEqualsDeclaration()
+		if importEquals.Name() != nil {
+			nodes = append(nodes, importEquals.Name())
+		}
+	}
+	return nodes
+}
+
 // VisitDestructuringIdentifiers calls fn for each identifier target in a
 // destructuring assignment pattern (object/array literal on the left side
 // of an assignment expression). Handles shorthand properties, renamed
